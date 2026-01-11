@@ -1701,27 +1701,7 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
 **HISTORICAL ACCURACY REQUIRED**
 Use ONLY the verified information provided. Do NOT invent historical facts.
 
-${historicalGuide}
-
-**STORY 1 REQUIREMENTS - OBSERVER PERSPECTIVE:**
-The main characters OBSERVE or WITNESS the historical event. They do NOT take on the roles of famous historical figures.
-Examples:
-- A child watching the Moon landing on TV with their family
-- The son/daughter of a worker/engineer/scientist involved in the event
-- A local child who happens to see the event unfold
-- A family member of someone who participated
-The characters experience history from the sidelines, learning about it through observation.
-
-**STORY 2 REQUIREMENTS - PARTICIPANT PERSPECTIVE:**
-The main characters BECOME the heroes and take on main roles in the historical event (fantasy/imagination style).
-Examples:
-- The child IS the astronaut landing on the moon
-- The child IS the explorer discovering new lands
-- The child IS the scientist making the breakthrough
-This is a "what if YOU were there" fantasy where children imagine themselves as the key figures.
-Historical accuracy in setting/costumes still applies, but the child replaces the famous figure.
-
-CRITICAL: These two stories MUST have DIFFERENT perspectives as described above.`;
+${historicalGuide}`;
       } else {
         categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
       }
@@ -1792,7 +1772,7 @@ ${landmarkEntries}`;
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
-      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : 'Adventure')
+      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
       .replace('{STORY_TYPE_NAME}', effectiveTheme)
       .replace('{STORY_TOPIC}', storyTopic || 'None')
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
@@ -2013,27 +1993,7 @@ ${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effec
 **HISTORICAL ACCURACY REQUIRED**
 Use ONLY the verified information provided. Do NOT invent historical facts.
 
-${historicalGuide}
-
-**STORY 1 REQUIREMENTS - OBSERVER PERSPECTIVE:**
-The main characters OBSERVE or WITNESS the historical event. They do NOT take on the roles of famous historical figures.
-Examples:
-- A child watching the Moon landing on TV with their family
-- The son/daughter of a worker/engineer/scientist involved in the event
-- A local child who happens to see the event unfold
-- A family member of someone who participated
-The characters experience history from the sidelines, learning about it through observation.
-
-**STORY 2 REQUIREMENTS - PARTICIPANT PERSPECTIVE:**
-The main characters BECOME the heroes and take on main roles in the historical event (fantasy/imagination style).
-Examples:
-- The child IS the astronaut landing on the moon
-- The child IS the explorer discovering new lands
-- The child IS the scientist making the breakthrough
-This is a "what if YOU were there" fantasy where children imagine themselves as the key figures.
-Historical accuracy in setting/costumes still applies, but the child replaces the famous figure.
-
-CRITICAL: These two stories MUST have DIFFERENT perspectives as described above.`;
+${historicalGuide}`;
       } else {
         categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
       }
@@ -2101,7 +2061,7 @@ ${landmarkEntries}`;
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
     const prompt = promptTemplate
-      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : 'Adventure')
+      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
       .replace('{STORY_TYPE_NAME}', effectiveTheme)
       .replace('{STORY_TOPIC}', storyTopic || 'None')
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)

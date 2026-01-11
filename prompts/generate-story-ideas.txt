@@ -103,6 +103,10 @@ IMPORTANT:
 - Both must use the same characters
 - You MUST output all 6 sections in order: DRAFT_1, REVIEW_1, FINAL_1, DRAFT_2, REVIEW_2, FINAL_2
 
+--- STORY REQUIREMENTS (use the section matching your STORY CATEGORY) ---
+
+FOR ADVENTURE / EDUCATIONAL / LIFE-CHALLENGE STORIES:
+
 STORY 1 REQUIREMENTS:
 - USE the user's location if provided (blend real-world setting into the adventure)
 - If AVAILABLE LANDMARKS are provided, incorporate 1-2 of them into the story
@@ -114,4 +118,23 @@ STORY 2 REQUIREMENTS:
 - Start DIRECTLY in the adventure world from the first sentence
 - No transition from real life - the adventure is already happening
 - Example: Characters wake up on a pirate ship, are already exploring a castle, find themselves in a jungle
+
+FOR HISTORICAL STORIES:
+
+STORY 1 & 2 REQUIREMENTS:
+The main characters ARE the historical achievers - they perform the famous deeds themselves.
+Assign EACH main character a specific role from the event.
+
+Examples of role assignment:
+- Moon landing with 2 characters: "Emma is the astronaut who takes humanity's first step on the moon. Max guides the mission from Houston's control room."
+- Wright Brothers with 2 characters: "Sophie and Max work together to build and fly the first airplane."
+- Light bulb with 1 character: "Emma invents the electric light bulb after testing thousands of materials."
+- Pyramids with 3 characters: "Emma leads the construction as chief architect. Max organizes the workers. Sophie solves the engineering puzzles."
+
+IMPORTANT FOR HISTORICAL STORIES:
+- Use the children's actual names (from CHARACTERS above), NOT the historical figure names
+- Each main character needs a meaningful role in the achievement
+- Supporting characters can take secondary roles (assistants, family, witnesses)
+- Historical accuracy in setting/costumes still applies
+- Both stories should feature the characters as achievers, but with DIFFERENT specific roles or approaches
 
