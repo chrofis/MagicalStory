@@ -1514,9 +1514,9 @@ export default function StoryWizard() {
           log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
           setIsGeneratingAvatar(true);
 
-          // Only auto-start avatar generation if character has a name
-          // If no name yet (user uploads photo first), generation will run when character is saved
-          if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
+          // Auto-start avatar generation immediately after photo analysis
+          // Character has an ID from creation, name is optional (handled in service)
+          if (charForGeneration && charForGeneration.id) {
             // Run avatar generation in background (don't await)
             const charId = charForGeneration.id;
             characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
@@ -1558,10 +1558,9 @@ export default function StoryWizard() {
                 setIsGeneratingAvatar(false);
               });
           } else {
-            // No name yet - skip auto-generation (will run when character is saved)
-            log.info(`⏭️ Skipping auto-generation: character has no name yet (will generate on save)`);
+            // No character data - should not happen
+            log.warn(`⏭️ Skipping auto-generation: no character data available`);
             setIsGeneratingAvatar(false);
-            setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'pending' } } : prev);
           }
         } else {
           // Check for specific errors

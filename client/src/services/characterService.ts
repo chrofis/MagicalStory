@@ -416,7 +416,9 @@ export const characterService = {
         genderLabel = age >= 18 ? 'person' : 'child';
       }
 
-      let physicalDescription = `${character.name} is a ${age}-year-old ${genderLabel}`;
+      // Use name if available, otherwise generic description
+      const nameOrGeneric = character.name?.trim() || `This ${genderLabel}`;
+      let physicalDescription = `${nameOrGeneric} is a ${age}-year-old ${genderLabel}`;
       if (character.physical) {
         if (character.physical.hair) physicalDescription += `, ${character.physical.hair}`;
         if (character.physical.face) physicalDescription += `, ${character.physical.face}`;
@@ -426,7 +428,7 @@ export const characterService = {
 
       // Prefer body with no background for best avatar generation results
       const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
-      log.info(`🎨 Generating clothing avatars for ${character.name} (id: ${character.id})`);
+      log.info(`🎨 Generating clothing avatars for ${character.name || 'unnamed'} (id: ${character.id})`);
 
       // Use async mode to avoid blocking connections
       // This allows character loading and other requests to proceed in parallel
@@ -562,7 +564,9 @@ export const characterService = {
         genderLabel = age >= 18 ? 'person' : 'child';
       }
 
-      let physicalDescription = `${character.name} is a ${age}-year-old ${genderLabel}`;
+      // Use name if available, otherwise generic description
+      const nameOrGeneric = character.name?.trim() || `This ${genderLabel}`;
+      let physicalDescription = `${nameOrGeneric} is a ${age}-year-old ${genderLabel}`;
       if (character.physical) {
         if (character.physical.hair) physicalDescription += `, ${character.physical.hair}`;
         if (character.physical.face) physicalDescription += `, ${character.physical.face}`;

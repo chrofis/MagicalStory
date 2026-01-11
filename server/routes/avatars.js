@@ -1311,7 +1311,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
     const isFemale = gender === 'female';
 
-    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name}, model: ${selectedModel}`);
+    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}`);
 
     const clothingCategories = {
       winter: { emoji: '❄️' },
@@ -1594,7 +1594,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
     const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
 
-    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
+    log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name || 'unnamed'} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
 
     const isFemale = gender === 'female';
 
@@ -1748,7 +1748,7 @@ These corrections OVERRIDE what is visible in the reference photo.
     // Helper function to generate a single avatar
     const generateSingleAvatar = async (category, config) => {
       try {
-        log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name} (${gender || 'unknown'}), model: ${selectedModel}...`);
+        log.debug(`${config.emoji} [CLOTHING AVATARS] Generating ${category} avatar for ${name || 'unnamed'} (${gender || 'unknown'}), model: ${selectedModel}...`);
 
         // Build the prompt from template
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
@@ -1949,7 +1949,7 @@ These corrections OVERRIDE what is visible in the reference photo.
 
     // PHASE 1: Generate all clothing avatars in parallel (winter, standard, summer)
     const categoryCount = Object.keys(clothingCategories).length;
-    log.debug(`🚀 [CLOTHING AVATARS] Generating ${categoryCount} avatars for ${name} in parallel...`);
+    log.debug(`🚀 [CLOTHING AVATARS] Generating ${categoryCount} avatars for ${name || 'unnamed'} in parallel...`);
     const generationStart = Date.now();
     const generationPromises = Object.entries(clothingCategories).map(
       ([category, config]) => generateSingleAvatar(category, config)
@@ -2140,7 +2140,7 @@ These corrections OVERRIDE what is visible in the reference photo.
       log.warn('Failed to log avatar generation activity:', activityErr.message);
     }
 
-    log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name}`);
+    log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name || 'unnamed'}`);
     // Log extracted traits for debugging
     if (results.extractedTraits) {
       log.debug(`📋 [CLOTHING AVATARS] Response extractedTraits: ${JSON.stringify(results.extractedTraits).substring(0, 200)}...`);
