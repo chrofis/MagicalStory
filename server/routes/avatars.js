@@ -1409,12 +1409,33 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         const data = await response.json();
         let imageData = null;
 
+        // Log API response status for debugging
+        if (!response.ok) {
+          log.error(`[AVATAR JOB ${jobId}] Gemini API error for ${category}: ${response.status} ${response.statusText}`);
+          log.error(`[AVATAR JOB ${jobId}] Response body:`, JSON.stringify(data).substring(0, 500));
+          return { category, imageData: null, prompt: avatarPrompt };
+        }
+
         if (data.candidates && data.candidates[0]?.content?.parts) {
           for (const part of data.candidates[0].content.parts) {
             if (part.inlineData) {
               imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
               break;
             }
+          }
+        }
+
+        // Log if no image was found in response
+        if (!imageData) {
+          log.warn(`[AVATAR JOB ${jobId}] No image data in Gemini response for ${category}`);
+          if (data.candidates?.[0]?.finishReason) {
+            log.warn(`[AVATAR JOB ${jobId}] Finish reason: ${data.candidates[0].finishReason}`);
+          }
+          if (data.promptFeedback) {
+            log.warn(`[AVATAR JOB ${jobId}] Prompt feedback: ${JSON.stringify(data.promptFeedback)}`);
+          }
+          if (data.error) {
+            log.error(`[AVATAR JOB ${jobId}] API error: ${JSON.stringify(data.error)}`);
           }
         }
 
