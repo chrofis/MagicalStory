@@ -1139,7 +1139,7 @@ export default function StoryWizard() {
   }, [step]);
 
   // Handler for story category change - doesn't auto-advance, user must select theme/topic
-  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | '') => {
+  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => {
     setStoryCategory(category);
     // Don't auto-advance - user needs to select theme/topic next
   };
@@ -2929,7 +2929,6 @@ export default function StoryWizard() {
             onThemeChange={handleThemeChange}
             onCustomThemeTextChange={setCustomThemeText}
             onLegacyStoryTypeChange={setStoryType}
-            developerMode={developerMode}
           />
         );
 

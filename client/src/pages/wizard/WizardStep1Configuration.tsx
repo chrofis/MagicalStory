@@ -12,7 +12,6 @@ interface WizardStep1Props {
   onCustomThemeTextChange: (text: string) => void;
   onArtStyleChange: (style: string) => void;
   onLegacyStoryTypeChange: (type: string) => void;
-  developerMode?: boolean;
 }
 
 /**
@@ -31,7 +30,6 @@ export function WizardStep1Configuration({
   onCustomThemeTextChange,
   onArtStyleChange,
   onLegacyStoryTypeChange,
-  developerMode = false,
 }: WizardStep1Props) {
   // Determine if story selection is complete (ready to show art style)
   const isStorySelectionComplete =
@@ -50,7 +48,6 @@ export function WizardStep1Configuration({
         onThemeChange={onThemeChange}
         onCustomThemeTextChange={onCustomThemeTextChange}
         onLegacyStoryTypeChange={onLegacyStoryTypeChange}
-        developerMode={developerMode}
       />
       {isStorySelectionComplete && (
         <div id="art-style-section">

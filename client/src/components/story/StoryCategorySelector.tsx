@@ -32,7 +32,6 @@ interface StoryCategorySelectorProps {
   onCustomThemeTextChange?: (text: string) => void;
   // For backwards compatibility - sets the legacy storyType
   onLegacyStoryTypeChange: (storyType: string) => void;
-  developerMode?: boolean;
 }
 
 export function StoryCategorySelector({
@@ -45,7 +44,6 @@ export function StoryCategorySelector({
   onThemeChange,
   onCustomThemeTextChange,
   onLegacyStoryTypeChange,
-  developerMode = false,
 }: StoryCategorySelectorProps) {
   const { language } = useLanguage();
   const lang = language as Language;

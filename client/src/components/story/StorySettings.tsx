@@ -194,7 +194,6 @@ export function StorySettings({
           onThemeChange={onThemeChange}
           onCustomThemeTextChange={onCustomThemeTextChange}
           onLegacyStoryTypeChange={onLegacyStoryTypeChange}
-          developerMode={developerMode}
         />
       )}
 
@@ -554,7 +553,6 @@ export function StorySettings({
               onTopicChange={onTopicChange}
               onThemeChange={onThemeChange}
               onLegacyStoryTypeChange={onLegacyStoryTypeChange}
-              developerMode={developerMode}
             />
 
             {/* Done Button */}

@@ -23,9 +23,9 @@ export interface AdventureThemeGroup {
   name: LocalizedString;
 }
 
-// Story category (Adventure, Life Challenge, Educational, Historical)
+// Story category (Adventure, Life Challenge, Educational, Historical, Custom)
 export interface StoryCategory {
-  id: 'adventure' | 'life-challenge' | 'educational' | 'historical';
+  id: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom';
   name: LocalizedString;
   description: LocalizedString;
   emoji: string;

@@ -10,7 +10,6 @@ interface WizardStep4Props {
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange: (text: string) => void;
   onLegacyStoryTypeChange: (type: string) => void;
-  developerMode?: boolean;
 }
 
 /**
@@ -27,7 +26,6 @@ export function WizardStep4StoryType({
   onThemeChange,
   onCustomThemeTextChange,
   onLegacyStoryTypeChange,
-  developerMode = false,
 }: WizardStep4Props) {
   return (
     <div className="space-y-6">
@@ -41,7 +39,6 @@ export function WizardStep4StoryType({
         onThemeChange={onThemeChange}
         onCustomThemeTextChange={onCustomThemeTextChange}
         onLegacyStoryTypeChange={onLegacyStoryTypeChange}
-        developerMode={developerMode}
       />
     </div>
   );
