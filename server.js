@@ -2,6 +2,7 @@
 // Includes: User quota system, email authentication, admin panel, PostgreSQL database support
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const bcrypt = require('bcryptjs');
@@ -382,6 +383,9 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Gzip compression for all responses (reduces 33MB avatar data to ~5MB)
+app.use(compression());
 
 // Security headers with helmet
 app.use(helmet({
