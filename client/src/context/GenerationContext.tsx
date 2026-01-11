@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, ty
 import { storyService } from '@/services';
 import storage from '@/services/storage';
 import logger from '@/services/logger';
+import { useAuth } from '@/context/AuthContext';
 
 // Storage key for persisting active job
 const ACTIVE_JOB_KEY = 'active_story_job';
@@ -40,6 +41,7 @@ const GenerationContext = createContext<GenerationContextType | null>(null);
 const POLL_INTERVAL = 3000;
 
 export function GenerationProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   const [progress, setProgress] = useState<GenerationProgress>({ current: 0, total: 100, message: '' });
   const [isComplete, setIsComplete] = useState(false);
@@ -49,6 +51,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
 
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
+  const lastUserIdRef = useRef<string | null>(null);
 
   // Load active job from localStorage on mount
   useEffect(() => {
@@ -70,6 +73,59 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
       }
     }
   }, []);
+
+  // Fetch active jobs from server when user changes (e.g., impersonation)
+  useEffect(() => {
+    const currentUserId = user?.id || null;
+
+    // Skip if user hasn't changed
+    if (currentUserId === lastUserIdRef.current) {
+      return;
+    }
+
+    // User changed - clear any existing job from localStorage (it belongs to old user)
+    if (lastUserIdRef.current !== null) {
+      logger.info('[GenerationContext] User changed, clearing local job state');
+      setActiveJob(null);
+      setIsComplete(false);
+      setCompletedStoryId(null);
+      setError(null);
+      storage.removeItem(ACTIVE_JOB_KEY);
+    }
+
+    lastUserIdRef.current = currentUserId;
+
+    // Fetch active jobs from server for new user
+    if (currentUserId) {
+      logger.info('[GenerationContext] Fetching active jobs for user:', currentUserId);
+      storyService.getActiveJobs()
+        .then(jobs => {
+          if (jobs.length > 0) {
+            // Take the most recent active job
+            const job = jobs[0];
+            logger.info('[GenerationContext] Found active job from server:', job.id);
+            const restoredJob: ActiveJob = {
+              jobId: job.id,
+              startedAt: new Date(job.created_at).getTime(),
+              storyTitle: '', // Will be populated when polling
+            };
+            setActiveJob(restoredJob);
+            setProgress({
+              current: job.progress || 0,
+              total: 100,
+              message: job.progress_message || '',
+            });
+            // Store in localStorage for consistency
+            storage.setItem(ACTIVE_JOB_KEY, JSON.stringify(restoredJob));
+          } else {
+            logger.info('[GenerationContext] No active jobs found for user');
+          }
+        })
+        .catch(err => {
+          logger.error('[GenerationContext] Failed to fetch active jobs:', err);
+        });
+    }
+  }, [user?.id]);
 
   // Poll job status when we have an active job
   const pollJobStatus = useCallback(async (jobId: string) => {

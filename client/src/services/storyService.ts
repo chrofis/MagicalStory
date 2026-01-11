@@ -1175,6 +1175,31 @@ export const storyService = {
     return response;
   },
 
+  // Get user's active/pending jobs (for restoring generation state after impersonation)
+  async getActiveJobs(): Promise<Array<{
+    id: string;
+    status: 'pending' | 'processing' | 'completed' | 'failed';
+    progress: number;
+    progress_message: string;
+    created_at: string;
+  }>> {
+    const response = await api.get<{ jobs: Array<{
+      id: string;
+      status: string;
+      progress: number;
+      progress_message: string;
+      created_at: string;
+    }> }>('/api/jobs/my-jobs?limit=5');
+
+    // Return only active jobs (pending or processing)
+    return response.jobs
+      .filter(job => job.status === 'pending' || job.status === 'processing')
+      .map(job => ({
+        ...job,
+        status: job.status as 'pending' | 'processing' | 'completed' | 'failed',
+      }));
+  },
+
   // PDF generation
   async generatePdf(storyId: string): Promise<Blob> {
     const token = localStorage.getItem('auth_token');
