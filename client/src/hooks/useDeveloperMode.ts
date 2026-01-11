@@ -26,6 +26,9 @@ interface DeveloperModeState {
   // Auto-repair: automatically fix detected issues in generated images (default: OFF)
   enableAutoRepair: boolean;
   setEnableAutoRepair: (enable: boolean) => void;
+  // Load all avatar variants upfront (heavy - for debugging)
+  loadAllAvatars: boolean;
+  setLoadAllAvatars: (load: boolean) => void;
   // Model selections
   modelSelections: ModelSelections;
   setModelSelections: React.Dispatch<React.SetStateAction<ModelSelections>>;
@@ -86,6 +89,9 @@ export function useDeveloperMode(): DeveloperModeState {
   // Auto-repair: automatically fix detected issues in generated images (default: OFF)
   const [enableAutoRepair, setEnableAutoRepair] = useState(false);
 
+  // Load all avatar variants upfront (heavy - for debugging avatar generation)
+  const [loadAllAvatars, setLoadAllAvatars] = useState(false);
+
   // Developer model selection - initialize based on dev mode
   const [modelSelections, setModelSelections] = useState<ModelSelections>(
     wasDevMode ? { ...DEV_MODEL_DEFAULTS } : { ...PROD_MODEL_DEFAULTS }
@@ -134,6 +140,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setDevSkipCovers,
     enableAutoRepair,
     setEnableAutoRepair,
+    loadAllAvatars,
+    setLoadAllAvatars,
     modelSelections,
     setModelSelections,
   };

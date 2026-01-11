@@ -95,6 +95,7 @@ export default function StoryWizard() {
     devSkipImages, setDevSkipImages,
     devSkipCovers, setDevSkipCovers,
     enableAutoRepair, setEnableAutoRepair,
+    loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
 
@@ -899,9 +900,10 @@ export default function StoryWizard() {
     const loadCharacterData = async () => {
       try {
         setIsLoading(true);
-        // Always load lightweight data initially (only standard avatar)
-        // Full avatar variants are loaded on-demand when needed
-        const data = await characterService.getCharacterData(false);
+        // Load character data - use loadAllAvatars flag for dev mode
+        // When true: loads all avatar variants (30MB+), useful for debugging
+        // When false: loads only thumbnails/metadata, full avatars loaded on-demand
+        const data = await characterService.getCharacterData(loadAllAvatars);
         log.info('Loaded character data from API:', {
           characters: data.characters.length,
           relationships: Object.keys(data.relationships).length,
@@ -947,9 +949,23 @@ export default function StoryWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
 
-  // NOTE: Removed auto-reload of full avatar data for dev mode and impersonation
-  // Full avatar variants (winter, summer, formal, styledAvatars) are now loaded on-demand
-  // to avoid 30+ MB payload on initial page load. Standard avatar is always available.
+  // Reload character data when loadAllAvatars is toggled ON (dev mode feature)
+  // This allows developers to load full 30MB+ avatar data for debugging
+  useEffect(() => {
+    if (loadAllAvatars && isAuthenticated && initialCharacterLoadDone) {
+      const reloadWithFullAvatars = async () => {
+        try {
+          log.info('Reloading characters with full avatars (dev mode)');
+          const data = await characterService.getCharacterData(true);
+          setCharacters(data.characters);
+          log.info(`Loaded ${data.characters.length} characters with full avatars`);
+        } catch (error) {
+          log.error('Failed to reload with full avatars:', error);
+        }
+      };
+      reloadWithFullAvatars();
+    }
+  }, [loadAllAvatars, isAuthenticated, initialCharacterLoadDone]);
 
   // Auto-start character creation when entering step 1 with no characters
   // Wait for initial load to complete to avoid creating blank characters on refresh
@@ -3949,6 +3965,19 @@ export default function StoryWizard() {
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Versucht erkannte Bildfehler automatisch zu korrigieren (z.B. fehlende Finger)' : language === 'fr' ? 'Essaie de corriger automatiquement les erreurs d\'image détectées' : 'Attempts to automatically fix detected image issues (e.g., missing fingers)'}
+                      </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={loadAllAvatars}
+                          onChange={(e) => setLoadAllAvatars(e.target.checked)}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Alle Avatare laden' : language === 'fr' ? 'Charger tous les avatars' : 'Load all avatars'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Lädt alle Avatar-Varianten (30MB+). Nützlich zum Debuggen.' : language === 'fr' ? 'Charge toutes les variantes d\'avatar (30MB+). Utile pour le débogage.' : 'Loads all avatar variants (30MB+). Useful for debugging.'}
                       </p>
                     </div>
                   )}
