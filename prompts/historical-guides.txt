@@ -1850,3 +1850,445 @@ HISTORICAL DETAILS:
 - Today: About 3,500 heart transplants per year in US
 
 THEMES: courage, medical innovation, gift of life, hope
+
+# =============================================================================
+# SWISS HISTORY
+# =============================================================================
+
+[swiss-founding]
+EVENT: Founding of Switzerland - Rütlischwur (August 1, 1291)
+LOCATION: Rütli Meadow, Lake Lucerne, Switzerland
+
+KEY FIGURES:
+- Werner Stauffacher: Representative from Schwyz (Swiss)
+- Walter Fürst: Representative from Uri (Swiss)
+- Arnold von Melchtal: Representative from Unterwalden (Swiss)
+
+HISTORICAL CONTEXT:
+In 1291, three forest communities around Lake Lucerne - Uri, Schwyz, and Unterwalden - sent
+representatives to a secret meeting on the Rütli meadow. They were unhappy with the Habsburg
+rulers who controlled much of the region and wanted to protect their ancient freedoms.
+
+On the meadow, by the light of the moon, the three men swore an oath (Schwur) of eternal
+alliance. They promised to help each other against any enemy and to settle disputes peacefully.
+This "Federal Charter" is considered the founding document of Switzerland.
+
+The oath was renewed every year, and more cantons joined over the centuries. August 1st became
+Switzerland's National Day, and the Rütli meadow remains a sacred place for the Swiss people.
+
+PERIOD COSTUMES:
+- Mountain farmers: Simple woolen tunics, leather belts, felt hats, leather shoes or wooden clogs
+- Representatives: Slightly finer wool clothing, cloaks for the cold night air
+- Medieval peasants: Undyed or earth-toned fabrics, practical work clothes
+
+KEY LOCATIONS: Rütli meadow, Lake Lucerne shores, Alpine mountain villages, Forest paths
+
+STORY ANGLES:
+- A child watching their father leave for the secret meeting
+- The boat journey across Lake Lucerne at night
+- The solemn oath-taking ceremony
+- Keeping the alliance secret from Habsburg spies
+
+THEMES: unity, freedom, friendship, standing together, promise
+
+[wilhelm-tell]
+EVENT: Wilhelm Tell and the Apple (November 18, 1307 - legend)
+LOCATION: Altdorf, Uri, Switzerland
+
+KEY FIGURES:
+- Wilhelm Tell: Legendary Swiss marksman and folk hero (Swiss)
+- Walter Tell: Wilhelm's young son (Swiss)
+- Hermann Gessler: Tyrannical Habsburg bailiff (Austrian)
+
+HISTORICAL CONTEXT:
+Wilhelm Tell is Switzerland's greatest folk hero. The Habsburg bailiff Gessler placed his hat
+on a pole in Altdorf and demanded everyone bow to it. Tell refused. As punishment, Gessler
+ordered Tell to shoot an apple off his son Walter's head with a crossbow.
+
+Tell calmly took two crossbow bolts, placed one in his quiver, and shot the apple cleanly off
+his son's head. When Gessler asked about the second bolt, Tell replied: "If I had harmed my
+son, the second bolt was for you."
+
+Gessler had Tell arrested, but during a storm on Lake Lucerne, Tell escaped and later killed
+Gessler at Hohle Gasse. Tell's defiance inspired the Swiss uprising against the Habsburgs.
+
+PERIOD COSTUMES:
+- Tell: Huntsman clothes - leather jerkin, wool trousers, felt hat with feather, crossbow
+- Walter: Simple boy's tunic, bare feet or leather shoes
+- Gessler: Noble attire - fine wool tunic, fur-trimmed cloak, elaborate hat
+- Soldiers: Chain mail or leather armor, Habsburg colors
+
+KEY LOCATIONS: Altdorf town square, Lake Lucerne, Hohle Gasse (Hollow Lane), Alpine mountains
+
+STORY ANGLES:
+- The tension of the apple shot from Walter's perspective
+- Tell's steady hands and courage under pressure
+- A child in the crowd watching the dramatic shot
+- The escape during the storm on Lake Lucerne
+
+THEMES: courage, standing up to bullies, father's love, freedom, skill
+
+[battle-morgarten]
+EVENT: Battle of Morgarten (November 15, 1315)
+LOCATION: Morgarten, Zug, Switzerland
+
+KEY FIGURES:
+- Swiss Confederates: Farmers and mountain men from Uri, Schwyz, and Unterwalden (Swiss)
+- Duke Leopold I of Austria: Led the Habsburg army (Austrian)
+
+HISTORICAL CONTEXT:
+In 1315, Duke Leopold I assembled a large army of armored knights to crush the rebellious
+Swiss cantons. The Swiss positioned themselves on steep slopes above a narrow path between
+Lake Ägeri and Morgarten mountain.
+
+When the Austrian column was strung out along the narrow path, the Swiss attacked from above,
+rolling boulders and tree trunks, then charging with halberds. The knights couldn't maneuver
+and many fell into the lake. The battle was over in less than an hour.
+
+This stunning victory proved disciplined infantry could defeat armored knights. It secured
+Swiss independence and became a symbol of Swiss determination.
+
+PERIOD COSTUMES:
+- Swiss fighters: Practical mountain clothes, leather caps, halberds and axes
+- Austrian knights: Full plate or chain mail armor, colorful surcoats with Habsburg eagles
+
+KEY LOCATIONS: Morgarten pass, Lake Ägeri shores, Slopes above the path
+
+STORY ANGLES:
+- A young Swiss farmer preparing for battle
+- Watching the mighty Austrian army approach
+- David vs. Goliath - farmers defeating knights
+
+THEMES: teamwork, clever thinking, defending home, small vs large
+
+[battle-sempach]
+EVENT: Battle of Sempach and Arnold von Winkelried (July 9, 1386)
+LOCATION: Sempach, Lucerne, Switzerland
+
+KEY FIGURES:
+- Arnold von Winkelried: Legendary Swiss hero who sacrificed himself (Swiss)
+- Duke Leopold III of Austria: Led the Habsburg forces, killed in battle (Austrian)
+
+HISTORICAL CONTEXT:
+The Austrian knights formed a wall of long pikes that the Swiss couldn't break through. Then
+Arnold von Winkelried stepped forward, shouting "I will open a path! Protect my wife and
+children!" He threw himself onto the pikes, grabbing as many as he could.
+
+His sacrifice created a gap in the Austrian line. The Swiss charged through and won a decisive
+victory. Duke Leopold was killed. Winkelried became a symbol of selfless courage.
+
+PERIOD COSTUMES:
+- Swiss fighters: Simple armor or leather, cantonal colors, halberds and swords
+- Austrian knights: Dismounted, heavy plate armor, long pikes
+
+KEY LOCATIONS: Fields near Sempach, Sempach chapel
+
+STORY ANGLES:
+- Arnold von Winkelried's moment of decision
+- A young soldier witnessing the sacrifice
+- The charge through the gap
+
+THEMES: sacrifice, bravery, protecting others, unity
+
+[swiss-reformation]
+EVENT: Zwingli and the Swiss Reformation (1523)
+LOCATION: Zurich, Switzerland
+
+KEY FIGURES:
+- Huldrych Zwingli: Priest and reformer who started the Swiss Reformation (Swiss)
+- Heinrich Bullinger: Zwingli's successor (Swiss)
+
+HISTORICAL CONTEXT:
+Huldrych Zwingli, a priest at the Grossmünster church in Zurich, began preaching reforms.
+In 1522, Zwingli and others broke fasting rules by eating sausages during Lent - the "Affair
+of the Sausages" became a symbol of reform. In 1523, Zurich officially adopted the Reformation.
+
+Churches were stripped of images and statues. Zwingli introduced free public education and
+care for the poor. He died in 1531 at the Battle of Kappel, but his reforms spread across
+Swiss cities like Bern and Basel.
+
+PERIOD COSTUMES:
+- Zwingli: Simple black scholar's robe
+- Citizens: 16th century Swiss-German clothing - doublets, hose, caps
+- Students: Scholar's gowns
+
+KEY LOCATIONS: Grossmünster church Zurich, Zurich town hall, Streets of Zurich
+
+STORY ANGLES:
+- A child seeing church images removed
+- Learning to read the Bible in German for the first time
+- The Affair of the Sausages
+
+THEMES: thinking differently, standing up for beliefs, education, change
+
+[red-cross-founding]
+EVENT: Henry Dunant Founds the Red Cross (October 29, 1863)
+LOCATION: Geneva, Switzerland
+
+KEY FIGURES:
+- Henry Dunant: Swiss businessman who founded the Red Cross (Swiss)
+- Guillaume-Henri Dufour: Swiss General who presided over founding conference (Swiss)
+
+HISTORICAL CONTEXT:
+In 1859, Henry Dunant witnessed the aftermath of the Battle of Solferino. Over 40,000 soldiers
+lay wounded with almost no medical care. Dunant organized local villagers to help wounded of
+BOTH sides, saying "Tutti fratelli" (All are brothers).
+
+Back in Geneva, he wrote "A Memory of Solferino" describing the horrors. In 1863, five Swiss
+citizens founded the International Committee of the Red Cross. In 1864, the first Geneva
+Convention established rules for treating wounded soldiers.
+
+PERIOD COSTUMES:
+- Dunant: 19th century gentleman - frock coat, waistcoat, cravat, top hat
+- Volunteers: Simple practical clothes with red cross armbands
+- Soldiers: Mid-19th century military uniforms
+
+KEY LOCATIONS: Geneva meeting hall, Battlefield of Solferino (Italy)
+
+STORY ANGLES:
+- Dunant witnessing the battlefield horrors
+- Villagers helping wounded soldiers from both armies
+- The founding meeting in Geneva
+
+THEMES: helping others, compassion, humanity, making a difference
+
+[general-dufour]
+EVENT: General Dufour and Swiss Unity (November 1847)
+LOCATION: Switzerland
+
+KEY FIGURES:
+- Guillaume-Henri Dufour: Swiss General, commander of federal forces (Swiss)
+
+HISTORICAL CONTEXT:
+In 1847, seven Catholic cantons formed the Sonderbund alliance. The Federal Diet appointed
+General Dufour to lead the federal army. Dufour won the civil war in just 26 days with fewer
+than 100 dead on both sides.
+
+He ordered soldiers to treat defeated enemies humanely, care for the wounded, and respect
+civilians. His compassion preserved Swiss unity. The Dufourspitze mountain is named after him.
+
+PERIOD COSTUMES:
+- Dufour: Swiss general's uniform - blue coat with gold epaulettes, bicorn hat
+- Federal soldiers: Blue uniforms with cantonal insignia
+- Sonderbund soldiers: Various cantonal uniforms
+
+KEY LOCATIONS: Various Swiss cantons, Lucerne, Bern
+
+STORY ANGLES:
+- A soldier ordered to treat prisoners kindly
+- Families divided by the civil war
+- Reconciliation between former enemies
+
+THEMES: mercy, reconciliation, leadership, keeping families together
+
+[sonderbund-war]
+EVENT: The Sonderbund War (November 3-29, 1847)
+LOCATION: Central Switzerland
+
+KEY FIGURES:
+- General Guillaume-Henri Dufour: Federal commander (Swiss)
+- Johann Ulrich von Salis-Soglio: Sonderbund commander (Swiss)
+
+HISTORICAL CONTEXT:
+By the 1840s, Switzerland was divided between liberal Protestant cantons wanting stronger
+central government and conservative Catholic cantons wanting traditional rights. Seven
+Catholic cantons formed the Sonderbund (Separate Alliance).
+
+The war lasted only 26 days. Dufour's humane treatment of the defeated helped heal wounds
+quickly. The result was the Federal Constitution of 1848, creating modern Switzerland.
+
+PERIOD COSTUMES:
+- Soldiers: 1840s military uniforms, varying by canton
+- Politicians: Formal 19th century dress - frock coats, cravats
+
+KEY LOCATIONS: Lucerne, Fribourg, Zug, Cantonal capitals
+
+STORY ANGLES:
+- A family divided between cantons on different sides
+- Former enemies reconciling after the war
+- Building a new country together
+
+THEMES: unity, resolving conflicts, compromise, nation building
+
+[swiss-constitution]
+EVENT: Swiss Federal Constitution (September 12, 1848)
+LOCATION: Bern, Switzerland
+
+KEY FIGURES:
+- Ulrich Ochsenbein: President of the constitutional commission (Swiss)
+- Jonas Furrer: First President of the Swiss Confederation (Swiss)
+
+HISTORICAL CONTEXT:
+After the Sonderbund War, the winners chose to write a new constitution uniting all Swiss.
+The Constitution of 1848 created the modern Swiss federal state with a two-chamber parliament,
+Federal Council of seven members, and guaranteed cantonal autonomy with national unity.
+
+The constitution protected religious freedom, established free trade between cantons, created
+national postal system and currency. It balanced interests of large and small cantons,
+Catholic and Protestant, German and French speakers.
+
+PERIOD COSTUMES:
+- Politicians: Formal 1840s attire - frock coats, top hats, cravats
+- Citizens: Various cantonal traditional dress
+
+KEY LOCATIONS: Bern Federal Palace, Cantonal meeting halls, Town squares
+
+STORY ANGLES:
+- Delegates arguing and finding compromise
+- A celebration when the constitution is adopted
+- Former enemies now sitting in parliament together
+
+THEMES: democracy, unity in diversity, fairness, new beginnings
+
+[gotthard-tunnel]
+EVENT: Building the Gotthard Railway Tunnel (May 22, 1882)
+LOCATION: Swiss Alps (Göschenen to Airolo)
+
+KEY FIGURES:
+- Louis Favre: Swiss engineer who led construction (Swiss)
+- Alfred Escher: Businessman who organized financing (Swiss)
+- Thousands of workers: Mostly Italian miners (Italian, Swiss)
+
+HISTORICAL CONTEXT:
+In 1872, construction began on a railway tunnel through the Gotthard Pass. Workers dug from
+both ends simultaneously. Conditions were brutal: extreme heat (up to 40C), flooding,
+rockfalls. About 200 workers died during construction.
+
+On February 29, 1880, the two tunnels met almost perfectly - only 33 centimeters off. When
+the tunnel opened in 1882, it was 15 kilometers long - the longest in the world. It transformed
+European travel and remains a source of Swiss national pride.
+
+PERIOD COSTUMES:
+- Workers: Heavy work clothes, leather boots, protective caps, oil lamps
+- Engineers: 19th century professional dress - suits with waistcoats
+- Railway officials: Uniforms with brass buttons
+
+KEY LOCATIONS: Göschenen (north portal), Airolo (south portal), Inside the tunnel
+
+STORY ANGLES:
+- An Italian worker far from home, digging in dangerous conditions
+- The moment the two tunnel teams meet in the middle
+- The opening day celebration
+
+THEMES: engineering, perseverance, international cooperation, connecting people
+
+[swiss-ww1-neutrality]
+EVENT: Switzerland Stays Neutral in WWI (1914-1918)
+LOCATION: Switzerland
+
+KEY FIGURES:
+- Ulrich Wille: Swiss General, commander of the army (Swiss)
+- Carl Spitteler: Swiss writer who urged national unity (Swiss)
+
+HISTORICAL CONTEXT:
+When WWI erupted in 1914, Switzerland was surrounded by warring nations. The Swiss mobilized
+about 250,000 men not to fight, but to defend borders and maintain neutrality.
+
+Switzerland became an island of peace. The Red Cross organized prisoner exchanges and delivered
+mail across enemy lines. Wounded prisoners were brought to Switzerland for care. Swiss families
+hosted war orphans.
+
+PERIOD COSTUMES:
+- Swiss soldiers: Grey-green uniforms, distinctive peaked caps
+- Refugees: Various civilian clothes, often worn
+- Red Cross workers: White with red cross armbands
+
+KEY LOCATIONS: Swiss borders, Mountain passes, Red Cross headquarters Geneva
+
+STORY ANGLES:
+- A Swiss soldier guarding the border, hearing battle sounds
+- A family hosting a war orphan
+- Red Cross workers organizing prisoner mail
+
+THEMES: peace, helping refugees, staying united, humanitarian aid
+
+[general-guisan]
+EVENT: General Guisan and the Rütli Report (July 25, 1940)
+LOCATION: Rütli Meadow, Switzerland
+
+KEY FIGURES:
+- Henri Guisan: Swiss General, commander of the army (Swiss)
+
+HISTORICAL CONTEXT:
+By summer 1940, Nazi Germany had conquered most of Europe. Switzerland was completely surrounded.
+On July 25, 1940, General Guisan summoned all 650 senior army commanders to the Rütli meadow -
+the legendary birthplace of Switzerland.
+
+Guisan outlined his strategy: the Réduit National (National Redoubt). The army would retreat to
+the Alps and fight to the last. His message was clear: Switzerland would NEVER surrender. The
+Rütlirapport restored Swiss morale and unity through the darkest years.
+
+PERIOD COSTUMES:
+- Guisan: Swiss general's uniform - grey-green tunic, peaked cap, medals
+- Officers: Swiss Army uniforms with rank insignia
+
+KEY LOCATIONS: Rütli meadow, Swiss Alpine fortresses, Command bunkers
+
+STORY ANGLES:
+- A young officer attending the historic gathering at Rütli
+- The journey to the meadow by boat across Lake Lucerne
+- Hearing Guisan's inspiring speech
+
+THEMES: leadership, courage, unity, defending freedom, determination
+
+[swiss-ww2-neutrality]
+EVENT: Switzerland in World War II (1939-1945)
+LOCATION: Switzerland
+
+KEY FIGURES:
+- Henri Guisan: Swiss General (Swiss)
+- Paul Grüninger: Police captain who saved Jewish refugees (Swiss)
+- Carl Lutz: Diplomat who saved tens of thousands of Jews in Budapest (Swiss)
+
+HISTORICAL CONTEXT:
+During WWII, Switzerland was surrounded by Nazi Germany and Fascist Italy. The country
+mobilized up to 850,000 soldiers and prepared to defend the Alps.
+
+Individual Swiss heroes saved many lives. Paul Grüninger illegally allowed thousands of
+Jewish refugees to enter Switzerland. Carl Lutz in Budapest saved over 62,000 Hungarian Jews.
+Life was hard - food was rationed - but Switzerland survived.
+
+PERIOD COSTUMES:
+- Swiss soldiers: WWII-era grey-green uniforms, steel helmets
+- Civilians: 1940s clothing - practical, sometimes patched
+- Refugees: Various, often carrying all possessions
+
+KEY LOCATIONS: Swiss borders, Alpine fortresses, Refugee camps, Geneva
+
+STORY ANGLES:
+- A border guard deciding whether to let refugees cross
+- A family planting vegetables to help with food rationing
+- Paul Grüninger risking his career to save refugees
+
+THEMES: protecting borders, helping refugees, staying neutral, difficult choices
+
+[swiss-womens-vote]
+EVENT: Swiss Women Win the Right to Vote (February 7, 1971)
+LOCATION: Switzerland
+
+KEY FIGURES:
+- Emilie Kempin-Spyri: Early fighter for women's rights (Swiss)
+- Marthe Gosteli: Leading suffragist (Swiss)
+
+HISTORICAL CONTEXT:
+Switzerland was one of the last European countries to give women voting rights. Because of
+direct democracy, MEN had to vote to give women the right to vote. The 1959 referendum
+failed with 67% voting no.
+
+But attitudes changed. In 1971, 65.7% voted yes. On February 7, 1971, Swiss women won full
+voting rights. The first women were elected to parliament that October. Some cantons held
+out until 1991!
+
+PERIOD COSTUMES:
+- Suffragists: 1970s clothing - practical dresses or pantsuits, suffrage sashes
+- Politicians: 1970s formal wear
+- Voters: Everyday 1970s Swiss clothing
+
+KEY LOCATIONS: Voting stations across Switzerland, Parliament building Bern
+
+STORY ANGLES:
+- A grandmother voting for the first time
+- A young woman celebrating with her mother and grandmother
+- A suffragist who fought for decades finally seeing victory
+
+THEMES: equality, perseverance, democracy, never giving up, fairness

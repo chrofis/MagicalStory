@@ -501,9 +501,34 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         img_h, img_w = img.shape[:2]
         print(f"[PHOTO] Processing image: {img_w}x{img_h}")
 
-        # 2. DETECT ALL FACES (fast - ~50ms)
+        # 2. DETECT FACES - try multiple strategies for best results
+        # MediaPipe struggles with unusual aspect ratios (tall portrait photos)
+        # Strategy: try original, then try normalized 640x480 if no/few faces found
         print("[FACE] Detecting faces...")
-        all_faces = detect_all_faces_mediapipe(img, min_confidence=0.15)
+
+        # First try: original image (or slightly resized if very large)
+        detection_img = img
+        if img_w > 1600 or img_h > 1600:
+            max_dim = max(img_w, img_h)
+            scale = 1200 / max_dim
+            detection_img = cv2.resize(img, (int(img_w * scale), int(img_h * scale)), interpolation=cv2.INTER_AREA)
+            print(f"[FACE] Resized large image: {detection_img.shape[1]}x{detection_img.shape[0]}")
+
+        all_faces = detect_all_faces_mediapipe(detection_img, min_confidence=0.15)
+
+        # Second try: if few faces found and image is portrait, try 640x480 normalized
+        # This helps with tall portrait photos where faces appear small
+        aspect_ratio = img_h / img_w
+        if len(all_faces) < 2 and aspect_ratio > 1.3:
+            print(f"[FACE] Trying normalized 640x480 (aspect ratio: {aspect_ratio:.2f})")
+            normalized_img = cv2.resize(img, (640, 480), interpolation=cv2.INTER_AREA)
+            normalized_faces = detect_all_faces_mediapipe(normalized_img, min_confidence=0.15)
+
+            # Use normalized results if more faces found
+            if len(normalized_faces) > len(all_faces):
+                print(f"[FACE] Normalized detection found more faces: {len(normalized_faces)} vs {len(all_faces)}")
+                all_faces = normalized_faces
+                # Note: coordinates are percentages, so they map back to original correctly
         # Log each face with confidence
         if len(all_faces) > 0:
             face_scores = ", ".join([f"face {f['id']+1}: {f['confidence']*100:.0f}%" for f in all_faces])
