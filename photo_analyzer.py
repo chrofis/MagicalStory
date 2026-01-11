@@ -246,7 +246,30 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
     """
     # Try MediaPipe Tasks API first (Python 3.14+)
     if MEDIAPIPE_TASKS_AVAILABLE:
-        return detect_all_faces_mediapipe_tasks(image, min_confidence)
+        # Tasks API has worse detection than legacy - use lower threshold initially
+        faces = detect_all_faces_mediapipe_tasks(image, min_confidence=0.05)
+
+        # Filter by the requested confidence threshold
+        high_conf_faces = [f for f in faces if f['confidence'] >= min_confidence]
+
+        # If we have few high-confidence faces, also try OpenCV
+        # OpenCV often detects faces that Tasks API misses (especially in group photos)
+        if len(high_conf_faces) < 2:
+            opencv_faces = detect_all_faces_opencv(image)
+            if len(opencv_faces) > len(high_conf_faces):
+                print(f"[FACE] Tasks API found {len(high_conf_faces)} (>={min_confidence}), OpenCV found {len(opencv_faces)} - using OpenCV")
+                faces = opencv_faces
+            else:
+                faces = high_conf_faces
+        else:
+            faces = high_conf_faces
+
+        # Re-sort and re-number
+        faces.sort(key=lambda f: f['confidence'], reverse=True)
+        for i, face in enumerate(faces):
+            face['id'] = i
+
+        return faces
 
     if not MEDIAPIPE_AVAILABLE:
         # Fallback to OpenCV when MediaPipe is not available
