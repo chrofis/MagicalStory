@@ -758,18 +758,7 @@ async function generateDynamicAvatar(character, category, config) {
     }
 
     if (!imageData) {
-      // Debug: Log what Gemini actually returned
       log.error(`❌ [DYNAMIC AVATAR] No image in response for ${logCategory}`);
-      log.error(`   candidates: ${data.candidates ? data.candidates.length : 'none'}`);
-      if (data.candidates?.[0]) {
-        log.error(`   finishReason: ${data.candidates[0].finishReason || 'unknown'}`);
-        log.error(`   parts: ${data.candidates[0].content?.parts?.length || 0}`);
-        if (data.candidates[0].content?.parts) {
-          data.candidates[0].content.parts.forEach((p, i) => {
-            log.error(`   part[${i}]: ${p.text ? 'text' : p.inlineData ? 'inlineData:' + p.inlineData.mimeType : 'unknown'}`);
-          });
-        }
-      }
       return { success: false, error: 'No image generated' };
     }
 
@@ -1245,14 +1234,7 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
 
-    // Debug: log received photo info
-    console.log(`🎭 [AVATAR OPTIONS] Received photo:`);
-    console.log(`   Type: ${typeof facePhoto}`);
-    console.log(`   Length: ${facePhoto.length}`);
-    console.log(`   Prefix: ${facePhoto.substring(0, 50)}...`);
-    console.log(`   Gender: ${gender}, Category: ${category}`);
-
-    log.debug(`🎭 [AVATAR OPTIONS] Generating 3 options sequentially...`);
+    log.debug(`🎭 [AVATAR OPTIONS] Generating 3 options for ${gender}...`);
 
     const character = {
       photoUrl: facePhoto,
@@ -1267,7 +1249,6 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
       if (i > 0) {
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
-      console.log(`🎭 [AVATAR OPTIONS] Generating option ${i + 1}/3...`);
       const result = await generateDynamicAvatar(character, category, config);
       if (result.success) {
         options.push({ id: i, imageData: result.imageData });

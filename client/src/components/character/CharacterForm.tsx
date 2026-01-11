@@ -576,36 +576,23 @@ export function CharacterForm({
 
   // Generate 3 avatar options for user to choose from
   const handleGenerateAvatarOptions = async () => {
-    console.log('[AVATAR OPTIONS] Button clicked!');
-    console.log('[AVATAR OPTIONS] character.photos:', character.photos);
-
-    // Use body photo like the working test script does (not face crop)
     const bodyPhoto = character.photos?.body || character.photos?.original;
-    console.log('[AVATAR OPTIONS] bodyPhoto:', bodyPhoto ? bodyPhoto.substring(0, 50) + '...' : 'null');
+    if (!bodyPhoto) return;
 
-    if (!bodyPhoto) {
-      console.log('[AVATAR OPTIONS] No bodyPhoto, returning early');
-      return;
-    }
-
-    // Use actual gender (female/male), not "child"
     const gender = character.gender === 'female' ? 'female' : 'male';
-    console.log('[AVATAR OPTIONS] Using gender:', gender);
 
     setIsGeneratingOptions(true);
     setAvatarOptions(null);
     setSelectedOptionId(null);
 
     try {
-      console.log('[AVATAR OPTIONS] Calling characterService.generateAvatarOptions...');
       const result = await characterService.generateAvatarOptions(bodyPhoto, gender);
-      console.log('[AVATAR OPTIONS] Result:', result);
       if (result.success && result.options.length > 0) {
         setAvatarOptions(result.options);
-        setSelectedOptionId(result.options[0].id); // Pre-select first option
+        setSelectedOptionId(result.options[0].id);
       }
     } catch (error) {
-      console.error('[AVATAR OPTIONS] Failed to generate avatar options:', error);
+      console.error('Failed to generate avatar options:', error);
     } finally {
       setIsGeneratingOptions(false);
     }
