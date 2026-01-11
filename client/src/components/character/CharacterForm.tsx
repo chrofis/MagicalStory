@@ -1,5 +1,5 @@
 import { ChangeEvent, useState, useEffect } from 'react';
-import { Upload, Save, RefreshCw, Pencil, X, ArrowRight } from 'lucide-react';
+import { Upload, Save, RefreshCw, Pencil, X, ArrowRight, Check, Camera } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/common/Button';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
@@ -401,6 +401,7 @@ interface CharacterFormProps {
   onSave: () => void;
   onCancel?: () => void;
   onPhotoChange: (file: File, keepOldClothing?: boolean) => void;
+  onSaveAndTryNewPhoto?: () => void;  // Save character and go to photo change
   onContinueToTraits?: () => void;
   onContinueToCharacteristics?: () => void;
   onContinueToRelationships?: () => void;
@@ -436,6 +437,7 @@ export function CharacterForm({
   onSave,
   onCancel,
   onPhotoChange,
+  onSaveAndTryNewPhoto,
   onContinueToTraits,
   onContinueToCharacteristics,
   onContinueToRelationships,
@@ -1065,40 +1067,78 @@ export function CharacterForm({
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3 max-w-md mx-auto">
-          {/* Primary: Accept & Save */}
-          <Button
-            onClick={onSave}
-            disabled={isStillGenerating && !hasFailed}
-            loading={isLoading}
-            icon={Save}
-          >
-            {hasAvatar && !isStillGenerating
-              ? (language === 'de' ? 'Perfekt - Charakter speichern' : language === 'fr' ? 'Parfait - Enregistrer' : 'Perfect - Save Character')
-              : (language === 'de' ? 'Charakter speichern' : language === 'fr' ? 'Enregistrer le personnage' : 'Save Character')
-            }
-          </Button>
-
-          {/* Secondary: Modify Avatar */}
+          {/* When avatar is ready: Primary "Use Avatar" button */}
           {hasAvatar && !isStillGenerating && (
+            <>
+              {/* Primary: Accept & Save - Large and prominent */}
+              <button
+                onClick={onSave}
+                disabled={isLoading}
+                className="w-full px-6 py-4 text-lg font-bold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-3 shadow-lg"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Check size={24} />
+                )}
+                {language === 'de' ? 'Perfekt - Avatar verwenden' : language === 'fr' ? 'Parfait - Utiliser l\'avatar' : 'Perfect - Use Avatar'}
+              </button>
+
+              {/* Hint about modifying later */}
+              <p className="text-xs text-gray-500 text-center">
+                {language === 'de'
+                  ? 'Du kannst den Avatar später jederzeit anpassen'
+                  : language === 'fr'
+                  ? 'Vous pouvez modifier l\'avatar plus tard'
+                  : 'You can modify the avatar later anytime'}
+              </p>
+
+              {/* Try with new photo */}
+              {onSaveAndTryNewPhoto && (
+                <button
+                  onClick={onSaveAndTryNewPhoto}
+                  className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  <Camera size={16} />
+                  {language === 'de' ? 'Mit neuem Foto versuchen' : language === 'fr' ? 'Essayer avec une nouvelle photo' : 'Try with a new photo'}
+                </button>
+              )}
+            </>
+          )}
+
+          {/* When avatar is still generating: Show continue button */}
+          {isStillGenerating && !hasFailed && (
             <button
-              onClick={() => setIsModifyingAvatar(true)}
-              className="w-full px-4 py-3 text-sm font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 flex items-center justify-center gap-2"
+              onClick={onSave}
+              disabled={isLoading}
+              className="w-full px-6 py-4 text-base font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
-              <Pencil size={16} />
-              {language === 'de' ? 'Avatar anpassen' : language === 'fr' ? 'Modifier l\'avatar' : 'Modify Avatar'}
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <ArrowRight size={20} />
+              )}
+              {language === 'de' ? 'Weiter ohne zu warten' : language === 'fr' ? 'Continuer sans attendre' : 'Continue without waiting'}
             </button>
           )}
 
-          {/* Tertiary: Cancel */}
-          {onCancel && (
+          {/* When generation failed: Show save anyway */}
+          {hasFailed && (
             <button
-              onClick={onCancel}
-              className="w-full bg-gray-200 text-gray-700 px-4 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+              onClick={onSave}
+              disabled={isLoading}
+              className="w-full px-6 py-4 text-base font-semibold bg-gray-600 text-white rounded-xl hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
             >
-              {t.cancel}
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Save size={20} />
+              )}
+              {language === 'de' ? 'Charakter trotzdem speichern' : language === 'fr' ? 'Enregistrer quand même' : 'Save character anyway'}
             </button>
           )}
         </div>
+
       </div>
     );
   }

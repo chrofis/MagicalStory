@@ -38,6 +38,7 @@ interface WizardStep2Props {
   onRegenerateAvatars: () => void;
   onRegenerateAvatarsWithTraits: () => void;
   onSaveAndRegenerateWithTraits: () => void;  // Combined save + regenerate with traits
+  onSaveAndTryNewPhoto: () => void;  // Save character and go to photo step for new photo
   // Relationship props
   relationships: RelationshipMap;
   relationshipTexts: RelationshipTextMap;
@@ -80,6 +81,7 @@ export function WizardStep2Characters({
   onRegenerateAvatars,
   onRegenerateAvatarsWithTraits,
   onSaveAndRegenerateWithTraits,
+  onSaveAndTryNewPhoto,
   relationships,
   relationshipTexts,
   onRelationshipChange,
@@ -170,6 +172,7 @@ export function WizardStep2Characters({
           onRegenerateAvatars={onRegenerateAvatars}
           onRegenerateAvatarsWithTraits={onRegenerateAvatarsWithTraits}
           onSaveAndRegenerateWithTraits={onSaveAndRegenerateWithTraits}
+          onSaveAndTryNewPhoto={onSaveAndTryNewPhoto}
           isLoading={isLoading}
           isAnalyzingPhoto={isAnalyzingPhoto}
           isGeneratingAvatar={isGeneratingAvatar}

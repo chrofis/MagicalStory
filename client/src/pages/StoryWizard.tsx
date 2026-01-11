@@ -1244,6 +1244,33 @@ export default function StoryWizard() {
     return true;
   };
 
+  // Get character with the most undefined relationships (for warning message)
+  const getCharacterWithMostUndefinedRelationships = (): Character | null => {
+    if (characters.length < 2) return null;
+
+    let maxUndefined = 0;
+    let charWithMostUndefined: Character | null = null;
+
+    for (const char of characters) {
+      let undefinedCount = 0;
+      for (const otherChar of characters) {
+        if (char.id !== otherChar.id) {
+          const key = `${char.id}-${otherChar.id}`;
+          const value = relationships[key];
+          if (!value || isNotKnownRelationship(value)) {
+            undefinedCount++;
+          }
+        }
+      }
+      if (undefinedCount > maxUndefined) {
+        maxUndefined = undefinedCount;
+        charWithMostUndefined = char;
+      }
+    }
+
+    return charWithMostUndefined;
+  };
+
   // Character handlers
   const startNewCharacter = () => {
     setCurrentCharacter({
@@ -2216,12 +2243,12 @@ export default function StoryWizard() {
 
   const canAccessStep = (s: number): boolean => {
     // NEW ORDER: 1=Characters, 2=BookSettings, 3=StoryType, 4=ArtStyle, 5=Summary, 6=StoryDisplay
-    // Relationships are now part of character editing
+    // Relationships default to "not known to" which is acceptable
     if (s === 1) return true;
-    if (s === 2) return characters.length > 0 && areAllRelationshipsDefined();
-    if (s === 3) return characters.length > 0 && areAllRelationshipsDefined();
-    if (s === 4) return characters.length > 0 && areAllRelationshipsDefined() && storyCategory !== '';
-    if (s === 5) return characters.length > 0 && areAllRelationshipsDefined() && storyCategory !== '' && artStyle !== '';
+    if (s === 2) return characters.length > 0;
+    if (s === 3) return characters.length > 0;
+    if (s === 4) return characters.length > 0 && storyCategory !== '';
+    if (s === 5) return characters.length > 0 && storyCategory !== '' && artStyle !== '';
     if (s === 6) return generatedStory !== '';
     return false;
   };
