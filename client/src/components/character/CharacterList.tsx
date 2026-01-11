@@ -100,7 +100,7 @@ export function CharacterList({
                 key={char.id}
                 className={`border rounded p-2 transition-all ${
                   isOut
-                    ? 'border-dashed border-gray-300 bg-gray-50 opacity-60'
+                    ? 'border-dashed border-gray-300 bg-gray-50'
                     : isMain
                     ? 'border-2 border-indigo-600 bg-indigo-50'
                     : 'border-gray-200 bg-white'
@@ -108,19 +108,25 @@ export function CharacterList({
               >
                 {/* Layout: Thumbnail left, Info+Controls right */}
                 <div className="flex gap-3">
-                  {/* Large thumbnail */}
+                  {/* Large thumbnail - clickable to edit */}
                   {(char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original) && (
-                    <img
-                      src={char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original}
-                      alt={char.name}
-                      className={`w-20 h-20 rounded-full object-cover object-top border-2 border-indigo-200 flex-shrink-0 ${isOut ? 'grayscale' : ''}`}
-                    />
+                    <button
+                      onClick={() => onEdit(char)}
+                      className="flex-shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded-full"
+                      title={t.editCharacter}
+                    >
+                      <img
+                        src={char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original}
+                        alt={char.name}
+                        className={`w-20 h-20 rounded-full object-cover object-top border-2 border-indigo-200 cursor-pointer hover:border-indigo-400 transition-colors ${isOut ? 'grayscale opacity-50' : ''}`}
+                      />
+                    </button>
                   )}
 
                   {/* Right side: Name, info, and controls */}
                   <div className="flex-1 min-w-0 flex flex-col justify-between">
                     {/* Top: Name and Edit/Delete */}
-                    <div className="flex items-start justify-between gap-2">
+                    <div className={`flex items-start justify-between gap-2 ${isOut ? 'opacity-50' : ''}`}>
                       <div className="min-w-0">
                         <h4 className="font-bold text-sm md:text-base truncate flex items-center gap-1">
                           {char.name}
