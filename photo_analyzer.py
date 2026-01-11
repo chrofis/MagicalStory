@@ -479,12 +479,16 @@ def remove_faces_except(image, keep_face_id, all_faces):
 
     # Find the selected face
     selected_face = None
+    print(f"[REMOVE_DEBUG] Looking for face ID {keep_face_id} (type: {type(keep_face_id)})")
+    print(f"[REMOVE_DEBUG] Available faces: {[(f.get('id'), type(f.get('id'))) for f in all_faces]}")
     for face in all_faces:
         if face['id'] == keep_face_id:
             selected_face = face
+            print(f"[REMOVE_DEBUG] Found selected face: ID={face['id']}")
             break
 
     if selected_face is None:
+        print(f"[REMOVE_DEBUG] WARNING: Selected face ID {keep_face_id} NOT FOUND in faces!")
         return result
 
     # Calculate selected face center (in pixels)
