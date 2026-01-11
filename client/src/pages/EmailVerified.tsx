@@ -169,7 +169,7 @@ export default function EmailVerified() {
           {status === 'manual' && (
             <div className="mb-8">
               <p className="text-gray-600 mb-4">
-                {isLoggedIn ? t.manualHint : t.notLoggedInHint}
+                {t.manualHint}
               </p>
               <div className="space-y-3">
                 {isLoggedIn ? (
