@@ -195,6 +195,7 @@ export function StoryDisplay({
   // Scene edit modal state (for editing scene before regenerating)
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [regeneratingPage, setRegeneratingPage] = useState<number | null>(null); // Track which page is regenerating
 
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
@@ -377,14 +378,22 @@ export function StoryDisplay({
   // Handle regenerate with edited scene
   const handleRegenerateWithScene = async () => {
     if (!sceneEditModal || !onRegenerateImage) return;
+    const pageNumber = sceneEditModal.pageNumber;
+    const scene = sceneEditModal.scene;
+    const characterIds = sceneEditModal.selectedCharacterIds;
+
+    // Close modal immediately and show spinner on the image
+    setSceneEditModal(null);
+    setRegeneratingPage(pageNumber);
     setIsRegenerating(true);
+
     try {
-      await onRegenerateImage(sceneEditModal.pageNumber, sceneEditModal.scene, sceneEditModal.selectedCharacterIds);
-      setSceneEditModal(null);
+      await onRegenerateImage(pageNumber, scene, characterIds);
     } catch (err) {
       console.error('Failed to regenerate image:', err);
     } finally {
       setIsRegenerating(false);
+      setRegeneratingPage(null);
     }
   };
 
@@ -1917,13 +1926,22 @@ export function StoryDisplay({
                         </p>
                       </div>
                     ) : (image?.imageData || progressiveImageData) ? (
-                      <div className="w-full mb-4">
+                      <div className="w-full mb-4 relative">
                         <DiagnosticImage
                           src={(image?.imageData || progressiveImageData) ?? ''}
                           alt={`Scene for page ${pageNumber}`}
-                          className="w-full rounded-lg shadow-md object-cover"
+                          className={`w-full rounded-lg shadow-md object-cover ${regeneratingPage === pageNumber ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
+                        {/* Regenerating spinner overlay */}
+                        {regeneratingPage === pageNumber && (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
+                            <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                            <p className="text-indigo-700 font-medium text-sm">
+                              {language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? 'Nouvelle image en cours...' : 'Generating new image...'}
+                            </p>
+                          </div>
+                        )}
                         {/* Image action buttons - shown to all users */}
                         {onRegenerateImage && (
                           <div className="mt-3 space-y-2">
@@ -2252,11 +2270,22 @@ export function StoryDisplay({
                     {/* Image on the left */}
                     {image && image.imageData ? (
                       <div className="flex flex-col">
-                        <img
-                          src={image.imageData}
-                          alt={`Scene for page ${pageNumber}`}
-                          className="w-full rounded-lg shadow-md object-cover"
-                        />
+                        <div className="relative">
+                          <img
+                            src={image.imageData}
+                            alt={`Scene for page ${pageNumber}`}
+                            className={`w-full rounded-lg shadow-md object-cover ${regeneratingPage === pageNumber ? 'opacity-50' : ''}`}
+                          />
+                          {/* Regenerating spinner overlay */}
+                          {regeneratingPage === pageNumber && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
+                              <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
+                              <p className="text-indigo-700 font-medium text-sm">
+                                {language === 'de' ? 'Neues Bild wird erstellt...' : language === 'fr' ? 'Nouvelle image en cours...' : 'Generating new image...'}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                         {/* Image action buttons - shown to all users */}
                         {onRegenerateImage && (
                           <div className="mt-3 space-y-2">

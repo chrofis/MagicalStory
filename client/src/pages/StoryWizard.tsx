@@ -3039,7 +3039,7 @@ export default function StoryWizard() {
               visualBible={visualBible || undefined}
               sceneImages={displaySceneImages}
               sceneDescriptions={progressiveStoryData?.sceneDescriptions || sceneDescriptions}
-              characters={characters}
+              characters={characters.filter(c => !excludedCharacters.includes(c.id))}
               // Progressive mode props - active when generating (even before story text arrives)
               progressiveMode={isGenerating}
               progressiveData={progressiveStoryData || undefined}
