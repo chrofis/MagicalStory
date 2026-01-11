@@ -2015,6 +2015,9 @@ export default function StoryWizard() {
   const handleSaveAndGenerateAvatar = async () => {
     if (!currentCharacter) return;
 
+    // Capture character ID for closure - user may navigate to different character during generation
+    const charId = currentCharacter.id;
+
     // Clear changed traits indicator after saving
     setChangedTraits(undefined);
 
@@ -2031,9 +2034,10 @@ export default function StoryWizard() {
 
     // Start background avatar generation
     setIsGeneratingAvatar(true);
-    setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'generating' } } : prev);
+    // Only set generating status if still on same character
+    setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'generating' } } : prev);
 
-    log.info(`🎨 Starting avatar generation for ${currentCharacter.name || 'unnamed'}...`);
+    log.info(`🎨 Starting avatar generation for ${currentCharacter.name || 'unnamed'} (id: ${charId})...`);
 
     try {
       // Generate avatars with physical traits
@@ -2071,23 +2075,36 @@ export default function StoryWizard() {
           },
         } : currentCharacter.clothing;
 
-        // Update local state with new avatars and physical traits
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : prev);
+        // Update characters array first (always - using captured charId)
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
+          c.id === charId ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
         ));
+        // Only update currentCharacter if user is still on the same character
+        setCurrentCharacter(prev =>
+          prev && prev.id === charId
+            ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing }
+            : prev
+        );
 
-        log.success(`✅ Avatar generated for ${currentCharacter.name}`);
+        log.success(`✅ Avatar generated for ${currentCharacter.name} (id: ${charId})`);
       } else {
         log.error(`❌ Failed to generate avatar: ${result.error}`);
         showError(`Failed to generate avatar: ${result.error || 'Unknown error'}`);
-        // Mark as failed
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+        // Mark as failed in characters array
+        setCharacters(prev => prev.map(c =>
+          c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
+        ));
+        // Only update currentCharacter if still on same character
+        setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
       }
     } catch (error) {
       log.error(`❌ Avatar generation failed:`, error);
       showError(`Avatar generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+      // Mark as failed in characters array
+      setCharacters(prev => prev.map(c =>
+        c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
+      ));
+      setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
     } finally {
       setIsGeneratingAvatar(false);
     }
