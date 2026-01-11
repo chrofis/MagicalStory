@@ -578,11 +578,18 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
             if full_img_rgba is not None:
                 full_img_rgba = remove_faces_except(full_img_rgba, selected_face_id, all_faces)
 
-        # 7. GET BODY BOUNDS (only for single-person images)
-        # For multi-face images, we use full_img_rgba directly (already has only selected person)
+        # 7. GET BODY BOUNDS
+        # For multi-face: use alpha channel (only selected person is visible after remove_faces_except)
+        # For single-face: use the segmentation mask
         body_box = None
-        if len(all_faces) == 1 and body_mask is not None:
-            # Single person - use mask bounds to crop
+        if len(all_faces) > 1 and selected_face_id is not None and full_img_rgba is not None:
+            # Multi-face: use alpha channel to find bounds of selected person
+            alpha_mask = full_img_rgba[:, :, 3]
+            body_box = get_body_bounds_from_mask(alpha_mask, padding_percent=0.05)
+            if body_box:
+                print(f"   Body box from alpha mask: x={body_box['x']:.1f}%, y={body_box['y']:.1f}%, w={body_box['width']:.1f}%, h={body_box['height']:.1f}%")
+        elif len(all_faces) == 1 and body_mask is not None:
+            # Single person - use segmentation mask bounds
             body_box = get_body_bounds_from_mask(body_mask, padding_percent=0.05)
 
         # 8. CREATE OUTPUTS
@@ -619,17 +626,13 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
 
         # Body with transparent background
         if full_img_rgba is not None:
-            # For multi-face images: use full_img_rgba directly (only selected person visible)
-            # For single-face images: crop to body_box
-            if len(all_faces) > 1 and selected_face_id is not None:
-                # Multi-face: use full image (non-selected people are already transparent)
-                body_img_rgba = full_img_rgba.copy()
-                print(f"   Using full image for body_no_bg (multi-face, selected: {selected_face_id})")
-            elif body_box:
-                # Single-face: crop to body bounds
+            # Crop to body_box (calculated from alpha mask for multi-face, or segmentation mask for single-face)
+            if body_box:
                 body_img_rgba = crop_to_box(full_img_rgba, body_box)
+                print(f"   Cropped body_no_bg to bounds")
             else:
                 body_img_rgba = full_img_rgba.copy()
+                print(f"   Using full image for body_no_bg (no body_box)")
 
             if body_img_rgba.size > 0:
                 # Resize if too large
