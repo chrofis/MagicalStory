@@ -109,6 +109,53 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/characters/:characterId/avatars - Get full avatars for a specific character
+// Used for on-demand loading when editing a character (avoids loading all avatars upfront)
+router.get('/:characterId/avatars', authenticateToken, async (req, res) => {
+  try {
+    const { characterId } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const rowId = `characters_${req.user.id}`;
+
+    // Extract only the avatars for the specific character
+    const query = `
+      SELECT c->'avatars' as avatars
+      FROM characters, jsonb_array_elements(data->'characters') c
+      WHERE id = $1 AND (c->>'id')::bigint = $2
+    `;
+
+    const result = await dbQuery(query, [rowId, characterId]);
+
+    if (result.length === 0) {
+      // Try legacy format
+      const legacyQuery = `
+        SELECT c->'avatars' as avatars
+        FROM characters, jsonb_array_elements(data->'characters') c
+        WHERE user_id = $1 AND (c->>'id')::bigint = $2
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      const legacyResult = await dbQuery(legacyQuery, [req.user.id, characterId]);
+
+      if (legacyResult.length === 0) {
+        return res.status(404).json({ error: 'Character not found' });
+      }
+
+      return res.json({ avatars: legacyResult[0].avatars || {} });
+    }
+
+    console.log(`[Characters] GET /${characterId}/avatars - Loaded full avatars`);
+    res.json({ avatars: result[0].avatars || {} });
+  } catch (err) {
+    console.error('Error fetching character avatars:', err);
+    res.status(500).json({ error: 'Failed to fetch character avatars' });
+  }
+});
+
 // POST /api/characters - Save user's characters
 router.post('/', authenticateToken, async (req, res) => {
   try {

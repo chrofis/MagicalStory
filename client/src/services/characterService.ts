@@ -406,6 +406,21 @@ export const characterService = {
   },
 
   /**
+   * Load full avatars for a specific character (on-demand)
+   * Used when editing a character to avoid loading all avatars upfront
+   */
+  async loadCharacterAvatars(characterId: number): Promise<CharacterAvatars | null> {
+    try {
+      const response = await api.get<{ avatars: CharacterAvatars }>(`/api/characters/${characterId}/avatars`);
+      log.info(`Loaded full avatars for character ${characterId}`);
+      return response.avatars || null;
+    } catch (error) {
+      log.error(`Failed to load avatars for character ${characterId}:`, error);
+      return null;
+    }
+  },
+
+  /**
    * Generate 3 avatar options for user to choose from
    */
   async generateAvatarOptions(facePhoto: string, gender: string): Promise<{

@@ -2208,10 +2208,26 @@ export default function StoryWizard() {
     }
   };
 
-  const editCharacter = (char: Character) => {
+  const editCharacter = async (char: Character) => {
     setCurrentCharacter({ ...char });
     setCharacterStep('traits'); // Go directly to traits when editing
     setShowCharacterCreated(false);
+
+    // Load full avatars on-demand if character has avatars but they weren't loaded
+    if (char.avatars?.hasFullAvatars && !char.avatars?.standard) {
+      const fullAvatars = await characterService.loadCharacterAvatars(char.id);
+      if (fullAvatars) {
+        // Merge full avatars into the character
+        setCurrentCharacter(prev => prev && prev.id === char.id ? {
+          ...prev,
+          avatars: { ...prev.avatars, ...fullAvatars }
+        } : prev);
+        // Also update in the characters list
+        setCharacters(prev => prev.map(c =>
+          c.id === char.id ? { ...c, avatars: { ...c.avatars, ...fullAvatars } } : c
+        ));
+      }
+    }
   };
 
   const deleteCharacter = async (id: number) => {
