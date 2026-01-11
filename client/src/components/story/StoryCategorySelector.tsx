@@ -460,7 +460,15 @@ export function StoryCategorySelector({
                   className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <span>{group.icon}</span>
+                    {group.id === 'swiss' ? (
+                      <svg width="20" height="20" viewBox="0 0 32 32" className="rounded-sm">
+                        <rect width="32" height="32" fill="#FF0000"/>
+                        <rect x="13" y="6" width="6" height="20" fill="white"/>
+                        <rect x="6" y="13" width="20" height="6" fill="white"/>
+                      </svg>
+                    ) : (
+                      <span>{group.icon}</span>
+                    )}
                     {group.name[lang] || group.name.en}
                   </span>
                   {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
