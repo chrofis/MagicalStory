@@ -317,18 +317,19 @@ export function StoryDisplay({
     // Handles multiple formats from LLM:
     // Format 1: "6. **Image Summary (Deutsch)**\nSophie kniet..."
     // Format 2: "**6. Image Summary (Deutsch)**\nSophie kniet..."
-    // Format 3: "6. **Bildzusammenfassung (Deutsch)**\nSophie kniet..." (fully translated header)
+    // Format 3: "## 6. Image Summary (Deutsch)\nSophie kniet..." (markdown headers)
+    // Format 4: "6. **Bildzusammenfassung (Deutsch)**\nSophie kniet..." (fully translated header)
     const section6Match = fullDescription.match(
-      /(?:\*\*)?6\.?\s*(?:\*\*)?\s*\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*\*?\*?\s*([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.|\n---|\n```|$)/i
+      /(?:#{1,3}\s*)?(?:\*\*)?6\.?\s*(?:\*\*)?\s*\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*\*?\*?\s*:?\s*\n?([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n---|\n```|$)/i
     );
     if (section6Match && section6Match[2] && section6Match[2].trim()) {
       return section6Match[2].trim();
     }
 
     // PRIORITY 2: Look for any "Image Summary (Language)" pattern anywhere (without section number)
-    // This catches variations like "**Image Summary (Deutsch):**\nContent..."
+    // This catches variations like "**Image Summary (Deutsch):**\nContent..." or "## Image Summary (Deutsch)"
     const localizedSummaryMatch = fullDescription.match(
-      /\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*:?\s*\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.|\n\*\*|$)/i
+      /(?:#{1,3}\s*)?\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*:?\s*\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n\*\*|\n#{1,3}\s|$)/i
     );
     if (localizedSummaryMatch && localizedSummaryMatch[2] && localizedSummaryMatch[2].trim()) {
       return localizedSummaryMatch[2].trim();
