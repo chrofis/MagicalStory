@@ -1558,7 +1558,16 @@ export default function StoryWizard() {
 
     try {
       log.info(`Re-analyzing photo with selected face ID: ${faceId}`);
-      const analysis = await characterService.analyzePhoto(pendingPhotoData, language, faceId);
+      // Pass cached faces to avoid re-detection (face IDs are unstable between calls)
+      const cachedFaces = detectedFaces.map(f => ({
+        id: f.id,
+        x: f.faceBox.x,
+        y: f.faceBox.y,
+        width: f.faceBox.width,
+        height: f.faceBox.height,
+        confidence: f.confidence,
+      }));
+      const analysis = await characterService.analyzePhoto(pendingPhotoData, language, faceId, cachedFaces);
 
       if (analysis.success) {
         log.info('Photo analysis complete with selected face:', {

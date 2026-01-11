@@ -141,7 +141,6 @@ export interface CharacterAvatars {
   summer?: string;
   formal?: string;
   faceThumbnails?: Record<ClothingCategory, string>; // Extracted face thumbnails for display
-  faceThumbnail?: string; // Single face thumbnail for lightweight list display (from standard avatar)
   hasFullAvatars?: boolean; // Flag indicating full avatars exist and can be loaded on-demand
   generatedAt?: string;
   status?: 'pending' | 'generating' | 'complete' | 'failed';

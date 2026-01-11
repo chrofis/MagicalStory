@@ -1086,7 +1086,7 @@ Your task is to create a 2x2 grid:
  */
 router.post('/analyze-photo', authenticateToken, async (req, res) => {
   try {
-    const { imageData, selectedFaceId } = req.body;
+    const { imageData, selectedFaceId, cachedFaces } = req.body;
 
     if (!imageData) {
       log.debug('📸 [PHOTO] Missing imageData in request');
@@ -1095,7 +1095,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
 
     const imageSize = imageData.length;
     const imageType = imageData.substring(0, 30);
-    log.debug(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}..., selectedFaceId: ${selectedFaceId}`);
+    log.debug(`📸 [PHOTO] Received image: ${imageSize} bytes, type: ${imageType}..., selectedFaceId: ${selectedFaceId}, cachedFaces: ${cachedFaces ? cachedFaces.length : 'none'}`);
 
     const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
     log.debug(`📸 [PHOTO] Calling Python service at: ${photoAnalyzerUrl}/analyze`);
@@ -1103,13 +1103,15 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
     const startTime = Date.now();
 
     try {
-      // Call Python service with optional selectedFaceId
+      // Call Python service with optional selectedFaceId and cachedFaces
+      // cachedFaces prevents re-detection (face IDs are unstable between calls)
       const analyzerResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           image: imageData,
-          selected_face_id: selectedFaceId !== undefined ? selectedFaceId : null
+          selected_face_id: selectedFaceId !== undefined ? selectedFaceId : null,
+          cached_faces: cachedFaces || null
         }),
         signal: AbortSignal.timeout(30000)
       });

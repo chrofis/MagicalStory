@@ -1006,8 +1006,8 @@ export function CharacterForm({
   // Step 5: Avatar Review for NEW characters
   if (isNewCharacter && step === 'avatar') {
     const avatarStatus = character.avatars?.status;
-    // Use faceThumbnail for display (lightweight), fall back to full avatars if available
-    const displayAvatar = character.avatars?.faceThumbnail ||
+    // Use faceThumbnails.standard for display (lightweight), fall back to full avatars if available
+    const displayAvatar = character.avatars?.faceThumbnails?.standard ||
                           character.avatars?.standard ||
                           character.avatars?.winter ||
                           character.avatars?.summer;
@@ -1288,8 +1288,8 @@ export function CharacterForm({
           {/* Avatar section - full width of left column */}
           <div>
             {(() => {
-              // Use faceThumbnail for display, fall back to full avatar
-              const avatarToShow = character.avatars?.faceThumbnail || character.avatars?.standard;
+              // Use faceThumbnails.standard for display, fall back to full avatar
+              const avatarToShow = character.avatars?.faceThumbnails?.standard || character.avatars?.standard;
 
               if (avatarToShow) {
                 return (
@@ -1328,13 +1328,13 @@ export function CharacterForm({
               );
             })()}
             {/* Enlarged avatar modal */}
-            {enlargedAvatar && (character.avatars?.faceThumbnail || character.avatars?.standard) && (
+            {enlargedAvatar && (character.avatars?.faceThumbnails?.standard || character.avatars?.standard) && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                 onClick={() => setEnlargedAvatar(false)}
               >
                 <img
-                  src={character.avatars?.faceThumbnail || character.avatars?.standard}
+                  src={character.avatars?.faceThumbnails?.standard || character.avatars?.standard}
                   alt={`${character.name} avatar`}
                   className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
@@ -2214,9 +2214,9 @@ export function CharacterForm({
               <div className="flex flex-col md:flex-row gap-6">
                 {/* Left side (or top on mobile): Avatar preview */}
                 <div className="flex-shrink-0 flex justify-center md:justify-start">
-                  {(character.avatars?.faceThumbnail || character.avatars?.standard) ? (
+                  {(character.avatars?.faceThumbnails?.standard || character.avatars?.standard) ? (
                     <img
-                      src={character.avatars?.faceThumbnail || character.avatars?.standard}
+                      src={character.avatars?.faceThumbnails?.standard || character.avatars?.standard}
                       alt={`${character.name} avatar`}
                       className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
                     />

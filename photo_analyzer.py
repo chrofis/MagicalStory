@@ -648,7 +648,7 @@ def crop_to_box(image, box, output_size=None):
     return cropped
 
 
-def process_photo(image_data, is_base64=True, selected_face_id=None):
+def process_photo(image_data, is_base64=True, selected_face_id=None, cached_faces=None):
     """
     Process uploaded photo - FAST version with multi-face support:
 
@@ -658,9 +658,10 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
        - If multiple valid faces (>=35% confidence), return thumbnails for selection
        - If single face, process normally
 
-    2. After selection (selected_face_id=N):
+    2. After selection (selected_face_id=N, cached_faces=[...]):
+       - Use cached_faces from first call (avoids re-detection ID instability)
        - Use the selected face
-       - Blur non-selected faces in body crop
+       - Remove non-selected faces from output
 
     Returns dict with face_thumbnail, body_no_bg, and bounding boxes
     """
@@ -711,11 +712,17 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         cv2.imwrite(debug_path, detection_img)
         print(f"[DEBUG] Saved detection input to: {debug_path}")
 
-        all_faces = detect_all_faces_mediapipe(detection_img, min_confidence=0.15)
+        # Use cached faces if provided (from first call), otherwise detect
+        # This prevents face ID instability between calls
+        if cached_faces is not None and selected_face_id is not None:
+            all_faces = cached_faces
+            print(f"[FACE] Using {len(all_faces)} cached faces from previous detection")
+        else:
+            all_faces = detect_all_faces_mediapipe(detection_img, min_confidence=0.15)
 
-        # Filter out tiny faces (likely false positives - hair tips, noise)
-        # Real faces should be at least 3% of image width/height
-        all_faces = [f for f in all_faces if f['width'] >= 3.0 and f['height'] >= 3.0]
+            # Filter out tiny faces (likely false positives - hair tips, noise)
+            # Real faces should be at least 3% of image width/height
+            all_faces = [f for f in all_faces if f['width'] >= 3.0 and f['height'] >= 3.0]
 
         # DEBUG: Draw detected faces on image and save
         if len(all_faces) > 0:
@@ -1008,8 +1015,9 @@ def analyze_photo():
 
         image_data = data['image']
         selected_face_id = data.get('selected_face_id')  # None for initial, int after selection
+        cached_faces = data.get('cached_faces')  # Face data from first call (prevents re-detection ID instability)
 
-        result = process_photo(image_data, is_base64=True, selected_face_id=selected_face_id)
+        result = process_photo(image_data, is_base64=True, selected_face_id=selected_face_id, cached_faces=cached_faces)
 
         if result['success']:
             return jsonify(result), 200

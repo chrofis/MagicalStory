@@ -54,7 +54,8 @@ router.get('/', authenticateToken, async (req, res) => {
                     'status', c->'avatars'->'status',
                     'stale', c->'avatars'->'stale',
                     'generatedAt', c->'avatars'->'generatedAt',
-                    'faceThumbnail', c->'avatars'->'faceThumbnails'->'standard',
+                    'faceThumbnails', c->'avatars'->'faceThumbnails',
+                    'clothing', c->'avatars'->'clothing',
                     'hasFullAvatars', (
                       c->'avatars'->'standard' IS NOT NULL OR
                       c->'avatars'->'winter' IS NOT NULL OR
@@ -121,13 +122,34 @@ router.post('/', authenticateToken, async (req, res) => {
       const characterId = `characters_${req.user.id}`;
       console.log(`[Characters] POST - Using characterId: ${characterId}`);
 
-      // First, fetch existing data to preserve server-side additions (like styledAvatars)
-      const existingRows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
-      let existingCharacters = [];
-      if (existingRows.length > 0) {
-        const existingData = typeof existingRows[0].data === 'string' ? JSON.parse(existingRows[0].data) : existingRows[0].data;
-        existingCharacters = existingData.characters || [];
-      }
+      // Fetch ONLY the fields that need preserving (avatars, photos) - not entire 30MB blob
+      // This query extracts just the preservation-relevant fields per character
+      const preserveQuery = `
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', c->>'id',
+            'name', c->>'name',
+            'avatars', c->'avatars',
+            'photo_url', c->>'photo_url',
+            'thumbnail_url', c->>'thumbnail_url',
+            'body_photo_url', c->>'body_photo_url',
+            'body_no_bg_url', c->>'body_no_bg_url',
+            'height', c->>'height',
+            'apparent_age', c->>'apparent_age',
+            'build', c->>'build',
+            'eye_color', c->>'eye_color',
+            'hair_color', c->>'hair_color',
+            'hair_style', c->>'hair_style',
+            'other_features', c->>'other_features',
+            'other', c->>'other',
+            'clothing', c->'clothing'
+          )
+        ) as preserved
+        FROM characters, jsonb_array_elements(data->'characters') c
+        WHERE id = $1
+      `;
+      const preserveResult = await dbQuery(preserveQuery, [characterId]);
+      const existingCharacters = preserveResult[0]?.preserved || [];
 
       // Merge server-side data from existing characters into new characters
       // This preserves avatar data AND character fields that may not be sent by the frontend

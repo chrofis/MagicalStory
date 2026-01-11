@@ -725,7 +725,7 @@ export const characterService = {
     }
   },
 
-  async analyzePhoto(imageData: string, language?: string, selectedFaceId?: number): Promise<{
+  async analyzePhoto(imageData: string, language?: string, selectedFaceId?: number, cachedFaces?: Array<{ id: number; x: number; y: number; width: number; height: number; confidence: number }>): Promise<{
     success: boolean;
     error?: string;  // Error code (e.g., 'no_face_detected')
     // Multi-face detection fields
@@ -811,7 +811,7 @@ export const characterService = {
         error?: string;
         fallback?: boolean;
         _debug?: { rawResponse?: string; error?: string };
-      }>('/api/analyze-photo', { imageData, language, selectedFaceId });
+      }>('/api/analyze-photo', { imageData, language, selectedFaceId, cachedFaces });
 
       // If analysis failed (e.g., no face detected), return error
       if (!response.success) {
