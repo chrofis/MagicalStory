@@ -1769,14 +1769,24 @@ export default function StoryWizard() {
         { avatarModel: modelSelections.avatarModel || undefined }
       );
 
-      if (result.success && result.avatars) {
-        // Update local state with new avatars (explicitly clear stale flag)
-        const freshAvatars = { ...result.avatars, stale: false };
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars } : prev);
+      if (result.success && result.character) {
+        // Update local state with new avatars AND extracted traits (explicitly clear stale flag)
+        const freshAvatars = { ...result.character.avatars, stale: false };
+        setCurrentCharacter(prev => prev ? {
+          ...prev,
+          avatars: freshAvatars,
+          physical: result.character!.physical,
+          clothing: result.character!.clothing,
+        } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars } : c
+          c.id === currentCharacter.id ? {
+            ...c,
+            avatars: freshAvatars,
+            physical: result.character!.physical,
+            clothing: result.character!.clothing,
+          } : c
         ));
-        log.success(`✅ Avatars regenerated for ${currentCharacter.name}`);
+        log.success(`✅ Avatars and traits regenerated for ${currentCharacter.name}`);
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);
         showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
@@ -2058,16 +2068,39 @@ export default function StoryWizard() {
       if (result.success && result.avatars) {
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // Update physical traits with detailedHairAnalysis if available
-        const updatedPhysical = result.extractedTraits?.detailedHairAnalysis ? {
+        // Update ALL physical traits from extraction (not just detailedHairAnalysis)
+        const updatedPhysical = result.extractedTraits ? {
           ...currentCharacter.physical,
-          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis,
+          build: result.extractedTraits.build || currentCharacter.physical?.build,
+          eyeColor: result.extractedTraits.eyeColor || currentCharacter.physical?.eyeColor,
+          eyeColorHex: result.extractedTraits.eyeColorHex || currentCharacter.physical?.eyeColorHex,
+          hairColor: result.extractedTraits.hairColor || currentCharacter.physical?.hairColor,
+          hairColorHex: result.extractedTraits.hairColorHex || currentCharacter.physical?.hairColorHex,
+          hairLength: result.extractedTraits.hairLength || currentCharacter.physical?.hairLength,
+          hairStyle: result.extractedTraits.hairStyle || currentCharacter.physical?.hairStyle,
+          facialHair: result.extractedTraits.facialHair || currentCharacter.physical?.facialHair,
+          skinTone: result.extractedTraits.skinTone || currentCharacter.physical?.skinTone,
+          skinToneHex: result.extractedTraits.skinToneHex || currentCharacter.physical?.skinToneHex,
+          face: result.extractedTraits.face || currentCharacter.physical?.face,
+          other: result.extractedTraits.other || currentCharacter.physical?.other,
+          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || currentCharacter.physical?.detailedHairAnalysis,
         } : currentCharacter.physical;
 
+        // Update extracted clothing too
+        const updatedClothing = result.extractedClothing ? {
+          ...currentCharacter.clothing,
+          structured: {
+            upperBody: result.extractedClothing.upperBody || undefined,
+            lowerBody: result.extractedClothing.lowerBody || undefined,
+            shoes: result.extractedClothing.shoes || undefined,
+            fullBody: result.extractedClothing.fullBody || undefined,
+          },
+        } : currentCharacter.clothing;
+
         // Update local state with new avatars and physical traits
-        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars, physical: updatedPhysical } : prev);
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical } : c
+          c.id === currentCharacter.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
         ));
 
         log.success(`✅ Avatar generated for ${currentCharacter.name}`);
@@ -2574,22 +2607,44 @@ export default function StoryWizard() {
 
           if (result.success && result.avatars) {
             const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
-            // Update physical traits with detailedHairAnalysis if available
-            const updatedPhysical = result.extractedTraits?.detailedHairAnalysis ? {
+            // Update ALL physical traits from extraction (not just detailedHairAnalysis)
+            const updatedPhysical = result.extractedTraits ? {
               ...char.physical,
-              detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis,
+              build: result.extractedTraits.build || char.physical?.build,
+              eyeColor: result.extractedTraits.eyeColor || char.physical?.eyeColor,
+              eyeColorHex: result.extractedTraits.eyeColorHex || char.physical?.eyeColorHex,
+              hairColor: result.extractedTraits.hairColor || char.physical?.hairColor,
+              hairColorHex: result.extractedTraits.hairColorHex || char.physical?.hairColorHex,
+              hairLength: result.extractedTraits.hairLength || char.physical?.hairLength,
+              hairStyle: result.extractedTraits.hairStyle || char.physical?.hairStyle,
+              facialHair: result.extractedTraits.facialHair || char.physical?.facialHair,
+              skinTone: result.extractedTraits.skinTone || char.physical?.skinTone,
+              skinToneHex: result.extractedTraits.skinToneHex || char.physical?.skinToneHex,
+              face: result.extractedTraits.face || char.physical?.face,
+              other: result.extractedTraits.other || char.physical?.other,
+              detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || char.physical?.detailedHairAnalysis,
             } : char.physical;
+            // Update extracted clothing too
+            const updatedClothing = result.extractedClothing ? {
+              ...char.clothing,
+              structured: {
+                upperBody: result.extractedClothing.upperBody || undefined,
+                lowerBody: result.extractedClothing.lowerBody || undefined,
+                shoes: result.extractedClothing.shoes || undefined,
+                fullBody: result.extractedClothing.fullBody || undefined,
+              },
+            } : char.clothing;
             // Update characters state
             setCharacters(prev => prev.map(c =>
-              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical } : c
+              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
             ));
             // Also update currentCharacter if it matches
-            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical } : prev);
+            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : prev);
             // Save to storage using local state to preserve any unsaved changes
             // Use functional update to get latest characters state
             setCharacters(prevChars => {
               const updatedCharsForSave = prevChars.map(c =>
-                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical } : c
+                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
               );
               // Fire save in background (don't await to avoid blocking)
               characterService.saveCharacterData({

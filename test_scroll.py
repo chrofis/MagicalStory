@@ -10,28 +10,45 @@ def main():
         page.goto('https://magicalstory.ch')
         time.sleep(3)
         
-        print("Scrolling through the page slowly...", flush=True)
-        # Smooth scroll through the page
-        for i in range(20):
-            page.evaluate('window.scrollBy({top: 300, behavior: "smooth"})')
-            time.sleep(1)
+        # Get page height
+        height = page.evaluate('document.body.scrollHeight')
+        print(f"Page height: {height}px", flush=True)
         
-        # Scroll back to top
-        print("Back to top...", flush=True)
-        page.evaluate('window.scrollTo({top: 0, behavior: "smooth"})')
+        print("Scrolling slowly through entire page...", flush=True)
+        scroll_pos = 0
+        step = 200
+        
+        while scroll_pos < height:
+            page.evaluate(f'window.scrollTo({{top: {scroll_pos}, behavior: "smooth"}})')
+            time.sleep(0.8)
+            scroll_pos += step
+            # Update height in case of lazy loading
+            height = page.evaluate('document.body.scrollHeight')
+        
+        print("Reached bottom! Scrolling back up...", flush=True)
         time.sleep(2)
         
-        # Now test mobile view
-        print("Testing mobile view...", flush=True)
+        # Scroll back to top slowly
+        while scroll_pos > 0:
+            scroll_pos -= step
+            page.evaluate(f'window.scrollTo({{top: {scroll_pos}, behavior: "smooth"}})')
+            time.sleep(0.5)
+        
+        print("Now mobile view...", flush=True)
         page.set_viewport_size({'width': 375, 'height': 812})
         time.sleep(2)
         
-        print("Scrolling mobile view...", flush=True)
-        for i in range(15):
-            page.evaluate('window.scrollBy({top: 400, behavior: "smooth"})')
-            time.sleep(1)
+        height = page.evaluate('document.body.scrollHeight')
+        print(f"Mobile page height: {height}px", flush=True)
         
-        print("Done! Keeping browser open for 2 minutes...", flush=True)
+        scroll_pos = 0
+        while scroll_pos < height:
+            page.evaluate(f'window.scrollTo({{top: {scroll_pos}, behavior: "smooth"}})')
+            time.sleep(0.8)
+            scroll_pos += step
+            height = page.evaluate('document.body.scrollHeight')
+        
+        print("Done scrolling! Keeping open for 2 min...", flush=True)
         time.sleep(120)
         browser.close()
 
