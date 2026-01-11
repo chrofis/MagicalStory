@@ -434,7 +434,7 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
     // Save back
     const dataJson = JSON.stringify(characterData);
     await dbQuery(
-      `UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2`,
+      `UPDATE characters SET data = $1 WHERE id = $2`,
       [dataJson, rowId]
     );
 
