@@ -774,7 +774,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
                     face_thumbnails.append({
                         'id': face['id'],
                         'confidence': round(face['confidence'], 2),
-                        'face_box': {
+                        'faceBox': {
                             'x': face['x'],
                             'y': face['y'],
                             'width': face['width'],
