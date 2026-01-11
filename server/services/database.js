@@ -68,6 +68,7 @@ async function initializeDatabase() {
     // Test connection first
     await dbPool.query('SELECT 1');
     console.log('✓ Database connection successful');
+    console.log('>>> STARTING TABLE INITIALIZATION <<<');
 
     // PostgreSQL table creation
     await dbPool.query(`
@@ -393,6 +394,7 @@ async function initializeDatabase() {
       console.log('✓ Default pricing tiers seeded');
     }
 
+    console.log('>>> FINISHED TABLE INITIALIZATION <<<');
     console.log('✓ Database tables initialized');
 
   } catch (err) {

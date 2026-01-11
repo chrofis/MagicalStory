@@ -313,49 +313,28 @@ def detect_all_faces_mediapipe_tasks(image, min_confidence=0.15):
 
 def detect_all_faces_mediapipe(image, min_confidence=0.15):
     """
-    Detect ALL faces - tries RetinaFace first (best), then MediaPipe, then OpenCV.
-    Returns list of faces sorted by confidence (highest first).
-    Filters out faces below min_confidence threshold.
+    Detect ALL faces using MTCNN (most accurate).
+    Falls back to MediaPipe only if MTCNN not available.
+    No OpenCV fallback to avoid false positives.
 
     Returns: list of {id, x, y, width, height, confidence}
     """
-    # Try MTCNN first (most accurate)
+    # Use MTCNN (most accurate) - no fallbacks to avoid false positives
     if MTCNN_AVAILABLE:
-        faces = detect_all_faces_mtcnn(image, min_confidence=0.9)  # MTCNN is accurate, use high threshold
-        if len(faces) > 0:
-            return faces
-        print("[FACE] MTCNN found 0 faces, trying MediaPipe...")
+        return detect_all_faces_mtcnn(image, min_confidence=0.9)
 
-    # Try MediaPipe Tasks API first (Python 3.14+)
+    # Fall back to MediaPipe Tasks API if MTCNN not available
     if MEDIAPIPE_TASKS_AVAILABLE:
-        # Tasks API has worse detection than legacy - use lower threshold initially
-        faces = detect_all_faces_mediapipe_tasks(image, min_confidence=0.05)
-
-        # Filter by the requested confidence threshold
-        high_conf_faces = [f for f in faces if f['confidence'] >= min_confidence]
-
-        # If we have few high-confidence faces, also try OpenCV
-        # OpenCV often detects faces that Tasks API misses (especially in group photos)
-        if len(high_conf_faces) < 2:
-            opencv_faces = detect_all_faces_opencv(image)
-            if len(opencv_faces) > len(high_conf_faces):
-                print(f"[FACE] Tasks API found {len(high_conf_faces)} (>={min_confidence}), OpenCV found {len(opencv_faces)} - using OpenCV")
-                faces = opencv_faces
-            else:
-                faces = high_conf_faces
-        else:
-            faces = high_conf_faces
-
-        # Re-sort and re-number
+        faces = detect_all_faces_mediapipe_tasks(image, min_confidence=min_confidence)
         faces.sort(key=lambda f: f['confidence'], reverse=True)
         for i, face in enumerate(faces):
             face['id'] = i
-
         return faces
 
+    # Fall back to legacy MediaPipe if Tasks API not available
     if not MEDIAPIPE_AVAILABLE:
-        # Fallback to OpenCV when MediaPipe is not available
-        return detect_all_faces_opencv(image)
+        print("[WARN] No face detector available (MTCNN, MediaPipe Tasks, or MediaPipe legacy)")
+        return []
 
     faces = []
     rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -409,14 +388,6 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
     faces.sort(key=lambda f: f['confidence'], reverse=True)
     for i, face in enumerate(faces):
         face['id'] = i
-
-    # If legacy MediaPipe found few faces, also try OpenCV as backup
-    # OpenCV sometimes detects faces that MediaPipe misses (especially in group photos)
-    if len(faces) < 2:
-        opencv_faces = detect_all_faces_opencv(image)
-        if len(opencv_faces) > len(faces):
-            print(f"[FACE] Legacy MediaPipe found {len(faces)}, OpenCV found {len(opencv_faces)} - using OpenCV")
-            return opencv_faces
 
     return faces
 
