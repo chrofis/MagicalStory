@@ -803,10 +803,8 @@ export const storyService = {
     // Timeout after 2 minutes of no response
     const STREAM_TIMEOUT_MS = 120000;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let lastActivityTime = Date.now();
 
     const resetTimeout = () => {
-      lastActivityTime = Date.now();
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         console.warn('[generateStoryIdeasStream] Stream timeout - no activity for 2 minutes');
