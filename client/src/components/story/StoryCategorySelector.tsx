@@ -216,23 +216,33 @@ export function StoryCategorySelector({
           {t.storyType}
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           {storyCategories.map((category) => (
             <button
               key={category.id}
               onClick={() => handleCategorySelect(category.id as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom')}
-              className={`p-6 rounded-xl border-2 transition-all text-left ${
+              className={`p-3 md:p-6 rounded-xl border-2 transition-all ${
                 category.id === 'custom'
                   ? 'border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50'
                   : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
               }`}
             >
-              <div className="text-4xl mb-3">{category.emoji}</div>
-              <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
-                {category.name[lang] || category.name.en}
+              {/* Mobile: horizontal layout with emoji left, title centered */}
+              <div className="flex md:hidden items-center gap-3">
+                <div className="text-3xl flex-shrink-0">{category.emoji}</div>
+                <div className={`flex-1 text-center font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
+                  {category.name[lang] || category.name.en}
+                </div>
               </div>
-              <div className="text-sm text-gray-600 mt-1">
-                {category.description[lang] || category.description.en}
+              {/* Desktop: vertical layout with emoji, title, description */}
+              <div className="hidden md:block text-left">
+                <div className="text-4xl mb-3">{category.emoji}</div>
+                <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
+                  {category.name[lang] || category.name.en}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">
+                  {category.description[lang] || category.description.en}
+                </div>
               </div>
             </button>
           ))}
