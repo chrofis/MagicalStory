@@ -371,17 +371,18 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// DELETE /api/characters/avatars/all - Clear all avatar data (admin only)
-// Useful for cleaning up large avatar data that slows down loading
+// DELETE /api/characters/avatars/styled - Clear styled/costumed avatar data (admin only)
+// Keeps base clothing avatars (winter, standard, summer, formal)
+// Only removes styledAvatars and costumed which are the bulk of the data
 // NOTE: Must be defined BEFORE /:characterId to avoid route conflict
-router.delete('/avatars/all', authenticateToken, async (req, res) => {
+router.delete('/avatars/styled', authenticateToken, async (req, res) => {
   try {
     // Admin only
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    console.log(`[Characters] DELETE /avatars/all - Admin ${req.user.id} clearing all avatars`);
+    console.log(`[Characters] DELETE /avatars/styled - Admin ${req.user.id} clearing styled/costumed avatars`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -400,14 +401,34 @@ router.delete('/avatars/all', authenticateToken, async (req, res) => {
 
     let clearedCount = 0;
     let totalSizeCleared = 0;
+    let styledCount = 0;
+    let costumedCount = 0;
 
     for (const char of characters) {
       if (char.avatars) {
-        const avatarJson = JSON.stringify(char.avatars);
-        totalSizeCleared += avatarJson.length;
-        console.log(`  Clearing avatars for ${char.name}: ${Object.keys(char.avatars).join(', ')}`);
-        delete char.avatars;
-        clearedCount++;
+        let charCleared = false;
+
+        // Clear styledAvatars (art-style converted avatars like Pixar, watercolor)
+        if (char.avatars.styledAvatars) {
+          const styledJson = JSON.stringify(char.avatars.styledAvatars);
+          totalSizeCleared += styledJson.length;
+          styledCount += Object.keys(char.avatars.styledAvatars).length;
+          console.log(`  Clearing styledAvatars for ${char.name}: ${Object.keys(char.avatars.styledAvatars).join(', ')}`);
+          delete char.avatars.styledAvatars;
+          charCleared = true;
+        }
+
+        // Clear costumed avatars (Cowboy, Pirate, etc.)
+        if (char.avatars.costumed) {
+          const costumedJson = JSON.stringify(char.avatars.costumed);
+          totalSizeCleared += costumedJson.length;
+          costumedCount += Object.keys(char.avatars.costumed).length;
+          console.log(`  Clearing costumed for ${char.name}: ${Object.keys(char.avatars.costumed).join(', ')}`);
+          delete char.avatars.costumed;
+          charCleared = true;
+        }
+
+        if (charCleared) clearedCount++;
       }
     }
 
@@ -415,21 +436,23 @@ router.delete('/avatars/all', authenticateToken, async (req, res) => {
     await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
 
     const sizeMB = (totalSizeCleared / 1024 / 1024).toFixed(2);
-    console.log(`[Characters] DELETE /avatars/all - Cleared ${clearedCount} characters, ${sizeMB}MB of avatar data`);
+    console.log(`[Characters] DELETE /avatars/styled - Cleared ${styledCount} styled + ${costumedCount} costumed avatars from ${clearedCount} characters, ${sizeMB}MB`);
 
     res.json({
       success: true,
-      message: `Cleared avatars for ${clearedCount} characters`,
-      clearedSizeMB: parseFloat(sizeMB)
+      message: `Cleared ${styledCount} styled + ${costumedCount} costumed avatars from ${clearedCount} characters`,
+      clearedSizeMB: parseFloat(sizeMB),
+      styledCount,
+      costumedCount
     });
   } catch (err) {
-    console.error('Error clearing avatars:', err);
-    res.status(500).json({ error: 'Failed to clear avatars' });
+    console.error('Error clearing styled avatars:', err);
+    res.status(500).json({ error: 'Failed to clear styled avatars' });
   }
 });
 
 // DELETE /api/characters/:characterId - Delete a single character
-// Much faster than re-uploading all characters via POST
+// Uses PostgreSQL JSONB functions to avoid loading entire data blob into Node.js
 router.delete('/:characterId', authenticateToken, async (req, res) => {
   try {
     const characterIdToDelete = parseInt(req.params.characterId, 10);
@@ -443,69 +466,72 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Fetch current character data
     const rowId = `characters_${req.user.id}`;
-    const rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [rowId]);
 
-    if (rows.length === 0) {
-      return res.status(404).json({ error: 'No character data found' });
-    }
+    // First, get ONLY the character name (not the full data blob)
+    const nameResult = await dbQuery(`
+      SELECT c.elem->>'name' as name
+      FROM characters,
+           jsonb_array_elements(data::jsonb->'characters') WITH ORDINALITY AS c(elem, idx)
+      WHERE id = $1
+        AND (c.elem->>'id')::bigint = $2
+    `, [rowId, characterIdToDelete]);
 
-    const data = JSON.parse(rows[0].data);
-
-    // Handle both old format (array) and new format (object)
-    let characterData;
-    if (Array.isArray(data)) {
-      characterData = { characters: data, relationships: {}, relationshipTexts: {} };
-    } else {
-      characterData = data;
-    }
-
-    // Check if character exists
-    const charIndex = characterData.characters.findIndex(c => c.id === characterIdToDelete);
-    if (charIndex === -1) {
+    if (nameResult.length === 0) {
       return res.status(404).json({ error: 'Character not found' });
     }
 
-    const deletedCharName = characterData.characters[charIndex].name;
+    const deletedCharName = nameResult[0].name;
 
-    // Remove the character
-    characterData.characters = characterData.characters.filter(c => c.id !== characterIdToDelete);
+    // Use PostgreSQL to filter out the character and clean relationships IN-PLACE
+    // This avoids loading 30+ MB of JSON into Node.js
+    const updateResult = await dbQuery(`
+      UPDATE characters
+      SET data = (
+        SELECT jsonb_build_object(
+          'characters', COALESCE(
+            (SELECT jsonb_agg(c)
+             FROM jsonb_array_elements(data::jsonb->'characters') c
+             WHERE (c->>'id')::bigint != $2),
+            '[]'::jsonb
+          ),
+          'relationships', COALESCE(
+            (SELECT jsonb_object_agg(key, value)
+             FROM jsonb_each(data::jsonb->'relationships')
+             WHERE key NOT LIKE '%' || $2::text || '-%'
+               AND key NOT LIKE '%-' || $2::text),
+            '{}'::jsonb
+          ),
+          'relationshipTexts', COALESCE(
+            (SELECT jsonb_object_agg(key, value)
+             FROM jsonb_each(data::jsonb->'relationshipTexts')
+             WHERE key NOT LIKE '%' || $2::text || '-%'
+               AND key NOT LIKE '%-' || $2::text),
+            '{}'::jsonb
+          ),
+          'customRelationships', COALESCE(data::jsonb->'customRelationships', '[]'::jsonb),
+          'customStrengths', COALESCE(data::jsonb->'customStrengths', '[]'::jsonb),
+          'customWeaknesses', COALESCE(data::jsonb->'customWeaknesses', '[]'::jsonb),
+          'customFears', COALESCE(data::jsonb->'customFears', '[]'::jsonb)
+        )::text
+      )
+      WHERE id = $1
+      RETURNING jsonb_array_length((data::jsonb)->'characters') as remaining_count
+    `, [rowId, characterIdToDelete]);
 
-    // Clean up relationships involving this character
-    if (characterData.relationships) {
-      Object.keys(characterData.relationships).forEach(key => {
-        if (key.includes(`${characterIdToDelete}-`) || key.includes(`-${characterIdToDelete}`)) {
-          delete characterData.relationships[key];
-        }
-      });
-    }
-    if (characterData.relationshipTexts) {
-      Object.keys(characterData.relationshipTexts).forEach(key => {
-        if (key.includes(`${characterIdToDelete}-`) || key.includes(`-${characterIdToDelete}`)) {
-          delete characterData.relationshipTexts[key];
-        }
-      });
-    }
-
-    // Save back
-    const dataJson = JSON.stringify(characterData);
-    await dbQuery(
-      `UPDATE characters SET data = $1 WHERE id = $2`,
-      [dataJson, rowId]
-    );
+    const remainingCount = updateResult[0]?.remaining_count || 0;
 
     await logActivity(req.user.id, req.user.username, 'CHARACTER_DELETED', {
       characterId: characterIdToDelete,
       characterName: deletedCharName,
-      remainingCount: characterData.characters.length
+      remainingCount
     });
 
-    console.log(`[Characters] DELETE - Successfully deleted character ${characterIdToDelete} (${deletedCharName})`);
+    console.log(`[Characters] DELETE - Successfully deleted character ${characterIdToDelete} (${deletedCharName}) - ${remainingCount} remaining`);
     res.json({
       success: true,
       message: `Character "${deletedCharName}" deleted`,
-      remainingCount: characterData.characters.length
+      remainingCount
     });
   } catch (err) {
     console.error('Error deleting character:', err);
