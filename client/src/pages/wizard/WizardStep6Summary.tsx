@@ -80,8 +80,8 @@ export function WizardStep6Summary({
   pages,
   userLocation,
   season,
-  storyDetails,
-  onStoryDetailsChange,
+  storyDetails: _storyDetails,
+  onStoryDetailsChange: _onStoryDetailsChange,
   dedication,
   onDedicationChange,
   onGenerateIdeas,
@@ -392,117 +392,104 @@ export function WizardStep6Summary({
           </div>
         )}
 
-        {/* Two-idea selection UI - show grid as soon as we have any ideas or are generating */}
-        {(editableIdeas.length >= 1 || isGeneratingIdea1 || isGeneratingIdea2) ? (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600 mb-2">{t.chooseIdea}</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[0, 1].map((index) => {
-                const idea = editableIdeas[index] || '';
-                const hasIdea = !!idea;
-                // Show loading if we're generating and don't have this story yet
-                const isLoading = isGeneratingIdeas && !hasIdea;
-                const isSelected = selectedOption === index;
-                const optionTitle = index === 0 ? t.option1 : t.option2;
+        {/* Two-idea selection UI - always show grid layout for consistency */}
+        <div className="space-y-4">
+          <p className="text-sm text-gray-600 mb-2">{t.chooseIdea}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {[0, 1].map((index) => {
+              const idea = editableIdeas[index] || '';
+              const hasIdea = !!idea;
+              // Show loading if we're generating this specific idea and don't have it yet
+              const isLoading = (index === 0 ? isGeneratingIdea1 : isGeneratingIdea2) && !hasIdea;
+              const isSelected = selectedOption === index;
+              const optionTitle = index === 0 ? t.option1 : t.option2;
 
-                return (
-                  <div
-                    key={index}
-                    className={`flex flex-col rounded-xl overflow-hidden transition-all ${
-                      isLoading
-                        ? 'ring-1 ring-gray-200 opacity-75'
-                        : isSelected
-                        ? 'ring-4 ring-green-500 shadow-lg shadow-green-100'
-                        : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-indigo-300'
-                    }`}
-                  >
-                    {/* Title bar */}
-                    <div className={`px-4 py-2 font-semibold flex items-center justify-between ${
-                      isLoading
-                        ? 'bg-gray-100 text-gray-500'
-                        : isSelected
-                        ? 'bg-green-500 text-white'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      <span>{optionTitle}</span>
-                      {isSelected && !isLoading && (
-                        <span className="flex items-center gap-1 text-sm">
-                          <Check size={16} />
-                          {t.selected}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Content area */}
-                    {isLoading ? (
-                      <div className="flex items-center justify-center h-64 bg-gray-50">
-                        <div className="text-center text-gray-500">
-                          <Loader2 size={32} className="animate-spin mx-auto mb-2" />
-                          <p className="text-sm">
-                            {lang === 'de' ? 'Geschichte wird erstellt...' :
-                             lang === 'fr' ? 'Création de l\'histoire...' :
-                             'Creating story idea...'}
-                          </p>
-                        </div>
-                      </div>
-                    ) : hasIdea ? (
-                      <>
-                        {/* Textarea */}
-                        <textarea
-                          value={idea}
-                          onChange={(e) => {
-                            const newIdeas = [...editableIdeas];
-                            newIdeas[index] = e.target.value;
-                            setEditableIdeas(newIdeas);
-                            // If this option was selected, update the story details too
-                            if (isSelected) {
-                              onSelectIdea(e.target.value);
-                            }
-                          }}
-                          className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${
-                            isSelected ? 'bg-green-50' : 'bg-white'
-                          }`}
-                          rows={10}
-                        />
-                        {/* Select button */}
-                        <button
-                          onClick={() => handleSelectOption(index)}
-                          className={`flex items-center justify-center gap-2 px-4 py-3 font-semibold transition-all ${
-                            isSelected
-                              ? 'bg-green-600 text-white cursor-default'
-                              : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                          }`}
-                        >
-                          <Check size={18} />
-                          {isSelected ? t.selected : t.useThis}
-                        </button>
-                      </>
-                    ) : (
-                      <div className="flex items-center justify-center h-64 bg-gray-50 text-gray-400">
-                        <p className="text-sm">
-                          {lang === 'de' ? 'Warte auf Idee...' :
-                           lang === 'fr' ? 'En attente...' :
-                           'Waiting...'}
-                        </p>
-                      </div>
+              return (
+                <div
+                  key={index}
+                  className={`flex flex-col rounded-xl overflow-hidden transition-all ${
+                    isLoading
+                      ? 'ring-1 ring-gray-200 opacity-75'
+                      : isSelected
+                      ? 'ring-4 ring-green-500 shadow-lg shadow-green-100'
+                      : 'ring-1 ring-gray-200 hover:ring-2 hover:ring-indigo-300'
+                  }`}
+                >
+                  {/* Title bar */}
+                  <div className={`px-4 py-2 font-semibold flex items-center justify-between ${
+                    isLoading
+                      ? 'bg-gray-100 text-gray-500'
+                      : isSelected
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    <span>{optionTitle}</span>
+                    {isSelected && !isLoading && (
+                      <span className="flex items-center gap-1 text-sm">
+                        <Check size={16} />
+                        {t.selected}
+                      </span>
                     )}
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Content area */}
+                  {isLoading ? (
+                    <div className="flex items-center justify-center h-64 bg-gray-50">
+                      <div className="text-center text-gray-500">
+                        <Loader2 size={32} className="animate-spin mx-auto mb-2" />
+                        <p className="text-sm">
+                          {lang === 'de' ? 'Geschichte wird erstellt...' :
+                           lang === 'fr' ? 'Création de l\'histoire...' :
+                           'Creating story idea...'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : hasIdea ? (
+                    <>
+                      {/* Textarea */}
+                      <textarea
+                        value={idea}
+                        onChange={(e) => {
+                          const newIdeas = [...editableIdeas];
+                          newIdeas[index] = e.target.value;
+                          setEditableIdeas(newIdeas);
+                          // If this option was selected, update the story details too
+                          if (isSelected) {
+                            onSelectIdea(e.target.value);
+                          }
+                        }}
+                        className={`w-full px-4 py-3 border-0 focus:outline-none focus:ring-0 text-base resize-none ${
+                          isSelected ? 'bg-green-50' : 'bg-white'
+                        }`}
+                        rows={10}
+                      />
+                      {/* Select button */}
+                      <button
+                        onClick={() => handleSelectOption(index)}
+                        className={`flex items-center justify-center gap-2 px-4 py-3 font-semibold transition-all ${
+                          isSelected
+                            ? 'bg-green-600 text-white cursor-default'
+                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                        }`}
+                      >
+                        <Check size={18} />
+                        {isSelected ? t.selected : t.useThis}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-center h-64 bg-gray-50 text-gray-400">
+                      <p className="text-sm">
+                        {lang === 'de' ? 'Klicke auf "Vorschlag generieren"' :
+                         lang === 'fr' ? 'Cliquez sur "Générer"' :
+                         'Click "Generate Suggestion"'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        ) : (
-          <textarea
-            value={storyDetails}
-            onChange={(e) => onStoryDetailsChange(e.target.value)}
-            placeholder={t.storyDetailsPlaceholder}
-            className={`w-full px-3 py-2 border-2 rounded-lg focus:border-indigo-600 focus:outline-none text-base ${
-              storyDetails.trim() ? 'border-gray-300' : 'border-orange-300 bg-orange-50'
-            }`}
-            rows={6}
-            disabled={isGeneratingIdeas}
-          />
-        )}
+        </div>
       </div>
 
       {/* Dedication - Optional */}
