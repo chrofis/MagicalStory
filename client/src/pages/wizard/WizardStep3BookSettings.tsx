@@ -292,13 +292,13 @@ export function WizardStep3BookSettings({
             <button
               key={level.value}
               onClick={() => onLanguageLevelChange(level.value)}
-              className={`flex-shrink-0 w-36 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
+              className={`flex-shrink-0 w-56 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
                 languageLevel === level.value
                   ? 'border-indigo-600 ring-2 ring-indigo-200'
                   : 'border-gray-200 hover:border-indigo-300'
               }`}
             >
-              <div className="w-full bg-gray-100 p-2 h-24 md:h-28">
+              <div className="w-full bg-gray-100 p-2 h-48 md:h-56">
                 <img
                   src={level.image}
                   alt={level.label}
