@@ -933,9 +933,15 @@ export const characterService = {
       }
 
       // Update the character with new avatars and extracted data
-      const updatedCharacters = currentData.characters.map(c =>
-        c.id === character.id ? updatedCharacter : c
-      );
+      // Check if character exists in the list (might be new character not yet saved)
+      const characterExists = currentData.characters.some(c => c.id === character.id);
+      const updatedCharacters = characterExists
+        ? currentData.characters.map(c => c.id === character.id ? updatedCharacter : c)
+        : [...currentData.characters, updatedCharacter]; // Add new character if not found
+
+      if (!characterExists) {
+        log.info(`📝 Character ${character.name} (id: ${character.id}) not found in server data - adding it`);
+      }
 
       // Save back
       await characterService.saveCharacterData({
