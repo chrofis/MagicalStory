@@ -787,12 +787,17 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
         # 6. REMOVE NON-SELECTED FACES (if multiple faces and one was selected)
         # Make them transparent so AI can't use them for avatar generation
         if len(all_faces) > 1 and selected_face_id is not None:
-            print(f"[REMOVE] Removing {len(all_faces) - 1} non-selected faces...")
+            print(f"[REMOVE] Removing {len(all_faces) - 1} non-selected faces, keeping ID {selected_face_id}")
+            print(f"[REMOVE] all_faces: {[(f.get('id'), f.get('x'), f.get('y')) for f in all_faces]}")
             if full_img_rgba is not None:
+                h, w = full_img_rgba.shape[:2]
+                visible_before = np.sum(full_img_rgba[:,:,3] > 0)
+                print(f"[REMOVE] Before: {visible_before}/{h*w} pixels visible ({100*visible_before/(h*w):.1f}%)")
+
                 full_img_rgba = remove_faces_except(full_img_rgba, selected_face_id, all_faces)
 
-                # Note: Re-segmentation was causing issues (removing selected face)
-                # The midpoint-based removal should be sufficient for now
+                visible_after = np.sum(full_img_rgba[:,:,3] > 0)
+                print(f"[REMOVE] After: {visible_after}/{h*w} pixels visible ({100*visible_after/(h*w):.1f}%)")
                 print("   Face removal complete")
 
         # 7. GET BODY BOUNDS
@@ -1406,13 +1411,19 @@ def extract_face():
                 (face_box['x'] + face_box['width']) / 100    # xmax
             ]
 
-            # Add 10% padding around face for context (but minimal to exclude shoulders)
-            padding = 0.10
+            # Asymmetric padding: more on top for hair/head, less on bottom to exclude shoulders
+            padding_top = 0.40     # 40% above face for hair/forehead
+            padding_bottom = 0.05  # 5% below face (minimal, exclude shoulders)
+            padding_sides = 0.15   # 15% on sides for ears/hair
+
+            face_height = face_bbox[2] - face_bbox[0]
+            face_width = face_bbox[3] - face_bbox[1]
+
             face_bbox_padded = [
-                max(0, face_bbox[0] - (face_bbox[2] - face_bbox[0]) * padding),  # ymin
-                max(0, face_bbox[1] - (face_bbox[3] - face_bbox[1]) * padding),  # xmin
-                min(1, face_bbox[2] + (face_bbox[2] - face_bbox[0]) * padding),  # ymax
-                min(1, face_bbox[3] + (face_bbox[3] - face_bbox[1]) * padding)   # xmax
+                max(0, face_bbox[0] - face_height * padding_top),     # ymin (top)
+                max(0, face_bbox[1] - face_width * padding_sides),    # xmin (left)
+                min(1, face_bbox[2] + face_height * padding_bottom),  # ymax (bottom)
+                min(1, face_bbox[3] + face_width * padding_sides)     # xmax (right)
             ]
 
             # Crop to face
