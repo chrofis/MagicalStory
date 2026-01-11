@@ -746,6 +746,15 @@ export function CharacterForm({
           </div>
         </div>
 
+        {/* Required fields message */}
+        {!canSaveName && (character.name?.trim().length >= 2) && (
+          <p className="text-sm text-red-500 text-center">
+            {language === 'de' ? 'Bitte Geschlecht und Alter eingeben' :
+             language === 'fr' ? 'Veuillez entrer le sexe et l\'âge' :
+             'Please enter gender and age'}
+          </p>
+        )}
+
         {/* Buttons */}
         <div className="flex gap-3">
           {onCancel && (
