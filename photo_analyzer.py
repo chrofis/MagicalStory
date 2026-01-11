@@ -164,7 +164,7 @@ def detect_all_faces_opencv(image):
     return faces
 
 
-def detect_all_faces_mediapipe(image, min_confidence=0.35):
+def detect_all_faces_mediapipe(image, min_confidence=0.15):
     """
     Detect ALL faces using MediaPipe Face Detection.
     Falls back to OpenCV Haar cascade if MediaPipe is unavailable.
@@ -503,7 +503,7 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
 
         # 2. DETECT ALL FACES (fast - ~50ms)
         print("[FACE] Detecting faces...")
-        all_faces = detect_all_faces_mediapipe(img, min_confidence=0.35)
+        all_faces = detect_all_faces_mediapipe(img, min_confidence=0.15)
         print(f"   Faces detected: {len(all_faces)}")
 
         # If no face detected, return error immediately
