@@ -68,7 +68,6 @@ async function initializeDatabase() {
     // Test connection first
     await dbPool.query('SELECT 1');
     console.log('✓ Database connection successful');
-    console.log('>>> STARTING TABLE INITIALIZATION <<<');
 
     // PostgreSQL table creation
     await dbPool.query(`
@@ -139,49 +138,16 @@ async function initializeDatabase() {
       )
     `);
 
-    // Characters table
+    // Characters table (data is JSONB for fast queries)
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS characters (
         id VARCHAR(255) PRIMARY KEY,
         user_id VARCHAR(255) NOT NULL,
-        data TEXT NOT NULL,
+        data JSONB NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_characters_user_id ON characters(user_id)`);
-
-    // Migration: Convert characters.data from TEXT to JSONB for faster operations
-    // Check if column is still TEXT and convert if needed
-    console.log('[DB] Checking characters.data column type...');
-    const charColType = await dbPool.query(`
-      SELECT data_type FROM information_schema.columns
-      WHERE table_name = 'characters' AND column_name = 'data'
-    `);
-    const currentType = charColType.rows[0]?.data_type?.toLowerCase();
-    console.log(`[DB] Characters data column type: "${currentType}" (rows: ${charColType.rows.length})`);
-    console.log(`[DB] Full result: ${JSON.stringify(charColType.rows)}`);
-    if (currentType === 'text') {
-      console.log('[DB] Converting characters.data from TEXT to JSONB...');
-      try {
-        // Add temporary JSONB column, copy data, swap columns
-        console.log('[DB] Step 1: Adding data_jsonb column...');
-        await dbPool.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS data_jsonb JSONB');
-        console.log('[DB] Step 2: Copying data to JSONB column...');
-        await dbPool.query('UPDATE characters SET data_jsonb = data::jsonb WHERE data_jsonb IS NULL AND data IS NOT NULL');
-        console.log('[DB] Step 3: Dropping old TEXT column...');
-        await dbPool.query('ALTER TABLE characters DROP COLUMN data');
-        console.log('[DB] Step 4: Renaming data_jsonb to data...');
-        await dbPool.query('ALTER TABLE characters RENAME COLUMN data_jsonb TO data');
-        console.log('[DB] Step 5: Setting NOT NULL constraint...');
-        await dbPool.query('ALTER TABLE characters ALTER COLUMN data SET NOT NULL');
-        console.log('[DB] ✅ Characters data column converted to JSONB');
-      } catch (err) {
-        console.error('[DB] Failed to convert characters.data to JSONB:', err.message);
-      }
-    } else {
-      console.log(`[DB] Characters data column already ${currentType}, no conversion needed`);
-    }
-    // Create GIN index for faster JSONB queries
     await dbPool.query('CREATE INDEX IF NOT EXISTS idx_characters_data_gin ON characters USING GIN (data)');
 
     // Stories table
@@ -394,7 +360,6 @@ async function initializeDatabase() {
       console.log('✓ Default pricing tiers seeded');
     }
 
-    console.log('>>> FINISHED TABLE INITIALIZATION <<<');
     console.log('✓ Database tables initialized');
 
   } catch (err) {

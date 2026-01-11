@@ -1,5 +1,7 @@
 # Node modules (if any)
 node_modules/
+**/node_modules/
+client/node_modules/
 
 # OS files
 .DS_Store
@@ -56,3 +58,6 @@ npm-debug.log*
 /playwright/.cache/
 /playwright/.auth/
 .auth/
+
+# Migration scripts (one-time use)
+run-migration*.js
