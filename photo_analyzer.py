@@ -529,8 +529,10 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
                 print(f"[FACE] Normalized detection found more faces: {len(normalized_faces)} vs {len(all_faces)}")
                 all_faces = normalized_faces
                 # Note: coordinates are percentages, so they map back to original correctly
-        # Log each face with confidence
+        # Log each face with confidence AND position
         if len(all_faces) > 0:
+            for f in all_faces:
+                print(f"   Face {f['id']+1}: {f['confidence']*100:.0f}% at x={f['x']:.1f}%, y={f['y']:.1f}%, w={f['width']:.1f}%, h={f['height']:.1f}%")
             face_scores = ", ".join([f"face {f['id']+1}: {f['confidence']*100:.0f}%" for f in all_faces])
             print(f"   Faces detected: {len(all_faces)} ({face_scores})")
         else:
