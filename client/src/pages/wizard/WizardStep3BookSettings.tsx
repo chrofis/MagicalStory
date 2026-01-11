@@ -93,20 +93,26 @@ export function WizardStep3BookSettings({
     winter: { de: 'Winter', fr: 'Hiver', en: 'Winter' },
   };
 
-  // Available page options based on developer mode
-  const availablePageOptions = developerMode
-    ? [4, 10, 14, 20, 24, 30, 34, 40, 44, 50]
-    : [10, 14, 20, 24, 30, 34, 40, 44, 50];
+  // Page slider configuration
+  const minPages = developerMode ? 4 : 10;
+  const maxPages = 50;
+  const pageStep = 2; // Only even values
 
-  // If current pages value is not in available options, reset to default (10)
+  // Ensure pages value is even and within range
   useEffect(() => {
-    const validOptions = developerMode
-      ? [4, 10, 14, 20, 24, 30, 34, 40, 44, 50]
-      : [10, 14, 20, 24, 30, 34, 40, 44, 50];
-    if (!validOptions.includes(pages)) {
-      onPagesChange(10);
+    let validPages = pages;
+
+    // Ensure even
+    if (validPages % 2 !== 0) {
+      validPages = Math.round(validPages / 2) * 2;
     }
-  }, [pages, developerMode, onPagesChange]);
+    // Ensure in range
+    validPages = Math.max(minPages, Math.min(maxPages, validPages));
+
+    if (validPages !== pages) {
+      onPagesChange(validPages);
+    }
+  }, [pages, minPages, maxPages, onPagesChange]);
 
   const readingLevels = [
     {
@@ -296,23 +302,45 @@ export function WizardStep3BookSettings({
           <label className="block text-xl font-semibold mb-3">
             {t.numberOfPages}
           </label>
-          <select
-            value={pages}
-            onChange={(e) => onPagesChange(parseInt(e.target.value))}
-            className="w-full px-4 py-3 border-2 border-indigo-200 rounded-lg focus:border-indigo-600 focus:outline-none text-base md:text-lg font-semibold"
-          >
-            {availablePageOptions.map((pageOption) => (
-              <option key={pageOption} value={pageOption}>
-                {getPageLabel(pageOption, pageOption === 4)}
-              </option>
-            ))}
-          </select>
-          <p className="text-sm text-gray-500 mt-2">
-            {languageLevel === '1st-grade'
-              ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
-              : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
-            }
-          </p>
+          <div className="space-y-3">
+            {/* Range Slider */}
+            <input
+              type="range"
+              min={minPages}
+              max={maxPages}
+              step={pageStep}
+              value={pages}
+              onChange={(e) => onPagesChange(parseInt(e.target.value))}
+              className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600
+                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
+                         [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
+                         [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:hover:bg-indigo-700
+                         [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-indigo-600
+                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+            />
+
+            {/* Value display with min/max */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-400">{minPages}</span>
+              <span className="text-xl font-bold text-indigo-600">
+                {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
+              </span>
+              <span className="text-sm text-gray-400">{maxPages}</span>
+            </div>
+
+            {/* Credits and description */}
+            <div className="text-center">
+              <p className="text-base font-medium text-gray-700">
+                {getPageLabel(pages, pages === 4)}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {languageLevel === '1st-grade'
+                  ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
+                  : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
+                }
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

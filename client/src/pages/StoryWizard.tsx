@@ -2955,6 +2955,8 @@ export default function StoryWizard() {
             storyLanguage={storyLanguage}
             languageLevel={languageLevel}
             pages={pages}
+            userLocation={userLocation}
+            season={season}
             storyDetails={storyDetails}
             onStoryDetailsChange={setStoryDetails}
             dedication={dedication}

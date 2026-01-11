@@ -15,6 +15,12 @@ const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[]
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
+interface UserLocation {
+  city: string | null;
+  region: string | null;
+  country: string | null;
+}
+
 interface WizardStep6Props {
   // Summary data
   characters: Character[];
@@ -27,6 +33,8 @@ interface WizardStep6Props {
   storyLanguage: StoryLanguageCode;
   languageLevel: string;
   pages: number;
+  userLocation: UserLocation | null;
+  season: string;
   // Editable fields
   storyDetails: string;
   onStoryDetailsChange: (details: string) => void;
@@ -66,6 +74,8 @@ export function WizardStep6Summary({
   storyLanguage,
   languageLevel,
   pages,
+  userLocation,
+  season,
   storyDetails,
   onStoryDetailsChange,
   dedication,
@@ -163,6 +173,21 @@ export function WizardStep6Summary({
     return '';
   };
 
+  const getSeasonLabel = () => {
+    const seasonLabels: Record<string, Record<string, string>> = {
+      spring: { de: 'Frühling', fr: 'Printemps', en: 'Spring' },
+      summer: { de: 'Sommer', fr: 'Été', en: 'Summer' },
+      autumn: { de: 'Herbst', fr: 'Automne', en: 'Autumn' },
+      winter: { de: 'Winter', fr: 'Hiver', en: 'Winter' },
+    };
+    return seasonLabels[season]?.[language] || seasonLabels[season]?.en || season;
+  };
+
+  const getLocationLabel = () => {
+    if (!userLocation?.city) return language === 'de' ? 'Nicht festgelegt' : language === 'fr' ? 'Non défini' : 'Not set';
+    return userLocation.country ? `${userLocation.city}, ${userLocation.country}` : userLocation.city;
+  };
+
   const t = {
     title: language === 'de' ? 'Geschichte erstellen' : language === 'fr' ? 'Créer l\'histoire' : 'Create Your Story',
     storyDetails: language === 'de' ? 'Geschichte / Handlung' : language === 'fr' ? 'Histoire / Intrigue' : 'Story / Plot',
@@ -192,6 +217,9 @@ export function WizardStep6Summary({
     supportingChars: language === 'de' ? 'Nebenfiguren' : language === 'fr' ? 'Personnages secondaires' : 'Also in story',
     level: language === 'de' ? 'Lesestufe' : language === 'fr' ? 'Niveau' : 'Level',
     pagesLabel: language === 'de' ? 'Seiten' : language === 'fr' ? 'Pages' : 'Pages',
+    lengthLabel: language === 'de' ? 'Länge' : language === 'fr' ? 'Longueur' : 'Length',
+    locationLabel: language === 'de' ? 'Ort' : language === 'fr' ? 'Lieu' : 'Location',
+    seasonLabel: language === 'de' ? 'Jahreszeit' : language === 'fr' ? 'Saison' : 'Season',
     chooseIdea: language === 'de' ? 'Wählen Sie eine Idee oder bearbeiten Sie sie:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la:' : 'Choose an idea or edit it:',
     useThis: language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this',
     option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : 'Option 1',
@@ -205,8 +233,18 @@ export function WizardStep6Summary({
         <Wand2 size={24} /> {t.title}
       </h2>
 
-      {/* Summary of all selections - responsive: stack on mobile, 3x2 grid on wide */}
+      {/* Summary of all selections - responsive: stack on mobile, 3x3 grid on wide */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 text-sm bg-gray-50 rounded-lg p-3">
+        {/* Story Type */}
+        <div className="flex items-center gap-1 group">
+          <span className="text-gray-500 whitespace-nowrap">{t.storyType}:</span>
+          <span className="font-medium truncate">
+            {storyCategory === 'adventure' ? getThemeName() : (
+              <>{getTopicName()}{storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}</>
+            )}
+          </span>
+          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+        </div>
         {/* Main Characters */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.mainChars}:</span>
@@ -225,21 +263,33 @@ export function WizardStep6Summary({
           <span className="font-medium truncate">{getStoryLanguageName()}</span>
           <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
-        {/* Reading Level & Pages */}
+        {/* Location - hide for historical stories */}
+        {storyCategory !== 'historical' && (
+          <div className="flex items-center gap-1 group">
+            <span className="text-gray-500 whitespace-nowrap">{t.locationLabel}:</span>
+            <span className="font-medium truncate">{getLocationLabel()}</span>
+            <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          </div>
+        )}
+        {/* Season - hide for historical stories */}
+        {storyCategory !== 'historical' && (
+          <div className="flex items-center gap-1 group">
+            <span className="text-gray-500 whitespace-nowrap">{t.seasonLabel}:</span>
+            <span className="font-medium truncate">{getSeasonLabel()}</span>
+            <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          </div>
+        )}
+        {/* Reading Level */}
         <div className="flex items-center gap-1 group">
           <span className="text-gray-500 whitespace-nowrap">{t.level}:</span>
-          <span className="font-medium truncate">{getReadingLevelLabel()} / {pages} {language === 'de' ? t.pagesLabel : t.pagesLabel.toLowerCase()}</span>
+          <span className="font-medium truncate">{getReadingLevelLabel()}</span>
           <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
-        {/* Story Type */}
+        {/* Length (Pages) */}
         <div className="flex items-center gap-1 group">
-          <span className="text-gray-500 whitespace-nowrap">{t.storyType}:</span>
-          <span className="font-medium truncate">
-            {storyCategory === 'adventure' ? getThemeName() : (
-              <>{getTopicName()}{storyTheme && storyTheme !== 'realistic' && ` + ${getThemeName()}`}</>
-            )}
-          </span>
-          <button onClick={() => onEditStep(3)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
+          <span className="text-gray-500 whitespace-nowrap">{t.lengthLabel}:</span>
+          <span className="font-medium truncate">{pages} {t.pagesLabel}</span>
+          <button onClick={() => onEditStep(2)} className="p-0.5 text-gray-400 hover:text-indigo-600 flex-shrink-0 md:opacity-0 md:group-hover:opacity-100" title={language === 'de' ? 'Bearbeiten' : 'Edit'}><Pencil size={10} /></button>
         </div>
         {/* Art Style */}
         <div className="flex items-center gap-1 group">
