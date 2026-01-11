@@ -223,14 +223,14 @@ export function WizardStep3BookSettings({
                   value={editCity}
                   onChange={(e) => setEditCity(e.target.value)}
                   placeholder={language === 'de' ? 'Stadt' : language === 'fr' ? 'Ville' : 'City'}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm w-20 focus:outline-none focus:border-indigo-500"
+                  className="px-2 py-1 border border-gray-300 rounded text-base w-24 focus:outline-none focus:border-indigo-500"
                 />
                 <input
                   type="text"
                   value={editCountry}
                   onChange={(e) => setEditCountry(e.target.value)}
                   placeholder={language === 'de' ? 'Land' : language === 'fr' ? 'Pays' : 'Country'}
-                  className="px-2 py-1 border border-gray-300 rounded text-sm w-20 focus:outline-none focus:border-indigo-500"
+                  className="px-2 py-1 border border-gray-300 rounded text-base w-24 focus:outline-none focus:border-indigo-500"
                 />
                 <button
                   onClick={handleSaveLocation}
