@@ -1514,34 +1514,41 @@ export default function StoryWizard() {
           // If no name yet (user uploads photo first), generation will run when character is saved
           if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
             // Run avatar generation in background (don't await)
+            const charId = charForGeneration.id;
             characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
               .then(result => {
                 if (result.success && result.character) {
-                  // Merge result with current state to preserve user's trait selections
-                  // (avatar generation runs async, user may have edited traits meanwhile)
+                  // Update currentCharacter ONLY if user is still editing this character
                   setCurrentCharacter(prev => {
-                    if (!prev) return result.character!;
+                    if (!prev || prev.id !== charId) return prev; // Don't update if user moved on
                     return {
                       ...prev,
-                      // Take avatars and physical traits from result
                       avatars: result.character!.avatars,
                       physical: result.character!.physical,
                       clothing: result.character!.clothing,
-                      // Keep user's current traits (they may have edited while avatar was generating)
                     };
                   });
+                  // Always update the characters array
                   setCharacters(prev => prev.map(c =>
-                    c.id === result.character!.id ? result.character! : c
+                    c.id === charId ? { ...c, ...result.character!, id: c.id } : c
                   ));
                   log.success(`✅ Avatar generated and traits extracted for ${charForGeneration!.name}`);
                 } else {
                   log.error(`❌ Avatar generation failed: ${result.error}`);
-                  setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+                  // Update both currentCharacter AND characters array on failure
+                  setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
+                  setCharacters(prev => prev.map(c =>
+                    c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
+                  ));
                 }
               })
               .catch(error => {
                 log.error(`❌ Avatar generation error:`, error);
-                setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+                // Update both currentCharacter AND characters array on error
+                setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
+                setCharacters(prev => prev.map(c =>
+                  c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
+                ));
               })
               .finally(() => {
                 setIsGeneratingAvatar(false);
@@ -1675,11 +1682,13 @@ export default function StoryWizard() {
         setIsGeneratingAvatar(true);
 
         if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
+          const charId = charForGeneration.id;
           characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
             .then(result => {
               if (result.success && result.character) {
+                // Update currentCharacter ONLY if user is still editing this character
                 setCurrentCharacter(prev => {
-                  if (!prev) return result.character!;
+                  if (!prev || prev.id !== charId) return prev;
                   return {
                     ...prev,
                     avatars: result.character!.avatars,
@@ -1687,18 +1696,25 @@ export default function StoryWizard() {
                     clothing: result.character!.clothing,
                   };
                 });
+                // Always update the characters array
                 setCharacters(prev => prev.map(c =>
-                  c.id === result.character!.id ? result.character! : c
+                  c.id === charId ? { ...c, ...result.character!, id: c.id } : c
                 ));
                 log.success(`✅ Avatar generated for ${charForGeneration!.name} (face selection)`);
               } else {
                 log.error(`❌ Avatar generation failed: ${result.error}`);
-                setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+                setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
+                setCharacters(prev => prev.map(c =>
+                  c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
+                ));
               }
             })
             .catch(error => {
               log.error(`❌ Avatar generation error:`, error);
-              setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'failed' } } : prev);
+              setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
+              setCharacters(prev => prev.map(c =>
+                c.id === charId ? { ...c, avatars: { status: 'failed' } } : c
+              ));
             })
             .finally(() => {
               setIsGeneratingAvatar(false);

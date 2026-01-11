@@ -1028,17 +1028,19 @@ export function CharacterForm({
           <p className="text-gray-600 mt-2">{character.name}</p>
         </div>
 
-        {/* Avatar Display - centered, prominent */}
+        {/* Avatar Display - centered, prominent, clickable for lightbox */}
         <div className="flex justify-center">
           {hasAvatar ? (
             <div className="relative">
               <img
                 src={displayAvatar}
                 alt={`${character.name} avatar`}
-                className="w-64 h-80 object-contain rounded-lg bg-white shadow-lg border-2 border-indigo-200"
+                className="w-64 h-80 object-contain rounded-lg bg-white shadow-lg border-2 border-indigo-200 cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => setLightboxImage(displayAvatar)}
+                title={language === 'de' ? 'Klicken zum Vergrössern' : language === 'fr' ? 'Cliquer pour agrandir' : 'Click to enlarge'}
               />
               {isStillGenerating && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg pointer-events-none">
                   <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
@@ -1139,6 +1141,11 @@ export function CharacterForm({
           )}
         </div>
 
+        {/* Lightbox for enlarged avatar view */}
+        <ImageLightbox
+          src={lightboxImage}
+          onClose={() => setLightboxImage(null)}
+        />
       </div>
     );
   }
