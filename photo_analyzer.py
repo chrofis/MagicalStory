@@ -70,42 +70,38 @@ try:
 except ImportError:
     print("[WARN] MediaPipe not installed - face detection disabled")
 
-# Try to initialize RetinaFace (best accuracy)
-RETINAFACE_AVAILABLE = False
+# Try to initialize MTCNN (best accuracy, lightweight)
+MTCNN_AVAILABLE = False
+mtcnn_detector = None
 try:
-    from deepface import DeepFace
-    RETINAFACE_AVAILABLE = True
-    print("[OK] RetinaFace available (via deepface)")
+    from mtcnn import MTCNN
+    mtcnn_detector = MTCNN()
+    MTCNN_AVAILABLE = True
+    print("[OK] MTCNN face detector available")
 except ImportError:
-    print("[INFO] RetinaFace not available - using MediaPipe/OpenCV fallback")
+    print("[INFO] MTCNN not available - using MediaPipe/OpenCV fallback")
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-def detect_all_faces_retinaface(image, min_confidence=0.5):
+def detect_all_faces_mtcnn(image, min_confidence=0.9):
     """
-    Detect ALL faces using RetinaFace (most accurate detector).
+    Detect ALL faces using MTCNN (accurate and lightweight).
     Returns list of faces sorted by confidence (highest first).
     """
-    if not RETINAFACE_AVAILABLE:
+    if not MTCNN_AVAILABLE or mtcnn_detector is None:
         return []
 
     try:
-        # Save image temporarily (deepface needs file path or numpy array)
         img_h, img_w = image.shape[:2]
 
-        # DeepFace expects RGB, OpenCV uses BGR
+        # MTCNN expects RGB, OpenCV uses BGR
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        # Extract faces using RetinaFace
-        faces_data = DeepFace.extract_faces(
-            rgb_image,
-            detector_backend='retinaface',
-            enforce_detection=False,
-            align=False
-        )
+        # Detect faces
+        faces_data = mtcnn_detector.detect_faces(rgb_image)
 
         faces = []
         for idx, face in enumerate(faces_data):
@@ -113,11 +109,9 @@ def detect_all_faces_retinaface(image, min_confidence=0.5):
             if conf < min_confidence:
                 continue
 
-            area = face.get('facial_area', {})
-            x = area.get('x', 0)
-            y = area.get('y', 0)
-            w = area.get('w', 0)
-            h = area.get('h', 0)
+            # MTCNN returns box as [x, y, width, height]
+            box = face.get('box', [0, 0, 0, 0])
+            x, y, w, h = box
 
             faces.append({
                 'id': idx,
@@ -133,11 +127,11 @@ def detect_all_faces_retinaface(image, min_confidence=0.5):
         for i, face in enumerate(faces):
             face['id'] = i
 
-        print(f"[RETINAFACE] Detected {len(faces)} faces")
+        print(f"[MTCNN] Detected {len(faces)} faces")
         return faces
 
     except Exception as e:
-        print(f"[RETINAFACE] Error: {e}")
+        print(f"[MTCNN] Error: {e}")
         return []
 
 
@@ -319,13 +313,19 @@ def detect_all_faces_mediapipe_tasks(image, min_confidence=0.15):
 
 def detect_all_faces_mediapipe(image, min_confidence=0.15):
     """
-    Detect ALL faces using MediaPipe Face Detection.
-    Falls back to OpenCV Haar cascade if MediaPipe is unavailable.
+    Detect ALL faces - tries RetinaFace first (best), then MediaPipe, then OpenCV.
     Returns list of faces sorted by confidence (highest first).
     Filters out faces below min_confidence threshold.
 
     Returns: list of {id, x, y, width, height, confidence}
     """
+    # Try MTCNN first (most accurate)
+    if MTCNN_AVAILABLE:
+        faces = detect_all_faces_mtcnn(image, min_confidence=0.9)  # MTCNN is accurate, use high threshold
+        if len(faces) > 0:
+            return faces
+        print("[FACE] MTCNN found 0 faces, trying MediaPipe...")
+
     # Try MediaPipe Tasks API first (Python 3.14+)
     if MEDIAPIPE_TASKS_AVAILABLE:
         # Tasks API has worse detection than legacy - use lower threshold initially
