@@ -518,7 +518,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[4] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -563,7 +563,7 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA Section */}
-      <section className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600 snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[5] = el; }} className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600 snap-start flex flex-col justify-center">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl lg:text-5xl font-title text-white mb-6">
             {st.readyToCreate}
