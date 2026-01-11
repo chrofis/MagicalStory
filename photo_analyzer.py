@@ -178,36 +178,55 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
         return detect_all_faces_opencv(image)
 
     faces = []
-    with mp_face_detection.FaceDetection(
-        model_selection=1,  # 0 for close faces, 1 for far faces
-        min_detection_confidence=0.1  # Very low - we filter ourselves at 0.15
-    ) as face_detection:
-        # Convert BGR to RGB
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        results = face_detection.process(rgb_image)
+    rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-        if results.detections:
-            for idx, detection in enumerate(results.detections):
-                confidence = detection.score[0]
+    # Try BOTH model types and combine results for better detection
+    # model_selection=0: close faces (within 2m), model_selection=1: far faces (up to 5m)
+    for model_type in [0, 1]:
+        with mp_face_detection.FaceDetection(
+            model_selection=model_type,
+            min_detection_confidence=0.1  # Very low - we filter ourselves at 0.15
+        ) as face_detection:
+            results = face_detection.process(rgb_image)
 
-                # Filter by our threshold
-                if confidence < min_confidence:
-                    continue
+            if results.detections:
+                for idx, detection in enumerate(results.detections):
+                    confidence = detection.score[0]
 
-                bbox = detection.location_data.relative_bounding_box
-                faces.append({
-                    'id': idx,
-                    'x': bbox.xmin * 100,
-                    'y': bbox.ymin * 100,
-                    'width': bbox.width * 100,
-                    'height': bbox.height * 100,
-                    'confidence': confidence
-                })
+                    # Filter by our threshold
+                    if confidence < min_confidence:
+                        continue
 
-    # Sort by confidence (highest first)
+                    bbox = detection.location_data.relative_bounding_box
+                    face = {
+                        'id': len(faces),
+                        'x': bbox.xmin * 100,
+                        'y': bbox.ymin * 100,
+                        'width': bbox.width * 100,
+                        'height': bbox.height * 100,
+                        'confidence': confidence
+                    }
+
+                    # Check if this face overlaps with existing faces (avoid duplicates)
+                    is_duplicate = False
+                    for existing in faces:
+                        # Check if centers are close (within 10% of image)
+                        center_x = face['x'] + face['width'] / 2
+                        center_y = face['y'] + face['height'] / 2
+                        existing_cx = existing['x'] + existing['width'] / 2
+                        existing_cy = existing['y'] + existing['height'] / 2
+                        if abs(center_x - existing_cx) < 10 and abs(center_y - existing_cy) < 10:
+                            # Keep the higher confidence one
+                            if face['confidence'] > existing['confidence']:
+                                existing.update(face)
+                            is_duplicate = True
+                            break
+
+                    if not is_duplicate:
+                        faces.append(face)
+
+    # Sort by confidence and re-number
     faces.sort(key=lambda f: f['confidence'], reverse=True)
-
-    # Re-assign IDs after sorting (0 = highest confidence)
     for i, face in enumerate(faces):
         face['id'] = i
 
