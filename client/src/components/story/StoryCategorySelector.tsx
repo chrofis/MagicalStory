@@ -68,7 +68,7 @@ export function StoryCategorySelector({
       selectedTopic: 'Topic',
       selectedTheme: 'Theme',
       change: 'Change',
-      customThemePlaceholder: 'Describe your adventure theme...',
+      customThemePlaceholder: 'Describe your story idea in detail...\n\nFor example:\n- A story about learning to ride a bike\n- An adventure in the Swiss mountains\n- Meeting a friendly dragon who helps with homework',
       customThemeLabel: 'Your custom theme:',
     },
     de: {
@@ -83,7 +83,7 @@ export function StoryCategorySelector({
       selectedTopic: 'Thema',
       selectedTheme: 'Setting',
       change: 'Ändern',
-      customThemePlaceholder: 'Beschreibe dein Abenteuer-Thema...',
+      customThemePlaceholder: 'Beschreibe deine Geschichte hier...\n\nZum Beispiel:\n- Eine Geschichte über das Fahrradfahren lernen\n- Ein Abenteuer in den Schweizer Bergen\n- Ein freundlicher Drache, der bei den Hausaufgaben hilft',
       customThemeLabel: 'Dein eigenes Thema:',
     },
     fr: {
@@ -98,7 +98,7 @@ export function StoryCategorySelector({
       selectedTopic: 'Sujet',
       selectedTheme: 'Thème',
       change: 'Changer',
-      customThemePlaceholder: 'Décris ton thème d\'aventure...',
+      customThemePlaceholder: 'Décris ton idée d\'histoire ici...\n\nPar exemple:\n- Une histoire sur l\'apprentissage du vélo\n- Une aventure dans les montagnes suisses\n- Un dragon amical qui aide aux devoirs',
       customThemeLabel: 'Ton thème personnalisé:',
     },
   };
@@ -621,8 +621,8 @@ export function StoryCategorySelector({
           </div>
         )}
 
-        {/* Theme - hide for historical (fixed historical settings, user can't change) */}
-        {storyCategory !== 'historical' && (
+        {/* Theme - hide for historical and custom (no redundant theme row needed) */}
+        {storyCategory !== 'historical' && storyCategory !== 'custom' && (
           <div className="flex items-center justify-between border-t border-indigo-100 pt-3">
             <div className="flex items-center gap-2">
               <span className="text-2xl">
@@ -652,14 +652,13 @@ export function StoryCategorySelector({
 
         {/* Custom theme input - shown when 'custom' is selected */}
         {storyTheme === 'custom' && (
-          <div className="border-t border-indigo-100 pt-3">
-            <label className="block text-xs text-gray-500 mb-1">{t.customThemeLabel}</label>
-            <input
-              type="text"
+          <div className="pt-3">
+            <textarea
               value={customThemeText}
               onChange={(e) => onCustomThemeTextChange?.(e.target.value)}
               placeholder={t.customThemePlaceholder}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-base resize-none"
+              rows={6}
             />
           </div>
         )}
