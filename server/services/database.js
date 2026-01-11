@@ -155,19 +155,28 @@ async function initializeDatabase() {
       SELECT data_type FROM information_schema.columns
       WHERE table_name = 'characters' AND column_name = 'data'
     `);
-    if (charColType.rows[0]?.data_type === 'text') {
+    const currentType = charColType.rows[0]?.data_type;
+    console.log(`[DB] Characters data column type: ${currentType}`);
+    if (currentType === 'text') {
       console.log('[DB] Converting characters.data from TEXT to JSONB...');
       try {
         // Add temporary JSONB column, copy data, swap columns
+        console.log('[DB] Step 1: Adding data_jsonb column...');
         await dbPool.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS data_jsonb JSONB');
+        console.log('[DB] Step 2: Copying data to JSONB column...');
         await dbPool.query('UPDATE characters SET data_jsonb = data::jsonb WHERE data_jsonb IS NULL AND data IS NOT NULL');
+        console.log('[DB] Step 3: Dropping old TEXT column...');
         await dbPool.query('ALTER TABLE characters DROP COLUMN data');
+        console.log('[DB] Step 4: Renaming data_jsonb to data...');
         await dbPool.query('ALTER TABLE characters RENAME COLUMN data_jsonb TO data');
+        console.log('[DB] Step 5: Setting NOT NULL constraint...');
         await dbPool.query('ALTER TABLE characters ALTER COLUMN data SET NOT NULL');
         console.log('[DB] ✅ Characters data column converted to JSONB');
       } catch (err) {
         console.error('[DB] Failed to convert characters.data to JSONB:', err.message);
       }
+    } else {
+      console.log(`[DB] Characters data column already ${currentType}, no conversion needed`);
     }
     // Create GIN index for faster JSONB queries
     await dbPool.query('CREATE INDEX IF NOT EXISTS idx_characters_data_gin ON characters USING GIN (data)');

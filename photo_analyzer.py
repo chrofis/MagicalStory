@@ -70,9 +70,75 @@ try:
 except ImportError:
     print("[WARN] MediaPipe not installed - face detection disabled")
 
+# Try to initialize RetinaFace (best accuracy)
+RETINAFACE_AVAILABLE = False
+try:
+    from deepface import DeepFace
+    RETINAFACE_AVAILABLE = True
+    print("[OK] RetinaFace available (via deepface)")
+except ImportError:
+    print("[INFO] RetinaFace not available - using MediaPipe/OpenCV fallback")
+
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+
+def detect_all_faces_retinaface(image, min_confidence=0.5):
+    """
+    Detect ALL faces using RetinaFace (most accurate detector).
+    Returns list of faces sorted by confidence (highest first).
+    """
+    if not RETINAFACE_AVAILABLE:
+        return []
+
+    try:
+        # Save image temporarily (deepface needs file path or numpy array)
+        img_h, img_w = image.shape[:2]
+
+        # DeepFace expects RGB, OpenCV uses BGR
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # Extract faces using RetinaFace
+        faces_data = DeepFace.extract_faces(
+            rgb_image,
+            detector_backend='retinaface',
+            enforce_detection=False,
+            align=False
+        )
+
+        faces = []
+        for idx, face in enumerate(faces_data):
+            conf = face.get('confidence', 0)
+            if conf < min_confidence:
+                continue
+
+            area = face.get('facial_area', {})
+            x = area.get('x', 0)
+            y = area.get('y', 0)
+            w = area.get('w', 0)
+            h = area.get('h', 0)
+
+            faces.append({
+                'id': idx,
+                'x': (x / img_w) * 100,
+                'y': (y / img_h) * 100,
+                'width': (w / img_w) * 100,
+                'height': (h / img_h) * 100,
+                'confidence': conf
+            })
+
+        # Sort by confidence (highest first) and re-number
+        faces.sort(key=lambda f: f['confidence'], reverse=True)
+        for i, face in enumerate(faces):
+            face['id'] = i
+
+        print(f"[RETINAFACE] Detected {len(faces)} faces")
+        return faces
+
+    except Exception as e:
+        print(f"[RETINAFACE] Error: {e}")
+        return []
 
 
 def detect_face_opencv(image):
