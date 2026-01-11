@@ -1,4 +1,4 @@
-import { useState, ChangeEvent } from 'react';
+import { useState, useRef, ChangeEvent } from 'react';
 import { Upload, CheckSquare, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
@@ -45,6 +45,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
   const [consent1Checked, setConsent1Checked] = useState(false);
   const [consent2Checked, setConsent2Checked] = useState(false);
   const [isRecordingConsent, setIsRecordingConsent] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const texts = consentTexts[language] || consentTexts.en;
 
   // User has already consented if photoConsentAt is set
@@ -52,6 +53,13 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
 
   // Can upload if already consented OR both checkboxes are checked
   const canUpload = hasExistingConsent || (consent1Checked && consent2Checked);
+
+  // Handle upload button click - trigger file input
+  const handleUploadClick = () => {
+    if (canUpload && !isRecordingConsent && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -132,20 +140,26 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
 
       {/* Upload button - prominent */}
       <div className="text-center mb-5">
-        <label className={`inline-flex items-center justify-center gap-3 px-10 py-4 rounded-xl text-xl font-bold shadow-lg transition-colors ${
-          canUpload && !isRecordingConsent
-            ? 'cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700'
-            : 'cursor-not-allowed bg-gray-300 text-gray-500'
-        }`}>
+        {/* Hidden file input - separate from button for better mobile compatibility */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={handleUploadClick}
+          disabled={!canUpload || isRecordingConsent}
+          className={`inline-flex items-center justify-center gap-3 px-10 py-4 rounded-xl text-xl font-bold shadow-lg transition-colors ${
+            canUpload && !isRecordingConsent
+              ? 'cursor-pointer bg-indigo-600 text-white hover:bg-indigo-700'
+              : 'cursor-not-allowed bg-gray-300 text-gray-500'
+          }`}
+        >
           <Upload size={28} /> {isRecordingConsent ? '...' : t.uploadPhoto}
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-            disabled={!canUpload || isRecordingConsent}
-          />
-        </label>
+        </button>
         {!canUpload && !hasExistingConsent && (
           <p className="text-sm text-amber-600 mt-2">{texts.pleaseAccept}</p>
         )}
