@@ -479,16 +479,13 @@ def remove_faces_except(image, keep_face_id, all_faces):
 
     # Find the selected face
     selected_face = None
-    print(f"[REMOVE_DEBUG] Looking for face ID {keep_face_id} (type: {type(keep_face_id)})")
-    print(f"[REMOVE_DEBUG] Available faces: {[(f.get('id'), type(f.get('id'))) for f in all_faces]}")
     for face in all_faces:
         if face['id'] == keep_face_id:
             selected_face = face
-            print(f"[REMOVE_DEBUG] Found selected face: ID={face['id']}")
             break
 
     if selected_face is None:
-        print(f"[REMOVE_DEBUG] WARNING: Selected face ID {keep_face_id} NOT FOUND in faces!")
+        print(f"[REMOVE] WARNING: Selected face ID {keep_face_id} not found")
         return result
 
     # Calculate selected face center (in pixels)
@@ -834,25 +831,9 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
             if full_img_rgba is not None:
                 full_img_rgba = remove_faces_except(full_img_rgba, selected_face_id, all_faces)
 
-                # 6b. RE-RUN BACKGROUND REMOVAL to clean up remaining parts of other people
-                # The first pass kept all people; now with others whited out, re-segment
-                print("[BG2] Re-running background removal to isolate selected person...")
-                try:
-                    # Convert RGBA to BGR (white where transparent)
-                    bgr_for_reseg = np.full((full_img_rgba.shape[0], full_img_rgba.shape[1], 3), 255, dtype=np.uint8)
-                    alpha = full_img_rgba[:, :, 3:4] / 255.0
-                    bgr_for_reseg = (full_img_rgba[:, :, :3] * alpha + bgr_for_reseg * (1 - alpha)).astype(np.uint8)
-
-                    # Run segmentation again - should now only see selected person
-                    reseg_rgba, reseg_mask = remove_background(bgr_for_reseg)
-                    if reseg_rgba is not None:
-                        # Combine: keep pixels that are visible in BOTH passes
-                        # (original alpha AND new segmentation)
-                        combined_alpha = np.minimum(full_img_rgba[:, :, 3], reseg_rgba[:, :, 3])
-                        full_img_rgba[:, :, 3] = combined_alpha
-                        print("   Re-segmentation complete - isolated selected person")
-                except Exception as reseg_error:
-                    print(f"   Re-segmentation failed: {reseg_error}")
+                # Note: Re-segmentation was causing issues (removing selected face)
+                # The midpoint-based removal should be sufficient for now
+                print("   Face removal complete")
 
         # 7. GET BODY BOUNDS
         # For multi-face: use alpha channel (only selected person is visible after remove_faces_except)
