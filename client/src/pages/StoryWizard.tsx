@@ -3061,7 +3061,11 @@ export default function StoryWizard() {
             onSaveAndRegenerateWithTraits={handleSaveAndRegenerateWithTraits}
             onSaveAndTryNewPhoto={async () => {
               // Save the character but keep it selected, then go to photo step
-              if (!currentCharacter) return;
+              log.info(`📸 onSaveAndTryNewPhoto called, currentCharacter: ${currentCharacter?.name}`);
+              if (!currentCharacter) {
+                log.warn('📸 No currentCharacter, returning early');
+                return;
+              }
 
               setIsLoading(true);
               try {
@@ -3086,11 +3090,13 @@ export default function StoryWizard() {
                 autoSelectMainCharacters(updatedCharacters);
 
                 // Keep current character selected and go to photo step
+                log.info(`📸 Setting characterStep to 'photo', currentCharacter still: ${currentCharacter?.name}`);
                 setCharacterStep('photo');
               } catch (error) {
-                log.error('Error saving character:', error);
+                log.error('📸 Error saving character:', error);
               } finally {
                 setIsLoading(false);
+                log.info(`📸 onSaveAndTryNewPhoto complete, characterStep should now be 'photo'`);
               }
             }}
             relationships={relationships}

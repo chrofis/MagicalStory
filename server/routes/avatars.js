@@ -1288,6 +1288,198 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
 });
 
 /**
+ * Process avatar generation in the background (for async mode)
+ * This function is called without awaiting, so it runs after the response is sent
+ */
+async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKey) {
+  const job = avatarJobs.get(jobId);
+  if (!job) return;
+
+  try {
+    job.status = 'processing';
+    job.message = 'Generating avatars...';
+    job.progress = 10;
+
+    const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = bodyParams;
+
+    // Import the actual generation logic (reuse from sync path)
+    // For now, we'll make a simplified version that calls the same helpers
+
+    const selectedModel = avatarModel || 'gemini-2.5-flash-image';
+    const modelConfig = IMAGE_MODELS[selectedModel];
+    const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
+    const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
+    const isFemale = gender === 'female';
+
+    log.debug(`👔 [AVATAR JOB ${jobId}] Starting background generation for ${name}, model: ${selectedModel}`);
+
+    const clothingCategories = {
+      winter: { emoji: '❄️' },
+      standard: { emoji: '👕' },
+      summer: { emoji: '☀️' }
+    };
+
+    const results = {
+      status: 'generating',
+      generatedAt: null,
+      faceMatch: {},
+      clothing: {},
+      structuredClothing: {},
+      extractedTraits: null,
+      rawEvaluation: null,
+      prompts: {}
+    };
+
+    // Prepare base64 data
+    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    // Build user clothing section
+    let userClothingSection = '';
+    if (clothing) {
+      const clothingParts = [];
+      if (clothing.fullBody) {
+        clothingParts.push(`Full outfit: ${clothing.fullBody}`);
+      } else {
+        if (clothing.upperBody) clothingParts.push(`Top: ${clothing.upperBody}`);
+        if (clothing.lowerBody) clothingParts.push(`Bottom: ${clothing.lowerBody}`);
+      }
+      if (clothing.shoes) clothingParts.push(`Shoes: ${clothing.shoes}`);
+      if (clothing.accessories) clothingParts.push(`Accessories: ${clothing.accessories}`);
+      if (clothingParts.length > 0) {
+        userClothingSection = `\n\nUSER-SPECIFIED CLOTHING (MUST USE - override default clothing style):\n${clothingParts.join('\n')}\nIMPORTANT: Use the user-specified clothing above instead of the default clothing style.`;
+      }
+    }
+
+    // Build user traits section
+    let userTraitsSection = '';
+    if (physicalTraits && Object.keys(physicalTraits).length > 0) {
+      const traitLines = [];
+      if (physicalTraits.hairColor) traitLines.push(`- Hair color: ${physicalTraits.hairColor}`);
+      if (physicalTraits.eyeColor) traitLines.push(`- Eye color: ${physicalTraits.eyeColor}`);
+      if (physicalTraits.hairLength) traitLines.push(`- Hair length: ${physicalTraits.hairLength}`);
+      if (physicalTraits.hairStyle) traitLines.push(`- Hair style: ${physicalTraits.hairStyle}`);
+      if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
+      if (traitLines.length > 0) {
+        userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):\n${traitLines.join('\n')}`;
+      }
+    }
+
+    job.progress = 20;
+    job.message = 'Generating winter, standard, summer avatars...';
+
+    // Generate avatars (simplified - uses Gemini API directly)
+    const generationStart = Date.now();
+
+    // Helper to generate single avatar with Gemini
+    const generateSingleAvatarForJob = async (category) => {
+      try {
+        const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
+        const clothingStylePrompt = getClothingStylePrompt(category, isFemale);
+        let avatarPrompt = fillTemplate(promptPart, { 'CLOTHING_STYLE': clothingStylePrompt });
+
+        if (userClothingSection && category === 'standard') {
+          avatarPrompt += userClothingSection;
+        }
+        if (userTraitsSection) {
+          avatarPrompt += userTraitsSection;
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [
+                  { text: avatarPrompt },
+                  { inlineData: { mimeType, data: base64Data } }
+                ]
+              }],
+              generationConfig: {
+                responseModalities: ['IMAGE', 'TEXT'],
+                responseMimeType: 'image/png'
+              }
+            })
+          }
+        );
+
+        const data = await response.json();
+        let imageData = null;
+
+        if (data.candidates && data.candidates[0]?.content?.parts) {
+          for (const part of data.candidates[0].content.parts) {
+            if (part.inlineData) {
+              imageData = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+              break;
+            }
+          }
+        }
+
+        if (imageData) {
+          const compressedImage = await compressImageToJPEG(imageData);
+          return { category, imageData: compressedImage, prompt: avatarPrompt };
+        }
+        return { category, imageData: null, prompt: avatarPrompt };
+      } catch (err) {
+        log.error(`[AVATAR JOB ${jobId}] Generation failed for ${category}:`, err.message);
+        return { category, imageData: null, prompt: null };
+      }
+    };
+
+    // Generate all avatars in parallel
+    const generationPromises = Object.keys(clothingCategories).map(cat => generateSingleAvatarForJob(cat));
+    const generatedAvatars = await Promise.all(generationPromises);
+
+    job.progress = 70;
+    job.message = 'Evaluating generated avatars...';
+
+    // Store results
+    for (const { category, imageData, prompt } of generatedAvatars) {
+      if (prompt) results.prompts[category] = prompt;
+      if (imageData) results[category] = imageData;
+    }
+
+    // Skip evaluation for background jobs (can be added later if needed)
+    // This significantly speeds up the job
+
+    results.status = 'complete';
+    results.generatedAt = new Date().toISOString();
+
+    if (!results.standard) {
+      throw new Error('Failed to generate standard avatar');
+    }
+
+    job.status = 'complete';
+    job.progress = 100;
+    job.message = 'Avatar generation complete';
+    job.result = results;
+
+    log.debug(`✅ [AVATAR JOB ${jobId}] Completed in ${Date.now() - generationStart}ms`);
+
+    // Log activity
+    try {
+      await logActivity(user.id, user.username, 'AVATAR_GENERATED', {
+        characterId,
+        characterName: name,
+        model: selectedModel,
+        async: true,
+        avatarsGenerated: Object.keys(clothingCategories).filter(cat => results[cat]).length
+      });
+    } catch (activityErr) {
+      log.warn(`[AVATAR JOB ${jobId}] Failed to log activity:`, activityErr.message);
+    }
+
+  } catch (err) {
+    log.error(`[AVATAR JOB ${jobId}] Failed:`, err.message);
+    job.status = 'failed';
+    job.error = err.message;
+  }
+}
+
+/**
  * POST /api/generate-clothing-avatars
  * Generate clothing avatars for a character (winter, standard, summer, formal)
  *
