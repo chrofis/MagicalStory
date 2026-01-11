@@ -63,6 +63,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
 
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    console.log('[PhotoUpload] handleFileChange:', { file: file?.name, canUpload, hasExistingConsent, consent1Checked, consent2Checked });
     if (file && canUpload) {
       // If this is the first time consenting, record it
       if (!hasExistingConsent && consent1Checked && consent2Checked) {
@@ -76,7 +77,10 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
           setIsRecordingConsent(false);
         }
       }
+      console.log('[PhotoUpload] Calling onPhotoSelect with file:', file.name);
       onPhotoSelect(file);
+    } else {
+      console.log('[PhotoUpload] NOT calling onPhotoSelect - file:', !!file, 'canUpload:', canUpload);
     }
   };
 

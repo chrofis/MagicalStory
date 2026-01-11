@@ -23,6 +23,25 @@ const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = requ
 // Tracks all costumed avatar generations with inputs, prompts, outputs, timing
 let costumedAvatarGenerationLog = [];
 
+// ============================================================================
+// AVATAR JOB QUEUE (for non-blocking avatar generation)
+// ============================================================================
+
+// In-memory store for avatar generation jobs
+// Jobs expire after 10 minutes
+const avatarJobs = new Map();
+const AVATAR_JOB_EXPIRY_MS = 10 * 60 * 1000; // 10 minutes
+
+// Clean up expired jobs periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [jobId, job] of avatarJobs.entries()) {
+    if (now - job.createdAt > AVATAR_JOB_EXPIRY_MS) {
+      avatarJobs.delete(jobId);
+    }
+  }
+}, 60000); // Check every minute
+
 /**
  * Create a short identifier for an image (first 12 chars of base64 data after header)
  */
@@ -1271,10 +1290,15 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
 /**
  * POST /api/generate-clothing-avatars
  * Generate clothing avatars for a character (winter, standard, summer, formal)
+ *
+ * Query params:
+ *   - async=true: Return immediately with job ID, poll /api/avatar-jobs/:jobId for result
+ *                 This prevents connection blocking and allows parallel requests
  */
 router.post('/generate-clothing-avatars', authenticateToken, async (req, res) => {
   try {
     const { characterId, facePhoto, physicalDescription, name, age, apparentAge, gender, build, physicalTraits, clothing, avatarModel } = req.body;
+    const asyncMode = req.query.async === 'true' || req.body.async === true;
 
     if (!facePhoto) {
       return res.status(400).json({ error: 'Missing facePhoto' });
@@ -1284,6 +1308,47 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     if (!geminiApiKey) {
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
     }
+
+    // ASYNC MODE: Return immediately with job ID
+    if (asyncMode) {
+      const crypto = require('crypto');
+      const jobId = `avatar_${crypto.randomBytes(8).toString('hex')}`;
+
+      // Create job entry
+      avatarJobs.set(jobId, {
+        userId: req.user.id,
+        characterId,
+        characterName: name,
+        status: 'pending',
+        progress: 0,
+        message: 'Starting avatar generation...',
+        createdAt: Date.now(),
+        result: null,
+        error: null
+      });
+
+      // Return immediately
+      res.json({
+        success: true,
+        async: true,
+        jobId,
+        message: 'Avatar generation started. Poll /api/avatar-jobs/' + jobId + ' for status.'
+      });
+
+      // Continue processing in background (don't await)
+      processAvatarJobInBackground(jobId, req.body, req.user, geminiApiKey).catch(err => {
+        log.error(`[AVATAR JOB ${jobId}] Background processing failed:`, err.message);
+        const job = avatarJobs.get(jobId);
+        if (job) {
+          job.status = 'failed';
+          job.error = err.message;
+        }
+      });
+
+      return; // Exit early - background job continues
+    }
+
+    // SYNC MODE: Original blocking behavior (for backwards compatibility)
 
     // Determine which model to use
     const selectedModel = avatarModel || 'gemini-2.5-flash-image';
@@ -1853,8 +1918,62 @@ These corrections OVERRIDE what is visible in the reference photo.
   }
 });
 
+/**
+ * GET /api/avatar-jobs/:jobId
+ * Get the status/result of an async avatar generation job
+ */
+router.get('/avatar-jobs/:jobId', authenticateToken, async (req, res) => {
+  const { jobId } = req.params;
+  const job = avatarJobs.get(jobId);
+
+  if (!job) {
+    return res.status(404).json({ error: 'Job not found or expired' });
+  }
+
+  // Verify ownership
+  if (job.userId !== req.user.id) {
+    return res.status(403).json({ error: 'Not authorized to view this job' });
+  }
+
+  // Return job status
+  if (job.status === 'pending' || job.status === 'processing') {
+    return res.json({
+      jobId,
+      status: job.status,
+      progress: job.progress || 0,
+      message: job.message || 'Processing...'
+    });
+  }
+
+  if (job.status === 'complete') {
+    // Return the result and delete the job
+    const result = job.result;
+    avatarJobs.delete(jobId);
+    return res.json({
+      jobId,
+      status: 'complete',
+      success: true,
+      clothingAvatars: result
+    });
+  }
+
+  if (job.status === 'failed') {
+    const error = job.error;
+    avatarJobs.delete(jobId);
+    return res.json({
+      jobId,
+      status: 'failed',
+      success: false,
+      error
+    });
+  }
+
+  res.json({ jobId, status: job.status });
+});
+
 module.exports = router;
 module.exports.generateDynamicAvatar = generateDynamicAvatar;
 module.exports.generateStyledCostumedAvatar = generateStyledCostumedAvatar;
 module.exports.getCostumedAvatarGenerationLog = getCostumedAvatarGenerationLog;
 module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationLog;
+module.exports.avatarJobs = avatarJobs; // Export for testing

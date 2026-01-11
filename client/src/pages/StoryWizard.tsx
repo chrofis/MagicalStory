@@ -1341,11 +1341,15 @@ export default function StoryWizard() {
   };
 
   const handlePhotoSelect = async (file: File, keepOldClothing?: boolean) => {
+    log.info(`📸 handlePhotoSelect called: file=${file?.name}, character=${currentCharacter?.name}, developerMode=${developerMode}`);
+
     // Check cooldown for existing characters with avatars (developers exempt)
     if (currentCharacter && !developerMode) {
       const hasAvatars = !!(currentCharacter.avatars?.winter || currentCharacter.avatars?.standard || currentCharacter.avatars?.summer);
+      log.info(`📸 hasAvatars=${hasAvatars}`);
       if (hasAvatars) {
         const cooldown = getAvatarCooldown(currentCharacter.id);
+        log.info(`📸 cooldown check: canRegenerate=${cooldown.canRegenerate}, waitSeconds=${cooldown.waitSeconds}`);
         if (!cooldown.canRegenerate) {
           const waitMsg = language === 'de'
             ? `Bitte warten Sie ${cooldown.waitSeconds} Sekunden, bevor Sie ein neues Foto hochladen.`
@@ -2607,23 +2611,43 @@ export default function StoryWizard() {
 
           if (result.success && result.avatars) {
             const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
-            // Update ALL physical traits from extraction (not just detailedHairAnalysis)
+
+            // MERGE physical traits - preserve USER edits, use extracted for non-user traits
+            const charSource = char.physicalTraitsSource || {};
             const updatedPhysical = result.extractedTraits ? {
               ...char.physical,
-              build: result.extractedTraits.build || char.physical?.build,
-              eyeColor: result.extractedTraits.eyeColor || char.physical?.eyeColor,
-              eyeColorHex: result.extractedTraits.eyeColorHex || char.physical?.eyeColorHex,
-              hairColor: result.extractedTraits.hairColor || char.physical?.hairColor,
-              hairColorHex: result.extractedTraits.hairColorHex || char.physical?.hairColorHex,
-              hairLength: result.extractedTraits.hairLength || char.physical?.hairLength,
-              hairStyle: result.extractedTraits.hairStyle || char.physical?.hairStyle,
-              facialHair: result.extractedTraits.facialHair || char.physical?.facialHair,
-              skinTone: result.extractedTraits.skinTone || char.physical?.skinTone,
-              skinToneHex: result.extractedTraits.skinToneHex || char.physical?.skinToneHex,
-              face: result.extractedTraits.face || char.physical?.face,
-              other: result.extractedTraits.other || char.physical?.other,
+              height: char.physical?.height, // Preserve height (not extracted from avatar)
+              // Preserve user-edited values, use extracted for non-user traits
+              build: charSource.build === 'user' ? char.physical?.build : result.extractedTraits.build,
+              eyeColor: charSource.eyeColor === 'user' ? char.physical?.eyeColor : result.extractedTraits.eyeColor,
+              eyeColorHex: charSource.eyeColor === 'user' ? char.physical?.eyeColorHex : result.extractedTraits.eyeColorHex,
+              hairColor: charSource.hairColor === 'user' ? char.physical?.hairColor : result.extractedTraits.hairColor,
+              hairColorHex: charSource.hairColor === 'user' ? char.physical?.hairColorHex : result.extractedTraits.hairColorHex,
+              hairLength: charSource.hairLength === 'user' ? char.physical?.hairLength : result.extractedTraits.hairLength,
+              hairStyle: charSource.hairStyle === 'user' ? char.physical?.hairStyle : result.extractedTraits.hairStyle,
+              facialHair: charSource.facialHair === 'user' ? char.physical?.facialHair : result.extractedTraits.facialHair,
+              skinTone: charSource.skinTone === 'user' ? char.physical?.skinTone : result.extractedTraits.skinTone,
+              skinToneHex: charSource.skinTone === 'user' ? char.physical?.skinToneHex : result.extractedTraits.skinToneHex,
+              face: charSource.face === 'user' ? char.physical?.face : result.extractedTraits.face,
+              other: charSource.other === 'user' ? char.physical?.other : result.extractedTraits.other,
+              // Detailed hair analysis from avatar evaluation (always use latest)
               detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || char.physical?.detailedHairAnalysis,
             } : char.physical;
+
+            // PRESERVE 'user' source - only set 'extracted' for non-user traits
+            const updatedTraitsSource = result.extractedTraits ? {
+              ...charSource,
+              build: charSource.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
+              eyeColor: charSource.eyeColor === 'user' ? 'user' as const : (result.extractedTraits.eyeColor ? 'extracted' as const : undefined),
+              hairColor: charSource.hairColor === 'user' ? 'user' as const : (result.extractedTraits.hairColor ? 'extracted' as const : undefined),
+              hairLength: charSource.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
+              hairStyle: charSource.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
+              face: charSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
+              facialHair: charSource.facialHair === 'user' ? 'user' as const : undefined,
+              other: charSource.other === 'user' ? 'user' as const : undefined,
+              skinTone: charSource.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
+            } : char.physicalTraitsSource;
+
             // Update extracted clothing too
             const updatedClothing = result.extractedClothing ? {
               ...char.clothing,
@@ -2634,17 +2658,17 @@ export default function StoryWizard() {
                 fullBody: result.extractedClothing.fullBody || undefined,
               },
             } : char.clothing;
-            // Update characters state
+            // Update characters state (include physicalTraitsSource)
             setCharacters(prev => prev.map(c =>
-              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
+              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : c
             ));
             // Also update currentCharacter if it matches
-            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : prev);
+            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : prev);
             // Save to storage using local state to preserve any unsaved changes
             // Use functional update to get latest characters state
             setCharacters(prevChars => {
               const updatedCharsForSave = prevChars.map(c =>
-                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
+                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : c
               );
               // Fire save in background (don't await to avoid blocking)
               characterService.saveCharacterData({

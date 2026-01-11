@@ -4,39 +4,42 @@ import os
 
 os.makedirs('temp_photos/review', exist_ok=True)
 
-def capture_all_sections(page, prefix):
-    """Scroll through all sections and capture each one"""
-    screenshots = []
+def capture_all_sections(page, prefix, is_mobile=False):
+    """Scroll through all sections using container scroll"""
     page.goto('https://magicalstory.ch')
     time.sleep(3)
     
-    # Capture each section by pressing PageDown
-    for i in range(7):
-        path = f'temp_photos/review/{prefix}_section_{i+1}.png'
-        page.screenshot(path=path)
-        screenshots.append(path)
-        page.keyboard.press('PageDown')
-        time.sleep(1)
+    # Get the scrollable container (first div with overflow-y-auto)
+    container = page.locator('div.overflow-y-auto').first
     
-    return screenshots
+    # Get section count by looking for snap-start sections
+    sections = page.locator('section.snap-start').all()
+    print(f"    Found {len(sections)} sections", flush=True)
+    
+    # Capture each section
+    for i, section in enumerate(sections):
+        try:
+            section.scroll_into_view_if_needed()
+            time.sleep(0.8)
+            page.screenshot(path=f'temp_photos/review/{prefix}_sec{i+1}.png')
+        except:
+            pass
+    
+    return len(sections)
 
 def main():
     print("=== COMPREHENSIVE WEBSITE REVIEW ===\n", flush=True)
     
     with sync_playwright() as p:
-        # Test configurations
         configs = [
-            ('chromium', 'desktop', 1440, 900),
-            ('chromium', 'tablet', 768, 1024),
-            ('chromium', 'mobile', 375, 812),
-            ('firefox', 'desktop', 1440, 900),
-            ('firefox', 'mobile', 375, 812),
-            ('webkit', 'desktop', 1440, 900),
-            ('webkit', 'mobile', 375, 812),
+            ('chromium', 'desktop', 1440, 900, False),
+            ('chromium', 'mobile', 375, 812, True),
+            ('firefox', 'desktop', 1440, 900, False),
+            ('webkit', 'mobile', 375, 812, True),
         ]
         
-        for browser_name, device, width, height in configs:
-            print(f"Testing {browser_name} - {device} ({width}x{height})...", flush=True)
+        for browser_name, device, width, height, is_mobile in configs:
+            print(f"Testing {browser_name} {device}...", flush=True)
             
             if browser_name == 'chromium':
                 browser = p.chromium.launch(headless=True)
@@ -47,17 +50,16 @@ def main():
             
             page = browser.new_page(viewport={'width': width, 'height': height})
             prefix = f'{browser_name}_{device}'
-            capture_all_sections(page, prefix)
+            capture_all_sections(page, prefix, is_mobile)
             
-            # Also capture pricing page
+            # Pricing
             page.goto('https://magicalstory.ch/pricing')
             time.sleep(2)
             page.screenshot(path=f'temp_photos/review/{prefix}_pricing.png', full_page=True)
             
             browser.close()
-            print(f"  Done!", flush=True)
     
-    print("\n=== All screenshots saved to temp_photos/review/ ===", flush=True)
+    print("\nDone! Analyzing screenshots...", flush=True)
 
 if __name__ == '__main__':
     main()
