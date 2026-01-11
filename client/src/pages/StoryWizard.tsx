@@ -2951,6 +2951,8 @@ export default function StoryWizard() {
             storyCategory={storyCategory}
             storyTopic={storyTopic}
             storyTheme={storyTheme}
+            customThemeText={customThemeText}
+            onCustomThemeTextChange={setCustomThemeText}
             artStyle={artStyle}
             storyLanguage={storyLanguage}
             languageLevel={languageLevel}
