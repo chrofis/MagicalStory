@@ -183,8 +183,8 @@ export function WizardStep3BookSettings({
           {language === 'de' ? 'Buchformat' : language === 'fr' ? 'Format du livre' : 'Book Format'}
         </h2>
 
-        {/* Language, Location, Season Row */}
-        <div className="flex flex-wrap items-center gap-4">
+        {/* Language, Location, Season Row - full width */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Language Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
@@ -198,7 +198,7 @@ export function WizardStep3BookSettings({
               >
                 {STORY_LANGUAGES.map((lang) => (
                   <option key={lang.code} value={lang.code}>
-                    {lang.flag} {lang.name}
+                    {lang.name}
                   </option>
                 ))}
               </select>
@@ -292,22 +292,22 @@ export function WizardStep3BookSettings({
             <button
               key={level.value}
               onClick={() => onLanguageLevelChange(level.value)}
-              className={`flex-shrink-0 w-32 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
+              className={`flex-shrink-0 w-36 md:w-auto text-left rounded-lg border-2 transition-all overflow-hidden ${
                 languageLevel === level.value
                   ? 'border-indigo-600 ring-2 ring-indigo-200'
                   : 'border-gray-200 hover:border-indigo-300'
               }`}
             >
-              <div className="w-full bg-gray-100 p-1.5 h-20 md:h-24">
+              <div className="w-full bg-gray-100 p-2 h-24 md:h-28">
                 <img
                   src={level.image}
                   alt={level.label}
                   className="w-full h-full object-contain"
                 />
               </div>
-              <div className="p-1.5 md:p-2">
-                <div className="font-semibold text-xs md:text-sm mb-0.5">{level.label}</div>
-                <div className="text-[10px] md:text-xs text-gray-500 whitespace-pre-line">{level.desc}</div>
+              <div className="p-2 md:p-2.5">
+                <div className="font-semibold text-sm mb-0.5">{level.label}</div>
+                <div className="text-xs text-gray-500 whitespace-pre-line">{level.desc}</div>
               </div>
             </button>
           ))}

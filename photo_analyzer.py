@@ -504,7 +504,12 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         # 2. DETECT ALL FACES (fast - ~50ms)
         print("[FACE] Detecting faces...")
         all_faces = detect_all_faces_mediapipe(img, min_confidence=0.15)
-        print(f"   Faces detected: {len(all_faces)}")
+        # Log each face with confidence
+        if len(all_faces) > 0:
+            face_scores = ", ".join([f"face {f['id']+1}: {f['confidence']*100:.0f}%" for f in all_faces])
+            print(f"   Faces detected: {len(all_faces)} ({face_scores})")
+        else:
+            print(f"   Faces detected: 0")
 
         # If no face detected, return error immediately
         if len(all_faces) == 0:
