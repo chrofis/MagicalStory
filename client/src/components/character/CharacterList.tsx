@@ -177,6 +177,8 @@ export function CharacterList({
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors border-l border-r border-gray-300 ${
                             isIn
                               ? 'bg-indigo-600 text-white'
+                              : isOut
+                              ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                               : 'bg-white text-gray-600 hover:bg-gray-100'
                           }`}
                         >
@@ -187,6 +189,8 @@ export function CharacterList({
                           className={`flex-1 px-1.5 py-1 font-medium transition-colors flex items-center justify-center gap-0.5 ${
                             isMain
                               ? 'bg-indigo-600 text-white'
+                              : isOut
+                              ? 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                               : 'bg-white text-gray-600 hover:bg-gray-100'
                           }`}
                         >
