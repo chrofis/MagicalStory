@@ -2219,34 +2219,47 @@ export default function StoryWizard() {
   };
 
   const deleteCharacter = async (id: number) => {
-    const updatedCharacters = characters.filter(c => c.id !== id);
-
-    // Also clean up relationships involving this character
-    const updatedRelationships = { ...relationships };
-    const updatedRelationshipTexts = { ...relationshipTexts };
-    Object.keys(updatedRelationships).forEach(key => {
-      if (key.includes(`${id}-`) || key.includes(`-${id}`)) {
-        delete updatedRelationships[key];
-        delete updatedRelationshipTexts[key];
-      }
-    });
-
     try {
-      await characterService.saveCharacterData({
-        characters: updatedCharacters,
-        relationships: updatedRelationships,
-        relationshipTexts: updatedRelationshipTexts,
-        customRelationships,
-        customStrengths: [],
-        customWeaknesses: [],
-        customFears: [],
-      });
-      setCharacters(updatedCharacters);
-      setRelationships(updatedRelationships);
-      setRelationshipTexts(updatedRelationshipTexts);
-      setMainCharacters(prev => prev.filter(cid => cid !== id));
+      // Use dedicated DELETE endpoint (much faster than re-uploading all characters)
+      const result = await characterService.deleteCharacter(id);
+
+      if (result.success) {
+        // Update local state - server already handled relationship cleanup in database
+        setCharacters(prev => prev.filter(c => c.id !== id));
+
+        // Clean up relationships in local state
+        setRelationships(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(key => {
+            if (key.includes(`${id}-`) || key.includes(`-${id}`)) {
+              delete updated[key];
+            }
+          });
+          return updated;
+        });
+        setRelationshipTexts(prev => {
+          const updated = { ...prev };
+          Object.keys(updated).forEach(key => {
+            if (key.includes(`${id}-`) || key.includes(`-${id}`)) {
+              delete updated[key];
+            }
+          });
+          return updated;
+        });
+
+        setMainCharacters(prev => prev.filter(cid => cid !== id));
+        log.success(`Character ${id} deleted`);
+      } else {
+        log.error('Failed to delete character:', result.error);
+        showError(language === 'de'
+          ? 'Charakter konnte nicht gelöscht werden'
+          : 'Failed to delete character');
+      }
     } catch (error) {
       log.error('Failed to delete character:', error);
+      showError(language === 'de'
+        ? 'Charakter konnte nicht gelöscht werden'
+        : 'Failed to delete character');
     }
   };
 

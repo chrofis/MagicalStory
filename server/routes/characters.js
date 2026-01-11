@@ -371,4 +371,89 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
+// DELETE /api/characters/:characterId - Delete a single character
+// Much faster than re-uploading all characters via POST
+router.delete('/:characterId', authenticateToken, async (req, res) => {
+  try {
+    const characterIdToDelete = parseInt(req.params.characterId, 10);
+    if (isNaN(characterIdToDelete)) {
+      return res.status(400).json({ error: 'Invalid character ID' });
+    }
+
+    console.log(`[Characters] DELETE - User ${req.user.id} deleting character ${characterIdToDelete}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Fetch current character data
+    const rowId = `characters_${req.user.id}`;
+    const rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [rowId]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No character data found' });
+    }
+
+    const data = JSON.parse(rows[0].data);
+
+    // Handle both old format (array) and new format (object)
+    let characterData;
+    if (Array.isArray(data)) {
+      characterData = { characters: data, relationships: {}, relationshipTexts: {} };
+    } else {
+      characterData = data;
+    }
+
+    // Check if character exists
+    const charIndex = characterData.characters.findIndex(c => c.id === characterIdToDelete);
+    if (charIndex === -1) {
+      return res.status(404).json({ error: 'Character not found' });
+    }
+
+    const deletedCharName = characterData.characters[charIndex].name;
+
+    // Remove the character
+    characterData.characters = characterData.characters.filter(c => c.id !== characterIdToDelete);
+
+    // Clean up relationships involving this character
+    if (characterData.relationships) {
+      Object.keys(characterData.relationships).forEach(key => {
+        if (key.includes(`${characterIdToDelete}-`) || key.includes(`-${characterIdToDelete}`)) {
+          delete characterData.relationships[key];
+        }
+      });
+    }
+    if (characterData.relationshipTexts) {
+      Object.keys(characterData.relationshipTexts).forEach(key => {
+        if (key.includes(`${characterIdToDelete}-`) || key.includes(`-${characterIdToDelete}`)) {
+          delete characterData.relationshipTexts[key];
+        }
+      });
+    }
+
+    // Save back
+    const dataJson = JSON.stringify(characterData);
+    await dbQuery(
+      `UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2`,
+      [dataJson, rowId]
+    );
+
+    await logActivity(req.user.id, req.user.username, 'CHARACTER_DELETED', {
+      characterId: characterIdToDelete,
+      characterName: deletedCharName,
+      remainingCount: characterData.characters.length
+    });
+
+    console.log(`[Characters] DELETE - Successfully deleted character ${characterIdToDelete} (${deletedCharName})`);
+    res.json({
+      success: true,
+      message: `Character "${deletedCharName}" deleted`,
+      remainingCount: characterData.characters.length
+    });
+  } catch (err) {
+    console.error('Error deleting character:', err);
+    res.status(500).json({ error: 'Failed to delete character' });
+  }
+});
+
 module.exports = router;

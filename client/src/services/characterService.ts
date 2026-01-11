@@ -355,6 +355,23 @@ export const characterService = {
   },
 
   /**
+   * Delete a single character by ID (much faster than re-saving all characters)
+   * Server handles relationship cleanup
+   */
+  async deleteCharacter(characterId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await api.delete<{ success: boolean; message: string; remainingCount: number }>(
+        `/api/characters/${characterId}`
+      );
+      log.success(`Deleted character ${characterId}: ${response.message}`);
+      return { success: true };
+    } catch (error) {
+      log.error(`Failed to delete character ${characterId}:`, error);
+      return { success: false, error: String(error) };
+    }
+  },
+
+  /**
    * Generate 3 avatar options for user to choose from
    */
   async generateAvatarOptions(facePhoto: string, gender: string): Promise<{

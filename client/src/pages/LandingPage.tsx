@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -6,6 +6,30 @@ import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Downlo
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer } from '@/components/common';
 import { storyService } from '@/services';
+
+// Scroll indicator component - subtle dots on the right
+function ScrollIndicator({ activeIndex, totalSections, onDotClick }: {
+  activeIndex: number;
+  totalSections: number;
+  onDotClick: (index: number) => void;
+}) {
+  return (
+    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col gap-2">
+      {Array.from({ length: totalSections }).map((_, index) => (
+        <button
+          key={index}
+          onClick={() => onDotClick(index)}
+          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+            index === activeIndex
+              ? 'bg-indigo-600 scale-125'
+              : 'bg-gray-300 hover:bg-gray-400'
+          }`}
+          aria-label={`Go to section ${index + 1}`}
+        />
+      ))}
+    </div>
+  );
+}
 
 const sectionTranslations = {
   en: {
@@ -117,6 +141,49 @@ export default function LandingPage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const st = sectionTranslations[language] || sectionTranslations.en;
 
+  // Scroll indicator state
+  const [activeSection, setActiveSection] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<(HTMLElement | null)[]>([]);
+  const TOTAL_SECTIONS = 6;
+
+  // Track scroll position with IntersectionObserver
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const index = sectionRefs.current.indexOf(entry.target as HTMLElement);
+            if (index !== -1) {
+              setActiveSection(index);
+            }
+          }
+        });
+      },
+      {
+        root: container,
+        threshold: 0.5,
+      }
+    );
+
+    sectionRefs.current.forEach((section) => {
+      if (section) observer.observe(section);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // Handle dot click to scroll to section
+  const handleDotClick = useCallback((index: number) => {
+    const section = sectionRefs.current[index];
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
   // Check for login query param
   useEffect(() => {
     if (searchParams.get('login') === 'true') {
@@ -203,14 +270,21 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="h-screen overflow-y-auto snap-y snap-mandatory bg-gray-50">
+    <div ref={containerRef} className="h-screen overflow-y-auto snap-y snap-mandatory bg-gray-50">
+      {/* Scroll Indicator */}
+      <ScrollIndicator
+        activeIndex={activeSection}
+        totalSections={TOTAL_SECTIONS}
+        onDotClick={handleDotClick}
+      />
+
       {/* Navigation - Fixed at top */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gray-50">
         <Navigation currentStep={0} />
       </div>
 
       {/* Hero Section - Full viewport height */}
-      <section className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative snap-start">
+      <section ref={(el) => { sectionRefs.current[0] = el; }} className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative snap-start">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10 flex-1 items-center">
           {/* Left Side - Text and Button */}
           <div className="w-full lg:w-[35%] flex flex-col justify-center">
@@ -309,7 +383,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 1: Create Your Characters */}
-      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[1] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -354,7 +428,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[2] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -399,7 +473,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 3: Choose Your Style */}
-      <section className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[3] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
