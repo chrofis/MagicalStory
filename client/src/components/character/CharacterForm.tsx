@@ -1473,34 +1473,6 @@ export function CharacterForm({
         </div>
       )}
 
-      {/* Developer Mode: Show which photo will be used for avatar generation */}
-      {(developerMode || isImpersonating) && (
-        <div className="bg-orange-50 border border-orange-300 rounded-lg p-3">
-          <h4 className="text-xs font-semibold text-orange-700 mb-2">
-            Avatar Generation Input Photo
-          </h4>
-          <div className="text-xs text-orange-600 mb-2">
-            <div>bodyNoBg: {character.photos?.bodyNoBg ? `✅ ${Math.round(character.photos.bodyNoBg.length / 1024)}KB` : '❌ missing'}</div>
-            <div>body: {character.photos?.body ? `✅ ${Math.round(character.photos.body.length / 1024)}KB` : '❌ missing'}</div>
-            <div>face: {character.photos?.face ? `✅ ${Math.round(character.photos.face.length / 1024)}KB` : '❌ missing'}</div>
-            <div>original: {character.photos?.original ? `✅ ${Math.round(character.photos.original.length / 1024)}KB` : '❌ missing'}</div>
-            <div className="mt-1 font-bold">
-              Will use: {character.photos?.bodyNoBg ? 'bodyNoBg ✅' : character.photos?.body ? 'body ⚠️' : character.photos?.face ? 'face ⚠️' : 'original ❌'}
-            </div>
-          </div>
-          {(character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original) && (
-            <div className="flex justify-center">
-              <img
-                src={character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original}
-                alt="Avatar generation input"
-                className="max-h-32 object-contain rounded border border-orange-300"
-                style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 20px 20px' }}
-              />
-            </div>
-          )}
-        </div>
-      )}
-
       {/* Developer Mode: Show raw Gemini response from photo analysis */}
       {(developerMode || isImpersonating) && photoAnalysisDebug?.rawResponse && (
         <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
