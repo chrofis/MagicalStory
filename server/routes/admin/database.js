@@ -580,4 +580,80 @@ router.post('/migrate-all-story-images', authenticateToken, requireAdmin, async 
   }
 });
 
+// POST /api/admin/convert-characters-jsonb
+// Convert characters.data column from TEXT to JSONB for faster operations
+router.post('/convert-characters-jsonb', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    const pool = getPool();
+    const results = [];
+
+    // Check current column type
+    const typeCheck = await pool.query(`
+      SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'characters' AND column_name = 'data'
+    `);
+
+    const currentType = typeCheck.rows[0]?.data_type;
+    results.push({ step: 'check_type', currentType });
+
+    if (currentType === 'jsonb') {
+      return res.json({
+        success: true,
+        message: 'Column is already JSONB, no conversion needed',
+        results
+      });
+    }
+
+    log.info('[CONVERT-JSONB] Converting characters.data from TEXT to JSONB...');
+
+    // Step 1: Add temporary JSONB column
+    results.push({ step: 'add_jsonb_column', status: 'starting' });
+    await pool.query('ALTER TABLE characters ADD COLUMN IF NOT EXISTS data_jsonb JSONB');
+    results[results.length - 1].status = 'done';
+
+    // Step 2: Copy data (this is the slow part)
+    results.push({ step: 'copy_data', status: 'starting' });
+    const copyResult = await pool.query(`
+      UPDATE characters SET data_jsonb = data::jsonb
+      WHERE data_jsonb IS NULL AND data IS NOT NULL
+    `);
+    results[results.length - 1].status = 'done';
+    results[results.length - 1].rowsUpdated = copyResult.rowCount;
+
+    // Step 3: Drop old column
+    results.push({ step: 'drop_text_column', status: 'starting' });
+    await pool.query('ALTER TABLE characters DROP COLUMN data');
+    results[results.length - 1].status = 'done';
+
+    // Step 4: Rename new column
+    results.push({ step: 'rename_column', status: 'starting' });
+    await pool.query('ALTER TABLE characters RENAME COLUMN data_jsonb TO data');
+    results[results.length - 1].status = 'done';
+
+    // Step 5: Add NOT NULL constraint
+    results.push({ step: 'add_not_null', status: 'starting' });
+    await pool.query('ALTER TABLE characters ALTER COLUMN data SET NOT NULL');
+    results[results.length - 1].status = 'done';
+
+    // Step 6: Create GIN index for faster queries
+    results.push({ step: 'create_index', status: 'starting' });
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_characters_data_gin ON characters USING GIN (data)');
+    results[results.length - 1].status = 'done';
+
+    log.info('[CONVERT-JSONB] Conversion complete!');
+    res.json({
+      success: true,
+      message: 'Successfully converted characters.data from TEXT to JSONB',
+      results
+    });
+  } catch (err) {
+    log.error('[CONVERT-JSONB] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
