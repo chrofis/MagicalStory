@@ -641,54 +641,58 @@ export default function MyStories() {
     <div className="min-h-screen bg-gray-50 pb-24">
       <Navigation currentStep={0} />
 
-      <div className="px-4 md:px-8 py-8 max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <Book size={28} />
-            {t.myStories}
+      <div className="px-4 md:px-8 py-4 md:py-8 max-w-6xl mx-auto">
+        {/* Header - compact on mobile */}
+        <div className="flex items-center justify-between gap-2 mb-4">
+          <h1 className="text-xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <Book size={24} className="md:w-7 md:h-7" />
+            <span className="hidden sm:inline">{t.myStories}</span>
           </h1>
 
-          <div className="flex flex-wrap items-center gap-3">
-            {/* See Pricing button */}
+          <div className="flex items-center gap-2">
+            {/* See Pricing button - icon only on mobile */}
             <button
               onClick={() => navigate('/pricing')}
-              className="flex items-center gap-2 px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-colors"
+              className="flex items-center gap-1 px-2 md:px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-colors"
+              title={t.seePricing}
             >
               <Tag size={18} />
-              {t.seePricing}
+              <span className="hidden md:inline">{t.seePricing}</span>
             </button>
 
-            {/* Create Book button */}
+            {/* Create Book button - icon only on mobile when not selected */}
             {canSelectForBook && (
               <button
                 onClick={goToBookBuilder}
                 disabled={selectedStories.length === 0 || isOverLimit}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-2 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={t.createBook}
               >
                 <BookOpen size={18} />
-                {t.createBook}
+                <span className="hidden md:inline">{t.createBook}</span>
                 {selectedStories.length > 0 && (
-                  <span className="bg-white text-indigo-600 text-xs px-2 py-0.5 rounded-full">
+                  <span className="bg-white text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">
                     {selectedStories.length}
                   </span>
                 )}
               </button>
             )}
 
-            {/* Create Story button */}
+            {/* Create Story button - compact on mobile */}
             <button
               onClick={() => navigate('/create?new=true')}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
+              className="flex items-center gap-1 px-2 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
+              title={t.createStory}
             >
-              {t.createStory}
+              <span className="md:hidden">+</span>
+              <span className="hidden md:inline">{t.createStory}</span>
             </button>
           </div>
         </div>
 
-        {/* Instructions hint */}
+        {/* Instructions hint - hidden on mobile, shown on desktop */}
         {stories.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-center gap-3">
+          <div className="hidden md:flex bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 items-center gap-3">
             <BookOpen size={20} className="text-blue-600 flex-shrink-0" />
             <p className="text-blue-800 text-sm">{t.selectHint}</p>
             {selectedStories.length > 0 && (
