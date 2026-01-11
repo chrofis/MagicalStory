@@ -108,8 +108,14 @@ export function WizardStep3BookSettings({
     : Math.floor(userCredits / creditsPerPage);
   // Round down to nearest even number
   const maxAffordablePages = Math.floor(affordablePages / 2) * 2;
+  // Check if user can't afford even the minimum
+  const minCreditsNeeded = minPages * creditsPerPage;
+  const cannotAffordMinimum = !hasUnlimitedCredits && userCredits < minCreditsNeeded;
+  const creditsNeededForMin = minCreditsNeeded - userCredits;
   // Effective max is the lower of absolute max and what user can afford
-  const effectiveMaxPages = Math.min(absoluteMaxPages, Math.max(minPages, maxAffordablePages));
+  const effectiveMaxPages = cannotAffordMinimum
+    ? minPages // Show minimum even if can't afford (slider will be disabled)
+    : Math.min(absoluteMaxPages, Math.max(minPages, maxAffordablePages));
   const isLimitedByCredits = !hasUnlimitedCredits && maxAffordablePages < absoluteMaxPages;
 
   // Ensure pages value is even and within range
@@ -316,59 +322,87 @@ export function WizardStep3BookSettings({
           <label className="block text-xl font-semibold mb-3">
             {t.numberOfPages}
           </label>
-          <div className="space-y-3">
-            {/* Range Slider */}
-            <input
-              type="range"
-              min={minPages}
-              max={effectiveMaxPages}
-              step={pageStep}
-              value={Math.min(pages, effectiveMaxPages)}
-              onChange={(e) => onPagesChange(parseInt(e.target.value))}
-              className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600
-                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
-                         [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
-                         [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:hover:bg-indigo-700
-                         [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-indigo-600
-                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-            />
 
-            {/* Value display with min/max */}
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-400">{minPages}</span>
-              <span className="text-xl font-bold text-indigo-600">
-                {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
-              </span>
-              <span className={`text-sm ${isLimitedByCredits ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                {effectiveMaxPages}
-                {isLimitedByCredits && ' ⚠️'}
-              </span>
-            </div>
-
-            {/* Credit limit warning */}
-            {isLimitedByCredits && (
-              <div className="text-center text-sm text-orange-600 bg-orange-50 rounded-lg py-2 px-3">
+          {/* Not enough credits warning */}
+          {cannotAffordMinimum ? (
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
+              <p className="text-red-700 font-semibold mb-2">
                 {language === 'de'
-                  ? `Max. ${effectiveMaxPages} Seiten mit ${userCredits} Credits möglich`
+                  ? 'Nicht genügend Credits'
                   : language === 'fr'
-                  ? `Max. ${effectiveMaxPages} pages possibles avec ${userCredits} crédits`
-                  : `Max. ${effectiveMaxPages} pages possible with ${userCredits} credits`}
-              </div>
-            )}
-
-            {/* Credits and description */}
-            <div className="text-center">
-              <p className="text-base font-medium text-gray-700">
-                {getPageLabel(pages, pages === 4)}
+                  ? 'Crédits insuffisants'
+                  : 'Not enough credits'}
               </p>
-              <p className="text-sm text-gray-500 mt-1">
-                {languageLevel === '1st-grade'
-                  ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
-                  : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
-                }
+              <p className="text-red-600 text-sm">
+                {language === 'de'
+                  ? `Du benötigst mindestens ${minCreditsNeeded} Credits für eine Geschichte mit ${minPages} Seiten. Dir fehlen noch ${creditsNeededForMin} Credits.`
+                  : language === 'fr'
+                  ? `Vous avez besoin d'au moins ${minCreditsNeeded} crédits pour une histoire de ${minPages} pages. Il vous manque ${creditsNeededForMin} crédits.`
+                  : `You need at least ${minCreditsNeeded} credits for a ${minPages}-page story. You need ${creditsNeededForMin} more credits.`}
+              </p>
+              <p className="text-gray-500 text-xs mt-2">
+                {language === 'de'
+                  ? `Aktuell: ${userCredits} Credits`
+                  : language === 'fr'
+                  ? `Actuel: ${userCredits} crédits`
+                  : `Current: ${userCredits} credits`}
               </p>
             </div>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Range Slider */}
+              <input
+                type="range"
+                min={minPages}
+                max={effectiveMaxPages}
+                step={pageStep}
+                value={Math.min(pages, effectiveMaxPages)}
+                onChange={(e) => onPagesChange(parseInt(e.target.value))}
+                className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600
+                           [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
+                           [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
+                           [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:hover:bg-indigo-700
+                           [&::-moz-range-thumb]:w-6 [&::-moz-range-thumb]:h-6 [&::-moz-range-thumb]:bg-indigo-600
+                           [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+              />
+
+              {/* Value display with min/max */}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-400">{minPages}</span>
+                <span className="text-xl font-bold text-indigo-600">
+                  {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
+                </span>
+                <span className={`text-sm ${isLimitedByCredits ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                  {effectiveMaxPages}
+                  {isLimitedByCredits && ' ⚠️'}
+                </span>
+              </div>
+
+              {/* Credit limit warning */}
+              {isLimitedByCredits && (
+                <div className="text-center text-sm text-orange-600 bg-orange-50 rounded-lg py-2 px-3">
+                  {language === 'de'
+                    ? `Max. ${effectiveMaxPages} Seiten mit ${userCredits} Credits möglich`
+                    : language === 'fr'
+                    ? `Max. ${effectiveMaxPages} pages possibles avec ${userCredits} crédits`
+                    : `Max. ${effectiveMaxPages} pages possible with ${userCredits} credits`}
+                </div>
+              )}
+
+              {/* Credits and description */}
+              <div className="text-center">
+                <p className="text-base font-medium text-gray-700">
+                  {getPageLabel(pages, pages === 4)}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {languageLevel === '1st-grade'
+                    ? (language === 'de' ? 'Jede Seite enthält ein Bild mit Text darunter' : language === 'fr' ? 'Chaque page contient une image avec du texte en dessous' : 'Each page contains an image with text below')
+                    : (language === 'de' ? 'Abwechselnd Textseite und Bildseite' : language === 'fr' ? 'Alternance de pages de texte et d\'images' : 'Alternating text page and image page')
+                  }
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
