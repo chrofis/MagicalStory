@@ -129,8 +129,9 @@ def detect_all_faces_mtcnn(image, min_confidence=0.9):
                 'confidence': conf
             })
 
-        # Sort by confidence (highest first) and re-number
-        faces.sort(key=lambda f: f['confidence'], reverse=True)
+        # Sort by confidence (highest first), then by x position for stability
+        # This ensures consistent ordering between API calls when confidence is similar
+        faces.sort(key=lambda f: (-f['confidence'], f['x']))
         for i, face in enumerate(faces):
             face['id'] = i
 
@@ -310,8 +311,8 @@ def detect_all_faces_mediapipe_tasks(image, min_confidence=0.15):
             }
             faces.append(face)
 
-    # Sort by confidence
-    faces.sort(key=lambda f: f['confidence'], reverse=True)
+    # Sort by confidence, then by x position for stability between API calls
+    faces.sort(key=lambda f: (-f['confidence'], f['x']))
     for i, face in enumerate(faces):
         face['id'] = i
 
@@ -333,7 +334,8 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
     # Fall back to MediaPipe Tasks API if MTCNN not available
     if MEDIAPIPE_TASKS_AVAILABLE:
         faces = detect_all_faces_mediapipe_tasks(image, min_confidence=min_confidence)
-        faces.sort(key=lambda f: f['confidence'], reverse=True)
+        # Sort by confidence, then by x position for stability
+        faces.sort(key=lambda f: (-f['confidence'], f['x']))
         for i, face in enumerate(faces):
             face['id'] = i
         return faces
@@ -391,8 +393,8 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
                     if not is_duplicate:
                         faces.append(face)
 
-    # Sort by confidence and re-number
-    faces.sort(key=lambda f: f['confidence'], reverse=True)
+    # Sort by confidence, then by x position for stability between API calls
+    faces.sort(key=lambda f: (-f['confidence'], f['x']))
     for i, face in enumerate(faces):
         face['id'] = i
 
