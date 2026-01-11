@@ -1692,6 +1692,34 @@ export function CharacterForm({
                 </div>
               </div>
             )}
+            {/* Show input photo that was/will be used for avatar generation */}
+            {(developerMode || isImpersonating) && (
+              <div className="text-[10px] text-gray-500 bg-orange-50 border border-orange-200 rounded p-2">
+                <div className="font-medium mb-1">Input Photo for Generation:</div>
+                <div className="flex items-start gap-2">
+                  <img
+                    src={character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original}
+                    alt="Generation input"
+                    className="w-16 h-20 object-contain rounded border border-orange-300"
+                    style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 10px 10px' }}
+                  />
+                  <div>
+                    <div className={character.photos?.bodyNoBg ? 'text-green-600 font-bold' : 'text-gray-400'}>
+                      bodyNoBg: {character.photos?.bodyNoBg ? `✅ ${Math.round(character.photos.bodyNoBg.length / 1024)}KB` : '❌'}
+                    </div>
+                    <div className={!character.photos?.bodyNoBg && character.photos?.body ? 'text-yellow-600 font-bold' : 'text-gray-400'}>
+                      body: {character.photos?.body ? `${Math.round(character.photos.body.length / 1024)}KB` : '❌'}
+                    </div>
+                    <div className={!character.photos?.bodyNoBg && !character.photos?.body && character.photos?.face ? 'text-yellow-600 font-bold' : 'text-gray-400'}>
+                      face: {character.photos?.face ? `${Math.round(character.photos.face.length / 1024)}KB` : '❌'}
+                    </div>
+                    <div className="mt-1 text-orange-700 font-bold">
+                      Using: {character.photos?.bodyNoBg ? 'bodyNoBg ✅' : character.photos?.body ? 'body ⚠️' : character.photos?.face ? 'face ⚠️' : 'original ❌'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2 flex-wrap">
               {onRegenerateAvatarsWithTraits && (
                 <button

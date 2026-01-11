@@ -1261,14 +1261,13 @@ router.post('/generate-avatar-options', authenticateToken, async (req, res) => {
     };
     const config = {};
 
-    // Generate 3 attempts sequentially with delay to avoid rate limiting
+    // Generate 3 attempts sequentially with 5s delay between requests
     const options = [];
     for (let i = 0; i < 3; i++) {
       if (i > 0) {
-        // Wait 2 seconds between requests to avoid rate limiting
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 5000));
       }
-      log.debug(`🎭 [AVATAR OPTIONS] Generating option ${i + 1}/3...`);
+      console.log(`🎭 [AVATAR OPTIONS] Generating option ${i + 1}/3...`);
       const result = await generateDynamicAvatar(character, category, config);
       if (result.success) {
         options.push({ id: i, imageData: result.imageData });
@@ -1311,11 +1310,15 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const useRunware = modelConfig?.backend === 'runware' || selectedModel === 'flux-schnell';
     const geminiModelId = modelConfig?.modelId || 'gemini-2.5-flash-image';
 
-    // Log image size to debug which photo is being used
+    // Log image details to debug which photo is being used
     const imageSize = Math.round(facePhoto.length / 1024);
     const isPNG = facePhoto.startsWith('data:image/png');
+    // Extract a fingerprint from the image data to verify it's the same image
+    const base64Start = facePhoto.indexOf('base64,') + 7;
+    const imageFingerprint = facePhoto.substring(base64Start, base64Start + 20);
     log.debug(`👔 [CLOTHING AVATARS] Starting generation for ${name} (id: ${characterId}), model: ${selectedModel}, backend: ${useRunware ? 'runware' : 'gemini'}`);
     log.debug(`👔 [CLOTHING AVATARS] Input photo: ${imageSize}KB, format: ${isPNG ? 'PNG (likely bodyNoBg)' : 'JPEG (likely original)'}`);
+    log.debug(`👔 [CLOTHING AVATARS] Image fingerprint: ${imageFingerprint}...`);
 
     const isFemale = gender === 'female';
 

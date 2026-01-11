@@ -23,9 +23,9 @@ CRITICAL GRID REQUIREMENTS:
 
 VISUAL REQUIREMENTS:
 - Face: 100% identical to reference photo. Direct replication, not averaged.
-- Expression: Natural, friendly SMILE. The person should look happy and approachable.
+- Expression: Natural, friendly expression. The person should look approachable.
 - Body: Generate age-appropriate body proportions based on the apparent age visible in the reference photo.
-- Setting: Pure clean white background (#FFFFFF) in each quadrant.
+- Setting: Solid light grey studio background in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
 - Top quadrants: Head and shoulders, face clearly visible
 - Bottom quadrants: Full body, head to toe. Shoes visible.
