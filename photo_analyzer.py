@@ -570,10 +570,10 @@ def process_photo(image_data, is_base64=True, selected_face_id=None):
         # Determine which face to use
         if selected_face_id is not None and selected_face_id < len(all_faces):
             face_box = all_faces[selected_face_id]
-            print(f"   Using selected face {selected_face_id} (confidence: {face_box['confidence']:.2f})")
+            print(f"   Using face {selected_face_id + 1} (selected, {face_box['confidence']*100:.0f}%)")
         else:
             face_box = all_faces[0]  # Use highest confidence face
-            print(f"   Using primary face (confidence: {face_box['confidence']:.2f})")
+            print(f"   Using face 1 ({face_box['confidence']*100:.0f}%)")
 
         # 5. REMOVE BACKGROUND (fast - ~100ms)
         print("[BG] Removing background...")
