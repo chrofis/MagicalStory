@@ -31,16 +31,22 @@ router.get('/', authenticateToken, async (req, res) => {
     };
 
     if (isDatabaseMode()) {
-      // Query by user_id and get the row with the most data (handles legacy ID formats)
-      // Legacy format: characters_{user_id}_{timestamp}
+      // First try to get by exact ID (fast path - no sorting needed)
       // Current format: characters_{user_id}
-      const selectQuery = `
-        SELECT data FROM characters
-        WHERE user_id = $1
-        ORDER BY LENGTH(data) DESC
-        LIMIT 1
-      `;
-      const rows = await dbQuery(selectQuery, [req.user.id]);
+      const characterId = `characters_${req.user.id}`;
+      let rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+
+      // Fallback: query by user_id if exact ID not found (handles legacy data)
+      // Legacy format: characters_{user_id}_{timestamp}
+      if (rows.length === 0) {
+        const fallbackQuery = `
+          SELECT data FROM characters
+          WHERE user_id = $1
+          ORDER BY created_at DESC
+          LIMIT 1
+        `;
+        rows = await dbQuery(fallbackQuery, [req.user.id]);
+      }
       console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}, includeAllAvatars: ${includeAllAvatars}`);
 
       if (rows.length > 0) {
