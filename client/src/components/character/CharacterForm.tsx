@@ -619,7 +619,7 @@ export function CharacterForm({
     }
   };
 
-  const canSaveName = character.name && character.name.trim().length >= 2;
+  const canSaveName = character.name && character.name.trim().length >= 2 && character.gender && character.age;
 
   const canSaveCharacter =
     character.name &&
@@ -702,14 +702,14 @@ export function CharacterForm({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
-                  {t.gender}
+                  {t.gender} <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={character.gender || ''}
                   onChange={(e) => updateField('gender', e.target.value as 'male' | 'female' | 'other')}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-base focus:border-indigo-500 focus:outline-none"
+                  className={`w-full px-2 py-1.5 border rounded text-base focus:border-indigo-500 focus:outline-none ${!character.gender ? 'border-red-300' : 'border-gray-300'}`}
                 >
-                  <option value="">{language === 'de' ? '— Unbekannt —' : language === 'fr' ? '— Inconnu —' : '— Unknown —'}</option>
+                  <option value="">{language === 'de' ? '— Bitte wählen —' : language === 'fr' ? '— Veuillez choisir —' : '— Please select —'}</option>
                   <option value="male">{t.male}</option>
                   <option value="female">{t.female}</option>
                   <option value="other">{t.other}</option>
@@ -717,13 +717,13 @@ export function CharacterForm({
               </div>
               <div>
                 <label className="block text-[10px] font-semibold text-gray-600 mb-0.5">
-                  {t.age}
+                  {t.age} <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
                   value={character.age}
                   onChange={(e) => updateField('age', e.target.value)}
-                  className="w-full px-2 py-1.5 border border-gray-300 rounded text-base focus:border-indigo-500 focus:outline-none"
+                  className={`w-full px-2 py-1.5 border rounded text-base focus:border-indigo-500 focus:outline-none ${!character.age ? 'border-red-300' : 'border-gray-300'}`}
                   min="1"
                   max="120"
                 />
@@ -2309,21 +2309,24 @@ export function CharacterForm({
               <button
                 onClick={() => {
                   setIsModifyingAvatar(false);
-                  if (onRegenerateAvatarsWithTraits) {
-                    recordRegeneration();
+                  recordRegeneration();
+                  // For new characters, use save+regenerate; for existing, just regenerate
+                  if (isNewCharacter && onSaveAndRegenerateWithTraits) {
+                    onSaveAndRegenerateWithTraits();
+                  } else if (onRegenerateAvatarsWithTraits) {
                     onRegenerateAvatarsWithTraits();
                   }
                 }}
-                disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating' || (!developerMode && !canRegenerate)}
+                disabled={isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating' || (!developerMode && !isImpersonating && !canRegenerate)}
                 className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
-                title={!developerMode && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
+                title={!developerMode && !isImpersonating && !canRegenerate ? (language === 'de' ? `Warten Sie ${waitSeconds}s` : `Wait ${waitSeconds}s`) : undefined}
               >
                 {isRegeneratingAvatarsWithTraits ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     {language === 'de' ? 'Generiere...' : 'Generating...'}
                   </>
-                ) : !developerMode && !canRegenerate ? (
+                ) : !developerMode && !isImpersonating && !canRegenerate ? (
                   <>
                     <Save size={16} />
                     {language === 'de' ? `Warten (${waitSeconds}s)` : `Wait (${waitSeconds}s)`}
