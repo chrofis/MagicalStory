@@ -180,7 +180,7 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
     faces = []
     with mp_face_detection.FaceDetection(
         model_selection=1,  # 0 for close faces, 1 for far faces
-        min_detection_confidence=0.3  # Lower threshold, we filter ourselves
+        min_detection_confidence=0.1  # Very low - we filter ourselves at 0.15
     ) as face_detection:
         # Convert BGR to RGB
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
