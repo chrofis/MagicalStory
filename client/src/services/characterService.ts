@@ -173,10 +173,28 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
   };
 }
 
+// Strip heavy base64 image data from avatars for saving
+// Server already has the images - we only need metadata
+function stripAvatarImages(avatars: Character['avatars']): Character['avatars'] {
+  if (!avatars) return avatars;
+  return {
+    status: avatars.status,
+    generatedAt: avatars.generatedAt,
+    stale: avatars.stale,
+    // Keep face thumbnails (small) for display
+    faceThumbnails: avatars.faceThumbnails,
+    // Strip all large base64 images - server already has them
+    // winter, standard, summer, formal, styledAvatars are NOT sent
+  };
+}
+
 // Convert frontend Character to API format
 function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
   // Auto-compute ageCategory if not set but age is available
   const ageCategory = char.ageCategory || getAgeCategory(char.age);
+
+  // Strip heavy avatar images - server already has them from generation
+  const lightAvatars = stripAvatarImages(char.avatars);
 
   return {
     id: char.id,
@@ -218,8 +236,8 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     // Clothing
     clothing: char.clothing?.current,
     structured_clothing: char.clothing?.structured,
-    clothing_avatars: char.avatars,
-    avatars: char.avatars,  // Also send as avatars for backend compatibility
+    clothing_avatars: lightAvatars,  // Only metadata, no images
+    avatars: lightAvatars,  // Only metadata, no images
     // Generated outfits per page
     generated_outfits: char.generatedOutfits,
   };
