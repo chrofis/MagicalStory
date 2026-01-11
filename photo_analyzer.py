@@ -780,7 +780,12 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
         body_mask = None
         try:
             full_img_rgba, body_mask = remove_background(img)
-            print("   Background removed")
+            if full_img_rgba is not None:
+                h, w = full_img_rgba.shape[:2]
+                visible = np.sum(full_img_rgba[:,:,3] > 128)
+                print(f"   Background removed: {visible}/{h*w} pixels visible ({100*visible/(h*w):.1f}%)")
+            else:
+                print("   Background removal returned None")
         except Exception as bg_error:
             print(f"   Background removal failed: {bg_error}")
 
