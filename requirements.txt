@@ -4,4 +4,4 @@ opencv-python-headless==4.8.1.78
 pillow==10.1.0
 numpy==1.24.3
 mediapipe==0.10.9
-mtcnn>=1.0.0
+mtcnn-opencv>=1.0.0

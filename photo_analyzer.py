@@ -70,16 +70,23 @@ try:
 except ImportError:
     print("[WARN] MediaPipe not installed - face detection disabled")
 
-# Try to initialize MTCNN (best accuracy, lightweight)
+# Try to initialize MTCNN (best accuracy)
+# Try mtcnn-opencv first (lightweight, no TensorFlow), then fall back to mtcnn (TensorFlow)
 MTCNN_AVAILABLE = False
 mtcnn_detector = None
 try:
-    from mtcnn import MTCNN
+    from mtcnn_cv2 import MTCNN
     mtcnn_detector = MTCNN()
     MTCNN_AVAILABLE = True
-    print("[OK] MTCNN face detector available")
+    print("[OK] MTCNN face detector available (OpenCV version)")
 except ImportError:
-    print("[INFO] MTCNN not available - using MediaPipe/OpenCV fallback")
+    try:
+        from mtcnn import MTCNN
+        mtcnn_detector = MTCNN()
+        MTCNN_AVAILABLE = True
+        print("[OK] MTCNN face detector available (TensorFlow version)")
+    except ImportError:
+        print("[INFO] MTCNN not available - will use MediaPipe fallback")
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
