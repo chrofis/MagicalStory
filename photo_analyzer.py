@@ -328,6 +328,14 @@ def detect_all_faces_mediapipe(image, min_confidence=0.15):
     for i, face in enumerate(faces):
         face['id'] = i
 
+    # If legacy MediaPipe found few faces, also try OpenCV as backup
+    # OpenCV sometimes detects faces that MediaPipe misses (especially in group photos)
+    if len(faces) < 2:
+        opencv_faces = detect_all_faces_opencv(image)
+        if len(opencv_faces) > len(faces):
+            print(f"[FACE] Legacy MediaPipe found {len(faces)}, OpenCV found {len(opencv_faces)} - using OpenCV")
+            return opencv_faces
+
     return faces
 
 
