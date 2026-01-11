@@ -150,6 +150,11 @@ const {
   callClaudeAPI
 } = require('./server/lib/textModels');
 const {
+  calculateTextCost,
+  calculateImageCost,
+  formatCostSummary
+} = require('./server/config/models');
+const {
   parseVisualBible,
   filterMainCharactersFromVisualBible,
   parseVisualBibleEntries,
@@ -2488,11 +2493,16 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
     // User-initiated regenerations use Gemini 3 Pro for higher quality
+    const imageModelId = 'gemini-3-pro-image-preview';
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
-      { imageModel: 'gemini-3-pro-image-preview' },
+      { imageModel: imageModelId },
       `PAGE ${pageNumber}`
     );
+
+    // Log API costs for this regeneration
+    const imageCost = calculateImageCost(imageModelId, imageResult.totalAttempts || 1);
+    console.log(`💰 [REGEN] API Cost: ${formatCostSummary(imageModelId, { imageCount: imageResult.totalAttempts || 1 }, imageCost)} (${imageResult.totalAttempts || 1} attempt(s))`);
 
     // Update the image in story data
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
@@ -2603,7 +2613,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       qualityScore: imageResult.score,
       qualityReasoning: imageResult.reasoning,
       fixTargets: imageResult.fixTargets || [],  // Bounding boxes for auto-repair
-      modelId: imageResult.modelId || null,
+      modelId: imageResult.modelId || imageModelId,
       totalAttempts: imageResult.totalAttempts || 1,
       retryHistory: imageResult.retryHistory || [],
       wasRegenerated: true,
@@ -2612,6 +2622,9 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       versionCount,
       creditsUsed: creditCost,
       creditsRemaining: newCredits,
+      // API cost tracking
+      apiCost: imageCost,
+      apiCostModel: imageModelId,
       // Previous version (immediate predecessor)
       previousImage: previousImageData,
       previousScore: previousScore,
@@ -2830,11 +2843,16 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     // Generate new cover with quality retry (automatically retries on text errors)
     // User-initiated regenerations use Gemini 3 Pro for higher quality
     const coverLabel = normalizedCoverType === 'front' ? 'FRONT COVER' : normalizedCoverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+    const coverImageModelId = 'gemini-3-pro-image-preview';
     const coverResult = await generateImageWithQualityRetry(
       coverPrompt, coverCharacterPhotos, null, 'cover', null, null, null,
-      { imageModel: 'gemini-3-pro-image-preview' },
+      { imageModel: coverImageModelId },
       coverLabel
     );
+
+    // Log API costs for this cover regeneration
+    const coverImageCost = calculateImageCost(coverImageModelId, coverResult.totalAttempts || 1);
+    console.log(`💰 [COVER REGEN] API Cost: ${formatCostSummary(coverImageModelId, { imageCount: coverResult.totalAttempts || 1 }, coverImageCost)} (${coverResult.totalAttempts || 1} attempt(s))`);
 
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
@@ -2899,7 +2917,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       qualityScore: coverResult.score,
       qualityReasoning: coverResult.reasoning,
       fixTargets: coverResult.fixTargets || [],  // Bounding boxes for auto-repair
-      modelId: coverResult.modelId || null,
+      modelId: coverResult.modelId || coverImageModelId,
       totalAttempts: coverResult.totalAttempts || 1,
       retryHistory: coverResult.retryHistory || [],
       wasRegenerated: true,
@@ -2914,7 +2932,10 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       originalReasoning: trueOriginalReasoning,
       // Credit info
       creditsUsed: requiredCredits,
-      creditsRemaining: newCredits
+      creditsRemaining: newCredits,
+      // API cost tracking
+      apiCost: coverImageCost,
+      apiCostModel: coverImageModelId
     });
 
   } catch (err) {

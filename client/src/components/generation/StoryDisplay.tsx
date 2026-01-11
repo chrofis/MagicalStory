@@ -195,7 +195,7 @@ export function StoryDisplay({
   // Scene edit modal state (for editing scene before regenerating)
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [regeneratingPage, setRegeneratingPage] = useState<number | null>(null); // Track which page is regenerating
+  const [regeneratingPages, setRegeneratingPages] = useState<Set<number>>(new Set()); // Track which pages are regenerating (supports parallel)
 
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
@@ -385,7 +385,7 @@ export function StoryDisplay({
 
     // Close modal immediately and show spinner on the image
     setSceneEditModal(null);
-    setRegeneratingPage(pageNumber);
+    setRegeneratingPages(prev => new Set(prev).add(pageNumber));
     setIsRegenerating(true);
 
     try {
@@ -393,8 +393,18 @@ export function StoryDisplay({
     } catch (err) {
       console.error('Failed to regenerate image:', err);
     } finally {
-      setIsRegenerating(false);
-      setRegeneratingPage(null);
+      setRegeneratingPages(prev => {
+        const next = new Set(prev);
+        next.delete(pageNumber);
+        return next;
+      });
+      // Only set isRegenerating to false if no more pages are regenerating
+      setRegeneratingPages(current => {
+        if (current.size === 0) {
+          setIsRegenerating(false);
+        }
+        return current;
+      });
     }
   };
 
@@ -1931,11 +1941,11 @@ export function StoryDisplay({
                         <DiagnosticImage
                           src={(image?.imageData || progressiveImageData) ?? ''}
                           alt={`Scene for page ${pageNumber}`}
-                          className={`w-full rounded-lg shadow-md object-cover ${regeneratingPage === pageNumber ? 'opacity-50' : ''}`}
+                          className={`w-full rounded-lg shadow-md object-cover ${regeneratingPages.has(pageNumber) ? 'opacity-50' : ''}`}
                           label={`Page ${pageNumber}`}
                         />
                         {/* Regenerating spinner overlay */}
-                        {regeneratingPage === pageNumber && (
+                        {regeneratingPages.has(pageNumber) && (
                           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                             <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
                             <p className="text-indigo-700 font-medium text-sm">
@@ -2275,10 +2285,10 @@ export function StoryDisplay({
                           <img
                             src={image.imageData}
                             alt={`Scene for page ${pageNumber}`}
-                            className={`w-full rounded-lg shadow-md object-cover ${regeneratingPage === pageNumber ? 'opacity-50' : ''}`}
+                            className={`w-full rounded-lg shadow-md object-cover ${regeneratingPages.has(pageNumber) ? 'opacity-50' : ''}`}
                           />
                           {/* Regenerating spinner overlay */}
-                          {regeneratingPage === pageNumber && (
+                          {regeneratingPages.has(pageNumber) && (
                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 rounded-lg">
                               <Loader size={40} className="animate-spin text-indigo-600 mb-2" />
                               <p className="text-indigo-700 font-medium text-sm">
