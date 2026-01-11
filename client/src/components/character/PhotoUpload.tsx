@@ -50,6 +50,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
 
   // User has already consented if photoConsentAt is set
   const hasExistingConsent = !!user?.photoConsentAt;
+  console.log('[PhotoUpload] Mounted/Updated:', { user: user?.email, photoConsentAt: user?.photoConsentAt, hasExistingConsent });
 
   // Can upload if already consented OR both checkboxes are checked
   const canUpload = hasExistingConsent || (consent1Checked && consent2Checked);

@@ -64,6 +64,7 @@ export interface PhysicalTraitsSource {
   hair?: TraitSource;        // Legacy
   facialHair?: TraitSource;
   other?: TraitSource;
+  skinTone?: TraitSource;
 }
 
 // Tracks where each clothing value came from

@@ -411,15 +411,19 @@ export const characterService = {
       const inputPhoto = character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original;
       log.info(`🎨 Generating clothing avatars for ${character.name} (id: ${character.id})`);
 
-      const response = await api.post<{
+      // Use async mode to avoid blocking connections
+      // This allows character loading and other requests to proceed in parallel
+      const startResponse = await api.post<{
         success: boolean;
+        async?: boolean;
+        jobId?: string;
         clothingAvatars?: CharacterAvatars & {
           extractedTraits?: ExtractedTraits;
           structuredClothing?: Record<string, ExtractedClothing>;
-          rawEvaluation?: Record<string, unknown>;  // Full unfiltered API response for dev mode
+          rawEvaluation?: Record<string, unknown>;
         };
         error?: string;
-      }>('/api/generate-clothing-avatars', {
+      }>('/api/generate-clothing-avatars?async=true', {
         characterId: character.id,
         facePhoto: inputPhoto,
         physicalDescription,
@@ -427,13 +431,65 @@ export const characterService = {
         age: character.age,
         apparentAge: character.apparentAge,
         gender: character.gender,
-        build: character.physical?.build,  // Don't send default - server will default to 'athletic'
-        // Pass user-entered clothing to override defaults
+        build: character.physical?.build,
         clothing: character.clothing?.structured,
-        // Avatar model override (dev mode)
         avatarModel: options?.avatarModel,
       });
 
+      // If async mode, poll for completion
+      if (startResponse.async && startResponse.jobId) {
+        log.info(`Avatar job started: ${startResponse.jobId}, polling for completion...`);
+
+        // Poll every 2 seconds for up to 2 minutes
+        const maxAttempts = 60;
+        const pollInterval = 2000;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+          const statusResponse = await api.get<{
+            jobId: string;
+            status: string;
+            progress?: number;
+            message?: string;
+            success?: boolean;
+            clothingAvatars?: CharacterAvatars & {
+              extractedTraits?: ExtractedTraits;
+              structuredClothing?: Record<string, ExtractedClothing>;
+              rawEvaluation?: Record<string, unknown>;
+            };
+            error?: string;
+          }>(`/api/avatar-jobs/${startResponse.jobId}`);
+
+          if (statusResponse.status === 'complete' && statusResponse.clothingAvatars) {
+            log.success(`Avatar job ${startResponse.jobId} completed after ${(attempt + 1) * 2}s`);
+            // Process the result same as sync mode
+            const extractedTraits = statusResponse.clothingAvatars.extractedTraits;
+            const extractedClothing = statusResponse.clothingAvatars.structuredClothing?.standard;
+            return {
+              success: true,
+              avatars: statusResponse.clothingAvatars,
+              extractedTraits,
+              extractedClothing,
+            };
+          }
+
+          if (statusResponse.status === 'failed') {
+            log.error(`Avatar job failed: ${statusResponse.error}`);
+            return { success: false, error: statusResponse.error };
+          }
+
+          // Still processing, continue polling
+          if (attempt % 5 === 0) {
+            log.info(`Avatar job ${startResponse.jobId}: ${statusResponse.message || statusResponse.status} (${statusResponse.progress || 0}%)`);
+          }
+        }
+
+        return { success: false, error: 'Avatar generation timed out' };
+      }
+
+      // Fallback: sync response (shouldn't happen with async=true)
+      const response = startResponse;
       if (response.success && response.clothingAvatars) {
         log.success(`Clothing avatars generated for ${character.name}`);
 
