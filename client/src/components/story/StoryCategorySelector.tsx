@@ -484,6 +484,7 @@ export function StoryCategorySelector({
                               {typeof event.year === 'string' && event.year.startsWith('-')
                                 ? `${event.year.slice(1)} BC`
                                 : event.year}
+                              {event.mainPerson && ` • ${event.mainPerson}`}
                             </div>
                           </div>
                         </div>
