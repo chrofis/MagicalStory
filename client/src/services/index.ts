@@ -4,6 +4,6 @@ export { characterService } from './characterService';
 export { storyService } from './storyService';
 export { adminService } from './adminService';
 export { photoService } from './photoService';
-export type { DashboardStats, AdminUser, CreditTransaction, UserDetailsResponse, PrintProduct, GelatoProduct, PaginationInfo } from './adminService';
+export type { DashboardStats, AdminUser, CreditTransaction, UserDetailsResponse, PrintProduct, GelatoProduct, PaginationInfo, TokenUsageResponse, TokenUsageByDay, TokenUsageByMonth, TokenUsageByUser } from './adminService';
 export type { PhotoAnalysisResult } from './photoService';
 export type { CharacterData, AvatarGenerationResult } from './characterService';

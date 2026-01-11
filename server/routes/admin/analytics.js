@@ -276,12 +276,14 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-      gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
+      gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+      runware: { direct_cost: 0, calls: 0 }
     };
 
     const byUser = {};
     const byStoryType = {};
     const byMonth = {};
+    const byDay = {};
     const storiesWithUsage = [];
     let storiesWithTokenData = 0;
 
@@ -296,10 +298,15 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           // Add to totals
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              totals[provider].input_tokens += tokenUsage[provider].input_tokens || 0;
-              totals[provider].output_tokens += tokenUsage[provider].output_tokens || 0;
-              totals[provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
-              totals[provider].calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware') {
+                totals.runware.direct_cost += tokenUsage[provider].direct_cost || 0;
+                totals.runware.calls += tokenUsage[provider].calls || 0;
+              } else {
+                totals[provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+                totals[provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+                totals[provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
+                totals[provider].calls += tokenUsage[provider].calls || 0;
+              }
             }
           }
 
@@ -318,17 +325,23 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              runware: { direct_cost: 0, calls: 0 }
             };
           }
           byUser[userKey].storyCount++;
           byUser[userKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              byUser[userKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
-              byUser[userKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
-              byUser[userKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
-              byUser[userKey][provider].calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware') {
+                byUser[userKey].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
+                byUser[userKey].runware.calls += tokenUsage[provider].calls || 0;
+              } else {
+                byUser[userKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+                byUser[userKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+                byUser[userKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
+                byUser[userKey][provider].calls += tokenUsage[provider].calls || 0;
+              }
             }
           }
 
@@ -341,17 +354,23 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              runware: { direct_cost: 0, calls: 0 }
             };
           }
           byStoryType[storyType].storyCount++;
           byStoryType[storyType].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              byStoryType[storyType][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
-              byStoryType[storyType][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
-              byStoryType[storyType][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
-              byStoryType[storyType][provider].calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware') {
+                byStoryType[storyType].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
+                byStoryType[storyType].runware.calls += tokenUsage[provider].calls || 0;
+              } else {
+                byStoryType[storyType][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+                byStoryType[storyType][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+                byStoryType[storyType][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
+                byStoryType[storyType][provider].calls += tokenUsage[provider].calls || 0;
+              }
             }
           }
 
@@ -364,17 +383,52 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 }
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              runware: { direct_cost: 0, calls: 0 }
             };
           }
           byMonth[monthKey].storyCount++;
           byMonth[monthKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              byMonth[monthKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
-              byMonth[monthKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
-              byMonth[monthKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
-              byMonth[monthKey][provider].calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware') {
+                byMonth[monthKey].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
+                byMonth[monthKey].runware.calls += tokenUsage[provider].calls || 0;
+              } else {
+                byMonth[monthKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+                byMonth[monthKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+                byMonth[monthKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
+                byMonth[monthKey][provider].calls += tokenUsage[provider].calls || 0;
+              }
+            }
+          }
+
+          // Aggregate by day
+          const dayKey = row.created_at ? new Date(row.created_at).toISOString().substring(0, 10) : 'unknown';
+          if (!byDay[dayKey]) {
+            byDay[dayKey] = {
+              storyCount: 0,
+              totalBookPages: 0,
+              anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              runware: { direct_cost: 0, calls: 0 }
+            };
+          }
+          byDay[dayKey].storyCount++;
+          byDay[dayKey].totalBookPages += bookPages;
+          for (const provider of Object.keys(totals)) {
+            if (tokenUsage[provider]) {
+              if (provider === 'runware') {
+                byDay[dayKey].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
+                byDay[dayKey].runware.calls += tokenUsage[provider].calls || 0;
+              } else {
+                byDay[dayKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
+                byDay[dayKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
+                byDay[dayKey][provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
+                byDay[dayKey][provider].calls += tokenUsage[provider].calls || 0;
+              }
             }
           }
 
@@ -423,15 +477,53 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         output: (totals.gemini_quality.output_tokens / 1000000) * 0.30,
         thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 0.30,
         total: 0
+      },
+      runware: {
+        total: totals.runware.direct_cost // Runware charges directly, no token calculation
       }
     };
     costs.anthropic.total = costs.anthropic.input + costs.anthropic.output;
     costs.gemini_text.total = costs.gemini_text.input + costs.gemini_text.output + costs.gemini_text.thinking;
     costs.gemini_image.total = costs.gemini_image.input + costs.gemini_image.output + costs.gemini_image.thinking;
     costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output + costs.gemini_quality.thinking;
-    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total;
+    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total + costs.runware.total;
 
     const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);
+
+    // Helper to calculate cost for a day/month entry
+    const calculateEntryCost = (entry) => {
+      const anthropicCost = ((entry.anthropic?.input_tokens || 0) / 1000000) * 3 +
+                           ((entry.anthropic?.output_tokens || 0) / 1000000) * 15;
+      const geminiTextCost = ((entry.gemini_text?.input_tokens || 0) / 1000000) * 0.075 +
+                            ((entry.gemini_text?.output_tokens || 0) / 1000000) * 0.30 +
+                            ((entry.gemini_text?.thinking_tokens || 0) / 1000000) * 0.30;
+      const geminiImageCost = ((entry.gemini_image?.input_tokens || 0) / 1000000) * 0.075 +
+                             ((entry.gemini_image?.output_tokens || 0) / 1000000) * 0.30 +
+                             ((entry.gemini_image?.thinking_tokens || 0) / 1000000) * 0.30;
+      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.075 +
+                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.30 +
+                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.30;
+      const runwareCost = entry.runware?.direct_cost || 0;
+      return anthropicCost + geminiTextCost + geminiImageCost + geminiQualityCost + runwareCost;
+    };
+
+    // Add cost to each day entry
+    const byDayWithCosts = Object.entries(byDay)
+      .map(([date, data]) => ({
+        date,
+        ...data,
+        totalCost: calculateEntryCost(data)
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date)); // Most recent first
+
+    // Add cost to each month entry
+    const byMonthWithCosts = Object.entries(byMonth)
+      .map(([month, data]) => ({
+        month,
+        ...data,
+        totalCost: calculateEntryCost(data)
+      }))
+      .sort((a, b) => b.month.localeCompare(a.month)); // Most recent first
 
     const response = {
       summary: {
@@ -447,7 +539,8 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         (a.anthropic.input_tokens + a.anthropic.output_tokens)
       ),
       byStoryType,
-      byMonth,
+      byDay: byDayWithCosts,
+      byMonth: byMonthWithCosts,
       recentStories: storiesWithUsage
     };
 

@@ -2144,12 +2144,17 @@ export default function StoryWizard() {
         // Fire and forget - the service handles generation + saving
         log.info(`🎨 Starting background avatar generation for ${savedChar.name}...`);
         characterService.generateAndSaveAvatarForCharacter(savedChar, undefined, { avatarModel: modelSelections.avatarModel || undefined }).then(result => {
-          if (result.success && result.avatars) {
-            // Update local state with new avatars
+          if (result.success && result.character) {
+            // Update local state with avatars AND extracted traits/clothing
             setCharacters(prev => prev.map(c =>
-              c.id === savedChar.id ? { ...c, avatars: result.avatars } : c
+              c.id === savedChar.id ? {
+                ...c,
+                avatars: result.character!.avatars,
+                physical: result.character!.physical,
+                clothing: result.character!.clothing,
+              } : c
             ));
-            log.success(`✅ Avatars saved for ${savedChar.name}`);
+            log.success(`✅ Avatars and traits saved for ${savedChar.name}`);
           } else if (!result.skipped) {
             log.warn(`Avatar generation failed for ${savedChar.name}: ${result.error}`);
           }

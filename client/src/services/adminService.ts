@@ -111,6 +111,120 @@ export interface GelatoProduct {
   };
 }
 
+// Token Usage Types
+export interface ProviderTokens {
+  input_tokens: number;
+  output_tokens: number;
+  thinking_tokens: number;
+  calls: number;
+}
+
+export interface RunwareUsage {
+  direct_cost: number;
+  calls: number;
+}
+
+export interface ProviderCost {
+  input: number;
+  output: number;
+  thinking: number;
+  total: number;
+}
+
+export interface TokenUsageTotals {
+  anthropic: ProviderTokens;
+  gemini_text: ProviderTokens;
+  gemini_image: ProviderTokens;
+  gemini_quality: ProviderTokens;
+  runware: RunwareUsage;
+}
+
+export interface TokenUsageCosts {
+  anthropic: ProviderCost;
+  gemini_text: ProviderCost;
+  gemini_image: ProviderCost;
+  gemini_quality: ProviderCost;
+  runware: { total: number };
+  grandTotal: number;
+}
+
+export interface TokenUsageByUser {
+  userId: string;
+  email: string;
+  name: string;
+  storyCount: number;
+  totalBookPages: number;
+  anthropic: ProviderTokens;
+  gemini_text: ProviderTokens;
+  gemini_image: ProviderTokens;
+  gemini_quality: ProviderTokens;
+  runware: RunwareUsage;
+}
+
+export interface TokenUsageByDay {
+  date: string;
+  storyCount: number;
+  totalBookPages: number;
+  anthropic: ProviderTokens;
+  gemini_text: ProviderTokens;
+  gemini_image: ProviderTokens;
+  gemini_quality: ProviderTokens;
+  runware: RunwareUsage;
+  totalCost: number;
+}
+
+export interface TokenUsageByMonth {
+  month: string;
+  storyCount: number;
+  totalBookPages: number;
+  anthropic: ProviderTokens;
+  gemini_text: ProviderTokens;
+  gemini_image: ProviderTokens;
+  gemini_quality: ProviderTokens;
+  runware: RunwareUsage;
+  totalCost: number;
+}
+
+export interface TokenUsageByStoryType {
+  [storyType: string]: {
+    storyCount: number;
+    totalBookPages: number;
+    anthropic: ProviderTokens;
+    gemini_text: ProviderTokens;
+    gemini_image: ProviderTokens;
+    gemini_quality: ProviderTokens;
+    runware: RunwareUsage;
+  };
+}
+
+export interface RecentStoryTokenUsage {
+  id: string;
+  title: string;
+  storyType: string;
+  storyPages: number;
+  bookPages: number;
+  userId: string;
+  userEmail: string;
+  createdAt: string;
+  tokenUsage: TokenUsageTotals;
+}
+
+export interface TokenUsageResponse {
+  summary: {
+    totalStories: number;
+    storiesWithTokenData: number;
+    storiesWithoutTokenData: number;
+    totalBookPages: number;
+  };
+  totals: TokenUsageTotals;
+  costs: TokenUsageCosts;
+  byUser: TokenUsageByUser[];
+  byStoryType: TokenUsageByStoryType;
+  byDay: TokenUsageByDay[];
+  byMonth: TokenUsageByMonth[];
+  recentStories: RecentStoryTokenUsage[];
+}
+
 export interface UserDetailsResponse {
   user: {
     id: string;
@@ -230,5 +344,10 @@ export const adminService = {
 
   async deletePrintProduct(id: number): Promise<void> {
     return api.delete(`/api/admin/print-products/${id}`);
+  },
+
+  // Token Usage Analytics
+  async getTokenUsage(days = 30, limit = 1000): Promise<TokenUsageResponse> {
+    return api.get<TokenUsageResponse>(`/api/admin/token-usage?days=${days}&limit=${limit}`);
   },
 };

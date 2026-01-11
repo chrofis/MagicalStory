@@ -34,12 +34,13 @@ import {
   Search,
   Check,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { Input } from '@/components/common/Input';
-import { adminTranslations, StatCard } from './admin';
+import { adminTranslations, StatCard, TokenUsageTab } from './admin';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -48,8 +49,8 @@ export default function AdminDashboard() {
   const { language } = useLanguage();
 
   // Read initial tab from URL query parameter
-  const tabFromUrl = searchParams.get('tab') as 'stats' | 'users' | 'products' | null;
-  const initialTab = tabFromUrl && ['stats', 'users', 'products'].includes(tabFromUrl) ? tabFromUrl : 'stats';
+  const tabFromUrl = searchParams.get('tab') as 'stats' | 'users' | 'products' | 'tokens' | null;
+  const initialTab = tabFromUrl && ['stats', 'users', 'products', 'tokens'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -59,7 +60,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products' | 'tokens'>(initialTab);
 
   // Modal states
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -156,7 +157,7 @@ export default function AdminDashboard() {
   }, [isAuthenticated, user, isImpersonating, activeTab]);
 
   // Update URL when tab changes
-  const handleTabChange = (tab: 'stats' | 'users' | 'products') => {
+  const handleTabChange = (tab: 'stats' | 'users' | 'products' | 'tokens') => {
     setActiveTab(tab);
     setSearchParams(tab === 'stats' ? {} : { tab });
   };
@@ -569,6 +570,17 @@ export default function AdminDashboard() {
           >
             <Printer size={18} />
             {texts.printProducts}
+          </button>
+          <button
+            onClick={() => handleTabChange('tokens')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'tokens'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <TrendingUp size={18} />
+            {texts.tokenUsage}
           </button>
         </div>
 
@@ -1012,6 +1024,11 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Token Usage Tab */}
+        {activeTab === 'tokens' && (
+          <TokenUsageTab texts={texts} />
         )}
       </div>
 
