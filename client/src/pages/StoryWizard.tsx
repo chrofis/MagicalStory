@@ -1374,6 +1374,16 @@ export default function StoryWizard() {
             bodyBox: analysis.photos?.bodyBox,
           };
 
+          // DEBUG: Log photo sizes to verify correct image is used
+          const bodyNoBgSize = analysis.photos?.bodyNoBg ? Math.round(analysis.photos.bodyNoBg.length / 1024) : 0;
+          const bodySize = analysis.photos?.body ? Math.round(analysis.photos.body.length / 1024) : 0;
+          const faceSize = analysis.photos?.face ? Math.round(analysis.photos.face.length / 1024) : 0;
+          log.info(`📸 [PHOTO CHANGE] Analysis returned: bodyNoBg=${bodyNoBgSize}KB, body=${bodySize}KB, face=${faceSize}KB`);
+          if (analysis.photos?.bodyNoBg) {
+            const fp = analysis.photos.bodyNoBg.substring(analysis.photos.bodyNoBg.indexOf('base64,') + 7, analysis.photos.bodyNoBg.indexOf('base64,') + 27);
+            log.info(`📸 [PHOTO CHANGE] bodyNoBg fingerprint: ${fp}...`);
+          }
+
           // Build clothing updates
           let updatedClothing: Character['clothing'] = undefined;
           let updatedClothingSource: Character['clothingSource'] = undefined;
@@ -1402,6 +1412,17 @@ export default function StoryWizard() {
             clothing: updatedClothing,
             clothingSource: updatedClothingSource,
           } : null;
+
+          // DEBUG: Verify charForGeneration has correct photos
+          if (charForGeneration) {
+            const cgBodyNoBg = charForGeneration.photos?.bodyNoBg;
+            const cgSize = cgBodyNoBg ? Math.round(cgBodyNoBg.length / 1024) : 0;
+            log.info(`📸 [CHAR FOR GEN] bodyNoBg=${cgSize}KB, has photos: ${!!charForGeneration.photos}`);
+            if (cgBodyNoBg) {
+              const fp = cgBodyNoBg.substring(cgBodyNoBg.indexOf('base64,') + 7, cgBodyNoBg.indexOf('base64,') + 27);
+              log.info(`📸 [CHAR FOR GEN] fingerprint: ${fp}...`);
+            }
+          }
 
           setCurrentCharacter(prev => {
             if (!prev) return null;
@@ -1536,6 +1557,14 @@ export default function StoryWizard() {
           faceBox: analysis.photos?.faceBox,
           bodyBox: analysis.photos?.bodyBox,
         };
+
+        // DEBUG: Log photo sizes after face selection
+        const bodyNoBgSize = analysis.photos?.bodyNoBg ? Math.round(analysis.photos.bodyNoBg.length / 1024) : 0;
+        log.info(`📸 [FACE SELECT] Analysis returned: bodyNoBg=${bodyNoBgSize}KB`);
+        if (analysis.photos?.bodyNoBg) {
+          const fp = analysis.photos.bodyNoBg.substring(analysis.photos.bodyNoBg.indexOf('base64,') + 7, analysis.photos.bodyNoBg.indexOf('base64,') + 27);
+          log.info(`📸 [FACE SELECT] bodyNoBg fingerprint: ${fp}...`);
+        }
 
         // Build clothing updates
         let updatedClothing: Character['clothing'] = undefined;
