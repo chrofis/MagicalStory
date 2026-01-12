@@ -3380,7 +3380,6 @@ export default function StoryWizard() {
               onRegenerateImage={storyId ? async (pageNumber: number, editedScene?: string, characterIds?: number[]) => {
                 try {
                   log.info('Regenerating image for page:', pageNumber, editedScene ? '(scene edited)' : '', characterIds ? `(${characterIds.length} characters)` : '');
-                  setIsGenerating(true);
                   const result = await storyService.regenerateImage(storyId, pageNumber, editedScene, characterIds);
                   log.info('Regenerate result:', { hasImageData: !!result?.imageData, length: result?.imageData?.length, versionCount: result?.versionCount, creditsRemaining: result?.creditsRemaining });
                   if (!result?.imageData) {
@@ -3418,8 +3417,6 @@ export default function StoryWizard() {
                     : language === 'fr'
                     ? `Échec de la régénération: ${errorMsg}`
                     : `Image regeneration failed: ${errorMsg}`);
-                } finally {
-                  setIsGenerating(false);
                 }
               } : undefined}
               onDownloadTxt={() => {
