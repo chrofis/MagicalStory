@@ -422,6 +422,25 @@ export const characterService = {
   },
 
   /**
+   * Load full character data for editing (on-demand)
+   * Includes heavy fields: body_no_bg_url, body_photo_url, photo_url, clothing_avatars, avatars
+   * These are stripped from the list view to reduce payload from ~3MB to ~100KB per character
+   */
+  async loadFullCharacter(characterId: number): Promise<Character | null> {
+    try {
+      const response = await api.get<{ character: CharacterApiResponse }>(`/api/characters/${characterId}/full`);
+      if (response.character) {
+        log.info(`Loaded full data for character ${characterId}`);
+        return mapCharacterFromApi(response.character);
+      }
+      return null;
+    } catch (error) {
+      log.error(`Failed to load full data for character ${characterId}:`, error);
+      return null;
+    }
+  },
+
+  /**
    * Generate 3 avatar options for user to choose from
    */
   async generateAvatarOptions(facePhoto: string, gender: string): Promise<{

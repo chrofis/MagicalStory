@@ -1841,9 +1841,10 @@ export default function StoryWizard() {
           hairStyle: currentSource.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
           build: currentSource.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
           face: currentSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
-          facialHair: currentSource.facialHair === 'user' ? 'user' as const : undefined,
-          other: currentSource.other === 'user' ? 'user' as const : undefined,
+          facialHair: currentSource.facialHair === 'user' ? 'user' as const : (result.extractedTraits.facialHair ? 'extracted' as const : undefined),
+          other: currentSource.other === 'user' ? 'user' as const : (result.extractedTraits.other ? 'extracted' as const : undefined),
           skinTone: currentSource.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
+          apparentAge: currentSource.apparentAge === 'user' ? 'user' as const : (result.extractedTraits.apparentAge ? 'extracted' as const : undefined),
         } : currentCharacter.physicalTraitsSource;
 
         // OVERWRITE clothing with extracted values from new avatar
@@ -1858,10 +1859,10 @@ export default function StoryWizard() {
           }
         } : currentCharacter.clothing;
 
-        // Extract apparentAge from avatar evaluation (always use - most accurate from generated avatar)
-        const updatedApparentAge = result.extractedTraits?.apparentAge
-          ? result.extractedTraits.apparentAge as AgeCategory
-          : currentCharacter.apparentAge;
+        // Extract apparentAge from avatar evaluation (preserve user edits)
+        const updatedApparentAge = currentSource.apparentAge === 'user'
+          ? currentCharacter.apparentAge
+          : (result.extractedTraits?.apparentAge as AgeCategory || currentCharacter.apparentAge);
 
         // Update state only - DO NOT save here
         // The user will click Save which triggers saveCharacter() with the updated state
@@ -1973,9 +1974,10 @@ export default function StoryWizard() {
           hairStyle: currentSource2.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
           build: currentSource2.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
           face: currentSource2.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
-          facialHair: currentSource2.facialHair === 'user' ? 'user' as const : undefined,
-          other: currentSource2.other === 'user' ? 'user' as const : undefined,
+          facialHair: currentSource2.facialHair === 'user' ? 'user' as const : (result.extractedTraits.facialHair ? 'extracted' as const : undefined),
+          other: currentSource2.other === 'user' ? 'user' as const : (result.extractedTraits.other ? 'extracted' as const : undefined),
           skinTone: currentSource2.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
+          apparentAge: currentSource2.apparentAge === 'user' ? 'user' as const : (result.extractedTraits.apparentAge ? 'extracted' as const : undefined),
         } : latestChar.physicalTraitsSource;
 
         // OVERWRITE clothing with extracted values from new avatar
@@ -1990,10 +1992,10 @@ export default function StoryWizard() {
           }
         } : latestChar.clothing;
 
-        // Extract apparentAge from avatar evaluation (always use - most accurate from generated avatar)
-        const updatedApparentAge2 = result.extractedTraits?.apparentAge
-          ? result.extractedTraits.apparentAge as AgeCategory
-          : latestChar.apparentAge;
+        // Extract apparentAge from avatar evaluation (preserve user edits)
+        const updatedApparentAge2 = currentSource2.apparentAge === 'user'
+          ? latestChar.apparentAge
+          : (result.extractedTraits?.apparentAge as AgeCategory || latestChar.apparentAge);
 
         // Only update currentCharacter if it's still the same character (user might have switched)
         setCurrentCharacter(prev => prev && prev.id === charId ? {
@@ -2254,7 +2256,27 @@ export default function StoryWizard() {
     setCharacterStep('traits'); // Go directly to traits when editing
     setShowCharacterCreated(false);
 
-    // Load full avatars on-demand if character has avatars but they weren't loaded
+    // Load full character data on-demand (heavy fields stripped from list view)
+    // Check if photo_url is missing - it's stripped from list view but needed for editing
+    if (!char.photo_url) {
+      const fullChar = await characterService.loadFullCharacter(char.id);
+      if (fullChar) {
+        // Merge full data into the character
+        setCurrentCharacter(prev => prev && prev.id === char.id ? {
+          ...prev,
+          ...fullChar,
+          // Keep existing avatars if they were already loaded
+          avatars: prev.avatars?.standard ? prev.avatars : fullChar.avatars
+        } : prev);
+        // Also update in the characters list
+        setCharacters(prev => prev.map(c =>
+          c.id === char.id ? { ...c, ...fullChar } : c
+        ));
+        return; // Full character includes avatars, no need to load separately
+      }
+    }
+
+    // Fallback: Load avatars on-demand if character has avatars but they weren't loaded
     if (char.avatars?.hasFullAvatars && !char.avatars?.standard) {
       const fullAvatars = await characterService.loadCharacterAvatars(char.id);
       if (fullAvatars) {
@@ -2709,9 +2731,10 @@ export default function StoryWizard() {
               hairLength: charSource.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
               hairStyle: charSource.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
               face: charSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
-              facialHair: charSource.facialHair === 'user' ? 'user' as const : undefined,
-              other: charSource.other === 'user' ? 'user' as const : undefined,
+              facialHair: charSource.facialHair === 'user' ? 'user' as const : (result.extractedTraits.facialHair ? 'extracted' as const : undefined),
+              other: charSource.other === 'user' ? 'user' as const : (result.extractedTraits.other ? 'extracted' as const : undefined),
               skinTone: charSource.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
+              apparentAge: charSource.apparentAge === 'user' ? 'user' as const : (result.extractedTraits.apparentAge ? 'extracted' as const : undefined),
             } : char.physicalTraitsSource;
 
             // Update extracted clothing too
@@ -2724,10 +2747,10 @@ export default function StoryWizard() {
                 fullBody: result.extractedClothing.fullBody || undefined,
               },
             } : char.clothing;
-            // Extract apparentAge from avatar evaluation (always use - most accurate from generated avatar)
-            const updatedApparentAge = result.extractedTraits?.apparentAge
-              ? result.extractedTraits.apparentAge as AgeCategory
-              : char.apparentAge;
+            // Extract apparentAge from avatar evaluation (preserve user edits)
+            const updatedApparentAge = charSource.apparentAge === 'user'
+              ? char.apparentAge
+              : (result.extractedTraits?.apparentAge as AgeCategory || char.apparentAge);
 
             // Update characters state (include physicalTraitsSource)
             setCharacters(prev => prev.map(c =>
