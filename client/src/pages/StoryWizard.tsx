@@ -1858,8 +1858,8 @@ export default function StoryWizard() {
           }
         } : currentCharacter.clothing;
 
-        // Extract apparentAge from evaluation (if not already set by user)
-        const updatedApparentAge = result.extractedTraits?.apparentAge && !currentCharacter.apparentAge
+        // Extract apparentAge from avatar evaluation (always use - most accurate from generated avatar)
+        const updatedApparentAge = result.extractedTraits?.apparentAge
           ? result.extractedTraits.apparentAge as AgeCategory
           : currentCharacter.apparentAge;
 
@@ -1990,8 +1990,8 @@ export default function StoryWizard() {
           }
         } : latestChar.clothing;
 
-        // Extract apparentAge from evaluation (if not already set)
-        const updatedApparentAge2 = result.extractedTraits?.apparentAge && !latestChar.apparentAge
+        // Extract apparentAge from avatar evaluation (always use - most accurate from generated avatar)
+        const updatedApparentAge2 = result.extractedTraits?.apparentAge
           ? result.extractedTraits.apparentAge as AgeCategory
           : latestChar.apparentAge;
 
@@ -2724,8 +2724,8 @@ export default function StoryWizard() {
                 fullBody: result.extractedClothing.fullBody || undefined,
               },
             } : char.clothing;
-            // Extract apparentAge from evaluation (if not already set)
-            const updatedApparentAge = result.extractedTraits?.apparentAge && !char.apparentAge
+            // Extract apparentAge from avatar evaluation (always use - most accurate from generated avatar)
+            const updatedApparentAge = result.extractedTraits?.apparentAge
               ? result.extractedTraits.apparentAge as AgeCategory
               : char.apparentAge;
 
