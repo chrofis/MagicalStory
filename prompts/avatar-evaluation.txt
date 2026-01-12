@@ -36,6 +36,7 @@ Return a JSON object with this EXACT structure:
     "finalScore": 8
   },
   "physicalTraits": {
+    "apparentAge": "<MUST be one of: infant | toddler | preschooler | kindergartner | young-school-age | school-age | preteen | young-teen | teenager | young-adult | adult | middle-aged | senior | elderly>",
     "build": "<MUST be one of: slim | average | athletic | stocky>",
     "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
     "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",

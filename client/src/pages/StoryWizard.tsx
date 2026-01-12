@@ -1853,6 +1853,11 @@ export default function StoryWizard() {
           }
         } : currentCharacter.clothing;
 
+        // Extract apparentAge from evaluation (if not already set by user)
+        const updatedApparentAge = result.extractedTraits?.apparentAge && !currentCharacter.apparentAge
+          ? result.extractedTraits.apparentAge as AgeCategory
+          : currentCharacter.apparentAge;
+
         // Update state only - DO NOT save here
         // The user will click Save which triggers saveCharacter() with the updated state
         setCurrentCharacter(prev => prev ? {
@@ -1861,6 +1866,7 @@ export default function StoryWizard() {
           physical: updatedPhysical,
           physicalTraitsSource: updatedTraitsSource,
           clothing: updatedClothing,
+          apparentAge: updatedApparentAge,
         } : prev);
         setCharacters(prev => prev.map(c =>
           c.id === currentCharacter.id ? {
@@ -1869,6 +1875,7 @@ export default function StoryWizard() {
             physical: updatedPhysical,
             physicalTraitsSource: updatedTraitsSource,
             clothing: updatedClothing,
+            apparentAge: updatedApparentAge,
           } : c
         ));
 
@@ -1973,6 +1980,11 @@ export default function StoryWizard() {
           }
         } : latestChar.clothing;
 
+        // Extract apparentAge from evaluation (if not already set)
+        const updatedApparentAge2 = result.extractedTraits?.apparentAge && !latestChar.apparentAge
+          ? result.extractedTraits.apparentAge as AgeCategory
+          : latestChar.apparentAge;
+
         // Only update currentCharacter if it's still the same character (user might have switched)
         setCurrentCharacter(prev => prev && prev.id === charId ? {
           ...prev,
@@ -1980,6 +1992,7 @@ export default function StoryWizard() {
           physical: updatedPhysical2,
           physicalTraitsSource: updatedTraitsSource2,
           clothing: updatedClothing2,
+          apparentAge: updatedApparentAge2,
         } : prev);
         setCharacters(prev => prev.map(c =>
           c.id === charId ? {
@@ -1988,6 +2001,7 @@ export default function StoryWizard() {
             physical: updatedPhysical2,
             physicalTraitsSource: updatedTraitsSource2,
             clothing: updatedClothing2,
+            apparentAge: updatedApparentAge2,
           } : c
         ));
 
@@ -2000,6 +2014,7 @@ export default function StoryWizard() {
           physical: updatedPhysical2,
           physicalTraitsSource: updatedTraitsSource2,
           clothing: updatedClothing2,
+          apparentAge: updatedApparentAge2,
         };
         const latestCharacters2 = await new Promise<Character[]>(resolve => {
           setCharacters(prev => {
@@ -2699,17 +2714,22 @@ export default function StoryWizard() {
                 fullBody: result.extractedClothing.fullBody || undefined,
               },
             } : char.clothing;
+            // Extract apparentAge from evaluation (if not already set)
+            const updatedApparentAge = result.extractedTraits?.apparentAge && !char.apparentAge
+              ? result.extractedTraits.apparentAge as AgeCategory
+              : char.apparentAge;
+
             // Update characters state (include physicalTraitsSource)
             setCharacters(prev => prev.map(c =>
-              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : c
+              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing, apparentAge: updatedApparentAge } : c
             ));
             // Also update currentCharacter if it matches
-            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : prev);
+            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing, apparentAge: updatedApparentAge } : prev);
             // Save to storage using local state to preserve any unsaved changes
             // Use functional update to get latest characters state
             setCharacters(prevChars => {
               const updatedCharsForSave = prevChars.map(c =>
-                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : c
+                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing, apparentAge: updatedApparentAge } : c
               );
               // Fire save in background (don't await to avoid blocking)
               characterService.saveCharacterData({

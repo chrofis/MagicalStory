@@ -282,8 +282,9 @@ export interface CharacterData {
 }
 
 // Extracted traits from avatar evaluation
-// Note: age/gender are NOT extracted - user inputs them
+// Note: gender is NOT extracted - user inputs it. apparentAge IS extracted from avatar.
 export interface ExtractedTraits {
+  apparentAge?: string;  // Age category based on visual appearance
   build?: string;
   eyeColor?: string;
   eyeColorHex?: string;

@@ -27,7 +27,7 @@ VISUAL REQUIREMENTS:
 - Body: Generate age-appropriate body proportions based on the apparent age visible in the reference photo.
 - Setting: Solid light grey studio background in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
-- Top quadrants: Head and shoulders, face clearly visible
+- Top quadrants: CLOSE-UP portrait, face fills 70-80% of the frame. Show from chin to top of head with minimal shoulders. Face is the PRIMARY focus.
 - Bottom quadrants: Full body, head to toe. Shoes visible.
 
 BODY TRANSFORMATION (CRITICAL):
