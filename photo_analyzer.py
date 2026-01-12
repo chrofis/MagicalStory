@@ -97,8 +97,10 @@ try:
     rembg_session = new_session("u2net")
     REMBG_AVAILABLE = True
     print("[OK] rembg background removal available (U2-Net)")
-except ImportError:
-    print("[INFO] rembg not available - will use MediaPipe fallback")
+except ImportError as e:
+    print(f"[INFO] rembg not available: {e}")
+except Exception as e:
+    print(f"[WARN] rembg initialization failed: {e}")
 
 # Create temp directory for processing
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
