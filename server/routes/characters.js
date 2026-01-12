@@ -621,6 +621,7 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
     const deletedCharName = nameResult[0].name;
 
     // Use PostgreSQL to filter out the character and clean relationships IN-PLACE
+    // Update both data AND metadata columns
     const updateResult = await dbQuery(`
       UPDATE characters
       SET data = jsonb_build_object(
@@ -648,6 +649,32 @@ router.delete('/:characterId', authenticateToken, async (req, res) => {
         'customStrengths', COALESCE(data->'customStrengths', '[]'::jsonb),
         'customWeaknesses', COALESCE(data->'customWeaknesses', '[]'::jsonb),
         'customFears', COALESCE(data->'customFears', '[]'::jsonb)
+      ),
+      metadata = jsonb_build_object(
+        'characters', COALESCE(
+          (SELECT jsonb_agg(c)
+           FROM jsonb_array_elements(metadata->'characters') c
+           WHERE (c->>'id')::bigint != $2),
+          '[]'::jsonb
+        ),
+        'relationships', COALESCE(
+          (SELECT jsonb_object_agg(key, value)
+           FROM jsonb_each(metadata->'relationships')
+           WHERE key NOT LIKE '%' || $2::text || '-%'
+             AND key NOT LIKE '%-' || $2::text),
+          '{}'::jsonb
+        ),
+        'relationshipTexts', COALESCE(
+          (SELECT jsonb_object_agg(key, value)
+           FROM jsonb_each(metadata->'relationshipTexts')
+           WHERE key NOT LIKE '%' || $2::text || '-%'
+             AND key NOT LIKE '%-' || $2::text),
+          '{}'::jsonb
+        ),
+        'customRelationships', COALESCE(metadata->'customRelationships', '[]'::jsonb),
+        'customStrengths', COALESCE(metadata->'customStrengths', '[]'::jsonb),
+        'customWeaknesses', COALESCE(metadata->'customWeaknesses', '[]'::jsonb),
+        'customFears', COALESCE(metadata->'customFears', '[]'::jsonb)
       )
       WHERE id = $1
       RETURNING jsonb_array_length(data->'characters') as remaining_count
