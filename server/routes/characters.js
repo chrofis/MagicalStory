@@ -296,6 +296,26 @@ router.post('/', authenticateToken, async (req, res) => {
           hasChanges = true;
         }
 
+        // Preserve physical traits object (contains height, skinTone, eyeColor, hairColor, etc.)
+        if (existingChar.physical && !newChar.physical) {
+          mergedChar.physical = existingChar.physical;
+          preservedFields.push('physical');
+          hasChanges = true;
+        } else if (existingChar.physical && newChar.physical) {
+          // Merge physical traits - keep existing values for any missing fields
+          mergedChar.physical = { ...existingChar.physical, ...newChar.physical };
+        }
+
+        // Preserve photos object (contains face, original, bodyNoBg URLs)
+        if (existingChar.photos && !newChar.photos) {
+          mergedChar.photos = existingChar.photos;
+          preservedFields.push('photos');
+          hasChanges = true;
+        } else if (existingChar.photos && newChar.photos) {
+          // Merge photos - keep existing values for any missing fields
+          mergedChar.photos = { ...existingChar.photos, ...newChar.photos };
+        }
+
         // Preserve photo data if not sent (reduces payload by 10-15MB)
         // Photos are large base64 data URLs that don't need to be re-uploaded every save
         if (existingChar.photo_url && !newChar.photo_url) {
@@ -448,7 +468,9 @@ router.post('/', authenticateToken, async (req, res) => {
             generatedAt: lightChar.avatars.generatedAt,
             hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
             // Keep only standard thumbnail for list view (~70KB per char instead of 273KB)
-            faceThumbnails: standardThumb ? { standard: standardThumb } : undefined
+            faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
+            // Keep clothing descriptions (small text, needed for display and preservation)
+            clothing: lightChar.avatars.clothing
           };
         }
         return lightChar;

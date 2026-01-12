@@ -635,8 +635,8 @@ export function CharacterForm({
   const localizedFlaws = defaultFlaws[language] || defaultFlaws.en;
   const localizedChallenges = defaultChallenges[language] || defaultChallenges.en;
 
-  // Get display photo URL
-  const displayPhoto = character.photos?.face || character.photos?.original;
+  // Get display photo URL - prefer avatar face thumbnail over original photo
+  const displayPhoto = character.avatars?.faceThumbnails?.standard || character.photos?.face || character.photos?.original;
 
   // Step 1: Name entry + Avatar placeholder
   if (step === 'name') {
@@ -1183,7 +1183,7 @@ export function CharacterForm({
                   src={displayPhoto}
                   alt={character.name}
                   className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => setLightboxImage(displayPhoto)}
+                  onClick={() => setLightboxImage(character.avatars?.standard || displayPhoto)}
                   title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                 />
               ) : (
@@ -1308,14 +1308,14 @@ export function CharacterForm({
                 </div>
               );
             })()}
-            {/* Enlarged avatar modal */}
-            {enlargedAvatar && (character.avatars?.faceThumbnails?.standard || character.avatars?.standard) && (
+            {/* Enlarged avatar modal - show full avatar */}
+            {enlargedAvatar && (character.avatars?.standard || character.avatars?.faceThumbnails?.standard) && (
               <div
                 className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75"
                 onClick={() => setEnlargedAvatar(false)}
               >
                 <img
-                  src={character.avatars?.faceThumbnails?.standard || character.avatars?.standard}
+                  src={character.avatars?.standard || character.avatars?.faceThumbnails?.standard}
                   alt={`${character.name} avatar`}
                   className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
                   onClick={(e) => e.stopPropagation()}
@@ -1328,11 +1328,11 @@ export function CharacterForm({
                 </button>
               </div>
             )}
-            {/* Avatar action buttons - side by side, same style */}
-            <div className="mt-2 flex gap-2 w-full max-w-[180px] lg:max-w-full">
+            {/* Avatar action buttons - full width on mobile, side by side on desktop */}
+            <div className="mt-3 flex flex-col sm:flex-row gap-2 w-full">
               {/* Change Photo button */}
-              <label className="flex-1 px-3 py-2 text-xs font-medium bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1.5 border border-gray-300 cursor-pointer shadow-sm transition-colors">
-                <Upload size={12} />
+              <label className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 cursor-pointer transition-colors">
+                <Upload size={16} />
                 {language === 'de' ? 'Neues Foto' : language === 'fr' ? 'Nouvelle photo' : 'New Photo'}
                 <input
                   type="file"
@@ -1344,9 +1344,9 @@ export function CharacterForm({
               {/* Modify Avatar button */}
               <button
                 onClick={() => setIsModifyingAvatar(true)}
-                className="flex-1 px-3 py-2 text-xs font-medium bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1.5 border border-gray-300 shadow-sm transition-colors"
+                className="flex-1 px-4 py-3 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-colors"
               >
-                <Pencil size={12} />
+                <Pencil size={16} />
                 {language === 'de' ? 'Anpassen' : language === 'fr' ? 'Modifier' : 'Modify'}
               </button>
             </div>
