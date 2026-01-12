@@ -41,13 +41,16 @@ router.get('/', authenticateToken, async (req, res) => {
           rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
         }
       } else {
-        // Normal mode: use simpler query that strips avatars efficiently
+        // Normal mode: strip ALL heavy fields for fast list loading
+        // Heavy fields: avatars, body_no_bg_url, body_photo_url, photo_url, clothing_avatars
+        // These are loaded on-demand when editing a specific character
         const lightQuery = `
           SELECT
             data - 'characters' || jsonb_build_object(
               'characters', COALESCE((
                 SELECT jsonb_agg(
-                  c - 'avatars' || CASE WHEN c ? 'avatars' THEN
+                  c - 'avatars' - 'body_no_bg_url' - 'body_photo_url' - 'photo_url' - 'clothing_avatars'
+                  || CASE WHEN c ? 'avatars' THEN
                     jsonb_build_object('avatars', jsonb_build_object(
                       'status', c->'avatars'->'status',
                       'stale', c->'avatars'->'stale',
@@ -143,6 +146,53 @@ router.get('/:characterId/avatars', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('Error fetching character avatars:', err);
     res.status(500).json({ error: 'Failed to fetch character avatars' });
+  }
+});
+
+// GET /api/characters/:characterId/full - Get ALL data for a specific character (for editing)
+// This loads the heavy fields: avatars, body_no_bg_url, body_photo_url, photo_url, clothing_avatars
+router.get('/:characterId/full', authenticateToken, async (req, res) => {
+  try {
+    const { characterId } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const rowId = `characters_${req.user.id}`;
+
+    // Extract the full character data (all fields)
+    const query = `
+      SELECT c as character
+      FROM characters, jsonb_array_elements(data->'characters') c
+      WHERE id = $1 AND (c->>'id')::bigint = $2
+    `;
+
+    const result = await dbQuery(query, [rowId, characterId]);
+
+    if (result.length === 0) {
+      // Try legacy format
+      const legacyQuery = `
+        SELECT c as character
+        FROM characters, jsonb_array_elements(data->'characters') c
+        WHERE user_id = $1 AND (c->>'id')::bigint = $2
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+      const legacyResult = await dbQuery(legacyQuery, [req.user.id, characterId]);
+
+      if (legacyResult.length === 0) {
+        return res.status(404).json({ error: 'Character not found' });
+      }
+
+      return res.json({ character: legacyResult[0].character });
+    }
+
+    console.log(`[Characters] GET /${characterId}/full - Loaded full character data`);
+    res.json({ character: result[0].character });
+  } catch (err) {
+    console.error('Error fetching full character data:', err);
+    res.status(500).json({ error: 'Failed to fetch character data' });
   }
 });
 
