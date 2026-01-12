@@ -128,7 +128,7 @@ export default function StoryWizard() {
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
-  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);  // Background avatar generation
+  const [generatingAvatarForId, setGeneratingAvatarForId] = useState<number | null>(null);  // Background avatar generation
   const [isRegeneratingAvatars, setIsRegeneratingAvatars] = useState(false);
   const [isRegeneratingAvatarsWithTraits, setIsRegeneratingAvatarsWithTraits] = useState(false);
   const [changedTraits, setChangedTraits] = useState<ChangedTraits | undefined>(undefined);
@@ -1481,13 +1481,13 @@ export default function StoryWizard() {
           // Don't await - let user continue while avatar generates
           log.info(`🎨 Auto-starting avatar generation in background...`);
           log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
-          setIsGeneratingAvatar(true);
 
           // Auto-start avatar generation immediately after photo analysis
           // Character has an ID from creation, name is optional (handled in service)
           if (charForGeneration && charForGeneration.id) {
             // Run avatar generation in background (don't await)
             const charId = charForGeneration.id;
+            setGeneratingAvatarForId(charId);
             characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
               .then(result => {
                 if (result.success && result.character) {
@@ -1524,12 +1524,12 @@ export default function StoryWizard() {
                 ));
               })
               .finally(() => {
-                setIsGeneratingAvatar(false);
+                setGeneratingAvatarForId(null);
               });
           } else {
             // No character data - should not happen
             log.warn(`⏭️ Skipping auto-generation: no character data available`);
-            setIsGeneratingAvatar(false);
+            setGeneratingAvatarForId(null);
           }
         } else {
           // Check for specific errors
@@ -1670,10 +1670,10 @@ export default function StoryWizard() {
         // Auto-start avatar generation in background
         log.info(`🎨 Auto-starting avatar generation in background after face selection...`);
         log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
-        setIsGeneratingAvatar(true);
 
         if (charForGeneration && charForGeneration.name && charForGeneration.name.trim()) {
           const charId = charForGeneration.id;
+          setGeneratingAvatarForId(charId);
           characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
             .then(result => {
               if (result.success && result.character) {
@@ -1708,11 +1708,11 @@ export default function StoryWizard() {
               ));
             })
             .finally(() => {
-              setIsGeneratingAvatar(false);
+              setGeneratingAvatarForId(null);
             });
         } else {
           log.info(`⏭️ Skipping auto-generation: character has no name yet`);
-          setIsGeneratingAvatar(false);
+          setGeneratingAvatarForId(null);
           setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'pending' } } : prev);
         }
       } else {
@@ -2085,7 +2085,7 @@ export default function StoryWizard() {
     }
 
     // Start background avatar generation
-    setIsGeneratingAvatar(true);
+    setGeneratingAvatarForId(charId);
     // Only set generating status if still on same character
     setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'generating' } } : prev);
 
@@ -2158,7 +2158,7 @@ export default function StoryWizard() {
       ));
       setCurrentCharacter(prev => prev && prev.id === charId ? { ...prev, avatars: { status: 'failed' } } : prev);
     } finally {
-      setIsGeneratingAvatar(false);
+      setGeneratingAvatarForId(null);
     }
   };
 
@@ -3131,7 +3131,7 @@ export default function StoryWizard() {
             showCharacterCreated={showCharacterCreated}
             isLoading={isLoading}
             isAnalyzingPhoto={isAnalyzingPhoto}
-            isGeneratingAvatar={isGeneratingAvatar}
+            isGeneratingAvatar={generatingAvatarForId === currentCharacter?.id}
             isRegeneratingAvatars={isRegeneratingAvatars}
             isRegeneratingAvatarsWithTraits={isRegeneratingAvatarsWithTraits}
             developerMode={developerMode}
