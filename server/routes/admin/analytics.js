@@ -359,7 +359,9 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       runware: { direct_cost: 0, calls: 0 },
       // Per-model tracking for avatars
-      avatarByModel: avatarByModel
+      avatarByModel: avatarByModel,
+      // Per-model tracking for story images (page_images, cover_images)
+      imageByModel: {}
     };
 
     const byUser = {};
@@ -388,6 +390,26 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
                 totals[provider].output_tokens += tokenUsage[provider].output_tokens || 0;
                 totals[provider].thinking_tokens += tokenUsage[provider].thinking_tokens || 0;
                 totals[provider].calls += tokenUsage[provider].calls || 0;
+              }
+            }
+          }
+
+          // Extract per-model image costs from byFunction data
+          if (tokenUsage.byFunction) {
+            const imageTypes = ['page_images', 'cover_images'];
+            for (const imageType of imageTypes) {
+              const funcData = tokenUsage.byFunction[imageType];
+              if (funcData && funcData.calls > 0) {
+                // Get the model used (models is now an array after serialization fix)
+                const models = funcData.models || [];
+                const modelId = models[0] || (imageType === 'cover_images' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image');
+
+                if (!totals.imageByModel[modelId]) {
+                  totals.imageByModel[modelId] = { calls: 0, input_tokens: 0, output_tokens: 0 };
+                }
+                totals.imageByModel[modelId].calls += funcData.calls;
+                totals.imageByModel[modelId].input_tokens += funcData.input_tokens || 0;
+                totals.imageByModel[modelId].output_tokens += funcData.output_tokens || 0;
               }
             }
           }
@@ -585,13 +607,17 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         total: 0
       },
       gemini_image: {
-        // Image generation - cost is per-image (~$0.04-$0.15), not per token
-        // Page images @ $0.04 (gemini-2.5-flash), covers @ $0.15 (gemini-3-pro)
+        // Image generation - cost is per-image, calculated per model from byFunction data
         input: (totals.gemini_image.input_tokens / 1000000) * 0.30,
         output: (totals.gemini_image.output_tokens / 1000000) * 2.50,
         thinking: (totals.gemini_image.thinking_tokens / 1000000) * 2.50,
-        // Weighted avg ~$0.065 per image (3 covers + 10 pages per story)
-        imageEstimate: totals.gemini_image.calls * 0.065,
+        // Calculate per-model cost using MODEL_PRICING
+        imageEstimate: Object.entries(totals.imageByModel || {}).reduce((sum, [modelId, usage]) => {
+          const pricing = MODEL_PRICING[modelId];
+          const perImage = pricing?.perImage || 0.04; // Default to flash pricing
+          return sum + (usage.calls * perImage);
+        }, 0) || (totals.gemini_image.calls * 0.065), // Fallback if no byFunction data
+        byModel: totals.imageByModel,
         total: 0
       },
       gemini_quality: {

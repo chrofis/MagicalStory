@@ -145,12 +145,18 @@ export interface TokenUsageTotals {
   gemini_quality: ProviderTokens;
   runware: RunwareUsage;
   avatarByModel: Record<string, ModelUsage>;
+  imageByModel: Record<string, ModelUsage>;
+}
+
+export interface GeminiImageCost extends ProviderCost {
+  imageEstimate: number;
+  byModel?: Record<string, ModelUsage>;
 }
 
 export interface TokenUsageCosts {
   anthropic: ProviderCost;
   gemini_text: ProviderCost;
-  gemini_image: ProviderCost;
+  gemini_image: GeminiImageCost;
   gemini_quality: ProviderCost;
   runware: { total: number };
   avatarByModel: Record<string, ModelUsage>;
