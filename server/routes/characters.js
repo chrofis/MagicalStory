@@ -435,15 +435,17 @@ router.post('/', authenticateToken, async (req, res) => {
       };
 
       // Generate lightweight metadata for fast list queries
+      // Strip ALL heavy fields - list view only needs basic info
       const lightCharacters = mergedCharacters.map(char => {
         // Strip heavy base64 fields
         const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
-        // Keep only avatar metadata, not full images
+        // Keep only minimal avatar metadata (no images, no thumbnails, no dev data)
         if (lightChar.avatars) {
-          const { winter, standard, summer, formal, styledAvatars, costumed, ...avatarMeta } = lightChar.avatars;
           lightChar.avatars = {
-            ...avatarMeta,
-            hasFullAvatars: !!(winter || standard || summer || formal)
+            status: lightChar.avatars.status,
+            stale: lightChar.avatars.stale,
+            generatedAt: lightChar.avatars.generatedAt,
+            hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal)
           };
         }
         return lightChar;
