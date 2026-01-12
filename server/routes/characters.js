@@ -16,6 +16,7 @@ const { authenticateToken } = require('../middleware/auth');
 //   By default, only returns 'standard' avatar to reduce payload size
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    const startTime = Date.now();
     // Allow includeAllAvatars for admins OR when admin is impersonating a user
     const includeAllAvatars = req.query.includeAllAvatars === 'true' &&
       (req.user.role === 'admin' || req.user.impersonating);
@@ -34,51 +35,16 @@ router.get('/', authenticateToken, async (req, res) => {
       const characterId = `characters_${req.user.id}`;
       let rows;
 
-      if (includeAllAvatars) {
-        // Admin mode: return full data (no stripping)
-        rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
-        if (rows.length === 0) {
-          rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
-        }
-      } else {
-        // Normal mode: strip ALL heavy fields for fast list loading
-        // Heavy fields: avatars, body_no_bg_url, body_photo_url, photo_url, clothing_avatars
-        // These are loaded on-demand when editing a specific character
-        const lightQuery = `
-          SELECT
-            data - 'characters' || jsonb_build_object(
-              'characters', COALESCE((
-                SELECT jsonb_agg(
-                  c - 'avatars' - 'body_no_bg_url' - 'body_photo_url' - 'photo_url' - 'clothing_avatars'
-                  || CASE WHEN c ? 'avatars' THEN
-                    jsonb_build_object('avatars', jsonb_build_object(
-                      'status', c->'avatars'->'status',
-                      'stale', c->'avatars'->'stale',
-                      'generatedAt', c->'avatars'->'generatedAt',
-                      'faceThumbnails', c->'avatars'->'faceThumbnails',
-                      'clothing', c->'avatars'->'clothing',
-                      'hasFullAvatars', c->'avatars'->'standard' IS NOT NULL
-                    ))
-                  ELSE '{}'::jsonb END
-                )
-                FROM jsonb_array_elements(data->'characters') c
-              ), '[]'::jsonb)
-            ) as data
-          FROM characters
-          WHERE id = $1
-        `;
-        rows = await dbQuery(lightQuery, [characterId]);
-
-        // Fallback for legacy data
-        if (rows.length === 0) {
-          rows = await dbQuery(
-            lightQuery.replace('WHERE id = $1', 'WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1'),
-            [req.user.id]
-          );
-        }
+      // Always fetch full data - JS stripping is faster than complex JSONB queries
+      // PostgreSQL must read entire JSONB doc anyway, complex operations just add overhead
+      const queryStart = Date.now();
+      rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
       }
+      const queryTime = Date.now() - queryStart;
 
-      console.log(`[Characters] GET - Found ${rows.length} rows for user_id: ${req.user.id}, includeAllAvatars: ${includeAllAvatars}`);
+      console.log(`[Characters] GET - Query took ${queryTime}ms for user_id: ${req.user.id}`);
 
       if (rows.length > 0) {
         const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
@@ -87,7 +53,28 @@ router.get('/', authenticateToken, async (req, res) => {
         } else {
           characterData = { ...characterData, ...data };
         }
-        console.log(`[Characters] GET - Characters count: ${characterData.characters.length}`);
+
+        // Strip heavy fields in JS (faster than complex JSONB queries)
+        if (!includeAllAvatars && characterData.characters) {
+          const stripStart = Date.now();
+          characterData.characters = characterData.characters.map(char => {
+            // Strip heavy base64 fields
+            const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+
+            // Keep only avatar metadata, not full images
+            if (lightChar.avatars) {
+              const { winter, standard, summer, formal, styledAvatars, costumed, ...avatarMeta } = lightChar.avatars;
+              lightChar.avatars = {
+                ...avatarMeta,
+                hasFullAvatars: !!(winter || standard || summer || formal)
+              };
+            }
+            return lightChar;
+          });
+          console.log(`[Characters] GET - JS stripping took ${Date.now() - stripStart}ms`);
+        }
+
+        console.log(`[Characters] GET - Characters count: ${characterData.characters.length}, total time: ${Date.now() - startTime}ms`);
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
