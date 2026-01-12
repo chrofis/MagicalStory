@@ -2257,8 +2257,8 @@ export default function StoryWizard() {
     setShowCharacterCreated(false);
 
     // Load full character data on-demand (heavy fields stripped from list view)
-    // Check if photo_url is missing - it's stripped from list view but needed for editing
-    if (!char.photo_url) {
+    // Check if bodyNoBg is missing - it's stripped from list view but needed for editing
+    if (!char.photos?.bodyNoBg) {
       const fullChar = await characterService.loadFullCharacter(char.id);
       if (fullChar) {
         // Merge full data into the character
