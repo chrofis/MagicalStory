@@ -2023,12 +2023,18 @@ These corrections OVERRIDE what is visible in the reference photo.
           // Store extracted physical traits (from generated avatar - reflects user corrections)
           if (faceMatchResult.physicalTraits && !results.extractedTraits) {
             results.extractedTraits = faceMatchResult.physicalTraits;
+            // Normalize: AI might return 'age' instead of 'apparentAge' - handle both
+            if (results.extractedTraits.age && !results.extractedTraits.apparentAge) {
+              results.extractedTraits.apparentAge = results.extractedTraits.age;
+              delete results.extractedTraits.age;
+              log.debug(`📋 [AVATAR EVAL] Normalized 'age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
+            }
             // Include detailed hair analysis if available
             if (faceMatchResult.detailedHairAnalysis) {
               results.extractedTraits.detailedHairAnalysis = faceMatchResult.detailedHairAnalysis;
               log.debug(`💇 [AVATAR EVAL] Stored detailed hair: lengthTop=${faceMatchResult.detailedHairAnalysis.lengthTop}, lengthSides=${faceMatchResult.detailedHairAnalysis.lengthSides}, bangs=${faceMatchResult.detailedHairAnalysis.bangsEndAt}`);
             }
-            log.debug(`📋 [AVATAR EVAL] Extracted traits from avatar: age=${faceMatchResult.physicalTraits.age}, gender=${faceMatchResult.physicalTraits.gender}, build=${faceMatchResult.physicalTraits.build}`);
+            log.debug(`📋 [AVATAR EVAL] Extracted traits from avatar: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
           }
 
           // Store structured clothing (from generated avatar)
