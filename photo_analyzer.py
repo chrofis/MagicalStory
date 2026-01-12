@@ -469,15 +469,15 @@ def create_face_thumbnail(image, face_box, size=200):
 
 def remove_faces_except(image, keep_face_id, all_faces):
     """
-    Blank out non-selected faces by making them white/transparent.
-    Only removes the face rectangles, not body regions.
+    Blank out non-selected people (face + body) by making them white/transparent.
+    Removes the face and extends down to remove body/clothing to prevent crosstalk.
 
     Args:
         image: BGRA numpy array (must have alpha channel)
         keep_face_id: ID of face to keep (0-indexed)
         all_faces: list of face dicts with x, y, width, height (percentages 0-100)
 
-    Returns: image with non-selected faces blanked out
+    Returns: image with non-selected people blanked out
     """
     if not all_faces or len(all_faces) <= 1:
         return image
@@ -490,6 +490,10 @@ def remove_faces_except(image, keep_face_id, all_faces):
         # Convert BGR to BGRA
         result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
 
+    # Get the kept face's x position to avoid blanking their body
+    kept_face = next((f for f in all_faces if f['id'] == keep_face_id), None)
+    kept_x_center = kept_face['x'] if kept_face else 50
+
     for face in all_faces:
         if face['id'] == keep_face_id:
             continue  # Skip the selected face
@@ -497,15 +501,47 @@ def remove_faces_except(image, keep_face_id, all_faces):
         # Calculate face boundaries with padding (50% extra to cover full head)
         face_padding = 0.5
         face_top = int(max(0, (face['y'] / 100 - face['height'] / 100 * face_padding)) * h)
-        face_bottom = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * face_padding) * h)
         face_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * face_padding)) * w)
         face_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * face_padding) * w)
 
-        # Blank out the face region - set to WHITE and transparent
-        if face_x2 > face_x1 and face_bottom > face_top:
+        # Body extends from face down to bottom of image
+        # Width is ~3x face width to cover shoulders
+        body_width_mult = 3.0
+        body_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * body_width_mult / 2)) * w)
+        body_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * body_width_mult / 2) * w)
+        body_bottom = h  # Extend to bottom of image
+
+        # Check if this body region would overlap with the kept face's body
+        # If the unwanted face is between kept face and edge, only blank toward the edge
+        if kept_face:
+            kept_x1 = int(max(0, (kept_x_center / 100 - kept_face['width'] / 100 * 1.5)) * w)
+            kept_x2 = int(min(1.0, (kept_x_center + kept_face['width']) / 100 + kept_face['width'] / 100 * 1.5) * w)
+
+            # Adjust body region to not overlap with kept person
+            if body_x2 > kept_x1 and body_x1 < kept_x2:
+                # There's overlap - adjust based on which side the unwanted face is on
+                face_center = (face_x1 + face_x2) // 2
+                kept_center = (kept_x1 + kept_x2) // 2
+                if face_center < kept_center:
+                    # Unwanted face is to the left - only blank left of kept person
+                    body_x2 = min(body_x2, kept_x1)
+                else:
+                    # Unwanted face is to the right - only blank right of kept person
+                    body_x1 = max(body_x1, kept_x2)
+
+        # Blank out the face region (head)
+        if face_x2 > face_x1 and face_top < h:
+            face_bottom = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * face_padding) * h)
             result[face_top:face_bottom, face_x1:face_x2, 0:3] = 255  # BGR = white
             result[face_top:face_bottom, face_x1:face_x2, 3] = 0      # Alpha = transparent
             print(f"   Blanked face {face['id']} at ({face_x1},{face_top})-({face_x2},{face_bottom})")
+
+        # Blank out the body region (below face to bottom)
+        if body_x2 > body_x1:
+            body_top = int((face['y'] + face['height']) / 100 * h)  # Start just below face
+            result[body_top:body_bottom, body_x1:body_x2, 0:3] = 255  # BGR = white
+            result[body_top:body_bottom, body_x1:body_x2, 3] = 0      # Alpha = transparent
+            print(f"   Blanked body {face['id']} at ({body_x1},{body_top})-({body_x2},{body_bottom})")
 
     return result
 
