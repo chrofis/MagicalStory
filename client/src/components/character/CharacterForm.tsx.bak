@@ -1217,7 +1217,17 @@ export function CharacterForm({
                   <Pencil size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </h3>
               )}
-
+              {/* Change Photo button - always visible */}
+              <label className="cursor-pointer bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-200 flex items-center gap-1 w-fit transition-colors border border-gray-200">
+                <Upload size={10} />
+                {language === 'de' ? 'Foto ändern' : language === 'fr' ? 'Changer la photo' : 'Change Photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
 
@@ -1263,14 +1273,11 @@ export function CharacterForm({
             </div>
           </div>
 
-          {/* Avatar section - full width of left column, centered on mobile */}
-          <div className="flex flex-col items-center lg:items-start">
+          {/* Avatar section - full width of left column */}
+          <div>
             {(() => {
-              // Show full avatar (standard) when available
-              // If hasFullAvatars but no standard loaded yet, show loading state
-              const avatarToShow = character.avatars?.standard;
-              const isLoadingFullAvatar = character.avatars?.hasFullAvatars && !character.avatars?.standard;
-              const isGenerating = isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating';
+              // Use faceThumbnails.standard for display, fall back to full avatar
+              const avatarToShow = character.avatars?.faceThumbnails?.standard || character.avatars?.standard;
 
               if (avatarToShow) {
                 return (
@@ -1282,7 +1289,7 @@ export function CharacterForm({
                       onClick={() => setEnlargedAvatar(true)}
                       title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                     />
-                    {isGenerating && (
+                    {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg">
                         <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       </div>
@@ -1292,12 +1299,12 @@ export function CharacterForm({
               }
 
               return (
-                <div className="w-full max-w-[180px] lg:max-w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
-                  {(isGenerating || isLoadingFullAvatar) ? (
+                <div className="w-full aspect-[3/4] rounded-lg border-2 border-dashed border-gray-300 bg-gray-100 flex flex-col items-center justify-center">
+                  {(isGeneratingAvatar || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || character.avatars?.status === 'generating') ? (
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                       <span className="text-xs text-indigo-600 font-medium px-2 text-center">
-                        {language === 'de' ? (isLoadingFullAvatar ? 'Lädt...' : 'Wird erstellt...') : (isLoadingFullAvatar ? 'Loading...' : 'Creating...')}
+                        {language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création...' : 'Creating...'}
                       </span>
                     </div>
                   ) : (
@@ -1328,30 +1335,16 @@ export function CharacterForm({
                 </button>
               </div>
             )}
-            {/* Avatar action buttons - side by side, same style */}
-            <div className="mt-2 flex gap-2 w-full max-w-[180px] lg:max-w-full">
-              {/* Change Photo button */}
-              <label className="flex-1 px-3 py-2 text-xs font-medium bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1.5 border border-gray-300 cursor-pointer shadow-sm transition-colors">
-                <Upload size={12} />
-                {language === 'de' ? 'Neues Foto' : language === 'fr' ? 'Nouvelle photo' : 'New Photo'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
-              {/* Modify Avatar button */}
+            {/* Avatar action buttons */}
+            <div className="mt-2 space-y-1">
+              {/* Modify Avatar button - for all users (blue style) */}
               <button
                 onClick={() => setIsModifyingAvatar(true)}
-                className="flex-1 px-3 py-2 text-xs font-medium bg-white text-gray-700 rounded-lg hover:bg-gray-50 flex items-center justify-center gap-1.5 border border-gray-300 shadow-sm transition-colors"
+                className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
               >
-                <Pencil size={12} />
-                {language === 'de' ? 'Anpassen' : language === 'fr' ? 'Modifier' : 'Modify'}
+                <Pencil size={10} />
+                {language === 'de' ? 'Aussehen anpassen' : language === 'fr' ? 'Modifier l\'apparence' : 'Modify Look'}
               </button>
-            </div>
-            {/* Developer mode buttons - below main buttons */}
-            <div className="mt-1 space-y-1">
               {/* Regenerate button - developer mode only */}
               {(developerMode || isImpersonating) && (
                 <button

@@ -436,6 +436,135 @@ async function downloadRunwareImage(imageUrl) {
 }
 
 /**
+ * Generate face-consistent image using PuLID (Pure and Lightning ID)
+ * PuLID provides excellent identity preservation from a single reference photo
+ *
+ * @param {string} referenceImage - Reference photo (data URI or base64) with clear face
+ * @param {string} prompt - Description of desired output
+ * @param {Object} options - Generation options
+ * @param {number} options.width - Output width (default: 896)
+ * @param {number} options.height - Output height (default: 1152)
+ * @param {number} options.idWeight - Identity weight 0-3 (default: 1.0, higher = stronger identity)
+ * @param {number} options.startStep - When to start applying identity 0-100% (default: 0, lower = stronger)
+ * @param {number} options.trueCFGScale - True CFG scale (default: 1)
+ * @returns {Promise<{imageData: string, usage: Object, modelId: string}>}
+ */
+async function generateWithPuLID(referenceImage, prompt, options = {}) {
+  const {
+    width = 1024,
+    height = 1024,
+    idWeight = 1.0,  // Identity strength (0-3, default 1)
+    steps = 25       // More steps = sharper but slower
+  } = options;
+
+  if (!RUNWARE_API_KEY) {
+    throw new Error('RUNWARE_API_KEY not configured');
+  }
+
+  const taskUUID = crypto.randomUUID();
+  log.info(`🎨 [RUNWARE PuLID] Starting face-consistent generation ${taskUUID.slice(0, 8)}...`);
+  log.debug(`🎨 [RUNWARE PuLID] Size: ${width}x${height}, ID weight: ${idWeight}`);
+  log.debug(`🎨 [RUNWARE PuLID] Prompt: ${prompt.substring(0, 100)}...`);
+
+  // Ensure reference image is in correct format
+  let refDataUri = referenceImage;
+  if (Buffer.isBuffer(referenceImage)) {
+    refDataUri = `data:image/png;base64,${referenceImage.toString('base64')}`;
+  }
+
+  // PuLID uses SDXL model with puLID configuration
+  const payload = [{
+    taskType: 'imageInference',
+    taskUUID: taskUUID,
+    positivePrompt: prompt,
+    negativePrompt: 'blurry, low quality, distorted, disfigured, bad anatomy, naked, nude, nsfw',
+    model: RUNWARE_MODELS.SDXL,  // runware:101@1 - SDXL works with PuLID
+    width: width,
+    height: height,
+    steps: steps,
+    CFGScale: 4,
+    outputFormat: 'PNG',
+    numberResults: 1,
+    // PuLID specific configuration
+    puLID: {
+      inputImages: [refDataUri],  // Reference face image(s)
+      idWeight: idWeight          // Identity strength (0-3, default 1)
+      // Note: trueCFGScale and CFGStartStep are mutually exclusive
+    }
+  }];
+
+  const startTime = Date.now();
+
+  try {
+    const response = await fetch(RUNWARE_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RUNWARE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(`❌ [RUNWARE PuLID] API error ${response.status}: ${errorText}`);
+      throw new Error(`Runware PuLID API error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    const elapsed = Date.now() - startTime;
+
+    // Handle errors in response
+    if (data.errors && data.errors.length > 0) {
+      const error = data.errors[0];
+      log.error(`❌ [RUNWARE PuLID] Task error: ${error.message || JSON.stringify(error)}`);
+      throw new Error(`Runware PuLID error: ${error.message || 'Unknown error'}`);
+    }
+
+    // Response is array of results
+    const result = data.data?.find(d => d.taskUUID === taskUUID);
+    if (!result) {
+      log.error(`❌ [RUNWARE PuLID] No result for task ${taskUUID}`);
+      throw new Error('No result in Runware PuLID response');
+    }
+
+    // Get the image - could be URL or base64
+    let imageData = result.imageURL;
+    if (!imageData && result.imageBase64) {
+      imageData = `data:image/png;base64,${result.imageBase64}`;
+    }
+
+    // If we got a URL, download and convert to base64
+    if (imageData && !imageData.startsWith('data:')) {
+      imageData = await downloadRunwareImage(imageData);
+    }
+
+    if (!imageData) {
+      throw new Error('No image data in Runware PuLID response');
+    }
+
+    const cost = result.cost || 0.002;  // SDXL cost ~$0.002
+    log.info(`✅ [RUNWARE PuLID] Complete in ${elapsed}ms. Cost: $${cost.toFixed(6)}`);
+
+    return {
+      imageData: imageData,
+      imageBase64: result.imageBase64,
+      usage: {
+        cost: cost,
+        direct_cost: cost,
+        inferenceTime: result.inferenceTime || elapsed
+      },
+      modelId: 'pulid-flux'
+    };
+
+  } catch (error) {
+    const elapsed = Date.now() - startTime;
+    log.error(`❌ [RUNWARE PuLID] Failed after ${elapsed}ms: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Check if Runware API is configured and available
  * @returns {boolean}
  */
@@ -447,6 +576,7 @@ module.exports = {
   inpaintWithRunware,
   generateWithRunware,
   generateAvatarWithACE,
+  generateWithPuLID,
   downloadRunwareImage,
   isRunwareConfigured,
   RUNWARE_MODELS
