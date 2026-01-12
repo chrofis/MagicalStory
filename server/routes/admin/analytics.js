@@ -456,57 +456,72 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       }
     }
 
-    // Calculate costs (approximate) - thinking tokens billed at output rate for Gemini
+    // Calculate costs - pricing per 1M tokens (updated Jan 2026)
+    // Source: https://ai.google.dev/gemini-api/docs/pricing
+    // Claude: $3 input / $15 output per 1M tokens
+    // Gemini 2.5 Flash (text): $0.30 input / $2.50 output per 1M tokens
+    // Gemini 2.5 Flash (image gen): ~$0.035 per image (not token-based)
+    // Gemini 2.0 Flash (quality): $0.10 input / $0.40 output per 1M tokens
     const costs = {
       anthropic: {
-        input: (totals.anthropic.input_tokens / 1000000) * 3,
-        output: (totals.anthropic.output_tokens / 1000000) * 15,
-        thinking: 0, // Anthropic doesn't have separate thinking tokens
+        input: (totals.anthropic.input_tokens / 1000000) * 3.00,
+        output: (totals.anthropic.output_tokens / 1000000) * 15.00,
+        thinking: (totals.anthropic.thinking_tokens / 1000000) * 15.00,
         total: 0
       },
       gemini_text: {
-        input: (totals.gemini_text.input_tokens / 1000000) * 0.075,
-        output: (totals.gemini_text.output_tokens / 1000000) * 0.30,
-        thinking: (totals.gemini_text.thinking_tokens / 1000000) * 0.30,
+        // Gemini 2.5 Flash for text
+        input: (totals.gemini_text.input_tokens / 1000000) * 0.30,
+        output: (totals.gemini_text.output_tokens / 1000000) * 2.50,
+        thinking: (totals.gemini_text.thinking_tokens / 1000000) * 2.50,
         total: 0
       },
       gemini_image: {
-        input: (totals.gemini_image.input_tokens / 1000000) * 0.075,
-        output: (totals.gemini_image.output_tokens / 1000000) * 0.30,
-        thinking: (totals.gemini_image.thinking_tokens / 1000000) * 0.30,
+        // Image generation - cost is per-image (~$0.035), not per token
+        // Tokens tracked here are just prompt tokens, real cost is images * $0.035
+        input: (totals.gemini_image.input_tokens / 1000000) * 0.30,
+        output: (totals.gemini_image.output_tokens / 1000000) * 2.50,
+        thinking: (totals.gemini_image.thinking_tokens / 1000000) * 2.50,
+        // Estimate: each call generates 1 image at ~$0.035
+        imageEstimate: totals.gemini_image.calls * 0.035,
         total: 0
       },
       gemini_quality: {
-        input: (totals.gemini_quality.input_tokens / 1000000) * 0.075,
-        output: (totals.gemini_quality.output_tokens / 1000000) * 0.30,
-        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 0.30,
+        // Gemini 2.0 Flash for quality eval
+        input: (totals.gemini_quality.input_tokens / 1000000) * 0.10,
+        output: (totals.gemini_quality.output_tokens / 1000000) * 0.40,
+        thinking: (totals.gemini_quality.thinking_tokens / 1000000) * 0.40,
         total: 0
       },
       runware: {
         total: totals.runware.direct_cost // Runware charges directly, no token calculation
       }
     };
-    costs.anthropic.total = costs.anthropic.input + costs.anthropic.output;
+    costs.anthropic.total = costs.anthropic.input + costs.anthropic.output + costs.anthropic.thinking;
     costs.gemini_text.total = costs.gemini_text.input + costs.gemini_text.output + costs.gemini_text.thinking;
-    costs.gemini_image.total = costs.gemini_image.input + costs.gemini_image.output + costs.gemini_image.thinking;
+    // For image generation, use the per-image estimate as primary cost
+    costs.gemini_image.total = costs.gemini_image.imageEstimate || (costs.gemini_image.input + costs.gemini_image.output + costs.gemini_image.thinking);
     costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output + costs.gemini_quality.thinking;
     costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total + costs.runware.total;
 
     const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);
 
-    // Helper to calculate cost for a day/month entry
+    // Helper to calculate cost for a day/month entry (using same pricing as totals)
     const calculateEntryCost = (entry) => {
-      const anthropicCost = ((entry.anthropic?.input_tokens || 0) / 1000000) * 3 +
-                           ((entry.anthropic?.output_tokens || 0) / 1000000) * 15;
-      const geminiTextCost = ((entry.gemini_text?.input_tokens || 0) / 1000000) * 0.075 +
-                            ((entry.gemini_text?.output_tokens || 0) / 1000000) * 0.30 +
-                            ((entry.gemini_text?.thinking_tokens || 0) / 1000000) * 0.30;
-      const geminiImageCost = ((entry.gemini_image?.input_tokens || 0) / 1000000) * 0.075 +
-                             ((entry.gemini_image?.output_tokens || 0) / 1000000) * 0.30 +
-                             ((entry.gemini_image?.thinking_tokens || 0) / 1000000) * 0.30;
-      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.075 +
-                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.30 +
-                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.30;
+      // Claude: $3 input / $15 output per 1M tokens
+      const anthropicCost = ((entry.anthropic?.input_tokens || 0) / 1000000) * 3.00 +
+                           ((entry.anthropic?.output_tokens || 0) / 1000000) * 15.00 +
+                           ((entry.anthropic?.thinking_tokens || 0) / 1000000) * 15.00;
+      // Gemini 2.5 Flash (text): $0.30 input / $2.50 output per 1M tokens
+      const geminiTextCost = ((entry.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
+                            ((entry.gemini_text?.output_tokens || 0) / 1000000) * 2.50 +
+                            ((entry.gemini_text?.thinking_tokens || 0) / 1000000) * 2.50;
+      // Gemini image gen: ~$0.035 per image (estimate based on call count)
+      const geminiImageCost = (entry.gemini_image?.calls || 0) * 0.035;
+      // Gemini 2.0 Flash (quality): $0.10 input / $0.40 output per 1M tokens
+      const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                               ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
+                               ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
       const runwareCost = entry.runware?.direct_cost || 0;
       return anthropicCost + geminiTextCost + geminiImageCost + geminiQualityCost + runwareCost;
     };

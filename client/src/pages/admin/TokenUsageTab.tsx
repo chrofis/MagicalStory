@@ -130,7 +130,10 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
             {formatCost(tokenData.costs.gemini_text.total + tokenData.costs.gemini_image.total + tokenData.costs.gemini_quality.total)}
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            Text: {formatCost(tokenData.costs.gemini_text.total)} | Image: {formatCost(tokenData.costs.gemini_image.total)}
+            {formatTokens(tokenData.totals.gemini_text.input_tokens + tokenData.totals.gemini_image.input_tokens + tokenData.totals.gemini_quality.input_tokens)} in / {formatTokens(tokenData.totals.gemini_text.output_tokens + tokenData.totals.gemini_image.output_tokens + tokenData.totals.gemini_quality.output_tokens)} out
+          </p>
+          <p className="text-xs text-blue-500 mt-0.5">
+            Text: {formatCost(tokenData.costs.gemini_text.total)} | Image: {formatCost(tokenData.costs.gemini_image.total)} ({tokenData.totals.gemini_image.calls} imgs)
           </p>
         </div>
 
@@ -175,10 +178,20 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
               </thead>
               <tbody className="divide-y">
                 {tokenData.byDay.slice(0, 14).map((day: TokenUsageByDay) => {
+                  // Pricing per 1M tokens (Jan 2026):
+                  // Claude: $3 input / $15 output
+                  // Gemini 2.5 Flash (text): $0.30 input / $2.50 output
+                  // Gemini Image: ~$0.035 per image
+                  // Gemini 2.0 Flash (quality): $0.10 input / $0.40 output
                   const anthropicCost = ((day.anthropic?.input_tokens || 0) / 1000000) * 3 +
-                                       ((day.anthropic?.output_tokens || 0) / 1000000) * 15;
-                  const geminiCost = ((day.gemini_text?.input_tokens || 0) + (day.gemini_image?.input_tokens || 0) + (day.gemini_quality?.input_tokens || 0)) / 1000000 * 0.075 +
-                                    ((day.gemini_text?.output_tokens || 0) + (day.gemini_image?.output_tokens || 0) + (day.gemini_quality?.output_tokens || 0)) / 1000000 * 0.30;
+                                       ((day.anthropic?.output_tokens || 0) / 1000000) * 15 +
+                                       ((day.anthropic?.thinking_tokens || 0) / 1000000) * 15;
+                  const geminiTextCost = ((day.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
+                                        ((day.gemini_text?.output_tokens || 0) / 1000000) * 2.50;
+                  const geminiImageCost = (day.gemini_image?.calls || 0) * 0.035;
+                  const geminiQualityCost = ((day.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                                           ((day.gemini_quality?.output_tokens || 0) / 1000000) * 0.40;
+                  const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
                   const runwareCost = day.runware?.direct_cost || 0;
 
                   return (
@@ -229,10 +242,16 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
               </thead>
               <tbody className="divide-y">
                 {tokenData.byMonth.map((month: TokenUsageByMonth) => {
+                  // Same pricing as daily table
                   const anthropicCost = ((month.anthropic?.input_tokens || 0) / 1000000) * 3 +
-                                       ((month.anthropic?.output_tokens || 0) / 1000000) * 15;
-                  const geminiCost = ((month.gemini_text?.input_tokens || 0) + (month.gemini_image?.input_tokens || 0) + (month.gemini_quality?.input_tokens || 0)) / 1000000 * 0.075 +
-                                    ((month.gemini_text?.output_tokens || 0) + (month.gemini_image?.output_tokens || 0) + (month.gemini_quality?.output_tokens || 0)) / 1000000 * 0.30;
+                                       ((month.anthropic?.output_tokens || 0) / 1000000) * 15 +
+                                       ((month.anthropic?.thinking_tokens || 0) / 1000000) * 15;
+                  const geminiTextCost = ((month.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
+                                        ((month.gemini_text?.output_tokens || 0) / 1000000) * 2.50;
+                  const geminiImageCost = (month.gemini_image?.calls || 0) * 0.035;
+                  const geminiQualityCost = ((month.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                                           ((month.gemini_quality?.output_tokens || 0) / 1000000) * 0.40;
+                  const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
                   const runwareCost = month.runware?.direct_cost || 0;
                   const costPerStory = month.storyCount > 0 ? month.totalCost / month.storyCount : 0;
 
@@ -284,10 +303,16 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
               </thead>
               <tbody className="divide-y">
                 {tokenData.byUser.slice(0, 20).map((user: TokenUsageByUser, index: number) => {
+                  // Same pricing as daily table
                   const anthropicCost = ((user.anthropic?.input_tokens || 0) / 1000000) * 3 +
-                                       ((user.anthropic?.output_tokens || 0) / 1000000) * 15;
-                  const geminiCost = ((user.gemini_text?.input_tokens || 0) + (user.gemini_image?.input_tokens || 0) + (user.gemini_quality?.input_tokens || 0)) / 1000000 * 0.075 +
-                                    ((user.gemini_text?.output_tokens || 0) + (user.gemini_image?.output_tokens || 0) + (user.gemini_quality?.output_tokens || 0)) / 1000000 * 0.30;
+                                       ((user.anthropic?.output_tokens || 0) / 1000000) * 15 +
+                                       ((user.anthropic?.thinking_tokens || 0) / 1000000) * 15;
+                  const geminiTextCost = ((user.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
+                                        ((user.gemini_text?.output_tokens || 0) / 1000000) * 2.50;
+                  const geminiImageCost = (user.gemini_image?.calls || 0) * 0.035;
+                  const geminiQualityCost = ((user.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
+                                           ((user.gemini_quality?.output_tokens || 0) / 1000000) * 0.40;
+                  const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
                   const runwareCost = user.runware?.direct_cost || 0;
                   const totalCost = anthropicCost + geminiCost + runwareCost;
                   const costPerStory = user.storyCount > 0 ? totalCost / user.storyCount : 0;
