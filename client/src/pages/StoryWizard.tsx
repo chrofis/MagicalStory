@@ -22,7 +22,7 @@ import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal
 import { FaceSelectionModal } from '@/components/character';
 
 // Types
-import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace } from '@/types/character';
+import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory } from '@/types/character';
 import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry } from '@/types/story';
 
 // Services & Helpers
@@ -1817,13 +1817,17 @@ export default function StoryWizard() {
           height: currentCharacter.physical?.height, // Preserve height (not extracted from avatar)
           // Preserve user-edited values, use extracted for non-user traits
           eyeColor: currentSource.eyeColor === 'user' ? currentCharacter.physical?.eyeColor : result.extractedTraits.eyeColor,
+          eyeColorHex: currentSource.eyeColor === 'user' ? currentCharacter.physical?.eyeColorHex : result.extractedTraits.eyeColorHex,
           hairColor: currentSource.hairColor === 'user' ? currentCharacter.physical?.hairColor : result.extractedTraits.hairColor,
+          hairColorHex: currentSource.hairColor === 'user' ? currentCharacter.physical?.hairColorHex : result.extractedTraits.hairColorHex,
           hairLength: currentSource.hairLength === 'user' ? currentCharacter.physical?.hairLength : result.extractedTraits.hairLength,
           hairStyle: currentSource.hairStyle === 'user' ? currentCharacter.physical?.hairStyle : result.extractedTraits.hairStyle,
           build: currentSource.build === 'user' ? currentCharacter.physical?.build : result.extractedTraits.build,
           face: currentSource.face === 'user' ? currentCharacter.physical?.face : result.extractedTraits.face,
           facialHair: currentSource.facialHair === 'user' ? currentCharacter.physical?.facialHair : result.extractedTraits.facialHair,
           other: currentSource.other === 'user' ? currentCharacter.physical?.other : result.extractedTraits.other,
+          skinTone: currentSource.skinTone === 'user' ? currentCharacter.physical?.skinTone : result.extractedTraits.skinTone,
+          skinToneHex: currentSource.skinTone === 'user' ? currentCharacter.physical?.skinToneHex : result.extractedTraits.skinToneHex,
           // Detailed hair analysis from avatar evaluation (always use latest)
           detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || currentCharacter.physical?.detailedHairAnalysis,
         } : currentCharacter.physical;
@@ -1839,6 +1843,7 @@ export default function StoryWizard() {
           face: currentSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
           facialHair: currentSource.facialHair === 'user' ? 'user' as const : undefined,
           other: currentSource.other === 'user' ? 'user' as const : undefined,
+          skinTone: currentSource.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
         } : currentCharacter.physicalTraitsSource;
 
         // OVERWRITE clothing with extracted values from new avatar
@@ -1944,13 +1949,17 @@ export default function StoryWizard() {
           height: latestChar.physical?.height, // Preserve height (not extracted from avatar)
           // Preserve user-edited values, use extracted for non-user traits
           eyeColor: currentSource2.eyeColor === 'user' ? latestChar.physical?.eyeColor : result.extractedTraits.eyeColor,
+          eyeColorHex: currentSource2.eyeColor === 'user' ? latestChar.physical?.eyeColorHex : result.extractedTraits.eyeColorHex,
           hairColor: currentSource2.hairColor === 'user' ? latestChar.physical?.hairColor : result.extractedTraits.hairColor,
+          hairColorHex: currentSource2.hairColor === 'user' ? latestChar.physical?.hairColorHex : result.extractedTraits.hairColorHex,
           hairLength: currentSource2.hairLength === 'user' ? latestChar.physical?.hairLength : result.extractedTraits.hairLength,
           hairStyle: currentSource2.hairStyle === 'user' ? latestChar.physical?.hairStyle : result.extractedTraits.hairStyle,
           build: currentSource2.build === 'user' ? latestChar.physical?.build : result.extractedTraits.build,
           face: currentSource2.face === 'user' ? latestChar.physical?.face : result.extractedTraits.face,
           facialHair: currentSource2.facialHair === 'user' ? latestChar.physical?.facialHair : result.extractedTraits.facialHair,
           other: currentSource2.other === 'user' ? latestChar.physical?.other : result.extractedTraits.other,
+          skinTone: currentSource2.skinTone === 'user' ? latestChar.physical?.skinTone : result.extractedTraits.skinTone,
+          skinToneHex: currentSource2.skinTone === 'user' ? latestChar.physical?.skinToneHex : result.extractedTraits.skinToneHex,
           // Detailed hair analysis from avatar evaluation (always use latest)
           detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || latestChar.physical?.detailedHairAnalysis,
         } : latestChar.physical;
@@ -1966,6 +1975,7 @@ export default function StoryWizard() {
           face: currentSource2.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
           facialHair: currentSource2.facialHair === 'user' ? 'user' as const : undefined,
           other: currentSource2.other === 'user' ? 'user' as const : undefined,
+          skinTone: currentSource2.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
         } : latestChar.physicalTraitsSource;
 
         // OVERWRITE clothing with extracted values from new avatar
