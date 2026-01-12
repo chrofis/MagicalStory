@@ -1217,17 +1217,7 @@ export function CharacterForm({
                   <Pencil size={14} className="text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </h3>
               )}
-              {/* Change Photo button - always visible */}
-              <label className="cursor-pointer bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs hover:bg-gray-200 flex items-center gap-1 w-fit transition-colors border border-gray-200">
-                <Upload size={10} />
-                {language === 'de' ? 'Foto ändern' : language === 'fr' ? 'Changer la photo' : 'Change Photo'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-              </label>
+
             </div>
           </div>
 
@@ -1276,8 +1266,9 @@ export function CharacterForm({
           {/* Avatar section - full width of left column */}
           <div>
             {(() => {
-              // Use faceThumbnails.standard for display, fall back to full avatar
-              const avatarToShow = character.avatars?.faceThumbnails?.standard || character.avatars?.standard;
+              // Show full avatar (standard) when available, fallback to thumbnail while loading
+              // Full avatars are loaded on-demand when editing, so initially we may only have thumbnails
+              const avatarToShow = character.avatars?.standard || character.avatars?.faceThumbnails?.standard;
 
               if (avatarToShow) {
                 return (
@@ -1335,16 +1326,30 @@ export function CharacterForm({
                 </button>
               </div>
             )}
-            {/* Avatar action buttons */}
-            <div className="mt-2 space-y-1">
+            {/* Avatar action buttons - side by side */}
+            <div className="mt-2 flex gap-1">
+              {/* Change Photo button */}
+              <label className="flex-1 px-2 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center justify-center gap-1 border border-gray-200 cursor-pointer">
+                <Upload size={10} />
+                {language === 'de' ? 'Foto' : language === 'fr' ? 'Photo' : 'Photo'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
               {/* Modify Avatar button - for all users (blue style) */}
               <button
                 onClick={() => setIsModifyingAvatar(true)}
-                className="w-full px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
+                className="flex-1 px-2 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 flex items-center justify-center gap-1 border border-indigo-200"
               >
                 <Pencil size={10} />
-                {language === 'de' ? 'Aussehen anpassen' : language === 'fr' ? 'Modifier l\'apparence' : 'Modify Look'}
+                {language === 'de' ? 'Anpassen' : language === 'fr' ? 'Modifier' : 'Modify'}
               </button>
+            </div>
+            {/* Developer mode buttons - below main buttons */}
+            <div className="mt-1 space-y-1">
               {/* Regenerate button - developer mode only */}
               {(developerMode || isImpersonating) && (
                 <button
