@@ -31,7 +31,7 @@ router.get('/', authenticateToken, async (req, res) => {
       const rows = await dbQuery('SELECT data FROM story_drafts WHERE user_id = $1', [req.user.id]);
 
       if (rows.length > 0) {
-        const data = JSON.parse(rows[0].data);
+        const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
         draftData = { ...draftData, ...data };
       }
     } else {

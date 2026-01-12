@@ -111,7 +111,7 @@ router.get('/', authenticateToken, async (req, res) => {
           meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
         } else if (row.data) {
           // Fallback: parse full data (slow path for stories without metadata)
-          const story = JSON.parse(row.data);
+          const story = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
           meta = buildStoryMetadata(story);
         } else {
           return null; // Skip invalid rows
@@ -293,7 +293,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
     } else {
       // SLOW PATH: Load full data blob (for non-migrated stories)
       const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
-      const story = JSON.parse(rows[0].data);
+      const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
       // Strip out image data and characters (loaded separately) but keep metadata
       const { characters: _, ...storyWithoutCharacters } = story;
@@ -367,7 +367,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = JSON.parse(rows[0].data);
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
     // Extract only dev-relevant fields (no image data, no characters)
     const devMetadata = {
@@ -478,7 +478,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = JSON.parse(dataRows[0].data);
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
     const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
     if (!sceneImage || !sceneImage.imageData) {
       return res.status(404).json({ error: 'Image not found' });
@@ -537,7 +537,7 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = JSON.parse(dataRows[0].data);
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
     const coverData = story.coverImages?.[coverType];
     if (!coverData) {
       return res.status(404).json({ error: 'Cover not found' });
@@ -584,7 +584,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       }
 
       if (rows.length > 0) {
-        story = JSON.parse(rows[0].data);
+        story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -629,7 +629,7 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
     // SLOW PATH: Fall back to loading from data blob
     const result = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     if (result.length > 0) {
-      const story = JSON.parse(result[0].data);
+      const story = typeof result[0].data === 'string' ? JSON.parse(result[0].data) : result[0].data;
       const coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
       if (coverImage) {
         return res.json({ coverImage });
@@ -830,7 +830,7 @@ router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = JSON.parse(result.rows[0].data);
+    const storyData = typeof result.rows[0].data === 'string' ? JSON.parse(result.rows[0].data) : result.rows[0].data;
     storyData.visualBible = visualBible;
     storyData.updatedAt = new Date().toISOString();
 
@@ -894,7 +894,7 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = JSON.parse(rows[0].data);
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
     // Preserve original story text on first edit
     if (!storyData.originalStory && storyData.story) {
@@ -962,7 +962,7 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = JSON.parse(rows[0].data);
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
     // Update title
     storyData.title = title.trim();
@@ -1014,7 +1014,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = JSON.parse(result.rows[0].data);
+    const storyData = typeof result.rows[0].data === 'string' ? JSON.parse(result.rows[0].data) : result.rows[0].data;
     const sceneImages = storyData.sceneImages || [];
     const sceneIndex = sceneImages.findIndex(s => s.pageNumber === pageNum);
 

@@ -413,7 +413,7 @@ router.post('/migrate-story-images/:storyId', authenticateToken, requireAdmin, a
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = JSON.parse(storyRows.rows[0].data);
+    const story = typeof storyRows.rows[0].data === 'string' ? JSON.parse(storyRows.rows[0].data) : storyRows.rows[0].data;
     let imagesMigrated = 0;
 
     // Migrate scene images
@@ -502,7 +502,7 @@ router.post('/migrate-all-story-images', authenticateToken, requireAdmin, async 
       try {
         // Load story data
         const dataRows = await pool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
-        const story = JSON.parse(dataRows.rows[0].data);
+        const story = typeof dataRows.rows[0].data === 'string' ? JSON.parse(dataRows.rows[0].data) : dataRows.rows[0].data;
         let imagesMigrated = 0;
 
         // Migrate scene images

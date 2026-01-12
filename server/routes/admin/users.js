@@ -513,7 +513,7 @@ router.get('/:userId/stories', authenticateToken, requireAdmin, async (req, res)
         meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
       } else if (row.data) {
         // Fallback: parse full data
-        const story = JSON.parse(row.data);
+        const story = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
         const sceneCount = story.sceneImages?.length || 0;
         meta = {
           id: story.id,
@@ -581,7 +581,7 @@ router.get('/:userId/stories/:storyId', authenticateToken, requireAdmin, async (
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = JSON.parse(rows[0].data);
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     log.info(`[ADMIN] Returning story "${story.title}" for user ${targetUserId}`);
     res.json(story);
   } catch (err) {
