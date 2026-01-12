@@ -469,8 +469,16 @@ def create_face_thumbnail(image, face_box, size=200):
 
 def remove_faces_except(image, keep_face_id, all_faces):
     """
-    Blank out non-selected people (face + body) by making them white/transparent.
-    Removes the face and extends down to remove body/clothing to prevent crosstalk.
+    Remove non-selected people by blanking maximum area while preserving the kept person.
+
+    Algorithm:
+    - If unwanted face has NO X overlap with kept face (side by side):
+      → Calculate midpoint between them on X axis
+      → Remove from midpoint to edge, from TOP of unwanted face to bottom
+      → This keeps everything above the unwanted person
+    - If unwanted face HAS X overlap with kept face (stacked):
+      → If unwanted is ABOVE kept: remove from y=0 to top of kept face (full width)
+      → If unwanted is BELOW kept: remove from top of unwanted face to y=100% (full width)
 
     Args:
         image: BGRA numpy array (must have alpha channel)
@@ -487,61 +495,91 @@ def remove_faces_except(image, keep_face_id, all_faces):
 
     # Ensure image has alpha channel
     if len(result.shape) == 2 or result.shape[2] == 3:
-        # Convert BGR to BGRA
         result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)
 
-    # Get the kept face's x position to avoid blanking their body
+    # Get the kept face
     kept_face = next((f for f in all_faces if f['id'] == keep_face_id), None)
-    kept_x_center = kept_face['x'] if kept_face else 50
+    if not kept_face:
+        return image
+
+    # Calculate kept face bounding box (percentages 0-100)
+    # Add padding for body width (2x face width on each side for shoulders)
+    body_padding = 2.0
+    kept_left = kept_face['x'] - kept_face['width'] * body_padding
+    kept_right = kept_face['x'] + kept_face['width'] + kept_face['width'] * body_padding
+    kept_top = kept_face['y'] - kept_face['height'] * 0.5  # Small padding above head
+
+    print(f"   Kept face {keep_face_id}: x={kept_face['x']:.1f}%, y={kept_face['y']:.1f}%")
+    print(f"   Kept body range: x={kept_left:.1f}%-{kept_right:.1f}%")
 
     for face in all_faces:
         if face['id'] == keep_face_id:
-            continue  # Skip the selected face
+            continue
 
-        # Calculate face boundaries with padding (50% extra to cover full head)
-        face_padding = 0.5
-        face_top = int(max(0, (face['y'] / 100 - face['height'] / 100 * face_padding)) * h)
-        face_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * face_padding)) * w)
-        face_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * face_padding) * w)
+        # Calculate unwanted face bounding box with body padding
+        unwanted_left = face['x'] - face['width'] * body_padding
+        unwanted_right = face['x'] + face['width'] + face['width'] * body_padding
+        unwanted_top = face['y'] - face['height'] * 0.5
 
-        # Body extends from face down to bottom of image
-        # Width is ~3x face width to cover shoulders
-        body_width_mult = 3.0
-        body_x1 = int(max(0, (face['x'] / 100 - face['width'] / 100 * body_width_mult / 2)) * w)
-        body_x2 = int(min(1.0, (face['x'] + face['width']) / 100 + face['width'] / 100 * body_width_mult / 2) * w)
-        body_bottom = h  # Extend to bottom of image
+        print(f"   Unwanted face {face['id']}: x={face['x']:.1f}%, y={face['y']:.1f}%")
 
-        # Check if this body region would overlap with the kept face's body
-        # If the unwanted face is between kept face and edge, only blank toward the edge
-        if kept_face:
-            kept_x1 = int(max(0, (kept_x_center / 100 - kept_face['width'] / 100 * 1.5)) * w)
-            kept_x2 = int(min(1.0, (kept_x_center + kept_face['width']) / 100 + kept_face['width'] / 100 * 1.5) * w)
+        # Check if X ranges overlap
+        x_overlaps = not (unwanted_right < kept_left or unwanted_left > kept_right)
 
-            # Adjust body region to not overlap with kept person
-            if body_x2 > kept_x1 and body_x1 < kept_x2:
-                # There's overlap - adjust based on which side the unwanted face is on
-                face_center = (face_x1 + face_x2) // 2
-                kept_center = (kept_x1 + kept_x2) // 2
-                if face_center < kept_center:
-                    # Unwanted face is to the left - only blank left of kept person
-                    body_x2 = min(body_x2, kept_x1)
-                else:
-                    # Unwanted face is to the right - only blank right of kept person
-                    body_x1 = max(body_x1, kept_x2)
+        if not x_overlaps:
+            # SIDE BY SIDE: Use midpoint logic on X, but only remove from top of unwanted down
+            # This keeps maximum area (everything above the unwanted person)
+            if face['x'] < kept_face['x']:
+                # Unwanted is to the LEFT of kept
+                # Midpoint between unwanted's right edge and kept's left edge
+                midpoint = (unwanted_right + kept_left) / 2
+                # Remove from x=0 to midpoint, from top of unwanted to bottom
+                remove_x1 = 0
+                remove_x2 = int(midpoint / 100 * w)
+                remove_y1 = int(max(0, unwanted_top) / 100 * h)
+                remove_y2 = h
+                print(f"   Side-by-side LEFT: remove x=0-{midpoint:.1f}%, y={unwanted_top:.1f}%-100%")
+            else:
+                # Unwanted is to the RIGHT of kept
+                # Midpoint between kept's right edge and unwanted's left edge
+                midpoint = (kept_right + unwanted_left) / 2
+                # Remove from midpoint to x=100%, from top of unwanted to bottom
+                remove_x1 = int(midpoint / 100 * w)
+                remove_x2 = w
+                remove_y1 = int(max(0, unwanted_top) / 100 * h)
+                remove_y2 = h
+                print(f"   Side-by-side RIGHT: remove x={midpoint:.1f}%-100%, y={unwanted_top:.1f}%-100%")
 
-        # Blank out the face region (head)
-        if face_x2 > face_x1 and face_top < h:
-            face_bottom = int(min(1.0, (face['y'] + face['height']) / 100 + face['height'] / 100 * face_padding) * h)
-            result[face_top:face_bottom, face_x1:face_x2, 0:3] = 255  # BGR = white
-            result[face_top:face_bottom, face_x1:face_x2, 3] = 0      # Alpha = transparent
-            print(f"   Blanked face {face['id']} at ({face_x1},{face_top})-({face_x2},{face_bottom})")
+            # Blank out the region
+            if remove_x2 > remove_x1 and remove_y2 > remove_y1:
+                result[remove_y1:remove_y2, remove_x1:remove_x2, 0:3] = 255
+                result[remove_y1:remove_y2, remove_x1:remove_x2, 3] = 0
+                print(f"   Blanked region ({remove_x1},{remove_y1})-({remove_x2},{remove_y2})")
 
-        # Blank out the body region (below face to bottom)
-        if body_x2 > body_x1:
-            body_top = int((face['y'] + face['height']) / 100 * h)  # Start just below face
-            result[body_top:body_bottom, body_x1:body_x2, 0:3] = 255  # BGR = white
-            result[body_top:body_bottom, body_x1:body_x2, 3] = 0      # Alpha = transparent
-            print(f"   Blanked body {face['id']} at ({body_x1},{body_top})-({body_x2},{body_bottom})")
+        else:
+            # STACKED (X overlaps): Use vertical logic
+            if face['y'] < kept_face['y']:
+                # Unwanted is ABOVE kept
+                # Remove from y=0 to top of kept face (full width)
+                remove_y1 = 0
+                remove_y2 = int(kept_top / 100 * h)
+                remove_x1 = 0
+                remove_x2 = w
+                print(f"   Stacked ABOVE: remove y=0-{kept_top:.1f}% (full width)")
+            else:
+                # Unwanted is BELOW kept
+                # Remove from top of unwanted face to y=100% (full width)
+                remove_y1 = int(unwanted_top / 100 * h)
+                remove_y2 = h
+                remove_x1 = 0
+                remove_x2 = w
+                print(f"   Stacked BELOW: remove y={unwanted_top:.1f}%-100% (full width)")
+
+            # Blank out the region
+            if remove_x2 > remove_x1 and remove_y2 > remove_y1:
+                result[remove_y1:remove_y2, remove_x1:remove_x2, 0:3] = 255
+                result[remove_y1:remove_y2, remove_x1:remove_x2, 3] = 0
+                print(f"   Blanked region ({remove_x1},{remove_y1})-({remove_x2},{remove_y2})")
 
     return result
 
