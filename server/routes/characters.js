@@ -41,39 +41,26 @@ router.get('/', authenticateToken, async (req, res) => {
           rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
         }
       } else {
-        // Normal mode: strip heavy avatar data in PostgreSQL (not Node.js)
-        // This avoids loading 30MB+ blob into memory just to strip it
+        // Normal mode: use simpler query that strips avatars efficiently
         const lightQuery = `
-          SELECT jsonb_build_object(
-            'characters', COALESCE((
-              SELECT jsonb_agg(
-                (SELECT jsonb_object_agg(key, value) FROM jsonb_each(c) WHERE key != 'avatars')
-                ||
-                CASE WHEN c->'avatars' IS NOT NULL THEN
-                  jsonb_build_object('avatars', jsonb_build_object(
-                    'status', c->'avatars'->'status',
-                    'stale', c->'avatars'->'stale',
-                    'generatedAt', c->'avatars'->'generatedAt',
-                    'faceThumbnails', c->'avatars'->'faceThumbnails',
-                    'clothing', c->'avatars'->'clothing',
-                    'hasFullAvatars', (
-                      c->'avatars'->'standard' IS NOT NULL OR
-                      c->'avatars'->'winter' IS NOT NULL OR
-                      c->'avatars'->'summer' IS NOT NULL
-                    )
-                  ))
-                ELSE '{}'::jsonb
-                END
-              )
-              FROM jsonb_array_elements(data->'characters') c
-            ), '[]'::jsonb),
-            'relationships', COALESCE(data->'relationships', '{}'::jsonb),
-            'relationshipTexts', COALESCE(data->'relationshipTexts', '{}'::jsonb),
-            'customRelationships', COALESCE(data->'customRelationships', '[]'::jsonb),
-            'customStrengths', COALESCE(data->'customStrengths', '[]'::jsonb),
-            'customWeaknesses', COALESCE(data->'customWeaknesses', '[]'::jsonb),
-            'customFears', COALESCE(data->'customFears', '[]'::jsonb)
-          ) as data
+          SELECT
+            data - 'characters' || jsonb_build_object(
+              'characters', COALESCE((
+                SELECT jsonb_agg(
+                  c - 'avatars' || CASE WHEN c ? 'avatars' THEN
+                    jsonb_build_object('avatars', jsonb_build_object(
+                      'status', c->'avatars'->'status',
+                      'stale', c->'avatars'->'stale',
+                      'generatedAt', c->'avatars'->'generatedAt',
+                      'faceThumbnails', c->'avatars'->'faceThumbnails',
+                      'clothing', c->'avatars'->'clothing',
+                      'hasFullAvatars', c->'avatars'->'standard' IS NOT NULL
+                    ))
+                  ELSE '{}'::jsonb END
+                )
+                FROM jsonb_array_elements(data->'characters') c
+              ), '[]'::jsonb)
+            ) as data
           FROM characters
           WHERE id = $1
         `;
@@ -81,8 +68,10 @@ router.get('/', authenticateToken, async (req, res) => {
 
         // Fallback for legacy data
         if (rows.length === 0) {
-          const fallbackQuery = lightQuery.replace('WHERE id = $1', 'WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1');
-          rows = await dbQuery(fallbackQuery, [req.user.id]);
+          rows = await dbQuery(
+            lightQuery.replace('WHERE id = $1', 'WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1'),
+            [req.user.id]
+          );
         }
       }
 
@@ -101,7 +90,8 @@ router.get('/', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    await logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length });
+    // Fire and forget - don't block response for logging
+    logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length }).catch(() => {});
     res.json(characterData);
   } catch (err) {
     console.error('Error fetching characters:', err);
