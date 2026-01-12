@@ -34,46 +34,39 @@ router.get('/', authenticateToken, async (req, res) => {
     if (isDatabaseMode()) {
       const characterId = `characters_${req.user.id}`;
       let rows;
-
-      // Always fetch full data - JS stripping is faster than complex JSONB queries
-      // PostgreSQL must read entire JSONB doc anyway, complex operations just add overhead
       const queryStart = Date.now();
-      rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
-      if (rows.length === 0) {
-        rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
+
+      if (includeAllAvatars) {
+        // Admin mode: return full data
+        rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
+        }
+      } else {
+        // Normal mode: use metadata column (pre-stripped, ~100KB vs 14MB)
+        rows = await dbQuery('SELECT metadata FROM characters WHERE id = $1', [characterId]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT metadata FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
+        }
+        // Rename metadata to data for consistent handling below
+        if (rows.length > 0 && rows[0].metadata) {
+          rows[0].data = rows[0].metadata;
+        } else if (rows.length > 0 && !rows[0].metadata) {
+          // Fallback: metadata column not populated yet, use full data with JS stripping
+          console.log('[Characters] GET - metadata column empty, falling back to full data');
+          rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+        }
       }
       const queryTime = Date.now() - queryStart;
+      console.log(`[Characters] GET - Query took ${queryTime}ms for user_id: ${req.user.id}, mode: ${includeAllAvatars ? 'full' : 'metadata'}`);
 
-      console.log(`[Characters] GET - Query took ${queryTime}ms for user_id: ${req.user.id}`);
-
-      if (rows.length > 0) {
+      if (rows.length > 0 && rows[0].data) {
         const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
         if (Array.isArray(data)) {
           characterData.characters = data;
         } else {
           characterData = { ...characterData, ...data };
         }
-
-        // Strip heavy fields in JS (faster than complex JSONB queries)
-        if (!includeAllAvatars && characterData.characters) {
-          const stripStart = Date.now();
-          characterData.characters = characterData.characters.map(char => {
-            // Strip heavy base64 fields
-            const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
-
-            // Keep only avatar metadata, not full images
-            if (lightChar.avatars) {
-              const { winter, standard, summer, formal, styledAvatars, costumed, ...avatarMeta } = lightChar.avatars;
-              lightChar.avatars = {
-                ...avatarMeta,
-                hasFullAvatars: !!(winter || standard || summer || formal)
-              };
-            }
-            return lightChar;
-          });
-          console.log(`[Characters] GET - JS stripping took ${Date.now() - stripStart}ms`);
-        }
-
         console.log(`[Characters] GET - Characters count: ${characterData.characters.length}, total time: ${Date.now() - startTime}ms`);
       }
     } else {
@@ -441,20 +434,48 @@ router.post('/', authenticateToken, async (req, res) => {
         customFears: customFears || []
       };
 
+      // Generate lightweight metadata for fast list queries
+      const lightCharacters = mergedCharacters.map(char => {
+        // Strip heavy base64 fields
+        const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+        // Keep only avatar metadata, not full images
+        if (lightChar.avatars) {
+          const { winter, standard, summer, formal, styledAvatars, costumed, ...avatarMeta } = lightChar.avatars;
+          lightChar.avatars = {
+            ...avatarMeta,
+            hasFullAvatars: !!(winter || standard || summer || formal)
+          };
+        }
+        return lightChar;
+      });
+
+      const metadataObj = {
+        characters: lightCharacters,
+        relationships: relationships || {},
+        relationshipTexts: relationshipTexts || {},
+        customRelationships: customRelationships || [],
+        customStrengths: customStrengths || [],
+        customWeaknesses: customWeaknesses || [],
+        customFears: customFears || []
+      };
+
       const jsonData = JSON.stringify(characterData);
+      const metadataJson = JSON.stringify(metadataObj);
       const jsonSizeMB = (jsonData.length / 1024 / 1024).toFixed(2);
-      console.log(`[Characters] POST - JSON data size: ${jsonSizeMB} MB`);
+      const metaSizeKB = (metadataJson.length / 1024).toFixed(0);
+      console.log(`[Characters] POST - Full data: ${jsonSizeMB} MB, Metadata: ${metaSizeKB} KB`);
 
       const upsertQuery = `
-        INSERT INTO characters (id, user_id, data, created_at)
-        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+        INSERT INTO characters (id, user_id, data, metadata, created_at)
+        VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
         ON CONFLICT (id) DO UPDATE SET
           data = EXCLUDED.data,
+          metadata = EXCLUDED.metadata,
           created_at = CURRENT_TIMESTAMP
       `;
 
       try {
-        await dbQuery(upsertQuery, [characterId, req.user.id, jsonData]);
+        await dbQuery(upsertQuery, [characterId, req.user.id, jsonData, metadataJson]);
         console.log(`[Characters] POST - Database upsert successful`);
       } catch (dbErr) {
         console.error(`[Characters] POST - Database upsert FAILED:`, dbErr.message);
