@@ -12,10 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 # Install all dependencies
 npm install && cd client && npm install && cd ..
+pip install -r requirements.txt   # Python dependencies for photo processing
 
-# Development (two terminals)
-npm run dev                    # Backend on :3000
-cd client && npm run dev       # Frontend on :5173
+# Development (THREE terminals for full local setup)
+npm run dev            # Terminal 1: Backend on :3000
+npm run dev:client     # Terminal 2: Frontend on :5173
+npm run dev:python     # Terminal 3: Python photo analyzer on :5000
 
 # Build frontend for production
 cd client && npm run build     # Outputs to /dist
@@ -26,6 +28,41 @@ git push origin master && railway redeploy --yes
 # View Railway logs
 railway logs
 ```
+
+### Python Photo Analyzer Service
+
+The `photo_analyzer.py` Flask service handles:
+- Face detection (MediaPipe/MTCNN)
+- Background removal (rembg/U2-Net)
+
+**Must be running on port 5000 for photo upload to work locally.**
+
+## Testing Commands
+
+```bash
+# Run E2E tests against localhost (start dev servers first!)
+npm run test:local
+
+# Run E2E tests against production
+npm run test:prod
+
+# Run tests with visible browser (for debugging)
+npm run test:headed
+
+# Run all test files
+npm run test:all
+```
+
+### Pre-deployment Testing Workflow
+
+When user says **"run tests"** or **"test before deploy"**:
+
+1. Start local servers in background
+2. Run `npm run test:local`
+3. Report results (10 tests should pass)
+4. If all pass, ask if user wants to deploy
+
+Tests check: homepage images, character photos, API health, auth, no JS errors, no 404s, wizard navigation.
 
 ## Architecture Overview
 
