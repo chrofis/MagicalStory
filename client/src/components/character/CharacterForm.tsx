@@ -1017,39 +1017,17 @@ export function CharacterForm({
 
     return (
       <div className="space-y-6">
-        {/* Info banner explaining what's happening */}
-        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-center">
-          <p className="text-indigo-800 font-medium">
-            {language === 'de'
-              ? `🎨 So wird ${character.name} in deiner Geschichte aussehen.`
-              : language === 'fr'
-              ? `🎨 Voici à quoi ressemblera ${character.name} dans ton histoire.`
-              : `🎨 This is how ${character.name} will look in your story.`
-            }
-          </p>
-          {isStillGenerating && (
-            <p className="text-indigo-600 text-sm mt-2">
-              {language === 'de'
-                ? 'Du kannst warten oder direkt weiterfahren – das Bild wird im Hintergrund fertig und du kannst es jederzeit bei den Charakteren anpassen.'
-                : language === 'fr'
-                ? 'Tu peux attendre ou continuer – l\'image sera terminée en arrière-plan et tu pourras la modifier à tout moment.'
-                : 'You can wait or continue – the image will finish in the background and you can adjust it anytime in your characters.'
+        {/* Header - only show when not generating */}
+        {!isStillGenerating && (
+          <div className="text-center">
+            <h3 className="text-2xl font-bold text-gray-800">
+              {hasFailed
+                ? (language === 'de' ? 'Erstellung fehlgeschlagen' : language === 'fr' ? 'Échec de la création' : 'Creation failed')
+                : (language === 'de' ? `${character.name}` : language === 'fr' ? `${character.name}` : `${character.name}`)
               }
-            </p>
-          )}
-        </div>
-
-        {/* Header */}
-        <div className="text-center">
-          <h3 className="text-2xl font-bold text-gray-800">
-            {isStillGenerating
-              ? (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating...')
-              : hasFailed
-              ? (language === 'de' ? 'Erstellung fehlgeschlagen' : language === 'fr' ? 'Échec de la création' : 'Creation failed')
-              : (language === 'de' ? `${character.name} ist fertig!` : language === 'fr' ? `${character.name} est prêt!` : `${character.name} is ready!`)
-            }
-          </h3>
-        </div>
+            </h3>
+          </div>
+        )}
 
         {/* Avatar Display - centered, prominent, clickable for lightbox */}
         <div className="flex justify-center">
@@ -1069,13 +1047,23 @@ export function CharacterForm({
               )}
             </div>
           ) : isStillGenerating ? (
-            <div className="w-64 h-80 rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center">
+            <div className="w-64 h-80 rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center p-4 text-center">
               <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <span className="text-indigo-600 font-medium">
-                {language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Creating...'}
+              <span className="text-indigo-700 font-medium">
+                {language === 'de'
+                  ? `So wird ${character.name} in deiner Geschichte aussehen`
+                  : language === 'fr'
+                  ? `Voici comment ${character.name} apparaîtra dans ton histoire`
+                  : `This is how ${character.name} will look in your story`
+                }
               </span>
-              <span className="text-indigo-400 text-sm mt-1">
-                {language === 'de' ? 'Dies kann einen Moment dauern' : language === 'fr' ? 'Cela peut prendre un moment' : 'This may take a moment'}
+              <span className="text-indigo-500 text-sm mt-2">
+                {language === 'de'
+                  ? 'Du kannst warten oder direkt weiterfahren'
+                  : language === 'fr'
+                  ? 'Tu peux attendre ou continuer'
+                  : 'You can wait or continue'
+                }
               </span>
             </div>
           ) : (
@@ -1106,7 +1094,7 @@ export function CharacterForm({
                 ) : (
                   <Check size={24} />
                 )}
-                {language === 'de' ? 'Perfekt – weiter' : language === 'fr' ? 'Parfait – continuer' : 'Perfect – continue'}
+                {language === 'de' ? 'Weiter' : language === 'fr' ? 'Continuer' : 'Continue'}
               </button>
 
               {/* Hint about modifying later */}
