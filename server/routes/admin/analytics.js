@@ -568,7 +568,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
     // Source: https://ai.google.dev/gemini-api/docs/pricing
     // Claude: $3 input / $15 output per 1M tokens
     // Gemini 2.5 Flash (text): $0.30 input / $2.50 output per 1M tokens
-    // Gemini 2.5 Flash (image gen): ~$0.035 per image (not token-based)
+    // Gemini image gen: ~$0.065 per image weighted avg (not token-based)
     // Gemini 2.0 Flash (quality): $0.10 input / $0.40 output per 1M tokens
     const costs = {
       anthropic: {
@@ -585,13 +585,13 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
         total: 0
       },
       gemini_image: {
-        // Image generation - cost is per-image (~$0.035), not per token
-        // Tokens tracked here are just prompt tokens, real cost is images * $0.035
+        // Image generation - cost is per-image (~$0.04-$0.15), not per token
+        // Page images @ $0.04 (gemini-2.5-flash), covers @ $0.15 (gemini-3-pro)
         input: (totals.gemini_image.input_tokens / 1000000) * 0.30,
         output: (totals.gemini_image.output_tokens / 1000000) * 2.50,
         thinking: (totals.gemini_image.thinking_tokens / 1000000) * 2.50,
-        // Estimate: each call generates 1 image at ~$0.035
-        imageEstimate: totals.gemini_image.calls * 0.035,
+        // Weighted avg ~$0.065 per image (3 covers + 10 pages per story)
+        imageEstimate: totals.gemini_image.calls * 0.065,
         total: 0
       },
       gemini_quality: {
@@ -629,7 +629,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
 
         // If very low, use per-image estimate
         if (modelCost < 0.001 && usage.calls > 0) {
-          modelCost = usage.calls * 0.035;  // Fallback per-image cost
+          modelCost = usage.calls * (MODEL_PRICING['gemini-2.5-flash-image']?.perImage || 0.04);  // Fallback per-image cost
         }
       }
 
@@ -662,8 +662,8 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       const geminiTextCost = ((entry.gemini_text?.input_tokens || 0) / 1000000) * 0.30 +
                             ((entry.gemini_text?.output_tokens || 0) / 1000000) * 2.50 +
                             ((entry.gemini_text?.thinking_tokens || 0) / 1000000) * 2.50;
-      // Gemini image gen: ~$0.035 per image (estimate based on call count)
-      const geminiImageCost = (entry.gemini_image?.calls || 0) * 0.035;
+      // Gemini image gen: ~$0.065 per image weighted avg (estimate based on call count)
+      const geminiImageCost = (entry.gemini_image?.calls || 0) * 0.065;
       // Gemini 2.0 Flash (quality): $0.10 input / $0.40 output per 1M tokens
       const geminiQualityCost = ((entry.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
                                ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +

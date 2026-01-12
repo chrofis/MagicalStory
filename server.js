@@ -6863,7 +6863,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       coverImages: coverImages,
       pageClothing: pageClothing, // Clothing per page
       clothingRequirements: streamingClothingRequirements, // Per-character clothing requirements
-      tokenUsage: tokenUsage, // Token usage statistics for cost tracking
+      tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: [], // Will be populated after apiUsage logging
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -8198,7 +8198,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       coverImages: coverImages,
       pageClothing: pageClothingData, // Clothing per page
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
-      tokenUsage: tokenUsage, // Token usage statistics for cost tracking
+      tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: genLog.getEntries(), // Generation log for dev mode
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -10031,7 +10031,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       visualBible: visualBible, // Visual Bible for recurring element consistency (dev mode)
       pageClothing: pageClothingData, // Clothing per page extracted from outline
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
-      tokenUsage: tokenUsage, // Token usage statistics for cost tracking
+      tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

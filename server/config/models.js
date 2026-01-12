@@ -168,8 +168,8 @@ const MODEL_PRICING = {
   'gemini-pro-latest': { input: 1.25, output: 10.00, thinking: 10.00 },
 
   // Image generation models (fixed cost per image, not per token)
-  'gemini-2.5-flash-image': { perImage: 0.035 },
-  'gemini-3-pro-image-preview': { perImage: 0.04 },
+  'gemini-2.5-flash-image': { perImage: 0.04 },
+  'gemini-3-pro-image-preview': { perImage: 0.15 },
   'runware:5@1': { perImage: 0.0006 },  // FLUX Schnell
   'runware:6@1': { perImage: 0.004 },   // FLUX Dev
   'ace-plus-plus': { perImage: 0.005 }
