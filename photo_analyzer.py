@@ -471,12 +471,11 @@ def remove_faces_except(image, keep_face_id, all_faces):
     """
     Remove non-selected people by blanking maximum area while preserving the kept person.
 
-    Algorithm:
-    - If unwanted face has NO X overlap with kept face (side by side):
-      → Calculate midpoint between them on X axis
+    Algorithm (uses face centers, not padded body ranges):
+    - If face centers are horizontally separated (X distance > avg face width) → side-by-side
+      → Calculate midpoint between face centers on X axis
       → Remove from midpoint to edge, from TOP of unwanted face to bottom
-      → This keeps everything above the unwanted person
-    - If unwanted face HAS X overlap with kept face (stacked):
+    - If face centers are close in X (stacked/overlapping) → stacked
       → If unwanted is ABOVE kept: remove from y=0 to top of kept face (full width)
       → If unwanted is BELOW kept: remove from top of unwanted face to y=100% (full width)
 
@@ -502,38 +501,36 @@ def remove_faces_except(image, keep_face_id, all_faces):
     if not kept_face:
         return image
 
-    # Calculate kept face bounding box (percentages 0-100)
-    # Add padding for body width (2x face width on each side for shoulders)
-    body_padding = 2.0
-    kept_left = kept_face['x'] - kept_face['width'] * body_padding
-    kept_right = kept_face['x'] + kept_face['width'] + kept_face['width'] * body_padding
-    kept_top = kept_face['y'] - kept_face['height'] * 0.5  # Small padding above head
+    kept_x = kept_face['x']
+    kept_y = kept_face['y']
+    kept_top = kept_y - kept_face['height'] * 0.5  # Small padding above head
 
-    print(f"   Kept face {keep_face_id}: x={kept_face['x']:.1f}%, y={kept_face['y']:.1f}%")
-    print(f"   Kept body range: x={kept_left:.1f}%-{kept_right:.1f}%")
+    print(f"   Kept face {keep_face_id}: x={kept_x:.1f}%, y={kept_y:.1f}%")
 
     for face in all_faces:
         if face['id'] == keep_face_id:
             continue
 
-        # Calculate unwanted face bounding box with body padding
-        unwanted_left = face['x'] - face['width'] * body_padding
-        unwanted_right = face['x'] + face['width'] + face['width'] * body_padding
-        unwanted_top = face['y'] - face['height'] * 0.5
+        face_x = face['x']
+        face_y = face['y']
+        unwanted_top = face_y - face['height'] * 0.5
 
-        print(f"   Unwanted face {face['id']}: x={face['x']:.1f}%, y={face['y']:.1f}%")
+        print(f"   Unwanted face {face['id']}: x={face_x:.1f}%, y={face_y:.1f}%")
 
-        # Check if X ranges overlap
-        x_overlaps = not (unwanted_right < kept_left or unwanted_left > kept_right)
+        # Use face center distance to determine side-by-side vs stacked
+        # Threshold: if X distance > average face width, treat as side-by-side
+        avg_face_width = (kept_face['width'] + face['width']) / 2
+        x_distance = abs(face_x - kept_x)
 
-        if not x_overlaps:
-            # SIDE BY SIDE: Use midpoint logic on X, but only remove from top of unwanted down
-            # This keeps maximum area (everything above the unwanted person)
-            if face['x'] < kept_face['x']:
+        is_side_by_side = x_distance > avg_face_width
+        print(f"   X distance: {x_distance:.1f}%, avg face width: {avg_face_width:.1f}% → {'side-by-side' if is_side_by_side else 'stacked'}")
+
+        if is_side_by_side:
+            # SIDE BY SIDE: Use midpoint between face centers
+            midpoint = (kept_x + face_x) / 2
+
+            if face_x < kept_x:
                 # Unwanted is to the LEFT of kept
-                # Midpoint between unwanted's right edge and kept's left edge
-                midpoint = (unwanted_right + kept_left) / 2
-                # Remove from x=0 to midpoint, from top of unwanted to bottom
                 remove_x1 = 0
                 remove_x2 = int(midpoint / 100 * w)
                 remove_y1 = int(max(0, unwanted_top) / 100 * h)
@@ -541,9 +538,6 @@ def remove_faces_except(image, keep_face_id, all_faces):
                 print(f"   Side-by-side LEFT: remove x=0-{midpoint:.1f}%, y={unwanted_top:.1f}%-100%")
             else:
                 # Unwanted is to the RIGHT of kept
-                # Midpoint between kept's right edge and unwanted's left edge
-                midpoint = (kept_right + unwanted_left) / 2
-                # Remove from midpoint to x=100%, from top of unwanted to bottom
                 remove_x1 = int(midpoint / 100 * w)
                 remove_x2 = w
                 remove_y1 = int(max(0, unwanted_top) / 100 * h)
@@ -557,10 +551,9 @@ def remove_faces_except(image, keep_face_id, all_faces):
                 print(f"   Blanked region ({remove_x1},{remove_y1})-({remove_x2},{remove_y2})")
 
         else:
-            # STACKED (X overlaps): Use vertical logic
-            if face['y'] < kept_face['y']:
+            # STACKED (faces close in X): Use vertical logic
+            if face_y < kept_y:
                 # Unwanted is ABOVE kept
-                # Remove from y=0 to top of kept face (full width)
                 remove_y1 = 0
                 remove_y2 = int(kept_top / 100 * h)
                 remove_x1 = 0
@@ -568,7 +561,6 @@ def remove_faces_except(image, keep_face_id, all_faces):
                 print(f"   Stacked ABOVE: remove y=0-{kept_top:.1f}% (full width)")
             else:
                 # Unwanted is BELOW kept
-                # Remove from top of unwanted face to y=100% (full width)
                 remove_y1 = int(unwanted_top / 100 * h)
                 remove_y2 = h
                 remove_x1 = 0
@@ -582,6 +574,7 @@ def remove_faces_except(image, keep_face_id, all_faces):
                 print(f"   Blanked region ({remove_x1},{remove_y1})-({remove_x2},{remove_y2})")
 
     return result
+
 
 
 def remove_background(image):
