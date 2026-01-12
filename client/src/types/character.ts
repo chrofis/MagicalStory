@@ -65,6 +65,7 @@ export interface PhysicalTraitsSource {
   facialHair?: TraitSource;
   other?: TraitSource;
   skinTone?: TraitSource;
+  apparentAge?: TraitSource; // How old they look (from avatar evaluation or user override)
 }
 
 // Tracks where each clothing value came from
