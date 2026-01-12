@@ -1048,8 +1048,7 @@ export function CharacterForm({
             </div>
           ) : isStillGenerating ? (
             <div className="w-64 h-80 rounded-lg border-2 border-dashed border-indigo-300 bg-indigo-50 flex flex-col items-center justify-center p-4 text-center">
-              <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <span className="text-indigo-700 font-medium">
+              <span className="text-indigo-700 font-medium mb-2">
                 {language === 'de'
                   ? `So wird ${character.name} in deiner Geschichte aussehen`
                   : language === 'fr'
@@ -1057,7 +1056,8 @@ export function CharacterForm({
                   : `This is how ${character.name} will look in your story`
                 }
               </span>
-              <span className="text-indigo-500 text-sm mt-2">
+              <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin my-4" />
+              <span className="text-indigo-500 text-sm">
                 {language === 'de'
                   ? 'Du kannst warten oder direkt weiterfahren'
                   : language === 'fr'
@@ -1285,7 +1285,7 @@ export function CharacterForm({
                     <img
                       src={avatarToShow}
                       alt={`${character.name} avatar`}
-                      className={`w-full object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
+                      className={`w-full max-w-[180px] lg:max-w-full aspect-[3/4] object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
                       onClick={() => setEnlargedAvatar(true)}
                       title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                     />
@@ -1589,7 +1589,7 @@ export function CharacterForm({
               </span>
             )}
           </h4>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {/* Show winter, standard, summer avatars (formal is not generated) */}
             {(['winter', 'standard', 'summer'] as const).map((category) => (
               <div key={category} className="text-center">
