@@ -131,12 +131,20 @@ export interface ProviderCost {
   total: number;
 }
 
+export interface ModelUsage {
+  input_tokens: number;
+  output_tokens: number;
+  calls: number;
+  cost?: number;
+}
+
 export interface TokenUsageTotals {
   anthropic: ProviderTokens;
   gemini_text: ProviderTokens;
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
   runware: RunwareUsage;
+  avatarByModel: Record<string, ModelUsage>;
 }
 
 export interface TokenUsageCosts {
@@ -145,6 +153,8 @@ export interface TokenUsageCosts {
   gemini_image: ProviderCost;
   gemini_quality: ProviderCost;
   runware: { total: number };
+  avatarByModel: Record<string, ModelUsage>;
+  totalAvatarCost: number;
   grandTotal: number;
 }
 
@@ -158,6 +168,7 @@ export interface TokenUsageByUser {
   gemini_text: ProviderTokens;
   gemini_image: ProviderTokens;
   gemini_quality: ProviderTokens;
+  avatarByModel: Record<string, ModelUsage>;
   runware: RunwareUsage;
 }
 

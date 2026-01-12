@@ -9,7 +9,7 @@ const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
-const { logActivity } = require('../services/database');
+const { logActivity, dbQuery } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
@@ -1616,7 +1616,10 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       structuredClothing: {}, // New: structured clothing from evaluation
       extractedTraits: null,  // Physical traits extracted from generated avatar
       rawEvaluation: null,    // Full unfiltered API response (for dev mode)
-      prompts: {}
+      prompts: {},
+      tokenUsage: {           // Track Gemini token usage for cost tracking (per model)
+        byModel: {}           // { 'gemini-2.5-flash-image': { input_tokens, output_tokens, calls }, ... }
+      }
     };
 
     // Prepare base64 data once for all requests
@@ -1846,12 +1849,19 @@ These corrections OVERRIDE what is visible in the reference photo.
 
         let data = await response.json();
 
-        // Log token usage
+        // Track token usage for cost tracking (per model)
         const avatarModelId = selectedModel;
         const avatarInputTokens = data.usageMetadata?.promptTokenCount || 0;
         const avatarOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
         if (avatarInputTokens > 0 || avatarOutputTokens > 0) {
           console.log(`📊 [AVATAR GENERATION] ${category} - model: ${avatarModelId}, input: ${avatarInputTokens.toLocaleString()}, output: ${avatarOutputTokens.toLocaleString()}`);
+          // Accumulate tokens per model for accurate cost tracking
+          if (!results.tokenUsage.byModel[avatarModelId]) {
+            results.tokenUsage.byModel[avatarModelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+          }
+          results.tokenUsage.byModel[avatarModelId].input_tokens += avatarInputTokens;
+          results.tokenUsage.byModel[avatarModelId].output_tokens += avatarOutputTokens;
+          results.tokenUsage.byModel[avatarModelId].calls += 1;
         }
 
         // Check if blocked by safety filters - retry with simplified prompt
@@ -1889,6 +1899,13 @@ These corrections OVERRIDE what is visible in the reference photo.
             const retryOutputTokens = data.usageMetadata?.candidatesTokenCount || 0;
             if (retryInputTokens > 0 || retryOutputTokens > 0) {
               console.log(`📊 [AVATAR GENERATION] ${category} retry - model: ${avatarModelId}, input: ${retryInputTokens.toLocaleString()}, output: ${retryOutputTokens.toLocaleString()}`);
+              // Accumulate retry tokens per model
+              if (!results.tokenUsage.byModel[avatarModelId]) {
+                results.tokenUsage.byModel[avatarModelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+              }
+              results.tokenUsage.byModel[avatarModelId].input_tokens += retryInputTokens;
+              results.tokenUsage.byModel[avatarModelId].output_tokens += retryOutputTokens;
+              results.tokenUsage.byModel[avatarModelId].calls += 1;
             }
             if (data.promptFeedback?.blockReason) {
               log.warn(`[CLOTHING AVATARS] ${category} retry also blocked:`, data.promptFeedback.blockReason);
@@ -2135,11 +2152,63 @@ These corrections OVERRIDE what is visible in the reference photo.
         backend: useRunware ? 'runware' : 'gemini',
         avatarsGenerated,
         evaluationsRun,
+        tokenUsage: results.tokenUsage,
         // Runware cost: $0.0006 per image
         estimatedCost: useRunware ? avatarsGenerated * 0.0006 : null
       });
     } catch (activityErr) {
       log.warn('Failed to log avatar generation activity:', activityErr.message);
+    }
+
+    // Store token usage in character data for admin analytics (per model)
+    const hasTokenUsage = Object.keys(results.tokenUsage.byModel).length > 0;
+    if (characterId && hasTokenUsage) {
+      try {
+        // Get current character data and accumulate token usage
+        const charResult = await dbQuery(
+          `SELECT id, data FROM characters WHERE user_id = $1`,
+          [req.user.id]
+        );
+
+        if (charResult?.rows?.[0]) {
+          const rowId = charResult.rows[0].id;
+          const data = typeof charResult.rows[0].data === 'string'
+            ? JSON.parse(charResult.rows[0].data)
+            : charResult.rows[0].data;
+
+          // Find the character and update its token usage
+          const characters = data.characters || [];
+          const charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+          if (charIndex >= 0) {
+            // Initialize or accumulate token usage per model
+            const existingUsage = characters[charIndex].avatarTokenUsage || { byModel: {} };
+            if (!existingUsage.byModel) existingUsage.byModel = {};
+
+            // Accumulate usage for each model
+            for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
+              if (!existingUsage.byModel[modelId]) {
+                existingUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+              }
+              existingUsage.byModel[modelId].input_tokens += usage.input_tokens;
+              existingUsage.byModel[modelId].output_tokens += usage.output_tokens;
+              existingUsage.byModel[modelId].calls += usage.calls;
+            }
+            existingUsage.lastUpdated = new Date().toISOString();
+            characters[charIndex].avatarTokenUsage = existingUsage;
+
+            // Save back to database
+            data.characters = characters;
+            await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
+
+            // Log summary
+            const totalCalls = Object.values(results.tokenUsage.byModel).reduce((sum, u) => sum + u.calls, 0);
+            const models = Object.keys(results.tokenUsage.byModel).join(', ');
+            log.debug(`📊 [AVATAR TOKENS] Stored usage for character ${characterId}: ${totalCalls} calls using ${models}`);
+          }
+        }
+      } catch (tokenErr) {
+        log.warn('Failed to store avatar token usage:', tokenErr.message);
+      }
     }
 
     log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name || 'unnamed'}`);

@@ -11,6 +11,7 @@ const router = express.Router();
 const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
+const { MODEL_PRICING } = require('../../config/models');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -275,13 +276,90 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       LIMIT $1
     `, [limit, days]);
 
+    // Query avatar token usage from characters (stored per-character when avatars are generated)
+    const avatarUsageResult = await pool.query(`
+      SELECT
+        c.user_id,
+        u.email as user_email,
+        u.username as user_name,
+        jsonb_array_elements(c.data->'characters') as char_data
+      FROM characters c
+      LEFT JOIN users u ON c.user_id = u.id
+    `);
+
+    // Extract avatar token usage from all characters (per model)
+    const avatarByModel = {};  // { 'gemini-2.5-flash-image': { input_tokens, output_tokens, calls }, ... }
+    const avatarUsageByUser = {};  // { email: { byModel: {...} } }
+
+    for (const row of avatarUsageResult.rows) {
+      const charData = row.char_data;
+      const userKey = row.user_email || row.user_id || 'unknown';
+
+      // Handle new byModel structure
+      if (charData?.avatarTokenUsage?.byModel) {
+        for (const [modelId, usage] of Object.entries(charData.avatarTokenUsage.byModel)) {
+          // Aggregate by model (global)
+          if (!avatarByModel[modelId]) {
+            avatarByModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+          }
+          avatarByModel[modelId].input_tokens += usage.input_tokens || 0;
+          avatarByModel[modelId].output_tokens += usage.output_tokens || 0;
+          avatarByModel[modelId].calls += usage.calls || 0;
+
+          // Aggregate by user and model
+          if (!avatarUsageByUser[userKey]) {
+            avatarUsageByUser[userKey] = { byModel: {} };
+          }
+          if (!avatarUsageByUser[userKey].byModel[modelId]) {
+            avatarUsageByUser[userKey].byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+          }
+          avatarUsageByUser[userKey].byModel[modelId].input_tokens += usage.input_tokens || 0;
+          avatarUsageByUser[userKey].byModel[modelId].output_tokens += usage.output_tokens || 0;
+          avatarUsageByUser[userKey].byModel[modelId].calls += usage.calls || 0;
+        }
+      }
+      // Handle legacy gemini_image structure (for backwards compatibility)
+      else if (charData?.avatarTokenUsage?.gemini_image) {
+        const usage = charData.avatarTokenUsage.gemini_image;
+        const modelId = 'gemini-2.5-flash-image';  // Default legacy model
+
+        if (!avatarByModel[modelId]) {
+          avatarByModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+        }
+        avatarByModel[modelId].input_tokens += usage.input_tokens || 0;
+        avatarByModel[modelId].output_tokens += usage.output_tokens || 0;
+        avatarByModel[modelId].calls += usage.calls || 0;
+
+        if (!avatarUsageByUser[userKey]) {
+          avatarUsageByUser[userKey] = { byModel: {} };
+        }
+        if (!avatarUsageByUser[userKey].byModel[modelId]) {
+          avatarUsageByUser[userKey].byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+        }
+        avatarUsageByUser[userKey].byModel[modelId].input_tokens += usage.input_tokens || 0;
+        avatarUsageByUser[userKey].byModel[modelId].output_tokens += usage.output_tokens || 0;
+        avatarUsageByUser[userKey].byModel[modelId].calls += usage.calls || 0;
+      }
+    }
+
+    // Log avatar usage summary
+    const avatarModels = Object.keys(avatarByModel);
+    if (avatarModels.length > 0) {
+      console.log(`📊 [ADMIN] Avatar generation by model:`);
+      for (const [modelId, usage] of Object.entries(avatarByModel)) {
+        console.log(`   ${modelId}: ${usage.input_tokens} in / ${usage.output_tokens} out (${usage.calls} calls)`);
+      }
+    }
+
     // Aggregate token usage (including thinking tokens for Gemini 2.5)
     const totals = {
       anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-      runware: { direct_cost: 0, calls: 0 }
+      runware: { direct_cost: 0, calls: 0 },
+      // Per-model tracking for avatars
+      avatarByModel: avatarByModel
     };
 
     const byUser = {};
@@ -331,6 +409,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+              avatarByModel: {},  // Per-model avatar usage
               runware: { direct_cost: 0, calls: 0 }
             };
           }
@@ -456,6 +535,35 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       }
     }
 
+    // Merge avatar usage into byUser (per model)
+    for (const [userKey, avatarUsage] of Object.entries(avatarUsageByUser)) {
+      if (!byUser[userKey]) {
+        // User has avatar usage but no stories - create entry
+        byUser[userKey] = {
+          userId: null,
+          email: userKey,
+          name: null,
+          storyCount: 0,
+          totalBookPages: 0,
+          anthropic: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+          gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+          gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+          gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
+          avatarByModel: {},
+          runware: { direct_cost: 0, calls: 0 }
+        };
+      }
+      // Merge per-model avatar usage
+      for (const [modelId, usage] of Object.entries(avatarUsage.byModel || {})) {
+        if (!byUser[userKey].avatarByModel[modelId]) {
+          byUser[userKey].avatarByModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+        }
+        byUser[userKey].avatarByModel[modelId].input_tokens += usage.input_tokens;
+        byUser[userKey].avatarByModel[modelId].output_tokens += usage.output_tokens;
+        byUser[userKey].avatarByModel[modelId].calls += usage.calls;
+      }
+    }
+
     // Calculate costs - pricing per 1M tokens (updated Jan 2026)
     // Source: https://ai.google.dev/gemini-api/docs/pricing
     // Claude: $3 input / $15 output per 1M tokens
@@ -495,14 +603,52 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       },
       runware: {
         total: totals.runware.direct_cost // Runware charges directly, no token calculation
-      }
+      },
+      // Per-model avatar costs
+      avatarByModel: {}
     };
+
+    // Calculate per-model avatar costs using MODEL_PRICING
+    let totalAvatarCost = 0;
+    for (const [modelId, usage] of Object.entries(totals.avatarByModel || {})) {
+      const pricing = MODEL_PRICING[modelId] || { input: 0.30, output: 2.50 };  // Default to flash pricing
+
+      // For image generation models, cost is typically per-image
+      // Check if model has perImage pricing (image generation models)
+      const isImageModel = modelId.includes('image') || pricing.perImage;
+      let modelCost;
+
+      if (isImageModel && pricing.perImage) {
+        // Per-image pricing
+        modelCost = usage.calls * pricing.perImage;
+      } else {
+        // Token-based pricing (fallback)
+        const inputCost = (usage.input_tokens / 1000000) * (pricing.input || 0.30);
+        const outputCost = (usage.output_tokens / 1000000) * (pricing.output || 2.50);
+        modelCost = inputCost + outputCost;
+
+        // If very low, use per-image estimate
+        if (modelCost < 0.001 && usage.calls > 0) {
+          modelCost = usage.calls * 0.035;  // Fallback per-image cost
+        }
+      }
+
+      costs.avatarByModel[modelId] = {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        calls: usage.calls,
+        cost: modelCost
+      };
+      totalAvatarCost += modelCost;
+    }
+
     costs.anthropic.total = costs.anthropic.input + costs.anthropic.output + costs.anthropic.thinking;
     costs.gemini_text.total = costs.gemini_text.input + costs.gemini_text.output + costs.gemini_text.thinking;
     // For image generation, use the per-image estimate as primary cost
     costs.gemini_image.total = costs.gemini_image.imageEstimate || (costs.gemini_image.input + costs.gemini_image.output + costs.gemini_image.thinking);
     costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output + costs.gemini_quality.thinking;
-    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total + costs.runware.total;
+    costs.totalAvatarCost = totalAvatarCost;
+    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total + totalAvatarCost + costs.runware.total;
 
     const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);
 

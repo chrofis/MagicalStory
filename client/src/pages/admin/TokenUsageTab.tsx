@@ -127,13 +127,20 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
             <span className="font-medium">Gemini</span>
           </div>
           <p className="text-2xl font-bold text-blue-700">
-            {formatCost(tokenData.costs.gemini_text.total + tokenData.costs.gemini_image.total + tokenData.costs.gemini_quality.total)}
+            {formatCost((tokenData.costs.gemini_text?.total || 0) + (tokenData.costs.gemini_image?.total || 0) + (tokenData.costs.gemini_quality?.total || 0) + (tokenData.costs.totalAvatarCost || 0))}
           </p>
           <p className="text-xs text-blue-600 mt-1">
-            {formatTokens(tokenData.totals.gemini_text.input_tokens + tokenData.totals.gemini_image.input_tokens + tokenData.totals.gemini_quality.input_tokens)} in / {formatTokens(tokenData.totals.gemini_text.output_tokens + tokenData.totals.gemini_image.output_tokens + tokenData.totals.gemini_quality.output_tokens)} out
+            Story Images: {formatCost(tokenData.costs.gemini_image?.total || 0)} ({tokenData.totals.gemini_image?.calls || 0} calls)
           </p>
           <p className="text-xs text-blue-500 mt-0.5">
-            Text: {formatCost(tokenData.costs.gemini_text.total)} | Image: {formatCost(tokenData.costs.gemini_image.total)} ({tokenData.totals.gemini_image.calls} imgs)
+            Avatars: {formatCost(tokenData.costs.totalAvatarCost || 0)}
+            {tokenData.costs.avatarByModel && Object.keys(tokenData.costs.avatarByModel).length > 0 && (
+              <span className="ml-1">
+                ({Object.entries(tokenData.costs.avatarByModel).map(([model, data]) =>
+                  `${model.replace('gemini-', '').replace('-image', '')}: ${data.calls}`
+                ).join(', ')})
+              </span>
+            )}
           </p>
         </div>
 
@@ -312,7 +319,14 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                   const geminiImageCost = (user.gemini_image?.calls || 0) * 0.035;
                   const geminiQualityCost = ((user.gemini_quality?.input_tokens || 0) / 1000000) * 0.10 +
                                            ((user.gemini_quality?.output_tokens || 0) / 1000000) * 0.40;
-                  const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost;
+                  // Calculate avatar cost per model
+                  let avatarCost = 0;
+                  if (user.avatarByModel) {
+                    for (const modelUsage of Object.values(user.avatarByModel)) {
+                      avatarCost += (modelUsage.calls || 0) * 0.035;  // ~$0.035 per avatar
+                    }
+                  }
+                  const geminiCost = geminiTextCost + geminiImageCost + geminiQualityCost + avatarCost;
                   const runwareCost = user.runware?.direct_cost || 0;
                   const totalCost = anthropicCost + geminiCost + runwareCost;
                   const costPerStory = user.storyCount > 0 ? totalCost / user.storyCount : 0;

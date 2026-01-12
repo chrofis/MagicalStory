@@ -1,5 +1,9 @@
 // MagicalStory Backend Server v1.0.4
 // Includes: User quota system, email authentication, admin panel, PostgreSQL database support
+
+// Load environment variables from .env file (for local development)
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -1388,6 +1392,53 @@ async function getAllCheckpoints(jobId) {
   } catch (err) {
     log.error(`❌ Failed to get checkpoints for job ${jobId}:`, err.message);
     return [];
+  }
+}
+
+// Delete all checkpoints for a job (call after job completes)
+async function deleteJobCheckpoints(jobId) {
+  if (STORAGE_MODE !== 'database' || !dbPool) return;
+
+  try {
+    const result = await dbPool.query(
+      'DELETE FROM story_job_checkpoints WHERE job_id = $1',
+      [jobId]
+    );
+    if (result.rowCount > 0) {
+      log.debug(`🧹 Deleted ${result.rowCount} checkpoints for job ${jobId}`);
+    }
+  } catch (err) {
+    log.error(`❌ Failed to delete checkpoints for job ${jobId}:`, err.message);
+  }
+}
+
+// Clean up old completed/failed jobs (call when new job starts)
+async function cleanupOldCompletedJobs() {
+  if (STORAGE_MODE !== 'database' || !dbPool) return;
+
+  try {
+    // Delete checkpoints for jobs completed more than 1 hour ago
+    const cpResult = await dbPool.query(`
+      DELETE FROM story_job_checkpoints
+      WHERE job_id IN (
+        SELECT id FROM story_jobs
+        WHERE status IN ('completed', 'failed')
+        AND updated_at < NOW() - INTERVAL '1 hour'
+      )
+    `);
+
+    // Delete old completed/failed jobs
+    const jobResult = await dbPool.query(`
+      DELETE FROM story_jobs
+      WHERE status IN ('completed', 'failed')
+      AND updated_at < NOW() - INTERVAL '1 hour'
+    `);
+
+    if (cpResult.rowCount > 0 || jobResult.rowCount > 0) {
+      log.info(`🧹 Cleanup: deleted ${cpResult.rowCount} old checkpoints, ${jobResult.rowCount} old jobs`);
+    }
+  } catch (err) {
+    log.error(`❌ Failed to cleanup old jobs:`, err.message);
   }
 }
 
@@ -8253,6 +8304,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
     );
 
+    // Clean up checkpoints immediately - story is saved, no longer needed
+    await deleteJobCheckpoints(jobId);
+
     // Clear styled avatar cache to free memory
     clearStyledAvatarCache();
 
@@ -10112,6 +10166,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
     );
 
+    // Clean up checkpoints immediately - story is saved, no longer needed
+    await deleteJobCheckpoints(jobId);
+
     // Clear styled avatar cache to free memory
     clearStyledAvatarCache();
 
@@ -10729,6 +10786,9 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', userCredits === -1 ? 0 : creditsNeeded, idempotencyKey]
       );
+
+      // Clean up old completed/failed jobs in background (don't await)
+      cleanupOldCompletedJobs().catch(err => log.error('Cleanup error:', err.message));
 
       // Update user's preferred language based on their story language choice
       if (inputData.language) {
