@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
+const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // In-memory cache for styled avatars
 // Key: `${characterName}_${clothingCategory}_${artStyle}`
@@ -73,24 +74,8 @@ function loadArtStylePrompts() {
   return prompts;
 }
 
-// Load styled avatar prompt template from prompts/styled-avatar.txt
-function loadStyledAvatarTemplate() {
-  const templatePath = path.join(__dirname, '../../prompts/styled-avatar.txt');
-  try {
-    const content = fs.readFileSync(templatePath, 'utf8');
-    // Remove comment lines
-    const lines = content.split('\n').filter(line => !line.trim().startsWith('#'));
-    const template = lines.join('\n').trim();
-    return template;
-  } catch (err) {
-    log.error(`[STYLED AVATARS] Failed to load styled-avatar.txt:`, err.message);
-    return null;
-  }
-}
-
 // Load prompts at module initialization
 const ART_STYLE_PROMPTS = loadArtStylePrompts();
-const STYLED_AVATAR_TEMPLATE = loadStyledAvatarTemplate();
 
 /**
  * Generate cache key for styled avatar
@@ -132,16 +117,21 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
   log.debug(`[STYLED AVATAR] Using art style: ${ART_STYLE_PROMPTS[characterArtStyle] ? characterArtStyle : artStyle}`);
 
   try {
-    // Build full prompt using template
-    let fullPrompt;
+    // Build full prompt using the unified styled-costumed-avatar template
+    // (same template used by generateStyledAvatarWithSignature in avatars.js)
     // Use clothing description if provided, otherwise fallback to "clothing from reference image"
     const clothingText = clothingDescription || 'the clothing shown in Image 2 (reference avatar)';
 
-    if (STYLED_AVATAR_TEMPLATE) {
-      fullPrompt = STYLED_AVATAR_TEMPLATE
-        .replace('{ART_STYLE_PROMPT}', artStylePrompt)
-        .replace('{CLOTHING_DESCRIPTION}', clothingText)
-        .replace('{CHARACTER_NAME}', characterName);
+    const template = PROMPT_TEMPLATES.styledCostumedAvatar || '';
+    let fullPrompt;
+
+    if (template) {
+      fullPrompt = fillTemplate(template, {
+        'ART_STYLE_PROMPT': artStylePrompt,
+        'COSTUME_DESCRIPTION': clothingText,
+        'COSTUME_TYPE': 'standard outfit',
+        'PHYSICAL_TRAITS': ''
+      });
     } else {
       // Fallback if template not loaded
       fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features. Wearing: ${clothingText}`;
@@ -840,6 +830,5 @@ module.exports = {
   getAvatarCacheKey,
 
   // Loaded prompts (for external use)
-  ART_STYLE_PROMPTS,
-  STYLED_AVATAR_TEMPLATE
+  ART_STYLE_PROMPTS
 };
