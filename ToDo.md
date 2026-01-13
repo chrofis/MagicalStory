@@ -85,6 +85,28 @@
 - [ ] Gelato batch queries
 - [ ] Move MODEL_PRICING to config file
 
+### Duplicate Endpoints (Fix Required)
+
+**1. `PATCH /api/stories/:id/page/:pageNum`** - Defined in TWO places:
+| Location | Line | Status |
+|----------|------|--------|
+| `server.js` | 3294 | Active (hit first) |
+| `server/routes/stories.js` | 741 | Active (never reached) |
+
+**Action:** Remove from `server.js`, keep only in `stories.js`
+
+**2. Print Products Admin** - Two different paths for same functionality:
+| Path | Location | Status |
+|------|----------|--------|
+| `/api/admin/print-provider/products` | `server.js:3799` | Legacy |
+| `/api/admin/print-products/` | `admin/print-products.js` | Current |
+
+**Action:** Deprecate `/print-provider/` path, use `/print-products/` only
+
+### Missing Route Exports
+
+- [ ] `avatarsRoutes` loaded directly in server.js, not exported from `server/routes/index.js`
+
 ---
 
 ## Future Improvements
