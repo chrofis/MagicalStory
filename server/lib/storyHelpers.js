@@ -132,17 +132,23 @@ function stripSceneMetadata(sceneDescription) {
   let stripped = sceneDescription;
 
   // Remove DRAFT section (STEP 1) - internal process, not needed for image generation
+  // Handles: "# STEP 1 - DRAFT", "**STEP 1 - DRAFT**", "DRAFT:", etc.
   stripped = stripped
+    .replace(/\n*#{1,3}\s*STEP\s*1\s*[-–]\s*DRAFT\s*\n[\s\S]*?(?=\n#{1,3}\s*STEP\s*2|\n---\s*\n#{1,3}|\n\*{0,2}STEP\s*2)/gi, '')
     .replace(/\n*\*{0,2}(?:STEP\s*1\s*[-–]?\s*)?DRAFT\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*2|CONNECTION\s*REVIEW|CRITICISM))/gi, '')
     .trim();
 
   // Remove CONNECTION REVIEW / CRITICISM section (STEP 2) - internal process
+  // Handles: "# STEP 2 - CONNECTION REVIEW", "**CONNECTION REVIEW**", etc.
   stripped = stripped
-    .replace(/\n*\*{0,2}(?:STEP\s*2\s*[-–]?\s*)?(?:CONNECTION\s*REVIEW|CRITICISM)\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*3|FINAL\s*OUTPUT|1\.\s))/gi, '')
+    .replace(/\n*#{1,3}\s*STEP\s*2\s*[-–]\s*CONNECTION\s*REVIEW\s*\n[\s\S]*?(?=\n#{1,3}\s*STEP\s*3|\n---\s*\n#{1,3}|\n\*{0,2}(?:STEP\s*3|FINAL)|$)/gi, '')
+    .replace(/\n*\*{0,2}(?:STEP\s*2\s*[-–]?\s*)?(?:CONNECTION\s*REVIEW|CRITICISM)\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*3|FINAL\s*OUTPUT|1\.\s)|$)/gi, '')
     .trim();
 
   // Remove FINAL OUTPUT header (STEP 3) - keep the content, just remove the header
+  // Handles: "# STEP 3 - FINAL OUTPUT", "**FINAL OUTPUT**", etc.
   stripped = stripped
+    .replace(/\n*#{1,3}\s*STEP\s*3\s*[-–]\s*FINAL\s*OUTPUT\s*\n*/gi, '\n')
     .replace(/\n*\*{0,2}(?:STEP\s*3\s*[-–]?\s*)?FINAL\s*OUTPUT\*{0,2}:?\s*\n*/gi, '\n')
     .trim();
 
