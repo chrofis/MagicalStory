@@ -108,33 +108,6 @@ You MUST output ALL sections below in this EXACT order. Do not skip any section.
 ---TITLE---
 TITLE: [Creative, age-appropriate title]
 
----CLOTHING REQUIREMENTS---
-```json
-{
-  "clothingRequirements": {
-    "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "[signature items if different from reference]" },
-      "winter": { "used": true/false, "signature": "[cold weather additions]" },
-      "summer": { "used": true/false, "signature": "[warm weather items]" },
-      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
-    }
-  }
-}
-```
-
-Guidelines for clothing:
-- Prefer `standard` when story doesn't require special clothing
-- For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
-- For costumed: Provide **complete outfit description**
-- Only mark `used: true` for variations that actually appear
-- **CRITICAL - No Face Coverings**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
-- **CRITICAL - Distinct Styles**: Each character must have a structurally DIFFERENT outfit, not just color variations:
-  - Give different ROLES (princess vs scribe, captain vs sailor, knight vs squire)
-  - Vary outfit TYPES (dress vs tunic, long robes vs short practical clothes)
-  - Vary ACCESSORIES (one has jewelry, another has tools, another has rope/belt)
-  - Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
-  - Example RIGHT: One has "priestess robes with ceremonial sash" + other has "explorer tunic with leather sandal straps and rope belt"
-
 ---CHARACTER ARCS---
 
 For EACH main character ({CHARACTER_NAMES}):
@@ -218,6 +191,36 @@ Outside, the garden looked like a white blanket. Sophie rolled the first snowbal
    - Page 3: Remove "Max the dog" since he's now introduced on page 2
 ```
 
+
+---CLOTHING REQUIREMENTS---
+Based on the story draft, determine which clothing variants each character needs.
+
+```json
+{
+  "clothingRequirements": {
+    "[CharacterName]": {
+      "standard": { "used": true/false, "signature": "[signature items if different from reference]" },
+      "winter": { "used": true/false, "signature": "[cold weather additions]" },
+      "summer": { "used": true/false, "signature": "[warm weather items]" },
+      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
+    }
+  }
+}
+```
+
+Guidelines for clothing:
+- Prefer `standard` when story doesn't require special clothing
+- **Indoor scenes should use `standard` clothing, NOT winter** - winter clothing is only for outdoor cold weather scenes
+- For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
+- For costumed: Provide **complete outfit description**
+- Only mark `used: true` for variations that actually appear
+- **CRITICAL - No Face Coverings**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
+- **CRITICAL - Distinct Styles**: Each character must have a structurally DIFFERENT outfit, not just color variations:
+  - Give different ROLES (princess vs scribe, captain vs sailor, knight vs squire)
+  - Vary outfit TYPES (dress vs tunic, long robes vs short practical clothes)
+  - Vary ACCESSORIES (one has jewelry, another has tools, another has rope/belt)
+  - Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
+  - Example RIGHT: One has "priestess robes with ceremonial sash" + other has "explorer tunic with leather sandal straps and rope belt"
 
 
 ---VISUAL BIBLE---
