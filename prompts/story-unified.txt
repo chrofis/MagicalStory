@@ -345,7 +345,7 @@ TEXT:
 [Full story text for this page - follow reading level guidelines]
 
 SCENE HINT:
-[1-2 sentences describing the KEY VISUAL MOMENT for illustration - use real character names, not aliases]
+[1-2 sentences describing the KEY VISUAL MOMENT - MUST include left/right positions for each character, e.g., "Luna (left) waves at Max (right) across the playground"]
 Characters:
 - [CharacterName]: [standard | winter | summer | costumed:type]
 - [CharacterName]: [standard | winter | summer | costumed:type]
@@ -355,7 +355,7 @@ TEXT:
 [Story text continues...]
 
 SCENE HINT:
-[Key visual moment]
+[Key visual moment with left/right positions]
 Characters:
 - [CharacterName]: [clothing category]
 - [CharacterName]: [clothing category]
@@ -382,5 +382,6 @@ Characters:
 6. **Per-character clothing** - EVERY character in each scene MUST have explicit clothing: `- Name: category`. NEVER use "same". Valid categories: standard, winter, summer, costumed:type
 7. **Visual Bible accuracy** - Add all scenes and elements, with specific colors
 8. **Character names in illustrations** - Use the character's REAL NAME from the provided list, even if the story uses a nickname or alias. Add alias in parentheses: `- Tim (as Superbrain): costumed:superhero`
+9. **Positional consistency** - EVERY scene hint MUST specify left/right positions for each character: "Luna (left) talks to Max (right)". Maintain consistent positions across scenes in the same setting.
 
 **DO NOT STOP until you have written all {PAGES} pages with TEXT and SCENE HINT for each.**

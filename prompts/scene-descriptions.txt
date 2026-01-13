@@ -192,6 +192,14 @@ When multiple characters appear, each must have UNIQUE pose and action.
 - ❌ WRONG: "All three children hold a finger to their lips"
 - ✅ RIGHT: "Sophie holds finger to lips, Manuel freezes mid-step with wide eyes, Lukas cups hand to ear"
 
+**Scene-to-Scene Positional Consistency (CRITICAL):**
+When multiple scenes share the same setting or situation, maintain consistent left/right positions:
+- **Same location across scenes** (e.g., dinner table, classroom): If Character A is on the LEFT in scene 1, they stay on the LEFT in scene 2
+- **Opposing groups** (teams playing, people arguing, fighting): Keep Team A consistently on one side, Team B on the other
+- **Check PREVIOUS_SCENES context above** to see established positions and maintain them
+- ❌ CONFUSING: Scene 1 has "Mom left, Dad right at table" → Scene 2 has "Dad left, Mom right at table"
+- ✅ CONSISTENT: Scene 1 has "Mom left, Dad right at table" → Scene 2 has "Mom left, Dad right at table"
+
 **Visual Hierarchy:**
 - MAIN CHARACTERS (from list): Prominent, active roles, full composition details
 - BACKGROUND CHARACTERS (generic): Describe vaguely ("other children", "passersby"), smaller/further away, passive actions
