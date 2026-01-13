@@ -115,7 +115,11 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
 async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null) {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
-  log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'})...`);
+  const hasClothing = !!clothingDescription;
+  log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'}, ${hasClothing ? 'with clothing desc' : 'no clothing desc'})...`);
+  if (hasClothing) {
+    log.debug(`👕 [STYLED AVATAR] ${characterName} clothing: ${clothingDescription.substring(0, 100)}${clothingDescription.length > 100 ? '...' : ''}`);
+  }
 
   // Get art style prompt from loaded prompts
   // Use character-specific art style (without scene elements like "rainy streets")
@@ -458,9 +462,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
 
   // Convert all needed avatars in parallel
   const conversionPromises = [];
-  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto }] of neededAvatars) {
+  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription }] of neededAvatars) {
     conversionPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto)
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription)
         .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}:`, error.message);
