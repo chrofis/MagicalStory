@@ -550,6 +550,9 @@ export const characterService = {
             // Process the result same as sync mode
             const extractedTraits = statusResponse.clothingAvatars.extractedTraits;
             const extractedClothing = statusResponse.clothingAvatars.structuredClothing?.standard;
+            log.info(`🔍 [DEBUG] extractedTraits: ${JSON.stringify(extractedTraits)?.substring(0, 100)}`);
+            log.info(`🔍 [DEBUG] extractedClothing: ${JSON.stringify(extractedClothing)}`);
+            log.info(`🔍 [DEBUG] structuredClothing keys: ${Object.keys(statusResponse.clothingAvatars.structuredClothing || {})}`);
             return {
               success: true,
               avatars: statusResponse.clothingAvatars,

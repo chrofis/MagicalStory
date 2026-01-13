@@ -382,6 +382,15 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
           continue;
         }
       } else {
+        // Check if this category was already generated with signature items
+        // (generateStyledAvatarWithSignature creates styled versions directly)
+        if (char.avatars?.signatures?.[clothingCategory]) {
+          const existingStyled = avatars?.styledAvatars?.[artStyle]?.[clothingCategory];
+          if (existingStyled) {
+            log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} already styled with signature, skipping`);
+            continue;
+          }
+        }
         originalAvatar = avatars?.[clothingCategory];
       }
 

@@ -1074,6 +1074,254 @@ Your task is to create a 2x2 grid:
   }
 }
 
+/**
+ * Generate a styled avatar with signature items in a single API call
+ * Similar to generateStyledCostumedAvatar but for standard/winter/summer with signature additions
+ * Takes the base category avatar and adds signature items while styling
+ *
+ * @param {Object} character - Character object with avatars
+ * @param {string} category - 'standard', 'winter', or 'summer'
+ * @param {Object} config - { signature?: string } - signature items to add
+ * @param {string} artStyle - Art style ID (pixar, watercolor, oil, etc.)
+ * @returns {Promise<Object>} - { success, imageData, clothing, category, artStyle, error? }
+ */
+async function generateStyledAvatarWithSignature(character, category, config, artStyle) {
+  const startTime = Date.now();
+  const geminiApiKey = process.env.GEMINI_API_KEY;
+  if (!geminiApiKey) {
+    log.error('[STYLED SIGNATURE] No Gemini API key available');
+    return { success: false, error: 'Avatar generation service unavailable' };
+  }
+
+  // Get avatar for the specified category as reference (has correct face + body + base clothing)
+  const hasAvatars = !!character.avatars;
+  const hasCategory = !!character.avatars?.[category];
+  const hasStandard = !!character.avatars?.standard;
+  const hasPhotos = !!character.photos;
+  const hasFace = !!character.photos?.face;
+
+  log.debug(`[STYLED SIGNATURE] ${character.name} data check: avatars=${hasAvatars}, ${category}=${hasCategory}, standard=${hasStandard}, photos=${hasPhotos}, face=${hasFace}`);
+
+  // Priority: category avatar > standard avatar > face photo
+  let baseAvatar = character.avatars?.[category];
+  if (!baseAvatar) {
+    baseAvatar = character.avatars?.standard;
+    if (baseAvatar) {
+      log.warn(`[STYLED SIGNATURE] ${character.name}: No ${category} avatar found, using standard avatar as fallback`);
+    }
+  }
+  if (!baseAvatar) {
+    const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
+    if (facePhoto) {
+      log.warn(`[STYLED SIGNATURE] ${character.name}: No ${category} or standard avatar found, using face photo as fallback`);
+      baseAvatar = facePhoto;
+    } else {
+      log.error(`[STYLED SIGNATURE] No ${category} avatar, standard avatar, or face photo for ${character.name}`);
+      return { success: false, error: `No reference image available - generate clothing avatars or upload photo first` };
+    }
+  } else {
+    log.debug(`[STYLED SIGNATURE] ${character.name}: Using ${category} avatar (${Math.round(baseAvatar.length / 1024)}KB)`);
+  }
+
+  // Get art style prompt
+  const characterArtStyle = `${artStyle}-character`;
+  const artStylePrompt = ART_STYLE_PROMPTS[characterArtStyle] || ART_STYLE_PROMPTS[artStyle] || ART_STYLE_PROMPTS['pixar-character'] || '';
+  log.debug(`[STYLED SIGNATURE] Using art style: ${ART_STYLE_PROMPTS[characterArtStyle] ? characterArtStyle : artStyle}`);
+
+  // Build clothing description: base clothing + signature items
+  const isFemale = character.gender === 'female';
+  const baseClothing = character.avatars?.clothing?.[category] || getClothingStylePrompt(category, isFemale);
+  const clothingWithSignature = config.signature
+    ? `${baseClothing}\n\nSIGNATURE ITEMS (MUST INCLUDE these visible elements): ${config.signature}`
+    : baseClothing;
+
+  log.debug(`🎨 [STYLED SIGNATURE] Generating ${category} avatar with signature in ${artStyle} style for ${character.name}`);
+
+  try {
+    // Build the combined prompt using the styled-costumed-avatar template
+    // (same template works for both costumes and signature items)
+    const template = PROMPT_TEMPLATES.styledCostumedAvatar || '';
+    const avatarPrompt = fillTemplate(template, {
+      'ART_STYLE_PROMPT': artStylePrompt,
+      'COSTUME_DESCRIPTION': clothingWithSignature,  // Clothing + signature items
+      'COSTUME_TYPE': `${category} outfit`,  // e.g., "winter outfit" instead of "Cowboy"
+      'PHYSICAL_TRAITS': ''
+    });
+
+    // Prepare base avatar data as the only reference
+    const avatarBase64 = baseAvatar.replace(/^data:image\/\w+;base64,/, '');
+    const avatarMimeType = baseAvatar.match(/^data:(image\/\w+);base64,/) ?
+      baseAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    // Build image parts array
+    const imageParts = [
+      {
+        inline_data: {
+          mime_type: avatarMimeType,
+          data: avatarBase64
+        }
+      }
+    ];
+
+    // System instruction - top row keeps reference style, bottom row gets new style
+    const systemText = `You are an expert character artist creating avatar illustrations for children's books.
+You are given a reference avatar.
+Your task is to create a 2x2 grid:
+- TOP ROW: EXACT copies of the reference face (same style as reference), just zoomed in to show face only
+- BOTTOM ROW: Full body in NEW ${artStyle} style wearing the specified outfit with signature items
+- The TOP ROW must keep the ORIGINAL reference style - do NOT change it
+- Only the BOTTOM ROW gets the new ${artStyle} style
+- All 4 images must show the SAME person
+- Signature items must be prominently visible in the bottom row`;
+
+    const requestBody = {
+      systemInstruction: {
+        parts: [{ text: systemText }]
+      },
+      contents: [{
+        parts: [
+          ...imageParts,
+          { text: avatarPrompt }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.5,
+        responseModalities: ["TEXT", "IMAGE"],
+        imageConfig: {
+          aspectRatio: "1:1"  // Square for 2x2 grid
+        }
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" }
+      ]
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(`❌ [STYLED SIGNATURE] Generation failed:`, errorText);
+      return { success: false, error: `API error: ${response.status}` };
+    }
+
+    let data = await response.json();
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    if (inputTokens > 0 || outputTokens > 0) {
+      console.log(`📊 [STYLED SIGNATURE] ${category}@${artStyle} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    }
+
+    // Check if blocked by safety filters
+    if (data.promptFeedback?.blockReason) {
+      log.warn(`[STYLED SIGNATURE] Blocked by safety filters:`, data.promptFeedback.blockReason);
+      return { success: false, error: `Blocked by safety filters: ${data.promptFeedback.blockReason}` };
+    }
+
+    // Extract image from response
+    let imageData = null;
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inlineData?.mimeType?.startsWith('image/')) {
+          const imgMime = part.inlineData.mimeType;
+          imageData = `data:${imgMime};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    }
+
+    if (!imageData) {
+      log.error(`❌ [STYLED SIGNATURE] No image in response`);
+      return { success: false, error: 'No image generated' };
+    }
+
+    // Compress the avatar
+    const compressed = await compressImageToJPEG(imageData, 85, 768);
+    const finalImageData = compressed || imageData;
+
+    // Evaluate face match to get clothing description
+    let clothingDescription = null;
+    const faceMatchResult = await evaluateAvatarFaceMatch(baseAvatar, finalImageData, geminiApiKey);
+    if (faceMatchResult?.clothing) {
+      clothingDescription = faceMatchResult.clothing;
+      log.debug(`👕 [STYLED SIGNATURE] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
+    }
+
+    const duration = Date.now() - startTime;
+    log.debug(`✅ [STYLED SIGNATURE] Generated ${category}@${artStyle} avatar with signature for ${character.name} in ${duration}ms`);
+
+    // Log generation details for developer mode auditing (reuse costumed log)
+    costumedAvatarGenerationLog.push({
+      timestamp: new Date().toISOString(),
+      characterName: character.name,
+      costumeType: `${category}+signature`,
+      artStyle,
+      costumeDescription: clothingWithSignature,
+      signature: config.signature || null,
+      durationMs: duration,
+      success: true,
+      inputs: {
+        referenceAvatar: {
+          identifier: getImageIdentifier(baseAvatar),
+          sizeKB: getImageSizeKB(baseAvatar),
+          imageData: baseAvatar
+        }
+      },
+      prompt: avatarPrompt,
+      output: {
+        identifier: getImageIdentifier(finalImageData),
+        sizeKB: getImageSizeKB(finalImageData),
+        imageData: finalImageData
+      }
+    });
+
+    return {
+      success: true,
+      imageData: finalImageData,
+      clothing: clothingDescription,
+      category: category,
+      signature: config.signature || null,
+      artStyle: artStyle
+    };
+
+  } catch (err) {
+    const duration = Date.now() - startTime;
+    log.error(`❌ [STYLED SIGNATURE] Error:`, err.message);
+
+    // Log failed generation
+    costumedAvatarGenerationLog.push({
+      timestamp: new Date().toISOString(),
+      characterName: character.name,
+      costumeType: `${category}+signature`,
+      artStyle,
+      signature: config.signature || null,
+      durationMs: duration,
+      success: false,
+      error: err.message,
+      inputs: {
+        referenceAvatar: baseAvatar ? {
+          identifier: getImageIdentifier(baseAvatar),
+          sizeKB: getImageSizeKB(baseAvatar),
+          imageData: baseAvatar
+        } : null
+      }
+    });
+
+    return { success: false, error: err.message };
+  }
+}
+
 // ============================================================================
 // ROUTES
 // ============================================================================
@@ -1539,6 +1787,58 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         }
       } catch (evalErr) {
         log.warn(`[AVATAR JOB ${jobId}] Evaluation failed (continuing without traits):`, evalErr.message);
+      }
+    }
+
+    // Directly update character in database with extracted traits and clothing
+    if (characterId && (results.extractedTraits || results.structuredClothing?.standard)) {
+      try {
+        log.debug(`💾 [AVATAR JOB ${jobId}] Updating character ${characterId} in database with extracted data`);
+
+        // Get current character data
+        const charResult = await db.query(`
+          SELECT data FROM characters WHERE id = $1 AND user_id = $2
+        `, [characterId, user.id]);
+
+        if (charResult.rows.length > 0) {
+          const charData = charResult.rows[0].data || {};
+          const characters = charData.characters || [];
+
+          // Find the character (usually first one for single-character stories, or match by name)
+          let charIndex = 0;
+          if (name && characters.length > 1) {
+            const foundIndex = characters.findIndex(c => c.name === name);
+            if (foundIndex >= 0) charIndex = foundIndex;
+          }
+
+          if (characters[charIndex]) {
+            // Apply extracted traits
+            if (results.extractedTraits) {
+              characters[charIndex].physicalTraits = {
+                ...(characters[charIndex].physicalTraits || {}),
+                ...results.extractedTraits
+              };
+              log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted traits to character`);
+            }
+
+            // Apply extracted clothing
+            if (results.structuredClothing?.standard) {
+              characters[charIndex].structured_clothing = results.structuredClothing.standard;
+              log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted clothing to character: ${JSON.stringify(results.structuredClothing.standard)}`);
+            }
+
+            // Update in database
+            charData.characters = characters;
+            await db.query(`
+              UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3
+            `, [JSON.stringify(charData), characterId, user.id]);
+
+            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${characterId} with extracted traits and clothing`);
+          }
+        }
+      } catch (dbErr) {
+        log.warn(`[AVATAR JOB ${jobId}] Failed to update character in database:`, dbErr.message);
+        // Don't fail the job, just log the warning
       }
     }
 
@@ -2347,6 +2647,7 @@ router.get('/avatar-jobs/:jobId', authenticateToken, async (req, res) => {
 module.exports = router;
 module.exports.generateDynamicAvatar = generateDynamicAvatar;
 module.exports.generateStyledCostumedAvatar = generateStyledCostumedAvatar;
+module.exports.generateStyledAvatarWithSignature = generateStyledAvatarWithSignature;
 module.exports.getCostumedAvatarGenerationLog = getCostumedAvatarGenerationLog;
 module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationLog;
 module.exports.avatarJobs = avatarJobs; // Export for testing

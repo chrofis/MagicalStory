@@ -6040,8 +6040,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         if (skipImages) return;
 
         // Generate missing avatars based on clothing requirements
-        const { generateDynamicAvatar } = require('./server/routes/avatars');
+        const { generateDynamicAvatar, generateStyledCostumedAvatar, generateStyledAvatarWithSignature } = require('./server/routes/avatars');
         const characters = inputData.characters || [];
+        const artStyle = inputData.artStyle || 'pixar';
 
         log.debug(`👕 [STORYBOOK] Processing clothing requirements for ${Object.keys(clothingRequirements).length} characters`);
 
@@ -6059,6 +6060,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
           // Ensure avatars object exists
           if (!char.avatars) char.avatars = {};
+          if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+          if (!char.avatars.clothing) char.avatars.clothing = {};
+          if (!char.avatars.signatures) char.avatars.signatures = {};
 
           for (const [category, config] of Object.entries(requirements)) {
             if (!config.used) continue;
@@ -6067,48 +6071,72 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             let avatarExists = false;
             if (category === 'costumed' && config.costume) {
               const costumeKey = config.costume.toLowerCase();
-              if (!char.avatars.costumed) char.avatars.costumed = {};
-              avatarExists = !!char.avatars.costumed[costumeKey];
+              if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+              if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+              avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
+            } else if (config.signature) {
+              // For signature items: check styled avatar (signature + style generated in one call)
+              avatarExists = !!char.avatars.styledAvatars?.[artStyle]?.[category];
             } else {
+              // For regular categories: check base avatar (style conversion happens later)
               avatarExists = !!char.avatars[category];
             }
 
             if (avatarExists) {
-              log.debug(`👕 [STORYBOOK] ${char.name} already has ${category} avatar, skipping`);
+              log.debug(`👕 [STORYBOOK] ${char.name} already has ${category}${config.signature ? '+sig' : ''} avatar, skipping`);
               continue;
             }
 
             // Generate missing avatar
-            log.debug(`👕 [STORYBOOK] Generating ${category}${config.costume ? ':' + config.costume : ''} avatar for ${char.name}...`);
+            const logCategory = config.costume ? `costumed:${config.costume}` : category;
+            log.debug(`👕 [STORYBOOK] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
             const avatarPromise = (async () => {
               try {
-                const result = await generateDynamicAvatar(char, category, config);
-                if (result.success && result.imageData) {
-                  if (category === 'costumed' && result.costumeType) {
-                    if (!char.avatars.costumed) char.avatars.costumed = {};
-                    char.avatars.costumed[result.costumeType] = result.imageData;
-                    // Invalidate any cached styled versions since source avatar changed
-                    invalidateStyledAvatarForCategory(char.name, `costumed:${result.costumeType}`, char);
-                    log.debug(`✅ [STORYBOOK] Generated costumed:${result.costumeType} avatar for ${char.name}`);
-                  } else {
-                    char.avatars[category] = result.imageData;
-                    // Invalidate any cached styled versions since source avatar changed
-                    invalidateStyledAvatarForCategory(char.name, category, char);
-                    log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
+                let result;
+
+                if (category === 'costumed' && config.costume) {
+                  // For costumed: generate styled version directly (costume + art style in one call)
+                  result = await generateStyledCostumedAvatar(char, config, artStyle);
+
+                  if (result.success && result.imageData) {
+                    const costumeKey = result.costumeType;
+                    char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                    if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                    if (result.clothing) {
+                      char.avatars.clothing.costumed[costumeKey] = result.clothing;
+                    }
+                    log.debug(`✅ [STORYBOOK] Generated styled costumed:${costumeKey}@${artStyle} avatar for ${char.name}`);
                   }
-                  // Also store clothing description if available
-                  if (result.clothing) {
-                    if (!char.avatars.clothing) char.avatars.clothing = {};
-                    if (category === 'costumed') {
-                      if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                      char.avatars.clothing.costumed[result.costumeType] = result.clothing;
-                    } else {
+                } else if (config.signature) {
+                  // For categories with signature: generate styled avatar directly (1 API call)
+                  result = await generateStyledAvatarWithSignature(char, category, config, artStyle);
+
+                  if (result.success && result.imageData) {
+                    if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+                    char.avatars.styledAvatars[artStyle][category] = result.imageData;
+                    if (result.clothing) {
                       char.avatars.clothing[category] = result.clothing;
                     }
+                    if (result.signature) {
+                      char.avatars.signatures[category] = result.signature;
+                    }
+                    log.debug(`✅ [STORYBOOK] Generated styled ${category}+sig@${artStyle} avatar for ${char.name}`);
+                  }
+                } else {
+                  // For standard/winter/summer without signature: generate base avatar
+                  result = await generateDynamicAvatar(char, category, config);
+
+                  if (result.success && result.imageData) {
+                    char.avatars[category] = result.imageData;
+                    invalidateStyledAvatarForCategory(char.name, category, char);
+                    if (result.clothing) {
+                      char.avatars.clothing[category] = result.clothing;
+                    }
+                    log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
                   }
                 }
               } catch (e) {
-                log.error(`❌ [STORYBOOK] Failed to generate ${category} avatar for ${char.name}: ${e.message}`);
+                log.error(`❌ [STORYBOOK] Failed to generate ${logCategory} avatar for ${char.name}: ${e.message}`);
               }
             })();
             avatarGenerationPromises.push(avatarPromise);
@@ -8485,6 +8513,59 @@ async function processStoryJob(jobId) {
     log.debug(`📝 [JOB PROCESS] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
     log.debug(`📝 [JOB PROCESS] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
 
+    // Load full character data from DB (frontend strips avatar images to reduce payload)
+    // This restores the avatar images so we don't regenerate existing avatars
+    if (inputData.characters?.length > 0 && job.user_id) {
+      try {
+        const charResult = await dbPool.query(
+          'SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+          [job.user_id]
+        );
+
+        if (charResult.rows.length > 0) {
+          const dbData = typeof charResult.rows[0].data === 'string'
+            ? JSON.parse(charResult.rows[0].data)
+            : charResult.rows[0].data;
+          const dbCharacters = dbData.characters || [];
+
+          // Merge DB avatar data into inputData characters
+          let mergedCount = 0;
+          for (const char of inputData.characters) {
+            const dbChar = dbCharacters.find(c =>
+              c.name.trim().toLowerCase() === char.name.trim().toLowerCase()
+            );
+
+            if (dbChar?.avatars) {
+              // Merge avatar data: DB images, but keep any metadata from request
+              char.avatars = {
+                ...char.avatars,        // Keep metadata from request (status, generatedAt, etc.)
+                ...dbChar.avatars,      // Add actual images from DB
+                styledAvatars: {
+                  ...char.avatars?.styledAvatars,
+                  ...dbChar.avatars?.styledAvatars
+                },
+                costumed: {
+                  ...char.avatars?.costumed,
+                  ...dbChar.avatars?.costumed
+                },
+                clothing: {
+                  ...char.avatars?.clothing,
+                  ...dbChar.avatars?.clothing
+                }
+              };
+              mergedCount++;
+            }
+          }
+
+          if (mergedCount > 0) {
+            log.debug(`📸 [JOB PROCESS] Restored avatar data from DB for ${mergedCount} characters`);
+          }
+        }
+      } catch (dbErr) {
+        log.warn(`📸 [JOB PROCESS] Failed to load character avatars from DB: ${dbErr.message}`);
+      }
+    }
+
     // Inject pre-discovered landmarks if available for this user's location
     // Check database first (persists across restarts), then fall back to in-memory cache
     if (inputData.userLocation?.city) {
@@ -8724,7 +8805,7 @@ async function processStoryJob(jobId) {
       log.debug(`👔 [PIPELINE] Clothing requirements found for ${Object.keys(clothingRequirements).length} characters`);
 
       // Import avatar generators
-      const { generateDynamicAvatar, generateStyledCostumedAvatar } = require('./server/routes/avatars');
+      const { generateDynamicAvatar, generateStyledCostumedAvatar, generateStyledAvatarWithSignature } = require('./server/routes/avatars');
 
       // Track which avatars we generate
       const avatarsGenerated = [];
@@ -8756,7 +8837,11 @@ async function processStoryJob(jobId) {
             if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
             if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
             avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
+          } else if (config.signature) {
+            // For signature items: check styled avatar (signature + style generated in one call)
+            avatarExists = !!char.avatars.styledAvatars?.[artStyle]?.[category];
           } else {
+            // For regular categories: check base avatar (style conversion happens later)
             avatarExists = !!char.avatars[category];
           }
 
@@ -8796,8 +8881,31 @@ async function processStoryJob(jobId) {
                 avatarsFailed.push(`${char.name}:${logCategory}`);
                 log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
               }
+            } else if (config.signature) {
+              // For categories with signature: generate styled avatar directly (1 API call)
+              // Uses base avatar + adds signature items + applies art style
+              result = await generateStyledAvatarWithSignature(char, category, config, artStyle);
+
+              if (result.success && result.imageData) {
+                // Store in styledAvatars structure (not base avatar)
+                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+                char.avatars.styledAvatars[artStyle][category] = result.imageData;
+                // Store clothing + signature info
+                if (result.clothing) {
+                  char.avatars.clothing[category] = result.clothing;
+                }
+                if (result.signature) {
+                  char.avatars.signatures[category] = result.signature;
+                }
+                avatarsGenerated.push(`${char.name}:${logCategory}+sig@${artStyle}`);
+                log.debug(`✅ [AVATAR] Generated styled ${logCategory} with signature @${artStyle} for ${char.name}`);
+              } else {
+                avatarsFailed.push(`${char.name}:${logCategory}`);
+                log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
+              }
             } else {
-              // For standard/winter/summer: use original dynamic avatar (realistic)
+              // For standard/winter/summer without signature: generate base avatar
+              // Style conversion will happen later in prepareStyledAvatars()
               result = await generateDynamicAvatar(char, category, config);
 
               if (result.success && result.imageData) {
@@ -8806,9 +8914,6 @@ async function processStoryJob(jobId) {
                 invalidateStyledAvatarForCategory(char.name, category, char);
                 if (result.clothing) {
                   char.avatars.clothing[category] = result.clothing;
-                }
-                if (result.signature) {
-                  char.avatars.signatures[category] = result.signature;
                 }
                 avatarsGenerated.push(`${char.name}:${logCategory}`);
                 log.debug(`✅ [AVATAR] Generated ${logCategory} avatar for ${char.name}`);
