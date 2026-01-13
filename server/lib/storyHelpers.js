@@ -1661,6 +1661,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
   if (PROMPT_TEMPLATES.sceneDescriptions) {
     // Get the full language instruction with spelling rules (e.g., 'Write in German with Swiss spelling. Use ä,ö,ü...')
     const languageInstruction = getLanguageInstruction(language);
+    const languageName = getLanguageNameEnglish(language);
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       PREVIOUS_SCENES: previousScenesText,
       SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
@@ -1669,7 +1670,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
       CHARACTER_CLOTHING: characterClothingText,
-      LANGUAGE: languageInstruction,
+      LANGUAGE_NAME: languageName,
+      LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language)
     });
   }

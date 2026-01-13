@@ -112,8 +112,9 @@ For any RECURRING ELEMENTS in the scene, list ONLY identifier and POSITION:
 - "objects" must include Visual Bible identifiers when available
 - "clothing" must match the clothing category for this page
 
-**6. Image Summary ({LANGUAGE})**
-Translate section 1 into {LANGUAGE}.
+**6. Image Summary ({LANGUAGE_NAME})**
+{LANGUAGE_INSTRUCTION}
+Translate section 1.
 
 ---
 
@@ -202,4 +203,4 @@ When multiple characters appear, each must have UNIQUE pose and action.
 
 ---
 
-**OUTPUT LANGUAGE:** Sections 1-5 in English. Section 6 is the Image Summary translated to {LANGUAGE}.
+**OUTPUT LANGUAGE:** Sections 1-5 in English. Section 6 is the Image Summary translated to {LANGUAGE_NAME}.
