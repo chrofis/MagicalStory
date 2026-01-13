@@ -220,6 +220,42 @@ Cons: Expensive
 
 ---
 
+## Testing Results (January 2025)
+
+### Conclusion: Not Recommended
+
+After extensive testing with Replicate's PuLID-FLUX, the technology is **not suitable** for our use case.
+
+**Problems found:**
+| Issue | Description |
+|-------|-------------|
+| Smooth/painterly skin | All outputs look like digital paintings, not photos |
+| Identity drift | Randomly adds facial hair, changes age, adds features (pigtails) |
+| Pose prompts ignored | "3/4 view" never worked - always front-facing |
+| Unpredictable | Same settings produce different results each time |
+| Expensive for quality | ~$0.07/image at 1536x1536 for mediocre results |
+
+**Best settings found (still not good enough):**
+```javascript
+{
+  true_cfg: 6,
+  id_weight: 1.5,
+  guidance_scale: 7,
+  width: 1536,
+  height: 1536,
+  prompt: "extremely sharp photograph, hyper detailed, 8k, raw photo, DSLR, Canon 5D Mark IV, 85mm lens, f/2.8, perfect sharp focus on face, every pore visible, studio lighting, neutral gray background, no retouching, documentary style portrait"
+}
+```
+
+**What PuLID is actually good for:**
+- Stylized/artistic character portraits
+- Rough identity transfer for illustrations
+- NOT photorealistic face recreation
+
+**Recommendation:** Stick with Gemini for avatar generation. It's designed for illustrated content, follows prompts better, and generates all 4 views in one image.
+
+---
+
 ## Implementation Status
 
 ### Runware PuLID Integration (Added)

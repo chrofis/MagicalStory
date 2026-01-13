@@ -1796,13 +1796,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         log.debug(`💾 [AVATAR JOB ${jobId}] Updating character ${characterId} (internal ID) in database with extracted data`);
 
         // Get current character data - query by user_id since there's one row per user
-        const charResult = await dbQuery(`
+        // Note: dbQuery returns rows array directly, not { rows: [...] }
+        const rows = await dbQuery(`
           SELECT id, data FROM characters WHERE user_id = $1
         `, [user.id]);
 
-        if (charResult.rows.length > 0) {
-          const rowId = charResult.rows[0].id; // e.g., "characters_1764881868108"
-          const charData = charResult.rows[0].data || {};
+        if (rows.length > 0) {
+          const rowId = rows[0].id; // e.g., "characters_1764881868108"
+          const charData = rows[0].data || {};
           const characters = charData.characters || [];
 
           // Find the character by its internal ID (characterId is the character's id within the array)
