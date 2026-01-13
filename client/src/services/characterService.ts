@@ -972,7 +972,8 @@ export const characterService = {
       onProgress?.('saving', `Fetching updated data for ${character.name}...`);
 
       // Fetch fresh data from server (avatar job already saved everything)
-      const freshData = await characterService.getCharacterData();
+      // IMPORTANT: includeAllAvatars=true to get the actual avatar images
+      const freshData = await characterService.getCharacterData(true);
       const freshCharacter = freshData.characters.find(c => c.id === character.id);
 
       if (freshCharacter) {
