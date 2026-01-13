@@ -1751,27 +1751,56 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       }
     }
 
-    // Run evaluation on standard avatar to extract traits and clothing
-    const standardAvatar = generatedAvatars.find(a => a.category === 'standard' && a.imageData);
-    log.debug(`🔍 [AVATAR JOB ${jobId}] Checking evaluation: standardAvatar=${!!standardAvatar}, geminiApiKey=${!!geminiApiKey}`);
-    if (standardAvatar && geminiApiKey) {
-      log.debug(`🔍 [AVATAR JOB ${jobId}] Starting evaluation...`);
+    // Run evaluation on ALL avatars in parallel to extract clothing for each
+    const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
+    log.debug(`🔍 [AVATAR JOB ${jobId}] Checking evaluation: avatarsToEvaluate=${avatarsToEvaluate.length}, geminiApiKey=${!!geminiApiKey}`);
+    if (avatarsToEvaluate.length > 0 && geminiApiKey) {
+      log.debug(`🔍 [AVATAR JOB ${jobId}] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
       job.progress = 80;
       job.message = 'Extracting traits and clothing...';
 
       try {
-        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, standardAvatar.imageData, geminiApiKey);
+        // Evaluate all avatars in parallel
+        const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
+          const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
+          return { category, faceMatchResult };
+        });
+        const evalResults = await Promise.all(evalPromises);
 
-        if (faceMatchResult) {
+        // Process results for each category
+        for (const { category, faceMatchResult } of evalResults) {
+          if (!faceMatchResult) continue;
+
+          // Store faceMatch for this category
           results.faceMatch = results.faceMatch || {};
-          results.faceMatch.standard = {
+          results.faceMatch[category] = {
             score: faceMatchResult.score,
             details: faceMatchResult.details,
             lpips: faceMatchResult.lpips || null
           };
 
-          // Store extracted physical traits
-          if (faceMatchResult.physicalTraits) {
+          // Store structured clothing for this category
+          if (faceMatchResult.clothing && typeof faceMatchResult.clothing === 'object') {
+            results.structuredClothing = results.structuredClothing || {};
+            results.structuredClothing[category] = faceMatchResult.clothing;
+
+            // Build text description for avatars.clothing
+            const clothingParts = [];
+            if (faceMatchResult.clothing.fullBody) {
+              clothingParts.push(faceMatchResult.clothing.fullBody);
+            } else {
+              if (faceMatchResult.clothing.upperBody) clothingParts.push(faceMatchResult.clothing.upperBody);
+              if (faceMatchResult.clothing.lowerBody) clothingParts.push(faceMatchResult.clothing.lowerBody);
+            }
+            if (faceMatchResult.clothing.shoes) clothingParts.push(faceMatchResult.clothing.shoes);
+            results.clothing = results.clothing || {};
+            results.clothing[category] = clothingParts.join(', ');
+
+            log.debug(`👕 [AVATAR JOB] ${category} clothing: ${results.clothing[category]}`);
+          }
+
+          // Only extract physical traits from standard avatar (same traits for all)
+          if (category === 'standard' && faceMatchResult.physicalTraits) {
             results.extractedTraits = faceMatchResult.physicalTraits;
             // Normalize apparentAge field names
             if (!results.extractedTraits.apparentAge) {
@@ -1789,26 +1818,6 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               results.extractedTraits.detailedHairAnalysis = faceMatchResult.detailedHairAnalysis;
             }
             log.debug(`📋 [AVATAR JOB] Extracted traits: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
-          }
-
-          // Store structured clothing
-          if (faceMatchResult.clothing && typeof faceMatchResult.clothing === 'object') {
-            results.structuredClothing = results.structuredClothing || {};
-            results.structuredClothing.standard = faceMatchResult.clothing;
-
-            // Also build text description for avatars.clothing (same as sync endpoint)
-            const clothingParts = [];
-            if (faceMatchResult.clothing.fullBody) {
-              clothingParts.push(faceMatchResult.clothing.fullBody);
-            } else {
-              if (faceMatchResult.clothing.upperBody) clothingParts.push(faceMatchResult.clothing.upperBody);
-              if (faceMatchResult.clothing.lowerBody) clothingParts.push(faceMatchResult.clothing.lowerBody);
-            }
-            if (faceMatchResult.clothing.shoes) clothingParts.push(faceMatchResult.clothing.shoes);
-            results.clothing = results.clothing || {};
-            results.clothing.standard = clothingParts.join(', ');
-
-            log.debug(`👕 [AVATAR JOB] Extracted clothing: ${JSON.stringify(faceMatchResult.clothing)}`);
           }
         }
       } catch (evalErr) {
