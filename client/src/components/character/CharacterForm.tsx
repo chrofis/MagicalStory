@@ -237,7 +237,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           {language === 'de' ? 'Visuelles Alter' : language === 'fr' ? 'Âge visuel' : 'Visual Age'}:
         </span>
         <select
-          value={character.apparentAge || getAgeCategory(character.age) || ''}
+          value={character.physical?.apparentAge || getAgeCategory(character.age) || ''}
           onChange={(e) => updateApparentAge(e.target.value as AgeCategory)}
           className={selectClass(changedTraits?.apparentAge)}
         >
@@ -2102,7 +2102,7 @@ export function CharacterForm({
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Apparent Age:</span>
-                <div className="font-medium">{character.apparentAge || '—'}</div>
+                <div className="font-medium">{character.physical?.apparentAge || '—'}</div>
               </div>
             </div>
 
@@ -2235,7 +2235,7 @@ export function CharacterForm({
                       character={character}
                       language={language}
                       updatePhysical={updatePhysical}
-                      updateApparentAge={(v) => updateField('apparentAge', v)}
+                      updateApparentAge={(v) => updatePhysical('apparentAge', v)}
                     />
                   </div>
 

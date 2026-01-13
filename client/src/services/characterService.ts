@@ -515,7 +515,7 @@ export const characterService = {
         physicalDescription,
         name: character.name,
         age: character.age,
-        apparentAge: character.apparentAge,
+        apparentAge: character.physical?.apparentAge,
         gender: character.gender,
         build: character.physical?.build,
         clothing: character.clothing?.structured,
@@ -719,7 +719,7 @@ export const characterService = {
         physicalDescription,
         name: character.name,
         age: character.age,
-        apparentAge: character.apparentAge,
+        apparentAge: character.physical?.apparentAge,
         gender: character.gender,
         build: userTraits.build || 'average',
         // Only pass user-edited physical traits (not extracted ones)
@@ -997,7 +997,7 @@ export const characterService = {
             face: traits.face || updatedCharacter.physical?.face,
             other: traits.other || updatedCharacter.physical?.other,
             detailedHairAnalysis: traits.detailedHairAnalysis || updatedCharacter.physical?.detailedHairAnalysis,
-            apparentAge: traits.apparentAge || updatedCharacter.physical?.apparentAge,
+            apparentAge: (traits.apparentAge as AgeCategory) || updatedCharacter.physical?.apparentAge,
           },
         };
         log.info(`📋 Populated physical traits from extraction for ${character.name}`);

@@ -1114,7 +1114,7 @@ function buildCharacterReferenceList(photos, characters = null) {
     const char = characters?.find(c => c.name === photo.name);
 
     // Visual age first (how old they look), then actual age
-    const effectiveAgeCategory = char?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
+    const effectiveAgeCategory = char?.physical?.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
     const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
     const age = char?.age ? `${char.age} years old` : '';
     const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
@@ -1725,7 +1725,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     // Build a numbered list of characters with full physical descriptions INCLUDING CLOTHING
     const charDescriptions = sceneCharacters.map((char, index) => {
       // Visual age first (how old they look), then actual age
-      const visualAge = char.apparentAge ? `Looks: ${char.apparentAge.replace(/-/g, ' ')}` : '';
+      const visualAge = char.physical?.apparentAge ? `Looks: ${char.physical.apparentAge.replace(/-/g, ' ')}` : '';
       const age = char.age ? `${char.age} years old` : '';
 
       // Age-specific gender term based on apparentAge
@@ -1758,7 +1758,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
             return isMale ? 'boy/man' : 'girl/woman';
         }
       };
-      const gender = getGenderTerm(char.gender, char.apparentAge);
+      const gender = getGenderTerm(char.gender, char.physical?.apparentAge);
       // Include physical traits with labels (excluding height - AI doesn't understand it for images)
       const physical = char.physical;
       // Get clothing STYLE from character analysis - colors AND patterns
