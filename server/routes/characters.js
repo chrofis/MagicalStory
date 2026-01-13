@@ -298,16 +298,29 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Preserve structured_clothing (new structured format with upperBody, lowerBody, shoes, fullBody)
-        if (existingChar.structured_clothing && !newChar.structured_clothing) {
-          mergedChar.structured_clothing = existingChar.structured_clothing;
+        const existingClothing = existingChar.structured_clothing;
+        const newClothing = newChar.structured_clothing;
+        const newClothingEmpty = !newClothing || (typeof newClothing === 'object' && Object.keys(newClothing).length === 0);
+
+        if (existingClothing && newClothingEmpty) {
+          // Frontend sent empty/no clothing - preserve from DB
+          mergedChar.structured_clothing = existingClothing;
           preservedFields.push('structured_clothing');
           hasChanges = true;
-        } else if (existingChar.structured_clothing && newChar.structured_clothing) {
-          // Merge structured clothing - new values take precedence
-          mergedChar.structured_clothing = {
-            ...existingChar.structured_clothing,
-            ...newChar.structured_clothing
-          };
+        } else if (existingClothing && !newClothingEmpty) {
+          // Frontend sent clothing - check if it has actual values or just nulls
+          const hasRealValues = newClothing.upperBody || newClothing.lowerBody || newClothing.fullBody || newClothing.shoes;
+          if (!hasRealValues) {
+            // Frontend sent structured_clothing but all fields are empty - preserve from DB
+            mergedChar.structured_clothing = existingClothing;
+            preservedFields.push('structured_clothing');
+            hasChanges = true;
+            console.log(`[Characters] POST - Frontend sent empty structured_clothing for ${newChar.name}, preserving from DB`);
+          } else {
+            // Frontend sent real values - use those
+            mergedChar.structured_clothing = newClothing;
+            console.log(`[Characters] POST - Using frontend structured_clothing for ${newChar.name}`);
+          }
         }
 
         // Preserve physical traits object (contains height, skinTone, eyeColor, hairColor, etc.)

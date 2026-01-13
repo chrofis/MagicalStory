@@ -1795,6 +1795,19 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           if (faceMatchResult.clothing && typeof faceMatchResult.clothing === 'object') {
             results.structuredClothing = results.structuredClothing || {};
             results.structuredClothing.standard = faceMatchResult.clothing;
+
+            // Also build text description for avatars.clothing (same as sync endpoint)
+            const clothingParts = [];
+            if (faceMatchResult.clothing.fullBody) {
+              clothingParts.push(faceMatchResult.clothing.fullBody);
+            } else {
+              if (faceMatchResult.clothing.upperBody) clothingParts.push(faceMatchResult.clothing.upperBody);
+              if (faceMatchResult.clothing.lowerBody) clothingParts.push(faceMatchResult.clothing.lowerBody);
+            }
+            if (faceMatchResult.clothing.shoes) clothingParts.push(faceMatchResult.clothing.shoes);
+            results.clothing = results.clothing || {};
+            results.clothing.standard = clothingParts.join(', ');
+
             log.debug(`👕 [AVATAR JOB] Extracted clothing: ${JSON.stringify(faceMatchResult.clothing)}`);
           }
         }
