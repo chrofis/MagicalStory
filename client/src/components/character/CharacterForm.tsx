@@ -1987,8 +1987,10 @@ export function CharacterForm({
           onClick={() => {
             // If no avatars yet and we can generate them, save + generate
             // Otherwise just save
+            // Also check if avatars are currently being generated (don't start a second generation)
             const hasAvatars = !!(character.avatars?.winter || character.avatars?.standard || character.avatars?.summer || character.avatars?.formal);
-            if (!hasAvatars && onSaveAndRegenerateWithTraits) {
+            const isCurrentlyGenerating = character.avatars?.status === 'generating';
+            if (!hasAvatars && !isCurrentlyGenerating && onSaveAndRegenerateWithTraits) {
               onSaveAndRegenerateWithTraits();
             } else {
               onSave();
