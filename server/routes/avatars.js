@@ -1490,8 +1490,55 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       if (imageData) results[category] = imageData;
     }
 
-    // Skip evaluation for background jobs (can be added later if needed)
-    // This significantly speeds up the job
+    // Run evaluation on standard avatar to extract traits and clothing
+    const standardAvatar = generatedAvatars.find(a => a.category === 'standard' && a.imageData);
+    if (standardAvatar && geminiApiKey) {
+      job.progress = 80;
+      job.message = 'Extracting traits and clothing...';
+
+      try {
+        const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, standardAvatar.imageData, geminiApiKey);
+
+        if (faceMatchResult) {
+          results.faceMatch = results.faceMatch || {};
+          results.faceMatch.standard = {
+            score: faceMatchResult.score,
+            details: faceMatchResult.details,
+            lpips: faceMatchResult.lpips || null
+          };
+
+          // Store extracted physical traits
+          if (faceMatchResult.physicalTraits) {
+            results.extractedTraits = faceMatchResult.physicalTraits;
+            // Normalize apparentAge field names
+            if (!results.extractedTraits.apparentAge) {
+              if (results.extractedTraits.apparent_age) {
+                results.extractedTraits.apparentAge = results.extractedTraits.apparent_age;
+                delete results.extractedTraits.apparent_age;
+                log.debug(`📋 [AVATAR JOB] Normalized 'apparent_age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
+              } else if (results.extractedTraits.age) {
+                results.extractedTraits.apparentAge = results.extractedTraits.age;
+                delete results.extractedTraits.age;
+                log.debug(`📋 [AVATAR JOB] Normalized 'age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
+              }
+            }
+            if (faceMatchResult.detailedHairAnalysis) {
+              results.extractedTraits.detailedHairAnalysis = faceMatchResult.detailedHairAnalysis;
+            }
+            log.debug(`📋 [AVATAR JOB] Extracted traits: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
+          }
+
+          // Store structured clothing
+          if (faceMatchResult.clothing && typeof faceMatchResult.clothing === 'object') {
+            results.structuredClothing = results.structuredClothing || {};
+            results.structuredClothing.standard = faceMatchResult.clothing;
+            log.debug(`👕 [AVATAR JOB] Extracted clothing: ${JSON.stringify(faceMatchResult.clothing)}`);
+          }
+        }
+      } catch (evalErr) {
+        log.warn(`[AVATAR JOB ${jobId}] Evaluation failed (continuing without traits):`, evalErr.message);
+      }
+    }
 
     results.status = 'complete';
     results.generatedAt = new Date().toISOString();
