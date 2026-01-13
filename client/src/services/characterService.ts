@@ -179,9 +179,7 @@ function stripAvatarImages(avatars: Character['avatars']): Character['avatars'] 
     status: avatars.status,
     generatedAt: avatars.generatedAt,
     stale: avatars.stale,
-    // Keep face thumbnails (small) for display
-    faceThumbnails: avatars.faceThumbnails,
-    // Strip all large base64 images - server already has them
+    // faceThumbnails are 64-105KB each - don't send on save, server has them
     // winter, standard, summer, formal, styledAvatars are NOT sent
   };
 }

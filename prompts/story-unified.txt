@@ -175,6 +175,7 @@ For EACH of the {PAGES} pages, output in this EXACT format:
 
 **Draft [Page number]**
 [Full story text for this page - follow reading level guidelines]
+*(Word count: X)*
 
 ... continue for ALL {PAGES} pages ...
 
@@ -191,12 +192,15 @@ Analyze the draft above for logical issues. Be harsh and critical.
 
 **Draft 1**
 Sophie woke up early and ran to the window. Snow! Real snow was falling outside. She grabbed her red boots and hurried downstairs to find Grandma already making hot chocolate.
+*(Word count: 32)*
 
 **Draft 2**
 "Can we build a snowman?" Sophie asked, bouncing on her toes. Grandma smiled and handed her a warm mug. "First, drink this. Then we'll bundle up."
+*(Word count: 28)*
 
 **Draft 3**
 Outside, the garden looked like a white blanket. Sophie rolled the first snowball while Grandma watched from the porch with Max the dog.
+*(Word count: 24)*
 
 ---CRITICAL ANALYSIS---
 
