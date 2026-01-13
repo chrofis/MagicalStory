@@ -11,7 +11,7 @@ export function ArtStyleSelector({ selectedStyle, onSelect }: ArtStyleSelectorPr
 
   return (
     <div id="art-style-section">
-      <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7 gap-2">
         {artStyles.map((style) => (
           <button
             key={style.id}

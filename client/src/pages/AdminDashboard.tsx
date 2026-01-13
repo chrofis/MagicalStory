@@ -1192,7 +1192,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Stats Summary */}
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="bg-pink-50 rounded-lg p-3 text-center">
                   <BookOpen size={20} className="mx-auto text-pink-600 mb-1" />
                   <p className="text-2xl font-bold text-pink-700">{userDetails.stats.totalStories}</p>

@@ -291,7 +291,7 @@ export function StoryCategorySelector({
                 </button>
 
                 {isExpanded && (
-                  <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3">
                     {themes.map((type) => (
                       <button
                         key={type.id}
@@ -544,7 +544,7 @@ export function StoryCategorySelector({
           <h3 className="font-bold text-gray-800 mb-1">{t.optionalTheme}</h3>
           <p className="text-sm text-gray-600 mb-3">{t.optionalThemeDesc}</p>
 
-          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
             {/* Realistic option first */}
             <button
               onClick={() => handleThemeWrapperSelect('realistic')}

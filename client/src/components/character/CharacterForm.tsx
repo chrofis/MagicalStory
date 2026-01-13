@@ -1811,7 +1811,7 @@ export function CharacterForm({
               ({Object.keys(character.avatars.costumed).length} {language === 'de' ? 'Kostüme' : 'costumes'})
             </span>
           </h4>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
             {Object.entries(character.avatars.costumed).map(([costumeType, avatarData]) => {
               const imageUrl = typeof avatarData === 'string' ? avatarData : avatarData?.imageData;
               const clothing = typeof avatarData === 'object' ? avatarData?.clothing : undefined;
@@ -1893,7 +1893,7 @@ export function CharacterForm({
                     {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
                   </h5>
                   {/* Standard clothing avatars */}
-                  <div className="grid grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                     {clothingOrder.map((category) => {
                       const avatar = avatars[category];
                       return (
@@ -1924,7 +1924,7 @@ export function CharacterForm({
                       <div className="text-[10px] font-medium text-orange-600 mb-2">
                         🎭 {language === 'de' ? 'Kostümierte Avatare' : 'Costumed Avatars'}
                       </div>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {costumeTypes.map((costumeType) => {
                           const avatar = costumedAvatars![costumeType];
                           return (
