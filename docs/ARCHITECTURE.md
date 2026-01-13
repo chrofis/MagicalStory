@@ -1,6 +1,6 @@
 # MagicalStory Architecture & Deployment
 
-**Last Updated:** January 2025
+**Last Updated:** January 2026
 
 ## Table of Contents
 
@@ -11,9 +11,10 @@
 5. [Database](#5-database)
 6. [API Endpoints](#6-api-endpoints)
 7. [External Service Integrations](#7-external-service-integrations)
-8. [Deployment](#8-deployment)
-9. [Development](#9-development)
-10. [Troubleshooting](#10-troubleshooting)
+8. [Image Generation & Repair System](#8-image-generation--repair-system)
+9. [Deployment](#9-deployment)
+10. [Development](#10-development)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
@@ -318,7 +319,114 @@ Migrations are in `database/migrations/` and run sequentially on startup:
 
 ---
 
-## 8. Deployment
+## 8. Image Generation & Repair System
+
+### Image Generation Models
+
+| Model | Provider | Cost | Use Case |
+|-------|----------|------|----------|
+| `gemini-2.5-flash-image` | Google | ~$0.04/img | Page illustrations (default) |
+| `gemini-3-pro-image-preview` | Google | ~$0.15/img | Cover images (higher quality) |
+| `flux-schnell` (runware:5@1) | Runware | ~$0.0006/img | Dev mode testing (ultra cheap) |
+| `flux-dev` (runware:6@1) | Runware | ~$0.004/img | Better quality testing |
+| `ace-plus-plus` | Runware | ~$0.005/img | Face-consistent avatar generation |
+
+Configuration in `server/config/models.js`:
+```javascript
+MODEL_DEFAULTS = {
+  pageImage: 'gemini-2.5-flash-image',
+  coverImage: 'gemini-3-pro-image-preview',
+  qualityEval: 'gemini-2.5-flash',
+  inpaintBackend: 'runware'
+}
+```
+
+### Quality Evaluation
+
+**Model:** `gemini-2.5-flash` (required - has spatial reasoning for bounding boxes)
+
+**Note:** `gemini-2.0-flash` cannot return bounding boxes, so it cannot do auto-repair.
+
+**Two evaluation types:**
+1. **Scene evaluation** (`prompts/image-evaluation.txt`) - Character consistency, anatomy, objects
+2. **Cover evaluation** (`prompts/cover-image-evaluation.txt`) - Text-focused (titles, readability)
+
+**Scoring:** 0-10 scale
+- PASS: Score 5+ (usable)
+- SOFT_FAIL: Score 3-4 (consider retry)
+- HARD_FAIL: Score 0-2 (must retry)
+
+**Output includes `fix_targets`:**
+```json
+{
+  "score": 6,
+  "fix_targets": [
+    {"bbox": [0.2, 0.3, 0.6, 0.7], "issue": "extra finger", "fix": "Fix hand to have 5 fingers"}
+  ]
+}
+```
+
+### Inpainting/Repair Backends
+
+| Backend | Model | Cost | Best For |
+|---------|-------|------|----------|
+| `runware` (default) | SDXL (runware:101@1) | ~$0.002/img | Objects, backgrounds |
+| `runware-flux-fill` | FLUX Fill (runware:102@1) | ~$0.05/img | Face repair |
+| `gemini` | gemini-2.5-flash-image | ~$0.03/img | Text-based editing (not true inpainting) |
+
+**Key difference:**
+- **Runware (real inpainting):** Uses binary mask images (white = repaint area, black = keep). Model trained specifically for inpainting.
+- **Gemini (workaround):** Uses text-based coordinates in prompt ("edit region from top 20% to 60%"). Not true inpainting - may not precisely respect boundaries or may change other areas.
+
+### Auto-Repair Flow
+
+When clicking "Repair" button (admin-only):
+
+1. **Check for pre-computed fix targets**
+   - Quality evaluation already saved `fix_targets` with bounding boxes
+   - If available, skip inspection step
+
+2. **If no pre-computed targets: Inspect image**
+   - `inspectImageForErrors()` calls Gemini 2.0 Flash (utility model)
+   - Looks for physics errors (extra fingers, floating objects, anatomical issues)
+   - Returns: `error_type`, `description`, `bounding_box [ymin, xmin, ymax, xmax]`, `fix_prompt`
+
+3. **Generate mask from bounding box**
+   - Creates black/white mask image using Sharp
+   - White rectangle = area to repaint
+
+4. **Call inpainting backend**
+   - Default: Runware SDXL with mask + original image + fix prompt
+   - Returns edited image with only that region modified
+
+5. **Save result**
+   - Updates `sceneImages` array with new image
+   - Sets `wasAutoRepaired: true`
+   - Stores `repairHistory` for debugging
+
+**Limit:** Masks covering >25% of image are skipped (inpainting doesn't work well for large areas).
+
+### Repair Endpoint
+
+```
+POST /api/stories/:id/repair/image/:pageNum
+```
+- **Admin-only** (dev mode feature)
+- Located in `server.js:3094`
+- Uses `autoRepairWithTargets()` or `autoRepairImage()` from `server/lib/images.js`
+
+### Text Models
+
+| Model | Provider | Cost (per 1M tokens) | Use Case |
+|-------|----------|---------------------|----------|
+| `claude-sonnet-4-5` | Anthropic | $3 in / $15 out | Story outline, text, scenes |
+| `claude-3-5-haiku` | Anthropic | $0.25 in / $1.25 out | Fast/cheap tasks |
+| `gemini-2.5-flash` | Google | $0.30 in / $2.50 out | Quality evaluation |
+| `gemini-2.0-flash` | Google | $0.10 in / $0.40 out | Utility tasks (fast) |
+
+---
+
+## 9. Deployment
 
 ### Deploy to Railway (Recommended)
 
@@ -364,7 +472,7 @@ railway up
 
 ---
 
-## 9. Development
+## 10. Development
 
 ### Local Development
 
@@ -405,7 +513,7 @@ All prompts in `/prompts/*.txt`, loaded via `server/services/prompts.js`:
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 ### Common Issues
 

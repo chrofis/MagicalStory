@@ -7391,7 +7391,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           page.text,
           sceneCharacters,
           page.sceneHint,
-          langText,
+          lang,
           streamingVisualBible,
           previousScenes,
           pageClothing
@@ -9279,7 +9279,7 @@ Output Format:
         const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
 
         // Generate scene description using Art Director prompt (in story language)
-        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes, currentClothing);
+        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing);
 
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
@@ -9752,7 +9752,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           try {
             // Generate scene description using Art Director prompt (in story language)
             // Pass visualBible so recurring elements are included in scene description
-            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, langText, visualBible, previousScenes, currentClothing);
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing);
 
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
             const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride);
