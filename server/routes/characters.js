@@ -289,11 +289,24 @@ router.post('/', authenticateToken, async (req, res) => {
           hasChanges = true;
         }
 
-        // Preserve clothing data (structured clothing details)
+        // Preserve clothing data (legacy text field)
         if (existingChar.clothing && !newChar.clothing) {
           mergedChar.clothing = existingChar.clothing;
           preservedFields.push('clothing');
           hasChanges = true;
+        }
+
+        // Preserve structured_clothing (new structured format with upperBody, lowerBody, shoes, fullBody)
+        if (existingChar.structured_clothing && !newChar.structured_clothing) {
+          mergedChar.structured_clothing = existingChar.structured_clothing;
+          preservedFields.push('structured_clothing');
+          hasChanges = true;
+        } else if (existingChar.structured_clothing && newChar.structured_clothing) {
+          // Merge structured clothing - new values take precedence
+          mergedChar.structured_clothing = {
+            ...existingChar.structured_clothing,
+            ...newChar.structured_clothing
+          };
         }
 
         // Preserve physical traits object (contains height, skinTone, eyeColor, hairColor, etc.)

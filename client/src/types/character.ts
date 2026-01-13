@@ -31,6 +31,7 @@ export interface PhysicalTraits {
   skinToneHex?: string;  // Hex color code for skin tone (e.g., "#E8BEAC")
   other?: string;        // Glasses, birthmarks, always-present accessories
   detailedHairAnalysis?: string;  // Detailed hair analysis from avatar evaluation
+  apparentAge?: AgeCategory; // How old they look in photo (from analysis or user override)
 }
 
 // Tracks which physical traits changed from previous photo analysis
@@ -204,7 +205,6 @@ export interface Character {
   gender: 'male' | 'female' | 'other';
   age: string;
   ageCategory?: AgeCategory; // Auto-filled from age, used for image generation
-  apparentAge?: AgeCategory; // How old they look in photo (from analysis or user override)
 
   // Physical traits (from photo analysis)
   physical?: PhysicalTraits;

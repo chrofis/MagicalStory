@@ -125,12 +125,11 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     hair: api.hair_color || api.hairColor,  // Legacy: combined hair field
     other: api.other,  // Glasses, birthmarks, always-present accessories
     detailedHairAnalysis: api.detailed_hair_analysis || api.detailedHairAnalysis,
+    apparentAge: (api.apparent_age || api.apparentAge) as AgeCategory | undefined, // How old they look
   };
 
   // Compute ageCategory from API or derive from age
   const ageCategory = (api.age_category || api.ageCategory || getAgeCategory(api.age)) as AgeCategory | undefined;
-  // Get apparent age from API (from photo analysis or user override)
-  const apparentAge = (api.apparent_age || api.apparentAge) as AgeCategory | undefined;
 
   return {
     id: api.id,
@@ -138,9 +137,8 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     gender: api.gender as 'male' | 'female' | 'other',
     age: api.age,
     ageCategory,
-    apparentAge,
 
-    physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.facialHair || physical.skinTone || physical.hair || physical.other || physical.detailedHairAnalysis) ? physical : undefined,
+    physical: (physical.height || physical.build || physical.face || physical.eyeColor || physical.hairColor || physical.hairLength || physical.hairStyle || physical.facialHair || physical.skinTone || physical.hair || physical.other || physical.detailedHairAnalysis || physical.apparentAge) ? physical : undefined,
 
     physicalTraitsSource: api.physical_traits_source || api.physicalTraitsSource,
 
@@ -202,7 +200,7 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     gender: char.gender,
     age: char.age,
     age_category: ageCategory,
-    apparent_age: char.apparentAge,
+    apparent_age: char.physical?.apparentAge,
     // Physical traits
     height: char.physical?.height,
     build: char.physical?.build,
@@ -999,6 +997,7 @@ export const characterService = {
             face: traits.face || updatedCharacter.physical?.face,
             other: traits.other || updatedCharacter.physical?.other,
             detailedHairAnalysis: traits.detailedHairAnalysis || updatedCharacter.physical?.detailedHairAnalysis,
+            apparentAge: traits.apparentAge || updatedCharacter.physical?.apparentAge,
           },
         };
         log.info(`📋 Populated physical traits from extraction for ${character.name}`);
