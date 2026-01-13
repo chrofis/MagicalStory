@@ -109,9 +109,10 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {string} artStyle - Target art style (pixar, watercolor, etc.)
  * @param {string} characterName - Character name for logging
  * @param {string} facePhoto - High-resolution face photo for identity (optional)
+ * @param {string} clothingDescription - Text description of clothing to wear (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null) {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   log.debug(`🎨 [STYLED AVATAR] Converting ${characterName} to ${artStyle} style (${hasMultipleRefs ? '2 reference images' : 'single image'})...`);
@@ -129,13 +130,17 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
   try {
     // Build full prompt using template
     let fullPrompt;
+    // Use clothing description if provided, otherwise fallback to "clothing from reference image"
+    const clothingText = clothingDescription || 'the clothing shown in Image 2 (reference avatar)';
+
     if (STYLED_AVATAR_TEMPLATE) {
       fullPrompt = STYLED_AVATAR_TEMPLATE
         .replace('{ART_STYLE_PROMPT}', artStylePrompt)
+        .replace('{CLOTHING_DESCRIPTION}', clothingText)
         .replace('{CHARACTER_NAME}', characterName);
     } else {
       // Fallback if template not loaded
-      fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features.`;
+      fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features. Wearing: ${clothingText}`;
     }
 
     // Build reference photos array
@@ -236,9 +241,10 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {string} artStyle
  * @param {string} originalAvatar - Base64 image data URL (body/clothing reference)
  * @param {string} facePhoto - High-resolution face photo for identity (optional)
+ * @param {string} clothingDescription - Text description of clothing (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -258,7 +264,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription);
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -416,12 +422,27 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
       // Priority: face thumbnail (768px) > original photo
       const facePhoto = char.photos?.face || char.photos?.original || char.photoUrl || null;
 
+      // Get clothing description text (for explicit clothing in styled avatar)
+      let clothingDescription = null;
+      if (!clothingCategory.startsWith('costumed:')) {
+        // Get stored clothing description for this category
+        clothingDescription = char.avatars?.clothing?.[clothingCategory];
+        // Also check for signature items to include
+        const signature = char.avatars?.signatures?.[clothingCategory];
+        if (signature && clothingDescription) {
+          clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+        } else if (signature && !clothingDescription) {
+          clothingDescription = `SIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
+        }
+      }
+
       if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
         neededAvatars.set(cacheKey, {
           characterName: charName,
           clothingCategory,
           originalAvatar,
-          facePhoto
+          facePhoto,
+          clothingDescription
         });
       }
     }

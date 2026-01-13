@@ -6,22 +6,22 @@ TOP ROW - EXACT COPIES OF REFERENCE (keep original style):
 
 ⚠️ TOP ROW MUST KEEP THE ORIGINAL REFERENCE STYLE - DO NOT CHANGE THE ART STYLE FOR TOP ROW.
 
-BOTTOM ROW - NEW ART STYLE WITH SIGNATURE CLOTHING:
-- BOTTOM-LEFT: Full body front view in new style: {ART_STYLE_PROMPT}. Wearing the EXACT clothing from Image 2 (the standard avatar).
+BOTTOM ROW - NEW ART STYLE WITH SPECIFIED CLOTHING:
+- BOTTOM-LEFT: Full body front view in new style: {ART_STYLE_PROMPT}. Wearing: {CLOTHING_DESCRIPTION}
 - BOTTOM-RIGHT: Full body side view facing RIGHT in same new style. Same clothing.
 
 ⚠️ ONLY THE BOTTOM ROW gets the new art style. Top row stays in reference style.
 
 REFERENCE IMAGES PROVIDED:
 - Image 1: High-resolution face photo - use for EXACT facial identity (face shape, features, skin tone, eye color, hair)
-- Image 2: Standard avatar showing current clothing - preserve this EXACT outfit (colors, patterns, accessories)
+- Image 2: Avatar showing clothing reference - use for body proportions and clothing style
 
 REQUIREMENTS:
 - SAME person in all 4 images - identical face, hair color, eye color, skin tone
 - TOP ROW: Original photorealistic style (exact copy of face from Image 1)
-- BOTTOM ROW: New art style ({ART_STYLE_PROMPT}) with clothing from Image 2
+- BOTTOM ROW: New art style ({ART_STYLE_PROMPT}) with specified clothing
 - Face shape, features, and expression MUST match Image 1 exactly
 - If subject is a child, they MUST remain a child with child-like proportions
 - NO "BEAUTIFICATION" - preserve exact facial features
 - Background: Light grey studio in all quadrants
-- All 4 quadrants show the SAME outfit from Image 2
+- Clothing in bottom row must match the description exactly

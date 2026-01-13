@@ -189,6 +189,19 @@ Outside, the garden looked like a white blanket. Sophie rolled the first snowbal
    - Page 1: Change to "grabbed her coat" (boots can be assumed)
    - Page 2: Add brief mention of Max the dog waiting by the door
    - Page 3: Remove "Max the dog" since he's now introduced on page 2
+
+---CLOTHING REQUIREMENTS---
+
+{
+  "clothingRequirements": {
+    "Sophie": {
+      "standard": { "used": false },
+      "winter": { "used": true, "signature": "red scarf, mittens" },
+      "summer": { "used": false },
+      "costumed": { "used": false }
+    }
+  }
+}
 ```
 
 
