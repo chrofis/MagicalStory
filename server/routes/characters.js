@@ -369,10 +369,28 @@ router.post('/', authenticateToken, async (req, res) => {
         // These get stripped for non-dev users on GET, so we must preserve them on save
         const basicVariants = ['standard', 'winter', 'summer', 'formal'];
         for (const variant of basicVariants) {
-          if (existingChar.avatars[variant] && !newChar.avatars?.[variant]) {
+          const existingHas = !!existingChar.avatars[variant];
+          const newHas = !!newChar.avatars?.[variant];
+          if (existingHas && !newHas) {
             mergedAvatars[variant] = existingChar.avatars[variant];
+            console.log(`[Characters] POST - Preserving avatar variant '${variant}' for ${newChar.name}`);
             hasChanges = true;
+          } else if (existingHas && newHas) {
+            console.log(`[Characters] POST - Frontend sent '${variant}' for ${newChar.name}, not preserving`);
           }
+        }
+
+        // Also preserve faceThumbnails
+        if (existingChar.avatars.faceThumbnails && !newChar.avatars?.faceThumbnails) {
+          mergedAvatars.faceThumbnails = existingChar.avatars.faceThumbnails;
+          console.log(`[Characters] POST - Preserving faceThumbnails for ${newChar.name}`);
+          hasChanges = true;
+        }
+
+        // Preserve status and generatedAt
+        if (existingChar.avatars.status && !newChar.avatars?.status) {
+          mergedAvatars.status = existingChar.avatars.status;
+          mergedAvatars.generatedAt = existingChar.avatars.generatedAt;
         }
 
         // Preserve avatar metadata (faceMatch, clothing, prompts, rawEvaluation)

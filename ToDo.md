@@ -1,227 +1,191 @@
-**Bugs / Features**
-Legal - add email legal@magicalstory.ch \& privacy@magicalstory.ch
-Legal - block US
-Legal - delete images after 30 days
+# MagicalStory TODO
 
-Avatar creation flow. First one without physical details. than read physical details from avatar. Than use details for future avatars. Correct way to implement this?
+## Bugs / High Priority
 
-
-
-
-**Ideas:**
-Flow of avatar generation when creating new. (not same as when editing)
-Pop up to guide first time users through webpage
-Propose stories based on main character
-
-
-Allow to configure a 2nd story while first one is generating
-Avatar generation only upon Email verification
-Image evalution for cover images
-Home page convert pictures to animated gifs
-Szene prompt to be restructured. Instructions what to do first, characters \& bible 2nd, story 3rd
-
-
-
-**Test:**
-Allow user to edit how avatar should be, hair, build \& clothing
-Allow users to edit text
-Allow users to regenerate image
-Scene prompt to use previous page and scene text as input, not just current page.
-verify Email sends back to login screen not generating the story
-Email verification before generating story
-ein emoji in home page unter button
-streaming display
-regenerate does not work
-Regenerating cover
-story generation does not work anymore
-Allow to select characters
-Character count completely wrong.
-Token count seems off
-
+- [ ] Legal - add email legal@magicalstory.ch & privacy@magicalstory.ch
+- [ ] Legal - block US
+- [ ] Legal - delete images after 30 days
+- [ ] Avatar creation flow: First generate without physical details, then read from avatar, then use for future avatars
 
 ---
 
-# Technical Debt & Refactoring (2024-12-29)
+## Features / Ideas
 
-## Completed
+### User Experience
+- [ ] Pop up to guide first time users through webpage
+- [ ] Propose stories based on main character
+- [ ] Allow to configure a 2nd story while first one is generating
+- [ ] Avatar generation only upon Email verification
+- [ ] Home page convert pictures to animated gifs
 
-### Security & Validation
+### Image Generation
+- [ ] Image evaluation for cover images (quality scoring)
+- [ ] Scene prompt restructure: Instructions first, characters & bible 2nd, story 3rd
+
+---
+
+## Technical Debt & Refactoring
+
+### Completed (2024-12)
+
+#### Security & Validation
 - [x] Rate limiting for `/log-error` endpoint
 - [x] File upload validation (size, MIME type)
 - [x] Password validation consistency (min 8 chars)
 - [x] Image regeneration rate limiting
 
-### Frontend
+#### Frontend
 - [x] Extract wizard step components (WizardStep1-4)
 - [x] Extract StoryDisplay modals (SceneEditModal, ImageHistoryModal, EnlargedImageModal)
 - [x] Replace all alert() calls with Toast notifications
 - [x] Extract CreditsModal from Navigation.tsx
 - [x] Create useDeveloperMode hook
 
----
+### Pending - Server Route Extraction
 
-## Pending - Server Route Extraction
-
-### Extract Webhook Handlers (~450 lines)
+#### Extract Webhook Handlers (~450 lines)
 **From:** `server.js` → **To:** `server/routes/webhooks.js`
 - `POST /api/stripe/webhook`
 - `POST /api/gelato/webhook`
 
-### Extract PDF Generation (~700 lines)
+#### Extract PDF Generation (~700 lines)
 **From:** `server.js` → **To:** `server/routes/pdf.js`
 - `GET /api/stories/:id/pdf`
 - `GET /api/stories/:id/print-pdf`
 - `POST /api/generate-pdf`
 - `POST /api/generate-book-pdf`
 
-### Extract Payment Endpoints (~250 lines)
+#### Extract Payment Endpoints (~250 lines)
 **From:** `server.js` → **To:** `server/routes/payments.js`
 - `GET /api/pricing`
 - `POST /api/stripe/create-checkout-session`
 - `POST /api/stripe/create-credits-checkout`
 
-### Extract Job Management (~530 lines)
+#### Extract Job Management (~530 lines)
 **From:** `server.js` → **To:** `server/routes/jobs.js`
 - `POST /api/jobs/create-story`
 - `GET /api/jobs/:jobId/status`
 - `POST /api/jobs/:jobId/cancel`
 
----
+### Pending - Frontend Refactoring (Optional)
 
-## Pending - Frontend Refactoring (Optional Further Reduction)
-
-### StoryWizard.tsx (2555 lines - reduced from 2646)
-Done: WizardStep1-4 extracted
-Optional further extraction:
+#### StoryWizard.tsx (2555 lines)
 - [ ] Extract `useWizardNavigation.ts` hook
-- [ ] Extract `WizardStep5Generation.tsx` (complex, many callbacks)
+- [ ] Extract `WizardStep5Generation.tsx`
 
-### StoryDisplay.tsx (2341 lines - reduced from 2512)
-Done: SceneEditModal, ImageHistoryModal, EnlargedImageModal extracted
-Optional further extraction:
+#### StoryDisplay.tsx (2341 lines)
 - [ ] Extract `TitleEditor.tsx`
 - [ ] Extract `PageDisplay.tsx`
 
-### CharacterForm.tsx (750 lines)
-- [ ] Extract step components (optional)
+#### CharacterForm.tsx (750 lines)
+- [ ] Extract step components
 
----
-
-## Pending - Performance
-
+### Pending - Performance
 - [ ] Admin users pagination
 - [ ] Gelato batch queries
 - [ ] Move MODEL_PRICING to config file
 
 ---
 
-**done**
+## Future Improvements
 
-Cover image at start of prompt, so this can start to generate early
+### Image Inpainting Alternatives
 
-Show user "my orders"
+**Current Implementation:**
+- Model: Gemini 2.5 Flash Image (~$0.04/image)
+- Limitation: No true mask support - uses text-based coordinates
+- Issue: Large area repairs (>25%) fail - we skip them
 
-Order handling Emails
+**Recommended: Stability AI SDXL**
+| Aspect | Value |
+|--------|-------|
+| Cost | ~$0.01/image (4x cheaper) |
+| Setup | Simple API key |
+| Features | True binary mask support |
 
-Email language
+**Alternative APIs:**
+| Provider | Model | Cost | Mask Support |
+|----------|-------|------|--------------|
+| Google Imagen 3 | Imagen 3 | $0.04 | Binary + dilation |
+| Google Imagen 3 | Imagen 3 Fast | $0.02 | Binary + dilation |
+| Stability AI | SDXL Inpaint | $0.01 | Full mask |
+| Replicate | FLUX Fill Pro | $0.05 | Paint-based |
+| OpenAI | GPT Image 1 Mini | $0.005-0.05 | Mask editing |
 
-height has to be changed in scene generation prompt from cm, to relative height (much bigger than)
+### Face Identity Preservation (Research Completed)
 
-Cover images to keep clothing style
+**PuLID-FLUX Testing Results (Jan 2025): NOT Recommended**
 
-Deine Geschichte sollte der Titel sein
+Problems found:
+- Smooth/painterly skin - looks like digital paintings
+- Identity drift - randomly adds/changes features
+- Pose prompts ignored - always front-facing
+- Unpredictable results
+- ~$0.07/image for mediocre quality
 
-Keine Linien Abstände im PDF print out
+**Conclusion:** Stick with Gemini for avatar generation. See `docs/FACE-EMBEDDINGS-RESEARCH.md` for full details.
 
-keine ä im Text
+---
 
-Bilder mit unterschiedlichen Format
+## Completed (Archive)
 
-Wieso limite von 9200 tokens
+<details>
+<summary>Previously completed items</summary>
 
-plot bei 24 Seiten abgeschnitten
+- [x] Cover image at start of prompt
+- [x] Show user "my orders"
+- [x] Order handling Emails
+- [x] Email language
+- [x] Height in scene generation (cm → relative height)
+- [x] Cover images keep clothing style
+- [x] "Deine Geschichte" as title
+- [x] PDF line spacing
+- [x] ä in Text
+- [x] Image format consistency
+- [x] Token limit 9200
+- [x] Plot truncation at 24 pages
+- [x] Story book print
+- [x] Pass only needed characters
+- [x] Image prompt language (German)
+- [x] Steampunk photo
+- [x] Watercolor style
+- [x] Sequential images
+- [x] New story clearing
+- [x] Relationships narrow box
+- [x] Character consistency for non-main characters
+- [x] Avatar placement (2 next to each other)
+- [x] Next button slow on relationships
+- [x] Bad example crowd
+- [x] Store character performance
+- [x] Thumbnail padding
+- [x] Email to rogerfischer
+- [x] Email direct link to story
+- [x] Printing functionality
+- [x] Text length definition
+- [x] "Meine Geschichten" centering, back button
+- [x] Admin dashboard
+- [x] Print book
+- [x] Page count
+- [x] Multiple stories in one book
+- [x] PDF text overflow, font scaling
+- [x] Password login
+- [x] Remove test for 10 images
+- [x] Pages in story generation
+- [x] Hardcover and Softcover
+- [x] Buy credits
+- [x] Generate story prompt
+- [x] Art styles images
+- [x] Art styles prompts
+- [x] Generate story button
+- [x] Home page pictures
+- [x] Remove character relations
+- [x] Privacy approval persistence
+- [x] Accept click area
+- [x] Person detection
+- [x] Home page layout
+- [x] Model display in developer view
+- [x] Status check on back navigation
+- [x] Back button navigation
+- [x] Secondary characters in scene composition
 
-story book print
-
-Dont't pass all characters only the ones needed
-
-Bild prompt nicht Deutsch
-
-steampunk photo ändern
-
-watercolor style hinzufügen
-
-sequential Bilder
-
-new story löscht alles
-
-Narrow box in relationships
-
-character consistent, if not main character, example siam katzen
-
-place avatar, 2 next to each other not 4
-
-next slow on relationships
-
-bad example crowd hinzufügen
-
-Store character takes too long
-
-A bit more padding on thumbnail
-
-Email to rogerfischer
-
-Email does not link directly to story
-
-printing does not work
-
-Text länge wo definiert?
-
-Meine Geschichten zentriert, back Pfeil eindeutiger
-
-admin dashboard
-
-print book
-
-Page count is off
-
-Mehrere Geschichten in einem Buch
-
-Text zu lange für pdf, font verkleinerung funktioniert?
-
-Entering password does not log on
-
-Remove the test for 10 images
-
-Pages do not appear in story generation
-
-Hardcover und Softcover
-
-Buy credits to create more stories
-
-generate story prompt
-
-art styles missing images
-
-art styles, missing prompts
-
-generate story button change colour and location
-
-home page add pictures
-
-removing character does not remove relations
-
-Even if user has approved privacy it is asked again
-
-Click for the accept is below the box
-
-No person detected
-
-Home page snaps below the step 1
-Home page, last button like first button
-generate pdf button colour
-Single page for story generation
-Show which model was used in developer view
-When going back status is not checked
-Back buttons don't point back
-Secondary characters are added to scene -composition, but not extracted from visual bible
+</details>
