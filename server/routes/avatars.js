@@ -2023,11 +2023,20 @@ These corrections OVERRIDE what is visible in the reference photo.
           // Store extracted physical traits (from generated avatar - reflects user corrections)
           if (faceMatchResult.physicalTraits && !results.extractedTraits) {
             results.extractedTraits = faceMatchResult.physicalTraits;
-            // Normalize: AI might return 'age' instead of 'apparentAge' - handle both
-            if (results.extractedTraits.age && !results.extractedTraits.apparentAge) {
-              results.extractedTraits.apparentAge = results.extractedTraits.age;
-              delete results.extractedTraits.age;
-              log.debug(`📋 [AVATAR EVAL] Normalized 'age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
+            // Normalize apparentAge: AI might return different field names
+            // Handle: 'apparent_age' (snake_case) or 'age' instead of 'apparentAge'
+            if (!results.extractedTraits.apparentAge) {
+              if (results.extractedTraits.apparent_age) {
+                // AI returned snake_case version
+                results.extractedTraits.apparentAge = results.extractedTraits.apparent_age;
+                delete results.extractedTraits.apparent_age;
+                log.debug(`📋 [AVATAR EVAL] Normalized 'apparent_age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
+              } else if (results.extractedTraits.age) {
+                // AI returned simple 'age'
+                results.extractedTraits.apparentAge = results.extractedTraits.age;
+                delete results.extractedTraits.age;
+                log.debug(`📋 [AVATAR EVAL] Normalized 'age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
+              }
             }
             // Include detailed hair analysis if available
             if (faceMatchResult.detailedHairAnalysis) {

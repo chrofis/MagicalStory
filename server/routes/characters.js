@@ -209,7 +209,8 @@ router.post('/', authenticateToken, async (req, res) => {
             'hair_style', c->>'hair_style',
             'other_features', c->>'other_features',
             'other', c->>'other',
-            'clothing', c->'clothing'
+            'clothing', c->'clothing',
+            'structured_clothing', c->'structured_clothing'
           )
         ) as preserved
         FROM characters, jsonb_array_elements(data->'characters') c
