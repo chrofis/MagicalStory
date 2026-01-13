@@ -1857,7 +1857,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // Update in database using rowId (e.g., "characters_1764881868108")
             charData.characters = characters;
             await dbQuery(`
-              UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2
+              UPDATE characters SET data = $1 WHERE id = $2
             `, [JSON.stringify(charData), rowId]);
 
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId}`);
