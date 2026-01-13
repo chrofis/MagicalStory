@@ -1732,10 +1732,23 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.progress = 70;
     job.message = 'Evaluating generated avatars...';
 
-    // Store results
+    // Store results and extract faceThumbnails
     for (const { category, imageData, prompt } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
-      if (imageData) results[category] = imageData;
+      if (imageData) {
+        results[category] = imageData;
+        // Extract face thumbnail from 2x2 grid (same as sync endpoint)
+        try {
+          const splitResult = await splitGridAndExtractFace(imageData);
+          if (splitResult.success && splitResult.faceThumbnail) {
+            if (!results.faceThumbnails) results.faceThumbnails = {};
+            results.faceThumbnails[category] = splitResult.faceThumbnail;
+            log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
+          }
+        } catch (err) {
+          log.warn(`[AVATAR JOB ${jobId}] Face thumbnail extraction failed for ${category}: ${err.message}`);
+        }
+      }
     }
 
     // Run evaluation on standard avatar to extract traits and clothing
