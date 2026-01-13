@@ -2600,6 +2600,22 @@ These corrections OVERRIDE what is visible in the reference photo.
             existingUsage.lastUpdated = new Date().toISOString();
             characters[charIndex].avatarTokenUsage = existingUsage;
 
+            // Also save extracted traits (apparentAge, build, etc.) and clothing to database
+            // This ensures the extraction results persist and don't rely on frontend saving
+            if (results.extractedTraits) {
+              characters[charIndex].physical = {
+                ...(characters[charIndex].physical || {}),
+                ...results.extractedTraits
+              };
+              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character (apparentAge=${results.extractedTraits.apparentAge})`);
+            }
+
+            // Save extracted clothing
+            if (results.structuredClothing?.standard) {
+              characters[charIndex].structured_clothing = results.structuredClothing.standard;
+              log.debug(`💾 [CLOTHING AVATARS] Applied extracted clothing to character`);
+            }
+
             // Save back to database
             data.characters = characters;
             await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
