@@ -1,48 +1,27 @@
-TASK: Create a 2x2 Character Concept Design Sheet / Orthographic Views. Use a GRID IMAGE with 4 views of the EXACT individual from the reference images, converted to the target art style.
+Create a 2x2 character sheet.
+
+TOP ROW - EXACT COPIES OF REFERENCE (keep original style):
+- TOP-LEFT: EXACT COPY of the reference face from Image 1. Same style, same colors, same everything. Zoomed in to show face (forehead to chin). No shoulders, no clothing visible.
+- TOP-RIGHT: EXACT COPY of reference face from Image 1, but head turned right (nose pointing right). Keep the SAME STYLE as reference image.
+
+⚠️ TOP ROW MUST KEEP THE ORIGINAL REFERENCE STYLE - DO NOT CHANGE THE ART STYLE FOR TOP ROW.
+
+BOTTOM ROW - NEW ART STYLE WITH SIGNATURE CLOTHING:
+- BOTTOM-LEFT: Full body front view in new style: {ART_STYLE_PROMPT}. Wearing the EXACT clothing from Image 2 (the standard avatar).
+- BOTTOM-RIGHT: Full body side view facing RIGHT in same new style. Same clothing.
+
+⚠️ ONLY THE BOTTOM ROW gets the new art style. Top row stays in reference style.
 
 REFERENCE IMAGES PROVIDED:
 - Image 1: High-resolution face photo - use for EXACT facial identity (face shape, features, skin tone, eye color, hair)
-- Image 2: Standard avatar showing current clothing and body proportions - preserve this outfit and build
+- Image 2: Standard avatar showing current clothing - preserve this EXACT outfit (colors, patterns, accessories)
 
-ART STYLE (CRITICAL - apply to entire image):
-{ART_STYLE_PROMPT}
-
-GRID LAYOUT (with clear black dividing lines between quadrants):
-+-------------------+-------------------+
-|  TOP LEFT         |  TOP RIGHT        |
-|  Face - Front     |  Face - 3/4       |
-|  (looking at      |  Profile (75deg   |
-|   camera)         |   looking RIGHT)  |
-+-------------------+-------------------+
-|  BOTTOM LEFT      |  BOTTOM RIGHT     |
-|  Full Body        |  Full Body        |
-|  Front View       |  Profile View     |
-|  (facing camera)  |  (facing RIGHT)   |
-+-------------------+-------------------+
-
-GRID REQUIREMENTS:
-- Clean 2x2 collage layout with a thin neutral divider
-- Both profile views (top right and bottom right) MUST face the SAME direction (RIGHT)
-- Each quadrant has solid light grey (off-white) studio background
-- All 4 quadrants show the SAME outfit from Image 2. If the outfit has pattern/logos they must be identical in size, color, and placement in all four views.
-- TOP QUADRANTS: Head and shoulders, face clearly visible
-- BOTTOM QUADRANTS: Full body from head to toe, shoes visible
-
-IDENTITY PERSISTENCE (CRITICAL):
-- Face: 100% identical to Image 1 (face photo) - Direct replication, not averaged - same face shape, features, expression style
-- Hair color, eye color, skin tone must match exactly from Image 1
-- The output MUST preserve the exact age, ethnicity, facial geometry, and unique micro-markers of the person in Image 1
-- If the subject is a child, they MUST remain a child with child-like proportions and features. Do not mature the face.
-- If the subject has specific facial markers (moles, scars, eye shape), these MUST be retained with 100% accuracy.
-- Body: Use the body proportions from Image 2 (standard avatar)
-- Enforce an age-accurate head-to-body ratio to ensure skeletal proportions match the facial age (Reference: Infant=4, Child=6, Teen=7, Adult=8)
-- Lighting: Natural, even, studio-style diffused light.
-- NO "BEAUTIFICATION". Do not apply "Standard Fashion Model" features. The face must be a literal duplicate of Image 1.
-- The goal is a photographic "Documentary" level of facial realism, rendered in the target art style.
-
-CLOTHING (preserve from Image 2):
-- Keep the EXACT same clothing visible in Image 2 (the standard avatar)
-- Preserve all clothing colors, patterns, and accessories
-- Do NOT change or modify the outfit in any way
-
-Output: High quality 2x2 grid image in the specified art style.
+REQUIREMENTS:
+- SAME person in all 4 images - identical face, hair color, eye color, skin tone
+- TOP ROW: Original photorealistic style (exact copy of face from Image 1)
+- BOTTOM ROW: New art style ({ART_STYLE_PROMPT}) with clothing from Image 2
+- Face shape, features, and expression MUST match Image 1 exactly
+- If subject is a child, they MUST remain a child with child-like proportions
+- NO "BEAUTIFICATION" - preserve exact facial features
+- Background: Light grey studio in all quadrants
+- All 4 quadrants show the SAME outfit from Image 2
