@@ -967,81 +967,49 @@ export const characterService = {
       result.extractedTraits = genResult.extractedTraits;
       result.extractedClothing = genResult.extractedClothing;
 
-      // Now save back to storage
-      onProgress?.('saving', `Saving avatars for ${character.name}...`);
+      // Server avatar job already saved to database directly - no need to save again
+      // Just fetch fresh data to get the server's version with extracted traits/clothing
+      onProgress?.('saving', `Fetching updated data for ${character.name}...`);
 
-      // Fetch current data to get relationships and other characters
-      const currentData = await characterService.getCharacterData();
+      // Fetch fresh data from server (avatar job already saved everything)
+      const freshData = await characterService.getCharacterData();
+      const freshCharacter = freshData.characters.find(c => c.id === character.id);
 
-      // Build updated character with avatars AND extracted traits/clothing
-      let updatedCharacter = { ...character, avatars: genResult.avatars };
-
-      // Populate physical traits from extraction (if available)
-      // Note: gender and age are NOT extracted - user must input them
-      if (genResult.extractedTraits) {
-        const traits = genResult.extractedTraits;
-        updatedCharacter = {
-          ...updatedCharacter,
-          // Update physical traits only (not age/gender - user inputs those)
-          physical: {
-            ...updatedCharacter.physical,
-            build: traits.build || updatedCharacter.physical?.build,
-            eyeColor: traits.eyeColor || updatedCharacter.physical?.eyeColor,
-            eyeColorHex: traits.eyeColorHex || updatedCharacter.physical?.eyeColorHex,
-            hairColor: traits.hairColor || updatedCharacter.physical?.hairColor,
-            hairColorHex: traits.hairColorHex || updatedCharacter.physical?.hairColorHex,
-            hairLength: traits.hairLength || updatedCharacter.physical?.hairLength,
-            hairStyle: traits.hairStyle || updatedCharacter.physical?.hairStyle,
-            facialHair: traits.facialHair || updatedCharacter.physical?.facialHair,
-            skinTone: traits.skinTone || updatedCharacter.physical?.skinTone,
-            skinToneHex: traits.skinToneHex || updatedCharacter.physical?.skinToneHex,
-            face: traits.face || updatedCharacter.physical?.face,
-            other: traits.other || updatedCharacter.physical?.other,
-            detailedHairAnalysis: traits.detailedHairAnalysis || updatedCharacter.physical?.detailedHairAnalysis,
-            apparentAge: (traits.apparentAge as AgeCategory) || updatedCharacter.physical?.apparentAge,
-          },
-        };
-        log.info(`📋 Populated physical traits from extraction for ${character.name}`);
-      }
-
-      // Populate structured clothing from extraction (if available)
-      if (genResult.extractedClothing) {
-        const clothing = genResult.extractedClothing;
-        updatedCharacter = {
-          ...updatedCharacter,
-          clothing: {
-            ...updatedCharacter.clothing,
+      if (freshCharacter) {
+        result.character = freshCharacter;
+        log.info(`📋 Using server-saved data for ${character.name} (traits, clothing already saved by avatar job)`);
+      } else {
+        // Fallback: build character locally if not found in server data (shouldn't happen)
+        log.warn(`⚠️ Character ${character.name} not found in server data after avatar job - using local data`);
+        result.character = {
+          ...character,
+          avatars: genResult.avatars,
+          physical: genResult.extractedTraits ? {
+            ...character.physical,
+            apparentAge: (genResult.extractedTraits.apparentAge as AgeCategory) || character.physical?.apparentAge,
+            build: genResult.extractedTraits.build || character.physical?.build,
+            eyeColor: genResult.extractedTraits.eyeColor || character.physical?.eyeColor,
+            eyeColorHex: genResult.extractedTraits.eyeColorHex || character.physical?.eyeColorHex,
+            hairColor: genResult.extractedTraits.hairColor || character.physical?.hairColor,
+            hairColorHex: genResult.extractedTraits.hairColorHex || character.physical?.hairColorHex,
+            hairLength: genResult.extractedTraits.hairLength || character.physical?.hairLength,
+            hairStyle: genResult.extractedTraits.hairStyle || character.physical?.hairStyle,
+            skinTone: genResult.extractedTraits.skinTone || character.physical?.skinTone,
+            skinToneHex: genResult.extractedTraits.skinToneHex || character.physical?.skinToneHex,
+          } : character.physical,
+          clothing: genResult.extractedClothing ? {
+            ...character.clothing,
             structured: {
-              upperBody: clothing.upperBody || undefined,
-              lowerBody: clothing.lowerBody || undefined,
-              shoes: clothing.shoes || undefined,
-              fullBody: clothing.fullBody || undefined,
+              upperBody: genResult.extractedClothing.upperBody || undefined,
+              lowerBody: genResult.extractedClothing.lowerBody || undefined,
+              shoes: genResult.extractedClothing.shoes || undefined,
+              fullBody: genResult.extractedClothing.fullBody || undefined,
             },
-          },
+          } : character.clothing,
         };
-        log.info(`👕 Populated structured clothing from extraction for ${character.name}`);
       }
-
-      // Update the character with new avatars and extracted data
-      // Check if character exists in the list (might be new character not yet saved)
-      const characterExists = currentData.characters.some(c => c.id === character.id);
-      const updatedCharacters = characterExists
-        ? currentData.characters.map(c => c.id === character.id ? updatedCharacter : c)
-        : [...currentData.characters, updatedCharacter]; // Add new character if not found
-
-      if (!characterExists) {
-        log.info(`📝 Character ${character.name} (id: ${character.id}) not found in server data - adding it`);
-      }
-
-      // Save back - preserve avatars since we just generated them
-      // Also include photos since this is typically called right after photo upload
-      await characterService.saveCharacterData({
-        ...currentData,
-        characters: updatedCharacters,
-      }, { preserveAvatars: true, includePhotos: true });
 
       result.success = true;
-      result.character = updatedCharacter;  // Return the updated character with avatars and extracted data
       onProgress?.('complete', `Avatars saved for ${character.name}`);
       log.success(`✅ Avatars generated and saved for ${character.name}`);
 
