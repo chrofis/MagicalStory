@@ -210,7 +210,8 @@ router.post('/', authenticateToken, async (req, res) => {
             'other_features', c->>'other_features',
             'other', c->>'other',
             'clothing', c->'clothing',
-            'structured_clothing', c->'structured_clothing'
+            'structured_clothing', c->'structured_clothing',
+            'physical', c->'physical'
           )
         ) as preserved
         FROM characters, jsonb_array_elements(data->'characters') c
@@ -324,13 +325,26 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Preserve physical traits object (contains height, skinTone, eyeColor, hairColor, etc.)
-        if (existingChar.physical && !newChar.physical) {
-          mergedChar.physical = existingChar.physical;
+        const existingPhysical = existingChar.physical || {};
+        const newPhysical = newChar.physical || {};
+        const newPhysicalEmpty = Object.keys(newPhysical).length === 0 ||
+          !Object.values(newPhysical).some(v => v !== null && v !== undefined && v !== '');
+
+        if (Object.keys(existingPhysical).length > 0 && newPhysicalEmpty) {
+          // Frontend sent empty physical - preserve from DB
+          mergedChar.physical = existingPhysical;
           preservedFields.push('physical');
           hasChanges = true;
-        } else if (existingChar.physical && newChar.physical) {
-          // Merge physical traits - keep existing values for any missing fields
-          mergedChar.physical = { ...existingChar.physical, ...newChar.physical };
+        } else if (Object.keys(existingPhysical).length > 0) {
+          // Merge physical traits - keep existing values for any missing/empty fields in new
+          const merged = { ...existingPhysical };
+          for (const [key, value] of Object.entries(newPhysical)) {
+            // Only use new value if it's truthy (not null, undefined, or empty string)
+            if (value !== null && value !== undefined && value !== '') {
+              merged[key] = value;
+            }
+          }
+          mergedChar.physical = merged;
         }
 
         // Preserve photos object (contains face, original, bodyNoBg URLs)

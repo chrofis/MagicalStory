@@ -69,7 +69,19 @@
 
 ### Pending - Frontend Refactoring (Optional)
 
-#### StoryWizard.tsx (2555 lines)
+#### URL Structure Refactoring
+Currently `/create` handles everything (wizard, generation, viewing). Split into cleaner routes:
+- [ ] `/create` - wizard for creating stories (steps 1-5 only)
+- [ ] `/story/:id` - viewing a completed story
+- [ ] `/story/:id/generating` or `/generating/:jobId` - watching generation progress
+
+Benefits:
+- StoryWizard.tsx becomes much simpler (just wizard steps)
+- Cleaner, shareable URLs
+- Separation of concerns
+- Easier navigation to ongoing generation from anywhere
+
+#### StoryWizard.tsx (~3800 lines)
 - [ ] Extract `useWizardNavigation.ts` hook
 - [ ] Extract `WizardStep5Generation.tsx`
 
@@ -106,6 +118,31 @@
 ### Missing Route Exports
 
 - [ ] `avatarsRoutes` loaded directly in server.js, not exported from `server/routes/index.js`
+
+### Character Attributes - Legacy Cleanup
+
+**Physical Traits (17 active + 1 deprecated):**
+- Active: `height`, `build`, `face`, `eyeColor`/`eyeColorHex`, `hairColor`/`hairColorHex`, `hairLength`, `hairStyle`, `facialHair`, `skinTone`/`skinUndertone`/`skinToneHex`, `other`, `detailedHairAnalysis`, `apparentAge`
+- [ ] **DEPRECATED:** `hair` field - remove and migrate to `hairColor` + `hairLength` + `hairStyle`
+
+**Clothing Attributes (4 active + 1 deprecated):**
+- Active: `upperBody`, `lowerBody`, `shoes`, `fullBody` (mutually exclusive)
+- Categories: `winter`, `standard`, `summer`, `formal`
+- [ ] **DEPRECATED:** `clothing.current` (free-text) - remove, use `clothing.structured` only
+
+**Snake_case vs camelCase (API compatibility):**
+- [ ] Consider standardizing to camelCase only: `apparent_age`→`apparentAge`, `photo_url`→`photoUrl`, `structured_clothing`→`structuredClothing`, etc.
+- Currently both formats supported in `characterService.ts` for backward compatibility
+
+**Deprecated Type Aliases (TODO: Remove):**
+- [ ] `ClothingAvatars` → `CharacterAvatars`
+- [ ] `PhysicalFeatures` → `PhysicalTraits`
+- Location: `client/src/types/character.ts` (lines 303-306)
+
+**Key Files:**
+- `client/src/types/character.ts` - Type definitions
+- `client/src/services/characterService.ts` - API mapping with legacy support
+- `prompts/avatar-evaluation.txt` - Extraction prompt with field values
 
 ---
 
