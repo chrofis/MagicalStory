@@ -1492,7 +1492,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
     // Run evaluation on standard avatar to extract traits and clothing
     const standardAvatar = generatedAvatars.find(a => a.category === 'standard' && a.imageData);
+    log.debug(`🔍 [AVATAR JOB ${jobId}] Checking evaluation: standardAvatar=${!!standardAvatar}, geminiApiKey=${!!geminiApiKey}`);
     if (standardAvatar && geminiApiKey) {
+      log.debug(`🔍 [AVATAR JOB ${jobId}] Starting evaluation...`);
       job.progress = 80;
       job.message = 'Extracting traits and clothing...';
 
