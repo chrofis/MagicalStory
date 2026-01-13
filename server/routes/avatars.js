@@ -1796,7 +1796,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         log.debug(`💾 [AVATAR JOB ${jobId}] Updating character ${characterId} in database with extracted data`);
 
         // Get current character data
-        const charResult = await db.query(`
+        const charResult = await dbQuery(`
           SELECT data FROM characters WHERE id = $1 AND user_id = $2
         `, [characterId, user.id]);
 
@@ -1814,8 +1814,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           if (characters[charIndex]) {
             // Apply extracted traits
             if (results.extractedTraits) {
-              characters[charIndex].physicalTraits = {
-                ...(characters[charIndex].physicalTraits || {}),
+              characters[charIndex].physical = {
+                ...(characters[charIndex].physical || {}),
                 ...results.extractedTraits
               };
               log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted traits to character`);
@@ -1827,9 +1827,24 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted clothing to character: ${JSON.stringify(results.structuredClothing.standard)}`);
             }
 
+            // Save avatars data including faceThumbnails
+            if (results.faceThumbnails || results.standard || results.winter || results.summer) {
+              characters[charIndex].avatars = {
+                ...(characters[charIndex].avatars || {}),
+                status: 'complete',
+                generatedAt: new Date().toISOString(),
+                ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
+                ...(results.standard && { standard: results.standard }),
+                ...(results.winter && { winter: results.winter }),
+                ...(results.summer && { summer: results.summer }),
+                ...(results.clothing && { clothing: results.clothing }),
+              };
+              log.debug(`💾 [AVATAR JOB ${jobId}] Applied avatar data including faceThumbnails`);
+            }
+
             // Update in database
             charData.characters = characters;
-            await db.query(`
+            await dbQuery(`
               UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3
             `, [JSON.stringify(charData), characterId, user.id]);
 
