@@ -2503,7 +2503,7 @@ export function CharacterForm({
                 : 'Click on the image you like best'}
             </p>
 
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
               {avatarOptions.map((option) => (
                 <div
                   key={option.id}

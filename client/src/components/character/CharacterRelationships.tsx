@@ -177,10 +177,9 @@ export function CharacterRelationships({
                     </div>
                   )}
 
-                  {/* Details input below dropdown */}
+                  {/* Details input below dropdown - textarea for better mobile editing */}
                   {isForwardDefined && (
-                    <input
-                      type="text"
+                    <textarea
                       value={sharedComment}
                       onChange={(e) => {
                         // Update both keys with the same comment
@@ -188,7 +187,8 @@ export function CharacterRelationships({
                         onRelationshipTextChange(inverseKey, e.target.value);
                       }}
                       placeholder={translations.detailsPlaceholder}
-                      className="w-full px-3 py-1.5 md:px-4 md:py-2 border border-blue-300 rounded text-xs md:text-sm text-center bg-white"
+                      rows={2}
+                      className="w-full px-3 py-2 md:px-4 md:py-3 border border-blue-300 rounded-lg text-sm md:text-base text-center bg-white resize-none focus:border-indigo-500 focus:outline-none"
                     />
                   )}
                 </div>
