@@ -435,6 +435,16 @@ const aiProxyLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Job status polling rate limiter (very permissive - lightweight read operation)
+// Allows frequent polling during story generation without hitting limits
+const jobStatusLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 300, // 300 requests per minute (5/second)
+  message: { error: 'Too many status requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Apply general rate limit to all API routes
 app.use('/api/', apiLimiter);
 
@@ -10931,8 +10941,8 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
   }
 });
 
-// Get job status
-app.get('/api/jobs/:jobId/status', authenticateToken, async (req, res) => {
+// Get job status (uses permissive rate limiter for frequent polling)
+app.get('/api/jobs/:jobId/status', jobStatusLimiter, authenticateToken, async (req, res) => {
   try {
     const { jobId } = req.params;
     const userId = req.user.id;
