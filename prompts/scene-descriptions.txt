@@ -41,7 +41,36 @@ You are an award-winning Art Director with 20 years of experience in children's 
 
 ---
 
-**OUTPUT FORMAT:**
+**INTERNAL PROCESS (you must complete all steps):**
+
+**STEP 1 - DRAFT:**
+Write a quick draft of what you want to illustrate:
+- Which moment to capture
+- Which characters are present (max 3)
+- Rough positions and key objects
+
+**STEP 2 - CONNECTION REVIEW:**
+Check EVERY connection between elements. For each pair, answer:
+
+Character ↔ Character connections:
+- Are they facing each other? If yes, are their bodies AND heads oriented correctly?
+- If one looks at the other, does the other look back or elsewhere? (specify)
+- What is the physical distance between them?
+
+Character ↔ Object connections:
+- If holding: which hand? Is the other hand accounted for?
+- If using: is the action physically possible from their position?
+- If near: is the spatial relationship clear (left of, on top of, behind)?
+
+Body consistency for each character:
+- Both arms: where is each one?
+- Body facing vs head facing: same direction or different? (if different, is it intentional?)
+- Pose vs action: does the pose support the action?
+
+Flag any issues found and how you'll fix them in the final output.
+
+**STEP 3 - FINAL OUTPUT:**
+Now write the polished output with all issues resolved:
 
 **1. Image Summary**
 - Which single moment you will illustrate

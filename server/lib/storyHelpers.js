@@ -129,9 +129,26 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 function stripSceneMetadata(sceneDescription) {
   if (!sceneDescription) return sceneDescription;
 
+  let stripped = sceneDescription;
+
+  // Remove DRAFT section (STEP 1) - internal process, not needed for image generation
+  stripped = stripped
+    .replace(/\n*\*{0,2}(?:STEP\s*1\s*[-–]?\s*)?DRAFT\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*2|CONNECTION\s*REVIEW|CRITICISM))/gi, '')
+    .trim();
+
+  // Remove CONNECTION REVIEW / CRITICISM section (STEP 2) - internal process
+  stripped = stripped
+    .replace(/\n*\*{0,2}(?:STEP\s*2\s*[-–]?\s*)?(?:CONNECTION\s*REVIEW|CRITICISM)\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*3|FINAL\s*OUTPUT|1\.\s))/gi, '')
+    .trim();
+
+  // Remove FINAL OUTPUT header (STEP 3) - keep the content, just remove the header
+  stripped = stripped
+    .replace(/\n*\*{0,2}(?:STEP\s*3\s*[-–]?\s*)?FINAL\s*OUTPUT\*{0,2}:?\s*\n*/gi, '\n')
+    .trim();
+
   // Remove section header and JSON block: "5. **METADATA (JSON):**\n```json\n...\n```" or just "```json\n...\n```"
   // Also handle variations like "**METADATA:**" or just the JSON block
-  let stripped = sceneDescription
+  stripped = stripped
     .replace(/\n*\d*\.?\s*\*{0,2}METADATA\s*\(?JSON\)?\*{0,2}:?\s*\n*```json[\s\S]*?```\n*/gi, '\n')
     .replace(/```json[\s\S]*?```\n*/gi, '')
     .trim();
