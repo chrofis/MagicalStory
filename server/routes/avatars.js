@@ -1791,25 +1791,36 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     }
 
     // Directly update character in database with extracted traits and clothing
-    if (characterId && (results.extractedTraits || results.structuredClothing?.standard)) {
+    if (characterId && (results.extractedTraits || results.structuredClothing?.standard || results.standard)) {
       try {
-        log.debug(`💾 [AVATAR JOB ${jobId}] Updating character ${characterId} in database with extracted data`);
+        log.debug(`💾 [AVATAR JOB ${jobId}] Updating character ${characterId} (internal ID) in database with extracted data`);
 
-        // Get current character data
+        // Get current character data - query by user_id since there's one row per user
         const charResult = await dbQuery(`
-          SELECT data FROM characters WHERE id = $1 AND user_id = $2
-        `, [characterId, user.id]);
+          SELECT id, data FROM characters WHERE user_id = $1
+        `, [user.id]);
 
         if (charResult.rows.length > 0) {
+          const rowId = charResult.rows[0].id; // e.g., "characters_1764881868108"
           const charData = charResult.rows[0].data || {};
           const characters = charData.characters || [];
 
-          // Find the character (usually first one for single-character stories, or match by name)
-          let charIndex = 0;
-          if (name && characters.length > 1) {
-            const foundIndex = characters.findIndex(c => c.name === name);
-            if (foundIndex >= 0) charIndex = foundIndex;
+          // Find the character by its internal ID (characterId is the character's id within the array)
+          let charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+
+          // Fallback: find by name if ID match fails
+          if (charIndex < 0 && name) {
+            charIndex = characters.findIndex(c => c.name === name);
           }
+
+          // Last resort: use first character
+          if (charIndex < 0 && characters.length > 0) {
+            charIndex = 0;
+            log.debug(`💾 [AVATAR JOB ${jobId}] Could not find character by ID ${characterId}, using first character`);
+          }
+
+          log.debug(`💾 [AVATAR JOB ${jobId}] Found character at index ${charIndex} (rowId: ${rowId})`);
+
 
           if (characters[charIndex]) {
             // Apply extracted traits
@@ -1842,13 +1853,13 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.debug(`💾 [AVATAR JOB ${jobId}] Applied avatar data including faceThumbnails`);
             }
 
-            // Update in database
+            // Update in database using rowId (e.g., "characters_1764881868108")
             charData.characters = characters;
             await dbQuery(`
-              UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2 AND user_id = $3
-            `, [JSON.stringify(charData), characterId, user.id]);
+              UPDATE characters SET data = $1, updated_at = NOW() WHERE id = $2
+            `, [JSON.stringify(charData), rowId]);
 
-            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${characterId} with extracted traits and clothing`);
+            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId}`);
           }
         }
       } catch (dbErr) {
