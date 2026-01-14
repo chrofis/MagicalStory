@@ -97,6 +97,46 @@ const CATEGORY_TO_TYPE = [
 ];
 
 /**
+ * Fetch Wikidata Q-IDs for a batch of Wikipedia page IDs
+ * Q-IDs are universal identifiers that are the same across all language editions
+ * e.g., "Bundeshaus" (de) and "Federal Palace" (en) both have Q213207
+ * @param {string} lang - Wikipedia language code (e.g., 'de', 'en')
+ * @param {number[]} pageIds - Array of page IDs to fetch Q-IDs for
+ * @returns {Promise<Map<number, string>>} - Map of pageId -> Wikidata Q-ID
+ */
+async function fetchWikidataIds(lang, pageIds) {
+  if (!pageIds || pageIds.length === 0) return new Map();
+
+  const results = new Map();
+  const batchSize = 50;
+
+  for (let i = 0; i < pageIds.length; i += batchSize) {
+    const batch = pageIds.slice(i, i + batchSize);
+    const url = `https://${lang}.wikipedia.org/w/api.php?` +
+      `action=query&pageids=${batch.join('|')}` +
+      `&prop=pageprops&ppprop=wikibase_item` +
+      `&format=json&origin=*`;
+
+    try {
+      const res = await fetch(url, { headers: WIKI_HEADERS });
+      const data = await res.json();
+
+      const pages = data.query?.pages || {};
+      for (const [pageId, page] of Object.entries(pages)) {
+        const qid = page.pageprops?.wikibase_item;
+        if (qid) {
+          results.set(parseInt(pageId), qid);
+        }
+      }
+    } catch (err) {
+      log.warn(`[LANDMARK-QID] Failed to fetch Wikidata IDs for ${lang}: ${err.message}`);
+    }
+  }
+
+  return results;
+}
+
+/**
  * Fetch Wikipedia categories for a batch of page IDs
  * @param {string} lang - Wikipedia language code (e.g., 'de', 'en')
  * @param {number[]} pageIds - Array of page IDs to fetch categories for
@@ -747,6 +787,7 @@ function extractLandmarkName(filename) {
  * Search Wikipedia for landmarks/POIs near coordinates
  * Wikipedia has clean article titles (actual landmark names)
  * Searches multiple language Wikipedias for better coverage
+ * Uses Wikidata Q-IDs to deduplicate across languages (same landmark, different names)
  * @param {number} lat - Latitude
  * @param {number} lon - Longitude
  * @param {number} radiusMeters - Search radius
@@ -775,7 +816,10 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
     languages = ['es', 'en']; // Spain: Spanish, English
   }
 
-  const allLandmarks = new Map(); // Dedupe by name across languages
+  // Language priority for deduplication (prefer German names for Swiss/German content)
+  const langPriority = { 'de': 1, 'en': 2, 'fr': 3, 'it': 4, 'es': 5 };
+
+  const allCandidates = []; // Collect all candidates first, dedupe later by Q-ID
   const excludeRegex = excludePattern ? new RegExp(excludePattern, 'i') : null;
 
   // German landmark indicators (for de.wikipedia)
@@ -786,6 +830,7 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
   // French landmark indicators (for fr.wikipedia)
   const frenchLandmarkIndicator = /(château|église|cathédrale|abbaye|monastère|pont|tour|musée|parc|jardin|palais|fontaine|monument|statue|gare|théâtre|place|marché|porte|mur|ruine|bain|therme|temple|chapelle|bibliothèque|université|école|hôpital|synagogue|mosquée|tunnel|col|stade|moulin|barrage|lac|rivière|cascade|grotte|montagne|île|phare)/i;
 
+  // PHASE 1: Collect candidates from all languages
   for (const lang of languages) {
     const url = `https://${lang}.wikipedia.org/w/api.php?` +
       `action=query&list=geosearch` +
@@ -799,6 +844,7 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
       const res = await fetch(url, { headers: WIKI_HEADERS });
       const data = await res.json();
 
+      const langCandidates = [];
       for (const item of data.query?.geosearch || []) {
         const name = item.title;
 
@@ -850,41 +896,93 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
           continue;
         }
 
-        // Dedupe by lowercase name - keep the one with shortest distance
-        const key = name.toLowerCase();
-        if (!allLandmarks.has(key) || item.dist < allLandmarks.get(key).distance) {
-          allLandmarks.set(key, {
-            name,
-            query: name,
-            source: `wikipedia-${lang}`,
-            distance: item.dist,
-            pageId: item.pageid,  // Store for category lookup
-            lang                   // Store which Wikipedia to query
-          });
+        langCandidates.push({
+          name,
+          query: name,
+          source: `wikipedia-${lang}`,
+          distance: item.dist,
+          pageId: item.pageid,
+          lang
+        });
+      }
+
+      // Fetch Wikidata Q-IDs for this language batch
+      if (langCandidates.length > 0) {
+        const pageIds = langCandidates.map(l => l.pageId);
+        const qidMap = await fetchWikidataIds(lang, pageIds);
+
+        for (const candidate of langCandidates) {
+          candidate.qid = qidMap.get(candidate.pageId) || null;
+          allCandidates.push(candidate);
         }
       }
 
-      log.debug(`[LANDMARK] Wikipedia (${lang}) found ${data.query?.geosearch?.length || 0} articles, ${allLandmarks.size} unique landmarks total`);
+      log.debug(`[LANDMARK] Wikipedia (${lang}) found ${langCandidates.length} candidates`);
     } catch (err) {
       log.error(`[LANDMARK] Wikipedia (${lang}) geosearch error:`, err.message);
     }
   }
 
-  const landmarks = Array.from(allLandmarks.values());
-  log.debug(`[LANDMARK] Wikipedia found ${landmarks.length} landmarks across ${languages.length} languages`);
+  // PHASE 2: Deduplicate by Wikidata Q-ID
+  // Same Q-ID = same landmark in different languages (e.g., "Bundeshaus" = "Palais fédéral")
+  const byQid = new Map();
+  const noQid = [];
 
-  // Enrich with categories (type + boost flag) - one API call per language
-  if (landmarks.length > 0) {
-    log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT START for ${landmarks.length} landmarks`);
-    await enrichLandmarksWithCategories(landmarks);
-    log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT DONE`);
-    const highBoostCount = landmarks.filter(l => l.boostAmount === 100).length;
-    const medBoostCount = landmarks.filter(l => l.boostAmount === 50).length;
-    const typedCount = landmarks.filter(l => l.type).length;
-    log.debug(`[LANDMARK] Categories: ${typedCount}/${landmarks.length} typed, ${highBoostCount} high boost, ${medBoostCount} med boost`);
+  for (const candidate of allCandidates) {
+    if (candidate.qid) {
+      if (!byQid.has(candidate.qid)) {
+        byQid.set(candidate.qid, []);
+      }
+      byQid.get(candidate.qid).push(candidate);
+    } else {
+      // No Q-ID - dedupe by name instead
+      noQid.push(candidate);
+    }
   }
 
-  return landmarks;
+  // Build deduplicated list: for each Q-ID, pick the preferred language variant
+  const deduplicated = [];
+  let duplicateCount = 0;
+
+  for (const [qid, variants] of byQid.entries()) {
+    if (variants.length > 1) {
+      duplicateCount++;
+      log.debug(`[LANDMARK] 🔗 ${qid}: ${variants.map(v => `${v.name}(${v.lang})`).join(' = ')}`);
+    }
+
+    // Sort by language priority and pick first (prefer German, then English, etc.)
+    variants.sort((a, b) => (langPriority[a.lang] || 99) - (langPriority[b.lang] || 99));
+    const best = variants[0];
+
+    // Store all language variants for reference
+    best.variants = variants.map(v => ({ name: v.name, lang: v.lang }));
+    deduplicated.push(best);
+  }
+
+  // Add landmarks without Q-ID (dedupe by name)
+  const noQidDeduped = new Map();
+  for (const candidate of noQid) {
+    const key = candidate.name.toLowerCase();
+    if (!noQidDeduped.has(key) || candidate.distance < noQidDeduped.get(key).distance) {
+      noQidDeduped.set(key, candidate);
+    }
+  }
+  deduplicated.push(...noQidDeduped.values());
+
+  log.info(`[LANDMARK] 🔄 Wikidata dedup: ${allCandidates.length} candidates → ${deduplicated.length} unique (${duplicateCount} duplicates merged)`);
+
+  // Enrich with categories (type + boost flag) - one API call per language
+  if (deduplicated.length > 0) {
+    log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT START for ${deduplicated.length} landmarks`);
+    await enrichLandmarksWithCategories(deduplicated);
+    log.info(`[LANDMARK] 📂 CATEGORY ENRICHMENT DONE`);
+    const highBoostCount = deduplicated.filter(l => l.boostAmount === 100).length;
+    const medBoostCount = deduplicated.filter(l => l.boostAmount === 50).length;
+    const typedCount = deduplicated.filter(l => l.type).length;
+    log.debug(`[LANDMARK] Categories: ${typedCount}/${deduplicated.length} typed, ${highBoostCount} high boost, ${medBoostCount} med boost`);
+  }
+
+  return deduplicated;
 }
 
 /**
