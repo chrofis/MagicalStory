@@ -384,128 +384,35 @@ router.post('/', authenticateToken, async (req, res) => {
           console.log(`[Characters] POST - Preserving fields for ${newChar.name}: ${preservedFields.join(', ')}`);
         }
 
-        // Preserve clothing_avatars/avatars from existing if not sent
-        if (!existingChar.avatars) {
+        // Avatar data is managed by backend (avatar generation saves directly to DB)
+        // Frontend only sends metadata (status, generatedAt, stale) - never images
+        // So we START with DB avatars and only update metadata from frontend
+        if (!existingChar.avatars && !newChar.avatars) {
           if (hasChanges) preservedCount++;
           return mergedChar;
         }
 
-        const mergedAvatars = { ...newChar.avatars };
+        // Start with DB avatars (has all images, thumbnails, etc.)
+        // If no DB avatars but frontend sent something, use frontend as base
+        const mergedAvatars = existingChar.avatars
+          ? { ...existingChar.avatars }
+          : { ...newChar.avatars };
 
-        // Preserve basic avatar variants (standard, winter, summer, formal) from database
-        // These get stripped for non-dev users on GET, so we must preserve them on save
-        // BUT: If frontend sent generatedAt, avatars were just generated - don't overwrite with stale DB data
-        const basicVariants = ['standard', 'winter', 'summer', 'formal'];
-        const frontendHasFreshAvatars = !!newChar.avatars?.generatedAt;
-        for (const variant of basicVariants) {
-          const existingHas = !!existingChar.avatars[variant];
-          const newHas = !!newChar.avatars?.[variant];
-          if (existingHas && !newHas && !frontendHasFreshAvatars) {
-            mergedAvatars[variant] = existingChar.avatars[variant];
-            console.log(`[Characters] POST - Preserving avatar variant '${variant}' for ${newChar.name}`);
-            hasChanges = true;
-          } else if (existingHas && newHas) {
-            console.log(`[Characters] POST - Frontend sent '${variant}' for ${newChar.name}, not preserving`);
-          } else if (existingHas && frontendHasFreshAvatars) {
-            console.log(`[Characters] POST - Frontend has fresh avatars (generatedAt), not preserving stale '${variant}' for ${newChar.name}`);
-          }
-        }
+        // Update metadata from frontend if provided
+        if (newChar.avatars?.status) mergedAvatars.status = newChar.avatars.status;
+        if (newChar.avatars?.generatedAt) mergedAvatars.generatedAt = newChar.avatars.generatedAt;
+        if (newChar.avatars?.stale !== undefined) mergedAvatars.stale = newChar.avatars.stale;
 
-        // Also preserve faceThumbnails
-        if (existingChar.avatars.faceThumbnails && !newChar.avatars?.faceThumbnails) {
-          mergedAvatars.faceThumbnails = existingChar.avatars.faceThumbnails;
-          console.log(`[Characters] POST - Preserving faceThumbnails for ${newChar.name}`);
-          hasChanges = true;
-        }
+        console.log(`[Characters] POST - Using DB avatars for ${newChar.name}, updated metadata from frontend`);
+        hasChanges = true;
 
-        // Preserve status and generatedAt
-        if (existingChar.avatars.status && !newChar.avatars?.status) {
-          mergedAvatars.status = existingChar.avatars.status;
-          mergedAvatars.generatedAt = existingChar.avatars.generatedAt;
-        }
-
-        // Preserve avatar metadata (faceMatch, clothing, prompts, rawEvaluation)
-        if (existingChar.avatars.faceMatch && !newChar.avatars?.faceMatch) {
-          mergedAvatars.faceMatch = existingChar.avatars.faceMatch;
-        }
-        if (existingChar.avatars.clothing && !newChar.avatars?.clothing) {
-          mergedAvatars.clothing = existingChar.avatars.clothing;
-        }
-        if (existingChar.avatars.prompts && !newChar.avatars?.prompts) {
-          mergedAvatars.prompts = existingChar.avatars.prompts;
-        }
-        if (existingChar.avatars.rawEvaluation && !newChar.avatars?.rawEvaluation) {
-          mergedAvatars.rawEvaluation = existingChar.avatars.rawEvaluation;
-        }
-
-        // Merge styledAvatars: request data wins over database (for fresh avatar generation)
-        if (existingChar.avatars.styledAvatars || mergedAvatars.styledAvatars) {
-          const dbStyles = Object.keys(existingChar.avatars.styledAvatars || {});
-          const reqStyles = Object.keys(mergedAvatars.styledAvatars || {});
-          if (dbStyles.length > 0) {
-            console.log(`[Characters] POST - Merging styledAvatars for ${newChar.name}: DB has [${dbStyles.join(', ')}], request has [${reqStyles.join(', ')}]`);
-          }
-          // Deep merge styled avatars: DB as base, request wins
-          const mergedStyled = { ...existingChar.avatars.styledAvatars };
-          for (const [styleKey, styleValue] of Object.entries(mergedAvatars.styledAvatars || {})) {
-            if (typeof styleValue === 'object' && styleValue !== null) {
-              mergedStyled[styleKey] = {
-                ...mergedStyled[styleKey],
-                ...styleValue  // Request data wins
-              };
-            }
-          }
-          mergedAvatars.styledAvatars = mergedStyled;
-          hasChanges = true;
-        }
-
-        // Merge costumed avatars: request data wins over database
-        if (existingChar.avatars.costumed || mergedAvatars.costumed) {
-          const dbTypes = Object.keys(existingChar.avatars.costumed || {});
-          const reqTypes = Object.keys(mergedAvatars.costumed || {});
-          if (dbTypes.length > 0 || reqTypes.length > 0) {
-            console.log(`[Characters] POST - Merging costumed for ${newChar.name}: DB has [${dbTypes.join(', ')}], request has [${reqTypes.join(', ')}]`);
-          }
-          mergedAvatars.costumed = {
-            ...existingChar.avatars.costumed,  // DB as base
-            ...mergedAvatars.costumed          // Request wins
-          };
-          hasChanges = true;
-        }
-
-        // Merge clothing descriptions for costumed: request data wins
-        if (existingChar.avatars.clothing?.costumed || mergedAvatars.clothing?.costumed) {
-          if (!mergedAvatars.clothing) mergedAvatars.clothing = {};
-          mergedAvatars.clothing.costumed = {
-            ...existingChar.avatars.clothing?.costumed,  // DB as base
-            ...mergedAvatars.clothing?.costumed          // Request wins
-          };
-          hasChanges = true;
-        }
-
-        // Merge signatures: request data wins over database
-        if (existingChar.avatars.signatures || mergedAvatars.signatures) {
-          mergedAvatars.signatures = {
-            ...existingChar.avatars.signatures,  // DB as base
-            ...mergedAvatars.signatures          // Request wins
-          };
-          hasChanges = true;
-        }
-
-        // Preserve faceThumbnails (extracted face crops with padding for display)
-        if (existingChar.avatars.faceThumbnails && !newChar.avatars?.faceThumbnails) {
-          mergedAvatars.faceThumbnails = existingChar.avatars.faceThumbnails;
-          hasChanges = true;
-        }
-
-        if (hasChanges) {
-          preservedCount++;
-          return {
-            ...mergedChar,
-            avatars: mergedAvatars
-          };
-        }
-        return mergedChar;
+        // DB avatars already have everything (images, thumbnails, styledAvatars, etc.)
+        // No need to merge - avatar generation saves directly to DB
+        preservedCount++;
+        return {
+          ...mergedChar,
+          avatars: mergedAvatars
+        };
       });
       if (preservedCount > 0) {
         console.log(`[Characters] POST - Preserved data for ${preservedCount} characters`);

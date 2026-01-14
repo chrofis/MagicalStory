@@ -24,6 +24,16 @@ const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = requ
 let costumedAvatarGenerationLog = [];
 
 // ============================================================================
+// FACE EVALUATION TOGGLE (for performance optimization)
+// ============================================================================
+
+// Internal toggle for face evaluation after avatar generation
+// When enabled: runs Gemini face match + LPIPS + ArcFace comparisons (~15 Python service calls)
+// When disabled: skips all evaluation, avatars generated without face scoring
+// Disable this for faster avatar generation on production
+const ENABLE_AVATAR_EVALUATION = false;
+
+// ============================================================================
 // AVATAR JOB QUEUE (for non-blocking avatar generation)
 // ============================================================================
 
@@ -785,12 +795,14 @@ async function generateDynamicAvatar(character, category, config) {
     const compressed = await compressImageToJPEG(imageData, 85, 768);
     const finalImageData = compressed || imageData;
 
-    // Evaluate face match to get clothing description
+    // Evaluate face match to get clothing description (optional)
     let clothingDescription = null;
-    const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey);
-    if (faceMatchResult?.clothing) {
-      clothingDescription = faceMatchResult.clothing;
-      log.debug(`👕 [DYNAMIC AVATAR] ${logCategory} clothing: ${clothingDescription}`);
+    if (ENABLE_AVATAR_EVALUATION) {
+      const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, finalImageData, geminiApiKey);
+      if (faceMatchResult?.clothing) {
+        clothingDescription = faceMatchResult.clothing;
+        log.debug(`👕 [DYNAMIC AVATAR] ${logCategory} clothing: ${clothingDescription}`);
+      }
     }
 
     log.debug(`✅ [DYNAMIC AVATAR] Generated ${logCategory} avatar for ${character.name}`);
@@ -1001,13 +1013,15 @@ Your task is to create a 2x2 grid:
     const compressed = await compressImageToJPEG(imageData, 85, 768);
     const finalImageData = compressed || imageData;
 
-    // Evaluate face match to get clothing description
+    // Evaluate face match to get clothing description (optional)
     // Use standardAvatar as reference (it contains the face we're matching against)
     let clothingDescription = null;
-    const faceMatchResult = await evaluateAvatarFaceMatch(standardAvatar, finalImageData, geminiApiKey);
-    if (faceMatchResult?.clothing) {
-      clothingDescription = faceMatchResult.clothing;
-      log.debug(`👕 [STYLED COSTUME] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
+    if (ENABLE_AVATAR_EVALUATION) {
+      const faceMatchResult = await evaluateAvatarFaceMatch(standardAvatar, finalImageData, geminiApiKey);
+      if (faceMatchResult?.clothing) {
+        clothingDescription = faceMatchResult.clothing;
+        log.debug(`👕 [STYLED COSTUME] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
+      }
     }
 
     const duration = Date.now() - startTime;
@@ -1250,12 +1264,14 @@ Your task is to create a 2x2 grid:
     const compressed = await compressImageToJPEG(imageData, 85, 768);
     const finalImageData = compressed || imageData;
 
-    // Evaluate face match to get clothing description
+    // Evaluate face match to get clothing description (optional)
     let clothingDescription = null;
-    const faceMatchResult = await evaluateAvatarFaceMatch(baseAvatar, finalImageData, geminiApiKey);
-    if (faceMatchResult?.clothing) {
-      clothingDescription = faceMatchResult.clothing;
-      log.debug(`👕 [STYLED SIGNATURE] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
+    if (ENABLE_AVATAR_EVALUATION) {
+      const faceMatchResult = await evaluateAvatarFaceMatch(baseAvatar, finalImageData, geminiApiKey);
+      if (faceMatchResult?.clothing) {
+        clothingDescription = faceMatchResult.clothing;
+        log.debug(`👕 [STYLED SIGNATURE] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
+      }
     }
 
     const duration = Date.now() - startTime;
@@ -1751,7 +1767,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       }
     }
 
-    // Run evaluation on ALL avatars in parallel to extract clothing for each
+    // Run evaluation on ALL avatars in parallel to extract clothing for each (optional)
+    if (ENABLE_AVATAR_EVALUATION) {
     const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
     log.debug(`🔍 [AVATAR JOB ${jobId}] Checking evaluation: avatarsToEvaluate=${avatarsToEvaluate.length}, geminiApiKey=${!!geminiApiKey}`);
     if (avatarsToEvaluate.length > 0 && geminiApiKey) {
@@ -1823,6 +1840,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       } catch (evalErr) {
         log.warn(`[AVATAR JOB ${jobId}] Evaluation failed (continuing without traits):`, evalErr.message);
       }
+    }
+    } else {
+      log.debug(`⏭️ [AVATAR JOB ${jobId}] Skipping face evaluation (ENABLE_AVATAR_EVALUATION=false)`);
     }
 
     // Directly update character in database with extracted traits and clothing
@@ -2413,7 +2433,8 @@ These corrections OVERRIDE what is visible in the reference photo.
       }
     }
 
-    // PHASE 2: Evaluate all generated avatars in parallel
+    // PHASE 2: Evaluate all generated avatars in parallel (optional, controlled by ENABLE_AVATAR_EVALUATION)
+    if (ENABLE_AVATAR_EVALUATION) {
     const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
     if (avatarsToEvaluate.length > 0) {
       log.debug(`🔍 [CLOTHING AVATARS] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
@@ -2564,7 +2585,10 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
         }
       }
-    }
+    } // end if (avatarsToEvaluate.length > 0)
+    } else {
+      log.debug(`⏭️ [CLOTHING AVATARS] Skipping face evaluation (ENABLE_AVATAR_EVALUATION=false)`);
+    } // end if (ENABLE_AVATAR_EVALUATION)
 
     log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms`)
 
