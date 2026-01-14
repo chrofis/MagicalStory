@@ -1702,6 +1702,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           ]
         };
 
+        // Log prompt for debugging IMAGE_OTHER issue
+        log.info(`[AVATAR JOB ${jobId}] 🔍 Prompt for ${category} (${avatarPrompt.length} chars)`);
+        log.info(`[AVATAR JOB ${jobId}] 🔍 System instruction present: ${!!PROMPT_TEMPLATES.avatarSystemInstruction} (${PROMPT_TEMPLATES.avatarSystemInstruction?.length || 0} chars)`);
+        log.info(`[AVATAR JOB ${jobId}] 🔍 Photo: ${base64Data.length} chars, mime: ${mimeType}`);
+
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
           {
@@ -1938,11 +1943,42 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             // Update in database using rowId (e.g., "characters_1764881868108")
             charData.characters = characters;
-            await dbQuery(`
-              UPDATE characters SET data = $1 WHERE id = $2
-            `, [JSON.stringify(charData), rowId]);
 
-            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId}`);
+            // Also regenerate metadata column (used for fast list queries)
+            // Strip heavy fields and keep only lightweight avatar info
+            const lightCharacters = characters.map(char => {
+              // Strip heavy base64 fields
+              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+              // Keep avatar metadata + only 'standard' faceThumbnail for list display
+              if (lightChar.avatars) {
+                const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+                lightChar.avatars = {
+                  status: lightChar.avatars.status,
+                  stale: lightChar.avatars.stale,
+                  generatedAt: lightChar.avatars.generatedAt,
+                  hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+                  faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
+                  clothing: lightChar.avatars.clothing
+                };
+              }
+              return lightChar;
+            });
+
+            const metadataObj = {
+              characters: lightCharacters,
+              relationships: charData.relationships || {},
+              relationshipTexts: charData.relationshipTexts || {},
+              customRelationships: charData.customRelationships || [],
+              customStrengths: charData.customStrengths || [],
+              customWeaknesses: charData.customWeaknesses || [],
+              customFears: charData.customFears || []
+            };
+
+            await dbQuery(`
+              UPDATE characters SET data = $1, metadata = $2 WHERE id = $3
+            `, [JSON.stringify(charData), JSON.stringify(metadataObj), rowId]);
+
+            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId} (data + metadata)`);
           }
           } // close else block for charIndex >= 0
         }

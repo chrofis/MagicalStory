@@ -85,7 +85,9 @@ async function inpaint(seedImage, maskImage, prompt, options = {}) {
     steps = 20,
     maskMargin = 0,
     width = 1024,
-    height = 1024
+    height = 1024,
+    negativePrompt = '',
+    cfgScale = 7
   } = options;
 
   const taskUUID = require('crypto').randomUUID();
@@ -114,9 +116,15 @@ async function inpaint(seedImage, maskImage, prompt, options = {}) {
     payload[0].maskMargin = maskMargin;
   }
 
+  // Add negative prompt if provided
+  if (negativePrompt) {
+    payload[0].negativePrompt = negativePrompt;
+  }
+
   console.log('\n--- Runware Inpaint Request ---');
   console.log(`Model: ${model}`);
   console.log(`Strength: ${strength}`);
+  if (negativePrompt) console.log(`Negative: ${negativePrompt}`);
   console.log(`Steps: ${steps}`);
   console.log(`Mask Margin: ${maskMargin}`);
   console.log(`Prompt: ${prompt}`);
@@ -238,6 +246,7 @@ Examples:
       else if (key === 'prompt') options.prompt = value;
       else if (key === 'mask') options.mask = value;
       else if (key === 'output') options.output = value;
+      else if (key === 'neg') options.neg = value;
     }
   }
 
@@ -286,6 +295,7 @@ Examples:
       strength: options.strength,
       steps: options.steps,
       maskMargin: options.margin,
+      negativePrompt: options.neg || '',
       width: width,
       height: height
     });
