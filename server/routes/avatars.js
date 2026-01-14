@@ -27,11 +27,15 @@ let costumedAvatarGenerationLog = [];
 // FACE EVALUATION TOGGLE (for performance optimization)
 // ============================================================================
 
-// Internal toggle for face evaluation after avatar generation
-// When enabled: runs Gemini face match + LPIPS + ArcFace comparisons (~15 Python service calls)
-// When disabled: skips all evaluation, avatars generated without face scoring
-// Disable this for faster avatar generation on production
-const ENABLE_AVATAR_EVALUATION = false;
+// Internal toggle for avatar evaluation after generation
+// Controls Gemini evaluation (extracts clothing, physical traits, face score)
+// Keep enabled for clothing extraction to work
+const ENABLE_AVATAR_EVALUATION = true;
+
+// Internal toggle for face comparison (LPIPS + ArcFace via Python service)
+// These are the slow calls (~15 network requests to Python service)
+// Disable for faster avatar generation on production
+const ENABLE_FACE_COMPARISON = false;
 
 // ============================================================================
 // AVATAR JOB QUEUE (for non-blocking avatar generation)
@@ -474,24 +478,37 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       ]
     };
 
-    // Run Gemini evaluation, LPIPS, and ArcFace in parallel
-    // LPIPS: measures visual similarity (style-sensitive)
-    // ArcFace: measures identity preservation (style-invariant - works photo→anime)
-    const [geminiResponse, lpipsResult, arcfaceResult] = await Promise.all([
-      fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(30000)
-        }
-      ),
-      // LPIPS comparison - extract faces from both images, then compare
-      compareFacesLPIPS(originalPhoto, generatedAvatar, 'top-left'),
-      // ArcFace identity comparison - style-invariant face matching
-      compareIdentityArcFace(originalPhoto, generatedAvatar, 'top-left')
-    ]);
+    // Run Gemini evaluation (always) and optionally LPIPS/ArcFace (controlled by ENABLE_FACE_COMPARISON)
+    // Gemini: extracts clothing, physical traits, face score
+    // LPIPS: measures visual similarity (style-sensitive) - SLOW, requires Python service
+    // ArcFace: measures identity preservation (style-invariant) - SLOW, requires Python service
+    const geminiPromise = fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(30000)
+      }
+    );
+
+    let lpipsResult = null;
+    let arcfaceResult = null;
+
+    if (ENABLE_FACE_COMPARISON) {
+      // Run all in parallel when face comparison is enabled
+      const [geminiRes, lpipsRes, arcfaceRes] = await Promise.all([
+        geminiPromise,
+        compareFacesLPIPS(originalPhoto, generatedAvatar, 'top-left'),
+        compareIdentityArcFace(originalPhoto, generatedAvatar, 'top-left')
+      ]);
+      lpipsResult = lpipsRes;
+      arcfaceResult = arcfaceRes;
+      var geminiResponse = geminiRes;
+    } else {
+      // Only run Gemini when face comparison is disabled (fast path)
+      var geminiResponse = await geminiPromise;
+    }
 
     if (!geminiResponse.ok) {
       return null;
@@ -2514,8 +2531,10 @@ These corrections OVERRIDE what is visible in the reference photo.
         }
       }
 
-      // PHASE 3: Cross-avatar LPIPS comparison (compare avatars against each other)
+      // PHASE 3: Cross-avatar LPIPS/ArcFace comparison (optional, controlled by ENABLE_FACE_COMPARISON)
       // This helps verify consistency - avatars of same person should be similar
+      // Skip when ENABLE_FACE_COMPARISON is false for faster generation
+      if (ENABLE_FACE_COMPARISON) {
       // Extract faces from top-left quadrant of each avatar, then compare face-to-face
       const avatarImages = {};
       for (const { category, imageData } of avatarsToEvaluate) {
@@ -2585,9 +2604,10 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
         }
       }
+      } // end if (ENABLE_FACE_COMPARISON) - PHASE 3
     } // end if (avatarsToEvaluate.length > 0)
     } else {
-      log.debug(`⏭️ [CLOTHING AVATARS] Skipping face evaluation (ENABLE_AVATAR_EVALUATION=false)`);
+      log.debug(`⏭️ [CLOTHING AVATARS] Skipping avatar evaluation (ENABLE_AVATAR_EVALUATION=false)`);
     } // end if (ENABLE_AVATAR_EVALUATION)
 
     log.debug(`✅ [CLOTHING AVATARS] Total time: ${Date.now() - generationStart}ms`)
