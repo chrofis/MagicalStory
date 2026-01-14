@@ -7864,7 +7864,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   log.debug(`✅ [UNIFIED] Generated styled ${category}+sig@${artStyle} avatar for ${char.name}`);
                 }
               } else {
-                // For standard/winter/summer without signature: generate base avatar
+                // FALLBACK: Standard/winter/summer should already exist from character creation.
+                // This path should rarely execute - log a warning so we can track if it does.
+                log.warn(`⚠️ [UNIFIED] FALLBACK: ${char.name} missing ${category} avatar - generating dynamically (this shouldn't normally happen)`);
                 result = await generateDynamicAvatar(char, category, config);
 
                 if (result.success && result.imageData) {
@@ -7872,7 +7874,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   if (result.clothing) {
                     char.avatars.clothing[category] = result.clothing;
                   }
-                  log.debug(`✅ [UNIFIED] Generated ${category} avatar for ${char.name}`);
+                  log.warn(`⚠️ [UNIFIED] FALLBACK: Generated ${category} avatar for ${char.name} - investigate why it was missing`);
                 }
               }
             } catch (err) {
