@@ -7776,6 +7776,121 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       clothingRequirements
     );
 
+    // Generate missing costumed/signature avatars based on clothingRequirements
+    // (This must happen BEFORE prepareStyledAvatars, which only converts existing avatars)
+    if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && !skipImages) {
+      const { generateStyledCostumedAvatar, generateStyledAvatarWithSignature, generateDynamicAvatar } = require('./server/routes/avatars');
+      const characters = inputData.characters || [];
+
+      log.debug(`👕 [UNIFIED] Processing clothing requirements for ${Object.keys(clothingRequirements).length} characters`);
+
+      const avatarGenerationPromises = [];
+
+      for (const [charName, requirements] of Object.entries(clothingRequirements)) {
+        const char = characters.find(c =>
+          c.name.trim().toLowerCase() === charName.trim().toLowerCase() ||
+          c.name.trim().toLowerCase().includes(charName.trim().toLowerCase()) ||
+          charName.trim().toLowerCase().includes(c.name.trim().toLowerCase())
+        );
+
+        if (!char) {
+          log.debug(`👕 [UNIFIED] Character "${charName}" not found in input characters, skipping`);
+          continue;
+        }
+
+        // Ensure avatars structure exists
+        if (!char.avatars) char.avatars = {};
+        if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+        if (!char.avatars.clothing) char.avatars.clothing = {};
+        if (!char.avatars.signatures) char.avatars.signatures = {};
+
+        for (const [category, config] of Object.entries(requirements)) {
+          if (!config.used) continue;
+
+          // Check if avatar already exists
+          let avatarExists = false;
+          if (category === 'costumed' && config.costume) {
+            const costumeKey = config.costume.toLowerCase();
+            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+            avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
+          } else if (config.signature) {
+            // For signature items: always regenerate (signature is story-specific)
+            avatarExists = false;
+          } else {
+            // For regular categories: check base avatar (style conversion happens later)
+            avatarExists = !!char.avatars[category];
+          }
+
+          if (avatarExists) {
+            log.debug(`👕 [UNIFIED] ${char.name} already has ${category} avatar, skipping`);
+            continue;
+          }
+
+          // Generate missing avatar
+          const logCategory = config.costume ? `costumed:${config.costume}` : category;
+          log.debug(`👕 [UNIFIED] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
+
+          const avatarPromise = (async () => {
+            try {
+              let result;
+
+              if (category === 'costumed' && config.costume) {
+                // For costumed: generate styled version directly (costume + art style in one call)
+                result = await generateStyledCostumedAvatar(char, config, artStyle);
+
+                if (result.success && result.imageData) {
+                  const costumeKey = result.costumeType;
+                  char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                  if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                  if (result.clothing) {
+                    char.avatars.clothing.costumed[costumeKey] = result.clothing;
+                  }
+                  log.debug(`✅ [UNIFIED] Generated styled costumed:${costumeKey}@${artStyle} avatar for ${char.name}`);
+                }
+              } else if (config.signature) {
+                // For categories with signature: generate styled avatar directly (1 API call)
+                result = await generateStyledAvatarWithSignature(char, category, config, artStyle);
+
+                if (result.success && result.imageData) {
+                  if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+                  char.avatars.styledAvatars[artStyle][category] = result.imageData;
+                  if (result.clothing) {
+                    char.avatars.clothing[category] = result.clothing;
+                  }
+                  if (result.signature) {
+                    char.avatars.signatures[category] = result.signature;
+                  }
+                  log.debug(`✅ [UNIFIED] Generated styled ${category}+sig@${artStyle} avatar for ${char.name}`);
+                }
+              } else {
+                // For standard/winter/summer without signature: generate base avatar
+                result = await generateDynamicAvatar(char, category, config);
+
+                if (result.success && result.imageData) {
+                  char.avatars[category] = result.imageData;
+                  if (result.clothing) {
+                    char.avatars.clothing[category] = result.clothing;
+                  }
+                  log.debug(`✅ [UNIFIED] Generated ${category} avatar for ${char.name}`);
+                }
+              }
+            } catch (err) {
+              log.error(`❌ [UNIFIED] Failed to generate ${logCategory} avatar for ${char.name}:`, err.message);
+            }
+          })();
+
+          avatarGenerationPromises.push(avatarPromise);
+        }
+      }
+
+      if (avatarGenerationPromises.length > 0) {
+        log.debug(`👕 [UNIFIED] Waiting for ${avatarGenerationPromises.length} avatar generations...`);
+        await Promise.all(avatarGenerationPromises);
+        log.debug(`✅ [UNIFIED] All avatar generations complete`);
+      }
+    }
+
     // Prepare styled avatars (convert existing avatars to target art style)
     if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
