@@ -2597,11 +2597,12 @@ These corrections OVERRIDE what is visible in the reference photo.
           [req.user.id]
         );
 
-        if (charResult?.rows?.[0]) {
-          const rowId = charResult.rows[0].id;
-          const data = typeof charResult.rows[0].data === 'string'
-            ? JSON.parse(charResult.rows[0].data)
-            : charResult.rows[0].data;
+        // Note: dbQuery returns rows array directly, not { rows: [...] }
+        if (charResult?.[0]) {
+          const rowId = charResult[0].id;
+          const data = typeof charResult[0].data === 'string'
+            ? JSON.parse(charResult[0].data)
+            : charResult[0].data;
 
           // Find the character and update its data
           const characters = data.characters || [];
