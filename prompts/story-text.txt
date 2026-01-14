@@ -54,28 +54,9 @@ Your characters must feel like real people, not cardboard cutouts.
 
 ## Jokes and Humor
 
-If the story includes a joke, pun, or humorous punchline:
-- Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section before the story text
-- Each variation should have a different approach (wordplay, timing, setup, punchline)
-- Number them 1-5 with a JOKE_ID
-- Then in the final story text, SELECT THE BEST joke and write it inline
-- Do NOT use `[JOKE ...]` placeholders - write the actual joke text
+**DO NOT include jokes, puns, or wordplay.** AI-generated humor is not funny and puns don't translate between languages.
 
-**Format for variations section:**
-```
----JOKE VARIATIONS---
-JOKE_ID: joke_page3
-1. "Why did the dragon sneeze? Because he caught a cold... fire!"
-2. "Why did the dragon sneeze? His cave was too dusty from all the gold!"
-3. "The dragon sneezed so hard, the whole mountain shook. 'Excuse me,' he said, 'I'm allergic to knights.'"
-4. "ACHOO! The dragon looked embarrassed. 'Sorry, I think I'm coming down with something... probably a knight-mare!'"
-5. "'Bless you!' said the princess. The dragon blushed. 'Thanks. I think I swallowed a butterfly.'"
----END JOKE VARIATIONS---
-```
-
-Then in the story text, write the best joke directly (e.g., use variation #3 inline).
-
-If no jokes in the story, skip this section entirely.
+Instead, create humor through funny situations, silly reactions, or absurd moments. Let the story be warm and entertaining without trying to be a comedian.
 
 ## Language
 

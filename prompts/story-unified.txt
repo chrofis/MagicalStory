@@ -78,32 +78,17 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 
 # Jokes and Humor
 
-If the story includes a joke, pun, or humorous punchline:
+**DO NOT include jokes, puns, or wordplay in the story.**
 
-**In the STORY DRAFT:**
-- Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section
-- Each variation should have a different approach (wordplay, timing, setup, punchline)
-- Number them 1-5 with a unique JOKE_ID
-- In the draft text, use `[JOKE joke_id]` as a placeholder
+AI-generated humor is not funny. Puns don't translate well between languages. Nobody wants to read forced jokes.
 
-**In the STORY PAGES (final version):**
-- Select the BEST joke variation from your 5 options
-- Write the actual joke text inline - NO placeholders in the final version
-- The final story must contain the complete joke, not `[JOKE ...]`
+Instead of jokes, create humor through:
+- Funny situations (a character slipping, something unexpected happening)
+- Silly character reactions and expressions
+- Absurd but believable moments
+- Physical comedy that can be shown in illustrations
 
-**Format example for DRAFT:**
-```
----JOKE VARIATIONS---
-JOKE_ID: dragon_sneeze
-1. "Why did the dragon sneeze? Because he caught a cold... fire!"
-2. "Why did the dragon sneeze? His cave was too dusty from all the gold!"
-3. "'Bless you!' said the princess. The dragon blushed. 'Thanks. I think I swallowed a butterfly.'"
-4. "ACHOO! 'Excuse me,' the dragon said, 'I'm allergic to knights.'"
-5. "The dragon sneezed so hard, smoke came out of his ears. 'Oops,' he giggled."
----END JOKE VARIATIONS---
-```
-
-If no jokes in the story, skip this section entirely.
+Let the story be warm and entertaining without trying to be a comedian.
 
 ---
 

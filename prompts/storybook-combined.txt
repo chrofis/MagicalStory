@@ -42,13 +42,10 @@ Create a simple story arc:
 - Engaging sentences that tell the story and complement the illustration
 
 ## Jokes and Humor
-If the story includes a joke or punchline:
-1. Write 5 DIFFERENT VERSIONS in a `---JOKE VARIATIONS---` section at the start
-2. Number them 1-5 with different approaches (wordplay, timing, punchline style)
-3. In the final story text, select the BEST joke and write it inline
-4. Do NOT use `[JOKE ...]` placeholders - write the actual joke text
 
-If no jokes, skip this section.
+**DO NOT include jokes, puns, or wordplay.** AI-generated humor is not funny and puns don't translate between languages.
+
+Instead, create humor through funny situations, silly reactions, or absurd moments that can be shown in illustrations.
 
 **GOOD EXAMPLE (Page text):**
 "Leo loved exploring the outdoors. Today, he discovered a secret trail deep in the woods. The trees were giant and full of green leaves. Birds called out from the branches high above. He walked steadily, looking for his next adventure. His brown backpack held all the important supplies for his trip."
