@@ -79,13 +79,19 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 # Jokes and Humor
 
 If the story includes a joke, pun, or humorous punchline:
-- Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section (before the story pages)
+
+**In the STORY DRAFT:**
+- Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section
 - Each variation should have a different approach (wordplay, timing, setup, punchline)
 - Number them 1-5 with a unique JOKE_ID
-- In the story text, use `[JOKE joke_id]` as a placeholder where the joke appears
-- The system will select the best version for the final story
+- In the draft text, use `[JOKE joke_id]` as a placeholder
 
-**Format example:**
+**In the STORY PAGES (final version):**
+- Select the BEST joke variation from your 5 options
+- Write the actual joke text inline - NO placeholders in the final version
+- The final story must contain the complete joke, not `[JOKE ...]`
+
+**Format example for DRAFT:**
 ```
 ---JOKE VARIATIONS---
 JOKE_ID: dragon_sneeze
@@ -348,8 +354,10 @@ Characters:
 - [CharacterName]: [clothing category]
 
 ---STORY PAGES---
-Rewrite the story based on the draft, BUT YOU MUST APPLY ALL FIXES from the CRITICAL ANALYSIS section
+Rewrite the story based on the draft, BUT YOU MUST APPLY ALL FIXES from the CRITICAL ANALYSIS section.
 The final output must be logically consistent and error-free.
+
+**IMPORTANT:** If you wrote joke variations earlier, select the BEST one and write it inline here. NO `[JOKE ...]` placeholders in the final text - write the actual joke.
 
 For EACH of the {PAGES} pages, output in this EXACT format:
 

@@ -57,11 +57,11 @@ Your characters must feel like real people, not cardboard cutouts.
 If the story includes a joke, pun, or humorous punchline:
 - Write 5 DIFFERENT VERSIONS of the joke in a `---JOKE VARIATIONS---` section before the story text
 - Each variation should have a different approach (wordplay, timing, setup, punchline)
-- Number them 1-5
-- The final story text should use `[JOKE #X]` as a placeholder where the joke appears
-- The system will select the best version for the final story
+- Number them 1-5 with a JOKE_ID
+- Then in the final story text, SELECT THE BEST joke and write it inline
+- Do NOT use `[JOKE ...]` placeholders - write the actual joke text
 
-**Format:**
+**Format for variations section:**
 ```
 ---JOKE VARIATIONS---
 JOKE_ID: joke_page3
@@ -73,7 +73,7 @@ JOKE_ID: joke_page3
 ---END JOKE VARIATIONS---
 ```
 
-Then in the story text: `[JOKE joke_page3]`
+Then in the story text, write the best joke directly (e.g., use variation #3 inline).
 
 If no jokes in the story, skip this section entirely.
 

@@ -1703,6 +1703,17 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
           availableLandmarks = [];
         }
       }
+
+      // Filter landmarks to match story language (avoid duplicates in different languages)
+      // Extract base language: 'de-ch' → 'de', 'de-de' → 'de', 'fr' → 'fr', 'en' → 'en'
+      if (availableLandmarks.length > 0 && language) {
+        const baseLang = language.split('-')[0].toLowerCase();
+        const beforeCount = availableLandmarks.length;
+        availableLandmarks = availableLandmarks.filter(l => !l.lang || l.lang === baseLang);
+        if (availableLandmarks.length < beforeCount) {
+          log.info(`[LANDMARK] Filtered landmarks by language '${baseLang}': ${beforeCount} → ${availableLandmarks.length}`);
+        }
+      }
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
@@ -1998,6 +2009,17 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
         } catch (err) {
           log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
           availableLandmarks = [];
+        }
+      }
+
+      // Filter landmarks to match story language (avoid duplicates in different languages)
+      // Extract base language: 'de-ch' → 'de', 'de-de' → 'de', 'fr' → 'fr', 'en' → 'en'
+      if (availableLandmarks.length > 0 && language) {
+        const baseLang = language.split('-')[0].toLowerCase();
+        const beforeCount = availableLandmarks.length;
+        availableLandmarks = availableLandmarks.filter(l => !l.lang || l.lang === baseLang);
+        if (availableLandmarks.length < beforeCount) {
+          log.info(`[LANDMARK] [STREAM] Filtered landmarks by language '${baseLang}': ${beforeCount} → ${availableLandmarks.length}`);
         }
       }
     }
@@ -8727,6 +8749,16 @@ async function processStoryJob(jobId) {
       }
 
       if (landmarks && landmarks.length > 0) {
+        // Filter landmarks to match story language (avoid duplicates in different languages)
+        // Extract base language: 'de-ch' → 'de', 'de-de' → 'de', 'fr' → 'fr', 'en' → 'en'
+        if (inputData.language) {
+          const baseLang = inputData.language.split('-')[0].toLowerCase();
+          const beforeCount = landmarks.length;
+          landmarks = landmarks.filter(l => !l.lang || l.lang === baseLang);
+          if (landmarks.length < beforeCount) {
+            log.info(`[LANDMARK] Filtered landmarks by language '${baseLang}': ${beforeCount} → ${landmarks.length}`);
+          }
+        }
         inputData.availableLandmarks = landmarks;
       } else {
         log.debug(`[LANDMARK] No cached landmarks available for ${inputData.userLocation.city}`);
