@@ -214,7 +214,7 @@ export function StoryDisplay({
 
   // Scene edit modal state (for editing scene before regenerating)
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [, setIsRegenerating] = useState(false); // Only setter used - tracks global regen state
   const [regeneratingPages, setRegeneratingPages] = useState<Set<number>>(new Set()); // Track which pages are regenerating (supports parallel)
 
   // Auto-repair state (dev mode only)
@@ -339,8 +339,10 @@ export function StoryDisplay({
     // Format 2: "**6. Image Summary (Deutsch)**\nSophie kniet..."
     // Format 3: "## 6. Image Summary (Deutsch)\nSophie kniet..." (markdown headers)
     // Format 4: "6. **Bildzusammenfassung (Deutsch)**\nSophie kniet..." (fully translated header)
+    // Format 5: "6. **Image Summary (German (Switzerland))**\n..." (nested parentheses)
+    // NOTE: Uses (?:[^()]+|\([^()]*\))+ to handle nested parens like "German (Switzerland)"
     const section6Match = fullDescription.match(
-      /(?:#{1,3}\s*)?(?:\*\*)?6\.?\s*(?:\*\*)?\s*\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*\*?\*?\s*:?\s*\n?([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n---|\n```|$)/i
+      /(?:#{1,3}\s*)?(?:\*\*)?6\.?\s*(?:\*\*)?\s*\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\((?:[^()]+|\([^()]*\))+\)\s*\*?\*?\s*:?\s*\n?([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n---|\n```|$)/i
     );
     if (section6Match && section6Match[2] && section6Match[2].trim()) {
       return section6Match[2].trim();
@@ -348,8 +350,9 @@ export function StoryDisplay({
 
     // PRIORITY 2: Look for any "Image Summary (Language)" pattern anywhere (without section number)
     // This catches variations like "**Image Summary (Deutsch):**\nContent..." or "## Image Summary (Deutsch)"
+    // NOTE: Uses (?:[^()]+|\([^()]*\))+ to handle nested parens like "German (Switzerland)"
     const localizedSummaryMatch = fullDescription.match(
-      /(?:#{1,3}\s*)?\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\([^)]+\)\s*:?\s*\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n\*\*|\n#{1,3}\s|$)/i
+      /(?:#{1,3}\s*)?\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\((?:[^()]+|\([^()]*\))+\)\s*:?\s*\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n\*\*|\n#{1,3}\s|$)/i
     );
     if (localizedSummaryMatch && localizedSummaryMatch[2] && localizedSummaryMatch[2].trim()) {
       return localizedSummaryMatch[2].trim();

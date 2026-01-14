@@ -285,7 +285,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
  * @param {Array<{pageNumber, clothingCategory, characterNames}>} pageRequirements - What's needed for each page
  * @returns {Promise<Map>} Map of cacheKey -> styledAvatar
  */
-async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // Skip for realistic style (no conversion needed)
@@ -425,7 +425,12 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
         // Get stored clothing description for this category
         clothingDescription = char.avatars?.clothing?.[clothingCategory];
         // Also check for signature items to include
-        const signature = char.avatars?.signatures?.[clothingCategory];
+        // First try char.avatars.signatures, then fallback to clothingRequirements
+        let signature = char.avatars?.signatures?.[clothingCategory];
+        if (!signature && clothingRequirements?.[charName]?.[clothingCategory]?.signature) {
+          signature = clothingRequirements[charName][clothingCategory].signature;
+          log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - using signature from clothingRequirements`);
+        }
         log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - clothing: ${clothingDescription ? 'yes' : 'no'}, signature: ${signature ? signature.substring(0, 50) + '...' : 'no'}`);
         if (signature && clothingDescription) {
           clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;

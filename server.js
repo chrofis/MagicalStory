@@ -6397,8 +6397,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             'standard',
             streamingClothingRequirements // Pass per-character clothing requirements
           );
-          // Convert avatars in parallel
-          await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements);
+          // Convert avatars in parallel (pass clothingRequirements for signature lookup)
+          await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements, streamingClothingRequirements);
           log.debug(`✅ [STORYBOOK] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.error(`⚠️ [STORYBOOK] Failed to prepare styled avatars, using original photos:`, error.message);
@@ -7896,7 +7896,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Prepare styled avatars (convert existing avatars to target art style)
     if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
-      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements);
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements);
     }
 
     // PHASE 3: Wait for scene expansion to complete (most should be done by now)
@@ -9108,8 +9108,8 @@ async function processStoryJob(jobId) {
           }
         }
 
-        // Convert avatars in parallel
-        await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements);
+        // Convert avatars in parallel (pass clothingRequirements for signature lookup)
+        await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements, clothingRequirements);
         log.debug(`✅ [PIPELINE] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
         log.error(`⚠️ [PIPELINE] Failed to prepare styled avatars, using original photos:`, error.message);
