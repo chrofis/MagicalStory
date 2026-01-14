@@ -347,13 +347,6 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
               : 'border-gray-300'
           } ${isUserEdited('skinTone') ? 'ring-2 ring-blue-400' : ''}`}
         />
-        {character.physical?.skinToneHex && (
-          <span
-            className="inline-block w-5 h-5 rounded border border-gray-300 flex-shrink-0"
-            style={{ backgroundColor: character.physical.skinToneHex }}
-            title={character.physical.skinToneHex}
-          />
-        )}
         <UserEditedIndicator field="skinTone" />
         {changedTraits?.skinTone && !isUserEdited('skinTone') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
@@ -2092,12 +2085,7 @@ export function CharacterForm({
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Skin Tone:</span>
-                <div className="font-medium flex items-center gap-1">
-                  {character.physical?.skinTone || '—'}
-                  {character.physical?.skinToneHex && (
-                    <span className="inline-block w-4 h-4 rounded border border-gray-300" style={{ backgroundColor: character.physical.skinToneHex }} title={character.physical.skinToneHex} />
-                  )}
-                </div>
+                <div className="font-medium">{character.physical?.skinTone || '—'}</div>
               </div>
               <div>
                 <span className="text-gray-500 text-xs">Other:</span>

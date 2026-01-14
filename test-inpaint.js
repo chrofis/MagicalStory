@@ -5,17 +5,19 @@
  *   node test-inpaint.js <image-path> [options]
  *
  * Options:
- *   --model=sdxl|flux|sd15    Model to use (default: sdxl)
- *   --strength=0.85           Inpaint strength 0-1 (default: 0.85)
- *   --steps=20                Inference steps (default: 20)
- *   --margin=48               Mask margin in pixels (default: 0)
- *   --prompt="fix text"       What to generate in masked area
- *   --mask=x,y,w,h            Mask region as percentages (e.g., 10,10,30,30)
- *   --output=result.png       Output file path
+ *   --model=sdxl|flux|sd15|ace  Model to use (default: sdxl, ace=ACE++ local_editing)
+ *   --strength=0.85             Inpaint strength 0-1 (default: 0.85)
+ *   --steps=20                  Inference steps (default: 20)
+ *   --margin=48                 Mask margin in pixels (default: 0)
+ *   --prompt="fix text"         What to generate in masked area
+ *   --mask=x,y,w,h              Mask region as percentages (e.g., 10,10,30,30)
+ *   --ref=reference.jpg         Reference image for ACE++ (character to match)
+ *   --output=result.png         Output file path
  *
  * Examples:
  *   node test-inpaint.js test-image.png --model=sdxl --mask=25,25,50,50 --prompt="a red apple"
  *   node test-inpaint.js test-image.png --model=flux --strength=0.9 --steps=30
+ *   node test-inpaint.js test-image.png --model=ace --ref=character.jpg --mask=0,10,35,80 --prompt="young boy"
  */
 
 const fs = require('fs');
@@ -32,12 +34,14 @@ const MODELS = {
   'sd15': 'runware:100@1',      // $0.0006/img - Fast, low quality
   'sdxl': 'runware:101@1',      // $0.002/img - Good balance
   'flux': 'runware:102@1',      // ~$0.05/img - Best quality
+  'ace': 'runware:102@1',       // ACE++ local_editing with reference image
 };
 
 const MODEL_COSTS = {
   'runware:100@1': 0.0006,
   'runware:101@1': 0.002,
   'runware:102@1': 0.05,
+  'ace': 0.05,                  // ACE++ uses FLUX Fill pricing
 };
 
 async function createMask(width, height, region) {

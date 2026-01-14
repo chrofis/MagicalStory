@@ -1745,6 +1745,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           if (data.error) {
             log.error(`[AVATAR JOB ${jobId}] API error: ${JSON.stringify(data.error)}`);
           }
+          // Log full response for debugging IMAGE_OTHER
+          log.warn(`[AVATAR JOB ${jobId}] Full Gemini response: ${JSON.stringify(data).substring(0, 1000)}`);
         }
 
         if (imageData) {
