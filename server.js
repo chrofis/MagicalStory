@@ -8700,21 +8700,21 @@ async function processStoryJob(jobId) {
             );
 
             if (dbChar?.avatars) {
-              // Merge avatar data: DB images, but keep any metadata from request
+              // Merge avatar data: DB as fallback, request data wins (later spread overwrites)
               char.avatars = {
-                ...char.avatars,        // Keep metadata from request (status, generatedAt, etc.)
-                ...dbChar.avatars,      // Add actual images from DB
+                ...dbChar.avatars,      // DB data first (fallback)
+                ...char.avatars,        // Request data wins (new avatars override stale DB)
                 styledAvatars: {
-                  ...char.avatars?.styledAvatars,
-                  ...dbChar.avatars?.styledAvatars
+                  ...dbChar.avatars?.styledAvatars,
+                  ...char.avatars?.styledAvatars
                 },
                 costumed: {
-                  ...char.avatars?.costumed,
-                  ...dbChar.avatars?.costumed
+                  ...dbChar.avatars?.costumed,
+                  ...char.avatars?.costumed
                 },
                 clothing: {
-                  ...char.avatars?.clothing,
-                  ...dbChar.avatars?.clothing
+                  ...dbChar.avatars?.clothing,
+                  ...char.avatars?.clothing
                 }
               };
               mergedCount++;
