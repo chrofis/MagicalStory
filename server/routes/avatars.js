@@ -1857,13 +1857,23 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
 
           if (characters[charIndex]) {
-            // Apply extracted traits
+            // Apply extracted traits as FLAT properties (not nested in physical)
+            // This matches the format used by frontend save and photo analysis
             if (results.extractedTraits) {
-              characters[charIndex].physical = {
-                ...(characters[charIndex].physical || {}),
-                ...results.extractedTraits
-              };
-              log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted traits to character`);
+              const t = results.extractedTraits;
+              if (t.apparentAge) characters[charIndex].apparent_age = t.apparentAge;
+              if (t.build) characters[charIndex].build = t.build;
+              if (t.eyeColor) characters[charIndex].eye_color = t.eyeColor;
+              if (t.hairColor) characters[charIndex].hair_color = t.hairColor;
+              if (t.hairLength) characters[charIndex].hair_length = t.hairLength;
+              if (t.hairStyle) characters[charIndex].hair_style = t.hairStyle;
+              if (t.skinTone) characters[charIndex].skin_tone = t.skinTone;
+              if (t.skinToneHex) characters[charIndex].skin_tone_hex = t.skinToneHex;
+              if (t.facialHair) characters[charIndex].facial_hair = t.facialHair;
+              if (t.face) characters[charIndex].other_features = t.face;
+              if (t.other) characters[charIndex].other = t.other;
+              if (t.detailedHairAnalysis) characters[charIndex].detailed_hair_analysis = t.detailedHairAnalysis;
+              log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted traits to character (flat): apparent_age=${t.apparentAge}`);
             }
 
             // Apply extracted clothing
@@ -2624,14 +2634,23 @@ These corrections OVERRIDE what is visible in the reference photo.
               characters[charIndex].avatarTokenUsage = existingUsage;
             }
 
-            // Save extracted traits (apparentAge, build, etc.) to database
-            // This ensures the extraction results persist and don't rely on frontend saving
+            // Save extracted traits as FLAT properties (not nested in physical)
+            // This matches the format used by frontend save and photo analysis
             if (results.extractedTraits) {
-              characters[charIndex].physical = {
-                ...(characters[charIndex].physical || {}),
-                ...results.extractedTraits
-              };
-              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character (apparentAge=${results.extractedTraits.apparentAge})`);
+              const t = results.extractedTraits;
+              if (t.apparentAge) characters[charIndex].apparent_age = t.apparentAge;
+              if (t.build) characters[charIndex].build = t.build;
+              if (t.eyeColor) characters[charIndex].eye_color = t.eyeColor;
+              if (t.hairColor) characters[charIndex].hair_color = t.hairColor;
+              if (t.hairLength) characters[charIndex].hair_length = t.hairLength;
+              if (t.hairStyle) characters[charIndex].hair_style = t.hairStyle;
+              if (t.skinTone) characters[charIndex].skin_tone = t.skinTone;
+              if (t.skinToneHex) characters[charIndex].skin_tone_hex = t.skinToneHex;
+              if (t.facialHair) characters[charIndex].facial_hair = t.facialHair;
+              if (t.face) characters[charIndex].other_features = t.face;
+              if (t.other) characters[charIndex].other = t.other;
+              if (t.detailedHairAnalysis) characters[charIndex].detailed_hair_analysis = t.detailedHairAnalysis;
+              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character (flat): apparent_age=${t.apparentAge}`);
             }
 
             // Save extracted clothing
