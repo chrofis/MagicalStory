@@ -17,6 +17,67 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
+// Art style ID to sample image file mapping
+const ART_STYLE_SAMPLES = {
+  'watercolor': 'water color style.jpg',
+  'concept': 'concept art style.jpg',
+  'anime': 'anime style.jpg',
+  'pixar': 'pixar art style 2.jpg',
+  'cartoon': 'cartoon style.jpg',
+  'comic': 'comic book style.jpg',
+  'oil': 'oil painting style.jpg',
+  'steampunk': 'steampunk style.jpg',
+  'cyber': 'cyber punk style.jpg',
+  'chibi': 'chibi style.jpg',
+  'manga': 'manga style.jpg',
+  'pixel': 'pixel style.jpg',
+  'lowpoly': 'low poly 3-D style.jpg'
+};
+
+// Cache for loaded style sample images (base64)
+const styleSampleCache = new Map();
+
+/**
+ * Load art style sample image as base64
+ * @param {string} artStyle - Art style ID
+ * @returns {string|null} Base64 data URL or null if not found
+ */
+function loadStyleSampleImage(artStyle) {
+  // Check cache first
+  if (styleSampleCache.has(artStyle)) {
+    return styleSampleCache.get(artStyle);
+  }
+
+  const filename = ART_STYLE_SAMPLES[artStyle];
+  if (!filename) {
+    log.debug(`[STYLE SAMPLE] No sample image defined for art style: ${artStyle}`);
+    return null;
+  }
+
+  const imagePath = path.join(__dirname, '../../images', filename);
+
+  try {
+    if (!fs.existsSync(imagePath)) {
+      log.warn(`[STYLE SAMPLE] Sample image not found: ${imagePath}`);
+      return null;
+    }
+
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64 = imageBuffer.toString('base64');
+    const mimeType = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    // Cache it
+    styleSampleCache.set(artStyle, dataUrl);
+    log.debug(`[STYLE SAMPLE] Loaded and cached sample for ${artStyle} (${Math.round(imageBuffer.length / 1024)}KB)`);
+
+    return dataUrl;
+  } catch (error) {
+    log.error(`[STYLE SAMPLE] Failed to load sample for ${artStyle}: ${error.message}`);
+    return null;
+  }
+}
+
 // In-memory cache for styled avatars
 // Key: `${characterName}_${clothingCategory}_${artStyle}`
 // Value: base64 image data (downsized)
@@ -157,6 +218,18 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       photoUrl: originalAvatar
     });
 
+    // Image 3: Art style sample (for style reference)
+    const styleSample = loadStyleSampleImage(artStyle);
+    if (styleSample) {
+      referencePhotos.push({
+        name: 'style_sample',
+        photoUrl: styleSample
+      });
+      // Append style sample instruction to prompt
+      fullPrompt += `\n\nImage ${referencePhotos.length} is a STYLE SAMPLE - match this exact art style for the output.`;
+      log.debug(`🎨 [STYLED AVATAR] Added style sample as Image ${referencePhotos.length}`);
+    }
+
     // Call image API to convert the avatar
     // Use 'avatar' evaluation type (lightweight, no quality retry)
     const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar');
@@ -189,7 +262,12 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
           identifier: getImageIdentifier(originalAvatar),
           sizeKB: getImageSizeKB(originalAvatar),
           imageData: originalAvatar // Full image for dev mode display
-        }
+        },
+        styleSample: styleSample ? {
+          identifier: getImageIdentifier(styleSample),
+          sizeKB: getImageSizeKB(styleSample),
+          imageData: styleSample // Full image for dev mode display
+        } : null
       },
       prompt: fullPrompt,
       output: {
@@ -222,7 +300,12 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
           identifier: getImageIdentifier(originalAvatar),
           sizeKB: getImageSizeKB(originalAvatar),
           imageData: originalAvatar
-        }
+        },
+        styleSample: styleSample ? {
+          identifier: getImageIdentifier(styleSample),
+          sizeKB: getImageSizeKB(styleSample),
+          imageData: styleSample
+        } : null
       }
     });
 

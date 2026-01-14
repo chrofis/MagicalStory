@@ -29,6 +29,7 @@ interface StyledAvatarGenerationEntry {
   inputs: {
     facePhoto: { identifier: string; sizeKB: number; imageData?: string } | null;
     originalAvatar: { identifier: string; sizeKB: number; imageData?: string };
+    styleSample?: { identifier: string; sizeKB: number; imageData?: string } | null;
   };
   prompt?: string;
   output?: { identifier: string; sizeKB: number; imageData?: string };
@@ -1434,6 +1435,22 @@ export function StoryDisplay({
                               <span className="text-blue-600 text-[10px]">{entry.inputs.originalAvatar.sizeKB} KB</span>
                             )}
                           </div>
+                          {entry.inputs.styleSample && (
+                            <div className="flex flex-col items-center">
+                              <span className="text-gray-600 text-[10px] mb-1">Style Sample</span>
+                              {entry.inputs.styleSample.imageData ? (
+                                <img
+                                  src={entry.inputs.styleSample.imageData}
+                                  alt="Style"
+                                  className="w-16 h-16 object-cover rounded border border-purple-300 cursor-pointer hover:opacity-80 transition-opacity"
+                                  onClick={() => setEnlargedImage({ src: entry.inputs.styleSample!.imageData!, title: 'Style Sample' })}
+                                  title={`${entry.inputs.styleSample.sizeKB} KB - Click to enlarge`}
+                                />
+                              ) : (
+                                <span className="text-purple-600 text-[10px]">{entry.inputs.styleSample.sizeKB} KB</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
 
