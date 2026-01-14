@@ -331,17 +331,32 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
         {changedTraits?.build && !isUserEdited('build') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
       </div>
 
-      {/* Row 4: Face | Facial Hair (non-females) or Other (females) */}
-      <InlineEditField
-        label={language === 'de' ? 'Gesicht' : language === 'fr' ? 'Visage' : 'Face'}
-        value={character.physical?.face || ''}
-        placeholder={language === 'de' ? 'z.B. rund' : 'e.g. round'}
-        onChange={(v) => updatePhysical('face', v)}
-        isAiExtracted={isAiExtracted}
-        isChanged={changedTraits?.face}
-        isUserEdited={isUserEdited('face')}
-        language={language}
-      />
+      {/* Row 4: Skin Tone | Facial Hair (non-females) or Other (females) */}
+      <div className="flex items-center gap-2">
+        <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
+          {language === 'de' ? 'Hautton' : language === 'fr' ? 'Teint' : 'Skin Tone'}:
+        </span>
+        <input
+          type="text"
+          value={character.physical?.skinTone || ''}
+          placeholder={language === 'de' ? 'z.B. hell, mittel' : 'e.g. fair, medium'}
+          onChange={(e) => updatePhysical('skinTone', e.target.value)}
+          className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded ${
+            changedTraits?.skinTone && !isUserEdited('skinTone')
+              ? 'border-amber-400 bg-amber-50'
+              : 'border-gray-300'
+          } ${isUserEdited('skinTone') ? 'ring-2 ring-blue-400' : ''}`}
+        />
+        {character.physical?.skinToneHex && (
+          <span
+            className="inline-block w-5 h-5 rounded border border-gray-300 flex-shrink-0"
+            style={{ backgroundColor: character.physical.skinToneHex }}
+            title={character.physical.skinToneHex}
+          />
+        )}
+        <UserEditedIndicator field="skinTone" />
+        {changedTraits?.skinTone && !isUserEdited('skinTone') && <span className="text-amber-500 text-xs" title="Changed">●</span>}
+      </div>
       {character.gender !== 'female' ? (
         <div className="flex items-center gap-2">
           <span className={`font-medium text-xs whitespace-nowrap ${labelClass}`}>
@@ -2066,13 +2081,6 @@ export function CharacterForm({
                 <div className="font-medium">{character.physical?.build || '—'}</div>
                 {character.physicalTraitsSource?.build && (
                   <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.build}]</span>
-                )}
-              </div>
-              <div>
-                <span className="text-gray-500 text-xs">Face:</span>
-                <div className="font-medium">{character.physical?.face || '—'}</div>
-                {character.physicalTraitsSource?.face && (
-                  <span className="text-[10px] text-gray-400">[{character.physicalTraitsSource.face}]</span>
                 )}
               </div>
               <div>

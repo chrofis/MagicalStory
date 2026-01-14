@@ -1909,24 +1909,47 @@ Tell calmly took two crossbow bolts, placed one in his quiver, and shot the appl
 his son's head. When Gessler asked about the second bolt, Tell replied: "If I had harmed my
 son, the second bolt was for you."
 
-Gessler had Tell arrested, but during a storm on Lake Lucerne, Tell escaped and later killed
-Gessler at Hohle Gasse. Tell's defiance inspired the Swiss uprising against the Habsburgs.
+Furious at Tell's defiance, Gessler had him bound and thrown onto a boat to be taken to prison
+at Küssnacht Castle. But a violent storm broke out on Lake Lucerne. The soldiers, unable to
+control the boat, freed Tell to steer them to safety - he was known as the best boatman in Uri.
+
+Tell steered toward a flat rock on the shore. As the boat approached, he grabbed his crossbow,
+leaped onto the rock, and pushed the boat back into the raging waves. This rock is called the
+Tellsplatte (Tell's Plate) and a chapel - the Tellskapelle - was later built there to honor
+his daring escape.
+
+Tell then raced overland to Hohle Gasse (the Hollow Lane), a narrow sunken path near Küssnacht
+where Gessler would have to pass. Hidden among the bushes, Tell waited. When Gessler's party
+rode through, Tell stepped out and shot the tyrant through the heart with his second bolt -
+the one he had saved for this moment.
+
+Tell's act of defiance sparked the Swiss uprising. He joined the three forest cantons in their
+fight for freedom and is said to have fought at the Rütli oath and helped storm Habsburg
+castles. According to legend, Tell died in 1354 trying to save a child from drowning in the
+Schächenbach river - a hero to the end.
 
 PERIOD COSTUMES:
 - Tell: Huntsman clothes - leather jerkin, wool trousers, felt hat with feather, crossbow
 - Walter: Simple boy's tunic, bare feet or leather shoes
 - Gessler: Noble attire - fine wool tunic, fur-trimmed cloak, elaborate hat
 - Soldiers: Chain mail or leather armor, Habsburg colors
+- Boatmen: Simple wool tunics, leather vests, bare arms for rowing
 
-KEY LOCATIONS: Altdorf town square, Lake Lucerne, Hohle Gasse (Hollow Lane), Alpine mountains
+KEY LOCATIONS: Altdorf town square (apple shot), Lake Lucerne (storm escape), Tellsplatte
+(the rock where Tell leaped), Tellskapelle (chapel marking the escape), Hohle Gasse near
+Küssnacht (assassination), Schächenbach river (Tell's death)
 
 STORY ANGLES:
 - The tension of the apple shot from Walter's perspective
 - Tell's steady hands and courage under pressure
 - A child in the crowd watching the dramatic shot
-- The escape during the storm on Lake Lucerne
+- The terrifying storm on Lake Lucerne and Tell's daring leap
+- Tell waiting in the Hohle Gasse, crossbow ready
+- The moment of justice when Gessler falls
+- Tell joining the Swiss uprising at the Rütli
+- Tell's final heroic act saving a drowning child
 
-THEMES: courage, standing up to bullies, father's love, freedom, skill
+THEMES: courage, standing up to bullies, father's love, freedom, skill, patience, justice
 
 [battle-morgarten]
 EVENT: Battle of Morgarten (November 15, 1315)
@@ -1989,6 +2012,90 @@ STORY ANGLES:
 - The charge through the gap
 
 THEMES: sacrifice, bravery, protecting others, unity
+
+[battle-murten]
+EVENT: Battle of Murten (June 22, 1476)
+LOCATION: Murten (Morat), Fribourg, Switzerland
+
+KEY FIGURES:
+- Hans Waldmann: Zurich commander, led the decisive charge (Swiss)
+- Adrian von Bubenberg: Defender of Murten, held the town for 13 days (Swiss)
+- Charles the Bold: Duke of Burgundy, one of Europe's most powerful rulers (Burgundian)
+
+HISTORICAL CONTEXT:
+Charles the Bold of Burgundy wanted to create a kingdom stretching from the Netherlands to
+Italy. Switzerland stood in his way. In 1476, he besieged the small town of Murten with
+20,000 soldiers. Adrian von Bubenberg and just 2,000 defenders held out for 13 days.
+
+On June 22, a Swiss relief army of 25,000 attacked. The battle lasted only one hour. The
+Swiss charged downhill through rain, catching the Burgundians during their midday meal.
+Charles's army was annihilated - over 10,000 Burgundians died, many drowning in Lake Murten.
+The Swiss lost only 410 men.
+
+The victory ended Burgundy's threat to Switzerland forever. Charles the Bold died months
+later at Nancy. A bone chapel (Beinhaus) was built from the remains of the fallen Burgundians
+and stood for 300 years. The phrase "Karl der Kühne verlor bei Murten Gut und Blut und Mut"
+(Charles the Bold lost at Murten his goods, blood, and courage) became a Swiss saying.
+
+PERIOD COSTUMES:
+- Swiss soldiers: Cantonal colors, slashed doublets, halberds, pikes, two-handed swords
+- Burgundian soldiers: Elaborate plate armor, rich surcoats with Burgundian cross
+- Adrian von Bubenberg: Knight's armor with Bern bear symbol
+- Charles: Royal armor, jeweled sword, ducal crown
+
+KEY LOCATIONS: Murten town walls, Battlefield hill, Lake Murten shores, Bone chapel site
+
+STORY ANGLES:
+- A young defender on Murten's walls, watching the huge Burgundian army
+- Adrian von Bubenberg refusing surrender despite hopelessness
+- The terrifying wait for the relief army
+- The charge downhill through the rain
+- Finding Burgundian treasure after the battle
+
+THEMES: defending your home, patience, courage against overwhelming odds, unity
+
+[swiss-guard]
+EVENT: Founding of the Papal Swiss Guard (January 22, 1506)
+LOCATION: Vatican City, Rome
+
+KEY FIGURES:
+- Pope Julius II: Commissioned the Swiss Guard (Italian)
+- Kaspar von Silenen: First commander of the Swiss Guard (Swiss)
+- 150 Swiss soldiers: The first guardsmen, recruited from Uri (Swiss)
+
+HISTORICAL CONTEXT:
+In 1506, Pope Julius II invited 150 Swiss soldiers to Rome to serve as his personal bodyguard.
+The Swiss had a fearsome reputation as the best soldiers in Europe after victories like Murten
+and Grandson. On January 22, 1506, the first Swiss Guards marched into Vatican City.
+
+The Guard's darkest hour came during the Sack of Rome in 1527. When Emperor Charles V's troops
+stormed the city, 189 Swiss Guards fought to the death defending Pope Clement VII. Only 42
+survived by escorting the Pope through a secret passage to Castel Sant'Angelo. This sacrifice
+on May 6 is commemorated every year when new guards are sworn in.
+
+Today, after more than 500 years, the Swiss Guard remains the oldest active military unit in
+the world. The colorful Renaissance uniforms - blue, red, orange, and yellow stripes - are
+said to be designed by Michelangelo (though this is likely legend). Only unmarried Swiss
+Catholic men between 19-30 can join, and they must be at least 174 cm tall.
+
+PERIOD COSTUMES:
+- Swiss Guards (ceremonial): Blue, red, orange and yellow striped doublets and hose, morion
+  helmet with red plume, halberd (Renaissance style, still worn today)
+- Swiss Guards (combat): Plate armor breastplate, morion helmet, sword and halberd
+- Pope Julius II: White papal robes, red cape, papal tiara
+- Renaissance soldiers: Various armor styles, pike formations
+
+KEY LOCATIONS: St. Peter's Basilica, Vatican gates, Sistine Chapel, Castel Sant'Angelo
+(refuge during Sack of Rome), Swiss Guard barracks
+
+STORY ANGLES:
+- A young Swiss man from Uri traveling to Rome for the first time
+- Learning to stand guard for hours without moving
+- The terror of the Sack of Rome, fighting to protect the Pope
+- A modern guard being sworn in on May 6, remembering the 1527 sacrifice
+- A child visiting the Vatican, amazed by the colorful uniforms
+
+THEMES: loyalty, duty, sacrifice, tradition, protecting others, honor
 
 [swiss-reformation]
 EVENT: Zwingli and the Swiss Reformation (1523)

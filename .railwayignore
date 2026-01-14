@@ -1,0 +1,14 @@
+node_modules
+client/node_modules
+client/dist
+dist
+.git
+*.log
+.env*
+.claude
+coverage
+.nyc_output
+.vscode
+.idea
+__pycache__
+*.pyc

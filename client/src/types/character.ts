@@ -37,7 +37,7 @@ export interface PhysicalTraits {
 // Tracks which physical traits changed from previous photo analysis
 export interface ChangedTraits {
   build?: boolean;
-  face?: boolean;
+  skinTone?: boolean;
   eyeColor?: boolean;
   hairColor?: boolean;
   hairLength?: boolean;

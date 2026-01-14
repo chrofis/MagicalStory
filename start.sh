@@ -8,16 +8,14 @@ echo "================================"
 echo ""
 echo "[1/2] Starting Python photo analyzer service on port 5000..."
 echo "Python version: $(python3 --version)"
-echo "Checking Python dependencies..."
-python3 -c "import flask; import cv2; import mediapipe; print('All dependencies OK')" || echo "WARNING: Some dependencies missing"
 
 # Start Python with unbuffered output so logs appear immediately
 python3 -u photo_analyzer.py 2>&1 | tee /tmp/python-service.log &
 PYTHON_PID=$!
 
 echo "Python service PID: $PYTHON_PID"
-echo "Waiting for Python service to initialize (10 seconds)..."
-sleep 10
+echo "Waiting for Python service to initialize (3 seconds)..."
+sleep 3
 
 # Check if Python service is still running
 if kill -0 $PYTHON_PID 2>/dev/null; then
