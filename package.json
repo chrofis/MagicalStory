@@ -14,7 +14,8 @@
     "test:local": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/local-debug.spec.ts --project=chromium --workers=1",
     "test:prod": "npx playwright test tests/local-debug.spec.ts --project=chromium --workers=1",
     "test:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/local-debug.spec.ts --project=chromium --workers=1 --headed",
-    "test:all": "npx playwright test --project=chromium --workers=1"
+    "test:all": "npx playwright test --project=chromium --workers=1",
+    "test:inpaint": "node test-inpaint.js"
   },
   "keywords": [
     "storytelling",

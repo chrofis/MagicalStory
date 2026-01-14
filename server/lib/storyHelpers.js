@@ -1401,6 +1401,15 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   // Extract character names for Visual Bible exclusion warning
   const characterNames = characterSummary.map(c => c.name).join(', ');
 
+  // Build character clothing info for signature accessory selection
+  const characterClothing = (inputData.characters || []).map(char => {
+    const clothing = char.avatars?.clothing?.standard;
+    if (clothing) {
+      return `- ${char.name}: ${clothing}`;
+    }
+    return `- ${char.name}: (no clothing info available)`;
+  }).join('\n');
+
   // Determine story category and build category-specific guidelines
   const storyCategory = inputData.storyCategory || 'adventure';
   const storyTopic = inputData.storyTopic || '';
@@ -1498,6 +1507,7 @@ ${historicalGuide}
       READING_LEVEL: readingLevel,
       CHARACTERS: JSON.stringify(characterSummary),
       CHARACTER_NAMES: characterNames,  // For Visual Bible exclusion warning
+      CHARACTER_CLOTHING: characterClothing || 'No clothing info available',
       STORY_CATEGORY: storyCategory,
       STORY_TYPE: storyTheme || inputData.storyType || 'adventure',
       STORY_TOPIC: storyTopic || 'None',

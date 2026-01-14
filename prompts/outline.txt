@@ -29,6 +29,7 @@ Your task is to create a compelling, well-structured story outline that will gui
 - **Story Topic**: {STORY_TOPIC}
 - **Story Details**: {STORY_DETAILS}
 - **Characters**: {CHARACTERS}
+- **Character Base Clothing**: {CHARACTER_CLOTHING}
 
 # Story Category Guidelines
 
@@ -79,9 +80,32 @@ For each main character ({CHARACTER_NAMES}), specify which clothing variations a
 
 **Guidelines:**
 - Prefer `standard` when the story doesn't require special clothing
-- For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, vest, accessories)
 - For `costumed`: Provide **complete outfit description** (full transformation)
 - Only mark variations as `used: true` if they actually appear in the story
+
+**CRITICAL - Signature Accessories (for standard/winter/summer):**
+Each character needs ONE distinctive accessory that makes them instantly recognizable. Look at the "Character Base Clothing" above to pick something that COMPLEMENTS their outfit.
+
+**Rules:**
+1. Each character gets a DIFFERENT accessory type:
+   - Scarf (wool, patterned, long)
+   - Jacket/Coat (denim jacket, bomber jacket, cardigan, hoodie)
+   - Bag (backpack, messenger bag, small purse)
+   - Hair accessory (ribbon, headband, bow, scrunchie)
+   - Belt or suspenders
+   - Watch or bracelet
+   - Boots or distinctive shoes
+
+2. Each accessory MUST have a BOLD, SPECIFIC color that COMPLEMENTS their base outfit:
+   - ✅ "cherry red wool scarf" (complements blue dress)
+   - ✅ "bright yellow backpack with star patches"
+   - ✅ "turquoise hair ribbon"
+   - ❌ "practical everyday clothes" (too vague!)
+   - ❌ "a scarf" (no color!)
+
+3. NO two characters share the same accessory type OR the same color.
+
+4. The signature must be a SINGLE ITEM, not a list of items.
 
 **CRITICAL - Distinct Costume Colors:**
 When multiple characters wear costumes, each character MUST have a **different primary color** to make them easily recognizable:
@@ -107,14 +131,14 @@ Beyond color differences, each character must have a **structurally different ou
 {
   "clothingRequirements": {
     "Sophie": {
-      "standard": { "used": true, "signature": "brown cowboy boots, leather belt with silver buckle" },
+      "standard": { "used": true, "signature": "cherry red wool scarf" },
       "winter": { "used": false },
-      "summer": { "used": true, "signature": "straw sun hat, open-toe sandals" },
+      "summer": { "used": true, "signature": "bright yellow sunflower hair clip" },
       "costumed": { "used": true, "costume": "Pirate", "description": "Striped RED-white shirt, brown leather vest with gold buttons, black pants tucked into tall boots, red sash belt, gold hoop earring" }
     },
     "Max": {
-      "standard": { "used": true },
-      "winter": { "used": true, "signature": "thick wool scarf, fur-lined boots" },
+      "standard": { "used": true, "signature": "royal blue denim jacket" },
+      "winter": { "used": true, "signature": "forest green puffy winter coat" },
       "summer": { "used": false },
       "costumed": { "used": true, "costume": "Pirate", "description": "Striped BLUE-white shirt, black leather vest with silver buttons, dark pants tucked into tall boots, blue sash belt" }
     }

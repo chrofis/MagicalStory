@@ -6924,6 +6924,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       clothingRequirements: streamingClothingRequirements, // Per-character clothing requirements
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: [], // Will be populated after apiUsage logging
+      styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
+      costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -10295,6 +10297,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       pageClothing: pageClothingData, // Clothing per page extracted from outline
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
+      styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
+      costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
