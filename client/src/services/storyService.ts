@@ -991,6 +991,12 @@ export const storyService = {
       story: string;
       storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
       visualBible?: VisualBible;
+      clothingRequirements?: Record<string, {
+        standard?: { used: boolean; signature?: string };
+        winter?: { used: boolean; signature?: string };
+        summer?: { used: boolean; signature?: string };
+        costumed?: { used: boolean; costume?: string; description?: string };
+      }>;
       styledAvatarGeneration?: Array<{
         timestamp: string;
         characterName: string;
@@ -1054,6 +1060,12 @@ export const storyService = {
         story?: string; // Unified: Server sends story directly
         storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
         visualBible?: VisualBible;
+        clothingRequirements?: Record<string, {
+          standard?: { used: boolean; signature?: string };
+          winter?: { used: boolean; signature?: string };
+          summer?: { used: boolean; signature?: string };
+          costumed?: { used: boolean; costume?: string; description?: string };
+        }>;
         styledAvatarGeneration?: Array<{
           timestamp: string;
           characterName: string;
@@ -1111,6 +1123,12 @@ export const storyService = {
         story?: string;
         storyTextPrompts?: Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>;
         visualBible?: VisualBible;
+        clothingRequirements?: Record<string, {
+          standard?: { used: boolean; signature?: string };
+          winter?: { used: boolean; signature?: string };
+          summer?: { used: boolean; signature?: string };
+          costumed?: { used: boolean; costume?: string; description?: string };
+        }>;
         styledAvatarGeneration?: Array<{
           timestamp: string;
           characterName: string;

@@ -233,6 +233,7 @@ export default function StoryWizard() {
   const [outlineUsage, setOutlineUsage] = useState<{ input_tokens: number; output_tokens: number } | undefined>(); // Token usage for outline (dev mode)
   const [storyTextPrompts, setStoryTextPrompts] = useState<Array<{ batch: number; startPage: number; endPage: number; prompt: string; modelId?: string; usage?: { input_tokens: number; output_tokens: number } }>>([]); // API prompts for story text (dev mode)
   const [visualBible, setVisualBible] = useState<VisualBible | null>(null); // Visual Bible for dev mode
+  const [clothingRequirements, setClothingRequirements] = useState<Record<string, { standard?: { used: boolean; signature?: string }; winter?: { used: boolean; signature?: string }; summer?: { used: boolean; signature?: string }; costumed?: { used: boolean; costume?: string; description?: string } }> | null>(null); // Clothing requirements per character (dev mode)
   const [styledAvatarGeneration, setStyledAvatarGeneration] = useState<Array<{
     timestamp: string;
     characterName: string;
@@ -536,6 +537,13 @@ export default function StoryWizard() {
               });
             } else {
               setVisualBible(null);
+            }
+
+            // Clothing requirements
+            if (story.clothingRequirements) {
+              setClothingRequirements(story.clothingRequirements);
+            } else {
+              setClothingRequirements(null);
             }
 
             // Scene images (without imageData - will be loaded progressively)
@@ -2966,6 +2974,12 @@ export default function StoryWizard() {
           } else {
             setVisualBible(null);
           }
+          // Clothing requirements
+          if (status.result.clothingRequirements) {
+            setClothingRequirements(status.result.clothingRequirements);
+          } else {
+            setClothingRequirements(null);
+          }
           setGeneratedStory(status.result.story);
           setOriginalStory(status.result.story); // Store original for restore functionality
           setSceneDescriptions(status.result.sceneDescriptions || []);
@@ -3348,6 +3362,7 @@ export default function StoryWizard() {
               styledAvatarGeneration={styledAvatarGeneration}
               costumedAvatarGeneration={costumedAvatarGeneration}
               generationLog={generationLog}
+              clothingRequirements={clothingRequirements || undefined}
               storyId={storyId}
               onVisualBibleChange={storyId ? async (updatedBible) => {
                 try {

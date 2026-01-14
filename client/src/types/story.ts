@@ -305,6 +305,12 @@ export interface SavedStory {
     usage?: TokenUsage;  // Token usage for this batch
   }>;
   visualBible?: Partial<VisualBible>;
+  clothingRequirements?: Record<string, {
+    standard?: { used: boolean; signature?: string };
+    winter?: { used: boolean; signature?: string };
+    summer?: { used: boolean; signature?: string };
+    costumed?: { used: boolean; costume?: string; description?: string };
+  }>;
   styledAvatarGeneration?: Array<{
     timestamp: string;
     characterName: string;
