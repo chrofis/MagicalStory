@@ -2586,9 +2586,10 @@ These corrections OVERRIDE what is visible in the reference photo.
       log.warn('Failed to log avatar generation activity:', activityErr.message);
     }
 
-    // Store token usage in character data for admin analytics (per model)
-    const hasTokenUsage = Object.keys(results.tokenUsage.byModel).length > 0;
-    if (characterId && hasTokenUsage) {
+    // Store token usage and extracted traits in character data
+    const hasTokenUsage = Object.keys(results.tokenUsage?.byModel || {}).length > 0;
+    const hasExtractedData = results.extractedTraits || results.structuredClothing;
+    if (characterId && (hasTokenUsage || hasExtractedData)) {
       try {
         // Get current character data and accumulate token usage
         const charResult = await dbQuery(
@@ -2602,27 +2603,28 @@ These corrections OVERRIDE what is visible in the reference photo.
             ? JSON.parse(charResult.rows[0].data)
             : charResult.rows[0].data;
 
-          // Find the character and update its token usage
+          // Find the character and update its data
           const characters = data.characters || [];
           const charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
           if (charIndex >= 0) {
-            // Initialize or accumulate token usage per model
-            const existingUsage = characters[charIndex].avatarTokenUsage || { byModel: {} };
-            if (!existingUsage.byModel) existingUsage.byModel = {};
+            // Accumulate token usage per model (if available)
+            if (hasTokenUsage) {
+              const existingUsage = characters[charIndex].avatarTokenUsage || { byModel: {} };
+              if (!existingUsage.byModel) existingUsage.byModel = {};
 
-            // Accumulate usage for each model
-            for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
-              if (!existingUsage.byModel[modelId]) {
-                existingUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
+                if (!existingUsage.byModel[modelId]) {
+                  existingUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+                }
+                existingUsage.byModel[modelId].input_tokens += usage.input_tokens;
+                existingUsage.byModel[modelId].output_tokens += usage.output_tokens;
+                existingUsage.byModel[modelId].calls += usage.calls;
               }
-              existingUsage.byModel[modelId].input_tokens += usage.input_tokens;
-              existingUsage.byModel[modelId].output_tokens += usage.output_tokens;
-              existingUsage.byModel[modelId].calls += usage.calls;
+              existingUsage.lastUpdated = new Date().toISOString();
+              characters[charIndex].avatarTokenUsage = existingUsage;
             }
-            existingUsage.lastUpdated = new Date().toISOString();
-            characters[charIndex].avatarTokenUsage = existingUsage;
 
-            // Also save extracted traits (apparentAge, build, etc.) and clothing to database
+            // Save extracted traits (apparentAge, build, etc.) to database
             // This ensures the extraction results persist and don't rely on frontend saving
             if (results.extractedTraits) {
               characters[charIndex].physical = {
@@ -2643,9 +2645,14 @@ These corrections OVERRIDE what is visible in the reference photo.
             await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
 
             // Log summary
-            const totalCalls = Object.values(results.tokenUsage.byModel).reduce((sum, u) => sum + u.calls, 0);
-            const models = Object.keys(results.tokenUsage.byModel).join(', ');
-            log.debug(`📊 [AVATAR TOKENS] Stored usage for character ${characterId}: ${totalCalls} calls using ${models}`);
+            if (hasTokenUsage) {
+              const totalCalls = Object.values(results.tokenUsage.byModel).reduce((sum, u) => sum + u.calls, 0);
+              const models = Object.keys(results.tokenUsage.byModel).join(', ');
+              log.debug(`📊 [AVATAR TOKENS] Stored usage for character ${characterId}: ${totalCalls} calls using ${models}`);
+            }
+            if (results.extractedTraits) {
+              log.debug(`📊 [AVATAR TRAITS] Saved to DB: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
+            }
           }
         }
       } catch (tokenErr) {
