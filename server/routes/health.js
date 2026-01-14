@@ -14,6 +14,28 @@ router.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// GET /api/debug-landmarks/:city - Temporary debug endpoint for landmarks
+const { getPool } = require('../services/database');
+router.get('/debug-landmarks/:city', async (req, res) => {
+  try {
+    const city = req.params.city.toLowerCase();
+    const pool = getPool();
+    const result = await pool.query(
+      "SELECT city, country, language, landmarks, created_at FROM landmarks_discovery WHERE LOWER(city) = $1 ORDER BY language",
+      [city]
+    );
+    const formatted = result.rows.map(row => ({
+      language: row.language,
+      city: row.city,
+      country: row.country,
+      landmarks: typeof row.landmarks === 'string' ? JSON.parse(row.landmarks) : row.landmarks
+    }));
+    res.json({ count: result.rowCount, entries: formatted });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/check-ip - Shows Railway's outgoing IP for debugging
 router.get('/check-ip', async (req, res) => {
   try {
