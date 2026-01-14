@@ -1533,7 +1533,7 @@ ${historicalGuide}
  * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2)
  * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'English', visualBible = null, previousScenes = [], characterClothing = {}) {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}) {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];

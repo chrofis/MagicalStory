@@ -2294,9 +2294,8 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Get characters from story data
     const characters = storyData.characters || [];
 
-    // Get language from story data (convert code to name)
-    const { getLanguageNameEnglish } = require('./server/lib/languages');
-    const language = getLanguageNameEnglish(storyData.language || 'en');
+    // Get language code from story data
+    const language = storyData.language || 'en';
 
     // Get Visual Bible for recurring elements
     const visualBible = storyData.visualBible || null;
