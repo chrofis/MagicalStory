@@ -15,6 +15,9 @@ Safe, family-friendly content only.
 - If scene describes distance between characters: show them FAR APART, not close together
 - Empty space is a compositional element - preserve it as described
 - "Left/right edge" means AT THE EDGE of the frame, not near center
+- IGNORE any metric distances (meters, feet) or percentages if present in scene description
+- Interpret closeness: "arm's reach" = close together, "far apart" = opposite sides of frame
+- Frame regions: "left edge" = very left, "left side" = left third, "center" = middle, "right side" = right third
 
 ---
 

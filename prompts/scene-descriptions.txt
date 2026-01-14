@@ -57,7 +57,9 @@ Check EVERY connection between elements. For each pair, answer:
 Character ↔ Character connections:
 - Are they facing each other? If yes, are their bodies AND heads oriented correctly?
 - If one looks at the other, does the other look back or elsewhere? (specify)
-- What is the physical distance between them?
+- Frame region: Where is each character? (left edge / left side / center / right side / right edge)
+- Depth layer: foreground, middle ground, or background?
+- Closeness: touching / arm's reach / clear gap / far apart / opposite edges?
 
 Character ↔ Object connections:
 - If holding: which hand? Is the other hand accounted for?
@@ -171,10 +173,23 @@ Sophie kniet im hohen Präriegras, trommelt mit den Fingern auf ihr Knie, währe
 - Objects touching → Use distinct materials/colors: "A [wooden-brown] stick in a [pink-skin] hand"
 
 **Distant Characters (Critical for Wide Shots):**
-- Characters 10+ meters apart → Extreme wide shot, characters appear SMALL in frame
-- MUST specify frame allocation: "Roger left 15%, empty plaza 70%, Lukas right 15%"
+- Characters far apart → Extreme wide shot, characters appear SMALL in frame
+- MUST specify frame regions: "Roger on left edge, Lukas on right edge, vast empty plaza dominates center"
+- MUST describe relative scale: "both appear as small figures, dwarfed by the space between them"
 - MUST name what fills the empty space: "the gray cobblestone plaza stretches between them" or "the vast snowy field separates them"
 - The empty space IS the visual story - describe it as a subject, not just absence
+
+**Positioning Language (CRITICAL - Image generators cannot interpret metrics):**
+NEVER USE:
+- Metric distances: "3 meters apart", "10 feet away", "1 meter tall"
+- Percentages: "left 15%", "occupies 30% of frame"
+- Pixel coordinates or bounding boxes
+
+ALWAYS USE:
+- Frame regions: "left edge", "left side", "center", "right side", "right edge"
+- Depth layers: "foreground", "middle ground", "background"
+- Relative closeness: "shoulder to shoulder", "arm's reach", "clear gap", "far apart", "opposite edges"
+- Scale descriptions: "small figures", "dominates the frame", "tiny silhouettes"
 
 **Gaze Direction (Always Specify):**
 - Characters looking AT EACH OTHER → "Eyes locked across the distance" or "Facing each other"
