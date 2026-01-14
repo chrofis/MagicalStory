@@ -125,7 +125,7 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     hair: api.hair_color || api.hairColor,  // Legacy: combined hair field
     other: api.other,  // Glasses, birthmarks, always-present accessories
     detailedHairAnalysis: api.detailed_hair_analysis || api.detailedHairAnalysis,
-    apparentAge: (api.apparent_age || api.apparentAge) as AgeCategory | undefined, // How old they look
+    apparentAge: (api.apparent_age || api.apparentAge || api.physical?.apparentAge) as AgeCategory | undefined, // How old they look (flat or nested)
   };
 
   // Compute ageCategory from API or derive from age
