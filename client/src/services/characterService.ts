@@ -707,14 +707,16 @@ export const characterService = {
       const hasUserClothing = Object.keys(userClothing).length > 0;
       log.info(`Clothing to send (user-edited only): ${hasUserClothing ? JSON.stringify(userClothing) : 'none'}`);
 
-      const response = await api.post<{
+      const startResponse = await api.post<{
         success: boolean;
+        async?: boolean;
+        jobId?: string;
         clothingAvatars?: CharacterAvatars & {
           extractedTraits?: ExtractedTraits;
           structuredClothing?: Record<string, ExtractedClothing>;
         };
         error?: string;
-      }>('/api/generate-clothing-avatars', {
+      }>('/api/generate-clothing-avatars?async=true', {
         characterId: character.id,
         facePhoto: inputPhoto,
         physicalDescription,
@@ -729,29 +731,70 @@ export const characterService = {
         clothing: hasUserClothing ? userClothing : undefined,
       });
 
-      if (response.success && response.clothingAvatars) {
+      // Async mode: poll for job completion
+      if (startResponse.async && startResponse.jobId) {
+        log.info(`Avatar job started: ${startResponse.jobId}, polling for completion...`);
+
+        // Poll every 2 seconds for up to 2 minutes
+        const maxAttempts = 60;
+        const pollInterval = 2000;
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+          const statusResponse = await api.get<{
+            jobId: string;
+            status: string;
+            progress?: number;
+            message?: string;
+            success?: boolean;
+            clothingAvatars?: CharacterAvatars & {
+              extractedTraits?: ExtractedTraits;
+              structuredClothing?: Record<string, ExtractedClothing>;
+            };
+            error?: string;
+          }>(`/api/avatar-jobs/${startResponse.jobId}`);
+
+          if (statusResponse.status === 'complete' && statusResponse.clothingAvatars) {
+            log.success(`Avatar job ${startResponse.jobId} completed after ${(attempt + 1) * 2}s`);
+            const extractedTraits = statusResponse.clothingAvatars.extractedTraits;
+            const extractedClothing = statusResponse.clothingAvatars.structuredClothing?.standard;
+            return {
+              success: true,
+              avatars: statusResponse.clothingAvatars,
+              extractedTraits,
+              extractedClothing,
+            };
+          }
+
+          if (statusResponse.status === 'failed') {
+            log.error(`Avatar job failed: ${statusResponse.error}`);
+            return { success: false, error: statusResponse.error };
+          }
+
+          // Log progress periodically
+          if (attempt % 5 === 0) {
+            log.info(`Avatar job ${startResponse.jobId}: ${statusResponse.message || statusResponse.status} (${statusResponse.progress || 0}%)`);
+          }
+        }
+
+        return { success: false, error: 'Avatar generation timed out' };
+      }
+
+      // Fallback: sync response (shouldn't happen with async=true)
+      if (startResponse.success && startResponse.clothingAvatars) {
         log.success(`Clothing avatars WITH TRAITS generated for ${character.name}`);
-
-        // Extract traits and clothing from the response
-        const extractedTraits = response.clothingAvatars.extractedTraits;
-        const extractedClothing = response.clothingAvatars.structuredClothing?.standard;
-
-        if (extractedTraits) {
-          log.info(`Extracted traits: ${JSON.stringify(extractedTraits)}`);
-        }
-        if (extractedClothing) {
-          log.info(`Extracted clothing: ${JSON.stringify(extractedClothing)}`);
-        }
-
+        const extractedTraits = startResponse.clothingAvatars.extractedTraits;
+        const extractedClothing = startResponse.clothingAvatars.structuredClothing?.standard;
         return {
           success: true,
-          avatars: response.clothingAvatars,
+          avatars: startResponse.clothingAvatars,
           extractedTraits,
           extractedClothing,
         };
       } else {
-        log.error(`Failed to generate avatars with traits: ${response.error}`);
-        return { success: false, error: response.error };
+        log.error(`Failed to generate avatars with traits: ${startResponse.error}`);
+        return { success: false, error: startResponse.error };
       }
     } catch (error) {
       log.error('Clothing avatar generation with traits failed:', error);
