@@ -21,13 +21,15 @@ router.get('/debug-landmarks/:city', async (req, res) => {
     const city = req.params.city.toLowerCase();
     const pool = getPool();
     const result = await pool.query(
-      "SELECT city, country, language, landmarks, created_at FROM landmarks_discovery WHERE LOWER(city) = $1 ORDER BY language",
+      "SELECT location_key, city, country, landmarks, landmark_count, created_at FROM discovered_landmarks WHERE LOWER(city) = $1",
       [city]
     );
     const formatted = result.rows.map(row => ({
-      language: row.language,
+      location_key: row.location_key,
       city: row.city,
       country: row.country,
+      landmark_count: row.landmark_count,
+      created_at: row.created_at,
       landmarks: typeof row.landmarks === 'string' ? JSON.parse(row.landmarks) : row.landmarks
     }));
     res.json({ count: result.rowCount, entries: formatted });
