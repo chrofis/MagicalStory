@@ -142,6 +142,37 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/admin/landmarks/:city - Query landmarks for a city
+router.get('/landmarks/:city', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const city = req.params.city.toLowerCase();
+    const pool = getPool();
+    const result = await pool.query(
+      "SELECT city, country, language, landmarks, created_at FROM landmarks_discovery WHERE LOWER(city) = $1 ORDER BY language",
+      [city]
+    );
+
+    const formatted = result.rows.map(row => {
+      let landmarks = row.landmarks;
+      if (typeof landmarks === 'string') {
+        landmarks = JSON.parse(landmarks);
+      }
+      return {
+        city: row.city,
+        country: row.country,
+        language: row.language,
+        created_at: row.created_at,
+        landmarks: landmarks
+      };
+    });
+
+    res.json({ count: result.rowCount, entries: formatted });
+  } catch (err) {
+    console.error('Error querying landmarks:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Mount all submodule routes
 router.use('/', adminSubroutes);
 
