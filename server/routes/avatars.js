@@ -1849,13 +1849,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             charIndex = characters.findIndex(c => c.name === name);
           }
 
-          // Last resort: use first character
-          if (charIndex < 0 && characters.length > 0) {
-            charIndex = 0;
-            log.debug(`💾 [AVATAR JOB ${jobId}] Could not find character by ID ${characterId}, using first character`);
-          }
-
-          log.debug(`💾 [AVATAR JOB ${jobId}] Found character at index ${charIndex} (rowId: ${rowId})`);
+          // If we still can't find the character, log error and skip update (don't save to wrong character!)
+          if (charIndex < 0) {
+            log.error(`❌ [AVATAR JOB ${jobId}] Could not find character by ID ${characterId} or name ${name} - skipping database update to prevent saving to wrong character`);
+          } else {
+            log.debug(`💾 [AVATAR JOB ${jobId}] Found character at index ${charIndex} (rowId: ${rowId})`);
 
 
           if (characters[charIndex]) {
@@ -1897,6 +1895,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId}`);
           }
+          } // close else block for charIndex >= 0
         }
       } catch (dbErr) {
         log.warn(`[AVATAR JOB ${jobId}] Failed to update character in database:`, dbErr.message);
