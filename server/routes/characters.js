@@ -394,16 +394,20 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // Preserve basic avatar variants (standard, winter, summer, formal) from database
         // These get stripped for non-dev users on GET, so we must preserve them on save
+        // BUT: If frontend sent generatedAt, avatars were just generated - don't overwrite with stale DB data
         const basicVariants = ['standard', 'winter', 'summer', 'formal'];
+        const frontendHasFreshAvatars = !!newChar.avatars?.generatedAt;
         for (const variant of basicVariants) {
           const existingHas = !!existingChar.avatars[variant];
           const newHas = !!newChar.avatars?.[variant];
-          if (existingHas && !newHas) {
+          if (existingHas && !newHas && !frontendHasFreshAvatars) {
             mergedAvatars[variant] = existingChar.avatars[variant];
             console.log(`[Characters] POST - Preserving avatar variant '${variant}' for ${newChar.name}`);
             hasChanges = true;
           } else if (existingHas && newHas) {
             console.log(`[Characters] POST - Frontend sent '${variant}' for ${newChar.name}, not preserving`);
+          } else if (existingHas && frontendHasFreshAvatars) {
+            console.log(`[Characters] POST - Frontend has fresh avatars (generatedAt), not preserving stale '${variant}' for ${newChar.name}`);
           }
         }
 
@@ -434,51 +438,56 @@ router.post('/', authenticateToken, async (req, res) => {
           mergedAvatars.rawEvaluation = existingChar.avatars.rawEvaluation;
         }
 
-        // Preserve styledAvatars from database
-        if (existingChar.avatars.styledAvatars) {
-          const styles = Object.keys(existingChar.avatars.styledAvatars);
-          console.log(`[Characters] POST - Preserving styledAvatars for ${newChar.name}: ${styles.join(', ')}`);
-          // Deep merge styled avatars (including costumed sub-types)
-          mergedAvatars.styledAvatars = {
-            ...mergedAvatars.styledAvatars
-          };
-          for (const [styleKey, styleValue] of Object.entries(existingChar.avatars.styledAvatars)) {
+        // Merge styledAvatars: request data wins over database (for fresh avatar generation)
+        if (existingChar.avatars.styledAvatars || mergedAvatars.styledAvatars) {
+          const dbStyles = Object.keys(existingChar.avatars.styledAvatars || {});
+          const reqStyles = Object.keys(mergedAvatars.styledAvatars || {});
+          if (dbStyles.length > 0) {
+            console.log(`[Characters] POST - Merging styledAvatars for ${newChar.name}: DB has [${dbStyles.join(', ')}], request has [${reqStyles.join(', ')}]`);
+          }
+          // Deep merge styled avatars: DB as base, request wins
+          const mergedStyled = { ...existingChar.avatars.styledAvatars };
+          for (const [styleKey, styleValue] of Object.entries(mergedAvatars.styledAvatars || {})) {
             if (typeof styleValue === 'object' && styleValue !== null) {
-              mergedAvatars.styledAvatars[styleKey] = {
-                ...mergedAvatars.styledAvatars?.[styleKey],
-                ...styleValue
+              mergedStyled[styleKey] = {
+                ...mergedStyled[styleKey],
+                ...styleValue  // Request data wins
               };
             }
           }
+          mergedAvatars.styledAvatars = mergedStyled;
           hasChanges = true;
         }
 
-        // Preserve costumed avatars from database (nested structure: { costumed: { pirate: "...", superhero: "..." } })
-        if (existingChar.avatars.costumed) {
-          const costumeTypes = Object.keys(existingChar.avatars.costumed);
-          console.log(`[Characters] POST - Preserving costumed avatars for ${newChar.name}: ${costumeTypes.join(', ')}`);
+        // Merge costumed avatars: request data wins over database
+        if (existingChar.avatars.costumed || mergedAvatars.costumed) {
+          const dbTypes = Object.keys(existingChar.avatars.costumed || {});
+          const reqTypes = Object.keys(mergedAvatars.costumed || {});
+          if (dbTypes.length > 0 || reqTypes.length > 0) {
+            console.log(`[Characters] POST - Merging costumed for ${newChar.name}: DB has [${dbTypes.join(', ')}], request has [${reqTypes.join(', ')}]`);
+          }
           mergedAvatars.costumed = {
-            ...mergedAvatars.costumed,
-            ...existingChar.avatars.costumed
+            ...existingChar.avatars.costumed,  // DB as base
+            ...mergedAvatars.costumed          // Request wins
           };
           hasChanges = true;
         }
 
-        // Preserve clothing descriptions for costumed
-        if (existingChar.avatars.clothing?.costumed) {
+        // Merge clothing descriptions for costumed: request data wins
+        if (existingChar.avatars.clothing?.costumed || mergedAvatars.clothing?.costumed) {
           if (!mergedAvatars.clothing) mergedAvatars.clothing = {};
           mergedAvatars.clothing.costumed = {
-            ...mergedAvatars.clothing?.costumed,
-            ...existingChar.avatars.clothing.costumed
+            ...existingChar.avatars.clothing?.costumed,  // DB as base
+            ...mergedAvatars.clothing?.costumed          // Request wins
           };
           hasChanges = true;
         }
 
-        // Preserve signatures
-        if (existingChar.avatars.signatures) {
+        // Merge signatures: request data wins over database
+        if (existingChar.avatars.signatures || mergedAvatars.signatures) {
           mergedAvatars.signatures = {
-            ...mergedAvatars.signatures,
-            ...existingChar.avatars.signatures
+            ...existingChar.avatars.signatures,  // DB as base
+            ...mergedAvatars.signatures          // Request wins
           };
           hasChanges = true;
         }
