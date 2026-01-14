@@ -48,11 +48,12 @@ Write a quick draft of what you want to illustrate:
 - Which moment to capture
 - Which characters are present (max 3), who is the main character of the scene
 - What is each character doing
-- Positions of all characters and key objects
+- Positions of all characters (use frame regions: left edge/left side/center/right side/right edge)
+- For any location, object, or landmark that characters point at, look at, or move toward - assign it a specific FRAME POSITION (e.g., "Bundeshaus: background-center", "the door: right edge")
 
 
 **STEP 2 - CONNECTION REVIEW:**
-Check EVERY connection between elements. For each pair, answer:
+Check EVERY connection between elements. This is where errors happen - be thorough.
 
 Character ↔ Character connections:
 - Are they facing each other? If yes, are their bodies AND heads oriented correctly?
@@ -71,7 +72,21 @@ Body consistency for each character:
 - Body facing vs head facing: same direction or different? (if different, is it intentional?)
 - Pose vs action: does the pose support the action?
 
-Flag any issues found and how you'll fix them in the final output.
+Pointing & Gaze Geometry:
+For EACH pointing gesture or significant gaze in the scene:
+- What is the TARGET? (object, location, character, off-frame)
+- Where is the TARGET in the frame? (left/center/right, foreground/background)
+- Where is the POINTER/LOOKER in the frame?
+- What DIRECTION must they point/look to reach the target?
+- VERIFY: Does the described arm direction actually point toward the target position?
+
+Example CHECK:
+- Franziska (center-left) points at Bundeshaus (background-center)
+- To point from center-left toward background-center, she must point toward the RIGHT
+- ❌ WRONG: "right arm extended pointing left" - this points AWAY from target
+- ✅ CORRECT: "right arm extended pointing toward center-right/background" - this reaches the target
+
+Flag any geometry errors and fix them before final output.
 
 **STEP 3 - FINAL OUTPUT:**
 Now write the polished output with all issues resolved:
