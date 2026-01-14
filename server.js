@@ -6085,15 +6085,15 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
               avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
             } else if (config.signature) {
-              // For signature items: check styled avatar (signature + style generated in one call)
-              avatarExists = !!char.avatars.styledAvatars?.[artStyle]?.[category];
+              // For signature items: always regenerate (signature is story-specific)
+              avatarExists = false;
             } else {
               // For regular categories: check base avatar (style conversion happens later)
               avatarExists = !!char.avatars[category];
             }
 
             if (avatarExists) {
-              log.debug(`👕 [STORYBOOK] ${char.name} already has ${category}${config.signature ? '+sig' : ''} avatar, skipping`);
+              log.debug(`👕 [STORYBOOK] ${char.name} already has ${category} avatar, skipping`);
               continue;
             }
 
@@ -8849,7 +8849,15 @@ async function processStoryJob(jobId) {
             avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
           } else if (config.signature) {
             // For signature items: check styled avatar (signature + style generated in one call)
-            avatarExists = !!char.avatars.styledAvatars?.[artStyle]?.[category];
+            // Also verify the stored signature matches - if different, need to regenerate
+            const existingStyled = !!char.avatars.styledAvatars?.[artStyle]?.[category];
+            const storedSignature = char.avatars?.signatures?.[category];
+            if (existingStyled && storedSignature !== config.signature) {
+              log.debug(`🔄 [AVATAR] ${char.name}:${category} signature changed ("${storedSignature?.substring(0, 30)}..." -> "${config.signature?.substring(0, 30)}..."), regenerating`);
+              avatarExists = false;  // Force regeneration
+            } else {
+              avatarExists = existingStyled;
+            }
           } else {
             // For regular categories: check base avatar (style conversion happens later)
             avatarExists = !!char.avatars[category];

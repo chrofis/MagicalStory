@@ -22,6 +22,7 @@ interface StyledAvatarGenerationEntry {
   timestamp: string;
   characterName: string;
   artStyle: string;
+  clothingCategory?: string;
   durationMs: number;
   success: boolean;
   error?: string;
@@ -49,6 +50,23 @@ interface CostumedAvatarGenerationEntry {
   prompt?: string;
   output?: { identifier: string; sizeKB: number; imageData?: string };
 }
+
+// Clothing requirements per character (from story outline)
+interface ClothingVariant {
+  used: boolean;
+  signature?: string;
+  costume?: string;
+  description?: string;
+}
+
+interface CharacterClothingRequirements {
+  standard?: ClothingVariant;
+  winter?: ClothingVariant;
+  summer?: ClothingVariant;
+  costumed?: ClothingVariant;
+}
+
+type ClothingRequirements = Record<string, CharacterClothingRequirements>;
 
 interface StoryDisplayProps {
   title: string;
@@ -83,6 +101,7 @@ interface StoryDisplayProps {
   styledAvatarGeneration?: StyledAvatarGenerationEntry[];
   costumedAvatarGeneration?: CostumedAvatarGenerationEntry[];
   generationLog?: GenerationLogEntry[];
+  clothingRequirements?: ClothingRequirements;
   // Partial story fields
   isPartial?: boolean;
   failureReason?: string;
@@ -145,6 +164,7 @@ export function StoryDisplay({
   styledAvatarGeneration = [],
   costumedAvatarGeneration = [],
   generationLog = [],
+  clothingRequirements,
   isPartial = false,
   failureReason,
   generatedPages,
@@ -1293,6 +1313,68 @@ export function StoryDisplay({
             </details>
           )}
 
+          {/* Clothing Requirements - Per-character outfit definitions */}
+          {clothingRequirements && Object.keys(clothingRequirements).length > 0 && (
+            <details className="bg-teal-50 border-2 border-teal-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-teal-800 hover:text-teal-900 flex items-center gap-2">
+                <span className="text-xl">👔</span>
+                {language === 'de'
+                  ? `Kleidungsanforderungen (${Object.keys(clothingRequirements).length} Charaktere)`
+                  : language === 'fr'
+                    ? `Exigences vestimentaires (${Object.keys(clothingRequirements).length} personnages)`
+                    : `Clothing Requirements (${Object.keys(clothingRequirements).length} characters)`}
+              </summary>
+              <div className="mt-4 space-y-3">
+                {Object.entries(clothingRequirements).map(([charName, requirements]) => (
+                  <div key={charName} className="bg-white border border-teal-200 rounded-lg p-3">
+                    <h4 className="font-bold text-teal-700 mb-2">{charName}</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      {/* Standard */}
+                      <div className={`p-2 rounded ${requirements.standard?.used ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200 opacity-50'}`}>
+                        <div className="font-semibold text-gray-700 flex items-center gap-1">
+                          {requirements.standard?.used ? '✅' : '⬜'} Standard
+                        </div>
+                        {requirements.standard?.used && requirements.standard?.signature && (
+                          <div className="text-gray-600 mt-1">{requirements.standard.signature}</div>
+                        )}
+                      </div>
+                      {/* Winter */}
+                      <div className={`p-2 rounded ${requirements.winter?.used ? 'bg-blue-50 border border-blue-200' : 'bg-gray-50 border border-gray-200 opacity-50'}`}>
+                        <div className="font-semibold text-gray-700 flex items-center gap-1">
+                          {requirements.winter?.used ? '❄️' : '⬜'} Winter
+                        </div>
+                        {requirements.winter?.used && requirements.winter?.signature && (
+                          <div className="text-gray-600 mt-1">{requirements.winter.signature}</div>
+                        )}
+                      </div>
+                      {/* Summer */}
+                      <div className={`p-2 rounded ${requirements.summer?.used ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200 opacity-50'}`}>
+                        <div className="font-semibold text-gray-700 flex items-center gap-1">
+                          {requirements.summer?.used ? '☀️' : '⬜'} Summer
+                        </div>
+                        {requirements.summer?.used && requirements.summer?.signature && (
+                          <div className="text-gray-600 mt-1">{requirements.summer.signature}</div>
+                        )}
+                      </div>
+                      {/* Costumed */}
+                      <div className={`p-2 rounded ${requirements.costumed?.used ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200 opacity-50'}`}>
+                        <div className="font-semibold text-gray-700 flex items-center gap-1">
+                          {requirements.costumed?.used ? '🎭' : '⬜'} Costumed
+                        </div>
+                        {requirements.costumed?.used && (
+                          <div className="text-gray-600 mt-1">
+                            {requirements.costumed.costume && <span className="font-medium">{requirements.costumed.costume}: </span>}
+                            {requirements.costumed.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
           {/* Styled Avatar Generation Log */}
           {styledAvatarGeneration && styledAvatarGeneration.length > 0 && (
             <details className="bg-pink-50 border-2 border-pink-200 rounded-xl p-4">
@@ -1309,7 +1391,7 @@ export function StoryDisplay({
                   <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-pink-200' : 'bg-red-50 border-red-300'}`}>
                     <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-800 flex items-center gap-2">
                       <span className={`w-2 h-2 rounded-full ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                      {entry.characterName} - {entry.artStyle}
+                      {entry.characterName} - {entry.artStyle} ({entry.clothingCategory || 'standard'})
                       <span className="text-xs text-gray-500 ml-auto">
                         {(entry.durationMs / 1000).toFixed(1)}s
                       </span>

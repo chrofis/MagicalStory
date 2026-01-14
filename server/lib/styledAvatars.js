@@ -95,9 +95,10 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {string} characterName - Character name for logging
  * @param {string} facePhoto - High-resolution face photo for identity (optional)
  * @param {string} clothingDescription - Text description of clothing to wear (optional)
+ * @param {string} clothingCategory - Clothing category (standard, winter, summer) for logging
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard') {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   const hasClothing = !!clothingDescription;
@@ -175,6 +176,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       timestamp: new Date().toISOString(),
       characterName,
       artStyle,
+      clothingCategory,
       durationMs: duration,
       success: true,
       inputs: {
@@ -206,6 +208,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       timestamp: new Date().toISOString(),
       characterName,
       artStyle,
+      clothingCategory,
       durationMs: Date.now() - startTime,
       success: false,
       error: error.message,
@@ -258,7 +261,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory);
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -423,6 +426,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements) {
         clothingDescription = char.avatars?.clothing?.[clothingCategory];
         // Also check for signature items to include
         const signature = char.avatars?.signatures?.[clothingCategory];
+        log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - clothing: ${clothingDescription ? 'yes' : 'no'}, signature: ${signature ? signature.substring(0, 50) + '...' : 'no'}`);
         if (signature && clothingDescription) {
           clothingDescription = `${clothingDescription}\n\nSIGNATURE ITEMS (MUST INCLUDE): ${signature}`;
         } else if (signature && !clothingDescription) {
