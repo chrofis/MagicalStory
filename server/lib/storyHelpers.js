@@ -883,7 +883,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         log.debug(`[AVATAR STYLED] ${char.name}: using styled ${effectiveClothingCategory}@${artStyle}`);
         // Get extracted clothing description
         if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
-          clothingDescription = avatars.clothing[effectiveClothingCategory];
+          const clothingData = avatars.clothing[effectiveClothingCategory];
+          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
         }
       }
       // Fallback to unstyled clothing avatar (standard, winter, summer)
@@ -893,7 +894,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         usedClothingCategory = effectiveClothingCategory;
         // Get extracted clothing description for this avatar
         if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
-          clothingDescription = avatars.clothing[effectiveClothingCategory];
+          const clothingData = avatars.clothing[effectiveClothingCategory];
+          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
         }
       }
 
@@ -904,7 +906,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         photoUrl = avatars.formal;
         usedClothingCategory = 'formal';
         if (avatars.clothing?.formal) {
-          clothingDescription = avatars.clothing.formal;
+          const clothingData = avatars.clothing.formal;
+          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
         }
       }
 
@@ -921,7 +924,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
               photoUrl = avatars.styledAvatars[artStyle][fallbackCategory];
               usedClothingCategory = fallbackCategory;
               if (avatars.clothing && avatars.clothing[fallbackCategory]) {
-                clothingDescription = avatars.clothing[fallbackCategory];
+                const clothingData = avatars.clothing[fallbackCategory];
+                clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
               }
               log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using styled ${fallbackCategory}@${artStyle}`);
               break;
@@ -937,7 +941,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
               photoUrl = avatars[fallbackCategory];
               usedClothingCategory = fallbackCategory;
               if (avatars.clothing && avatars.clothing[fallbackCategory]) {
-                clothingDescription = avatars.clothing[fallbackCategory];
+                const clothingData = avatars.clothing[fallbackCategory];
+                clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
               }
               log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using unstyled ${fallbackCategory}`);
               break;

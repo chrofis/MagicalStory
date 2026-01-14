@@ -885,7 +885,7 @@ export function StoryDisplay({
                             <div className="text-xs">
                               <span className="font-medium text-gray-600">Physical:</span>
                               <span className="text-gray-700 ml-1">
-                                {char.physical?.face || 'Not analyzed'} | {char.physical?.hair || 'N/A'} | {char.physical?.build || 'N/A'}
+                                {char.physical?.skinTone || 'N/A'} | {char.physical?.hair || 'N/A'} | {char.physical?.build || 'N/A'}
                                 {char.physical?.other && ` | ${char.physical.other}`}
                               </span>
                             </div>
