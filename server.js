@@ -1704,14 +1704,21 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
         }
       }
 
-      // Filter landmarks to match story language (avoid duplicates in different languages)
-      // Extract base language: 'de-ch' → 'de', 'de-de' → 'de', 'fr' → 'fr', 'en' → 'en'
+      // Select landmark names in story language (using Wikidata variants)
+      // Each landmark has variants: [{name: "Ruine Stein", lang: "de"}, {name: "Stein Castle", lang: "en"}]
       if (availableLandmarks.length > 0 && language) {
         const baseLang = language.split('-')[0].toLowerCase();
-        const beforeCount = availableLandmarks.length;
-        availableLandmarks = availableLandmarks.filter(l => !l.lang || l.lang === baseLang);
-        if (availableLandmarks.length < beforeCount) {
-          log.info(`[LANDMARK] Filtered landmarks by language '${baseLang}': ${beforeCount} → ${availableLandmarks.length}`);
+        for (const landmark of availableLandmarks) {
+          if (landmark.variants && landmark.variants.length > 0) {
+            // Find variant matching story language
+            const match = landmark.variants.find(v => v.lang === baseLang);
+            if (match && match.name !== landmark.name) {
+              log.debug(`[LANDMARK] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
+              landmark.originalName = landmark.name; // Keep original for reference
+              landmark.name = match.name;
+              landmark.query = match.name;
+            }
+          }
         }
       }
     }
@@ -2012,14 +2019,21 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
         }
       }
 
-      // Filter landmarks to match story language (avoid duplicates in different languages)
-      // Extract base language: 'de-ch' → 'de', 'de-de' → 'de', 'fr' → 'fr', 'en' → 'en'
+      // Select landmark names in story language (using Wikidata variants)
+      // Each landmark has variants: [{name: "Ruine Stein", lang: "de"}, {name: "Stein Castle", lang: "en"}]
       if (availableLandmarks.length > 0 && language) {
         const baseLang = language.split('-')[0].toLowerCase();
-        const beforeCount = availableLandmarks.length;
-        availableLandmarks = availableLandmarks.filter(l => !l.lang || l.lang === baseLang);
-        if (availableLandmarks.length < beforeCount) {
-          log.info(`[LANDMARK] [STREAM] Filtered landmarks by language '${baseLang}': ${beforeCount} → ${availableLandmarks.length}`);
+        for (const landmark of availableLandmarks) {
+          if (landmark.variants && landmark.variants.length > 0) {
+            // Find variant matching story language
+            const match = landmark.variants.find(v => v.lang === baseLang);
+            if (match && match.name !== landmark.name) {
+              log.debug(`[LANDMARK] [STREAM] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
+              landmark.originalName = landmark.name;
+              landmark.name = match.name;
+              landmark.query = match.name;
+            }
+          }
         }
       }
     }
@@ -8751,14 +8765,21 @@ async function processStoryJob(jobId) {
       }
 
       if (landmarks && landmarks.length > 0) {
-        // Filter landmarks to match story language (avoid duplicates in different languages)
-        // Extract base language: 'de-ch' → 'de', 'de-de' → 'de', 'fr' → 'fr', 'en' → 'en'
+        // Select landmark names in story language (using Wikidata variants)
+        // Each landmark has variants: [{name: "Ruine Stein", lang: "de"}, {name: "Stein Castle", lang: "en"}]
         if (inputData.language) {
           const baseLang = inputData.language.split('-')[0].toLowerCase();
-          const beforeCount = landmarks.length;
-          landmarks = landmarks.filter(l => !l.lang || l.lang === baseLang);
-          if (landmarks.length < beforeCount) {
-            log.info(`[LANDMARK] Filtered landmarks by language '${baseLang}': ${beforeCount} → ${landmarks.length}`);
+          for (const landmark of landmarks) {
+            if (landmark.variants && landmark.variants.length > 0) {
+              // Find variant matching story language
+              const match = landmark.variants.find(v => v.lang === baseLang);
+              if (match && match.name !== landmark.name) {
+                log.debug(`[LANDMARK] Using ${baseLang} name: "${match.name}" (was: "${landmark.name}")`);
+                landmark.originalName = landmark.name;
+                landmark.name = match.name;
+                landmark.query = match.name;
+              }
+            }
           }
         }
         inputData.availableLandmarks = landmarks;
