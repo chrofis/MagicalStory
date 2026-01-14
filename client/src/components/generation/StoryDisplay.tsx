@@ -3000,7 +3000,7 @@ export function StoryDisplay({
           onSceneChange={(scene) => setSceneEditModal({ ...sceneEditModal, scene })}
           onClose={() => setSceneEditModal(null)}
           onRegenerate={handleRegenerateWithScene}
-          isRegenerating={isRegenerating}
+          isRegenerating={regeneratingPages.has(sceneEditModal.pageNumber)}
           imageRegenerationCost={imageRegenerationCost}
           characters={characters.map(c => ({ id: c.id, name: c.name, photoUrl: c.photoData }))}
           selectedCharacterIds={sceneEditModal.selectedCharacterIds}
