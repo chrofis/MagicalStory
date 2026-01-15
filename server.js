@@ -3082,6 +3082,11 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, imageRegener
     // Edit the image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImage.imageData, editPrompt);
 
+    // Log token usage for image editing
+    if (editResult?.usage) {
+      log.debug(`📊 [PAGE EDIT] Token usage - input: ${editResult.usage.inputTokens}, output: ${editResult.usage.outputTokens}, model: ${editResult.usage.model}`);
+    }
+
     if (!editResult || !editResult.imageData) {
       return res.status(500).json({ error: 'Failed to edit image - no result returned' });
     }
@@ -3425,6 +3430,11 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
     // Edit the cover image (pure text/instruction based - no character photos to avoid regeneration artifacts)
     const editResult = await editImageWithPrompt(currentImageData, editPrompt);
 
+    // Log token usage for cover editing
+    if (editResult?.usage) {
+      log.debug(`📊 [COVER EDIT] Token usage - input: ${editResult.usage.inputTokens}, output: ${editResult.usage.outputTokens}, model: ${editResult.usage.model}`);
+    }
+
     if (!editResult || !editResult.imageData) {
       return res.status(500).json({ error: 'Failed to edit cover - no result returned' });
     }
@@ -3484,15 +3494,15 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
   }
 });
 
-// Edit page text or scene description directly
+// Edit page text, scene description, or image directly
 app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { text, sceneDescription } = req.body;
+    const { text, sceneDescription, imageData } = req.body;
     const pageNumber = parseInt(pageNum);
 
-    if (!text && !sceneDescription) {
-      return res.status(400).json({ error: 'Provide text or sceneDescription to update' });
+    if (!text && !sceneDescription && !imageData) {
+      return res.status(400).json({ error: 'Provide text, sceneDescription, or imageData to update' });
     }
 
     log.debug(`📝 Editing page ${pageNumber} for story ${id}`);
@@ -3531,6 +3541,24 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
       storyData.sceneDescriptions = sceneDescriptions;
     }
 
+    // Update image if provided (admin only - used for reverting repairs)
+    if (imageData !== undefined) {
+      if (req.user.role !== 'admin') {
+        return res.status(403).json({ error: 'Only admins can update images directly' });
+      }
+      let sceneImages = storyData.sceneImages || [];
+      const imageIndex = sceneImages.findIndex(s => s.pageNumber === pageNumber);
+
+      if (imageIndex >= 0) {
+        sceneImages[imageIndex].imageData = imageData;
+        sceneImages[imageIndex].wasAutoRepaired = false;  // Mark as reverted
+        log.info(`🔄 [REVERT] Image reverted for page ${pageNumber} of story ${id}`);
+      } else {
+        return res.status(404).json({ error: `No image found for page ${pageNumber}` });
+      }
+      storyData.sceneImages = sceneImages;
+    }
+
     // Save updated story with metadata
     await saveStoryData(id, storyData);
 
@@ -3539,7 +3567,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
     res.json({
       success: true,
       pageNumber,
-      updated: { text: text !== undefined, sceneDescription: sceneDescription !== undefined }
+      updated: { text: text !== undefined, sceneDescription: sceneDescription !== undefined, imageData: imageData !== undefined }
     });
 
   } catch (err) {

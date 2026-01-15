@@ -1230,6 +1230,11 @@ async function editImageWithPrompt(imageData, editInstruction) {
 
     const data = await response.json();
 
+    // Extract token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
+
     // Log response structure for debugging
     log.debug('✏️  [IMAGE EDIT] Response structure:', {
       hasCandidates: !!data.candidates,
@@ -1248,14 +1253,14 @@ async function editImageWithPrompt(imageData, editInstruction) {
         if (inlineData && inlineData.data) {
           const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
           const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
-          console.log(`✅ [IMAGE EDIT] Successfully edited image`);
-          return { imageData: editedImageData };
+          log.info(`✅ [IMAGE EDIT] Successfully edited image`);
+          return { imageData: editedImageData, usage: { inputTokens, outputTokens, model: modelId } };
         }
       }
     }
 
     log.warn('⚠️  [IMAGE EDIT] No edited image in response');
-    return null;
+    return { imageData: null, usage: { inputTokens, outputTokens, model: modelId } };
   } catch (error) {
     log.error('❌ [IMAGE EDIT] Error editing image:', error);
     throw error;
@@ -2018,22 +2023,23 @@ Output JSON only:
     // Log token usage
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    if (inputTokens > 0) {
-      console.log(`📊 [INPAINT VERIFY] model: gemini-2.0-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
-    }
+    const modelId = 'gemini-2.0-flash';
+    log.debug(`📊 [INPAINT VERIFY] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
 
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    const usage = { inputTokens, outputTokens, model: modelId };
 
     try {
       const result = JSON.parse(responseText);
       return {
         fixed: result.fixed === true,
         confidence: parseFloat(result.confidence) || 0.5,
-        explanation: result.explanation || 'No explanation provided'
+        explanation: result.explanation || 'No explanation provided',
+        usage
       };
     } catch (parseErr) {
       log.debug(`[INPAINT VERIFY] Failed to parse response: ${parseErr.message}`);
-      return null;
+      return { usage }; // Return usage even on parse failure
     }
   } catch (err) {
     log.debug(`[INPAINT VERIFY] Error: ${err.message}`);
