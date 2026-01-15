@@ -6188,6 +6188,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       (parsedVB, rawSection) => {
         // Filter out main characters from secondary characters (safety net)
         streamingVisualBible = filterMainCharactersFromVisualBible(parsedVB, inputData.characters);
+        // Initialize main characters from inputData.characters
+        initializeVisualBibleMainCharacters(streamingVisualBible, inputData.characters);
         log.debug(`📖 [STREAM-COVER] Visual Bible ready for cover generation`);
       },
       // onCoverSceneComplete
@@ -6489,6 +6491,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       visualBible = parseVisualBible('## Visual Bible\n' + visualBibleSection);
       // Filter out main characters from secondary characters (safety net)
       visualBible = filterMainCharactersFromVisualBible(visualBible, inputData.characters);
+      // Initialize main characters from inputData.characters with their style analysis
+      // This populates visualBible.mainCharacters for the dev panel display
+      initializeVisualBibleMainCharacters(visualBible, inputData.characters);
       const totalEntries = (visualBible.secondaryCharacters?.length || 0) +
                           (visualBible.animals?.length || 0) +
                           (visualBible.artifacts?.length || 0) +
@@ -7777,6 +7782,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         streamingVisualBible = vb;
         // Filter main characters from Visual Bible
         filterMainCharactersFromVisualBible(streamingVisualBible, inputData.characters);
+        // Initialize main characters from inputData.characters
+        initializeVisualBibleMainCharacters(streamingVisualBible, inputData.characters);
         log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
       },
       onCoverHints: () => {
@@ -7880,6 +7887,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Filter main characters from Visual Bible (safety net)
     filterMainCharactersFromVisualBible(visualBible, inputData.characters);
+
+    // Initialize main characters from inputData.characters with their style analysis
+    // This populates visualBible.mainCharacters for the dev panel display
+    initializeVisualBibleMainCharacters(visualBible, inputData.characters);
 
     // Link pre-discovered landmarks (if available) to skip fetching later
     if (inputData.availableLandmarks?.length > 0) {
