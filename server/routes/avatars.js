@@ -724,10 +724,22 @@ async function generateDynamicAvatar(character, category, config) {
       'CLOTHING_STYLE': clothingPrompt
     });
 
-    // Prepare image data
-    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
-      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+    // Prepare image data - resize to avoid Gemini IMAGE_OTHER errors
+    const photoSizeKB = Math.round(facePhoto.length / 1024);
+    log.debug(`🎭 [DYNAMIC AVATAR] Input photo: ${photoSizeKB}KB`);
+
+    const sharp = require('sharp');
+    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const inputBuffer = Buffer.from(base64Input, 'base64');
+    const resizedBuffer = await sharp(inputBuffer)
+      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    const resizedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
+    log.debug(`🎭 [DYNAMIC AVATAR] Resized to ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
+
+    const base64Data = resizedPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = 'image/jpeg'; // Always JPEG after resize
 
     const requestBody = {
       systemInstruction: {
@@ -2202,10 +2214,25 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       }
     };
 
+    // SYNC PATH: Resize photos for Gemini to avoid IMAGE_OTHER errors (matches async path logic)
+    const photoSizeKB = Math.round(facePhoto.length / 1024);
+    const isPNG = facePhoto.startsWith('data:image/png');
+    log.info(`👔 [CLOTHING AVATARS] 📸 Input photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+
+    // Force resize to 512px max dimension for Gemini
+    const sharp = require('sharp');
+    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const inputBuffer = Buffer.from(base64Input, 'base64');
+    const resizedBuffer = await sharp(inputBuffer)
+      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    const resizedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
+    log.info(`👔 [CLOTHING AVATARS] Resized to ${resizedPhoto.length} chars (was ${facePhoto.length})`);
+
     // Prepare base64 data once for all requests
-    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
-      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+    const base64Data = resizedPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = 'image/jpeg'; // Always JPEG after resize
 
     // Build user clothing section if provided
     let userClothingSection = '';
