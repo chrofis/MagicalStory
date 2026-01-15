@@ -345,6 +345,77 @@ function getTeachingGuide(category, topicId) {
   return null;
 }
 
+// Historical Locations Databank
+const HISTORICAL_LOCATIONS_FILE = path.join(__dirname, '../data/historical-locations.json');
+let historicalLocationsCache = null;
+
+/**
+ * Load historical locations databank (lazy loading with cache)
+ * @returns {Object|null} The databank object or null if not available
+ */
+function loadHistoricalLocationsDatabank() {
+  if (historicalLocationsCache !== null) {
+    return historicalLocationsCache;
+  }
+
+  try {
+    if (fs.existsSync(HISTORICAL_LOCATIONS_FILE)) {
+      historicalLocationsCache = JSON.parse(fs.readFileSync(HISTORICAL_LOCATIONS_FILE, 'utf-8'));
+      log.info(`[LOCATIONS] Loaded historical locations databank with ${Object.keys(historicalLocationsCache).length} events`);
+    } else {
+      log.debug('[LOCATIONS] Historical locations databank not found');
+      historicalLocationsCache = {};
+    }
+  } catch (err) {
+    log.warn(`[LOCATIONS] Error loading historical locations databank: ${err.message}`);
+    historicalLocationsCache = {};
+  }
+
+  return historicalLocationsCache;
+}
+
+/**
+ * Get pre-fetched location photos for a historical event
+ * Randomly selects one photo per location for variety
+ * @param {string} eventId - The historical event ID (e.g., 'moon-landing', 'pyramids')
+ * @returns {Array} Array of location objects with randomly selected photo
+ */
+function getHistoricalLocations(eventId) {
+  if (!eventId) return [];
+
+  const databank = loadHistoricalLocationsDatabank();
+  const eventData = databank[eventId];
+
+  if (!eventData?.locations?.length) {
+    return [];
+  }
+
+  // For each location, randomly pick one of the stored photos
+  return eventData.locations.map(loc => {
+    if (!loc.photos || loc.photos.length === 0) {
+      return {
+        name: loc.name,
+        type: loc.type,
+        hasPhoto: false
+      };
+    }
+
+    // Random selection from available photos
+    const randomPhoto = loc.photos[Math.floor(Math.random() * loc.photos.length)];
+
+    return {
+      name: loc.name,
+      type: loc.type,
+      query: loc.query,
+      description: randomPhoto.description,
+      photoUrl: randomPhoto.photoUrl,
+      photoData: randomPhoto.photoData,
+      attribution: randomPhoto.attribution,
+      hasPhoto: true
+    };
+  }).filter(loc => loc.hasPhoto);
+}
+
 /**
  * Get adventure theme guide directly (for always including in story ideas)
  * @param {string} themeId - The adventure theme ID (e.g., 'pirate', 'knight', 'wizard')
@@ -1474,15 +1545,29 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
     // Get historical event context from txt guide
     const historicalGuide = getTeachingGuide('historical', storyTopic);
     const historicalEvent = getEventById(storyTopic);
+    // Get pre-fetched location photos
+    const historicalLocations = getHistoricalLocations(storyTopic);
     if (historicalGuide) {
       const eventName = historicalEvent?.name || storyTopic;
       const eventYear = historicalEvent?.year || '';
+
+      // Build location references section if locations are available
+      let locationsSection = '';
+      if (historicalLocations?.length > 0) {
+        locationsSection = `
+
+**PRE-POPULATED LOCATIONS (reference images available for these):**
+${historicalLocations.map(loc => `- ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
+Include these locations in the story when appropriate - we have reference photos for accurate image generation.`;
+        log.debug(`[PROMPT] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
+      }
+
       categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
 
 **CRITICAL: HISTORICAL ACCURACY REQUIRED**
 This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
 
-${historicalGuide}
+${historicalGuide}${locationsSection}
 
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
@@ -2252,15 +2337,29 @@ ${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
     // Get historical event context from txt guide
     const historicalGuide = getTeachingGuide('historical', storyTopic);
     const historicalEvent = getEventById(storyTopic);
+    // Get pre-fetched location photos (unified prompt)
+    const historicalLocations = getHistoricalLocations(storyTopic);
     if (historicalGuide) {
       const eventName = historicalEvent?.name || storyTopic;
       const eventYear = historicalEvent?.year || '';
+
+      // Build location references section if locations are available
+      let locationsSection = '';
+      if (historicalLocations?.length > 0) {
+        locationsSection = `
+
+**PRE-POPULATED LOCATIONS (reference images available for these):**
+${historicalLocations.map(loc => `- ${loc.name} (${loc.type}): ${loc.description || 'Historical landmark'}`).join('\n')}
+Include these locations in the story when appropriate - we have reference photos for accurate image generation.`;
+        log.debug(`[UNIFIED] Including ${historicalLocations.length} pre-fetched location photos for ${storyTopic}`);
+      }
+
       categoryGuidelines = `This is a HISTORICAL story about the real event: "${eventName}"${eventYear ? ` (${eventYear})` : ''}.
 
 **CRITICAL: HISTORICAL ACCURACY REQUIRED**
 This story MUST be historically accurate. Do NOT invent facts. Use ONLY the verified information provided below.
 
-${historicalGuide}
+${historicalGuide}${locationsSection}
 
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
@@ -2508,6 +2607,9 @@ module.exports = {
   getTeachingGuide,
   getAdventureGuide,
   getSceneComplexityGuide,
+
+  // Historical locations
+  getHistoricalLocations,
 
   // Landmark helpers
   getLandmarkPhotosForPage,

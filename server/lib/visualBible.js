@@ -1544,6 +1544,75 @@ function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
 }
 
 // ============================================================================
+// HISTORICAL LOCATIONS INJECTION
+// ============================================================================
+
+/**
+ * Inject pre-fetched historical locations into Visual Bible
+ * Call this after parseVisualBible for historical stories
+ * @param {Object} visualBible - The Visual Bible object to modify
+ * @param {Array} historicalLocations - Array of locations from getHistoricalLocations()
+ */
+function injectHistoricalLocations(visualBible, historicalLocations) {
+  if (!visualBible || !historicalLocations?.length) {
+    return;
+  }
+
+  let injectedCount = 0;
+  for (const loc of historicalLocations) {
+    // Check if this location already exists in the Visual Bible
+    const existingIndex = visualBible.locations?.findIndex(
+      existing => existing.name.toLowerCase() === loc.name.toLowerCase() ||
+                  existing.landmarkQuery?.toLowerCase() === loc.query?.toLowerCase()
+    );
+
+    const locationEntry = {
+      id: `LOC-${loc.name.replace(/\s+/g, '-').toUpperCase().substring(0, 20)}`,
+      name: loc.name,
+      appearsInPages: [], // Will be filled during story generation
+      description: loc.description || `Historic ${loc.type}: ${loc.name}`,
+      setting: 'outdoor',
+      extractedDescription: loc.description || null,
+      firstAppearanceAnalyzed: true, // Already analyzed during prefetch
+      source: 'historical-databank',
+      // Pre-populated photo data
+      isRealLandmark: true,
+      landmarkQuery: loc.query,
+      referencePhotoUrl: loc.photoUrl,
+      referencePhotoData: loc.photoData,
+      photoAttribution: loc.attribution,
+      photoSource: 'historical-prefetch',
+      photoFetchStatus: 'success'
+    };
+
+    if (existingIndex >= 0) {
+      // Update existing entry with photo data if it doesn't have any
+      const existing = visualBible.locations[existingIndex];
+      if (!existing.referencePhotoData && loc.photoData) {
+        visualBible.locations[existingIndex] = {
+          ...existing,
+          ...locationEntry,
+          id: existing.id, // Keep original ID
+          appearsInPages: existing.appearsInPages // Keep existing pages
+        };
+        injectedCount++;
+        log.debug(`[HISTORICAL-LOC] Updated "${loc.name}" with photo data`);
+      }
+    } else {
+      // Add new location
+      visualBible.locations = visualBible.locations || [];
+      visualBible.locations.push(locationEntry);
+      injectedCount++;
+      log.debug(`[HISTORICAL-LOC] Injected "${loc.name}" (${loc.type})`);
+    }
+  }
+
+  if (injectedCount > 0) {
+    log.info(`[VISUAL BIBLE] 📍 Injected ${injectedCount} historical location(s) with reference photos`);
+  }
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1579,5 +1648,8 @@ module.exports = {
   extractStoryTextFromOutput,
 
   // Landmark linking
-  linkPreDiscoveredLandmarks
+  linkPreDiscoveredLandmarks,
+
+  // Historical locations
+  injectHistoricalLocations
 };

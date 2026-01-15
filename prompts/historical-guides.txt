@@ -46,6 +46,11 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Kennedy Space Center Florida, Mission Control Houston, Moon surface, Inside spacecraft
 
+LOCATION_REFERENCES:
+- Kennedy Space Center | Kennedy Space Center | Building
+- Mission Control Houston | NASA Johnson Space Center Mission Control | Building
+- Saturn V Rocket | Saturn V rocket Kennedy Space Center | Structure
+
 STORY ANGLES:
 - A child watching the Moon landing on TV with their family
 - The son/daughter of a NASA engineer during the mission
@@ -140,6 +145,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Wright bicycle shop Dayton Ohio, Kitty Hawk beach, Kill Devil Hills
 
+LOCATION_REFERENCES:
+- Wright Brothers Memorial | Wright Brothers National Memorial Kill Devil Hills | Monument
+- Kitty Hawk | Kitty Hawk North Carolina beach | Natural
+
 STORY ANGLES:
 - The brothers testing gliders and learning from failures
 - The excitement of the first successful flight
@@ -181,6 +190,10 @@ PERIOD COSTUMES:
 - American Crowd: 1920s American fashion - flapper dresses, fedora hats, suspenders
 
 KEY LOCATIONS: Roosevelt Field New York, Inside Spirit of St. Louis cockpit, Over the Atlantic, Le Bourget airfield Paris
+
+LOCATION_REFERENCES:
+- Le Bourget Airport | Paris Le Bourget Airport | Building
+- Spirit of St. Louis | Spirit of St. Louis airplane Smithsonian | Artifact
 
 STORY ANGLES:
 - The long lonely hours over the ocean
@@ -225,6 +238,10 @@ PERIOD COSTUMES:
 - Base Camp: British expedition clothing - wool sweaters, tweed, expedition parkas
 
 KEY LOCATIONS: Base Camp Nepal, Various camps up the mountain, Hillary Step, Summit of Everest
+
+LOCATION_REFERENCES:
+- Mount Everest | Mount Everest Himalaya | Mountain
+- Everest Base Camp | Everest Base Camp Nepal | Natural
 
 STORY ANGLES:
 - The friendship between Hillary and Tenzing
@@ -629,6 +646,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Cavendish Laboratory Cambridge, King's College London, The Eagle pub Cambridge
 
+LOCATION_REFERENCES:
+- Cavendish Laboratory | Cavendish Laboratory Cambridge | Building
+- The Eagle Pub | The Eagle pub Cambridge | Historic
+
 STORY ANGLES:
 - The race to solve the puzzle
 - Building models to understand nature
@@ -908,6 +929,11 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Berlin Wall checkpoints, Brandenburg Gate, Streets of Berlin
 
+LOCATION_REFERENCES:
+- Brandenburg Gate | Brandenburg Gate Berlin | Monument
+- Berlin Wall Memorial | Berlin Wall Memorial Bernauer Strasse | Monument
+- Checkpoint Charlie | Checkpoint Charlie Berlin | Historic
+
 STORY ANGLES:
 - A family separated by the wall for decades
 - The night the wall came down
@@ -954,6 +980,10 @@ PERIOD COSTUMES:
 - Prison: Prison uniform - shorts and sandals on Robben Island
 
 KEY LOCATIONS: Robben Island prison, Victor Verster Prison, Cape Town City Hall, Johannesburg
+
+LOCATION_REFERENCES:
+- Robben Island | Robben Island prison | Historic
+- Cape Town City Hall | Cape Town City Hall | Building
 
 STORY ANGLES:
 - A child seeing Mandela walk free on TV
@@ -1008,6 +1038,11 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Giza plateau, Nile River, Stone quarries, Workers' village
 
+LOCATION_REFERENCES:
+- Great Pyramid of Giza | Great Pyramid of Giza | Monument
+- Great Sphinx | Great Sphinx of Giza | Monument
+- Giza Plateau | Giza pyramid complex | Natural
+
 STORY ANGLES:
 - A young worker helping build the pyramid
 - An architect solving construction problems
@@ -1052,6 +1087,10 @@ PERIOD COSTUMES:
 - Parisians: Belle Epoque fashion - bustles, parasols, bowler hats
 
 KEY LOCATIONS: Champ de Mars Paris, Construction site, Eiffel's factory
+
+LOCATION_REFERENCES:
+- Eiffel Tower | Eiffel Tower Paris | Tower
+- Champ de Mars | Champ de Mars Paris | Park
 
 STORY ANGLES:
 - A worker riveting beams high above Paris
@@ -1098,6 +1137,11 @@ PERIOD COSTUMES:
 - Officials: White colonial suits, panama hats
 
 KEY LOCATIONS: Culebra Cut, Gatun Locks, Gatun Lake, Panama City
+
+LOCATION_REFERENCES:
+- Panama Canal | Panama Canal | Structure
+- Gatun Locks | Gatun Locks Panama Canal | Structure
+- Miraflores Locks | Miraflores Locks Panama Canal | Structure
 
 STORY ANGLES:
 - A worker helping dig the great ditch
@@ -1147,6 +1191,9 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Golden Gate strait, Bridge towers, San Francisco, Marin County
 
+LOCATION_REFERENCES:
+- Golden Gate Bridge | Golden Gate Bridge San Francisco | Bridge
+
 STORY ANGLES:
 - Workers building high above the water
 - The safety net that saved lives
@@ -1192,6 +1239,10 @@ PERIOD COSTUMES:
 - Engineers: Business suits with hard hats for site visits
 
 KEY LOCATIONS: Folkestone England, Coquelles France, Inside the tunnel, Tunnel boring machine
+
+LOCATION_REFERENCES:
+- Channel Tunnel Terminal | Eurotunnel terminal Folkestone | Building
+- Channel Tunnel | Channel Tunnel entrance | Structure
 
 STORY ANGLES:
 - Workers meeting in the middle
@@ -1243,6 +1294,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Gutenberg's workshop in Mainz, Medieval town, Church or university library
 
+LOCATION_REFERENCES:
+- Gutenberg Museum | Gutenberg Museum Mainz | Museum
+- Mainz Cathedral | Mainz Cathedral | Church
+
 STORY ANGLES:
 - A child learning to read from the first books
 - Gutenberg solving printing problems
@@ -1289,6 +1344,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Panathenaic Stadium Athens, Marathon route, Olympic venues
 
+LOCATION_REFERENCES:
+- Panathenaic Stadium | Panathenaic Stadium Athens | Stadium
+- Acropolis | Acropolis of Athens | Monument
+
 STORY ANGLES:
 - An athlete traveling to compete
 - Spyridon Louis running the marathon
@@ -1334,6 +1393,10 @@ PERIOD COSTUMES:
 - Guests: 1950s American fashion - poodle skirts, saddle shoes, families in Sunday best
 
 KEY LOCATIONS: Main Street USA, Sleeping Beauty Castle, Adventureland, Tomorrowland
+
+LOCATION_REFERENCES:
+- Sleeping Beauty Castle | Sleeping Beauty Castle Disneyland | Castle
+- Main Street USA | Main Street USA Disneyland | Historic
 
 STORY ANGLES:
 - A family visiting on opening day
@@ -1431,6 +1494,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Valley of the Kings, Tomb entrance, Inside the burial chambers
 
+LOCATION_REFERENCES:
+- Valley of the Kings | Valley of the Kings Egypt | Archaeological
+- Tutankhamun Mask | Tutankhamun death mask Egyptian Museum | Artifact
+
 STORY ANGLES:
 - The moment of discovery
 - Peering into the tomb for the first time
@@ -1475,6 +1542,10 @@ PERIOD COSTUMES:
 - Scientists: Academic dress, carrying notebooks
 
 KEY LOCATIONS: Regent's Park London, Various animal enclosures, Reptile house
+
+LOCATION_REFERENCES:
+- London Zoo | London Zoo Regent's Park | Zoo
+- Regent's Park | Regent's Park London | Park
 
 STORY ANGLES:
 - A child seeing a giraffe for the first time
@@ -1521,6 +1592,11 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Streets of Pompeii, Forum, Homes with frescos, Mount Vesuvius
 
+LOCATION_REFERENCES:
+- Pompeii Ruins | Pompeii archaeological site | Ruins
+- Mount Vesuvius | Mount Vesuvius volcano | Mountain
+- Pompeii Forum | Forum of Pompeii | Ruins
+
 STORY ANGLES:
 - A Roman child's life before the eruption
 - Discovering a city lost for centuries
@@ -1565,6 +1641,10 @@ PERIOD COSTUMES:
 - Children: Victorian children's clothing - sailor suits, pinafores
 
 KEY LOCATIONS: Main hall, Dinosaur gallery, Darwin Centre, Gardens
+
+LOCATION_REFERENCES:
+- Natural History Museum London | Natural History Museum London | Building
+- Hintze Hall | Hintze Hall Natural History Museum London | Interior
 
 STORY ANGLES:
 - A child visiting the museum for the first time
@@ -1611,6 +1691,11 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: HMS Beagle, Galapagos Islands, Volcanic landscapes, Darwin's study (later)
 
+LOCATION_REFERENCES:
+- Galapagos Islands | Galapagos Islands Ecuador | Natural
+- Giant Tortoise | Galapagos giant tortoise | Animal
+- Marine Iguana | Galapagos marine iguana | Animal
+
 STORY ANGLES:
 - Young Darwin exploring the islands
 - Observing unusual animals
@@ -1655,6 +1740,10 @@ PERIOD COSTUMES:
 - Modern Farmers: 1970s Chinese rural clothing
 
 KEY LOCATIONS: Farmer's well site, Pit 1 (largest), Emperor's tomb mound
+
+LOCATION_REFERENCES:
+- Terracotta Army | Terracotta Army Xi'an | Archaeological
+- Mausoleum of Qin Shi Huang | Mausoleum of the First Qin Emperor | Archaeological
 
 STORY ANGLES:
 - A farmer discovering ancient soldiers
@@ -1701,6 +1790,10 @@ PERIOD COSTUMES:
 - Mission Control: Business casual with headsets
 
 KEY LOCATIONS: Space Shuttle, Earth orbit, Mission Control, Deep space (images)
+
+LOCATION_REFERENCES:
+- Hubble Space Telescope | Hubble Space Telescope | Artifact
+- Space Shuttle Discovery | Space Shuttle Discovery | Artifact
 
 STORY ANGLES:
 - The disappointment of the blurry images
@@ -1883,6 +1976,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Rütli meadow, Lake Lucerne shores, Alpine mountain villages, Forest paths
 
+LOCATION_REFERENCES:
+- Rütli Meadow | Rütli meadow Switzerland | Historic
+- Lake Lucerne | Lake Lucerne Switzerland | Natural
+
 STORY ANGLES:
 - A child watching their father leave for the secret meeting
 - The boat journey across Lake Lucerne at night
@@ -1939,6 +2036,11 @@ KEY LOCATIONS: Altdorf town square (apple shot), Lake Lucerne (storm escape), Te
 (the rock where Tell leaped), Tellskapelle (chapel marking the escape), Hohle Gasse near
 Küssnacht (assassination), Schächenbach river (Tell's death)
 
+LOCATION_REFERENCES:
+- Tell Monument | Wilhelm Tell Monument Altdorf | Monument
+- Tellskapelle | Tellskapelle Lake Lucerne | Chapel
+- Hohle Gasse | Hohle Gasse Küssnacht | Historic
+
 STORY ANGLES:
 - The tension of the apple shot from Walter's perspective
 - Tell's steady hands and courage under pressure
@@ -1977,6 +2079,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Morgarten pass, Lake Ägeri shores, Slopes above the path
 
+LOCATION_REFERENCES:
+- Morgarten Battlefield | Morgarten battlefield Switzerland | Historic
+- Lake Ägeri | Lake Ägeri Switzerland | Natural
+
 STORY ANGLES:
 - A young Swiss farmer preparing for battle
 - Watching the mighty Austrian army approach
@@ -2005,6 +2111,10 @@ PERIOD COSTUMES:
 - Austrian knights: Dismounted, heavy plate armor, long pikes
 
 KEY LOCATIONS: Fields near Sempach, Sempach chapel
+
+LOCATION_REFERENCES:
+- Sempach Chapel | Schlachtkapelle Sempach | Chapel
+- Sempach | Sempach Switzerland | Town
 
 STORY ANGLES:
 - Arnold von Winkelried's moment of decision
@@ -2044,6 +2154,11 @@ PERIOD COSTUMES:
 - Charles: Royal armor, jeweled sword, ducal crown
 
 KEY LOCATIONS: Murten town walls, Battlefield hill, Lake Murten shores, Bone chapel site
+
+LOCATION_REFERENCES:
+- Murten Town Walls | Murten town walls | Fortification
+- Lake Murten | Lake Murten Switzerland | Natural
+- Murten | Murten old town Switzerland | Town
 
 STORY ANGLES:
 - A young defender on Murten's walls, watching the huge Burgundian army
@@ -2088,6 +2203,11 @@ PERIOD COSTUMES:
 KEY LOCATIONS: St. Peter's Basilica, Vatican gates, Sistine Chapel, Castel Sant'Angelo
 (refuge during Sack of Rome), Swiss Guard barracks
 
+LOCATION_REFERENCES:
+- St. Peter's Basilica | St. Peter's Basilica Vatican | Church
+- Sistine Chapel | Sistine Chapel Vatican | Chapel
+- Castel Sant'Angelo | Castel Sant'Angelo Rome | Castle
+
 STORY ANGLES:
 - A young Swiss man from Uri traveling to Rome for the first time
 - Learning to stand guard for hours without moving
@@ -2121,6 +2241,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Grossmünster church Zurich, Zurich town hall, Streets of Zurich
 
+LOCATION_REFERENCES:
+- Grossmünster | Grossmünster Zurich | Church
+- Zurich Old Town | Zurich Altstadt | Town
+
 STORY ANGLES:
 - A child seeing church images removed
 - Learning to read the Bible in German for the first time
@@ -2151,6 +2275,10 @@ PERIOD COSTUMES:
 - Soldiers: Mid-19th century military uniforms
 
 KEY LOCATIONS: Geneva meeting hall, Battlefield of Solferino (Italy)
+
+LOCATION_REFERENCES:
+- International Red Cross Museum | International Red Cross Museum Geneva | Museum
+- Geneva | Geneva old town Switzerland | Town
 
 STORY ANGLES:
 - Dunant witnessing the battlefield horrors
@@ -2240,6 +2368,10 @@ PERIOD COSTUMES:
 
 KEY LOCATIONS: Bern Federal Palace, Cantonal meeting halls, Town squares
 
+LOCATION_REFERENCES:
+- Federal Palace | Federal Palace of Switzerland Bern | Building
+- Bern Old Town | Bern Altstadt | Town
+
 STORY ANGLES:
 - Delegates arguing and finding compromise
 - A celebration when the constitution is adopted
@@ -2271,6 +2403,10 @@ PERIOD COSTUMES:
 - Railway officials: Uniforms with brass buttons
 
 KEY LOCATIONS: Göschenen (north portal), Airolo (south portal), Inside the tunnel
+
+LOCATION_REFERENCES:
+- Gotthard Tunnel Portal | Gotthard railway tunnel portal | Structure
+- Teufelsbrücke | Teufelsbrücke Devil's Bridge Gotthard | Bridge
 
 STORY ANGLES:
 - An Italian worker far from home, digging in dangerous conditions
