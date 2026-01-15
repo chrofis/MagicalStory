@@ -3126,17 +3126,19 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, imageRegener
 });
 
 // Auto-repair image (detect and fix physics errors) - DEV ONLY
+// Enhanced: supports multi-pass repair, stores evaluation data like automatic auto-repair
 app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
+    const maxPasses = Math.min(Math.max(parseInt(req.body.maxPasses) || 1, 1), 3);  // 1-3 passes
 
     // Admin-only endpoint (dev mode feature)
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    log.info(`🔧 [REPAIR] Starting auto-repair for story ${id}, page ${pageNumber}`);
+    log.info(`🔧 [REPAIR] Starting manual auto-repair for story ${id}, page ${pageNumber} (max ${maxPasses} passes)`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -3155,9 +3157,10 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
 
     // Get the current image
     const sceneImages = storyData.sceneImages || [];
-    const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
+    const sceneIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
+    const currentScene = sceneIndex >= 0 ? sceneImages[sceneIndex] : null;
 
-    if (!currentImage || !currentImage.imageData) {
+    if (!currentScene || !currentScene.imageData) {
       return res.status(404).json({ error: 'No image found for this page' });
     }
 
@@ -3166,49 +3169,163 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
       .filter(c => c.photoData)
       .map(c => c.photoData);
 
-    // Run auto-repair - use pre-computed fix targets if available (saves API call)
-    let repairResult;
-    if (currentImage.fixTargets && currentImage.fixTargets.length > 0) {
-      log.info(`🔄 [REPAIR] Using ${currentImage.fixTargets.length} pre-computed fix targets for story ${id}, page ${pageNumber}`);
-      repairResult = await autoRepairWithTargets(currentImage.imageData, currentImage.fixTargets, 0, characterPhotos);
-    } else {
-      log.info(`🔄 [REPAIR] No pre-computed targets, using inspection-based repair for story ${id}, page ${pageNumber}`);
-      repairResult = await autoRepairImage(currentImage.imageData, 1);  // Only 1 repair cycle
+    // Initialize retryHistory if not present
+    if (!currentScene.retryHistory) {
+      currentScene.retryHistory = [];
     }
 
-    if (!repairResult) {
-      return res.status(500).json({ error: 'Auto-repair failed' });
-    }
+    let currentImageData = currentScene.imageData;
+    let anyRepaired = false;
+    const newRetryEntries = [];
+    let allRepairHistory = currentScene.repairHistory || [];
 
-    // Update the image in story data if repaired
-    if (repairResult.repaired) {
-      const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
-      if (existingIndex >= 0) {
-        sceneImages[existingIndex] = {
-          ...sceneImages[existingIndex],
-          imageData: repairResult.imageData,
-          wasAutoRepaired: true,
-          repairHistory: repairResult.repairHistory,
-          repairedAt: new Date().toISOString()
-        };
+    // Multi-pass repair loop
+    for (let pass = 1; pass <= maxPasses; pass++) {
+      log.info(`🔧 [REPAIR] Pass ${pass}/${maxPasses} for story ${id}, page ${pageNumber}`);
+
+      // Step 1: Evaluate current image to get score and fix targets
+      const preEvalResult = await evaluateImageQuality(
+        currentImageData,
+        currentScene.prompt || '',
+        characterPhotos,
+        'scene'
+      );
+
+      if (!preEvalResult || preEvalResult.score === null) {
+        log.warn(`⚠️ [REPAIR] Pre-repair evaluation failed on pass ${pass}`);
+        break;
       }
 
-      // Save updated story with metadata
+      const preRepairScore = preEvalResult.score;
+      const fixTargets = preEvalResult.fixTargets || [];
+
+      log.info(`🔧 [REPAIR] Pass ${pass}: Pre-repair score ${preRepairScore}%, ${fixTargets.length} fix targets`);
+
+      // If score is already good and no fix targets, skip repair
+      if (preRepairScore >= IMAGE_QUALITY_THRESHOLD && fixTargets.length === 0) {
+        log.info(`✅ [REPAIR] Pass ${pass}: Score ${preRepairScore}% already good, no repair needed`);
+        break;
+      }
+
+      // Step 2: Run auto-repair with targets
+      let repairResult;
+      if (fixTargets.length > 0) {
+        repairResult = await autoRepairWithTargets(
+          currentImageData,
+          fixTargets,
+          0,  // No additional inspection-based attempts
+          { includeDebugImages: true }  // Include mask/before/after for dev mode
+        );
+      } else {
+        // No fix targets from eval - use inspection-based repair
+        repairResult = await autoRepairImage(currentImageData, 1, { includeDebugImages: true });
+      }
+
+      if (!repairResult || !repairResult.repaired) {
+        log.info(`ℹ️ [REPAIR] Pass ${pass}: No repairs applied`);
+        // Still record the attempt
+        newRetryEntries.push({
+          attempt: currentScene.retryHistory.length + newRetryEntries.length + 1,
+          type: 'auto_repair',
+          preRepairScore: preRepairScore,
+          postRepairScore: preRepairScore,  // Same score since no repair
+          fixTargetsCount: fixTargets.length,
+          preRepairEval: {
+            score: preEvalResult.score,
+            reasoning: preEvalResult.reasoning,
+            fixTargets: fixTargets
+          },
+          postRepairEval: null,
+          repairDetails: repairResult?.repairHistory || [],
+          noRepairNeeded: repairResult?.noErrorsFound || false,
+          timestamp: new Date().toISOString()
+        });
+        break;
+      }
+
+      // Step 3: Re-evaluate after repair
+      const postEvalResult = await evaluateImageQuality(
+        repairResult.imageData,
+        currentScene.prompt || '',
+        characterPhotos,
+        'scene'
+      );
+
+      const postRepairScore = postEvalResult?.score ?? preRepairScore;
+
+      log.info(`🔧 [REPAIR] Pass ${pass}: Post-repair score ${postRepairScore}% (was ${preRepairScore}%)`);
+
+      // Step 4: Record retry entry (like automatic auto-repair does)
+      newRetryEntries.push({
+        attempt: currentScene.retryHistory.length + newRetryEntries.length + 1,
+        type: 'auto_repair',
+        preRepairScore: preRepairScore,
+        postRepairScore: postRepairScore,
+        fixTargetsCount: fixTargets.length,
+        imageData: repairResult.imageData,  // Include repaired image
+        preRepairEval: {
+          score: preEvalResult.score,
+          reasoning: preEvalResult.reasoning,
+          fixTargets: fixTargets
+        },
+        postRepairEval: postEvalResult ? {
+          score: postEvalResult.score,
+          reasoning: postEvalResult.reasoning,
+          fixTargets: postEvalResult.fixTargets || []
+        } : null,
+        repairDetails: repairResult.repairHistory || [],
+        timestamp: new Date().toISOString()
+      });
+
+      // Update state for next pass
+      if (postRepairScore > preRepairScore) {
+        currentImageData = repairResult.imageData;
+        anyRepaired = true;
+        allRepairHistory = [...allRepairHistory, ...(repairResult.repairHistory || [])];
+        log.info(`✅ [REPAIR] Pass ${pass}: Score improved ${preRepairScore}% → ${postRepairScore}%`);
+      } else {
+        log.info(`ℹ️ [REPAIR] Pass ${pass}: Score did not improve (${preRepairScore}% → ${postRepairScore}%)`);
+        // Still use the repaired image if it was different
+        if (repairResult.imageData !== currentImageData) {
+          currentImageData = repairResult.imageData;
+          anyRepaired = true;
+          allRepairHistory = [...allRepairHistory, ...(repairResult.repairHistory || [])];
+        }
+      }
+
+      // Check if we've reached good quality
+      if (postRepairScore >= IMAGE_QUALITY_THRESHOLD) {
+        log.info(`✅ [REPAIR] Pass ${pass}: Quality threshold reached (${postRepairScore}% >= ${IMAGE_QUALITY_THRESHOLD}%)`);
+        break;
+      }
+    }
+
+    // Update scene data
+    if (anyRepaired || newRetryEntries.length > 0) {
+      sceneImages[sceneIndex] = {
+        ...currentScene,
+        imageData: currentImageData,
+        wasAutoRepaired: anyRepaired || currentScene.wasAutoRepaired,
+        retryHistory: [...currentScene.retryHistory, ...newRetryEntries],
+        repairHistory: allRepairHistory,
+        repairedAt: anyRepaired ? new Date().toISOString() : currentScene.repairedAt
+      };
+
+      // Save updated story
       storyData.sceneImages = sceneImages;
       await saveStoryData(id, storyData);
 
-      log.info(`✅ [REPAIR] Image repaired for story ${id}, page ${pageNumber}`);
-    } else {
-      log.info(`ℹ️ [REPAIR] No repairs needed for story ${id}, page ${pageNumber}`);
+      log.info(`✅ [REPAIR] Saved ${newRetryEntries.length} repair entries for story ${id}, page ${pageNumber}`);
     }
 
     res.json({
       success: true,
       pageNumber,
-      repaired: repairResult.repaired,
-      noErrorsFound: repairResult.noErrorsFound,
-      imageData: repairResult.imageData,
-      repairHistory: repairResult.repairHistory
+      repaired: anyRepaired,
+      passesRun: newRetryEntries.length,
+      imageData: currentImageData,
+      retryEntries: newRetryEntries,
+      repairHistory: allRepairHistory
     });
 
   } catch (err) {
