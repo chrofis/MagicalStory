@@ -499,18 +499,69 @@ test.describe('API Integration', () => {
     // Check API responses
     console.log(`Captured ${apiCalls.length} API calls to /api/characters`);
 
+    // Track avatar health issues
+    const failedAvatars: string[] = [];
+    const missingAvatars: string[] = [];
+    const incompleteAvatars: string[] = [];
+    const healthSummary: string[] = [];
+
     for (const call of apiCalls) {
       console.log(`API: ${call.url}`);
       if (typeof call.response === 'object' && call.response !== null) {
         const response = call.response as { characters?: unknown[] };
         if (response.characters) {
           console.log(`  Characters: ${response.characters.length}`);
-          for (const char of response.characters as { name?: string; avatars?: { status?: string } }[]) {
-            console.log(`    - ${char.name}: avatars.status=${char.avatars?.status || 'none'}`);
+          for (const char of response.characters as {
+            name?: string;
+            avatars?: {
+              status?: string;
+              error?: string;
+              faceThumbnails?: Record<string, string>;
+              hasFullAvatars?: boolean;
+              styledAvatars?: Record<string, unknown>;
+            }
+          }[]) {
+            const name = char.name || 'Unknown';
+            const status = char.avatars?.status || 'none';
+            const error = char.avatars?.error;
+            const faceThumbnails = char.avatars?.faceThumbnails;
+            const hasThumbnails = faceThumbnails && Object.keys(faceThumbnails).length > 0;
+            const thumbnailCount = faceThumbnails ? Object.keys(faceThumbnails).length : 0;
+            const hasFullAvatars = char.avatars?.hasFullAvatars;
+
+            console.log(`    - ${name}: status=${status}, thumbnails=${thumbnailCount}, hasFullAvatars=${hasFullAvatars}`);
+            if (error) {
+              console.log(`      ERROR: ${error}`);
+            }
+
+            // Check for failures
+            if (status === 'failed') {
+              failedAvatars.push(name + (error ? ` (${error})` : ''));
+              healthSummary.push(`  ✗ ${name}: FAILED${error ? ' - ' + error : ''}`);
+            } else if (status === 'none' || !status) {
+              missingAvatars.push(name);
+              healthSummary.push(`  ✗ ${name}: NO AVATAR`);
+            } else if (status === 'complete' && !hasThumbnails && !hasFullAvatars) {
+              // "Complete" but no actual data at all - this is broken
+              incompleteAvatars.push(name);
+              healthSummary.push(`  ✗ ${name}: marked complete but NO DATA`);
+            } else if (status === 'complete') {
+              // Complete with at least some data
+              healthSummary.push(`  ✓ ${name}: complete, ${thumbnailCount} thumbnails, hasFullAvatars=${hasFullAvatars}`);
+            } else {
+              healthSummary.push(`  ~ ${name}: ${status}`);
+            }
           }
         }
       }
     }
+
+    // Print avatar health summary
+    console.log('\n=== AVATAR HEALTH CHECK ===');
+    for (const line of healthSummary) {
+      console.log(line);
+    }
+    console.log('===========================\n');
 
     // Verify logs and print summary
     const logResult = logVerifier.verify();
@@ -526,7 +577,18 @@ test.describe('API Integration', () => {
       console.log('===================\n');
     }
 
+    // ASSERTIONS - These will FAIL the test if avatar health is bad
     expect(apiCalls.length).toBeGreaterThan(0);
+
+    // Fail if any avatars have failed status
+    if (failedAvatars.length > 0) {
+      throw new Error(`Avatar generation FAILED for: ${failedAvatars.join(', ')}`);
+    }
+
+    // Fail if avatars are marked complete but missing actual data
+    if (incompleteAvatars.length > 0) {
+      throw new Error(`Avatars marked complete but missing data: ${incompleteAvatars.join(', ')}`);
+    }
 
     // Fail if there are errors in logs
     expect(logResult.unexpectedErrors).toHaveLength(0);

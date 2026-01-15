@@ -1614,23 +1614,67 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       tokenUsage: { byModel: {} }  // Track token usage for cost metrics
     };
 
+    // Log photo info to understand what's being sent
+    const photoSizeKB = Math.round(facePhoto.length / 1024);
+    const isPNG = facePhoto.startsWith('data:image/png');
+    log.info(`[AVATAR JOB ${jobId}] 📸 Input photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+
+    // LOCALHOST FIX: If photo is large JPEG (likely unprocessed original), try to remove background
+    // Production processes photos during upload (creates bodyNoBg), but localhost may not have MediaPipe
+    // This ensures avatar generation works even with unprocessed photos
+    let processedFacePhoto = facePhoto;
+    if (!isPNG && photoSizeKB > 50) {
+      log.info(`[AVATAR JOB ${jobId}] 🔄 Photo appears unprocessed (JPEG ${photoSizeKB}KB), attempting background removal...`);
+      try {
+        const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
+        const analyzeResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: facePhoto,
+            extract_face: true,
+            extract_body: false,
+            remove_background: true
+          })
+        });
+
+        if (analyzeResponse.ok) {
+          const analyzeData = await analyzeResponse.json();
+          // Prefer face thumbnail (processed, background on peach), then body with no bg
+          const processedPhoto = analyzeData.faceThumbnail || analyzeData.face_thumbnail ||
+                                 analyzeData.bodyNoBg || analyzeData.body_no_bg;
+          if (processedPhoto) {
+            const processedSize = Math.round(processedPhoto.length / 1024);
+            log.info(`[AVATAR JOB ${jobId}] ✅ Got processed photo from analyzer: ${processedSize}KB`);
+            processedFacePhoto = processedPhoto;
+          } else {
+            log.warn(`[AVATAR JOB ${jobId}] ⚠️ Analyzer returned no processed photo, using original`);
+          }
+        } else {
+          log.warn(`[AVATAR JOB ${jobId}] ⚠️ Photo analyzer returned ${analyzeResponse.status}, using original`);
+        }
+      } catch (analyzerErr) {
+        log.warn(`[AVATAR JOB ${jobId}] ⚠️ Photo analyzer error: ${analyzerErr.message}, using original`);
+      }
+    }
+
     // Prepare base64 data - ALWAYS resize photos for Gemini to avoid IMAGE_OTHER errors
     // Gemini works better with smaller images (tested: 13KB works, 90KB fails)
-    log.info(`[AVATAR JOB ${jobId}] Resizing photo (${facePhoto.length} chars) for Gemini...`);
+    log.info(`[AVATAR JOB ${jobId}] Resizing photo (${processedFacePhoto.length} chars) for Gemini...`);
 
     // Force resize to 512px max dimension - this bypasses the 100KB skip threshold in compressImageToJPEG
     const sharp = require('sharp');
-    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Input = processedFacePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 80 })
+      .jpeg({ quality: 85 })
       .toBuffer();
-    const processedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.info(`[AVATAR JOB ${jobId}] Resized to ${processedPhoto.length} chars (was ${facePhoto.length})`);
-    const base64Data = processedPhoto.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = processedPhoto.match(/^data:(image\/\w+);base64,/) ?
-      processedPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    const finalPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
+    log.info(`[AVATAR JOB ${jobId}] Resized to ${finalPhoto.length} chars (was ${processedFacePhoto.length})`);
+    const base64Data = finalPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = finalPhoto.match(/^data:(image\/\w+);base64,/) ?
+      finalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
     // Build user clothing section
     let userClothingSection = '';
@@ -1989,11 +2033,15 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               // Keep avatar metadata + only 'standard' faceThumbnail for list display
               if (lightChar.avatars) {
                 const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+                // Check for avatars in both old schema (top-level) and new schema (styledAvatars)
+                const hasOldSchemaAvatars = !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal);
+                const hasNewSchemaAvatars = !!(lightChar.avatars.styledAvatars && Object.keys(lightChar.avatars.styledAvatars).length > 0);
                 lightChar.avatars = {
                   status: lightChar.avatars.status,
                   stale: lightChar.avatars.stale,
                   generatedAt: lightChar.avatars.generatedAt,
-                  hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+                  error: lightChar.avatars.error,
+                  hasFullAvatars: hasOldSchemaAvatars || hasNewSchemaAvatars,
                   faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
                   clothing: lightChar.avatars.clothing
                 };
@@ -2800,11 +2848,15 @@ These corrections OVERRIDE what is visible in the reference photo.
               const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
               if (lightChar.avatars) {
                 const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+                // Check for avatars in both old schema (top-level) and new schema (styledAvatars)
+                const hasOldSchemaAvatars = !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal);
+                const hasNewSchemaAvatars = !!(lightChar.avatars.styledAvatars && Object.keys(lightChar.avatars.styledAvatars).length > 0);
                 lightChar.avatars = {
                   status: lightChar.avatars.status,
                   stale: lightChar.avatars.stale,
                   generatedAt: lightChar.avatars.generatedAt,
-                  hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+                  error: lightChar.avatars.error,
+                  hasFullAvatars: hasOldSchemaAvatars || hasNewSchemaAvatars,
                   faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
                   clothing: lightChar.avatars.clothing
                 };
