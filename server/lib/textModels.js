@@ -12,6 +12,45 @@ const TEXT_MODEL = process.env.TEXT_MODEL || 'claude-sonnet';
 const activeTextModel = TEXT_MODELS[TEXT_MODEL] || TEXT_MODELS['claude-sonnet'];
 
 /**
+ * Retry wrapper with exponential backoff for transient failures
+ * @param {Function} fn - Async function to retry
+ * @param {Object} options - { maxRetries: 2, baseDelay: 2000, maxDelay: 30000 }
+ * @returns {Promise} - Result of fn() or throws after all retries exhausted
+ */
+async function withRetry(fn, options = {}) {
+  const { maxRetries = 2, baseDelay = 2000, maxDelay = 30000 } = options;
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+
+      // Check if error is retryable (network errors, timeouts, 5xx)
+      const isRetryable =
+        error.code === 'UND_ERR_SOCKET' ||
+        error.code === 'ECONNRESET' ||
+        error.code === 'ETIMEDOUT' ||
+        error.message?.includes('terminated') ||
+        error.message?.includes('reset') ||
+        error.message?.includes('ECONNRESET') ||
+        (error.status >= 500 && error.status < 600);
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError;
+      }
+
+      // Exponential backoff with jitter
+      const delay = Math.min(baseDelay * Math.pow(2, attempt) + Math.random() * 1000, maxDelay);
+      log.warn(`⚠️ [RETRY] Attempt ${attempt + 1}/${maxRetries + 1} failed: ${error.message}. Retrying in ${Math.round(delay)}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw lastError;
+}
+
+/**
  * Get model defaults - single source of truth for all model selections
  */
 function getModelDefaults() {
@@ -67,30 +106,34 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
   // Minimum 5 minutes, + 3 seconds per 1000 tokens for very large requests
   const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: modelId,
-      max_tokens: maxTokens,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    }),
-    signal: AbortSignal.timeout(timeoutMs)
-  });
+  const data = await withRetry(async () => {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: maxTokens,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error (${response.status}): ${error}`);
-  }
+    if (!res.ok) {
+      const errorText = await res.text();
+      const error = new Error(`Anthropic API error (${res.status}): ${errorText}`);
+      error.status = res.status;
+      throw error;
+    }
 
-  const data = await response.json();
+    return res.json();
+  }, { maxRetries: 2, baseDelay: 2000 });
 
   // Extract token usage
   const inputTokens = data.usage?.input_tokens || 0;
@@ -127,28 +170,34 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
 
   console.log(`🌊 [STREAM] Starting streaming request to Anthropic (${maxTokens} max tokens)...`);
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: modelId,
-      max_tokens: maxTokens,
-      stream: true,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
-    })
-  });
+  const response = await withRetry(async () => {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: maxTokens,
+        stream: true,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Anthropic API error (${response.status}): ${error}`);
-  }
+    if (!res.ok) {
+      const errorText = await res.text();
+      const error = new Error(`Anthropic streaming API error (${res.status}): ${errorText}`);
+      error.status = res.status;
+      throw error;
+    }
+
+    return res;
+  }, { maxRetries: 2, baseDelay: 2000 });
 
   // Process the SSE stream
   const reader = response.body.getReader();
