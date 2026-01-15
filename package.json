@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "node server.js",
     "dev:log": "node server.js 2>&1 | tee logs/server.log",
     "dev:client": "cd client && npm run dev",
     "dev:python": "venv311/Scripts/python.exe photo_analyzer.py",

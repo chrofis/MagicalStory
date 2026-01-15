@@ -8814,7 +8814,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Log results to generation log
-        genLog.log('final_checks', 'result', {
+        genLog.info('final_checks_result', `Final checks: ${finalChecksReport.summary}`, null, {
           imageChecks: finalChecksReport.imageChecks?.length || 0,
           textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
           totalIssues: finalChecksReport.totalIssues || 0,
@@ -8825,7 +8825,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.info(`📋 [UNIFIED] Final checks complete: ${finalChecksReport.summary}`);
       } catch (checkErr) {
         log.error('❌ [UNIFIED] Final checks failed:', checkErr.message);
-        genLog.logError('final_checks', checkErr.message);
+        genLog.error('final_checks_failed', checkErr.message);
         // Non-fatal - story generation continues
       }
     }
