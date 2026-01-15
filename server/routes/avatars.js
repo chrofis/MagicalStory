@@ -2034,6 +2034,25 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.debug(`💾 [AVATAR JOB ${jobId}] Applied avatar data including faceThumbnails`);
             }
 
+            // Save token usage for cost tracking (ASYNC path)
+            const hasTokenUsage = results.tokenUsage && Object.keys(results.tokenUsage.byModel || {}).length > 0;
+            if (hasTokenUsage) {
+              const existingUsage = characters[charIndex].avatarTokenUsage || { byModel: {} };
+              if (!existingUsage.byModel) existingUsage.byModel = {};
+
+              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
+                if (!existingUsage.byModel[modelId]) {
+                  existingUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
+                }
+                existingUsage.byModel[modelId].input_tokens += usage.input_tokens || 0;
+                existingUsage.byModel[modelId].output_tokens += usage.output_tokens || 0;
+                existingUsage.byModel[modelId].calls += usage.calls || 0;
+              }
+              existingUsage.lastUpdated = new Date().toISOString();
+              characters[charIndex].avatarTokenUsage = existingUsage;
+              log.info(`📊 [AVATAR JOB ${jobId}] Token usage saved: ${JSON.stringify(existingUsage.byModel)}`);
+            }
+
             // Update in database using rowId (e.g., "characters_1764881868108")
             charData.characters = characters;
 
