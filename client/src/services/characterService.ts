@@ -672,6 +672,13 @@ export const characterService = {
         if (traitsSource.build === 'user' && character.physical.build) {
           userTraits.build = character.physical.build;
         }
+        if (traitsSource.skinTone === 'user' && character.physical.skinTone) {
+          userTraits.skinTone = character.physical.skinTone;
+          // Also include hex if available (uses same source as skinTone)
+          if (character.physical.skinToneHex) {
+            userTraits.skinToneHex = character.physical.skinToneHex;
+          }
+        }
         if (traitsSource.face === 'user' && character.physical.face) {
           userTraits.face = character.physical.face;
         }

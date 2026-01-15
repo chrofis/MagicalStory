@@ -1658,6 +1658,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       if (physicalTraits.hairLength) traitLines.push(`- Hair length: ${physicalTraits.hairLength}`);
       if (physicalTraits.hairStyle) traitLines.push(`- Hair style: ${physicalTraits.hairStyle}`);
       if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
+      if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
+      if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
+      if (physicalTraits.facialHair) traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
+      if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
       if (traitLines.length > 0) {
         userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):\n${traitLines.join('\n')}`;
       }
@@ -1733,11 +1737,15 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         const data = await response.json();
         let imageData = null;
 
+        // Extract token usage from response
+        const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+        const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+
         // Log API response status for debugging
         if (!response.ok) {
           log.error(`[AVATAR JOB ${jobId}] Gemini API error for ${category}: ${response.status} ${response.statusText}`);
           log.error(`[AVATAR JOB ${jobId}] Response body:`, JSON.stringify(data).substring(0, 500));
-          return { category, imageData: null, prompt: avatarPrompt };
+          return { category, imageData: null, prompt: avatarPrompt, inputTokens, outputTokens };
         }
 
         if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -1770,12 +1778,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
         if (imageData) {
           const compressedImage = await compressImageToJPEG(imageData);
-          return { category, imageData: compressedImage, prompt: avatarPrompt };
+          return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens, outputTokens };
         }
-        return { category, imageData: null, prompt: avatarPrompt };
+        return { category, imageData: null, prompt: avatarPrompt, inputTokens, outputTokens };
       } catch (err) {
         log.error(`[AVATAR JOB ${jobId}] Generation failed for ${category}:`, err.message);
-        return { category, imageData: null, prompt: null };
+        return { category, imageData: null, prompt: null, inputTokens: 0, outputTokens: 0 };
       }
     };
 
@@ -1786,9 +1794,19 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.progress = 70;
     job.message = 'Evaluating generated avatars...';
 
-    // Store results and extract faceThumbnails
-    for (const { category, imageData, prompt } of generatedAvatars) {
+    // Store results, extract faceThumbnails, and aggregate token usage
+    for (const { category, imageData, prompt, inputTokens, outputTokens } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
+
+      // Aggregate token usage by model
+      if (inputTokens > 0 || outputTokens > 0) {
+        if (!results.tokenUsage.byModel[geminiModelId]) {
+          results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
+        }
+        results.tokenUsage.byModel[geminiModelId].input_tokens += inputTokens;
+        results.tokenUsage.byModel[geminiModelId].output_tokens += outputTokens;
+      }
+
       if (imageData) {
         results[category] = imageData;
         // Extract face thumbnail from 2x2 grid (same as sync endpoint)
@@ -2164,6 +2182,7 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       if (physicalTraits.hairLength) traitLines.push(`- Hair length: ${physicalTraits.hairLength}`);
       if (physicalTraits.hairStyle) traitLines.push(`- Hair style: ${physicalTraits.hairStyle}`);
       if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
+      if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
       if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
       if (physicalTraits.facialHair) traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
       if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
@@ -2176,6 +2195,7 @@ ${traitLines.join('\n')}
 These corrections OVERRIDE what is visible in the reference photo.
 - If hair color is specified, the output MUST show that exact hair color
 - If eye color is specified, the output MUST show that exact eye color
+- If skin tone is specified, the output MUST show that exact skin tone
 - Apply these traits while preserving the person's facial identity from the reference.`;
         log.info(`🎨 [CLOTHING AVATARS] Using user-specified physical traits: ${traitLines.join(', ')}`);
       }

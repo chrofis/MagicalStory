@@ -19,7 +19,7 @@ VISUAL REQUIREMENTS:
 - Body: Generate age-appropriate body proportions based on apparent age in reference.
 - Setting: Pure clean white background (#FFFFFF) in each quadrant.
 - Lighting: Natural, even, studio-style diffused light.
-- Top quadrants: Head and shoulders, face clearly visible
+- Top quadrants: FACE ONLY - forehead to chin. NO shoulders, NO neck, NO clothing visible. Tight crop on face.
 - Bottom quadrants: Full body, head to toe. Shoes visible.
 
 BODY TRANSFORMATION:
