@@ -1610,7 +1610,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       structuredClothing: {},
       extractedTraits: null,
       rawEvaluation: null,
-      prompts: {}
+      prompts: {},
+      tokenUsage: { byModel: {} }  // Track token usage for cost metrics
     };
 
     // Prepare base64 data - ALWAYS resize photos for Gemini to avoid IMAGE_OTHER errors
