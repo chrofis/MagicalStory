@@ -225,11 +225,13 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
     if (hasSeparateImages) {
       // FAST PATH: Load metadata without image data, get image info from story_images table
       // Use JSONB to extract non-image fields (PostgreSQL won't load the huge imageData strings)
-      // Also exclude 'characters' (7MB+) since they're loaded separately via /api/characters
+      // Characters are extracted separately with only id/name (not full 7MB+ photo data)
       const metaQuery = `
         SELECT
           (data::jsonb) - 'sceneImages' - 'coverImages' - 'characters' as base_data,
-          COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count
+          COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count,
+          (SELECT jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name'))
+           FROM jsonb_array_elements((data::jsonb)->'characters') c) as characters_mini
         FROM stories WHERE id = $1
       `;
       const metaRows = await dbQuery(metaQuery, [id]);
@@ -237,6 +239,11 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         ? JSON.parse(metaRows[0].base_data)
         : metaRows[0].base_data;
       const sceneCount = parseInt(metaRows[0].scene_count) || 0;
+      // Add minimal characters array (just id/name for GenerationSettingsPanel)
+      const charactersMini = metaRows[0].characters_mini || [];
+      baseData.characters = Array.isArray(charactersMini)
+        ? charactersMini.map(c => ({ id: parseInt(c.id) || c.id, name: c.name }))
+        : [];
 
       // Get image info from story_images table (fast - no large data)
       const imageInfoRows = await dbQuery(
@@ -295,10 +302,13 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
       const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
-      // Strip out image data and characters (loaded separately) but keep metadata
-      const { characters: _, ...storyWithoutCharacters } = story;
+      // Strip out image data and full characters (photo data is huge), but include minimal char info
+      const { characters: fullCharacters, ...storyWithoutCharacters } = story;
+      // Extract just id/name from characters for GenerationSettingsPanel
+      const charactersMini = (fullCharacters || []).map(c => ({ id: c.id, name: c.name }));
       metadata = {
         ...storyWithoutCharacters,
+        characters: charactersMini,
         sceneImages: story.sceneImages?.map(img => ({
           ...img,
           imageData: undefined,
