@@ -87,10 +87,20 @@ export function ImageHistoryModal({
                     {version.isActive && <span className="ml-2 text-green-600 text-xs">(Active)</span>}
                   </summary>
                   <div className="mt-2 space-y-2">
+                    {version.userInput && (
+                      <div>
+                        <div className="text-xs font-semibold text-purple-700">
+                          {language === 'de' ? 'Benutzer-Eingabe:' : language === 'fr' ? 'Entrée utilisateur:' : 'User Input:'}
+                        </div>
+                        <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-purple-50 p-2 rounded border border-purple-200 max-h-24 overflow-y-auto">
+                          {version.userInput}
+                        </pre>
+                      </div>
+                    )}
                     {version.description && (
                       <div>
                         <div className="text-xs font-semibold text-amber-700">
-                          {language === 'de' ? 'Szene:' : language === 'fr' ? 'Scène:' : 'Scene:'}
+                          {language === 'de' ? 'Erweiterte Szene:' : language === 'fr' ? 'Scène étendue:' : 'Expanded Scene:'}
                         </div>
                         <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-2 rounded border border-gray-200 max-h-24 overflow-y-auto">
                           {version.description}

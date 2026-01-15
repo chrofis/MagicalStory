@@ -2629,6 +2629,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // Create new version entry
     const newVersion = {
       imageData: imageResult.imageData,
+      userInput: inputDescription !== expandedDescription ? inputDescription : null,  // User's input before expansion
       description: expandedDescription,  // Full expanded scene description used for this version
       prompt: imagePrompt,
       modelId: imageResult.modelId || null,
