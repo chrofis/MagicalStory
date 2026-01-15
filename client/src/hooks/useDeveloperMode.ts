@@ -26,6 +26,9 @@ interface DeveloperModeState {
   // Auto-repair: automatically fix detected issues in generated images (default: OFF)
   enableAutoRepair: boolean;
   setEnableAutoRepair: (enable: boolean) => void;
+  // Final checks: run image and text consistency checks at end of generation (default: OFF)
+  enableFinalChecks: boolean;
+  setEnableFinalChecks: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -89,6 +92,9 @@ export function useDeveloperMode(): DeveloperModeState {
   // Auto-repair: automatically fix detected issues in generated images (default: OFF)
   const [enableAutoRepair, setEnableAutoRepair] = useState(false);
 
+  // Final checks: run image and text consistency checks at end of generation (default: OFF)
+  const [enableFinalChecks, setEnableFinalChecks] = useState(false);
+
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
 
@@ -140,6 +146,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setDevSkipCovers,
     enableAutoRepair,
     setEnableAutoRepair,
+    enableFinalChecks,
+    setEnableFinalChecks,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

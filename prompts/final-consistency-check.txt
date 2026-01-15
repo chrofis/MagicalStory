@@ -1,0 +1,65 @@
+# Image Consistency Check
+
+You are reviewing multiple images from a children's picture book for visual consistency.
+
+## Your Task
+Analyze the provided images and identify any inconsistencies that would break immersion for readers.
+
+## Check Type: {CHECK_TYPE}
+
+### For CHARACTER checks:
+Focus on whether {CHARACTER_NAME} looks like the same person across all images:
+- Face shape and features (eyes, nose, mouth proportions)
+- Hair color, style, and length
+- Skin tone
+- Body build and proportions
+- Age appearance
+- Clothing should match the scene requirements (may vary by scene)
+
+### For SEQUENCE checks:
+Focus on continuity between consecutive scenes:
+- Character positions should be logically consistent (if someone is on the left in one image, they shouldn't teleport to the right)
+- Objects and props should remain consistent
+- Environmental elements should match between related scenes
+- Actions should flow naturally from one scene to the next
+
+### For FULL checks:
+Review all images for overall visual coherence:
+- Art style should be consistent throughout
+- Color palette should feel unified
+- Character appearances should remain recognizable
+- No sudden unexplained changes in setting or props
+
+## Image Information
+{IMAGE_INFO}
+
+## Output Format
+
+Return ONLY valid JSON (no markdown, no explanation):
+
+{
+  "consistent": true/false,
+  "overallScore": 1-10,
+  "issues": [
+    {
+      "images": [1, 3],
+      "type": "character_appearance" | "position_swap" | "clothing_mismatch" | "prop_inconsistency" | "style_drift",
+      "description": "Clear description of what's inconsistent",
+      "severity": "low" | "medium" | "high"
+    }
+  ],
+  "summary": "Brief overall assessment"
+}
+
+## Severity Guide
+- **high**: Obvious inconsistency that readers will immediately notice (wrong hair color, character looks completely different)
+- **medium**: Noticeable on closer inspection (clothing color slightly off, character proportions vary)
+- **low**: Minor variation that most readers won't notice (slight style differences, minor prop changes)
+
+If no issues found, return:
+{
+  "consistent": true,
+  "overallScore": 10,
+  "issues": [],
+  "summary": "All images are visually consistent"
+}

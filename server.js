@@ -124,6 +124,7 @@ const {
   compressImageToJPEG,
   autoRepairImage,
   autoRepairWithTargets,
+  runFinalConsistencyChecks,
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
@@ -152,7 +153,8 @@ const {
   callAnthropicAPI,
   callAnthropicAPIStreaming,
   callGeminiTextAPI,
-  callClaudeAPI
+  callClaudeAPI,
+  evaluateTextConsistency
 } = require('./server/lib/textModels');
 const {
   calculateTextCost,
@@ -176,7 +178,8 @@ const {
   parseNewVisualBibleEntries,
   mergeNewVisualBibleEntries,
   extractStoryTextFromOutput,
-  linkPreDiscoveredLandmarks
+  linkPreDiscoveredLandmarks,
+  injectHistoricalLocations
 } = require('./server/lib/visualBible');
 const { prefetchLandmarkPhotos, discoverLandmarksForLocation } = require('./server/lib/landmarkPhotos');
 
@@ -212,7 +215,8 @@ const {
   buildUnifiedStoryPrompt,
   getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
-  extractSceneMetadata
+  extractSceneMetadata,
+  getHistoricalLocations
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { GenerationLogger } = require('./server/lib/generationLogger');
@@ -3133,6 +3137,7 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
     const { id, pageNum } = req.params;
     const pageNumber = parseInt(pageNum);
     const maxPasses = Math.min(Math.max(parseInt(req.body.maxPasses) || 1, 1), 3);  // 1-3 passes
+    const providedFixTargets = req.body.fixTargets || null;  // Optional: use existing fix targets instead of re-evaluating
 
     // Admin-only endpoint (dev mode feature)
     if (req.user.role !== 'admin') {
@@ -3184,21 +3189,38 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
     for (let pass = 1; pass <= maxPasses; pass++) {
       log.info(`🔧 [REPAIR] Pass ${pass}/${maxPasses} for story ${id}, page ${pageNumber}`);
 
-      // Step 1: Evaluate current image to get score and fix targets
-      const preEvalResult = await evaluateImageQuality(
-        currentImageData,
-        currentScene.prompt || '',
-        characterPhotos,
-        'scene'
-      );
+      // Step 1: Get fix targets - use provided ones on first pass, or evaluate
+      let preEvalResult;
+      let fixTargets;
+      let preRepairScore;
 
-      if (!preEvalResult || preEvalResult.score === null) {
-        log.warn(`⚠️ [REPAIR] Pre-repair evaluation failed on pass ${pass}`);
-        break;
+      if (pass === 1 && providedFixTargets && providedFixTargets.length > 0) {
+        // Use provided fix targets from existing evaluation (skip re-evaluation)
+        log.info(`🔧 [REPAIR] Using ${providedFixTargets.length} provided fix targets (skipping evaluation)`);
+        fixTargets = providedFixTargets;
+        preRepairScore = currentScene.qualityScore || 0;
+        preEvalResult = {
+          score: preRepairScore,
+          reasoning: currentScene.qualityReasoning || 'Using existing evaluation',
+          fixTargets: fixTargets
+        };
+      } else {
+        // Evaluate current image to get score and fix targets
+        preEvalResult = await evaluateImageQuality(
+          currentImageData,
+          currentScene.prompt || '',
+          characterPhotos,
+          'scene'
+        );
+
+        if (!preEvalResult || preEvalResult.score === null) {
+          log.warn(`⚠️ [REPAIR] Pre-repair evaluation failed on pass ${pass}`);
+          break;
+        }
+
+        preRepairScore = preEvalResult.score;
+        fixTargets = preEvalResult.fixTargets || [];
       }
-
-      const preRepairScore = preEvalResult.score;
-      const fixTargets = preEvalResult.fixTargets || [];
 
       log.info(`🔧 [REPAIR] Pass ${pass}: Pre-repair score ${preRepairScore}%, ${fixTargets.length} fix targets`);
 
@@ -5691,7 +5713,7 @@ class ProgressiveStoryPageParser {
 
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // Generation logger for tracking API usage and debugging
@@ -6494,6 +6516,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       // Initialize main characters from inputData.characters with their style analysis
       // This populates visualBible.mainCharacters for the dev panel display
       initializeVisualBibleMainCharacters(visualBible, inputData.characters);
+      // Inject historical locations with pre-fetched photos (for historical stories)
+      if (inputData.storyCategory === 'historical' && inputData.storyTopic) {
+        const historicalLocations = getHistoricalLocations(inputData.storyTopic);
+        if (historicalLocations?.length > 0) {
+          injectHistoricalLocations(visualBible, historicalLocations);
+          log.info(`📍 [STORYBOOK] Injected ${historicalLocations.length} pre-fetched historical location(s)`);
+        }
+      }
       const totalEntries = (visualBible.secondaryCharacters?.length || 0) +
                           (visualBible.animals?.length || 0) +
                           (visualBible.artifacts?.length || 0) +
@@ -7065,6 +7095,60 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }
     }
 
+    // =========================================================================
+    // FINAL CONSISTENCY CHECKS (if enabled)
+    // =========================================================================
+    let finalChecksReport = null;
+    if (enableFinalChecks && !skipImages && allImages.length >= 2) {
+      try {
+        genLog.setStage('final_checks');
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [97, 'Running final consistency checks...', jobId]
+        );
+        log.info(`🔍 [STORYBOOK] Running final consistency checks...`);
+
+        // Run image consistency checks
+        const imageCheckData = {
+          sceneImages: allImages.map((img, idx) => ({
+            imageData: img.imageData,
+            pageNumber: img.pageNumber || idx + 1
+          }))
+        };
+        finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
+          checkCharacters: true
+        });
+
+        // Run text consistency check
+        if (fullStoryText && fullStoryText.length > 100) {
+          const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
+          const textCheck = await evaluateTextConsistency(fullStoryText, inputData.language || lang, characterNames);
+          if (textCheck) {
+            finalChecksReport.textCheck = textCheck;
+            if (textCheck.quality !== 'good') {
+              finalChecksReport.overallConsistent = false;
+            }
+            finalChecksReport.totalIssues += textCheck.issues?.length || 0;
+          }
+        }
+
+        // Log results to generation log
+        genLog.log('final_checks', 'result', {
+          imageChecks: finalChecksReport.imageChecks?.length || 0,
+          textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
+          totalIssues: finalChecksReport.totalIssues || 0,
+          overallConsistent: finalChecksReport.overallConsistent,
+          summary: finalChecksReport.summary
+        });
+
+        log.info(`📋 [STORYBOOK] Final checks complete: ${finalChecksReport.summary}`);
+      } catch (checkErr) {
+        log.error('❌ [STORYBOOK] Final checks failed:', checkErr.message);
+        genLog.logError('final_checks', checkErr.message);
+        // Non-fatal - story generation continues
+      }
+    }
+
     // Save story to stories table so it appears in My Stories
     const storyId = jobId; // Use jobId as storyId for consistency
     const storyData = {
@@ -7103,6 +7187,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       generationLog: [], // Will be populated after apiUsage logging
       styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
+      finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -7334,7 +7419,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -7891,6 +7976,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Initialize main characters from inputData.characters with their style analysis
     // This populates visualBible.mainCharacters for the dev panel display
     initializeVisualBibleMainCharacters(visualBible, inputData.characters);
+
+    // Inject historical locations with pre-fetched photos (for historical stories)
+    if (inputData.storyCategory === 'historical' && inputData.storyTopic) {
+      const historicalLocations = getHistoricalLocations(inputData.storyTopic);
+      if (historicalLocations?.length > 0) {
+        injectHistoricalLocations(visualBible, historicalLocations);
+        log.info(`📍 [UNIFIED] Injected ${historicalLocations.length} pre-fetched historical location(s)`);
+      }
+    }
 
     // Link pre-discovered landmarks (if available) to skip fetching later
     if (inputData.availableLandmarks?.length > 0) {
@@ -8673,6 +8767,60 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.error('❌ [UNIFIED] Failed to log credit completion:', creditErr.message);
     }
 
+    // =========================================================================
+    // FINAL CONSISTENCY CHECKS (if enabled)
+    // =========================================================================
+    let finalChecksReport = null;
+    if (enableFinalChecks && !skipImages && allImages.length >= 2) {
+      try {
+        genLog.setStage('final_checks');
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [97, 'Running final consistency checks...', jobId]
+        );
+        log.info(`🔍 [UNIFIED] Running final consistency checks...`);
+
+        // Run image consistency checks
+        const imageCheckData = {
+          sceneImages: allImages.map((img, idx) => ({
+            imageData: img.imageData,
+            pageNumber: img.pageNumber || idx + 1
+          }))
+        };
+        finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
+          checkCharacters: true
+        });
+
+        // Run text consistency check
+        if (fullStoryText && fullStoryText.length > 100) {
+          const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
+          const textCheck = await evaluateTextConsistency(fullStoryText, inputData.language || 'en', characterNames);
+          if (textCheck) {
+            finalChecksReport.textCheck = textCheck;
+            if (textCheck.quality !== 'good') {
+              finalChecksReport.overallConsistent = false;
+            }
+            finalChecksReport.totalIssues += textCheck.issues?.length || 0;
+          }
+        }
+
+        // Log results to generation log
+        genLog.log('final_checks', 'result', {
+          imageChecks: finalChecksReport.imageChecks?.length || 0,
+          textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
+          totalIssues: finalChecksReport.totalIssues || 0,
+          overallConsistent: finalChecksReport.overallConsistent,
+          summary: finalChecksReport.summary
+        });
+
+        log.info(`📋 [UNIFIED] Final checks complete: ${finalChecksReport.summary}`);
+      } catch (checkErr) {
+        log.error('❌ [UNIFIED] Final checks failed:', checkErr.message);
+        genLog.logError('final_checks', checkErr.message);
+        // Non-fatal - story generation continues
+      }
+    }
+
     // Build final result (genLog already finalized before story save)
     const resultData = {
       storyId,
@@ -8692,7 +8840,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage,
       estimatedCost: totalCost,
       generationMode: 'unified',
-      generationLog: genLog.getEntries()
+      generationLog: genLog.getEntries(),
+      finalChecksReport: finalChecksReport || null
     };
 
     // Mark job as completed
@@ -9000,6 +9149,7 @@ async function processStoryJob(jobId) {
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
+    const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
 
     // Check if user is admin (for including debug images in repair history)
     const userResult = await dbPool.query('SELECT role FROM users WHERE id = $1', [job.user_id]);
@@ -9086,12 +9236,12 @@ async function processStoryJob(jobId) {
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks);
     }
 
     if (generationMode === 'pictureBook') {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks);
     }
 
     // outlineAndText mode (legacy): Separate outline + text generation

@@ -146,6 +146,7 @@ export interface RepairAttempt {
   description: string;
   boundingBox: number[];
   fixPrompt: string;
+  fullPrompt?: string;  // Full inpainting prompt with coordinates (for display)
   maskImage?: string;
   beforeImage?: string;
   afterImage?: string | null;
@@ -208,6 +209,11 @@ export interface SceneImage {
   qualityScore?: number;
   qualityReasoning?: string;
   qualityModelId?: string;  // Model used for quality evaluation
+  fixTargets?: Array<{  // Bounding boxes for auto-repair from quality evaluation
+    boundingBox: number[];
+    issue: string;
+    fixPrompt: string;
+  }>;
   // Regeneration info (for dev mode)
   wasRegenerated?: boolean;
   totalAttempts?: number;

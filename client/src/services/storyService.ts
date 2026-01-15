@@ -668,7 +668,11 @@ export const storyService = {
   },
 
   // Auto-repair image (detect and fix physics errors) - DEV ONLY
-  async repairImage(storyId: string, pageNumber: number): Promise<{
+  async repairImage(storyId: string, pageNumber: number, fixTargets?: Array<{
+    boundingBox: number[];
+    issue: string;
+    fixPrompt: string;
+  }>): Promise<{
     success: boolean;
     repaired: boolean;
     noErrorsFound: boolean;
@@ -679,6 +683,7 @@ export const storyService = {
       description: string;
       boundingBox: number[];
       fixPrompt: string;
+      fullPrompt?: string;
       maskImage: string;
       beforeImage: string;
       afterImage: string | null;
@@ -697,6 +702,7 @@ export const storyService = {
         description: string;
         boundingBox: number[];
         fixPrompt: string;
+        fullPrompt?: string;
         maskImage: string;
         beforeImage: string;
         afterImage: string | null;
@@ -704,7 +710,8 @@ export const storyService = {
         timestamp: string;
       }>;
     }>(
-      `/api/stories/${storyId}/repair/image/${pageNumber}`
+      `/api/stories/${storyId}/repair/image/${pageNumber}`,
+      { fixTargets }
     );
     return response;
   },
@@ -927,6 +934,7 @@ export const storyService = {
     skipCovers?: boolean;
     // Developer feature options
     enableAutoRepair?: boolean;
+    enableFinalChecks?: boolean;
     // Developer model overrides (admin only)
     modelOverrides?: {
       outlineModel?: string | null;
@@ -970,6 +978,7 @@ export const storyService = {
       skipCovers: data.skipCovers,
       // Developer feature options
       enableAutoRepair: data.enableAutoRepair,
+      enableFinalChecks: data.enableFinalChecks,
       // Developer model overrides
       modelOverrides: data.modelOverrides,
       // User location for landmark discovery

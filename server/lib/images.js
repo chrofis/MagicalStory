@@ -2262,7 +2262,8 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
     return {
       imageData: compressedImageData,
       usage: result.usage,
-      modelId: result.modelId
+      modelId: result.modelId,
+      fullPrompt: fixPrompt  // Runware uses the fix prompt directly
     };
 
   } catch (error) {
@@ -2333,19 +2334,22 @@ async function inpaintWithMask(originalImage, boundingBoxes, fixPrompt, maskImag
 
     // Build the inpainting prompt with TEXT-BASED coordinates
     // This avoids confusion when multiple images are sent
-    const inpaintPrompt = `Edit this image. Make changes ONLY in the specified region(s).
+    const inpaintPrompt = fillTemplate(PROMPT_TEMPLATES.inpainting || `Edit this image. Make changes ONLY in the specified region(s).
 
 TARGET REGION(S) TO EDIT:
-${coordText}
+{REGIONS}
 
 WHAT TO FIX IN THESE REGIONS:
-${fixPrompt}
+{FIX_PROMPT}
 
 IMPORTANT INSTRUCTIONS:
 - ONLY modify the content within the specified coordinate regions
 - Keep everything outside these regions EXACTLY the same
 - Maintain the same art style and color palette
-- Make minimal changes - just fix the specific issues mentioned`;
+- Make minimal changes - just fix the specific issues mentioned`, {
+      REGIONS: coordText,
+      FIX_PROMPT: fixPrompt
+    });
 
     // Build parts array: prompt + ONLY the original image
     // NOTE: We do NOT send the mask as an image - coordinates are in the text prompt
@@ -2406,7 +2410,7 @@ IMPORTANT INSTRUCTIONS:
           const compressedImageData = await compressImageToJPEG(rawImageData);
 
           log.info(`✅ [INPAINT] Successfully inpainted image (tokens: ${usage.input_tokens} in, ${usage.output_tokens} out)`);
-          return { imageData: compressedImageData, usage, modelId };
+          return { imageData: compressedImageData, usage, modelId, fullPrompt: inpaintPrompt };
         }
       }
     }
@@ -2511,6 +2515,7 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
           description: targets.map(t => t.issue).join('; '),
           boundingBoxes: groupBboxes,
           fixPrompt: groupPrompt,
+          fullPrompt: repaired.fullPrompt || groupPrompt,  // Full inpainting prompt sent to API
           success: true,
           targetCount: targets.length,
           modelId: repaired.modelId || modelId,
@@ -2715,6 +2720,7 @@ async function autoRepairImage(imageData, maxAttempts = 2, options = {}) {
       description: inspection.description,
       boundingBox: inspection.boundingBox,
       fixPrompt: inspection.fixPrompt,
+      fullPrompt: repaired.fullPrompt || inspection.fixPrompt,  // Full inpainting prompt sent to API
       success: true,
       timestamp: new Date().toISOString()
     };
@@ -2736,6 +2742,283 @@ async function autoRepairImage(imageData, maxAttempts = 2, options = {}) {
     noErrorsFound: false,
     repairHistory
   };
+}
+
+// =============================================================================
+// FINAL CONSISTENCY CHECKS
+// Cross-image consistency evaluation for story quality assurance
+// =============================================================================
+
+/**
+ * Evaluate consistency across multiple images
+ * Used for final quality checks before completing story generation
+ *
+ * @param {Array<{imageData: string, pageNumber: number|string}>} images - Array of images with page info
+ * @param {string} checkType - 'character' | 'sequence' | 'full'
+ * @param {object} options - Additional options
+ * @param {string} options.characterName - Character name for character-focused checks
+ * @param {Array<string>} options.referencePhotos - Reference photos for character comparison
+ * @returns {Promise<object>} Consistency analysis result
+ */
+async function evaluateConsistencyAcrossImages(images, checkType = 'full', options = {}) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      log.warn('⚠️  [CONSISTENCY] Gemini API key not configured, skipping consistency check');
+      return null;
+    }
+
+    if (!images || images.length < 2) {
+      log.verbose('[CONSISTENCY] Need at least 2 images for consistency check');
+      return { consistent: true, overallScore: 10, issues: [], summary: 'Single image - no consistency check needed' };
+    }
+
+    // Limit to 15 images per call (practical limit for performance)
+    const imagesToCheck = images.slice(0, 15);
+    if (images.length > 15) {
+      log.warn(`⚠️  [CONSISTENCY] Limited to first 15 images (had ${images.length})`);
+    }
+
+    // Load prompt template
+    const promptTemplate = PROMPT_TEMPLATES.finalConsistencyCheck;
+    if (!promptTemplate) {
+      log.error('❌ [CONSISTENCY] Missing prompt template: final-consistency-check.txt');
+      return null;
+    }
+
+    // Build image info for prompt
+    const imageInfo = imagesToCheck.map((img, idx) =>
+      `Image ${idx + 1}: Page ${img.pageNumber || 'unknown'}`
+    ).join('\n');
+
+    // Fill template
+    const prompt = fillTemplate(promptTemplate, {
+      CHECK_TYPE: checkType.toUpperCase(),
+      CHARACTER_NAME: options.characterName || 'all characters',
+      IMAGE_INFO: imageInfo
+    });
+
+    // Build parts array with all images
+    const parts = [];
+
+    // Add reference photos first (if doing character check)
+    if (checkType === 'character' && options.referencePhotos?.length > 0) {
+      for (const refPhoto of options.referencePhotos.slice(0, 3)) {
+        if (refPhoto && refPhoto.startsWith('data:image')) {
+          const imageHash = hashImageData(refPhoto);
+          let compressedBase64 = compressedRefCache.get(imageHash);
+
+          if (!compressedBase64) {
+            const compressed = await compressImageToJPEG(refPhoto, 80, 512);
+            compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+            compressedRefCache.set(imageHash, compressedBase64);
+          }
+
+          parts.push({
+            text: `Reference photo for ${options.characterName}:`
+          });
+          parts.push({
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: compressedBase64
+            }
+          });
+        }
+      }
+    }
+
+    // Add all scene images
+    for (let i = 0; i < imagesToCheck.length; i++) {
+      const img = imagesToCheck[i];
+      const imageData = img.imageData || img;
+
+      if (!imageData || !imageData.startsWith('data:image')) {
+        continue;
+      }
+
+      // Compress image for efficiency
+      const compressed = await compressImageToJPEG(imageData, 80, 768);
+      const base64Data = compressed.replace(/^data:image\/\w+;base64,/, '');
+
+      parts.push({
+        text: `Image ${i + 1} (Page ${img.pageNumber || 'unknown'}):`
+      });
+      parts.push({
+        inline_data: {
+          mime_type: 'image/jpeg',
+          data: base64Data
+        }
+      });
+    }
+
+    // Add the evaluation prompt
+    parts.push({ text: prompt });
+
+    // Call Gemini API
+    const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    log.info(`🔍 [CONSISTENCY] Checking ${imagesToCheck.length} images (type: ${checkType})`);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          maxOutputTokens: 8000,
+          temperature: 0.2
+        },
+        safetySettings: [
+          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+          { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error(`❌ [CONSISTENCY] API error: ${error.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    log.verbose(`📊 [CONSISTENCY] Tokens - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+
+    // Extract response text
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+    // Parse JSON response
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+
+        // Log summary
+        const issueCount = result.issues?.length || 0;
+        if (issueCount > 0) {
+          log.warn(`⚠️  [CONSISTENCY] Found ${issueCount} issue(s): ${result.summary || 'see details'}`);
+        } else {
+          log.info(`✅ [CONSISTENCY] All images consistent (score: ${result.overallScore || 'N/A'})`);
+        }
+
+        return result;
+      }
+    } catch (parseError) {
+      log.error(`❌ [CONSISTENCY] Failed to parse response: ${parseError.message}`);
+      log.debug(`Response was: ${responseText.substring(0, 500)}`);
+    }
+
+    return null;
+  } catch (error) {
+    log.error(`❌ [CONSISTENCY] Error: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Run all final consistency checks for a completed story
+ *
+ * @param {object} storyData - Story data containing images and text
+ * @param {Array<object>} characters - Main characters with photos
+ * @param {object} options - Check options
+ * @returns {Promise<object>} Combined consistency report
+ */
+async function runFinalConsistencyChecks(storyData, characters = [], options = {}) {
+  const report = {
+    timestamp: new Date().toISOString(),
+    imageChecks: [],
+    textCheck: null,
+    overallConsistent: true,
+    totalIssues: 0,
+    summary: ''
+  };
+
+  try {
+    const sceneImages = storyData.sceneImages || [];
+
+    if (sceneImages.length < 2) {
+      report.summary = 'Not enough images for consistency check';
+      return report;
+    }
+
+    // Prepare images with page numbers
+    const imagesWithPages = sceneImages.map((img, idx) => ({
+      imageData: img.imageData || img,
+      pageNumber: img.pageNumber || idx + 1
+    })).filter(img => img.imageData);
+
+    // 1. Full consistency check across all images
+    log.info('🔍 [FINAL CHECKS] Running full image consistency check...');
+    const fullCheck = await evaluateConsistencyAcrossImages(imagesWithPages, 'full');
+    if (fullCheck) {
+      report.imageChecks.push({
+        type: 'full',
+        ...fullCheck
+      });
+      if (!fullCheck.consistent) {
+        report.overallConsistent = false;
+      }
+      report.totalIssues += fullCheck.issues?.length || 0;
+    }
+
+    // 2. Character-specific checks (one per main character)
+    if (characters?.length > 0 && options.checkCharacters !== false) {
+      for (const character of characters.slice(0, 3)) { // Limit to 3 main characters
+        const charName = character.name;
+        const charPhoto = character.photoUrl || character.photo;
+
+        // Find images where this character appears (based on scene hints or all images)
+        const charImages = imagesWithPages; // For now, check all images
+
+        if (charImages.length >= 2 && charPhoto) {
+          log.info(`🔍 [FINAL CHECKS] Checking character consistency: ${charName}`);
+          const charCheck = await evaluateConsistencyAcrossImages(
+            charImages,
+            'character',
+            { characterName: charName, referencePhotos: [charPhoto] }
+          );
+
+          if (charCheck) {
+            report.imageChecks.push({
+              type: 'character',
+              characterName: charName,
+              ...charCheck
+            });
+            if (!charCheck.consistent) {
+              report.overallConsistent = false;
+            }
+            report.totalIssues += charCheck.issues?.length || 0;
+          }
+        }
+      }
+    }
+
+    // Build summary
+    const checksRun = report.imageChecks.length;
+    if (report.totalIssues === 0) {
+      report.summary = `All ${checksRun} checks passed - images are consistent`;
+    } else {
+      report.summary = `Found ${report.totalIssues} issue(s) across ${checksRun} checks`;
+    }
+
+    log.info(`📋 [FINAL CHECKS] Complete: ${report.summary}`);
+
+  } catch (error) {
+    log.error(`❌ [FINAL CHECKS] Error running checks: ${error.message}`);
+    report.error = error.message;
+  }
+
+  return report;
 }
 
 module.exports = {
@@ -2765,6 +3048,10 @@ module.exports = {
   inpaintWithMask,
   autoRepairImage,
   autoRepairWithTargets,
+
+  // Final consistency checks
+  evaluateConsistencyAcrossImages,
+  runFinalConsistencyChecks,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,

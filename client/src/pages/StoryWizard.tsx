@@ -95,6 +95,7 @@ export default function StoryWizard() {
     devSkipImages, setDevSkipImages,
     devSkipCovers, setDevSkipCovers,
     enableAutoRepair, setEnableAutoRepair,
+    enableFinalChecks, setEnableFinalChecks,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
@@ -2820,6 +2821,7 @@ export default function StoryWizard() {
         skipCovers: devSkipCovers,
         // Developer feature options
         enableAutoRepair: enableAutoRepair,
+        enableFinalChecks: enableFinalChecks,
         // Developer model overrides (admin only)
         modelOverrides: (user?.role === 'admin' || isImpersonating) ? {
           outlineModel: modelSelections.outlineModel,
@@ -3665,7 +3667,13 @@ export default function StoryWizard() {
               onRepairImage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number) => {
                 try {
                   log.info('Starting auto-repair for page:', pageNumber);
-                  const result = await storyService.repairImage(storyId, pageNumber);
+                  // Find the scene to get existing fixTargets (if available)
+                  const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+                  const fixTargets = scene?.fixTargets;
+                  if (fixTargets && fixTargets.length > 0) {
+                    log.info(`Using ${fixTargets.length} existing fix targets from evaluation`);
+                  }
+                  const result = await storyService.repairImage(storyId, pageNumber, fixTargets);
 
                   if (result.repaired) {
                     // Update the scene image with the repaired version
@@ -4017,6 +4025,19 @@ export default function StoryWizard() {
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Versucht erkannte Bildfehler automatisch zu korrigieren (z.B. fehlende Finger)' : language === 'fr' ? 'Essaie de corriger automatiquement les erreurs d\'image détectées' : 'Attempts to automatically fix detected image issues (e.g., missing fingers)'}
+                      </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={enableFinalChecks}
+                          onChange={(e) => setEnableFinalChecks(e.target.checked)}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Konsistenzprüfung aktivieren' : language === 'fr' ? 'Activer la vérification de cohérence' : 'Enable final checks'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Prüft Bilder und Text auf Konsistenz am Ende der Generierung' : language === 'fr' ? 'Vérifie la cohérence des images et du texte à la fin de la génération' : 'Checks images and text for consistency at end of generation'}
                       </p>
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">

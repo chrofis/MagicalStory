@@ -1,0 +1,72 @@
+# Story Text Consistency Check
+
+You are a professional editor reviewing a children's story for quality and consistency.
+
+## Language
+The story is written in: {LANGUAGE}
+
+## Story Text
+{STORY_TEXT}
+
+## Character Names
+These are the main characters: {CHARACTER_NAMES}
+
+## Your Task
+Review the story text carefully for the following issues:
+
+### 1. Spelling and Grammar
+- Spelling mistakes (in {LANGUAGE})
+- Grammar errors
+- Punctuation issues
+- Awkward phrasing
+
+### 2. Story Flow
+- Missing transitions between scenes
+- Abrupt jumps in narrative
+- Paragraphs that seem incomplete
+- Text that doesn't make sense in context
+
+### 3. Character Consistency
+- Character names used correctly throughout
+- No sudden name changes or misspellings
+- Characters acting consistently with their established personality
+- No characters appearing who weren't introduced
+
+### 4. Logical Issues
+- Timeline inconsistencies (afternoon becoming morning without explanation)
+- Physical impossibilities (character in two places at once)
+- Plot holes or unexplained events
+- Actions that don't follow from previous events
+
+## Output Format
+
+Return ONLY valid JSON (no markdown, no explanation):
+
+{
+  "quality": "good" | "needs_review" | "has_issues",
+  "overallScore": 1-10,
+  "issues": [
+    {
+      "page": 3,
+      "type": "spelling" | "grammar" | "flow" | "character" | "logic",
+      "text": "The exact problematic text",
+      "issue": "Description of the problem",
+      "suggestion": "How to fix it",
+      "severity": "low" | "medium" | "high"
+    }
+  ],
+  "summary": "Brief overall assessment of story quality"
+}
+
+## Severity Guide
+- **high**: Errors that significantly impact readability (major spelling errors, confusing text, plot holes)
+- **medium**: Issues that should be fixed but don't break the story (minor grammar, awkward phrasing)
+- **low**: Style suggestions and minor improvements (word choice, flow enhancements)
+
+If no issues found, return:
+{
+  "quality": "good",
+  "overallScore": 10,
+  "issues": [],
+  "summary": "Story text is well-written and consistent"
+}

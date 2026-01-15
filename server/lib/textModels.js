@@ -553,6 +553,92 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
   return callTextModel(prompt, maxTokens);
 }
 
+// =============================================================================
+// TEXT CONSISTENCY CHECK
+// Quality check for story text (spelling, grammar, flow)
+// =============================================================================
+
+/**
+ * Evaluate story text for consistency and quality issues
+ * Used for final quality checks before completing story generation
+ *
+ * @param {string} storyText - Full story text (all pages concatenated)
+ * @param {string} language - Language code (e.g., 'de-ch', 'en', 'fr')
+ * @param {Array<string>} characterNames - Names of main characters
+ * @returns {Promise<object>} Text quality analysis result
+ */
+async function evaluateTextConsistency(storyText, language = 'en', characterNames = []) {
+  try {
+    if (!storyText || storyText.length < 100) {
+      log.verbose('[TEXT CHECK] Story text too short for consistency check');
+      return { quality: 'good', overallScore: 10, issues: [], summary: 'Text too short for analysis' };
+    }
+
+    // Use lazy-loaded prompt templates to avoid circular dependency
+    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+
+    // Load prompt template
+    const promptTemplate = PROMPT_TEMPLATES.textConsistencyCheck;
+    if (!promptTemplate) {
+      log.error('❌ [TEXT CHECK] Missing prompt template: text-consistency-check.txt');
+      return null;
+    }
+
+    // Language name mapping
+    const languageNames = {
+      'de-ch': 'Swiss German (de-ch)',
+      'de': 'German (de)',
+      'en': 'English (en)',
+      'fr': 'French (fr)'
+    };
+    const languageName = languageNames[language] || language;
+
+    // Fill template
+    const prompt = fillTemplate(promptTemplate, {
+      LANGUAGE: languageName,
+      STORY_TEXT: storyText,
+      CHARACTER_NAMES: characterNames.join(', ') || 'Not specified'
+    });
+
+    log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language})`);
+
+    // Use Gemini for text check (faster and cheaper than Claude for this task)
+    const result = await callGeminiTextAPI(prompt, 4000, 'gemini-2.0-flash');
+
+    if (!result?.text) {
+      log.warn('⚠️  [TEXT CHECK] No response from text model');
+      return null;
+    }
+
+    // Parse JSON response
+    try {
+      // Extract JSON from response (handle markdown code blocks)
+      const jsonMatch = result.text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const textCheck = JSON.parse(jsonMatch[0]);
+
+        // Log summary
+        const issueCount = textCheck.issues?.length || 0;
+        if (issueCount > 0) {
+          log.warn(`⚠️  [TEXT CHECK] Found ${issueCount} issue(s): ${textCheck.summary || 'see details'}`);
+        } else {
+          log.info(`✅ [TEXT CHECK] Text is well-written (score: ${textCheck.overallScore || 'N/A'})`);
+        }
+
+        return textCheck;
+      }
+    } catch (parseError) {
+      log.error(`❌ [TEXT CHECK] Failed to parse response: ${parseError.message}`);
+      log.debug(`Response was: ${result.text.substring(0, 500)}`);
+    }
+
+    return null;
+  } catch (error) {
+    log.error(`❌ [TEXT CHECK] Error: ${error.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   // Configuration
   TEXT_MODELS,
@@ -569,5 +655,8 @@ module.exports = {
   callAnthropicAPIStreaming,
   callGeminiTextAPI,
   callGeminiTextAPIStreaming,
-  callClaudeAPI
+  callClaudeAPI,
+
+  // Text consistency check
+  evaluateTextConsistency
 };

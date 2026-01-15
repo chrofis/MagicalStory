@@ -368,7 +368,7 @@ export function RetryHistoryDisplay({
                             <summary className="text-gray-500 cursor-pointer hover:text-gray-700 text-[11px]">
                               Show fix prompt
                             </summary>
-                            <div className="mt-1 p-2 bg-gray-50 rounded text-[11px] text-gray-600">{repair.fixPrompt}</div>
+                            <div className="mt-1 p-2 bg-gray-50 rounded text-[11px] text-gray-600 whitespace-pre-wrap">{repair.fullPrompt || repair.fixPrompt}</div>
                           </details>
                           <div className="flex gap-4 items-start">
                             {/* Before with Mask Overlay */}

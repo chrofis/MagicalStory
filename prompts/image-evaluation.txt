@@ -173,7 +173,7 @@ Output your COMPLETE analysis as JSON (no other text):
   "verdict": "PASS",
   "issues_summary": "Manuel missing from scene; Lukas pants missing green accents; Eli ear patch on wrong side",
   "fix_targets": [
-    {"bbox": [0.6, 0.36, 0.85, 0.5], "issue": "pants missing green accents", "fix": "Add neon green accents to dark blue pants"}
+    {"bbox": [0.6, 0.36, 0.85, 0.5], "issue": "pants missing green accents", "fix": "Add neon green stripe accents to the dark blue pants of the young boy standing in the center foreground"}
   ]
 }
 ```
@@ -183,3 +183,10 @@ Output your COMPLETE analysis as JSON (no other text):
 - `fix_targets` array: include only if score < 8 and issues are fixable by re-rendering a region
 - `bbox` coordinates: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left
 - Include ALL analysis steps in the JSON structure
+- **CRITICAL for `fix` field**: Write as a SELF-CONTAINED VISUAL DESCRIPTION. The image editor does NOT know character names - describe by appearance and position only.
+  - BAD: "Add black gloves to Lukas"
+  - GOOD: "Add black knitted gloves to the hands of the young boy with short brown hair and blue striped hoodie on the right side"
+  - BAD: "Fix Eli's eye patch"
+  - GOOD: "Add a black eye patch over the left eye of the small brown stuffed animal being held"
+  - BAD: "Sophie's jacket should be floral"
+  - GOOD: "Change the girl's white puffer jacket to have blue, orange and yellow floral pattern"
