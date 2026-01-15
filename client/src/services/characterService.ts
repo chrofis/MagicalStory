@@ -655,6 +655,10 @@ export const characterService = {
       // Filter traits to only include those with 'user' source
       // This prevents reinforcing extraction errors during regeneration
       const traitsSource = character.physicalTraitsSource || {};
+      log.info(`Physical traits source: ${JSON.stringify(traitsSource)}`);
+      log.info(`Physical skinTone value: '${character.physical?.skinTone}', source: '${traitsSource.skinTone}'`);
+      log.info(`Physical hairStyle value: '${character.physical?.hairStyle}', source: '${traitsSource.hairStyle}'`);
+
       const userTraits: typeof character.physical = {};
       if (character.physical) {
         if (traitsSource.eyeColor === 'user' && character.physical.eyeColor) {
