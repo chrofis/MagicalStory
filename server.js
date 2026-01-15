@@ -6308,6 +6308,33 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }
     );
 
+    // Bug #7 fix: Prepare styled avatars BEFORE streaming starts
+    // This ensures images generated during streaming have access to styled avatar cache
+    if (artStyle !== 'realistic' && avatarGenerationPromises.length > 0) {
+      log.debug(`🎨 [STORYBOOK] Waiting for ${avatarGenerationPromises.length} avatar generations before preparing styles...`);
+      await Promise.all(avatarGenerationPromises);
+      avatarGenerationPromises.length = 0; // Clear to avoid double-await later
+      log.debug(`✅ [STORYBOOK] Avatar generations complete, preparing styled avatars...`);
+    }
+
+    // Prepare styled avatars for basic clothing categories (standard, winter, summer)
+    // This populates the cache so streaming images can use styled avatars
+    if (artStyle !== 'realistic') {
+      try {
+        const basicRequirements = (inputData.characters || []).flatMap(char =>
+          ['standard', 'winter', 'summer'].map(cat => ({
+            pageNumber: 'pre-stream',
+            clothingCategory: cat,
+            characterNames: [char.name]
+          }))
+        );
+        await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, streamingClothingRequirements);
+        log.debug(`✅ [STORYBOOK] Pre-streaming styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
+      } catch (error) {
+        log.warn(`⚠️ [STORYBOOK] Pre-streaming styled avatar prep failed: ${error.message}`);
+      }
+    }
+
     const sceneParser = new ProgressiveSceneParser((completedScene) => {
       // Called when a scene is detected as complete during streaming
       const { pageNumber, text, sceneDescription } = completedScene;
@@ -7885,6 +7912,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [18, `Story complete: "${title}" (${avatarsStarted} avatars, ${scenesStarted} scenes in parallel)`, jobId]
     );
+
+    // Bug #8 fix: Prepare styled avatars BEFORE covers start
+    // Covers call applyStyledAvatars which needs the cache populated by prepareStyledAvatars
+    // Without this, covers would get raw avatars instead of styled ones
+    if (!skipImages && artStyle !== 'realistic' && streamingAvatarPromises.length > 0) {
+      log.debug(`🎨 [UNIFIED] Waiting for ${streamingAvatarPromises.length} avatar generations before preparing styles for covers...`);
+      await Promise.all(streamingAvatarPromises);
+      log.debug(`✅ [UNIFIED] Avatar generations complete, preparing styled avatars for covers...`);
+
+      // Prepare styled avatars for basic clothing categories used in covers
+      try {
+        const basicCoverRequirements = (inputData.characters || []).flatMap(char =>
+          ['standard', 'winter', 'summer'].map(cat => ({
+            pageNumber: 'pre-cover',
+            clothingCategory: cat,
+            characterNames: [char.name]
+          }))
+        );
+        await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, streamingClothingRequirements);
+        log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
+      } catch (error) {
+        log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
+      }
+    }
 
     // Start cover generation now that we have full cover hints
     if (!skipImages && !skipCovers && coverHints) {
