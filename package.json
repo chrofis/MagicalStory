@@ -8,7 +8,7 @@
     "dev": "nodemon server.js",
     "dev:log": "node server.js 2>&1 | tee logs/server.log",
     "dev:client": "cd client && npm run dev",
-    "dev:python": "python photo_analyzer.py",
+    "dev:python": "venv311/Scripts/python.exe photo_analyzer.py",
     "build": "cd client && npm install && npm run build",
     "build:client": "cd client && npm run build",
     "test": "npx playwright test tests/local-debug.spec.ts --project=chromium --workers=1",
