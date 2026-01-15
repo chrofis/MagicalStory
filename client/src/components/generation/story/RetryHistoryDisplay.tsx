@@ -363,7 +363,12 @@ export function RetryHistoryDisplay({
                     <div className="mt-3 space-y-3">
                       {attempt.repairDetails.map((repair, rIdx) => (
                         <div key={rIdx} className="bg-white p-3 rounded-lg border shadow-sm">
-                          <div className="font-medium text-amber-800 mb-1">{repair.description}</div>
+                          <div className="flex justify-between items-start mb-1">
+                            <div className="font-medium text-amber-800">{repair.description}</div>
+                            {repair.modelId && (
+                              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{repair.modelId}</span>
+                            )}
+                          </div>
                           <details className="mb-2">
                             <summary className="text-gray-500 cursor-pointer hover:text-gray-700 text-[11px]">
                               Show fix prompt

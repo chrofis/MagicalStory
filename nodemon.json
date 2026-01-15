@@ -1,6 +1,6 @@
 {
   "watch": ["server.js", "server/"],
-  "ext": "js,json",
+  "ext": "js",
   "ignore": [
     "node_modules/",
     "client/",
@@ -8,6 +8,7 @@
     "data/",
     "logs/",
     "*.log",
+    "*.json",
     "test-*.js",
     ".claude/"
   ]

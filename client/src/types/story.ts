@@ -147,6 +147,7 @@ export interface RepairAttempt {
   boundingBox: number[];
   fixPrompt: string;
   fullPrompt?: string;  // Full inpainting prompt with coordinates (for display)
+  modelId?: string;     // Model used for inpainting
   maskImage?: string;
   beforeImage?: string;
   afterImage?: string | null;
