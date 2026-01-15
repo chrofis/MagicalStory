@@ -2741,9 +2741,52 @@ These corrections OVERRIDE what is visible in the reference photo.
               log.debug(`💾 [CLOTHING AVATARS] Applied extracted clothing to character`);
             }
 
-            // Save back to database
+            // Save avatar images to character (SYNC path - matches ASYNC path behavior)
+            if (results.standard || results.winter || results.summer) {
+              characters[charIndex].avatars = {
+                ...(characters[charIndex].avatars || {}),
+                status: 'complete',
+                generatedAt: new Date().toISOString(),
+                ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
+                ...(results.standard && { standard: results.standard }),
+                ...(results.winter && { winter: results.winter }),
+                ...(results.summer && { summer: results.summer }),
+                ...(results.clothing && { clothing: results.clothing }),
+              };
+              log.debug(`💾 [CLOTHING AVATARS] Applied avatar data including faceThumbnails`);
+            }
+
+            // Generate lightweight metadata for fast list queries (matches POST /api/characters behavior)
+            const lightCharacters = characters.map(char => {
+              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+              if (lightChar.avatars) {
+                const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+                lightChar.avatars = {
+                  status: lightChar.avatars.status,
+                  stale: lightChar.avatars.stale,
+                  generatedAt: lightChar.avatars.generatedAt,
+                  hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+                  faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
+                  clothing: lightChar.avatars.clothing
+                };
+              }
+              return lightChar;
+            });
+
+            const metadataObj = {
+              characters: lightCharacters,
+              relationships: data.relationships || {},
+              relationshipTexts: data.relationshipTexts || {},
+              customRelationships: data.customRelationships || [],
+              customStrengths: data.customStrengths || [],
+              customWeaknesses: data.customWeaknesses || [],
+              customFears: data.customFears || []
+            };
+
+            // Save back to database (both data and metadata columns)
             data.characters = characters;
-            await dbQuery('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(data), rowId]);
+            await dbQuery('UPDATE characters SET data = $1, metadata = $2 WHERE id = $3',
+              [JSON.stringify(data), JSON.stringify(metadataObj), rowId]);
 
             // Log summary
             if (hasTokenUsage) {

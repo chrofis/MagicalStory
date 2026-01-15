@@ -121,9 +121,15 @@ async function inpaint(seedImage, maskImage, prompt, options = {}) {
     payload[0].negativePrompt = negativePrompt;
   }
 
+  // Add CFG scale
+  if (cfgScale !== 7) {
+    payload[0].CFGScale = cfgScale;
+  }
+
   console.log('\n--- Runware Inpaint Request ---');
   console.log(`Model: ${model}`);
   console.log(`Strength: ${strength}`);
+  console.log(`CFG Scale: ${cfgScale}`);
   if (negativePrompt) console.log(`Negative: ${negativePrompt}`);
   console.log(`Steps: ${steps}`);
   console.log(`Mask Margin: ${maskMargin}`);
@@ -247,6 +253,7 @@ Examples:
       else if (key === 'mask') options.mask = value;
       else if (key === 'output') options.output = value;
       else if (key === 'neg') options.neg = value;
+      else if (key === 'cfg') options.cfg = parseFloat(value);
     }
   }
 
@@ -296,6 +303,7 @@ Examples:
       steps: options.steps,
       maskMargin: options.margin,
       negativePrompt: options.neg || '',
+      cfgScale: options.cfg || 7,
       width: width,
       height: height
     });

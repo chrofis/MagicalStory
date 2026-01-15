@@ -1397,7 +1397,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       console.log(`✅ [QUALITY RETRY] No text expected and none found - correct`);
     }
 
-    // Store this attempt in history (WITHOUT imageData to avoid bloating storage)
+    // Store this attempt in history (including imageData for dev mode debugging)
     retryHistory.push({
       attempt: attempts,
       type: 'generation',
@@ -1407,8 +1407,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       textIssue: result.textIssue,
       expectedText: result.expectedText,
       actualText: result.actualText,
-      // imageData omitted - would bloat storage by ~3MB per attempt
-      hasImage: !!result.imageData,
+      imageData: result.imageData,  // Include for dev mode Generierungshistorie
       modelId: result.modelId,
       timestamp: new Date().toISOString()
     });
