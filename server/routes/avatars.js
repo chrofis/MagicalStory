@@ -1844,6 +1844,11 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         for (const { category, faceMatchResult } of evalResults) {
           if (!faceMatchResult) continue;
 
+          // Store raw evaluation for dev mode debugging (first one only)
+          if (!results.rawEvaluation && faceMatchResult.raw) {
+            results.rawEvaluation = faceMatchResult.raw;
+          }
+
           // Store faceMatch for this category
           results.faceMatch = results.faceMatch || {};
           results.faceMatch[category] = {
