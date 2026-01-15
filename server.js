@@ -2241,6 +2241,9 @@ ${landmarkEntries}`;
       return null;
     };
 
+    // Track last sent content to avoid duplicate sends
+    let lastStory2Length = 0;
+
     // Stream from LLM and parse for story markers
     await callTextModelStreaming(prompt, 6000, (delta, fullText) => {
       accumulatedText = fullText;
@@ -2255,21 +2258,27 @@ ${landmarkEntries}`;
         }
       }
 
-      // Check if we have a complete story 2 (streaming check)
-      if (!story2Sent && story1Sent) {
+      // Progressively stream story 2 once story 1 is complete
+      // Send updates as more content arrives (throttled by length changes)
+      if (story1Sent) {
         const story2 = parseStory2(accumulatedText);
-        if (story2 && story2.length > 50) {
-          // Wait until end to send story 2 to ensure completeness
+        if (story2 && story2.length > 50 && story2.length > lastStory2Length + 20) {
+          res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
+          lastStory2Length = story2.length;
+          if (!story2Sent) {
+            log.debug('  Story 2 streaming started');
+            story2Sent = true;
+          }
         }
       }
     }, modelToUse);
 
-    // Parse final result and send story 2 if not already sent
-    if (!story2Sent) {
-      const story2 = parseStory2(accumulatedText);
-      if (story2) {
-        res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
-        log.debug('  Story 2 sent to client');
+    // Send final complete story 2 (ensures complete text is shown even if streamed partially)
+    const finalStory2 = parseStory2(accumulatedText);
+    if (finalStory2) {
+      res.write(`data: ${JSON.stringify({ story2: finalStory2 })}\n\n`);
+      if (!story2Sent) {
+        log.debug('  Story 2 sent to client (final)');
       }
     }
 
