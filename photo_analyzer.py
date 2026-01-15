@@ -427,8 +427,9 @@ def create_face_thumbnail(image, face_box, size=200):
 
     Returns: base64-encoded JPEG string
     """
-    # Add 30% padding around face (increased from 15% to show full head)
-    face_box_padded = add_padding_to_box(face_box, padding_percent=0.30)
+    # Asymmetric padding: more top for hair, less bottom to avoid shoulders
+    # top=50% for full hair, bottom=15% below chin, sides=25%
+    face_box_padded = add_asymmetric_padding_to_box(face_box, top=0.50, bottom=0.15, left=0.25, right=0.25)
     face_img = crop_to_box(image, face_box_padded)
 
     if face_img.size == 0:
@@ -692,6 +693,31 @@ def add_padding_to_box(box, padding_percent=0.5):
     }
 
 
+def add_asymmetric_padding_to_box(box, top=0.5, bottom=0.5, left=0.3, right=0.3):
+    """
+    Add asymmetric padding around a bounding box.
+    Padding values are percentages of the box's width/height.
+    E.g., top=0.5 means add 50% of face height above the face.
+    Box is in percentage 0-100 format.
+    """
+    pad_top = box['height'] * top
+    pad_bottom = box['height'] * bottom
+    pad_left = box['width'] * left
+    pad_right = box['width'] * right
+
+    new_x = max(0, box['x'] - pad_left)
+    new_y = max(0, box['y'] - pad_top)
+    new_width = min(100 - new_x, box['width'] + pad_left + pad_right)
+    new_height = min(100 - new_y, box['height'] + pad_top + pad_bottom)
+
+    return {
+        'x': new_x,
+        'y': new_y,
+        'width': new_width,
+        'height': new_height
+    }
+
+
 def crop_to_box(image, box, output_size=None):
     """
     Crop image to bounding box (box is in percentage 0-100)
@@ -947,8 +973,8 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
 
         # Face thumbnail with background removed (768x768 for avatar generation)
         if face_box and full_img_rgba is not None:
-            # Add 30% padding around face (increased from 15% to show full head)
-            face_box_padded = add_padding_to_box(face_box, padding_percent=0.30)
+            # Asymmetric padding: more top for hair, less bottom to avoid shoulders
+            face_box_padded = add_asymmetric_padding_to_box(face_box, top=0.50, bottom=0.15, left=0.25, right=0.25)
             face_img = crop_to_box(full_img_rgba, face_box_padded)
 
             if face_img.size > 0:
