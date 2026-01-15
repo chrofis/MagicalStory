@@ -15,7 +15,15 @@
     "test:prod": "npx playwright test tests/local-debug.spec.ts --project=chromium --workers=1",
     "test:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/local-debug.spec.ts --project=chromium --workers=1 --headed",
     "test:all": "npx playwright test --project=chromium --workers=1",
-    "test:inpaint": "node test-inpaint.js"
+    "test:inpaint": "node test-inpaint.js",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:ui": "vitest --ui",
+    "test:api": "vitest run tests/api",
+    "test:e2e:avatar": "npx playwright test tests/avatar.spec.ts --project=chromium --workers=1",
+    "test:e2e:avatar:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/avatar.spec.ts --project=chromium --workers=1 --headed",
+    "test:concurrency": "npx playwright test tests/concurrency --workers=1",
+    "test:avatar:all": "npm run test:unit && npm run test:api && npm run test:e2e:avatar"
   },
   "keywords": [
     "storytelling",
@@ -45,7 +53,9 @@
   "devDependencies": {
     "@playwright/test": "^1.57.0",
     "@types/node": "^25.0.3",
+    "@vitest/ui": "^4.0.17",
     "cross-env": "^10.1.0",
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "vitest": "^4.0.17"
   }
 }
