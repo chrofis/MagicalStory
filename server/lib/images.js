@@ -2259,11 +2259,18 @@ async function inpaintWithRunwareBackend(originalImage, boundingBoxes, fixPrompt
 
     log.info(`✅ [INPAINT-RUNWARE] Complete. Cost: $${result.usage?.cost?.toFixed(6) || '0.002000'}`);
 
+    // Construct descriptive fullPrompt for display (includes bounding box info)
+    const coordText = boundingBoxes.map((bbox, i) => {
+      const [ymin, xmin, ymax, xmax] = bbox;
+      return `Region ${i + 1}: [y: ${(ymin * 100).toFixed(0)}%-${(ymax * 100).toFixed(0)}%, x: ${(xmin * 100).toFixed(0)}%-${(xmax * 100).toFixed(0)}%]`;
+    }).join('\n');
+    const descriptivePrompt = `TARGET REGION(S) (mask-based):\n${coordText}\n\nREQUESTED CHANGE:\n${fixPrompt}`;
+
     return {
       imageData: compressedImageData,
       usage: result.usage,
       modelId: result.modelId,
-      fullPrompt: fixPrompt  // Runware uses the fix prompt directly
+      fullPrompt: descriptivePrompt
     };
 
   } catch (error) {
