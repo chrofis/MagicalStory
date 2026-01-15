@@ -6207,7 +6207,16 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const characters = inputData.characters || [];
         const artStyle = inputData.artStyle || 'pixar';
 
-        log.debug(`👕 [STORYBOOK] Processing clothing requirements for ${Object.keys(clothingRequirements).length} characters`);
+        // Bug #13 fix: Log completeness check for clothing requirements
+        const reqCharCount = Object.keys(clothingRequirements).length;
+        const expectedCharCount = characters.length;
+        if (reqCharCount < expectedCharCount) {
+          log.warn(`⚠️ [STORYBOOK] Clothing requirements incomplete: ${reqCharCount}/${expectedCharCount} characters`);
+        } else {
+          log.debug(`✅ [STORYBOOK] Clothing requirements complete: ${reqCharCount}/${expectedCharCount} characters`);
+        }
+
+        log.debug(`👕 [STORYBOOK] Processing clothing requirements for ${reqCharCount} characters`);
 
         for (const [charName, requirements] of Object.entries(clothingRequirements)) {
           const char = characters.find(c =>
@@ -6331,7 +6340,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, streamingClothingRequirements);
         log.debug(`✅ [STORYBOOK] Pre-streaming styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
+        // Bug #14 fix: Include stack trace for better debugging
         log.warn(`⚠️ [STORYBOOK] Pre-streaming styled avatar prep failed: ${error.message}`);
+        log.debug(`   Stack: ${error.stack?.split('\n').slice(0, 3).join(' -> ')}`);
       }
     }
 
@@ -7043,7 +7054,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           }
         }
       } catch (error) {
-        log.error(`⚠️ [STORYBOOK] Failed to persist styled avatars:`, error.message);
+        // Bug #14 fix: Include more context for styled avatar persistence errors
+        log.error(`⚠️ [STORYBOOK] Failed to persist styled avatars: ${error.message}`);
+        log.debug(`   Stack: ${error.stack?.split('\n').slice(0, 3).join(' -> ')}`);
       }
     }
 
@@ -7479,16 +7492,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (!config || !config.used) continue;
 
         // Check if avatar already exists
+        // Bug #12 note: Different checks are intentional:
+        // - Costumed: check STYLED avatars (generated directly in target style)
+        // - Standard/winter/summer: check RAW avatars (styled versions created later by prepareStyledAvatars)
         let avatarExists = false;
         if (category === 'costumed' && config.costume) {
           const costumeKey = config.costume.toLowerCase();
           if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
           if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
           avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
-          log.debug(`⚡ [STREAM-AVATAR] ${char.name} costumed:${costumeKey} exists=${avatarExists}`);
+          log.debug(`⚡ [STREAM-AVATAR] ${char.name} costumed:${costumeKey} styled@${artStyle} exists=${avatarExists}`);
         } else {
+          // For non-costumed, we check raw avatar - styled version created later by prepareStyledAvatars
           avatarExists = !!char.avatars[category];
-          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} exists=${avatarExists}`);
+          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} raw exists=${avatarExists}`);
         }
 
         if (avatarExists) {
@@ -7528,7 +7545,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
             }
           } catch (err) {
+            // Bug #14 fix: Include more context for avatar generation failures
             log.error(`❌ [STREAM-AVATAR] Failed for ${char.name} ${category}: ${err.message}`);
+            log.debug(`   Stack: ${err.stack?.split('\n').slice(0, 3).join(' -> ')}`);
           }
         });
         streamingAvatarPromises.push(avatarPromise);
@@ -7737,10 +7756,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       },
       onClothingRequirements: (requirements) => {
         streamingClothingRequirements = requirements;
+        // Bug #13 fix: Log completeness check for clothing requirements
+        const reqCharCount = Object.keys(requirements).length;
+        const expectedCharCount = (inputData.characters || []).length;
+        if (reqCharCount < expectedCharCount) {
+          log.warn(`⚠️ [STREAM] Clothing requirements incomplete: ${reqCharCount}/${expectedCharCount} characters`);
+        } else {
+          log.debug(`✅ [STREAM] Clothing requirements complete: ${reqCharCount}/${expectedCharCount} characters`);
+        }
         // Start avatar generation immediately
         if (!avatarsStartedDuringStreaming && !skipImages) {
           avatarsStartedDuringStreaming = true;
-          log.debug(`⚡ [STREAM] Starting avatar generation for ${Object.keys(requirements).length} characters`);
+          log.debug(`⚡ [STREAM] Starting avatar generation for ${reqCharCount} characters`);
           for (const [charName, charReqs] of Object.entries(requirements)) {
             startAvatarGeneration(charName, charReqs);
           }
@@ -7933,7 +7960,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, streamingClothingRequirements);
         log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
+        // Bug #14 fix: Include stack trace for better debugging
         log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
+        log.debug(`   Stack: ${error.stack?.split('\n').slice(0, 3).join(' -> ')}`);
       }
     }
 

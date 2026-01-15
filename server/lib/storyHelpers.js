@@ -780,17 +780,28 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         // clothingRequirements can be:
         // - Nested: { "CharName": { "costumed": { "costume": "superhero", "used": true } } }
         // - Flat: { "CharName": "costumed:superhero" }
+        // - With _currentClothing: { "CharName": { "_currentClothing": "costumed:superhero" } }
         if (!costumeKey && clothingRequirements) {
           const charClothing = clothingRequirements[char.name];
           if (typeof charClothing === 'string' && charClothing.startsWith('costumed:')) {
             // Flat format
             costumeKey = charClothing.split(':')[1].toLowerCase();
             log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from flat clothingRequirements`);
-          } else if (charClothing && typeof charClothing === 'object' && charClothing.costumed) {
-            // Nested format
-            if (charClothing.costumed.used && charClothing.costumed.costume) {
-              costumeKey = charClothing.costumed.costume.toLowerCase();
-              log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from nested clothingRequirements`);
+          } else if (charClothing && typeof charClothing === 'object') {
+            // Bug #11 fix: Handle multiple nested formats
+            // Format 1: { _currentClothing: "costumed:X" } - check this first (already handled above, but double-check)
+            if (charClothing._currentClothing && charClothing._currentClothing.startsWith('costumed:')) {
+              costumeKey = charClothing._currentClothing.split(':')[1].toLowerCase();
+              log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from _currentClothing`);
+            }
+            // Format 2: { costumed: { costume: "X", used: true } }
+            else if (charClothing.costumed) {
+              if (charClothing.costumed.costume) {
+                // Accept costume even if 'used' is not explicitly true (backwards compat)
+                // Many places set costume without the 'used' flag
+                costumeKey = charClothing.costumed.costume.toLowerCase();
+                log.debug(`[AVATAR LOOKUP] ${char.name}: found costume "${costumeKey}" from nested clothingRequirements (used: ${charClothing.costumed.used})`);
+              }
             }
           }
         }
@@ -963,6 +974,14 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           photoType = 'face';
           photoUrl = photos.face || photos.original || char.photoUrl;
         }
+      }
+
+      // Bug #9 fix: Log when no photo found for a character
+      if (!photoUrl) {
+        const searchedFor = effectiveClothingCategory || clothingCategory || 'any';
+        const hasAvatars = !!avatars;
+        const hasPhotos = Object.keys(photos).length > 0;
+        log.warn(`[PHOTO LOOKUP] No photo found for "${char.name}" (wanted: ${searchedFor}, hasAvatars: ${hasAvatars}, hasPhotos: ${hasPhotos})`);
       }
 
       return {

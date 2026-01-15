@@ -549,7 +549,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription)
         .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
         .catch(error => {
-          log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}:`, error.message);
+          // Bug #14 fix: Include stack trace for better debugging
+          log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);
+          log.debug(`   Stack: ${error.stack?.split('\n').slice(0, 3).join(' -> ')}`);
           return { cacheKey, success: false };
         })
     );
