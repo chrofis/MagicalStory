@@ -64,3 +64,10 @@ run-migration*.js
 test-output/
 tmpclaude-*
 *.bak
+
+# Test files with potential secrets
+test-gemini*.js
+
+# Inpainting test outputs
+test-*.png
+test-scene*.jpg

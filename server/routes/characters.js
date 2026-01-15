@@ -353,8 +353,15 @@ router.post('/', authenticateToken, async (req, res) => {
           preservedFields.push('photos');
           hasChanges = true;
         } else if (existingChar.photos && newChar.photos) {
-          // Merge photos - keep existing values for any missing fields
-          mergedChar.photos = { ...existingChar.photos, ...newChar.photos };
+          // Merge photos - keep existing values, only overwrite with non-null new values
+          // This prevents failed photo analysis from wiping out existing photos
+          const mergedPhotos = { ...existingChar.photos };
+          for (const [key, value] of Object.entries(newChar.photos)) {
+            if (value !== null && value !== undefined) {
+              mergedPhotos[key] = value;
+            }
+          }
+          mergedChar.photos = mergedPhotos;
         }
 
         // Preserve photo data if not sent (reduces payload by 10-15MB)

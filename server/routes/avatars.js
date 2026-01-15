@@ -1613,10 +1613,23 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       prompts: {}
     };
 
-    // Prepare base64 data
-    const base64Data = facePhoto.replace(/^data:image\/\w+;base64,/, '');
-    const mimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
-      facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+    // Prepare base64 data - ALWAYS resize photos for Gemini to avoid IMAGE_OTHER errors
+    // Gemini works better with smaller images (tested: 13KB works, 90KB fails)
+    log.info(`[AVATAR JOB ${jobId}] Resizing photo (${facePhoto.length} chars) for Gemini...`);
+
+    // Force resize to 512px max dimension - this bypasses the 100KB skip threshold in compressImageToJPEG
+    const sharp = require('sharp');
+    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const inputBuffer = Buffer.from(base64Input, 'base64');
+    const resizedBuffer = await sharp(inputBuffer)
+      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+    const processedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
+    log.info(`[AVATAR JOB ${jobId}] Resized to ${processedPhoto.length} chars (was ${facePhoto.length})`);
+    const base64Data = processedPhoto.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = processedPhoto.match(/^data:(image\/\w+);base64,/) ?
+      processedPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
     // Build user clothing section
     let userClothingSection = '';
