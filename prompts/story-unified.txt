@@ -216,7 +216,11 @@ Guidelines for clothing:
 - Prefer `standard` when story doesn't require special clothing
 - **Indoor scenes should use `standard` clothing, NOT winter** - winter clothing is only for outdoor cold weather scenes
 - For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
-- For costumed: Provide **complete outfit description**
+- For costumed: Provide **complete outfit description** (CLOTHING ONLY - do NOT include pets, companions, animals, carried objects, or items in pockets/pouches)
+  - ✅ INCLUDE: clothes, shoes, belts, jewelry, capes, vests, aprons worn on body
+  - ❌ EXCLUDE: pets ("elephant peeking from pocket"), companions, toys, bag contents
+  - Example WRONG: "brown vest with a pocket where Eli the mouse peeks out"
+  - Example RIGHT: "brown vest with brass buttons and a small pocket"
 - Only mark `used: true` for variations that actually appear
 - **CRITICAL - No Face Coverings**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
 - **CRITICAL - Distinct Styles**: Each character must have a structurally DIFFERENT outfit, not just color variations:

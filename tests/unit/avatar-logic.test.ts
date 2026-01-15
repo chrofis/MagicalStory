@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 
 // Import the character merge functions
 // @ts-expect-error - JS module without types
@@ -12,6 +12,80 @@ import {
   isPhysicalEmpty,
   createLightCharacter
 } from '../../server/lib/characterMerge.js';
+
+/**
+ * Log verification for unit tests
+ * Tracks console output and reports warnings/errors
+ */
+const logCapture = {
+  logs: [] as { type: string; args: unknown[] }[],
+  warnings: [] as string[],
+  errors: [] as string[],
+};
+
+// Spy on console methods
+const originalLog = console.log;
+const originalWarn = console.warn;
+const originalError = console.error;
+
+beforeEach(() => {
+  // Clear captured logs before each test
+  logCapture.logs = [];
+  logCapture.warnings = [];
+  logCapture.errors = [];
+
+  // Spy on console.log
+  console.log = vi.fn((...args: unknown[]) => {
+    logCapture.logs.push({ type: 'log', args });
+    const text = args.map(a => String(a)).join(' ');
+    if (text.includes('[WARN]')) {
+      logCapture.warnings.push(text);
+    }
+    if (text.includes('[ERROR]')) {
+      logCapture.errors.push(text);
+    }
+  });
+
+  // Spy on console.warn
+  console.warn = vi.fn((...args: unknown[]) => {
+    logCapture.logs.push({ type: 'warn', args });
+    logCapture.warnings.push(args.map(a => String(a)).join(' '));
+  });
+
+  // Spy on console.error
+  console.error = vi.fn((...args: unknown[]) => {
+    logCapture.logs.push({ type: 'error', args });
+    logCapture.errors.push(args.map(a => String(a)).join(' '));
+  });
+});
+
+afterEach(() => {
+  // Report any unexpected warnings
+  if (logCapture.warnings.length > 0) {
+    originalLog('⚠️ Warnings during test:', logCapture.warnings);
+  }
+
+  // Fail test if there were errors logged
+  if (logCapture.errors.length > 0) {
+    originalLog('🔴 Errors during test:', logCapture.errors);
+    // Don't fail yet - just report (uncomment to enforce)
+    // expect(logCapture.errors).toHaveLength(0);
+  }
+
+  // Restore console
+  console.log = originalLog;
+  console.warn = originalWarn;
+  console.error = originalError;
+});
+
+afterAll(() => {
+  // Print summary at end of all tests
+  originalLog('\n=== UNIT TEST LOG SUMMARY ===');
+  originalLog(`Total log calls: ${logCapture.logs.length}`);
+  originalLog(`Warnings: ${logCapture.warnings.length}`);
+  originalLog(`Errors: ${logCapture.errors.length}`);
+  originalLog('=============================\n');
+});
 
 describe('Avatar Merge Logic', () => {
   describe('mergeAvatars', () => {

@@ -46,6 +46,7 @@ MagicalStory/
 # Logs
 *.log
 npm-debug.log*
+logs/*.log
 
 # Firebase service account (secrets)
 *.firebase*.json

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "dev:log": "node server.js 2>&1 | tee logs/server.log",
     "dev:client": "cd client && npm run dev",
     "dev:python": "python photo_analyzer.py",
     "build": "cd client && npm install && npm run build",

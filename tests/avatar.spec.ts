@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import path from 'path';
+import { LogVerifier, LOG_PATTERNS, createLogVerifier } from './helpers/log-verifier';
 
 /**
  * Avatar E2E Tests
@@ -15,6 +16,9 @@ import path from 'path';
  *
  * NOTE: These tests interact with real APIs and may incur costs (~$0.10/run).
  * For CI, consider using the unit/API tests which are free.
+ *
+ * LOG VERIFICATION: Tests verify expected server logs are present and report warnings/errors.
+ * Run against localhost with `npm run dev:log` for full server log capture.
  */
 
 const TEST_EMAIL = process.env.TEST_EMAIL;
@@ -22,6 +26,9 @@ const TEST_PASSWORD = process.env.TEST_PASSWORD;
 
 // Test fixtures directory
 const FIXTURES_DIR = path.join(__dirname, 'fixtures');
+
+// Check if running against localhost (for server log verification)
+const isLocalhost = process.env.TEST_BASE_URL?.includes('localhost') || false;
 
 // Helper to wait for avatar generation job to complete
 async function waitForAvatarGeneration(page: Page, timeout = 120000): Promise<void> {
@@ -86,8 +93,23 @@ test.describe('Avatar Creation Flow', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('character list shows avatar thumbnails', async ({ page }) => {
+    // Setup log verification
+    const logVerifier = createLogVerifier();
+    logVerifier.attachBrowser(page);
+    if (isLocalhost) {
+      logVerifier.markServerLogPosition();
+    }
+
+    // Define expected logs for character load
+    logVerifier.expect(LOG_PATTERNS.CHARACTER_LOAD);
+
     await page.goto('/create');
     await page.waitForTimeout(2000);
+
+    // Read server logs if running locally
+    if (isLocalhost) {
+      logVerifier.readNewServerLogs();
+    }
 
     // Take screenshot to see current state
     await page.screenshot({ path: 'test-results/avatar-character-list.png' });
@@ -98,8 +120,23 @@ test.describe('Avatar Creation Flow', () => {
 
     console.log(`Found ${count} avatar/image elements on character list`);
 
+    // Verify logs and print summary
+    const logResult = logVerifier.verify();
+    console.log(logResult.summary);
+
+    // Report issues but don't fail (server logs only available on localhost)
+    if (logResult.unexpectedErrors.length > 0) {
+      console.log('🔴 ERRORS IN LOGS:', logResult.unexpectedErrors);
+    }
+    if (logResult.unexpectedWarnings.length > 0) {
+      console.log('⚠️ WARNINGS IN LOGS:', logResult.unexpectedWarnings);
+    }
+
     // Page should have loaded
     expect(page.url()).toContain('/create');
+
+    // Fail if there are errors in logs
+    expect(logResult.unexpectedErrors).toHaveLength(0);
   });
 
   test('character edit shows avatar section', async ({ page }) => {
@@ -205,6 +242,19 @@ test.describe('Avatar Save/Load Persistence', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('avatars persist after page reload', async ({ page }) => {
+    // Setup log verification
+    const logVerifier = createLogVerifier();
+    logVerifier.attachBrowser(page);
+    if (isLocalhost) {
+      logVerifier.markServerLogPosition();
+    }
+
+    // Define expected logs - should see two character loads (initial + reload)
+    logVerifier.expect([
+      { pattern: '[Characters] GET', required: true, description: 'Initial character load' },
+      { pattern: /Characters count: \d+/, required: true, description: 'Characters loaded' },
+    ]);
+
     await page.goto('/create');
     await page.waitForTimeout(2000);
 
@@ -215,9 +265,20 @@ test.describe('Avatar Save/Load Persistence', () => {
     // Take screenshot
     await page.screenshot({ path: 'test-results/avatar-before-reload.png' });
 
+    // Mark position before reload
+    if (isLocalhost) {
+      logVerifier.readNewServerLogs();
+      logVerifier.markServerLogPosition();
+    }
+
     // Reload the page
     await page.reload();
     await page.waitForTimeout(3000);
+
+    // Read logs from reload
+    if (isLocalhost) {
+      logVerifier.readNewServerLogs();
+    }
 
     // Count avatar images after reload
     const afterReload = await page.locator('img[src*="data:image"]').count();
@@ -226,8 +287,20 @@ test.describe('Avatar Save/Load Persistence', () => {
     // Take screenshot
     await page.screenshot({ path: 'test-results/avatar-after-reload.png' });
 
+    // Verify logs and print summary
+    const logResult = logVerifier.verify();
+    console.log(logResult.summary);
+
+    // Report missing required logs
+    if (logResult.missingRequired.length > 0) {
+      console.log('❌ MISSING EXPECTED LOGS:', logResult.missingRequired);
+    }
+
     // Avatars should persist (count should be similar or same)
     expect(afterReload).toBeGreaterThanOrEqual(beforeReload - 1); // Allow for minor differences
+
+    // Fail if there are errors in logs
+    expect(logResult.unexpectedErrors).toHaveLength(0);
   });
 
   test('character data persists through navigation', async ({ page }) => {
@@ -388,6 +461,19 @@ test.describe('API Integration', () => {
   test.skip(!TEST_EMAIL || !TEST_PASSWORD, 'Test credentials not configured');
 
   test('character API returns avatar data', async ({ page }) => {
+    // Setup log verification
+    const logVerifier = createLogVerifier();
+    logVerifier.attachBrowser(page);
+    if (isLocalhost) {
+      logVerifier.markServerLogPosition();
+    }
+
+    // Define expected server logs
+    logVerifier.expect([
+      ...LOG_PATTERNS.CHARACTER_LOAD,
+      { pattern: /mode: (full|metadata)/, required: false, description: 'Load mode logged' },
+    ]);
+
     // Intercept API calls
     const apiCalls: { url: string; response: unknown }[] = [];
 
@@ -405,6 +491,11 @@ test.describe('API Integration', () => {
     await page.goto('/create');
     await page.waitForTimeout(3000);
 
+    // Read server logs
+    if (isLocalhost) {
+      logVerifier.readNewServerLogs();
+    }
+
     // Check API responses
     console.log(`Captured ${apiCalls.length} API calls to /api/characters`);
 
@@ -414,13 +505,30 @@ test.describe('API Integration', () => {
         const response = call.response as { characters?: unknown[] };
         if (response.characters) {
           console.log(`  Characters: ${response.characters.length}`);
-          for (const char of response.characters.slice(0, 2) as { name?: string; avatars?: { status?: string } }[]) {
+          for (const char of response.characters as { name?: string; avatars?: { status?: string } }[]) {
             console.log(`    - ${char.name}: avatars.status=${char.avatars?.status || 'none'}`);
           }
         }
       }
     }
 
+    // Verify logs and print summary
+    const logResult = logVerifier.verify();
+    console.log(logResult.summary);
+
+    // Show all server logs for debugging
+    if (isLocalhost && logResult.allLogs.length > 0) {
+      console.log('\n=== SERVER LOGS ===');
+      for (const log of logResult.allLogs.filter(l => l.source === 'server').slice(0, 20)) {
+        const prefix = log.type === 'error' ? '🔴' : log.type === 'warn' ? '⚠️' : '  ';
+        console.log(`${prefix} ${log.text.substring(0, 120)}`);
+      }
+      console.log('===================\n');
+    }
+
     expect(apiCalls.length).toBeGreaterThan(0);
+
+    // Fail if there are errors in logs
+    expect(logResult.unexpectedErrors).toHaveLength(0);
   });
 });

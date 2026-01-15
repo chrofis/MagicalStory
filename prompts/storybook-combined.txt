@@ -83,7 +83,11 @@ For each main character ({MAIN_CHARACTER_NAMES}), specify which clothing variati
 **Guidelines:**
 - Prefer `standard` when the story doesn't require special clothing
 - For `standard`, `winter`, `summer`: Only describe **signature elements** that differ from the reference photo (hat, boots, scarf, vest, accessories)
-- For `costumed`: Provide **complete outfit description** (full transformation)
+- For `costumed`: Provide **complete outfit description** (CLOTHING ONLY - do NOT include pets, companions, animals, carried objects, or items in pockets/pouches)
+  - ✅ INCLUDE: clothes, shoes, belts, jewelry, capes, vests, aprons worn on body
+  - ❌ EXCLUDE: pets ("elephant peeking from pocket"), companions, toys, bag contents
+  - Example WRONG: "brown vest with a pocket where Eli the mouse peeks out"
+  - Example RIGHT: "brown vest with brass buttons and a small pocket"
 - Only mark variations as `used: true` if they actually appear in the story
 
 Select ONE clothing category per scene based on the context. Use `[Clothing: category]` in each scene.
