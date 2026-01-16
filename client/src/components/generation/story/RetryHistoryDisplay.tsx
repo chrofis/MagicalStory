@@ -6,6 +6,7 @@ interface RetryHistoryDisplayProps {
   retryHistory: RetryAttempt[];
   totalAttempts: number;
   language: string;
+  onRevertRepair?: (attemptIndex: number, beforeImage: string) => void;
 }
 
 /**
@@ -200,7 +201,8 @@ function MaskOverlayImage({
 export function RetryHistoryDisplay({
   retryHistory,
   totalAttempts,
-  language
+  language,
+  onRevertRepair
 }: RetryHistoryDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
 
@@ -316,10 +318,33 @@ export function RetryHistoryDisplay({
             {/* Auto-repair specific display */}
             {attempt.type === 'auto_repair' && (
               <div className="space-y-2">
-                {/* Fix targets count */}
-                {attempt.fixTargetsCount && (
-                  <div className="text-xs text-amber-700">
-                    Fixed {attempt.fixTargetsCount} target{attempt.fixTargetsCount > 1 ? 's' : ''}
+                {/* Fix targets count and revert button */}
+                <div className="flex items-center justify-between">
+                  {attempt.fixTargetsCount && (
+                    <div className="text-xs text-amber-700">
+                      Fixed {attempt.fixTargetsCount} target{attempt.fixTargetsCount > 1 ? 's' : ''}
+                    </div>
+                  )}
+                  {/* Revert button - show when score went down or stayed same */}
+                  {onRevertRepair && attempt.repairDetails?.[0]?.beforeImage &&
+                   attempt.postRepairScore !== undefined && attempt.preRepairScore !== undefined &&
+                   attempt.postRepairScore <= attempt.preRepairScore && (
+                    <button
+                      onClick={() => onRevertRepair(idx, attempt.repairDetails![0].beforeImage!)}
+                      className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded border border-red-300 transition-colors"
+                    >
+                      ↩️ {language === 'de' ? 'Zurücksetzen' : 'Revert to Original'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Warning if score went down */}
+                {attempt.postRepairScore !== undefined && attempt.preRepairScore !== undefined &&
+                 attempt.postRepairScore < attempt.preRepairScore && (
+                  <div className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                    ⚠️ {language === 'de'
+                      ? `Bewertung verschlechtert: ${attempt.preRepairScore}% → ${attempt.postRepairScore}%`
+                      : `Score decreased: ${attempt.preRepairScore}% → ${attempt.postRepairScore}%`}
                   </div>
                 )}
 

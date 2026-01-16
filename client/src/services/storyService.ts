@@ -716,6 +716,21 @@ export const storyService = {
     return response;
   },
 
+  // Update scene image directly (admin only - for reverting repairs)
+  async updateSceneImage(storyId: string, pageNumber: number, imageData: string): Promise<{
+    success: boolean;
+    pageNumber: number;
+  }> {
+    const response = await api.patch<{
+      success: boolean;
+      pageNumber: number;
+    }>(
+      `/api/stories/${storyId}/page/${pageNumber}`,
+      { imageData }
+    );
+    return response;
+  },
+
   // AI Generation
   async callClaude(prompt: string, maxTokens = 8192): Promise<string> {
     const response = await api.post<{ content: string }>('/api/claude', {

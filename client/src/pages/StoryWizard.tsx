@@ -3699,6 +3699,29 @@ export default function StoryWizard() {
                   throw error;
                 }
               } : undefined}
+              // Revert repair to original image (dev mode only)
+              onRevertRepair={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, beforeImage: string) => {
+                try {
+                  log.info('Reverting repair for page:', pageNumber);
+                  // Update local state with the before image
+                  setSceneImages(prev => prev.map(img => {
+                    if (img.pageNumber === pageNumber) {
+                      return {
+                        ...img,
+                        imageData: beforeImage,
+                        wasAutoRepaired: false
+                      };
+                    }
+                    return img;
+                  }));
+                  // Save to server
+                  await storyService.updateSceneImage(storyId, pageNumber, beforeImage);
+                  log.info('Repair reverted successfully');
+                } catch (error) {
+                  log.error('Failed to revert repair:', error);
+                  throw error;
+                }
+              } : undefined}
               // Story text editing
               onSaveStoryText={storyId ? async (text: string) => {
                 try {

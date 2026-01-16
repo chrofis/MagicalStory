@@ -96,6 +96,7 @@ interface StoryDisplayProps {
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onRepairImage?: (pageNumber: number) => Promise<void>;
+  onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
   developerMode?: boolean;
@@ -159,6 +160,7 @@ export function StoryDisplay({
   onEditImage,
   onEditCover: _onEditCover,
   onRepairImage,
+  onRevertRepair,
   onVisualBibleChange,
   storyId,
   developerMode = false,
@@ -2302,6 +2304,7 @@ export function StoryDisplay({
                                 retryHistory={image.retryHistory}
                                 totalAttempts={image?.totalAttempts || image.retryHistory.length}
                                 language={language}
+                                onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
                               />
                             )}
 
@@ -2646,6 +2649,7 @@ export function StoryDisplay({
                                 retryHistory={image.retryHistory}
                                 totalAttempts={image.totalAttempts || image.retryHistory.length}
                                 language={language}
+                                onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
                               />
                             )}
 
