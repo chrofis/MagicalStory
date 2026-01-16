@@ -156,6 +156,49 @@ export interface RepairAttempt {
   verification?: InpaintVerification;  // Targeted verification results (LPIPS + LLM)
 }
 
+// Final consistency checks report
+export interface FinalChecksImageIssue {
+  images: number[];
+  type: 'character_appearance' | 'position_swap' | 'clothing_mismatch' | 'prop_inconsistency' | 'style_drift';
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface FinalChecksTextIssue {
+  page?: number;
+  type: 'spelling' | 'grammar' | 'flow' | 'character' | 'logic';
+  text?: string;
+  issue: string;
+  suggestion?: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface FinalChecksImageCheck {
+  type: 'full' | 'character' | 'sequence';
+  characterName?: string;
+  consistent: boolean;
+  overallScore?: number;
+  issues: FinalChecksImageIssue[];
+  summary?: string;
+}
+
+export interface FinalChecksTextCheck {
+  quality: 'good' | 'needs_review' | 'has_issues';
+  overallScore?: number;
+  issues: FinalChecksTextIssue[];
+  summary?: string;
+}
+
+export interface FinalChecksReport {
+  timestamp: string;
+  imageChecks: FinalChecksImageCheck[];
+  textCheck?: FinalChecksTextCheck | null;
+  overallConsistent: boolean;
+  totalIssues: number;
+  summary: string;
+  error?: string;
+}
+
 // Generation log entry for debugging story generation
 export type GenerationLogStage = 'outline' | 'avatars' | 'scenes' | 'images' | 'covers' | 'finalize';
 export type GenerationLogLevel = 'info' | 'warn' | 'error' | 'debug';

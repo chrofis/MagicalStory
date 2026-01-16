@@ -23,7 +23,7 @@ import { FaceSelectionModal } from '@/components/character';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -266,6 +266,7 @@ export default function StoryWizard() {
     output?: { identifier: string; sizeKB: number; imageData?: string };
   }>>([]); // Costumed avatar generation log (dev mode)
   const [generationLog, setGenerationLog] = useState<GenerationLogEntry[]>([]); // Generation log (dev mode)
+  const [finalChecksReport, setFinalChecksReport] = useState<FinalChecksReport | null>(null); // Final consistency checks report (dev mode)
   const [sceneDescriptions, setSceneDescriptions] = useState<SceneDescription[]>([]);
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
@@ -672,6 +673,11 @@ export default function StoryWizard() {
                   if (devMetadata.costumedAvatarGeneration?.length) {
                     console.log('[StoryWizard] Dev metadata costumedAvatarGeneration:', devMetadata.costumedAvatarGeneration.length, 'entries');
                     setCostumedAvatarGeneration(devMetadata.costumedAvatarGeneration);
+                  }
+                  // Load final checks report from dev metadata
+                  if (devMetadata.finalChecksReport) {
+                    console.log('[StoryWizard] Dev metadata finalChecksReport:', devMetadata.finalChecksReport.totalIssues, 'issues');
+                    setFinalChecksReport(devMetadata.finalChecksReport);
                   }
                   log.debug('Dev metadata merged into story');
                 }
@@ -2961,6 +2967,7 @@ export default function StoryWizard() {
           setStyledAvatarGeneration(status.result.styledAvatarGeneration || []);
           setCostumedAvatarGeneration(status.result.costumedAvatarGeneration || []);
           setGenerationLog(status.result.generationLog || []);
+          setFinalChecksReport(status.result.finalChecksReport || null);
           // Ensure visualBible has required fields (backward compatibility)
           if (status.result.visualBible) {
             setVisualBible({
@@ -3364,6 +3371,7 @@ export default function StoryWizard() {
               styledAvatarGeneration={styledAvatarGeneration}
               costumedAvatarGeneration={costumedAvatarGeneration}
               generationLog={generationLog}
+              finalChecksReport={finalChecksReport}
               clothingRequirements={clothingRequirements || undefined}
               storyId={storyId}
               onVisualBibleChange={storyId ? async (updatedBible) => {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
-import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry } from '@/types/story';
+import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, GenerationSettingsPanel } from './story';
@@ -103,6 +103,7 @@ interface StoryDisplayProps {
   styledAvatarGeneration?: StyledAvatarGenerationEntry[];
   costumedAvatarGeneration?: CostumedAvatarGenerationEntry[];
   generationLog?: GenerationLogEntry[];
+  finalChecksReport?: FinalChecksReport | null;
   clothingRequirements?: ClothingRequirements;
   // Partial story fields
   isPartial?: boolean;
@@ -167,6 +168,7 @@ export function StoryDisplay({
   styledAvatarGeneration = [],
   costumedAvatarGeneration = [],
   generationLog = [],
+  finalChecksReport,
   clothingRequirements,
   isPartial = false,
   failureReason,
@@ -1682,6 +1684,163 @@ export function StoryDisplay({
                     <span className="text-gray-400 text-[10px]">{entry.event}</span>
                   </div>
                 ))}
+              </div>
+            </details>
+          )}
+
+          {/* Final Checks Report (if available) */}
+          {finalChecksReport && (
+            <details className={`border-2 rounded-xl p-4 ${
+              finalChecksReport.overallConsistent
+                ? 'bg-green-50 border-green-200'
+                : 'bg-amber-50 border-amber-200'
+            }`}>
+              <summary className={`cursor-pointer text-lg font-bold flex items-center gap-2 ${
+                finalChecksReport.overallConsistent
+                  ? 'text-green-800 hover:text-green-900'
+                  : 'text-amber-800 hover:text-amber-900'
+              }`}>
+                {finalChecksReport.overallConsistent ? '✓' : '⚠️'}
+                {language === 'de'
+                  ? `Konsistenzprüfung (${finalChecksReport.totalIssues} Probleme)`
+                  : language === 'fr'
+                    ? `Vérification de cohérence (${finalChecksReport.totalIssues} problèmes)`
+                    : `Final Checks (${finalChecksReport.totalIssues} issues)`}
+              </summary>
+              <div className="mt-4 space-y-4">
+                {/* Summary */}
+                <p className="text-sm text-gray-700">{finalChecksReport.summary}</p>
+
+                {/* Image Checks */}
+                {finalChecksReport.imageChecks && finalChecksReport.imageChecks.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-gray-800">
+                      {language === 'de' ? 'Bildkonsistenz' : language === 'fr' ? 'Cohérence des images' : 'Image Consistency'}
+                    </h4>
+                    {finalChecksReport.imageChecks.map((check, checkIdx) => (
+                      <div key={checkIdx} className="bg-white border border-gray-200 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className={`text-sm font-medium ${check.consistent ? 'text-green-600' : 'text-amber-600'}`}>
+                            {check.consistent ? '✓' : '⚠️'}
+                          </span>
+                          <span className="text-sm font-semibold text-gray-700">
+                            {check.type === 'full' ? 'Full Check' :
+                             check.type === 'character' ? `Character: ${check.characterName}` :
+                             check.type === 'sequence' ? 'Sequence Check' : check.type}
+                          </span>
+                          {check.overallScore !== undefined && (
+                            <span className="ml-auto text-xs bg-gray-100 px-2 py-0.5 rounded">
+                              Score: {check.overallScore}/10
+                            </span>
+                          )}
+                        </div>
+                        {check.issues && check.issues.length > 0 && (
+                          <div className="space-y-2 mt-2">
+                            {check.issues.map((issue, issueIdx) => (
+                              <div key={issueIdx} className={`text-xs p-2 rounded ${
+                                issue.severity === 'high' ? 'bg-red-50 border-l-4 border-red-400' :
+                                issue.severity === 'medium' ? 'bg-amber-50 border-l-4 border-amber-400' :
+                                'bg-gray-50 border-l-4 border-gray-300'
+                              }`}>
+                                <div className="flex items-start gap-2">
+                                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                    issue.severity === 'high' ? 'bg-red-200 text-red-800' :
+                                    issue.severity === 'medium' ? 'bg-amber-200 text-amber-800' :
+                                    'bg-gray-200 text-gray-700'
+                                  }`}>
+                                    {issue.severity}
+                                  </span>
+                                  <span className="text-gray-500">Pages {issue.images?.join(', ')}</span>
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
+                                    {issue.type?.replace(/_/g, ' ')}
+                                  </span>
+                                </div>
+                                <p className="text-gray-700 mt-1">{issue.description}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {check.summary && (
+                          <p className="text-xs text-gray-500 mt-2 italic">{check.summary}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Text Check */}
+                {finalChecksReport.textCheck && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-gray-800">
+                      {language === 'de' ? 'Textqualität' : language === 'fr' ? 'Qualité du texte' : 'Text Quality'}
+                    </h4>
+                    <div className="bg-white border border-gray-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-sm font-medium ${
+                          finalChecksReport.textCheck.quality === 'good' ? 'text-green-600' :
+                          finalChecksReport.textCheck.quality === 'needs_review' ? 'text-amber-600' :
+                          'text-red-600'
+                        }`}>
+                          {finalChecksReport.textCheck.quality === 'good' ? '✓' : '⚠️'}
+                        </span>
+                        <span className="text-sm font-semibold text-gray-700">
+                          {finalChecksReport.textCheck.quality === 'good' ? 'Good' :
+                           finalChecksReport.textCheck.quality === 'needs_review' ? 'Needs Review' :
+                           'Has Issues'}
+                        </span>
+                        {finalChecksReport.textCheck.overallScore !== undefined && (
+                          <span className="ml-auto text-xs bg-gray-100 px-2 py-0.5 rounded">
+                            Score: {finalChecksReport.textCheck.overallScore}/10
+                          </span>
+                        )}
+                      </div>
+                      {finalChecksReport.textCheck.issues && finalChecksReport.textCheck.issues.length > 0 && (
+                        <div className="space-y-2 mt-2">
+                          {finalChecksReport.textCheck.issues.map((issue, issueIdx) => (
+                            <div key={issueIdx} className={`text-xs p-2 rounded ${
+                              issue.severity === 'high' ? 'bg-red-50 border-l-4 border-red-400' :
+                              issue.severity === 'medium' ? 'bg-amber-50 border-l-4 border-amber-400' :
+                              'bg-gray-50 border-l-4 border-gray-300'
+                            }`}>
+                              <div className="flex items-start gap-2 flex-wrap">
+                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                  issue.severity === 'high' ? 'bg-red-200 text-red-800' :
+                                  issue.severity === 'medium' ? 'bg-amber-200 text-amber-800' :
+                                  'bg-gray-200 text-gray-700'
+                                }`}>
+                                  {issue.severity}
+                                </span>
+                                {issue.page && (
+                                  <span className="text-gray-500">Page {issue.page}</span>
+                                )}
+                                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
+                                  {issue.type}
+                                </span>
+                              </div>
+                              <p className="text-gray-700 mt-1">{issue.issue}</p>
+                              {issue.text && (
+                                <p className="text-gray-500 mt-1 italic">"{issue.text}"</p>
+                              )}
+                              {issue.suggestion && (
+                                <p className="text-green-700 mt-1">→ {issue.suggestion}</p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {finalChecksReport.textCheck.summary && (
+                        <p className="text-xs text-gray-500 mt-2 italic">{finalChecksReport.textCheck.summary}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error message if checks failed */}
+                {finalChecksReport.error && (
+                  <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700">
+                    Error: {finalChecksReport.error}
+                  </div>
+                )}
               </div>
             </details>
           )}

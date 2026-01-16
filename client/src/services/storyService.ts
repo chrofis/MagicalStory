@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, GenerationLogEntry } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, GenerationLogEntry, FinalChecksReport } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -380,6 +380,7 @@ export const storyService = {
       prompt?: string;
       output?: { identifier: string; sizeKB: number; imageData?: string };
     }>;
+    finalChecksReport?: FinalChecksReport;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');
@@ -1052,6 +1053,7 @@ export const storyService = {
         output?: { identifier: string; sizeKB: number };
       }>;
       generationLog?: GenerationLogEntry[];
+      finalChecksReport?: FinalChecksReport;
       sceneDescriptions: SceneDescription[];
       sceneImages: SceneImage[];
       coverImages?: CoverImages;
@@ -1121,6 +1123,7 @@ export const storyService = {
           output?: { identifier: string; sizeKB: number };
         }>;
         generationLog?: GenerationLogEntry[];
+        finalChecksReport?: FinalChecksReport;
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
@@ -1184,6 +1187,7 @@ export const storyService = {
           output?: { identifier: string; sizeKB: number };
         }>;
         generationLog?: GenerationLogEntry[];
+        finalChecksReport?: FinalChecksReport;
         sceneDescriptions?: SceneDescription[];
         sceneImages?: SceneImage[];
         coverImages?: CoverImages;
