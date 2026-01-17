@@ -1136,6 +1136,42 @@ export default function StoryWizard() {
     }
   }, [step, storyCategory, storyTheme, storyTopic, characters.length, isGeneratingIdeas, generatedIdeas.length]);
 
+  // Abort idea generation and clear results when key inputs change
+  // This prevents stale ideas from being shown when user goes back and changes topic/theme
+  const prevInputsRef = useRef({ storyCategory, storyTheme, storyTopic });
+  useEffect(() => {
+    const prevInputs = prevInputsRef.current;
+    const inputsChanged =
+      prevInputs.storyCategory !== storyCategory ||
+      prevInputs.storyTheme !== storyTheme ||
+      prevInputs.storyTopic !== storyTopic;
+
+    // Update ref with current values
+    prevInputsRef.current = { storyCategory, storyTheme, storyTopic };
+
+    // If inputs changed and we're generating or have generated ideas, abort and reset
+    if (inputsChanged && (isGeneratingIdeas || generatedIdeas.length > 0)) {
+      log.info('[StoryWizard] Story inputs changed - aborting idea generation and clearing results');
+
+      // Abort current stream if running
+      if (streamAbortRef.current) {
+        streamAbortRef.current.abort();
+        streamAbortRef.current = null;
+      }
+
+      // Clear state
+      setIsGeneratingIdeas(false);
+      setIsGeneratingIdea1(false);
+      setIsGeneratingIdea2(false);
+      setGeneratedIdeas([]);
+      setLastIdeaPrompt(null);
+      setLastIdeaFullResponse('');
+
+      // Reset pre-generation flag so it can re-trigger on step 4
+      preGenerateIdeasRef.current = false;
+    }
+  }, [storyCategory, storyTheme, storyTopic, isGeneratingIdeas, generatedIdeas.length]);
+
   // Safety timeout: reset isGeneratingIdeas if stuck for too long (e.g., server deploy)
   useEffect(() => {
     if (!isGeneratingIdeas) return;
