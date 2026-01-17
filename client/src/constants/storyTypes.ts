@@ -59,7 +59,14 @@ export const storyCategories: StoryCategory[] = [
 // =============================================================================
 // ADVENTURE THEMES (Setting/Wrapper) - Grouped
 // =============================================================================
+
+// Popular adventure theme IDs (shown in expanded "Popular" section)
+export const popularAdventureThemeIds = [
+  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'easter'
+];
+
 export const adventureThemeGroups: AdventureThemeGroup[] = [
+  { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires' } },
   { id: 'historical', name: { en: 'Historical Times', de: 'Historische Zeiten', fr: 'Époques historiques' } },
   { id: 'fantasy', name: { en: 'Fantasy & Magic', de: 'Fantasie & Magie', fr: 'Fantaisie & Magie' } },
   { id: 'locations', name: { en: 'Exploration', de: 'Entdeckung', fr: 'Exploration' } },
@@ -172,7 +179,15 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'online-safety', name: { en: 'Online Safety', de: 'Sicherheit im Internet', fr: 'Sécurité en ligne' }, emoji: '🔒', ageGroup: 'preteen' },
 ];
 
+// Popular life challenge IDs (shown in expanded "Popular" section)
+export const popularLifeChallengeIds = [
+  'going-to-bed', 'cleaning-up', 'first-kindergarten', 'first-school',
+  'losing-game', 'dealing-bully', 'telling-truth', 'spending-wisely',
+  'moving-house', 'screen-time'
+];
+
 export const lifeChallengeGroups: LifeChallengeGroup[] = [
+  { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires' }, ageRange: 'all' },
   { id: 'toddler', name: { en: 'Toddler (2-4)', de: 'Kleinkind (2-4)', fr: 'Tout-petit (2-4)' }, ageRange: '2-4' },
   { id: 'preschool', name: { en: 'Preschool (4-6)', de: 'Vorschule (4-6)', fr: 'Préscolaire (4-6)' }, ageRange: '4-6' },
   { id: 'early-school', name: { en: 'Early School (6-9)', de: 'Grundschule (6-9)', fr: 'École primaire (6-9)' }, ageRange: '6-9' },
@@ -234,7 +249,14 @@ export const educationalTopics: EducationalTopic[] = [
   { id: 'famous-artists', name: { en: 'Famous Artists', de: 'Berühmte Künstler', fr: 'Artistes célèbres' }, emoji: '🖼️', group: 'arts' },
 ];
 
+// Popular educational topic IDs (shown in expanded "Popular" section)
+export const popularEducationalTopicIds = [
+  'alphabet', 'numbers-1-10', 'rhyming', 'seasons', 'weather',
+  'water-cycle', 'farm-animals', 'five-senses', 'days-week', 'months-year'
+];
+
 export const educationalGroups: EducationalGroup[] = [
+  { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires' } },
   { id: 'letters', name: { en: 'Letters & Reading', de: 'Buchstaben & Lesen', fr: 'Lettres & Lecture' } },
   { id: 'numbers', name: { en: 'Numbers & Math', de: 'Zahlen & Mathe', fr: 'Nombres & Maths' } },
   { id: 'colors', name: { en: 'Colors', de: 'Farben', fr: 'Couleurs' } },
@@ -249,7 +271,14 @@ export const educationalGroups: EducationalGroup[] = [
 // =============================================================================
 // HISTORICAL EVENTS (for historically accurate story generation)
 // =============================================================================
+// Popular historical event IDs (shown in expanded "Popular" section)
+export const popularHistoricalEventIds = [
+  'wilhelm-tell', 'gotthard-tunnel', 'moon-landing', 'columbus-voyage',
+  'wright-brothers', 'lindbergh-flight', 'galapagos-darwin', 'berlin-wall-fall', 'golden-gate'
+];
+
 export const historicalEventGroups: HistoricalEventGroup[] = [
+  { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires' }, icon: '⭐' },
   { id: 'swiss', name: { en: 'Swiss History', de: 'Schweizer Geschichte', fr: 'Histoire Suisse' }, icon: '🇨🇭' },
   { id: 'exploration', name: { en: 'Exploration & Discovery', de: 'Entdeckungen', fr: 'Exploration & Découverte' }, icon: '🧭' },
   { id: 'science', name: { en: 'Science & Medicine', de: 'Wissenschaft & Medizin', fr: 'Science & Médecine' }, icon: '🔬' },
@@ -271,7 +300,7 @@ export const historicalEvents: HistoricalEvent[] = [
   { id: 'general-dufour', name: { en: 'General Dufour and Swiss Unity', de: 'General Dufour und die Schweizer Einheit', fr: 'Général Dufour et l\'unité suisse' }, shortName: { en: 'General Dufour', de: 'General Dufour', fr: 'Général Dufour' }, emoji: '🎖️', year: 1847, category: 'swiss', mainPerson: 'Guillaume-Henri Dufour' },
   { id: 'sonderbund-war', name: { en: 'The Sonderbund War', de: 'Der Sonderbundskrieg', fr: 'La Guerre du Sonderbund' }, shortName: { en: 'Sonderbund', de: 'Sonderbund', fr: 'Sonderbund' }, emoji: '🏔️', year: 1847, category: 'swiss' },
   { id: 'swiss-constitution', name: { en: 'Swiss Federal Constitution', de: 'Schweizerische Bundesverfassung', fr: 'Constitution fédérale suisse' }, shortName: { en: 'Constitution', de: 'Bundesverfassung', fr: 'Constitution' }, emoji: '📋', year: 1848, category: 'swiss' },
-  { id: 'gotthard-tunnel', name: { en: 'Gotthard Railway Tunnel', de: 'Gotthard-Eisenbahntunnel', fr: 'Tunnel ferroviaire du Gothard' }, shortName: { en: 'Gotthard Tunnel', de: 'Gotthardtunnel', fr: 'Tunnel du Gothard' }, emoji: '🚂', year: 1882, category: 'swiss' },
+  { id: 'gotthard-tunnel', name: { en: 'Building the Gotthard Tunnel', de: 'Bau des Gotthardtunnels', fr: 'Construction du tunnel du Gothard' }, shortName: { en: 'Gotthard Tunnel', de: 'Gotthardtunnel Bau', fr: 'Tunnel du Gothard' }, emoji: '🚂', year: 1882, category: 'swiss' },
   { id: 'swiss-ww1-neutrality', name: { en: 'Swiss Neutrality in WWI', de: 'Schweizer Neutralität im 1. Weltkrieg', fr: 'Neutralité suisse pendant la Première Guerre' }, shortName: { en: 'WWI Neutrality', de: 'Neutralität 1. WK', fr: 'Neutralité 1GM' }, emoji: '🕊️', year: 1914, category: 'swiss' },
   { id: 'general-guisan', name: { en: 'General Guisan and the Rütli Report', de: 'General Guisan und der Rütlirapport', fr: 'Général Guisan et le Rapport du Grütli' }, shortName: { en: 'General Guisan', de: 'General Guisan', fr: 'Général Guisan' }, emoji: '🎖️', year: 1940, category: 'swiss', mainPerson: 'Henri Guisan' },
   { id: 'swiss-ww2-neutrality', name: { en: 'Switzerland in World War II', de: 'Die Schweiz im 2. Weltkrieg', fr: 'La Suisse pendant la Seconde Guerre' }, shortName: { en: 'WWII', de: '2. Weltkrieg', fr: '2ème GM' }, emoji: '🏔️', year: 1939, category: 'swiss' },
@@ -309,14 +338,14 @@ export const historicalEvents: HistoricalEvent[] = [
   { id: 'emancipation', name: { en: 'Abolition of Slavery', de: 'Abschaffung der Sklaverei', fr: 'Abolition de l\'esclavage' }, shortName: { en: 'End of Slavery', de: 'Ende der Sklaverei', fr: 'Fin de l\'esclavage' }, emoji: '⛓️', year: 1865, category: 'rights', mainPerson: 'Abraham Lincoln' },
   { id: 'womens-suffrage', name: { en: 'Women Win the Vote', de: 'Frauenwahlrecht', fr: 'Droit de vote des femmes' }, shortName: { en: 'Women\'s Vote', de: 'Frauenwahlrecht', fr: 'Vote des femmes' }, emoji: '🗳️', year: 1920, category: 'rights' },
   { id: 'rosa-parks', name: { en: 'Rosa Parks & Bus Boycott', de: 'Rosa Parks & Busboykott', fr: 'Rosa Parks & Boycott des bus' }, shortName: { en: 'Rosa Parks', de: 'Rosa Parks', fr: 'Rosa Parks' }, emoji: '🚌', year: 1955, category: 'rights', mainPerson: 'Rosa Parks' },
-  { id: 'berlin-wall-fall', name: { en: 'Fall of the Berlin Wall', de: 'Fall der Berliner Mauer', fr: 'Chute du mur de Berlin' }, shortName: { en: 'Berlin Wall', de: 'Berliner Mauer', fr: 'Mur de Berlin' }, emoji: '🧱', year: 1989, category: 'rights' },
+  { id: 'berlin-wall-fall', name: { en: 'Fall of the Berlin Wall', de: 'Fall der Berliner Mauer', fr: 'Chute du mur de Berlin' }, shortName: { en: 'Berlin Wall Fall', de: 'Fall der Berliner Mauer', fr: 'Chute du Mur de Berlin' }, emoji: '🧱', year: 1989, category: 'rights' },
   { id: 'mandela-freedom', name: { en: 'Mandela Released', de: 'Mandela befreit', fr: 'Mandela libéré' }, shortName: { en: 'Mandela Free', de: 'Mandela frei', fr: 'Mandela libre' }, emoji: '✊', year: 1990, category: 'rights', mainPerson: 'Nelson Mandela' },
 
   // Great Constructions
   { id: 'pyramids', name: { en: 'Building the Great Pyramids', de: 'Bau der Pyramiden', fr: 'Construction des Pyramides' }, shortName: { en: 'The Pyramids', de: 'Die Pyramiden', fr: 'Les Pyramides' }, emoji: '🔺', year: '-2560', category: 'construction' },
   { id: 'eiffel-tower', name: { en: 'Eiffel Tower Opens', de: 'Eiffelturm eröffnet', fr: 'Tour Eiffel inaugurée' }, shortName: { en: 'Eiffel Tower', de: 'Eiffelturm', fr: 'Tour Eiffel' }, emoji: '🗼', year: 1889, category: 'construction', mainPerson: 'Gustave Eiffel' },
   { id: 'panama-canal', name: { en: 'Panama Canal Opens', de: 'Panamakanal eröffnet', fr: 'Canal de Panama inauguré' }, shortName: { en: 'Panama Canal', de: 'Panamakanal', fr: 'Canal de Panama' }, emoji: '🚢', year: 1914, category: 'construction' },
-  { id: 'golden-gate', name: { en: 'Golden Gate Bridge Opens', de: 'Golden Gate Bridge eröffnet', fr: 'Pont Golden Gate inauguré' }, shortName: { en: 'Golden Gate', de: 'Golden Gate', fr: 'Golden Gate' }, emoji: '🌉', year: 1937, category: 'construction' },
+  { id: 'golden-gate', name: { en: 'Building the Golden Gate Bridge', de: 'Bau der Golden Gate Bridge', fr: 'Construction du pont Golden Gate' }, shortName: { en: 'Golden Gate Bridge', de: 'Bau der Golden Gate Bridge', fr: 'Pont Golden Gate' }, emoji: '🌉', year: 1937, category: 'construction' },
   { id: 'channel-tunnel', name: { en: 'Channel Tunnel Opens', de: 'Eurotunnel eröffnet', fr: 'Tunnel sous la Manche' }, shortName: { en: 'Chunnel', de: 'Eurotunnel', fr: 'Eurotunnel' }, emoji: '🚇', year: 1994, category: 'construction' },
 
   // Culture & Arts
@@ -337,14 +366,23 @@ export const historicalEvents: HistoricalEvent[] = [
 // =============================================================================
 
 export function getStoryTypesByGroup(groupId: AdventureThemeGroupId): StoryType[] {
+  if (groupId === 'popular') {
+    return storyTypes.filter(t => popularAdventureThemeIds.includes(t.id));
+  }
   return storyTypes.filter(t => t.group === groupId);
 }
 
 export function getLifeChallengesByGroup(groupId: string): LifeChallenge[] {
+  if (groupId === 'popular') {
+    return lifeChallenges.filter(c => popularLifeChallengeIds.includes(c.id));
+  }
   return lifeChallenges.filter(c => c.ageGroup === groupId);
 }
 
 export function getEducationalTopicsByGroup(groupId: string): EducationalTopic[] {
+  if (groupId === 'popular') {
+    return educationalTopics.filter(t => popularEducationalTopicIds.includes(t.id));
+  }
   return educationalTopics.filter(t => t.group === groupId);
 }
 
@@ -366,6 +404,9 @@ export function getStoryCategoryById(id: string): StoryCategory | undefined {
 }
 
 export function getHistoricalEventsByGroup(groupId: string): HistoricalEvent[] {
+  if (groupId === 'popular') {
+    return historicalEvents.filter(e => popularHistoricalEventIds.includes(e.id));
+  }
   return historicalEvents.filter(e => e.category === groupId);
 }
 

@@ -129,16 +129,16 @@ export function StoryCategorySelector({
     );
   };
 
-  // Expand all groups by default when category changes
+  // Expand only "popular" group by default when category changes (others collapsed)
   useEffect(() => {
     if (storyCategory === 'adventure') {
-      setExpandedAdventureGroups(adventureThemeGroups.map(g => g.id));
+      setExpandedAdventureGroups(['popular']);
     } else if (storyCategory === 'life-challenge') {
-      setExpandedLifeGroups(lifeChallengeGroups.map(g => g.id));
+      setExpandedLifeGroups(['popular']);
     } else if (storyCategory === 'educational') {
-      setExpandedEduGroups(educationalGroups.map(g => g.id));
+      setExpandedEduGroups(['popular']);
     } else if (storyCategory === 'historical') {
-      setExpandedHistoricalGroups(historicalEventGroups.map(g => g.id));
+      setExpandedHistoricalGroups(['popular']);
     }
   }, [storyCategory]);
 
@@ -284,7 +284,8 @@ export function StoryCategorySelector({
                   onClick={() => toggleAdventureGroup(group.id)}
                   className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-semibold text-gray-700 flex items-center gap-2">
+                    {group.id === 'popular' && <span>⭐</span>}
                     {group.name[lang] || group.name.en}
                   </span>
                   {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -345,7 +346,8 @@ export function StoryCategorySelector({
                   onClick={() => toggleLifeGroup(group.id)}
                   className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-semibold text-gray-700 flex items-center gap-2">
+                    {group.id === 'popular' && <span>⭐</span>}
                     {group.name[lang] || group.name.en}
                   </span>
                   {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -408,7 +410,8 @@ export function StoryCategorySelector({
                   onClick={() => toggleEduGroup(group.id)}
                   className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
-                  <span className="font-semibold text-gray-700">
+                  <span className="font-semibold text-gray-700 flex items-center gap-2">
+                    {group.id === 'popular' && <span>⭐</span>}
                     {group.name[lang] || group.name.en}
                   </span>
                   {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
