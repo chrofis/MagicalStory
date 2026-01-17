@@ -24,8 +24,8 @@ export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: str
 // German regional variants (shown after separator)
 export const GERMAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-de', name: 'Deutsch (Standard)', flag: '🇩🇪' },
-  { code: 'de-de-north', name: 'Deutsch (Nord)', flag: '🇩🇪' },
-  { code: 'de-de-south', name: 'Deutsch (Süd)', flag: '🇩🇪' },
+  { code: 'de-de-north', name: 'Norddeutsch', flag: '🇩🇪' },
+  { code: 'de-de-south', name: 'Süddeutsch', flag: '🇩🇪' },
   { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
   { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
 ];
