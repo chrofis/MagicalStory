@@ -192,6 +192,7 @@ export interface FinalChecksImageCheck {
   overallScore?: number;
   issues: FinalChecksImageIssue[];
   summary?: string;
+  evaluationPrompt?: string;  // Prompt used for evaluation (for dev mode)
 }
 
 export interface FinalChecksTextCheck {

@@ -47,6 +47,7 @@ N'inventez PAS de nouveaux personnages ou objets.
    - **summer** - Temps chaud (t-shirts, shorts, vêtements légers)
    - **formal** - Occasions spéciales (costumes, robes)
    - **standard** - Casual quotidien
+   - **costumed:X** - Costume thématique (ex: "costumed:pirate", "costumed:knight", "costumed:astronaut") - quand les personnages portent des costumes d'aventure/thématiques
 
 5. **Personnages:** Pour CHAQUE personnage présent:
    * **[Nom du Personnage]:**
@@ -64,7 +65,7 @@ N'inventez PAS de nouveaux personnages ou objets.
 ```
    - characters: TOUS les personnages/animaux décrits dans la section 3 (Composition) DOIVENT être listés ici
    - Ceci est utilisé pour attacher des images de référence - personnages manquants = références manquantes
-   - clothing: Un parmi "winter", "summer", "formal", "standard"
+   - clothing: Un parmi "winter", "summer", "formal", "standard", ou "costumed:X" (où X est le thème, ex: pirate, knight, astronaut)
    - objects: Tableau des noms d'objets/animaux des ÉLÉMENTS RÉCURRENTS dans cette scène
 
 **PHYSIQUE & LOGIQUE DE CAMÉRA:**

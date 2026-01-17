@@ -47,6 +47,7 @@ Do NOT invent new characters or objects.
    - **summer** - Warm weather (t-shirts, shorts, light clothes)
    - **formal** - Special occasions (suits, dresses)
    - **standard** - Everyday casual
+   - **costumed:X** - Theme costume (e.g., "costumed:pirate", "costumed:knight", "costumed:astronaut") - use when characters wear adventure/theme costumes
 
 5. **Characters:** For EACH character present:
    * **[Character Name]:**
@@ -64,7 +65,7 @@ Do NOT invent new characters or objects.
 ```
    - characters: ALL characters/animals described in section 3 (Composition) MUST be listed here
    - This is used to attach reference images - missing characters = missing references
-   - clothing: One of "winter", "summer", "formal", "standard"
+   - clothing: One of "winter", "summer", "formal", "standard", or "costumed:X" (where X is the theme like pirate, knight, astronaut)
    - objects: Array of object/animal names from RECURRING ELEMENTS appearing in this scene
 
 **PHYSICS & CAMERA LOGIC:**

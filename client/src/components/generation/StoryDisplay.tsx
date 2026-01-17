@@ -1782,6 +1782,17 @@ export function StoryDisplay({
                         {check.summary && (
                           <p className="text-xs text-gray-500 mt-2 italic">{check.summary}</p>
                         )}
+                        {/* Evaluation prompt (collapsible) - for dev mode */}
+                        {check.evaluationPrompt && (
+                          <details className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
+                            <summary className="cursor-pointer text-xs font-medium text-blue-800">
+                              🔍 View Evaluation Prompt
+                            </summary>
+                            <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                              {check.evaluationPrompt}
+                            </pre>
+                          </details>
+                        )}
                       </div>
                     ))}
                   </div>

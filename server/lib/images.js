@@ -2922,14 +2922,14 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      return { ...result, usage: { inputTokens, outputTokens, model: modelId } };
+      return { ...result, usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt };
     }
   } catch (parseError) {
     log.error(`❌ [CONSISTENCY] Failed to parse response: ${parseError.message}`);
     log.debug(`Response was: ${responseText.substring(0, 500)}`);
   }
 
-  return { usage: { inputTokens, outputTokens, model: modelId } };
+  return { usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt };
 }
 
 /**

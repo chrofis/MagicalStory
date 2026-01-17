@@ -47,6 +47,7 @@ Erfinde KEINE neuen Charaktere oder Objekte.
    - **summer** - Warmes Wetter (T-Shirts, Shorts, leichte Kleidung)
    - **formal** - Besondere Anlässe (Anzüge, Kleider)
    - **standard** - Alltägliche Freizeitkleidung
+   - **costumed:X** - Themenkostüm (z.B. "costumed:pirate", "costumed:knight", "costumed:astronaut") - wenn Charaktere Abenteuer-/Themenkostüme tragen
 
 5. **Charaktere:** Für JEDEN anwesenden Charakter:
    * **[Charaktername]:**
@@ -64,7 +65,7 @@ Erfinde KEINE neuen Charaktere oder Objekte.
 ```
    - characters: ALLE Charaktere/Tiere aus Abschnitt 3 (Komposition) MÜSSEN hier aufgelistet sein
    - Dies wird verwendet um Referenzbilder anzuhängen - fehlende Charaktere = fehlende Referenzen
-   - clothing: Eines von "winter", "summer", "formal", "standard"
+   - clothing: Eines von "winter", "summer", "formal", "standard", oder "costumed:X" (wobei X das Thema ist, z.B. pirate, knight, astronaut)
    - objects: Array der Objekt-/Tiernamen aus WIEDERKEHRENDE ELEMENTE in dieser Szene
 
 **PHYSIK & KAMERA-LOGIK:**
