@@ -425,7 +425,9 @@ function extractIssues(jobLines) {
     errors: [],
     fallbacks: [],
     lowQualityScores: [],
-    retries: []
+    retries: [],
+    runtimeErrors: [],  // JavaScript runtime errors (TypeError, etc.)
+    nanIssues: []       // NaN in calculations
   };
 
   for (const line of jobLines) {
@@ -474,6 +476,30 @@ function extractIssues(jobLines) {
     // Retries
     if (msg.includes('retry') || msg.includes('Retry') || msg.includes('attempt')) {
       issues.retries.push({ time: ts, message: msg.substring(0, 150) });
+    }
+
+    // Runtime errors (JavaScript errors like TypeError, .match is not a function, etc.)
+    const runtimeErrorPatterns = [
+      /is not a function/i,
+      /is not defined/i,
+      /cannot read propert/i,
+      /cannot set propert/i,
+      /TypeError/i,
+      /ReferenceError/i,
+      /SyntaxError/i,
+      /undefined is not/i,
+      /null is not/i
+    ];
+    for (const pattern of runtimeErrorPatterns) {
+      if (pattern.test(msg)) {
+        issues.runtimeErrors.push({ time: ts, message: msg.substring(0, 200) });
+        break;
+      }
+    }
+
+    // NaN issues in calculations
+    if (msg.includes('NaN') && (msg.includes('TOTAL') || msg.includes('token') || msg.includes('cost'))) {
+      issues.nanIssues.push({ time: ts, message: msg.substring(0, 150) });
     }
   }
 
@@ -582,7 +608,8 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
 
   // Issues
   const totalIssues = issues.warnings.length + issues.errors.length +
-                      issues.fallbacks.length + issues.lowQualityScores.length;
+                      issues.fallbacks.length + issues.lowQualityScores.length +
+                      issues.runtimeErrors.length + issues.nanIssues.length;
 
   console.log(`\n\u26a0\ufe0f  ISSUES (${totalIssues} found)`);
 
@@ -629,6 +656,16 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
         const pageStr = q.page ? ` Page ${q.page}:` : '';
         console.log(`      [${q.time}]${pageStr} Score: ${q.score}%`);
       });
+    }
+
+    if (issues.runtimeErrors.length > 0) {
+      console.log(`\n   💥 Runtime Errors (${issues.runtimeErrors.length}):`);
+      issues.runtimeErrors.forEach(e => console.log(`      [${e.time}] ${e.message}`));
+    }
+
+    if (issues.nanIssues.length > 0) {
+      console.log(`\n   🔢 NaN Issues (${issues.nanIssues.length}):`);
+      issues.nanIssues.forEach(n => console.log(`      [${n.time}] ${n.message}`));
     }
   }
 

@@ -33,6 +33,7 @@ async function loadFaces() {
         run: r + 1,
         face: f,
         position: ['Eye Focus', 'Structure Focus', 'Detail Focus', 'Gestalt Focus'][f-1],
+        filename,
         filepath,
         image: base64
       });
@@ -47,13 +48,36 @@ function loadOriginal() {
   return `data:image/png;base64,${buffer.toString('base64')}`;
 }
 
-// Compare two faces using ArcFace
-async function compareIdentity(image1, image2) {
+// First extract face embedding from original (with face detection)
+async function getEmbedding(imageBase64, extractFace = true) {
+  try {
+    const response = await fetch(`${PHOTO_ANALYZER_URL}/face-embedding`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: imageBase64,
+        extract_face: extractFace
+      })
+    });
+    const result = await response.json();
+    if (result.success) {
+      return result.embedding;
+    }
+    console.error('Embedding error:', result.error);
+    return null;
+  } catch (err) {
+    console.error('Fetch error:', err.message);
+    return null;
+  }
+}
+
+// Compare two embeddings
+async function compareEmbeddings(emb1, emb2) {
   try {
     const response = await fetch(`${PHOTO_ANALYZER_URL}/compare-identity`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image1, image2 })
+      body: JSON.stringify({ embedding1: emb1, embedding2: emb2 })
     });
     const result = await response.json();
     return result.success ? result.similarity : null;
@@ -63,26 +87,43 @@ async function compareIdentity(image1, image2) {
 }
 
 async function main() {
-  console.log('Loading original photo and 12 generated faces...\n');
+  console.log('=== Comparing 12 generated faces to original photo ===\n');
 
   const original = loadOriginal();
   const faces = await loadFaces();
 
   console.log(`Original: ${originalPath}`);
-  console.log(`Comparing ${faces.length} faces to original...\n`);
+  console.log(`Generated faces: ${faces.length}\n`);
+
+  // Step 1: Get embedding from original (with face extraction)
+  console.log('Step 1: Extracting face embedding from original photo...');
+  const originalEmbedding = await getEmbedding(original, true);
+
+  if (!originalEmbedding) {
+    console.log('ERROR: Could not extract face from original photo!');
+    return;
+  }
+  console.log(`  Got ${originalEmbedding.length}-dimensional embedding\n`);
+
+  // Step 2: Get embeddings from all variations (they are already face crops)
+  console.log('Step 2: Getting embeddings from all 12 variations...\n');
 
   const results = [];
-
   for (let i = 0; i < faces.length; i++) {
     process.stdout.write(`\r  Progress: ${i+1}/${faces.length}`);
 
-    const similarity = await compareIdentity(original, faces[i].image);
-    if (similarity !== null) {
-      results.push({
-        ...faces[i],
-        similarity,
-        image: undefined // Don't store in results
-      });
+    // Variations are already face crops, no need for face extraction
+    const varEmbedding = await getEmbedding(faces[i].image, false);
+
+    if (varEmbedding) {
+      const similarity = await compareEmbeddings(originalEmbedding, varEmbedding);
+      if (similarity !== null) {
+        results.push({
+          ...faces[i],
+          similarity,
+          image: undefined
+        });
+      }
     }
   }
 
@@ -96,6 +137,7 @@ async function main() {
   results.forEach((r, idx) => {
     const marker = idx === 0 ? ' <-- BEST MATCH' : '';
     console.log(`${idx + 1}. ${r.id} (Run ${r.run}, ${r.position}): ${(r.similarity * 100).toFixed(1)}%${marker}`);
+    console.log(`      File: ${r.filename}`);
   });
 
   console.log('\n=== SUMMARY BY RUN ===\n');
@@ -103,7 +145,7 @@ async function main() {
   for (let run = 1; run <= 3; run++) {
     const runResults = results.filter(r => r.run === run);
     const avg = runResults.reduce((a, b) => a + b.similarity, 0) / runResults.length;
-    const best = runResults[0];
+    const best = runResults.sort((a, b) => b.similarity - a.similarity)[0];
     console.log(`Run ${run}: Avg ${(avg * 100).toFixed(1)}%, Best: ${best.id} (${best.position}) at ${(best.similarity * 100).toFixed(1)}%`);
   }
 
@@ -113,7 +155,7 @@ async function main() {
   console.log(`  Run: ${best.run}`);
   console.log(`  Position: ${best.position}`);
   console.log(`  Similarity: ${(best.similarity * 100).toFixed(1)}%`);
-  console.log(`  File: ${best.filepath}`);
+  console.log(`  Full path: ${best.filepath}`);
 }
 
 main().catch(console.error);
