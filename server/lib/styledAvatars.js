@@ -484,7 +484,17 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         let signature = char.avatars?.signatures?.[clothingCategory];
 
         // Debug: log what's in clothingRequirements for this character
-        const charReqs = clothingRequirements?.[charName];
+        // Use case-insensitive lookup for character name (Claude might use different casing)
+        let charReqs = clothingRequirements?.[charName];
+        if (!charReqs && clothingRequirements) {
+          // Fallback: case-insensitive lookup
+          const charNameLower = charName.toLowerCase();
+          const matchingKey = Object.keys(clothingRequirements).find(k => k.toLowerCase() === charNameLower);
+          if (matchingKey) {
+            charReqs = clothingRequirements[matchingKey];
+            log.debug(`🔍 [STYLED AVATARS] ${charName}: found clothingRequirements via case-insensitive match: "${matchingKey}"`);
+          }
+        }
         const catReqs = charReqs?.[clothingCategory];
         log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - charReqs keys: ${charReqs ? Object.keys(charReqs).join(',') : 'none'}, catReqs: ${JSON.stringify(catReqs || 'none')}`);
 
@@ -699,24 +709,26 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
   // If we have explicit per-character clothing requirements from outline, use those
   if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
-    // Build per-character clothing map: { charName: [clothingCategories] }
+    // Build per-character clothing map: { charNameLower: [clothingCategories] }
+    // Use lowercase keys for case-insensitive matching (Claude might use different casing)
     // A character can have MULTIPLE used categories (e.g., standard AND costumed)
     const characterClothingMap = {};
     for (const [charName, reqs] of Object.entries(clothingRequirements)) {
-      characterClothingMap[charName] = [];
+      const keyLower = charName.toLowerCase();
+      characterClothingMap[keyLower] = [];
       // Collect ALL categories with used=true
       for (const [category, config] of Object.entries(reqs)) {
         if (config && config.used) {
           if (category === 'costumed' && config.costume) {
-            characterClothingMap[charName].push(`costumed:${config.costume.toLowerCase()}`);
+            characterClothingMap[keyLower].push(`costumed:${config.costume.toLowerCase()}`);
           } else {
-            characterClothingMap[charName].push(category);
+            characterClothingMap[keyLower].push(category);
           }
         }
       }
       // Default to standard if no category is used
-      if (characterClothingMap[charName].length === 0) {
-        characterClothingMap[charName] = ['standard'];
+      if (characterClothingMap[keyLower].length === 0) {
+        characterClothingMap[keyLower] = ['standard'];
       }
     }
 
@@ -732,7 +744,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
       // Add requirement for each character with ALL their clothing categories
       for (const char of sceneCharacters) {
-        const clothingCategories = characterClothingMap[char.name] || [defaultClothing];
+        const clothingCategories = characterClothingMap[char.name.toLowerCase()] || [defaultClothing];
         for (const clothingCategory of clothingCategories) {
           requirements.push({
             pageNumber: pageNum,
@@ -745,7 +757,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
     // For covers, each character needs ALL their clothing variations
     for (const char of characters) {
-      const clothingCategories = characterClothingMap[char.name] || [defaultClothing];
+      const clothingCategories = characterClothingMap[char.name.toLowerCase()] || [defaultClothing];
       for (const clothingCategory of clothingCategories) {
         requirements.push({
           pageNumber: 'cover',
