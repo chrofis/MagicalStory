@@ -734,7 +734,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {Array<{name: string, photoData: string}>} landmarkPhotos - Landmark reference photos for real-world locations
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = []) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0) {
   // Check cache first (include previousImage presence in cache key for sequential mode)
   const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
 
@@ -773,12 +773,19 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         }
       }
 
+      // If LLM ignored 3-character limit, provide ALL reference photos
+      const useAllRefs = sceneCharacterCount > 3;
+      const finalReferenceImages = useAllRefs ? referenceImages : referenceImages.slice(0, 3);
+      if (useAllRefs && referenceImages.length > 3) {
+        log.info(`🎭 [IMAGE GEN] Scene has ${sceneCharacterCount} characters (>3), using ALL ${referenceImages.length} reference photos`);
+      }
+
       const result = await generateWithRunware(prompt, {
         model: RUNWARE_MODELS.FLUX_SCHNELL,
         width: 1024,
         height: 1024,
         steps: 4,
-        referenceImages: referenceImages.slice(0, 3) // Limit to 3 refs for cost
+        referenceImages: finalReferenceImages
       });
 
       // Call onImageReady callback for progressive display
@@ -1289,7 +1296,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
-  const { isAdmin = false, enableAutoRepair = false, landmarkPhotos = [] } = options;
+  const { isAdmin = false, enableAutoRepair = false, landmarkPhotos = [], sceneCharacterCount = 0 } = options;
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
@@ -1317,7 +1324,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);

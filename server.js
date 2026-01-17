@@ -7810,26 +7810,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await Promise.all(streamingAvatarPromises);
         }
 
-        // hint.clothing can be a string ('standard', 'costumed:Cowboy') or object (per-character) - only use if string
-        const clothingCategory = typeof hint.clothing === 'string' ? hint.clothing : 'standard';
+        // Build per-character clothing requirements from hint.characterClothing
+        // hint.characterClothing = { 'Manuel': 'winter', 'Sophie': 'standard', 'Roger': 'costumed:knight' }
         const sceneDescription = hint.hint || hint.scene || '';
         const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
 
-        // Handle costumed:type format
-        let effectiveCategory = clothingCategory;
-        let costumeType = null;
-        if (clothingCategory.startsWith('costumed:')) {
-          effectiveCategory = 'costumed';
-          costumeType = clothingCategory.split(':')[1];
+        // Build coverClothingRequirements with _currentClothing for per-character lookup
+        const coverClothingRequirements = {};
+        if (hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
+          for (const [charName, clothing] of Object.entries(hint.characterClothing)) {
+            coverClothingRequirements[charName] = { _currentClothing: clothing };
+          }
+          log.debug(`🎨 [COVER] ${coverType}: Using per-character clothing: ${JSON.stringify(hint.characterClothing)}`);
         }
 
-        // Get character photos with clothing - pass clothingRequirements for per-character costume lookup
+        // Merge with streamingClothingRequirements (cover-specific takes precedence)
+        const mergedClothingRequirements = { ...streamingClothingRequirements };
+        for (const [charName, data] of Object.entries(coverClothingRequirements)) {
+          if (!mergedClothingRequirements[charName]) {
+            mergedClothingRequirements[charName] = data;
+          } else {
+            mergedClothingRequirements[charName] = { ...mergedClothingRequirements[charName], ...data };
+          }
+        }
+
+        // Default clothing category (used if no per-character clothing specified)
+        const defaultClothingCategory = 'standard';
+        let effectiveCategory = defaultClothingCategory;
+        let costumeType = null;
+
+        // Get character photos with clothing - per-character clothing from mergedClothingRequirements takes precedence
         let coverPhotos = getCharacterPhotoDetails(
           coverType === 'titlePage' ? coverCharacters : inputData.characters,
           effectiveCategory,
           costumeType,
           artStyle,
-          streamingClothingRequirements
+          mergedClothingRequirements
         );
         coverPhotos = applyStyledAvatars(coverPhotos, artStyle);
 
@@ -8035,6 +8051,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const clothingRequirements = parser.extractClothingRequirements() || streamingClothingRequirements;
     const visualBible = parser.extractVisualBible() || streamingVisualBible || {};
     const coverHints = parser.extractCoverHints();
+    // Debug: log cover hints character clothing
+    if (coverHints) {
+      for (const [coverType, hint] of Object.entries(coverHints)) {
+        if (hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
+          log.debug(`🎨 [UNIFIED] Cover ${coverType} character clothing: ${JSON.stringify(hint.characterClothing)}`);
+        }
+      }
+    }
     const storyPages = parser.extractPages();
 
     // Construct fullStoryText from parsed pages (for storage compatibility)
@@ -8577,7 +8601,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           null,
           pageModelOverrides,
           `PAGE ${pageNum}`,
-          { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos }
+          { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length }
         );
 
         if (imageResult?.imageData) {
@@ -8844,7 +8868,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 null,
                 { imageModel: modelOverrides?.imageModel, qualityModel: modelOverrides?.qualityModel },
                 `PAGE ${pageNum} (consistency fix)`,
-                { isAdmin: false, enableAutoRepair: false, landmarkPhotos: pageLandmarkPhotos }
+                { isAdmin: false, enableAutoRepair: false, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length }
               );
 
               if (imageResult?.imageData) {
