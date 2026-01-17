@@ -3043,8 +3043,13 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
     const seenIssueKeys = new Set();
     let lowestScore = 10;
     let anyInconsistent = false;
+    const evaluationPrompts = [];
 
     for (const result of batchResults) {
+      // Collect prompts from each batch
+      if (result.evaluationPrompt) {
+        evaluationPrompts.push(result.evaluationPrompt);
+      }
       if (!result.consistent) {
         anyInconsistent = true;
       }
@@ -3077,7 +3082,10 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
         outputTokens: totalOutputTokens,
         model: MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
         batches: batches.length
-      }
+      },
+      evaluationPrompts: evaluationPrompts.length > 0 ? evaluationPrompts : undefined,
+      // For backward compatibility, also include first prompt as singular
+      evaluationPrompt: evaluationPrompts[0] || undefined
     };
 
     // Log summary

@@ -9027,6 +9027,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 };
 
                 // Replace with fixed image
+                // Debug: Log image data hash to verify different images are generated
+                const oldHash = existingImage.imageData ? existingImage.imageData.slice(-20) : 'none';
+                const newHash = imageResult.imageData ? imageResult.imageData.slice(-20) : 'none';
+                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] existingImage.pageNumber=${existingImage.pageNumber}, arrayIndex=${allImages.indexOf(existingImage)}`);
+                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image hash: ${oldHash} -> ${newHash}`);
+
                 existingImage.imageData = imageResult.imageData;
                 existingImage.prompt = imagePrompt;
                 existingImage.description = expandedDescription;
@@ -9040,6 +9046,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Track which pages were regenerated (skip redundant re-check - each image already evaluated)
             finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
             log.info(`📋 [CONSISTENCY REGEN] Regeneration complete for ${pagesToRegenerate.size} page(s)`);
+
+            // Debug: Verify all images have unique data after consistency regen
+            const imageHashes = allImages.map(img => ({
+              page: img.pageNumber,
+              hash: img.imageData ? img.imageData.slice(-20) : 'none'
+            }));
+            const hashGroups = {};
+            for (const { page, hash } of imageHashes) {
+              if (!hashGroups[hash]) hashGroups[hash] = [];
+              hashGroups[hash].push(page);
+            }
+            const duplicates = Object.entries(hashGroups).filter(([, pages]) => pages.length > 1);
+            if (duplicates.length > 0) {
+              log.warn(`⚠️ [CONSISTENCY REGEN] DUPLICATE IMAGES DETECTED: ${JSON.stringify(duplicates.map(([hash, pages]) => ({ hash, pages })))}`);
+            } else {
+              log.debug(`✅ [CONSISTENCY REGEN] All ${allImages.length} images have unique data`);
+            }
           }
         }
 
