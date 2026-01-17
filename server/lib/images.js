@@ -707,8 +707,14 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
 
     const rewriteResult = await callTextModel(rewritePrompt, 1000);
     const rewrittenScene = rewriteResult.text;
-    console.log(`✅ [REWRITE] Scene rewritten: ${rewrittenScene.substring(0, 100)}...`);
-    return rewrittenScene.trim();
+
+    // Log token usage
+    if (rewriteResult.usage) {
+      log.debug(`📊 [REWRITE] Token usage - input: ${rewriteResult.usage.input_tokens || 0}, output: ${rewriteResult.usage.output_tokens || 0}`);
+    }
+
+    log.info(`✅ [REWRITE] Scene rewritten: ${rewrittenScene.substring(0, 100)}...`);
+    return { text: rewrittenScene.trim(), usage: rewriteResult.usage };
   } catch (error) {
     log.error(`❌ [REWRITE] Failed to rewrite scene:`, error.message);
     throw error;
@@ -1336,7 +1342,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         if (sceneMatch && sceneMatch[1]) {
           try {
             const originalScene = sceneMatch[1].trim();
-            const rewrittenScene = await rewriteBlockedScene(originalScene, callTextModel);
+            const rewriteResult = await rewriteBlockedScene(originalScene, callTextModel);
+            const rewrittenScene = rewriteResult.text;
 
             // Replace scene in prompt
             currentPrompt = currentPrompt.replace(originalScene, rewrittenScene);
@@ -1348,6 +1355,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               type: 'safety_block_rewrite',
               originalScene: originalScene.substring(0, 200),
               rewrittenScene: rewrittenScene.substring(0, 200),
+              rewriteUsage: rewriteResult.usage,
               error: error.message,
               timestamp: new Date().toISOString()
             });
@@ -2930,14 +2938,14 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
           log.info(`✅ [CONSISTENCY] All images consistent (score: ${result.overallScore || 'N/A'})`);
         }
 
-        return result;
+        return { ...result, usage: { inputTokens, outputTokens, model: modelId } };
       }
     } catch (parseError) {
       log.error(`❌ [CONSISTENCY] Failed to parse response: ${parseError.message}`);
       log.debug(`Response was: ${responseText.substring(0, 500)}`);
     }
 
-    return null;
+    return { usage: { inputTokens, outputTokens, model: modelId } };
   } catch (error) {
     log.error(`❌ [CONSISTENCY] Error: ${error.message}`);
     return null;
