@@ -8821,7 +8821,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
               // Re-expand scene with correction notes
               log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with corrections...`);
-              const sceneDescription = existingImage.description;
+
+              // Get scene description - could be in different places depending on generation flow
+              let sceneDescription = existingImage.description || existingImage.prompt || '';
+              if (typeof sceneDescription !== 'string') {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has non-string description, using prompt instead`);
+                sceneDescription = existingImage.prompt || '';
+              }
+              if (!sceneDescription) {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has no description, skipping`);
+                continue;
+              }
+
               const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters);
 
               const expansionPrompt = buildSceneExpansionPrompt(
