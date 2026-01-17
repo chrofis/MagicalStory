@@ -8775,6 +8775,156 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           checkCharacters: true
         });
 
+        // =====================================================================
+        // AUTO-REGENERATE IMAGES WITH CONSISTENCY ISSUES
+        // =====================================================================
+        if (finalChecksReport?.imageChecks?.length > 0 && !inputData.skipConsistencyRegen) {
+          const pagesToRegenerate = new Set();
+          const pageIssueMap = new Map(); // pageNum -> issues[]
+
+          // Collect pages with medium/high severity issues
+          for (const check of finalChecksReport.imageChecks) {
+            for (const issue of (check.issues || [])) {
+              if (issue.severity === 'high' || issue.severity === 'medium') {
+                for (const pageNum of (issue.images || [])) {
+                  pagesToRegenerate.add(pageNum);
+                  if (!pageIssueMap.has(pageNum)) pageIssueMap.set(pageNum, []);
+                  pageIssueMap.get(pageNum).push(issue);
+                }
+              }
+            }
+          }
+
+          if (pagesToRegenerate.size > 0) {
+            log.info(`🔄 [CONSISTENCY REGEN] Regenerating ${pagesToRegenerate.size} page(s) with issues: ${[...pagesToRegenerate].join(', ')}`);
+            await dbPool.query(
+              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+              [98, `Fixing ${pagesToRegenerate.size} consistency issue(s)...`, jobId]
+            );
+
+            for (const pageNum of pagesToRegenerate) {
+              const pageIssues = pageIssueMap.get(pageNum);
+              const pageIndex = pageNum - 1;
+              const existingImage = allImages.find(img => img.pageNumber === pageNum);
+
+              if (!existingImage) {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} not found, skipping`);
+                continue;
+              }
+
+              // Build correction notes from issues
+              const correctionNotes = pageIssues.map(issue =>
+                `- ${issue.type.toUpperCase()}${issue.characterInvolved ? ` (${issue.characterInvolved})` : ''}: ${issue.description}\n  FIX: ${issue.recommendation}`
+              ).join('\n\n');
+
+              // Re-expand scene with correction notes
+              log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with corrections...`);
+              const sceneDescription = existingImage.description;
+              const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters);
+
+              const expansionPrompt = buildSceneExpansionPrompt(
+                sceneDescription,
+                { characters: inputData.characters, visualBible },
+                sceneCharacters,
+                visualBible,
+                inputData.language,
+                correctionNotes
+              );
+
+              const expandedDescription = await callClaudeAPI(expansionPrompt, 2048, modelOverrides?.textModel);
+
+              // Get reference photos for this scene (same as original generation)
+              let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', null, inputData.artStyle, {});
+              pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+
+              // Get landmark photos
+              const sceneMetadata = extractSceneMetadata(sceneDescription);
+              const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
+              const allReferencePhotos = [...pagePhotos, ...pageLandmarkPhotos];
+
+              // Build new image prompt
+              const imagePrompt = buildImagePrompt(
+                expandedDescription,
+                inputData,
+                sceneCharacters,
+                false,
+                visualBible,
+                pageNum,
+                true,
+                allReferencePhotos
+              );
+
+              // Usage tracker for consistency regen
+              const regenUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
+                if (imgUsage) addUsage('gemini_image', imgUsage, 'consistency_regen', imgModel);
+                if (qualUsage) addUsage('gemini_quality', qualUsage, 'consistency_regen_quality', qualModel);
+              };
+
+              // Regenerate with quality retry
+              log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Generating new image...`);
+              const imageResult = await generateImageWithQualityRetry(
+                imagePrompt,
+                allReferencePhotos,
+                pageNum > 1 ? allImages[pageIndex - 1]?.imageData : null,
+                'scene',
+                null,
+                regenUsageTracker,
+                null,
+                { imageModel: modelOverrides?.imageModel, qualityModel: modelOverrides?.qualityModel },
+                `PAGE ${pageNum} (consistency fix)`,
+                { isAdmin: false, enableAutoRepair: false, landmarkPhotos: pageLandmarkPhotos }
+              );
+
+              if (imageResult?.imageData) {
+                // Store original image and prompt before replacing
+                existingImage.consistencyRegen = {
+                  originalImage: existingImage.imageData,
+                  originalPrompt: existingImage.prompt,
+                  originalDescription: existingImage.description,
+                  fixedImage: imageResult.imageData,
+                  fixedPrompt: imagePrompt,
+                  fixedDescription: expandedDescription,
+                  correctionNotes: correctionNotes,
+                  issues: pageIssues,
+                  score: imageResult.score,
+                  timestamp: new Date().toISOString()
+                };
+
+                // Replace with fixed image
+                existingImage.imageData = imageResult.imageData;
+                existingImage.prompt = imagePrompt;
+                existingImage.description = expandedDescription;
+                existingImage.qualityScore = imageResult.score;
+                log.info(`✅ [CONSISTENCY REGEN] [PAGE ${pageNum}] Replaced image (score: ${imageResult.score || 'N/A'}%)`);
+              } else {
+                log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Regeneration failed, keeping original`);
+              }
+            }
+
+            // Re-run consistency check to verify fixes
+            log.info(`🔍 [CONSISTENCY REGEN] Re-checking consistency after regeneration...`);
+            const recheckImageData = {
+              sceneImages: allImages.map((img, idx) => {
+                const metadata = extractSceneMetadata(img.description) || {};
+                return {
+                  imageData: img.imageData,
+                  pageNumber: img.pageNumber || idx + 1,
+                  characters: metadata.characters || [],
+                  clothing: metadata.clothing || 'standard',
+                  referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean)
+                };
+              })
+            };
+            const recheck = await runFinalConsistencyChecks(recheckImageData, inputData.characters || [], { checkCharacters: false });
+            if (recheck) {
+              finalChecksReport.recheckAfterRegen = recheck;
+              finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
+              const remainingIssues = recheck.imageChecks?.reduce((sum, c) => sum + (c.issues?.length || 0), 0) || 0;
+              log.info(`📋 [CONSISTENCY REGEN] Re-check complete: ${remainingIssues} issue(s) remaining`);
+            }
+          }
+        }
+
         // Run text consistency check - include detailed language instructions and reading level
         // Use same model as story generation for language consistency
         if (fullStoryText && fullStoryText.length > 100) {
@@ -9232,7 +9382,8 @@ async function processStoryJob(jobId) {
 
     // Inject pre-discovered landmarks if available for this user's location
     // Check database first (persists across restarts), then fall back to in-memory cache
-    if (inputData.userLocation?.city) {
+    // Skip for historical stories - they use historically accurate locations, not local landmarks
+    if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const cacheKey = `${inputData.userLocation.city}_${inputData.userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
       let landmarks = null;
 
@@ -9286,6 +9437,8 @@ async function processStoryJob(jobId) {
       } else {
         log.debug(`[LANDMARK] No cached landmarks available for ${inputData.userLocation.city}`);
       }
+    } else if (inputData.storyCategory === 'historical') {
+      log.debug(`[LANDMARK] Skipping local landmarks for historical story (uses historical locations instead)`);
     }
 
     const skipImages = inputData.skipImages === true; // Developer mode: text only
