@@ -12,7 +12,8 @@ export type StoryLanguageCode =
   | 'de-ch' | 'de-de' | 'de-at' | 'de-it'           // German regions
   | 'de-de-north' | 'de-de-south'                   // German sub-variants
   | 'de'                                            // German legacy fallback
-  | 'it' | 'it-it' | 'it-ch' | 'it-it-north' | 'it-it-central' | 'it-it-south' | 'it-sm';  // Italian variants
+  | 'it' | 'it-it' | 'it-ch' | 'it-it-north' | 'it-it-central' | 'it-it-south' | 'it-sm'  // Italian variants
+  | 'gsw-zh' | 'gsw-be' | 'gsw-bs' | 'gsw-lu' | 'gsw-sg' | 'gsw-vs' | 'gsw-gr';  // Swiss German dialects
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
 
 export type AdventureThemeGroupId = 'popular' | 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';

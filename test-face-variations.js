@@ -115,7 +115,7 @@ async function generateFaceVariations(photoBase64, apiKey) {
 Each interpretation emphasizes DIFFERENT facial features - eyes, structure, details, or overall impression.
 The 4 faces should look RELATED but NOT IDENTICAL - like 4 artists each drew the same person.
 GOAL: Create variation so some interpretations match the original better than others.
-User will SELECT which interpretation best captures the person's likeness.`
+CRITICAL: Output faces ONLY. Do NOT add any text, labels, numbers, or captions to the image.`
       }]
     },
     contents: [{

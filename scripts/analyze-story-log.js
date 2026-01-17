@@ -330,8 +330,11 @@ function extractIssues(jobLines) {
     }
 
     // Errors - look for actual error indicators
-    if ((msg.includes('Error:') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
-         (msg.includes('failed') && !msg.includes('story-failed'))) || line.level === 'err') {
+    const isError = msg.includes('Error') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
+                    (msg.includes('failed') && !msg.includes('story-failed')) ||
+                    (msg.includes('Failed') && !msg.includes('story-failed')) ||
+                    line.level === 'err';
+    if (isError) {
       // Skip checkpoint errors, email templates, and normal log messages
       if (!msg.includes('checkpoint') && !msg.includes('story-failed') && !msg.includes('email template')) {
         issues.errors.push({ time: ts, message: msg.substring(0, 150) });
@@ -424,8 +427,24 @@ function printAnalysis(job, storyInfo, costs, issues) {
   } else {
     if (issues.errors.length > 0) {
       console.log(`\n   \u274c Errors (${issues.errors.length}):`);
-      issues.errors.slice(0, 5).forEach(e => console.log(`      [${e.time}] ${e.message}`));
-      if (issues.errors.length > 5) console.log(`      ... and ${issues.errors.length - 5} more`);
+      // Show critical errors first (TEXT CHECK, CONSISTENCY, fatal failures)
+      const criticalErrors = issues.errors.filter(e =>
+        e.message.includes('TEXT CHECK') ||
+        e.message.includes('CONSISTENCY') ||
+        e.message.includes('Job') ||
+        e.message.includes('fatal')
+      );
+      const otherErrors = issues.errors.filter(e => !criticalErrors.includes(e));
+
+      if (criticalErrors.length > 0) {
+        console.log('      CRITICAL:');
+        criticalErrors.forEach(e => console.log(`      [${e.time}] ${e.message}`));
+      }
+      if (otherErrors.length > 0) {
+        console.log('      OTHER:');
+        otherErrors.slice(0, 5).forEach(e => console.log(`      [${e.time}] ${e.message}`));
+        if (otherErrors.length > 5) console.log(`      ... and ${otherErrors.length - 5} more`);
+      }
     }
 
     if (issues.warnings.length > 0) {

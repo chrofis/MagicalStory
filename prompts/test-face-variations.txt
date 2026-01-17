@@ -30,7 +30,11 @@ The goal is variation in HOW accurately each captures the original - so user can
 - ALL 4 same gender and age as reference
 - ALL 4 photorealistic
 - Simple solid background
-- NO TEXT, NO LABELS, NO CAPTIONS - faces only
+
+## CRITICAL: NO TEXT
+DO NOT add any text, labels, numbers, captions, or watermarks to the image.
+The output must contain ONLY the 4 face portraits - nothing else.
+No "Eye Focus", no "1", no "2", no labels of any kind.
 
 ## KEY INSTRUCTION
 These 4 faces should look RELATED but NOT IDENTICAL.

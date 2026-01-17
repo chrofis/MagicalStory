@@ -136,3 +136,20 @@ Character data stored as JSONB in `characters.data` column containing:
 - `characters[]` - Array of character objects
 - `relationships` - Character relationship mappings
 - Physical traits, clothing, avatars per character
+
+## Log Analysis
+
+When user asks to **"analyze log"**, **"check the log"**, **"analyze story run"**, or similar:
+
+```bash
+node scripts/analyze-story-log.js                           # Latest log in ~/Downloads
+node scripts/analyze-story-log.js ~/Downloads/logs.XXX.log  # Specific log file
+```
+
+The script analyzes Railway logs and shows:
+- **Story info**: title, language, characters, pages
+- **Timing**: total duration, per-stage timing
+- **Costs**: breakdown by provider (Anthropic, Gemini) and function
+- **Issues**: errors (especially TEXT CHECK, CONSISTENCY failures), warnings, fallbacks, low quality scores
+
+Log files are downloaded from Railway and stored in `~/Downloads/logs.*.log`

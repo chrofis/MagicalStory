@@ -68,6 +68,66 @@ const LANGUAGES = {
   },
 
   // ============================================================================
+  // SWISS GERMAN DIALECTS (Schweizerdeutsch / Mundart)
+  // ============================================================================
+
+  'gsw-zh': {
+    code: 'gsw-zh',
+    name: 'Züritüütsch',
+    nameEnglish: 'Zurich German',
+    instruction: 'Zürcher Dialekt. Verwende "hät" (nicht "het"), "isch" (nicht "ischt"). Artikel: "de/d/s" (der/die/das). Verwende "grönnt" (gerannt), "gschwätzt" (geredet), "nää" (nehmen), "gää" (geben), "niened" (nirgends), "öpper/öppis" (jemand/etwas), "keit" (gefallen). Erste Person: "ich". Charakteristisch harte, abgehackte Konsonanten. Verkleinerungsform: "-li". Häufige Ausdrücke: "läck" (wow), "lässig" (cool), "huerä" (sehr, vulgärer Verstärker), "Sali/Hoi" (hallo), "Tschau zäme" (tschüss zusammen). Schnelleres Tempo, urbaner Ton. RICHTIG: "ich hät gsäit", "de Maa", "s\'Chind", "niened", "öppis", "er isch keit", "Sali zäme" | FALSCH: "i hät gseit", "dr Maa", "ds Chind", "niäna", "äppis", "er ischt gheit", "Grüessech".',
+    note: '(Züritüütsch: "hät", "de/d/s", "niened", "öppis", "keit". RICHTIG: "ich hät gsäit", "Sali" | FALSCH: "i hät gseit", "Grüessech")'
+  },
+
+  'gsw-be': {
+    code: 'gsw-be',
+    name: 'Bärndütsch',
+    nameEnglish: 'Bernese German',
+    instruction: 'Berner Dialekt. Verwende "het" (nicht "hät"), "isch" (nicht "ischt"). Artikel: "dr/d/ds" (der/die/das). Verwende "grännt" (gerannt), "gredt" (geredet), "näh" (nehmen), "gäh" (geben), "niene" (nirgends), "öpper/öppis" (jemand/etwas), "gheit" (gefallen), "äuä" (wahrscheinlich/vermutlich), "gäng" (immer), "geng" (ständig), "ou" (auch). Erste Person: "i" (nicht "ich"). Charakteristisch langsamer, melodischer Rhythmus mit französischem Einfluss. Verkleinerungsform: "-li". Häufige Ausdrücke: "Grüessech" (hallo förmlich), "Uf Widerluege" (auf Wiedersehen), "Hesch mer öppis?" (Hast du etwas für mich?), "äuä" (wahrscheinlich), "gäu" (gell?/nicht wahr?). Weichere, gedehnte Vokale. RICHTIG: "i ha gseit", "dr Maa", "ds Chind", "niene", "äuä scho", "er isch gheit", "Grüessech mitenand" | FALSCH: "ich hät gsäit", "de Maa", "s\'Chind", "niened", "wahrschindli", "er isch keit", "Sali".',
+    note: '(Bärndütsch: "het", "dr/d/ds", "niene", "äuä", "gheit". RICHTIG: "i ha gseit", "Grüessech" | FALSCH: "ich hät gsäit", "Sali")'
+  },
+
+  'gsw-bs': {
+    code: 'gsw-bs',
+    name: 'Baseldytsch',
+    nameEnglish: 'Basel German',
+    instruction: 'Basler Dialekt. Verwende "het" (nicht "hät"), "isch" (nicht "ischt"). Artikel: "dr/d/s" (der/die/das). Verwende "grännt" (gerannt), "gschwätzt" (geredet), "nämme" (nehmen), "gää" (geben), "niene" (nirgends), "öpper/öppis" (jemand/etwas). Erste Person: "i" (nicht "ich"). Besondere Merkmale: "ai" bleibt "ai" (nicht "äi"), französische und deutsche Grenzeinflüsse. Verkleinerungsform: "-li". Häufige Ausdrücke: "Salli" (hallo), "Adie" (tschüss, französischer Einfluss), "E Guete" (guten Appetit), "Waisch?" (weisst du?), "Dütsch" (Deutsch), "Spässli" (Spässchen). Urbaner, weltoffener Ton mit leichtem französischem Flair. RICHTIG: "i ha gsait", "dr Maa", "s Chind", "niene", "Salli zämme", "Adie", "e Guete" | FALSCH: "ich hät gsäit", "de Maa", "s\'Chind", "niened", "Sali", "Tschüss", "en Guete".',
+    note: '(Baseldytsch: "het", "dr/d/s", "niene", "Salli", "Adie". RICHTIG: "i ha gsait", "Adie" | FALSCH: "ich hät gsäit", "Tschüss")'
+  },
+
+  'gsw-lu': {
+    code: 'gsw-lu',
+    name: 'Luzärndütsch',
+    nameEnglish: 'Lucerne German',
+    instruction: 'Luzerner/Innerschweizer Dialekt. Verwende "het" (nicht "hät"), "isch" (nicht "ischt"). Artikel: "de/d/s" oder "dr/d/s". Verwende "grönnt/glauffe" (gerannt), "gredt" (geredet), "näh" (nehmen), "gäh" (geben), "niene" (nirgends), "öpper/öppis" (jemand/etwas), "gheit" (gefallen). Erste Person: "ich" oder "i". Übergangsdialekt zwischen Zürich und Bern. Verkleinerungsform: "-li" oder "-eli". Häufige Ausdrücke: "Grüezi" (hallo), "Ade" (tschüss), "ächt" (wirklich), "gäll" (gell?), "huere" (sehr). Traditioneller, ländlicher Ton mit katholischem Einfluss. RICHTIG: "ich/i ha gseit", "de Maa", "s Chind", "niene", "öppis", "er isch gheit", "Grüezi wohl" | FALSCH: "i hät gsäit", "niened", "keit", "Sali" (zu urban).',
+    note: '(Luzärndütsch: "het", "de/d/s", "niene", "gheit". RICHTIG: "ich ha gseit", "Grüezi" | FALSCH: "i hät gsäit", "Sali")'
+  },
+
+  'gsw-sg': {
+    code: 'gsw-sg',
+    name: 'Sanggallerdütsch',
+    nameEnglish: 'St. Gallen German',
+    instruction: 'St. Galler/Ostschweizer Dialekt. Verwende "hät" oder "het", "isch" (nicht "ischt"). Artikel: "de/d/s". Verwende "grönnt/gloffa" (gerannt), "gschwätzt/gredt" (geredet), "neh" (nehmen), "geh" (geben), "nöd" (nicht), "niena" (nirgends), "öpper/öppis" (jemand/etwas). Erste Person: "i" oder "ich". Besondere Merkmale: näher an Vorarlberg/österreichischen Einflüssen, "ö"-Laute. Häufige Ausdrücke: "Grüezi", "Ade/Pfiat di", "gell" (gell?), "fescht" (sehr), "luaga" (schauen). Melodischerer, östlicher Ton. RICHTIG: "i ha gseit", "de Maa", "s Chind", "niena", "öppis", "luag!", "gell", "Pfiat di" | FALSCH: "dr Maa", "niene", "gäu", "lueg".',
+    note: '(Sanggallerdütsch: "de/d/s", "niena", "luaga", "Pfiat di". RICHTIG: "i ha gseit", "luag!" | FALSCH: "dr Maa", "lueg")'
+  },
+
+  'gsw-vs': {
+    code: 'gsw-vs',
+    name: 'Walliserdütsch',
+    nameEnglish: 'Valais German',
+    instruction: 'Walliser Dialekt (sehr archaisch, eigenständig). Verwende "ischt" (nicht "isch"), "het/hett". Artikel: "dr/d/ds" oder "der/di/das". Bewahrt alte germanische Laute: "Kind" (nicht "Chind"), "Kuchi" (nicht "Chuchi"), harte K-Laute. Verwende "gigu" (gegangen), "cho" (kommen), "tüe" (tun), "schii" (sein), "hiitu" (heute), "moorä" (morgen), "geschtr" (gestern), "ferggeschtr" (vorgestern), "übermoorä" (übermorgen), "niena" (nirgends), "öpper/öppis". Erste Person: "i" oder "iich". Besondere Merkmale: bewahrte mittelalterliche Vokale, einzigartige Verbkonjugationen, sehr langsamer Rhythmus. Verkleinerungsform: "-ji" oder "-i". Häufige Ausdrücke: "Grüess Gott", "Bhüet di Gott" (auf Wiedersehen), "Wievil ischts?" (wie spät ist es?). Oft schwer verständlich für andere Schweizer. RICHTIG: "i bi gigu", "der Maa", "ds Kind", "hiitu", "moorä", "ischt", "Kuchi", "Bhüet di" | FALSCH: "ich bi gange", "de Maa", "s Chind", "hüt", "morn", "isch", "Chuchi", "Tschüss".',
+    note: '(Walliserdütsch: "ischt", "Kind" (nicht "Chind"), "hiitu", "moorä". RICHTIG: "i bi gigu", "Bhüet di" | FALSCH: "ich bi gange", "Chuchi")'
+  },
+
+  'gsw-gr': {
+    code: 'gsw-gr',
+    name: 'Bündnerdütsch',
+    nameEnglish: 'Graubünden German',
+    instruction: 'Bündner Dialekt. Verwende "ischt" (nicht "isch"), "hät/het". Artikel: "dr/d/ds" oder "der/di/das". Verwende "ganga" (gegangen), "cho" (kommen), "nää" (nehmen), "gää" (geben), "niäna" (nirgends), "äpper/äppis" (jemand/etwas), "glachad" (gelacht), volle Verbendungen "-ad/-ed". Erste Person: "i" (nicht "ich"). Besondere Merkmale: rätoromanische Einflüsse, melodische Intonation, volle Vokalendungen, weicherer Rhythmus. Bewahrt "-a"-Endungen bei Verben: "macha", "reda", "laufa". Verkleinerungsform: "-li" oder "-i". Häufige Ausdrücke: "Allegra" (hallo, rätoromanisch), "Grüezi", "A revair" (auf Wiedersehen, rätoromanischer Einfluss), "seer" (sehr), "güat" (gut). RICHTIG: "i ha gseit", "dr Maa", "ds Chind", "niäna", "äppis", "er ischt gheit", "i kha", "seer güat", "Allegra" | FALSCH: "ich hät gsäit", "de Maa", "s\'Chind", "niened", "öppis", "er isch keit", "ich chan", "sehr guet", "Sali".',
+    note: '(Bündnerdütsch: "ischt", "niäna", "äppis", "Allegra". RICHTIG: "i ha gseit", "Allegra" | FALSCH: "ich hät gsäit", "Sali")'
+  },
+
+  // ============================================================================
   // FRENCH VARIANTS
   // ============================================================================
 
@@ -315,7 +375,15 @@ function getAvailableLanguages() {
     { code: 'it-it-north', name: 'Italiano (Nord)', nameEnglish: 'Italian (Northern)' },
     { code: 'it-it-central', name: 'Italiano (Centro/Toscana)', nameEnglish: 'Italian (Central/Tuscan)' },
     { code: 'it-it-south', name: 'Italiano (Sud)', nameEnglish: 'Italian (Southern)' },
-    { code: 'it-sm', name: 'Italiano (San Marino)', nameEnglish: 'Italian (San Marino)' }
+    { code: 'it-sm', name: 'Italiano (San Marino)', nameEnglish: 'Italian (San Marino)' },
+    // Swiss German dialects (Mundart)
+    { code: 'gsw-zh', name: 'Züritüütsch', nameEnglish: 'Zurich German' },
+    { code: 'gsw-be', name: 'Bärndütsch', nameEnglish: 'Bernese German' },
+    { code: 'gsw-bs', name: 'Baseldytsch', nameEnglish: 'Basel German' },
+    { code: 'gsw-lu', name: 'Luzärndütsch', nameEnglish: 'Lucerne German' },
+    { code: 'gsw-sg', name: 'Sanggallerdütsch', nameEnglish: 'St. Gallen German' },
+    { code: 'gsw-vs', name: 'Walliserdütsch', nameEnglish: 'Valais German' },
+    { code: 'gsw-gr', name: 'Bündnerdütsch', nameEnglish: 'Graubünden German' }
   ];
 }
 

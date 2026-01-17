@@ -3,16 +3,20 @@ import { BookOpen, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
+// Language family type
+type LanguageFamily = 'de' | 'fr' | 'it' | 'en' | 'gsw';
+
 // Main language options (shown first - default variant for each language)
-const MAIN_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string; family: 'de' | 'fr' | 'it' | 'en' }[] = [
+const MAIN_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string; family: LanguageFamily }[] = [
   { code: 'de-ch', name: 'Deutsch', flag: '🇨🇭', family: 'de' },
   { code: 'fr-ch', name: 'Français', flag: '🇨🇭', family: 'fr' },
   { code: 'it-ch', name: 'Italiano', flag: '🇨🇭', family: 'it' },
   { code: 'en-gb', name: 'English', flag: '🇬🇧', family: 'en' },
+  { code: 'gsw-zh', name: 'Mundart', flag: '🇨🇭', family: 'gsw' },
 ];
 
 // Regional variants for each language family
-const LANGUAGE_VARIANTS: Record<'de' | 'fr' | 'it' | 'en', { code: StoryLanguageCode; name: string; flag: string }[]> = {
+const LANGUAGE_VARIANTS: Record<LanguageFamily, { code: StoryLanguageCode; name: string; flag: string }[]> = {
   de: [
     { code: 'de-ch', name: 'Schweiz', flag: '🇨🇭' },
     { code: 'de-de', name: 'Standard', flag: '🇩🇪' },
@@ -44,10 +48,20 @@ const LANGUAGE_VARIANTS: Record<'de' | 'fr' | 'it' | 'en', { code: StoryLanguage
     { code: 'en-ie', name: 'Ireland', flag: '🇮🇪' },
     { code: 'en-za', name: 'South Africa', flag: '🇿🇦' },
   ],
+  gsw: [
+    { code: 'gsw-zh', name: 'Züritüütsch', flag: '🇨🇭' },
+    { code: 'gsw-be', name: 'Bärndütsch', flag: '🇨🇭' },
+    { code: 'gsw-bs', name: 'Baseldytsch', flag: '🇨🇭' },
+    { code: 'gsw-lu', name: 'Luzärndütsch', flag: '🇨🇭' },
+    { code: 'gsw-sg', name: 'Sanggallerdütsch', flag: '🇨🇭' },
+    { code: 'gsw-vs', name: 'Walliserdütsch', flag: '🇨🇭' },
+    { code: 'gsw-gr', name: 'Bündnerdütsch', flag: '🇨🇭' },
+  ],
 };
 
 // Helper to determine language family from code
-function getLanguageFamily(code: StoryLanguageCode): 'de' | 'fr' | 'it' | 'en' {
+function getLanguageFamily(code: StoryLanguageCode): LanguageFamily {
+  if (code.startsWith('gsw')) return 'gsw';
   if (code.startsWith('de')) return 'de';
   if (code.startsWith('fr')) return 'fr';
   if (code.startsWith('it')) return 'it';

@@ -333,8 +333,78 @@ test.describe('Character Management', () => {
 
     await page.screenshot({ path: 'test-results/t1-07b-traits-selected.png', fullPage: true });
 
-    // Step 8: Navigate through remaining wizard steps until character is saved
-    console.log('Step 8: Navigate through wizard to save character');
+    // Step 8: Set relationships for Franziska
+    console.log('Step 8: Set relationships');
+
+    // Click Next to go to relationships step
+    const nextToRelationships = page.locator('button:has-text("Next"), button:has-text("Weiter")').first();
+    if (await nextToRelationships.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await nextToRelationships.click();
+      await page.waitForTimeout(2000);
+    }
+
+    await page.screenshot({ path: 'test-results/t1-08a-relationships-step.png', fullPage: true });
+
+    // Find relationship dropdowns and set them
+    // Franziska should be: Parent of Lukas, Sophie, Manuel; Married to Roger
+    const relationshipSelects = page.locator('select');
+    const relSelectCount = await relationshipSelects.count();
+    console.log(`Found ${relSelectCount} relationship selects`);
+
+    // Log all selects to understand the structure
+    for (let i = 0; i < relSelectCount; i++) {
+      const select = relationshipSelects.nth(i);
+      if (!await select.isVisible({ timeout: 500 }).catch(() => false)) continue;
+
+      // Get the label/context for this select (the character name it's for)
+      const parent = select.locator('xpath=ancestor::div[contains(@class, "rounded")]').first();
+      const parentText = await parent.textContent().catch(() => '');
+
+      if (parentText?.includes('Lukas') || parentText?.includes('Sophie') || parentText?.includes('Manuel')) {
+        // Set as parent (Elternteil von)
+        try {
+          await select.selectOption({ label: 'Parent of' });
+          console.log(`Set relationship to ${parentText?.split(/\s/)[0]}: Parent of`);
+        } catch {
+          try {
+            await select.selectOption({ label: 'Elternteil von' });
+            console.log(`Set relationship to ${parentText?.split(/\s/)[0]}: Elternteil von`);
+          } catch {
+            // Try by value
+            const options = await select.locator('option').allTextContents();
+            const parentOption = options.find(o => o.toLowerCase().includes('parent') || o.toLowerCase().includes('eltern'));
+            if (parentOption) {
+              await select.selectOption({ label: parentOption });
+              console.log(`Set relationship: ${parentOption}`);
+            }
+          }
+        }
+      } else if (parentText?.includes('Roger')) {
+        // Set as married to
+        try {
+          await select.selectOption({ label: 'Married to' });
+          console.log(`Set relationship to Roger: Married to`);
+        } catch {
+          try {
+            await select.selectOption({ label: 'Verheiratet mit' });
+            console.log(`Set relationship to Roger: Verheiratet mit`);
+          } catch {
+            // Try by value
+            const options = await select.locator('option').allTextContents();
+            const marriedOption = options.find(o => o.toLowerCase().includes('married') || o.toLowerCase().includes('verheiratet'));
+            if (marriedOption) {
+              await select.selectOption({ label: marriedOption });
+              console.log(`Set relationship: ${marriedOption}`);
+            }
+          }
+        }
+      }
+    }
+
+    await page.screenshot({ path: 'test-results/t1-08b-relationships-set.png', fullPage: true });
+
+    // Step 9: Navigate through remaining wizard steps until character is saved
+    console.log('Step 9: Navigate through wizard to save character');
 
     for (let step = 0; step < 10; step++) {
       await page.waitForTimeout(1000);
@@ -375,7 +445,7 @@ test.describe('Character Management', () => {
       }
 
       // If neither button works, we might be stuck
-      console.log(`Step ${step}: Looking for way forward...`);
+      console.log(`Step 9.${step}: Looking for way forward...`);
       await page.screenshot({ path: `test-results/t1-08-step${step}.png`, fullPage: true });
     }
 
@@ -405,8 +475,8 @@ test.describe('Character Management', () => {
     // Take screenshot to verify
     await page.screenshot({ path: 'test-results/t1-09-final.png', fullPage: true });
 
-    // Step 9: Verify Franziska exists with avatar
-    console.log('Step 9: Verify Franziska has avatar');
+    // Step 10: Verify Franziska exists with avatar
+    console.log('Step 10: Verify Franziska has avatar');
 
     // Wait longer for avatar to be available (might still be processing)
     await page.waitForTimeout(10000);
@@ -461,8 +531,8 @@ test.describe('Character Management', () => {
       console.log(`Verified: Franziska has avatar: ${franziskaAvatarSrc.substring(0, 80)}...`);
     }
 
-    // Step 10: Verify Franziska has relationships
-    console.log('Step 10: Verify Franziska has relationships');
+    // Step 11: Verify Franziska has relationships
+    console.log('Step 11: Verify Franziska has relationships');
     await clickEditButton(page, 'Franziska');
     await page.waitForTimeout(2000);
     await page.screenshot({ path: 'test-results/t1-10-edit-franziska.png', fullPage: true });
@@ -494,7 +564,7 @@ test.describe('Character Management', () => {
 
     // IMPORTANT: Close the edit form WITHOUT saving to avoid overwriting avatar data
     // The edit form may not have loaded all photo/avatar data, so saving would erase it
-    console.log('Step 11: Close edit form (without saving to preserve avatar)');
+    console.log('Step 12: Close edit form (without saving to preserve avatar)');
 
     // Navigate back to character list - this closes the edit form without saving
     await page.goto('/create');
