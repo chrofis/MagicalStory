@@ -15,6 +15,9 @@ The story is written in: {LANGUAGE}
 
 **Check that pages have appropriate length and paragraph structure.**
 
+## ⚠️ PARAGRAPH FORMATTING - CHECK CAREFULLY
+This is frequently wrong in generated stories. Verify EVERY page. If wrong, fix it in fullCorrectedText with proper paragraph breaks.
+
 ## Story Text
 {STORY_TEXT}
 
