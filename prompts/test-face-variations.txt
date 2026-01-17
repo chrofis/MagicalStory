@@ -30,6 +30,7 @@ The goal is variation in HOW accurately each captures the original - so user can
 - ALL 4 same gender and age as reference
 - ALL 4 photorealistic
 - Simple solid background
+- NO TEXT, NO LABELS, NO CAPTIONS - faces only
 
 ## KEY INSTRUCTION
 These 4 faces should look RELATED but NOT IDENTICAL.

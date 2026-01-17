@@ -54,16 +54,6 @@ function getLanguageFamily(code: StoryLanguageCode): 'de' | 'fr' | 'it' | 'en' {
   return 'en';
 }
 
-// Helper to get display name for current language
-function getLanguageDisplayName(code: StoryLanguageCode): string {
-  const family = getLanguageFamily(code);
-  const variant = LANGUAGE_VARIANTS[family].find(v => v.code === code);
-  const mainLang = MAIN_LANGUAGES.find(l => l.family === family);
-  if (variant && mainLang) {
-    return `${mainLang.name} (${variant.name})`;
-  }
-  return mainLang?.name || code;
-}
 
 // Season options
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'];

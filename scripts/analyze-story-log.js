@@ -442,7 +442,10 @@ function printAnalysis(job, storyInfo, costs, issues) {
 
     if (issues.lowQualityScores.length > 0) {
       console.log(`\n   \ud83d\udcca Low Quality Scores (${issues.lowQualityScores.length}):`);
-      issues.lowQualityScores.forEach(q => console.log(`      [${q.time}] Score: ${q.score}`));
+      issues.lowQualityScores.forEach(q => {
+        const pageStr = q.page ? ` Page ${q.page}:` : '';
+        console.log(`      [${q.time}]${pageStr} Score: ${q.score}%`);
+      });
     }
   }
 
