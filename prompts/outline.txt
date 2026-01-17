@@ -55,21 +55,7 @@ When writing about characters' strengths and weaknesses:
 
 ---
 
-# Part 1: Title
-
-## Story Title
-Create an engaging, age-appropriate title for this story. The title should:
-- Capture the essence of the story
-- Be appealing to the target age group
-- Be memorable and creative
-- Reflect the main theme or adventure
-
-Format:
-Title: [Your creative title here]
-
----
-
-# Part 2: Clothing Requirements (for Avatar Generation)
+# Part 1: Clothing Requirements (for Avatar Generation)
 
 For each main character ({CHARACTER_NAMES}), specify which clothing variations are needed in the story:
 
@@ -148,7 +134,7 @@ Beyond color differences, each character must have a **structurally different ou
 
 ---
 
-# Part 3: Visual Bible (for Illustration Consistency)
+# Part 2: Visual Bible (for Illustration Consistency)
 
 List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensures consistent illustrations throughout the book.
 
@@ -229,7 +215,7 @@ For famous buildings, monuments, or natural wonders that exist in reality:
 
 ---
 
-# Part 4: Cover Scene Descriptions
+# Part 3: Cover Scene Descriptions
 
 In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for these 3 cover elements.
 
@@ -249,7 +235,7 @@ In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for th
 
 ---
 
-# Part 5: Plot Structure
+# Part 4: Plot Structure
 
 Create a detailed {PAGES}-page story outline with a compelling plot. The focus of the plot must be on the main character(s).
 Clearly define:
@@ -289,7 +275,7 @@ Example:
 
 ---
 
-# Part 6: Character Development Arcs
+# Part 5: Character Development Arcs
 
 For EACH main character provided, detail their development arc by describing:
 
@@ -311,7 +297,7 @@ For all other characters:
 
 ---
 
-# Part 7: Page-by-Page Breakdown
+# Part 6: Page-by-Page Breakdown
 
 For EACH of the {PAGES} story pages, provide:
 
@@ -330,24 +316,21 @@ For EACH of the {PAGES} story pages, provide:
 # CRITICAL: You MUST generate ALL 7 sections
 
 **You MUST complete ALL sections listed above:**
-1. Title
-2. Clothing Requirements (JSON for each main character)
-3. Visual Bible (with all subsections)
-4. Cover Scenes (all 3: Title Page, Initial Page, Back Cover)
-5. Plot Structure (with Themes, Tone, and Clothing Continuity)
-6. Character Development Arcs (for ALL characters)
-7. Page-by-Page Breakdown (for ALL {PAGES} pages, from Page 1 to Page {PAGES})
+1. Clothing Requirements (JSON for each main character)
+2. Visual Bible (with all subsections)
+3. Cover Scenes (all 3: Title Page, Initial Page, Back Cover)
+4. Plot Structure (with Themes, Tone, and Clothing Continuity)
+5. Character Development Arcs (for ALL characters)
+6. Page-by-Page Breakdown (for ALL {PAGES} pages, from Page 1 to Page {PAGES})
+7. Title (generated LAST, after you know the full story)
 
-**DO NOT STOP EARLY.** The outline is incomplete unless it contains detailed breakdowns for every single page from 1 to {PAGES}.
+**DO NOT STOP EARLY.** The outline is incomplete unless it contains detailed breakdowns for every single page from 1 to {PAGES}, AND a final title.
 
 ---
 
 # Format Your Response
 
-**IMPORTANT: Output MUST be in this EXACT order: Title → Clothing Requirements → Visual Bible → Cover Scenes → Plot Structure → Character Arcs → Pages**
-
-## Title
-Title: [Story title]
+**IMPORTANT: Output MUST be in this EXACT order: Clothing Requirements → Visual Bible → Cover Scenes → Plot Structure → Character Arcs → Pages → Title**
 
 ## Clothing Requirements
 
@@ -515,9 +498,18 @@ Clothing: [same]
 
 ...continue for ALL {PAGES} pages (Page 3, Page 4, ... Page {PAGES}). Use [same] for most pages; only use [change to: X] when there's an explicit reason.
 
+## Title
+
+Now that you have drafted the complete story with all pages, create a title that:
+- Captures the ACTUAL story you've written (not just the theme)
+- Reflects the main adventure, conflict, or lesson learned
+- Is memorable and appealing to the target age group
+- Works well in {LANGUAGE}
+
+Format:
+Title: [Your creative title based on the story above]
+
 ---
 
-
-
-** Reminder Do not stop until you have written all {PAGES} pages.**
+**REMINDER: Do not stop until you have written all {PAGES} pages AND the final title.**
 
