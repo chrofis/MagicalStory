@@ -9,7 +9,7 @@ export type Language = UILanguage;
 export type StoryLanguageCode = 'en' | 'de' | 'de-ch' | 'de-de' | 'fr';
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
 
-export type AdventureThemeGroupId = 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';
+export type AdventureThemeGroupId = 'popular' | 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';
 
 export interface StoryType {
   id: string;
