@@ -1,10 +1,32 @@
-import { RefreshCw, Edit3, Users } from 'lucide-react';
+import { useState } from 'react';
+import { RefreshCw, Edit3, Users, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface CharacterOption {
   id: number;
   name: string;
   photoUrl?: string;
+}
+
+interface ConsistencyIssue {
+  type: string;
+  characterInvolved?: string;
+  description: string;
+  recommendation: string;
+  severity: string;
+}
+
+interface ConsistencyRegenData {
+  originalImage: string;
+  originalPrompt: string;
+  originalDescription: string;
+  fixedImage: string;
+  fixedPrompt: string;
+  fixedDescription: string;
+  correctionNotes: string;
+  issues: ConsistencyIssue[];
+  score: number;
+  timestamp: string;
 }
 
 interface SceneEditModalProps {
@@ -19,6 +41,8 @@ interface SceneEditModalProps {
   characters?: CharacterOption[];
   selectedCharacterIds?: number[];
   onCharacterSelectionChange?: (ids: number[]) => void;
+  // Consistency regeneration data (dev mode)
+  consistencyRegen?: ConsistencyRegenData;
 }
 
 export function SceneEditModal({
@@ -32,8 +56,11 @@ export function SceneEditModal({
   characters = [],
   selectedCharacterIds = [],
   onCharacterSelectionChange,
+  consistencyRegen,
 }: SceneEditModalProps) {
   const { language } = useLanguage();
+  const [showOriginalPrompt, setShowOriginalPrompt] = useState(false);
+  const [showFixedPrompt, setShowFixedPrompt] = useState(false);
 
   const toggleCharacter = (id: number) => {
     if (!onCharacterSelectionChange) return;
@@ -104,6 +131,105 @@ export function SceneEditModal({
                 {language === 'de' ? 'Wählen Sie die Charaktere aus, die im Bild erscheinen sollen.' :
                  language === 'fr' ? 'Sélectionnez les personnages qui doivent apparaître dans l\'image.' :
                  'Select the characters that should appear in the image.'}
+              </p>
+            </div>
+          )}
+
+          {/* Consistency Fix Comparison (Dev Mode) */}
+          {consistencyRegen && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="text-amber-600" size={20} />
+                <h4 className="font-semibold text-amber-800">
+                  {language === 'de' ? 'Konsistenz-Korrektur angewendet' :
+                   language === 'fr' ? 'Correction de cohérence appliquée' :
+                   'Consistency Fix Applied'}
+                </h4>
+                <span className="text-xs bg-amber-200 text-amber-800 px-2 py-0.5 rounded">
+                  Score: {consistencyRegen.score}%
+                </span>
+              </div>
+
+              {/* Issues Fixed */}
+              <div className="mb-4">
+                <p className="text-sm font-medium text-amber-700 mb-2">
+                  {language === 'de' ? 'Behobene Probleme:' :
+                   language === 'fr' ? 'Problèmes corrigés:' :
+                   'Issues Fixed:'}
+                </p>
+                <ul className="text-sm text-amber-900 space-y-1">
+                  {consistencyRegen.issues.map((issue, idx) => (
+                    <li key={idx} className="flex flex-col">
+                      <span className="font-medium">
+                        {issue.type.toUpperCase()}
+                        {issue.characterInvolved && ` (${issue.characterInvolved})`}:
+                      </span>
+                      <span className="text-amber-700 ml-2">{issue.description}</span>
+                      <span className="text-amber-600 ml-2 text-xs">→ {issue.recommendation}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Image Comparison */}
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1 text-center">
+                    {language === 'de' ? 'Original' : language === 'fr' ? 'Original' : 'Original'}
+                  </p>
+                  <img
+                    src={consistencyRegen.originalImage}
+                    alt="Original"
+                    className="w-full rounded-lg border border-gray-300"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-green-600 mb-1 text-center">
+                    {language === 'de' ? 'Korrigiert' : language === 'fr' ? 'Corrigé' : 'Fixed'}
+                  </p>
+                  <img
+                    src={consistencyRegen.fixedImage}
+                    alt="Fixed"
+                    className="w-full rounded-lg border-2 border-green-500"
+                  />
+                </div>
+              </div>
+
+              {/* Collapsible Prompts */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setShowOriginalPrompt(!showOriginalPrompt)}
+                  className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800"
+                >
+                  {showOriginalPrompt ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {language === 'de' ? 'Original-Prompt' : language === 'fr' ? 'Prompt original' : 'Original Prompt'}
+                </button>
+                {showOriginalPrompt && (
+                  <pre className="text-xs bg-gray-100 p-2 rounded overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
+                    {consistencyRegen.originalPrompt}
+                  </pre>
+                )}
+
+                <button
+                  onClick={() => setShowFixedPrompt(!showFixedPrompt)}
+                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800"
+                >
+                  {showFixedPrompt ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  {language === 'de' ? 'Korrigierter Prompt (mit Korrekturen)' :
+                   language === 'fr' ? 'Prompt corrigé (avec corrections)' :
+                   'Fixed Prompt (with corrections)'}
+                </button>
+                {showFixedPrompt && (
+                  <pre className="text-xs bg-green-50 p-2 rounded border border-green-200 overflow-x-auto max-h-32 overflow-y-auto whitespace-pre-wrap">
+                    {consistencyRegen.fixedPrompt}
+                  </pre>
+                )}
+              </div>
+
+              <p className="text-xs text-gray-400 mt-2">
+                {language === 'de' ? `Korrigiert am ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
+                 language === 'fr' ? `Corrigé le ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
+                 `Fixed at ${new Date(consistencyRegen.timestamp).toLocaleString()}`}
               </p>
             </div>
           )}

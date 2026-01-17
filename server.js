@@ -2310,10 +2310,12 @@ ${landmarkEntries}`;
 
     // Wait for both to complete
     await Promise.all([streamStory1, streamStory2]);
+    log.debug('  Both stories complete, sending done event...');
 
     // Send completion with full responses for dev mode
     const combinedResponse = `=== STORY 1 ===\n${fullResponse1}\n\n=== STORY 2 ===\n${fullResponse2}`;
     res.write(`data: ${JSON.stringify({ done: true, fullResponse: combinedResponse })}\n\n`);
+    log.debug('  Done event sent, closing stream');
     res.end();
 
   } catch (err) {

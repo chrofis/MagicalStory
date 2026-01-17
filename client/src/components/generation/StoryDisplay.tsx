@@ -3250,6 +3250,7 @@ export function StoryDisplay({
           characters={characters.map(c => ({ id: c.id, name: c.name, photoUrl: c.photoData }))}
           selectedCharacterIds={sceneEditModal.selectedCharacterIds}
           onCharacterSelectionChange={(ids) => setSceneEditModal({ ...sceneEditModal, selectedCharacterIds: ids })}
+          consistencyRegen={developerMode ? sceneImages.find(img => img.pageNumber === sceneEditModal.pageNumber)?.consistencyRegen : undefined}
         />
       )}
 

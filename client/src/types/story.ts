@@ -294,6 +294,25 @@ export interface SceneImage {
   repairedAt?: string;
   // Face evaluation data (dev mode)
   faceEvaluation?: unknown;
+  // Consistency regeneration data (dev mode)
+  consistencyRegen?: {
+    originalImage: string;
+    originalPrompt: string;
+    originalDescription: string;
+    fixedImage: string;
+    fixedPrompt: string;
+    fixedDescription: string;
+    correctionNotes: string;
+    issues: Array<{
+      type: string;
+      characterInvolved?: string;
+      description: string;
+      recommendation: string;
+      severity: string;
+    }>;
+    score: number;
+    timestamp: string;
+  };
 }
 
 export interface CoverImageData {
