@@ -7683,26 +7683,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.debug(`⚡ [STREAM-AVATAR] ${char.name} category=${category}, config.used=${config?.used}, config.costume=${config?.costume}`);
         if (!config || !config.used) continue;
 
-        // Check if avatar already exists
-        // Bug #12 note: Different checks are intentional:
-        // - Costumed: check STYLED avatars (generated directly in target style)
-        // - Standard/winter/summer: check RAW avatars (styled versions created later by prepareStyledAvatars)
-        let avatarExists = false;
-        if (category === 'costumed' && config.costume) {
-          const costumeKey = config.costume.toLowerCase();
-          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+        // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
+        if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+        if (category === 'costumed') {
           if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-          avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
-          log.debug(`⚡ [STREAM-AVATAR] ${char.name} costumed:${costumeKey} styled@${artStyle} exists=${avatarExists}`);
-        } else {
-          // For non-costumed, we check raw avatar - styled version created later by prepareStyledAvatars
-          avatarExists = !!char.avatars[category];
-          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} raw exists=${avatarExists}`);
-        }
-
-        if (avatarExists) {
-          log.debug(`⚡ [STREAM-AVATAR] ${char.name} ${category} avatar already exists, skipping`);
-          continue;
         }
 
         // Queue avatar generation
@@ -8251,27 +8235,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         for (const [category, config] of Object.entries(requirements)) {
           if (!config.used) continue;
 
-          // Check if avatar already exists
-          let avatarExists = false;
-          if (category === 'costumed' && config.costume) {
-            const costumeKey = config.costume.toLowerCase();
-            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
+          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          if (category === 'costumed') {
             if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-            avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
-          } else if (config.signature) {
-            // For signature items: always regenerate (signature is story-specific)
-            avatarExists = false;
-          } else {
-            // For regular categories: check base avatar (style conversion happens later)
-            avatarExists = !!char.avatars[category];
           }
 
-          if (avatarExists) {
-            log.debug(`👕 [UNIFIED] ${char.name} already has ${category} avatar, skipping`);
-            continue;
-          }
-
-          // Generate missing avatar
           const logCategory = config.costume ? `costumed:${config.costume}` : category;
           log.debug(`👕 [UNIFIED] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
 
@@ -9667,30 +9636,14 @@ async function processStoryJob(jobId) {
         for (const [category, config] of Object.entries(requirements)) {
           if (!config || !config.used) continue;
 
-          // Check if avatar already exists
-          let avatarExists = false;
-          if (category === 'costumed' && config.costume) {
-            const costumeKey = config.costume.toLowerCase();
-            // Check for styled costumed avatar (new structure)
-            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
+          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          if (category === 'costumed') {
             if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-            avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
-          } else if (config.signature) {
-            // For signature items: always regenerate (signature is story-specific)
-            avatarExists = false;
-          } else {
-            // For regular categories: check base avatar (style conversion happens later)
-            avatarExists = !!char.avatars[category];
           }
 
-          if (avatarExists) {
-            log.debug(`[AVATAR] ${char.name} already has ${category}${config.costume ? ':' + config.costume : ''} avatar, skipping`);
-            continue;
-          }
-
-          // Generate the missing avatar
           const logCategory = config.costume ? `costumed:${config.costume}` : category;
-          log.debug(`🎭 [AVATAR] Generating ${logCategory} avatar for ${char.name}...`);
+          log.debug(`🎭 [AVATAR] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
 
           await dbPool.query(
             'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
