@@ -1814,6 +1814,14 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           if (!response.ok) {
             log.error(`[AVATAR JOB ${jobId}] Gemini API error for ${category}: ${response.status} ${response.statusText}`);
             log.error(`[AVATAR JOB ${jobId}] Response body:`, JSON.stringify(data).substring(0, 500));
+
+            // Check if this is a retryable error (503 model overloaded, 429 rate limit)
+            const isRetryableHttpError = response.status === 503 || response.status === 429;
+            if (isRetryableHttpError && attempt < MAX_RETRIES) {
+              log.info(`[AVATAR JOB ${jobId}] 🔄 Will retry ${category} after ${response.status} error...`);
+              continue; // Go to next attempt in the retry loop
+            }
+
             return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
           }
 

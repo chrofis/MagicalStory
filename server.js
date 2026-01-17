@@ -2199,102 +2199,83 @@ ${landmarkEntries}`;
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Get model to use
-    const { callTextModelStreaming, getModelDefaults } = require('./server/lib/textModels');
+    const { callTextModel, getModelDefaults } = require('./server/lib/textModels');
     const modelDefaults = getModelDefaults();
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
 
-    // Track accumulated text and which stories we've sent
-    let accumulatedText = '';
-    let story1Sent = false;
-    let story2Sent = false;
+    // Load single-story prompt template
+    const singlePromptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-idea-single.txt'), 'utf-8');
+
+    // Helper function to parse [FINAL] from response
+    const parseFinal = (text) => {
+      const match = text.match(/\[FINAL\]\s*([\s\S]*?)$/i);
+      if (match) return match[1].trim();
+      // Fallback: return the whole text if no marker
+      return text.trim();
+    };
+
+    // Build prompt for a single story
+    const buildSinglePrompt = (variantInstruction) => {
+      return singlePromptTemplate
+        .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
+        .replace('{STORY_TYPE_NAME}', effectiveTheme)
+        .replace('{STORY_TOPIC}', storyTopic || 'None')
+        .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
+        .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
+        .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
+        .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
+        .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
+        .replace('{TOPIC_GUIDE}', topicGuideText)
+        .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
+        .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
+        .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
+        .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
+        .replace('{STORY_VARIANT_INSTRUCTION}', variantInstruction)
+        .replace('{STORY_REQUIREMENTS}', storyRequirements)
+        .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
+    };
 
     // Send initial event
-    res.write(`data: ${JSON.stringify({ status: 'generating', prompt, model: modelToUse })}\n\n`);
+    const prompt1 = buildSinglePrompt('Use local landmarks if available. Create an engaging story that uses the setting naturally.');
+    res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse })}\n\n`);
 
-    // Helper function to parse story markers (supports multiple formats)
-    // NOTE: Do NOT use |$ in lookahead during streaming - it matches end of partial text!
-    const parseStory1 = (text) => {
-      // Try [FINAL_1] format first - requires explicit terminator (no $ fallback during streaming)
-      let match = text.match(/\[FINAL_1\]\s*([\s\S]*?)(?=\n---|\[DRAFT_2\]|\[FINAL_2\]|##\s*STORY\s*2|\*\*\s*Story\s*2)/i);
-      if (match) return match[1].trim();
-      // Try ## STORY 1 format
-      match = text.match(/##\s*STORY\s*1[:\s]*([^\n]*(?:\n(?!\n---|##\s*STORY\s*2|\*\*\s*Story\s*2)[\s\S])*?)(?=\n---|##\s*STORY\s*2|\*\*\s*Story\s*2)/i);
-      if (match) return match[1].trim();
-      // Try **Story 1: Title** format (bold markdown)
-      match = text.match(/\*\*\s*Story\s*1[:\s]*[^*]*\*\*\s*([\s\S]*?)(?=\n---|\*\*\s*Story\s*2)/i);
-      if (match) return match[1].trim();
-      return null;
-    };
+    // Track full responses for dev mode
+    let fullResponse1 = '';
+    let fullResponse2 = '';
 
-    const parseStory2 = (text) => {
-      // Try [FINAL_2] format first
-      let match = text.match(/\[FINAL_2\]\s*([\s\S]*?)$/);
-      if (match) return match[1].trim();
-      // Try ## STORY 2 format
-      match = text.match(/##\s*STORY\s*2[:\s]*([\s\S]*?)$/i);
-      if (match) return match[1].trim();
-      // Try **Story 2: Title** format (bold markdown)
-      match = text.match(/\*\*\s*Story\s*2[:\s]*[^*]*\*\*\s*([\s\S]*?)$/i);
-      if (match) return match[1].trim();
-      return null;
-    };
-
-    // Track last sent content to avoid duplicate sends
-    let lastStory2Length = 0;
-
-    // Stream from LLM and parse for story markers
-    await callTextModelStreaming(prompt, 6000, (delta, fullText) => {
-      accumulatedText = fullText;
-
-      // Check if we have a complete story 1
-      if (!story1Sent) {
-        const story1 = parseStory1(accumulatedText);
-        if (story1 && story1.length > 50) {
-          res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
-          story1Sent = true;
-          log.debug('  Story 1 sent to client');
-        }
-      }
-
-      // Progressively stream story 2 once story 1 is complete
-      // Send updates as more content arrives (throttled by length changes)
-      if (story1Sent) {
-        const story2 = parseStory2(accumulatedText);
-        if (story2 && story2.length > 50 && story2.length > lastStory2Length + 20) {
-          res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
-          lastStory2Length = story2.length;
-          if (!story2Sent) {
-            log.debug('  Story 2 streaming started');
-            story2Sent = true;
-          }
-        }
-      }
-    }, modelToUse);
-
-    // Send final complete story 2 (ensures complete text is shown even if streamed partially)
-    const finalStory2 = parseStory2(accumulatedText);
-    if (finalStory2) {
-      res.write(`data: ${JSON.stringify({ story2: finalStory2 })}\n\n`);
-      if (!story2Sent) {
-        log.debug('  Story 2 sent to client (final)');
-      }
+    // Generate Story 1
+    log.debug('  Generating story 1...');
+    try {
+      fullResponse1 = await callTextModel(prompt1, 3000, modelToUse);
+      const story1 = parseFinal(fullResponse1);
+      res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
+      log.debug('  Story 1 sent to client');
+    } catch (err) {
+      log.error('  Story 1 generation failed:', err.message);
+      res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
+      res.end();
+      return;
     }
 
-    // If story1 wasn't parsed correctly, try to extract it now
-    if (!story1Sent) {
-      const story1 = parseStory1(accumulatedText);
-      if (story1) {
-        res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
-      } else {
-        // Fallback: use the whole response as story1
-        res.write(`data: ${JSON.stringify({ story1: accumulatedText.trim() })}\n\n`);
-      }
+    // Generate Story 2 (different approach)
+    log.debug('  Generating story 2...');
+    const prompt2 = buildSinglePrompt('Create a DIFFERENT story from before. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.');
+    try {
+      fullResponse2 = await callTextModel(prompt2, 3000, modelToUse);
+      const story2 = parseFinal(fullResponse2);
+      res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
+      log.debug('  Story 2 sent to client');
+    } catch (err) {
+      log.error('  Story 2 generation failed:', err.message);
+      // Story 1 already sent, just log error for story 2
+      res.write(`data: ${JSON.stringify({ error: 'Failed to generate second story idea' })}\n\n`);
     }
 
-    // Send completion with full response for dev mode
-    res.write(`data: ${JSON.stringify({ done: true, fullResponse: accumulatedText })}\n\n`);
+    // Send completion with full responses for dev mode
+    const combinedResponse = `=== STORY 1 ===\n${fullResponse1}\n\n=== STORY 2 ===\n${fullResponse2}`;
+    res.write(`data: ${JSON.stringify({ done: true, fullResponse: combinedResponse })}\n\n`);
     res.end();
 
   } catch (err) {
