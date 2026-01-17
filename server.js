@@ -7148,6 +7148,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // FINAL CONSISTENCY CHECKS (if enabled)
     // =========================================================================
     let finalChecksReport = null;
+    let originalStoryText = null; // Will store original text if corrections are applied
     if (enableFinalChecks && !skipImages && allImages.length >= 2) {
       try {
         genLog.setStage('final_checks');
@@ -7189,6 +7190,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               finalChecksReport.overallConsistent = false;
             }
             finalChecksReport.totalIssues += textCheck.issues?.length || 0;
+
+            // Auto-apply text corrections if available
+            if (textCheck.fullCorrectedText && textCheck.issues?.length > 0) {
+              log.info(`✏️  [STORYBOOK] Applying ${textCheck.issues.length} text correction(s) to story`);
+              originalStoryText = fullStoryText; // Preserve original for dev mode
+              fullStoryText = textCheck.fullCorrectedText; // Apply corrected text
+              finalChecksReport.textCorrectionApplied = true;
+            }
           }
         }
 
@@ -7196,6 +7205,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         genLog.info('final_checks_result', `Final checks: ${finalChecksReport.summary}`, null, {
           imageChecks: finalChecksReport.imageChecks?.length || 0,
           textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
+          textCorrectionApplied: finalChecksReport.textCorrectionApplied || false,
           totalIssues: finalChecksReport.totalIssues || 0,
           overallConsistent: finalChecksReport.overallConsistent,
           summary: finalChecksReport.summary
@@ -7236,8 +7246,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       outlineModelId: streamingTextModelId, // Model used (dev mode)
       outlineUsage: streamingTextUsage, // Token usage (dev mode)
       visualBible: visualBible, // Recurring visual elements for consistency
-      storyText: fullStoryText,
-      originalStory: fullStoryText, // Store original for restore functionality
+      storyText: fullStoryText, // May be corrected text if text check found issues
+      originalStory: originalStoryText || fullStoryText, // Store original AI text for dev mode
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
@@ -8690,6 +8700,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // FINAL CONSISTENCY CHECKS (if enabled)
     // =========================================================================
     let finalChecksReport = null;
+    let originalStoryText = null; // Will store original text if corrections are applied
     if (enableFinalChecks && !skipImages && allImages.length >= 2) {
       try {
         genLog.setStage('final_checks');
@@ -8732,6 +8743,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               finalChecksReport.overallConsistent = false;
             }
             finalChecksReport.totalIssues += textCheck.issues?.length || 0;
+
+            // Auto-apply text corrections if available
+            if (textCheck.fullCorrectedText && textCheck.issues?.length > 0) {
+              log.info(`✏️  [UNIFIED] Applying ${textCheck.issues.length} text correction(s) to story`);
+              originalStoryText = fullStoryText; // Preserve original for dev mode
+              fullStoryText = textCheck.fullCorrectedText; // Apply corrected text
+              finalChecksReport.textCorrectionApplied = true;
+            }
           }
         }
 
@@ -8739,6 +8758,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         genLog.info('final_checks_result', `Final checks: ${finalChecksReport.summary}`, null, {
           imageChecks: finalChecksReport.imageChecks?.length || 0,
           textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
+          textCorrectionApplied: finalChecksReport.textCorrectionApplied || false,
           totalIssues: finalChecksReport.totalIssues || 0,
           overallConsistent: finalChecksReport.overallConsistent,
           summary: finalChecksReport.summary
@@ -8812,8 +8832,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       visualBible: visualBible, // Recurring visual elements for consistency
       styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
-      storyText: fullStoryText,
-      originalStory: fullStoryText, // Store original for restore functionality
+      storyText: fullStoryText, // May be corrected text if text check found issues
+      originalStory: originalStoryText || fullStoryText, // Store original AI text for dev mode
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,
       coverImages: coverImages,
