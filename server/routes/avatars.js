@@ -1731,6 +1731,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
     // Helper to generate single avatar with Gemini
     const generateSingleAvatarForJob = async (category) => {
+      const MAX_RETRIES = 2; // Total attempts = MAX_RETRIES + 1 = 3
+      let totalInputTokens = 0;
+      let totalOutputTokens = 0;
+
       try {
         const promptPart = (PROMPT_TEMPLATES.avatarMainPrompt || '').split('---\nCLOTHING_STYLES:')[0].trim();
         const clothingStylePrompt = getClothingStylePrompt(category, isFemale);
@@ -1781,65 +1785,89 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         log.info(`[AVATAR JOB ${jobId}] 🔍 System instruction present: ${!!PROMPT_TEMPLATES.avatarSystemInstruction} (${PROMPT_TEMPLATES.avatarSystemInstruction?.length || 0} chars)`);
         log.info(`[AVATAR JOB ${jobId}] 🔍 Photo: ${base64Data.length} chars, mime: ${mimeType}`);
 
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody)
+        // Retry loop for IMAGE_OTHER failures
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          if (attempt > 0) {
+            log.info(`[AVATAR JOB ${jobId}] 🔄 Retry ${attempt}/${MAX_RETRIES} for ${category} after IMAGE_OTHER...`);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between retries
           }
-        );
 
-        const data = await response.json();
-        let imageData = null;
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${geminiModelId}:generateContent?key=${geminiApiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody)
+            }
+          );
 
-        // Extract token usage from response
-        const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-        const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+          const data = await response.json();
+          let imageData = null;
 
-        // Log API response status for debugging
-        if (!response.ok) {
-          log.error(`[AVATAR JOB ${jobId}] Gemini API error for ${category}: ${response.status} ${response.statusText}`);
-          log.error(`[AVATAR JOB ${jobId}] Response body:`, JSON.stringify(data).substring(0, 500));
-          return { category, imageData: null, prompt: avatarPrompt, inputTokens, outputTokens };
-        }
+          // Extract token usage from response
+          const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+          const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+          totalInputTokens += inputTokens;
+          totalOutputTokens += outputTokens;
 
-        if (data.candidates && data.candidates[0]?.content?.parts) {
-          for (const part of data.candidates[0].content.parts) {
-            // Handle both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
-            const inlineData = part.inlineData || part.inline_data;
-            if (inlineData && inlineData.data) {
-              const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
-              imageData = `data:${respMimeType};base64,${inlineData.data}`;
-              break;
+          // Log API response status for debugging
+          if (!response.ok) {
+            log.error(`[AVATAR JOB ${jobId}] Gemini API error for ${category}: ${response.status} ${response.statusText}`);
+            log.error(`[AVATAR JOB ${jobId}] Response body:`, JSON.stringify(data).substring(0, 500));
+            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+          }
+
+          if (data.candidates && data.candidates[0]?.content?.parts) {
+            for (const part of data.candidates[0].content.parts) {
+              // Handle both camelCase (inlineData) and snake_case (inline_data) - Gemini API varies
+              const inlineData = part.inlineData || part.inline_data;
+              if (inlineData && inlineData.data) {
+                const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+                imageData = `data:${respMimeType};base64,${inlineData.data}`;
+                break;
+              }
             }
           }
+
+          // Success - return the image
+          if (imageData) {
+            if (attempt > 0) {
+              log.info(`[AVATAR JOB ${jobId}] ✅ ${category} succeeded on retry ${attempt}`);
+            }
+            const compressedImage = await compressImageToJPEG(imageData);
+            return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+          }
+
+          // No image - check if it's IMAGE_OTHER (retryable) or something else
+          const finishReason = data.candidates?.[0]?.finishReason;
+          const isImageOther = finishReason === 'IMAGE_OTHER';
+
+          if (!isImageOther || attempt === MAX_RETRIES) {
+            // Non-retryable error or last attempt - log and return failure
+            log.warn(`[AVATAR JOB ${jobId}] No image data in Gemini response for ${category}`);
+            if (finishReason) {
+              log.warn(`[AVATAR JOB ${jobId}] Finish reason: ${finishReason}`);
+            }
+            if (data.promptFeedback) {
+              log.warn(`[AVATAR JOB ${jobId}] Prompt feedback: ${JSON.stringify(data.promptFeedback)}`);
+            }
+            if (data.error) {
+              log.error(`[AVATAR JOB ${jobId}] API error: ${JSON.stringify(data.error)}`);
+            }
+            // Log full response for debugging IMAGE_OTHER
+            log.warn(`[AVATAR JOB ${jobId}] Full Gemini response: ${JSON.stringify(data).substring(0, 1000)}`);
+            return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
+          }
+
+          // IMAGE_OTHER with retries remaining - continue to next iteration
+          log.warn(`[AVATAR JOB ${jobId}] IMAGE_OTHER for ${category}, will retry...`);
         }
 
-        // Log if no image was found in response
-        if (!imageData) {
-          log.warn(`[AVATAR JOB ${jobId}] No image data in Gemini response for ${category}`);
-          if (data.candidates?.[0]?.finishReason) {
-            log.warn(`[AVATAR JOB ${jobId}] Finish reason: ${data.candidates[0].finishReason}`);
-          }
-          if (data.promptFeedback) {
-            log.warn(`[AVATAR JOB ${jobId}] Prompt feedback: ${JSON.stringify(data.promptFeedback)}`);
-          }
-          if (data.error) {
-            log.error(`[AVATAR JOB ${jobId}] API error: ${JSON.stringify(data.error)}`);
-          }
-          // Log full response for debugging IMAGE_OTHER
-          log.warn(`[AVATAR JOB ${jobId}] Full Gemini response: ${JSON.stringify(data).substring(0, 1000)}`);
-        }
-
-        if (imageData) {
-          const compressedImage = await compressImageToJPEG(imageData);
-          return { category, imageData: compressedImage, prompt: avatarPrompt, inputTokens, outputTokens };
-        }
-        return { category, imageData: null, prompt: avatarPrompt, inputTokens, outputTokens };
+        // Should not reach here, but just in case
+        return { category, imageData: null, prompt: avatarPrompt, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
       } catch (err) {
         log.error(`[AVATAR JOB ${jobId}] Generation failed for ${category}:`, err.message);
-        return { category, imageData: null, prompt: null, inputTokens: 0, outputTokens: 0 };
+        return { category, imageData: null, prompt: null, inputTokens: totalInputTokens, outputTokens: totalOutputTokens };
       }
     };
 

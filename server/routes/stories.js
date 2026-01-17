@@ -425,7 +425,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       // Styled avatar generation log (for developer mode auditing)
       styledAvatarGeneration: story.styledAvatarGeneration || [],
       // Costumed avatar generation log (for developer mode auditing)
-      costumedAvatarGeneration: story.costumedAvatarGeneration || []
+      costumedAvatarGeneration: story.costumedAvatarGeneration || [],
+      // Final consistency checks report (if final checks were enabled)
+      finalChecksReport: story.finalChecksReport || null
     };
 
     console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries, styledAvatars: ${devMetadata.styledAvatarGeneration?.length || 0}, costumedAvatars: ${devMetadata.costumedAvatarGeneration?.length || 0}`);
