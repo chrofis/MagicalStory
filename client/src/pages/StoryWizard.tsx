@@ -3675,12 +3675,29 @@ export default function StoryWizard() {
               onRepairImage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number) => {
                 try {
                   log.info('Starting auto-repair for page:', pageNumber);
-                  // Find the scene to get existing fixTargets (if available)
                   const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-                  const fixTargets = scene?.fixTargets;
-                  if (fixTargets && fixTargets.length > 0) {
-                    log.info(`Using ${fixTargets.length} existing fix targets from evaluation`);
+
+                  // Get fixTargets - try current state first, then check retryHistory
+                  let fixTargets = scene?.fixTargets;
+
+                  if (!fixTargets || fixTargets.length === 0) {
+                    // Look for pre-repair fixTargets in retryHistory (from automatic repair during generation)
+                    const lastAutoRepair = scene?.retryHistory
+                      ?.filter(r => r.type === 'auto_repair')
+                      ?.slice(-1)[0];
+
+                    if (lastAutoRepair?.preRepairEval?.fixTargets && lastAutoRepair.preRepairEval.fixTargets.length > 0) {
+                      fixTargets = lastAutoRepair.preRepairEval.fixTargets;
+                      log.info(`Using ${fixTargets.length} fix targets from retryHistory.preRepairEval`);
+                    }
                   }
+
+                  if (fixTargets && fixTargets.length > 0) {
+                    log.info(`Using ${fixTargets.length} existing fix targets`);
+                  } else {
+                    log.info('No stored fix targets found, will re-evaluate');
+                  }
+
                   const result = await storyService.repairImage(storyId, pageNumber, fixTargets);
 
                   if (result.repaired) {
