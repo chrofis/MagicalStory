@@ -127,7 +127,7 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
  * @returns {string} Scene description without JSON metadata block or translated summary
  */
 function stripSceneMetadata(sceneDescription) {
-  if (!sceneDescription) return sceneDescription;
+  if (!sceneDescription || typeof sceneDescription !== 'string') return sceneDescription;
 
   let stripped = sceneDescription;
 
