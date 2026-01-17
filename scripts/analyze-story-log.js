@@ -207,21 +207,45 @@ function extractStoryInfo(jobLines) {
     const metadataTitleMatch = msg.match(/Returning story metadata:\s*(.+?)\s*\(\d+\s*images/);
     if (metadataTitleMatch && !info.title) info.title = metadataTitleMatch[1];
 
-    // Story type, language, characters from idea generation
-    const ideaMatch = msg.match(/Story type:\s*(.+?),\s*Language:\s*(\S+),\s*Characters:\s*(\d+)/);
-    if (ideaMatch) {
-      info.storyType = ideaMatch[1];
-      info.language = ideaMatch[2];
-      info.characters = parseInt(ideaMatch[3]);
+    // Category/Topic/Language/Pages from job input logs
+    // Pattern: "Category: adventure, Topic: ..., Theme: ..., Language: en, Pages: 15"
+    const categoryMatch = msg.match(/Category:\s*(\S+),.*Language:\s*(\S+),\s*Pages:\s*(\d+)/);
+    if (categoryMatch) {
+      info.storyType = categoryMatch[1];
+      info.language = categoryMatch[2];
+      info.pages = parseInt(categoryMatch[3]);
     }
 
-    // Language level
+    // Language from standalone log: "  Language: en"
+    const langMatch = msg.match(/^\s*Language:\s*(\S+)\s*$/);
+    if (langMatch && !info.language) info.language = langMatch[1];
+
+    // Language from image prompt template: "Using storybook template for language: de-ch"
+    const templateLangMatch = msg.match(/template for language:\s*(\S+)/);
+    if (templateLangMatch && !info.language) info.language = templateLangMatch[1];
+
+    // Language level: "  Language Level: A1" or "Scene count: 15 (A1)"
     const levelMatch = msg.match(/Language Level:\s*(\S+)/);
     if (levelMatch) info.languageLevel = levelMatch[1];
 
-    // Pages
+    const sceneCountLevelMatch = msg.match(/Scene count:\s*\d+\s*\((\w+)\)/);
+    if (sceneCountLevelMatch && !info.languageLevel) info.languageLevel = sceneCountLevelMatch[1];
+
+    // Characters count from: "characters count: 2"
+    const charsMatch = msg.match(/characters count:\s*(\d+)/);
+    if (charsMatch) info.characters = parseInt(charsMatch[1]);
+
+    // Pages from: "Scenes to generate: 15"
     const pagesMatch = msg.match(/Scenes to generate:\s*(\d+)/);
-    if (pagesMatch) info.pages = parseInt(pagesMatch[1]);
+    if (pagesMatch && !info.pages) info.pages = parseInt(pagesMatch[1]);
+
+    // Pages from UNIFIED input: "Input: 15 pages"
+    const unifiedPagesMatch = msg.match(/\[UNIFIED\].*Input:\s*(\d+)\s*pages/);
+    if (unifiedPagesMatch && !info.pages) info.pages = parseInt(unifiedPagesMatch[1]);
+
+    // Pages from streaming efficiency: "Streaming efficiency: 7/7 pages"
+    const streamingPagesMatch = msg.match(/Streaming efficiency:\s*\d+\/(\d+)\s*pages/);
+    if (streamingPagesMatch && !info.pages) info.pages = parseInt(streamingPagesMatch[1]);
 
     // Returning full story (backup for title)
     const returnMatch = msg.match(/Returning full story:\s*(.+?)\s+with\s+(\d+)\s+images/);
