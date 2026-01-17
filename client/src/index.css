@@ -16,6 +16,16 @@ body {
   overflow-x: hidden; /* Prevent horizontal scroll on mobile */
 }
 
+/* Prevent image dragging on all devices (especially mobile) */
+img {
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none; /* Disable iOS callout on long press */
+}
+
 /* Story text styles */
 .story-text {
   font-family: 'Libre Baskerville', Georgia, serif;
