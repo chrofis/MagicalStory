@@ -359,11 +359,13 @@ The final output must be logically consistent and error-free.
 
 **IMPORTANT:** If you wrote joke variations earlier, select the BEST one and write it inline here. NO `[JOKE ...]` placeholders in the final text - write the actual joke.
 
+**DO NOT include word count in the final STORY PAGES section.** Word counts are only for the draft - the final output should be clean text only.
+
 For EACH of the {PAGES} pages, output in this EXACT format:
 
 --- Page 1 ---
 TEXT:
-[Full story text for this page - follow reading level guidelines]
+[Full story text for this page - follow reading level guidelines, NO word count]
 
 SCENE HINT:
 [1-2 sentences describing the KEY VISUAL MOMENT - MUST include left/right positions for each character, e.g., "Luna (left) waves at Max (right) across the playground"]

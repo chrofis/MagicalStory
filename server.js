@@ -8787,6 +8787,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           // Collect pages with medium/high severity issues
           for (const check of finalChecksReport.imageChecks) {
             for (const issue of (check.issues || [])) {
+              log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, images=${JSON.stringify(issue.images)}`);
               if (issue.severity === 'high' || issue.severity === 'medium') {
                 for (const pageNum of (issue.images || [])) {
                   pagesToRegenerate.add(pageNum);
@@ -8795,6 +8796,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 }
               }
             }
+          }
+
+          if (pagesToRegenerate.size === 0 && finalChecksReport.totalIssues > 0) {
+            log.info(`📋 [CONSISTENCY REGEN] No pages selected for regeneration (${finalChecksReport.totalIssues} issues found but none with high/medium severity)`);
           }
 
           if (pagesToRegenerate.size > 0) {

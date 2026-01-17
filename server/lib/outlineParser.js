@@ -1305,7 +1305,8 @@ class UnifiedStoryParser {
 
       // Extract TEXT section
       const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
-      const text = textMatch ? textMatch[1].trim() : '';
+      // Strip any trailing metadata like "*(Word count: 331)*" or similar
+      const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').trim() : '';
 
       // Extract SCENE HINT section (stops at Characters: which is now multi-line)
       const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
@@ -1708,7 +1709,8 @@ class ProgressiveUnifiedParser {
       if ((nextPageIndex > match.index && charactersBlockComplete) || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
         const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
-        const text = textMatch ? textMatch[1].trim() : '';
+        // Strip any trailing metadata like "*(Word count: 331)*" or similar
+        const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').trim() : '';
 
         const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
