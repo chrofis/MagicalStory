@@ -2997,9 +2997,19 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     const clothingRequirements = storyData.clothingRequirements || null;
 
     // Get character photos with correct clothing variant
-    // All covers use ALL characters (scene descriptions rarely name characters explicitly)
-    const coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-    log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
+    let coverCharacterPhotos;
+    if (normalizedCoverType === 'front') {
+      // Front cover: use only MAIN characters (isMainCharacter: true)
+      const allCharacters = storyData.characters || [];
+      const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+      const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+      coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      log.debug(`📕 [COVER REGEN] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
+    } else {
+      // Initial/Back covers: use ALL characters
+      coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
+    }
     // Apply styled avatars for non-costumed characters
     if (effectiveCoverClothing !== 'costumed') {
       coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
@@ -6271,9 +6281,21 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Get art style for avatar lookup
         const artStyleId = inputData.artStyle || 'pixar';
 
-        // All covers use ALL characters (scene descriptions rarely name characters explicitly)
-        const referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, streamingClothingRequirements);
-        log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+        // Determine character selection based on cover type
+        let referencePhotos;
+        if (coverType === 'titlePage') {
+          // Front cover: use only MAIN characters (isMainCharacter: true)
+          const allCharacters = inputData.characters || [];
+          const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+          // Fallback to all characters if no main characters defined
+          const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+          referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, costumeType, artStyleId, streamingClothingRequirements);
+          log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+        } else {
+          // Initial page and back cover: ALL characters
+          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, streamingClothingRequirements);
+          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+        }
         // Apply styled avatars for non-costumed characters
         if (clothing !== 'costumed') {
           referencePhotos = applyStyledAvatars(referencePhotos, artStyleId);
@@ -7008,8 +7030,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Front cover - only generate if not already done during streaming
         if (!coverImages.frontCover) {
-          // Use ALL characters for front cover (scene descriptions rarely name characters explicitly)
-          const frontCoverCharacters = inputData.characters || [];
+          // Front cover: use only MAIN characters (isMainCharacter: true)
+          const allCharacters = inputData.characters || [];
+          const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+          // Fallback to all characters if no main characters defined
+          const frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
           // Use extracted clothing or parse from scene description
           const frontCoverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
           // Handle costumed:type format
@@ -7025,7 +7050,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           if (frontCoverClothingCat !== 'costumed') {
             frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
           }
-          log.debug(`📕 [STORYBOOK] Front cover: ALL ${frontCoverCharacters.length} characters, clothing: ${frontCoverClothing}`);
+          log.debug(`📕 [STORYBOOK] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars), clothing: ${frontCoverClothing}`);
 
           const frontCoverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
             TITLE_PAGE_SCENE: titlePageScene,
@@ -8840,11 +8865,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const pagesToRegenerate = new Set();
           const pageIssueMap = new Map(); // pageNum -> issues[]
 
-          // Collect pages with medium/high severity issues
+          // Collect pages with high severity issues only (medium severity not auto-regenerated)
           for (const check of finalChecksReport.imageChecks) {
             for (const issue of (check.issues || [])) {
               log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, images=${JSON.stringify(issue.images)}`);
-              if (issue.severity === 'high') {  // Only regenerate high severity issues
+              if (issue.severity === 'high') {
                 for (const pageNum of (issue.images || [])) {
                   pagesToRegenerate.add(pageNum);
                   if (!pageIssueMap.has(pageNum)) pageIssueMap.set(pageNum, []);
@@ -8855,7 +8880,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
 
           if (pagesToRegenerate.size === 0 && finalChecksReport.totalIssues > 0) {
-            log.info(`📋 [CONSISTENCY REGEN] No pages selected for regeneration (${finalChecksReport.totalIssues} issues found but none with high/medium severity)`);
+            log.info(`📋 [CONSISTENCY REGEN] No pages selected for regeneration (${finalChecksReport.totalIssues} issues found but none with high severity)`);
           }
 
           if (pagesToRegenerate.size > 0) {
@@ -8907,8 +8932,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
               const expandedDescription = await callClaudeAPI(expansionPrompt, 2048, modelOverrides?.textModel);
 
-              // Get reference photos for this scene (same as original generation)
-              let pagePhotos = getCharacterPhotoDetails(sceneCharacters, 'standard', null, inputData.artStyle, {});
+              // Get reference photos for this scene with CORRECT clothing (not hardcoded 'standard')
+              const sceneMetadataForClothing = extractSceneMetadata(existingImage.description) || {};
+              const originalClothing = existingImage.clothing || sceneMetadataForClothing.clothing || 'standard';
+              let clothingCategory = originalClothing;
+              let costumeType = null;
+              if (originalClothing.startsWith('costumed:')) {
+                clothingCategory = 'costumed';
+                costumeType = originalClothing.split(':')[1];
+              }
+              // Build per-character clothing requirements for this page
+              const pageClothingReqs = {};
+              if (clothingRequirements) {
+                for (const [charName, reqs] of Object.entries(clothingRequirements)) {
+                  if (reqs && reqs._currentClothing) {
+                    pageClothingReqs[charName] = { _currentClothing: reqs._currentClothing };
+                  }
+                }
+              }
+              log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using clothing: ${originalClothing}`);
+              let pagePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, inputData.artStyle, pageClothingReqs);
               pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
 
               // Get landmark photos
@@ -8950,7 +8993,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               );
 
               if (imageResult?.imageData) {
-                // Store original image and prompt before replacing
+                // Store original image and prompt before replacing (with retry history for dev mode)
                 existingImage.consistencyRegen = {
                   originalImage: existingImage.imageData,
                   originalPrompt: existingImage.prompt,
@@ -8961,7 +9004,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   correctionNotes: correctionNotes,
                   issues: pageIssues,
                   score: imageResult.score,
-                  timestamp: new Date().toISOString()
+                  timestamp: new Date().toISOString(),
+                  retryHistory: imageResult.retryHistory || [],
+                  totalAttempts: imageResult.totalAttempts || 1,
+                  wasRegenerated: imageResult.wasRegenerated || false
                 };
 
                 // Replace with fixed image
@@ -8975,27 +9021,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
             }
 
-            // Re-run consistency check to verify fixes
-            log.info(`🔍 [CONSISTENCY REGEN] Re-checking consistency after regeneration...`);
-            const recheckImageData = {
-              sceneImages: allImages.map((img, idx) => {
-                const metadata = extractSceneMetadata(img.description) || {};
-                return {
-                  imageData: img.imageData,
-                  pageNumber: img.pageNumber || idx + 1,
-                  characters: metadata.characters || [],
-                  clothing: metadata.clothing || 'standard',
-                  referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean)
-                };
-              })
-            };
-            const recheck = await runFinalConsistencyChecks(recheckImageData, inputData.characters || [], { checkCharacters: false });
-            if (recheck) {
-              finalChecksReport.recheckAfterRegen = recheck;
-              finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
-              const remainingIssues = recheck.imageChecks?.reduce((sum, c) => sum + (c.issues?.length || 0), 0) || 0;
-              log.info(`📋 [CONSISTENCY REGEN] Re-check complete: ${remainingIssues} issue(s) remaining`);
-            }
+            // Track which pages were regenerated (skip redundant re-check - each image already evaluated)
+            finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
+            log.info(`📋 [CONSISTENCY REGEN] Regeneration complete for ${pagesToRegenerate.size} page(s)`);
           }
         }
 
@@ -9900,8 +9928,11 @@ async function processStoryJob(jobId) {
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
       // Prepare all cover generation promises
-      // Front cover - use ALL characters (scene descriptions rarely name characters explicitly)
-      const frontCoverCharacters = inputData.characters || [];
+      // Front cover - use only MAIN characters (isMainCharacter: true)
+      const allCharacters = inputData.characters || [];
+      const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+      const frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+      log.debug(`📕 [PIPELINE] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars)`);
       const frontCoverClothingRaw = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
       let frontCoverClothing = frontCoverClothingRaw;
       let frontCoverCostumeType = null;

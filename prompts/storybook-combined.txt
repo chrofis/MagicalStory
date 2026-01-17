@@ -196,11 +196,11 @@ TITLE: [Creative story title]
 ---TITLE PAGE---
 SCENE: (visual only - do NOT mention title text)
 Setting: [Cover scene that sets the mood for the story]
-Characters: [ALL MAIN CHARACTERS together - list each one]
-Action: [An inviting cover moment featuring all main characters together]
+Characters: [List ONLY characters with isMainCharacter=true by name]
+Action: [An inviting cover moment featuring the main character(s)]
 Mood: [Welcoming, magical, exciting, etc.]
 Clothing: [winter/summer/standard OR costumed:type]
-**CHARACTER RULE: Include ALL main characters on the front cover. They should all be prominently visible and recognizable.**
+**CRITICAL: Include ONLY characters marked as "main characters" (isMainCharacter: true). Do NOT include parents, siblings, or supporting characters unless they are marked as main characters.**
 
 ---INITIAL PAGE---
 SCENE: (visual only - do NOT mention dedication text)
