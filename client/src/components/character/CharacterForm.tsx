@@ -1555,14 +1555,23 @@ export function CharacterForm({
       {(developerMode || isImpersonating) && character.photos?.bodyNoBg && (
         <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-3">
           <h4 className="text-xs font-semibold text-yellow-700 mb-2">
-            Body Crop (No Background)
+            Body Crop (No Background) <span className="text-yellow-500 font-normal">(click to download)</span>
           </h4>
           <div className="flex justify-center">
             <img
               src={character.photos.bodyNoBg}
               alt={`${character.name} body crop`}
-              className="max-h-48 object-contain rounded border border-gray-300"
+              className="max-h-48 object-contain rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
               style={{ background: 'repeating-conic-gradient(#ccc 0% 25%, #fff 0% 50%) 50% / 20px 20px' }}
+              onClick={() => {
+                const link = document.createElement('a');
+                link.href = character.photos!.bodyNoBg!;
+                link.download = `${character.name.replace(/\s+/g, '_')}_body_no_bg.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
+              title="Click to download"
             />
           </div>
         </div>
