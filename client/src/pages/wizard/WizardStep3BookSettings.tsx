@@ -7,6 +7,7 @@ import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
   { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
+  { code: 'it-ch', name: 'Italiano (Svizzera)', flag: '🇨🇭' },
   { code: 'en-gb', name: 'English (UK)', flag: '🇬🇧' },
 ];
 
@@ -34,6 +35,15 @@ const ENGLISH_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[
   { code: 'en-au', name: 'English (Australia)', flag: '🇦🇺' },
   { code: 'en-ie', name: 'English (Ireland)', flag: '🇮🇪' },
   { code: 'en-za', name: 'English (South Africa)', flag: '🇿🇦' },
+];
+
+// Italian regional variants (shown after separator)
+const ITALIAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'it-it', name: 'Italiano (Standard)', flag: '🇮🇹' },
+  { code: 'it-it-north', name: 'Italiano (Nord)', flag: '🇮🇹' },
+  { code: 'it-it-central', name: 'Italiano (Centro/Toscana)', flag: '🇮🇹' },
+  { code: 'it-it-south', name: 'Italiano (Sud)', flag: '🇮🇹' },
+  { code: 'it-sm', name: 'Italiano (San Marino)', flag: '🇸🇲' },
 ];
 
 // Season options
@@ -246,6 +256,14 @@ export function WizardStep3BookSettings({
                   ──── {language === 'de' ? 'Englisch Varianten' : language === 'fr' ? 'Variantes anglaises' : 'English Variants'} ────
                 </option>
                 {ENGLISH_VARIANTS.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
+                <option disabled className="text-gray-400">
+                  ──── {language === 'de' ? 'Italienisch Varianten' : language === 'fr' ? 'Variantes italiennes' : 'Italian Variants'} ────
+                </option>
+                {ITALIAN_VARIANTS.map((lang) => (
                   <option key={lang.code} value={lang.code}>
                     {lang.name}
                   </option>

@@ -179,6 +179,67 @@ const LANGUAGES = {
     nameEnglish: 'English (UK - British)',
     instruction: 'You MUST write your response in English. Use British spelling: "-our" (colour, favour, honour), "-ise" (organise, realise), "-re" (centre, theatre), "-lled/-lling" (travelled, travelling), "grey", "catalogue", "cheque". Use British vocabulary: "flat" (not "apartment"), "lift" (not "elevator"), "lorry" (not "truck"), "boot" (not "trunk"), "bonnet" (not "hood"), "trousers" (not "pants"), "holiday" (not "vacation"), "pavement" (not "sidewalk"), "post" (not "mail"), "rubbish" (not "garbage"), "nappy" (not "diaper"), "biscuit" (not "cookie"), "crisps" (not "chips"), "chips" (not "fries"), "queue" (not "line"), "torch" (not "flashlight"), "cinema" (not "movie theater"). Use "have got" more freely. Date format: day-month-year. CORRECT: "colour", "travelled", "the flat", "in hospital", "at the weekend", "have you got" | WRONG: "color", "traveled", "the apartment", "in the hospital", "on the weekend", "do you have".',
     note: '(British English: -our, -ise, -re spellings. "flat", "lift", "lorry", "holiday". CORRECT: "colour", "travelled" | WRONG: "color", "traveled")'
+  },
+
+  // ============================================================================
+  // ITALIAN VARIANTS
+  // ============================================================================
+
+  'it-it': {
+    code: 'it-it',
+    name: 'Italiano (Standard)',
+    nameEnglish: 'Italian (Standard)',
+    instruction: 'You MUST write your response in Italian. Use standard Italian based on Tuscan literary tradition. Use passato prossimo for recent past in speech and informal writing, passato remoto for distant past and formal narrative. Standard vocabulary: "cellulare" (mobile phone), "frigorifero" (fridge), "automobile/macchina" (car), "anguria" (watermelon), "ragazzo/ragazza" (boy/girl), "sciocco" (silly/foolish), "soltanto" (only). Use "che cosa" or "cosa" for "what". Formal register uses "Lei" for polite address. CORRECT: "Che cosa fai?", "il cellulare", "l\'anguria", "sono andato ieri" | WRONG: "Che azione!", "il natel", "il cocomero" (regional), "tengo fame".',
+    note: '(Standard Italian: passato prossimo/remoto. "cellulare", "anguria". CORRECT: "il cellulare", "sono andato" | WRONG: "il natel", "tengo fame")'
+  },
+
+  'it-ch': {
+    code: 'it-ch',
+    name: 'Italiano (Svizzera)',
+    nameEnglish: 'Italian (Switzerland)',
+    instruction: 'You MUST write your response in Italian. Use Swiss Italian with German and French influences. Use standard Italian grammar but Swiss vocabulary: "azione" (special offer), "natel" (mobile phone, from German), "autopostale" (postal bus), "tassì" (taxi, stress on final syllable), "supermercato" or "negozio" (not "grande magazzino"), "scuola media" (middle school), "liceo" (all secondary schools), "comune" (municipality, used frequently), "formazione" (education/training), "stazione di servizio" (not "benzinaio"). More formal register overall. Administrative terms often differ from Italy. French-influenced: "controllare" (to check), "malgrado" (despite). CORRECT: "un\'azione speciale", "il natel", "l\'autopostale", "il tassì", "la formazione professionale" | WRONG: "una promo", "il cellulare", "il pullman", "il taxi" (Italian stress), "l\'addestramento".',
+    note: '(Swiss Italian: "azione", "natel", "autopostale", "tassì". CORRECT: "il natel", "l\'autopostale" | WRONG: "il cellulare", "il pullman")'
+  },
+
+  'it-it-north': {
+    code: 'it-it-north',
+    name: 'Italiano (Nord)',
+    nameEnglish: 'Italian (Northern)',
+    instruction: 'You MUST write your response in Italian. Use standard Italian with northern regional coloring (Lombardia, Piemonte, Veneto, Emilia-Romagna). Prefer passato prossimo almost exclusively, even for distant past. Use "cosa" (not "che cosa"). Northern vocabulary: "anguria" (watermelon), "ragazzo" (boy), "sciocco" (silly), "parlare" (to speak). More direct, business-like tone. Use "scherzare" (to joke). Common expressions: "magari" (maybe/I wish), "boh" (I don\'t know). Less emphatic than southern variants. CORRECT: "Cosa fai?", "l\'anguria", "sono andato" (even for distant past), "mica male", "boh, non so" | WRONG: "Che cosa vuoi?", "il cocomero", "andai" (passato remoto in speech), "tengo", "guaglione".',
+    note: '(Northern Italian: passato prossimo preferred. "cosa", "anguria", "magari", "boh". CORRECT: "sono andato", "boh" | WRONG: "andai", "tengo")'
+  },
+
+  'it-it-central': {
+    code: 'it-it-central',
+    name: 'Italiano (Centro/Toscana)',
+    nameEnglish: 'Italian (Central/Tuscan)',
+    instruction: 'You MUST write your response in Italian. Use standard Italian with Tuscan coloring (Toscana, Umbria, northern Lazio). Closest to literary standard. Use both passato prossimo and passato remoto appropriately. Tuscan vocabulary: "cencio" (rag), "balocco" (toy), "desinare" (lunch, formal), "grulleria" (foolishness), "gote" (cheeks), "cocomero" (watermelon), "bischero" (fool, informal). Use "codesto" (that near you) in formal writing. "Babbo" (dad, not "papà"). Common expression: "icché" for "che cosa" in informal speech. CORRECT: "il cocomero", "il babbo", "codesto libro", "che grulleria!" | WRONG: "l\'anguria", "il papà" (acceptable but less Tuscan), "tengo", "sto + gerund" overuse.',
+    note: '(Tuscan Italian: "cocomero", "babbo", "codesto", "bischero". CORRECT: "il babbo", "il cocomero" | WRONG: "il papà", "l\'anguria")'
+  },
+
+  'it-it-south': {
+    code: 'it-it-south',
+    name: 'Italiano (Sud)',
+    nameEnglish: 'Italian (Southern)',
+    instruction: 'You MUST write your response in Italian. Use standard Italian with southern regional coloring (Campania, Calabria, Sicilia, Puglia). Use "tenere" alongside "avere" for possession: "tengo fame" (I\'m hungry). Prefer passato remoto even for recent events in narrative. Southern vocabulary: "guaglione/guagliona" (boy/girl, Napoli), "picciliddru" (child, Sicilia), "mozzarella", "pummarola" (tomato sauce). More emphatic expressions, use "assai" (very/much), "mo\'" (now), "stare + gerund" frequently. Warmer, more expressive tone. "Ué" as interjection. Food terms often standard in all Italian. CORRECT: "tengo fame", "vieni mo\'!", "è bello assai", "andai ieri" (passato remoto for yesterday), "ué!" | WRONG: "ho fame" (correct but less southern), "vieni adesso", "è molto bello", "sono andato" (for narrative).',
+    note: '(Southern Italian: "tengo", passato remoto, "assai", "mo\'", "ué". CORRECT: "tengo fame", "andai ieri" | WRONG: "ho fame", "sono andato")'
+  },
+
+  'it-sm': {
+    code: 'it-sm',
+    name: 'Italiano (San Marino)',
+    nameEnglish: 'Italian (San Marino)',
+    instruction: 'You MUST write your response in Italian. Use essentially identical to standard Italian (it-it) with minor local administrative terms. Use standard Italian grammar, spelling, and vocabulary throughout. Local terms: "Capitani Reggenti" (heads of state), "castello" (administrative district), "Consiglio Grande e Generale" (parliament). Sammarinese identity reflected in references to institutions, not language variation. Formal register for official contexts. CORRECT: "il Capitano Reggente", "il castello di Serravalle", standard Italian throughout | WRONG: Swiss or regional Italian variants.',
+    note: '(San Marino Italian: Standard Italian + local administrative terms. CORRECT: "Capitani Reggenti", "castello" | WRONG: Swiss/regional variants)'
+  },
+
+  // Legacy 'it' maps to Standard Italian
+  'it': {
+    code: 'it-it',
+    name: 'Italiano (Standard)',
+    nameEnglish: 'Italian (Standard)',
+    instruction: 'You MUST write your response in Italian. Use standard Italian based on Tuscan literary tradition. Use passato prossimo for recent past in speech and informal writing, passato remoto for distant past and formal narrative. Standard vocabulary: "cellulare" (mobile phone), "frigorifero" (fridge), "automobile/macchina" (car), "anguria" (watermelon), "ragazzo/ragazza" (boy/girl), "sciocco" (silly/foolish), "soltanto" (only). Use "che cosa" or "cosa" for "what". Formal register uses "Lei" for polite address. CORRECT: "Che cosa fai?", "il cellulare", "l\'anguria", "sono andato ieri" | WRONG: "Che azione!", "il natel", "il cocomero" (regional), "tengo fame".',
+    note: '(Standard Italian: passato prossimo/remoto. "cellulare", "anguria". CORRECT: "il cellulare", "sono andato" | WRONG: "il natel", "tengo fame")'
   }
 };
 
@@ -247,7 +308,14 @@ function getAvailableLanguages() {
     { code: 'en-ca', name: 'English (Canada)', nameEnglish: 'English (Canada)' },
     { code: 'en-au', name: 'English (Australia)', nameEnglish: 'English (Australia)' },
     { code: 'en-ie', name: 'English (Ireland)', nameEnglish: 'English (Ireland)' },
-    { code: 'en-za', name: 'English (South Africa)', nameEnglish: 'English (South Africa)' }
+    { code: 'en-za', name: 'English (South Africa)', nameEnglish: 'English (South Africa)' },
+    // Italian variants
+    { code: 'it-it', name: 'Italiano (Standard)', nameEnglish: 'Italian (Standard)' },
+    { code: 'it-ch', name: 'Italiano (Svizzera)', nameEnglish: 'Italian (Switzerland)' },
+    { code: 'it-it-north', name: 'Italiano (Nord)', nameEnglish: 'Italian (Northern)' },
+    { code: 'it-it-central', name: 'Italiano (Centro/Toscana)', nameEnglish: 'Italian (Central/Tuscan)' },
+    { code: 'it-it-south', name: 'Italiano (Sud)', nameEnglish: 'Italian (Southern)' },
+    { code: 'it-sm', name: 'Italiano (San Marino)', nameEnglish: 'Italian (San Marino)' }
   ];
 }
 

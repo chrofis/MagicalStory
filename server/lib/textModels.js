@@ -623,7 +623,8 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
     log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language})`);
 
     // Use Gemini for text check (faster and cheaper than Claude for this task)
-    const result = await callGeminiTextAPI(prompt, 4000, 'gemini-2.0-flash');
+    // Use 8000 tokens to avoid truncation (4000 was hitting the limit)
+    const result = await callGeminiTextAPI(prompt, 8000, 'gemini-2.0-flash');
 
     if (!result?.text) {
       log.warn('⚠️  [TEXT CHECK] No response from text model');
