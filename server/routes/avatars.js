@@ -1174,8 +1174,8 @@ async function generateStyledAvatarWithSignature(character, category, config, ar
   // Build clothing description: base clothing + signature items
   const isFemale = character.gender === 'female';
   const baseClothing = character.avatars?.clothing?.[category] || getClothingStylePrompt(category, isFemale);
-  const clothingWithSignature = config.signature
-    ? `${baseClothing}\n\nSIGNATURE ITEMS (MUST INCLUDE these visible elements): ${config.signature}`
+  const clothingWithSignature = config.signature && config.signature.toLowerCase() !== 'none'
+    ? `${baseClothing}, plus this signature element: ${config.signature}`
     : baseClothing;
 
   log.debug(`🎨 [STYLED SIGNATURE] Generating ${category} avatar with signature in ${artStyle} style for ${character.name}`);

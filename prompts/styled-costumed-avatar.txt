@@ -8,7 +8,7 @@ TOP ROW - EXACT COPIES OF REFERENCE (same style as reference):
 
 BOTTOM ROW - NEW STYLE WITH COSTUME:
 - BOTTOM-LEFT: Full body front view in new style: {ART_STYLE_PROMPT}. Wearing: {COSTUME_DESCRIPTION}
-- BOTTOM-RIGHT: Full body side view facing RIGHT in same new style. Same costume.
+- BOTTOM-RIGHT: Full body side view facing RIGHT in same new style. Wearing: {COSTUME_DESCRIPTION}
 
 ⚠️ ONLY THE BOTTOM ROW gets the new art style. Top row stays in reference style.
 
