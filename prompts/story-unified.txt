@@ -204,7 +204,7 @@ Based on the story draft, determine which clothing variants each character needs
 {
   "clothingRequirements": {
     "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "[signature items if different from reference]" },
+      "standard": { "used": true/false, "signature": "[story-theme items: badge, backpack, etc.]" },
       "winter": { "used": true/false, "signature": "[cold weather additions]" },
       "summer": { "used": true/false, "signature": "[warm weather items]" },
       "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
@@ -216,7 +216,15 @@ Based on the story draft, determine which clothing variants each character needs
 Guidelines for clothing:
 - Prefer `standard` when story doesn't require special clothing
 - **Indoor scenes should use `standard` clothing, NOT winter** - winter clothing is only for outdoor cold weather scenes
-- For standard/winter/summer: Only describe **signature elements** (hat, boots, scarf, vest)
+- For standard/winter/summer: describe **signature items** - story-relevant additions to their normal clothes
+  - Signature items should relate to the story THEME (1-2 items per character)
+  - Examples by theme:
+    - Space story: "NASA mission patch on shirt, toy rocket in pocket"
+    - Camping story: "hiking backpack, compass on lanyard"
+    - Birthday story: "party hat, birthday badge"
+    - Cooking story: "kid-sized apron, chef bandana"
+    - School story: "colorful backpack, friendship bracelet"
+  - If truly no additions needed, write "none" (but most stories benefit from theme items)
 - For costumed: Provide **complete outfit description** (CLOTHING ONLY - do NOT include pets, companions, animals, carried objects, or items in pockets/pouches)
   - ✅ INCLUDE: clothes, shoes, belts, jewelry, capes, vests, aprons worn on body
   - ❌ EXCLUDE: pets ("elephant peeking from pocket"), companions, toys, bag contents
