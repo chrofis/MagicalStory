@@ -3,48 +3,67 @@ import { BookOpen, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
-// Primary story language options (shown first)
-const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
-  { code: 'it-ch', name: 'Italiano (Svizzera)', flag: '🇨🇭' },
-  { code: 'en-gb', name: 'English (UK)', flag: '🇬🇧' },
+// Main language options (shown first - default variant for each language)
+const MAIN_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string; family: 'de' | 'fr' | 'it' | 'en' }[] = [
+  { code: 'de-ch', name: 'Deutsch', flag: '🇨🇭', family: 'de' },
+  { code: 'fr-ch', name: 'Français', flag: '🇨🇭', family: 'fr' },
+  { code: 'it-ch', name: 'Italiano', flag: '🇨🇭', family: 'it' },
+  { code: 'en-gb', name: 'English', flag: '🇬🇧', family: 'en' },
 ];
 
-// German regional variants (shown after separator)
-const GERMAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'de-de', name: 'Deutsch (Standard)', flag: '🇩🇪' },
-  { code: 'de-de-north', name: 'Norddeutsch', flag: '🇩🇪' },
-  { code: 'de-de-south', name: 'Süddeutsch', flag: '🇩🇪' },
-  { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
-  { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
-];
+// Regional variants for each language family
+const LANGUAGE_VARIANTS: Record<'de' | 'fr' | 'it' | 'en', { code: StoryLanguageCode; name: string; flag: string }[]> = {
+  de: [
+    { code: 'de-ch', name: 'Schweiz', flag: '🇨🇭' },
+    { code: 'de-de', name: 'Standard', flag: '🇩🇪' },
+    { code: 'de-de-north', name: 'Nord', flag: '🇩🇪' },
+    { code: 'de-de-south', name: 'Süd', flag: '🇩🇪' },
+    { code: 'de-at', name: 'Österreich', flag: '🇦🇹' },
+    { code: 'de-it', name: 'Südtirol', flag: '🇮🇹' },
+  ],
+  fr: [
+    { code: 'fr-ch', name: 'Suisse', flag: '🇨🇭' },
+    { code: 'fr-fr', name: 'France', flag: '🇫🇷' },
+    { code: 'fr-be', name: 'Belgique', flag: '🇧🇪' },
+    { code: 'fr-ca', name: 'Québec', flag: '🇨🇦' },
+    { code: 'fr-af', name: 'Afrique', flag: '🌍' },
+  ],
+  it: [
+    { code: 'it-ch', name: 'Svizzera', flag: '🇨🇭' },
+    { code: 'it-it', name: 'Standard', flag: '🇮🇹' },
+    { code: 'it-it-north', name: 'Nord', flag: '🇮🇹' },
+    { code: 'it-it-central', name: 'Centro/Toscana', flag: '🇮🇹' },
+    { code: 'it-it-south', name: 'Sud', flag: '🇮🇹' },
+    { code: 'it-sm', name: 'San Marino', flag: '🇸🇲' },
+  ],
+  en: [
+    { code: 'en-gb', name: 'UK', flag: '🇬🇧' },
+    { code: 'en-us', name: 'US', flag: '🇺🇸' },
+    { code: 'en-ca', name: 'Canada', flag: '🇨🇦' },
+    { code: 'en-au', name: 'Australia', flag: '🇦🇺' },
+    { code: 'en-ie', name: 'Ireland', flag: '🇮🇪' },
+    { code: 'en-za', name: 'South Africa', flag: '🇿🇦' },
+  ],
+};
 
-// French regional variants (shown after separator)
-const FRENCH_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'fr-fr', name: 'Français (France)', flag: '🇫🇷' },
-  { code: 'fr-be', name: 'Français (Belgique)', flag: '🇧🇪' },
-  { code: 'fr-ca', name: 'Français (Québec)', flag: '🇨🇦' },
-  { code: 'fr-af', name: 'Français (Afrique)', flag: '🌍' },
-];
+// Helper to determine language family from code
+function getLanguageFamily(code: StoryLanguageCode): 'de' | 'fr' | 'it' | 'en' {
+  if (code.startsWith('de')) return 'de';
+  if (code.startsWith('fr')) return 'fr';
+  if (code.startsWith('it')) return 'it';
+  return 'en';
+}
 
-// English regional variants (shown after separator)
-const ENGLISH_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'en-us', name: 'English (US)', flag: '🇺🇸' },
-  { code: 'en-ca', name: 'English (Canada)', flag: '🇨🇦' },
-  { code: 'en-au', name: 'English (Australia)', flag: '🇦🇺' },
-  { code: 'en-ie', name: 'English (Ireland)', flag: '🇮🇪' },
-  { code: 'en-za', name: 'English (South Africa)', flag: '🇿🇦' },
-];
-
-// Italian regional variants (shown after separator)
-const ITALIAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  { code: 'it-it', name: 'Italiano (Standard)', flag: '🇮🇹' },
-  { code: 'it-it-north', name: 'Italiano (Nord)', flag: '🇮🇹' },
-  { code: 'it-it-central', name: 'Italiano (Centro/Toscana)', flag: '🇮🇹' },
-  { code: 'it-it-south', name: 'Italiano (Sud)', flag: '🇮🇹' },
-  { code: 'it-sm', name: 'Italiano (San Marino)', flag: '🇸🇲' },
-];
+// Helper to get display name for current language
+function getLanguageDisplayName(code: StoryLanguageCode): string {
+  const family = getLanguageFamily(code);
+  const variant = LANGUAGE_VARIANTS[family].find(v => v.code === code);
+  const mainLang = MAIN_LANGUAGES.find(l => l.family === family);
+  if (variant && mainLang) {
+    return `${mainLang.name} (${variant.name})`;
+  }
+  return mainLang?.name || code;
+}
 
 // Season options
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'];
@@ -220,57 +239,42 @@ export function WizardStep3BookSettings({
 
         {/* Language, Location, Season Row - full width */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Language Dropdown */}
+          {/* Language Selection */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
               {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
             </span>
+            {/* Main Language Buttons */}
+            <div className="flex gap-1">
+              {MAIN_LANGUAGES.map((lang) => (
+                <button
+                  key={lang.family}
+                  onClick={() => onStoryLanguageChange(lang.code)}
+                  className={`px-2 py-1 text-sm font-medium rounded transition-colors ${
+                    getLanguageFamily(storyLanguage) === lang.family
+                      ? 'bg-indigo-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {lang.name}
+                </button>
+              ))}
+            </div>
+            {/* Variant Dropdown - shows variants for selected language family */}
             <div className="relative">
               <select
                 value={storyLanguage}
                 onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+                className="px-2 py-1 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-7"
               >
-                {STORY_LANGUAGES.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-                <option disabled className="text-gray-400">
-                  ──── {language === 'de' ? 'Deutsch Varianten' : language === 'fr' ? 'Variantes allemandes' : 'German Variants'} ────
-                </option>
-                {GERMAN_VARIANTS.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-                <option disabled className="text-gray-400">
-                  ──── {language === 'de' ? 'Französisch Varianten' : language === 'fr' ? 'Variantes françaises' : 'French Variants'} ────
-                </option>
-                {FRENCH_VARIANTS.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-                <option disabled className="text-gray-400">
-                  ──── {language === 'de' ? 'Englisch Varianten' : language === 'fr' ? 'Variantes anglaises' : 'English Variants'} ────
-                </option>
-                {ENGLISH_VARIANTS.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
-                  </option>
-                ))}
-                <option disabled className="text-gray-400">
-                  ──── {language === 'de' ? 'Italienisch Varianten' : language === 'fr' ? 'Variantes italiennes' : 'Italian Variants'} ────
-                </option>
-                {ITALIAN_VARIANTS.map((lang) => (
-                  <option key={lang.code} value={lang.code}>
-                    {lang.name}
+                {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
+                  <option key={variant.code} value={variant.code}>
+                    {variant.flag} {variant.name}
                   </option>
                 ))}
               </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="absolute inset-y-0 right-0 flex items-center pr-1.5 pointer-events-none">
+                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </div>

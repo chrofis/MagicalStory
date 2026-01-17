@@ -83,7 +83,7 @@ function extractJobs(lines) {
   const jobs = [];
   const jobsById = new Map();
 
-  // First pass: find all job IDs mentioned in the log
+  // First pass: find all job IDs and their start/end indices
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const msg = line.message;
@@ -101,17 +101,21 @@ function extractJobs(lines) {
           startIndex: i,
           endIndex: i,
           status: 'unknown',
-          lines: []
+          lines: [] // Will be populated in second pass
         });
       }
       const job = jobsById.get(jobId);
-      job.lines.push(line);
       job.endIndex = i;
 
       // Update timestamps
       const ts = parseTimestamp(line.timestamp);
-      if (!job.startTime || ts < job.startTime) job.startTime = ts;
-      if (!job.endTime || ts > job.endTime) job.endTime = ts;
+      if (!job.startTime || ts < job.startTime) {
+        job.startTime = ts;
+        job.startIndex = i;
+      }
+      if (!job.endTime || ts > job.endTime) {
+        job.endTime = ts;
+      }
 
       // Job start patterns
       const createMatch = msg.match(/Creating story job (job_\S+) for user (\S+)/);
@@ -152,9 +156,14 @@ function extractJobs(lines) {
     }
   }
 
-  // Convert to array and filter to only jobs with meaningful data
+  // Second pass: collect ALL lines between start and end index for each job
   for (const job of jobsById.values()) {
-    // Only include jobs with cost data or completion status
+    // Collect all lines in the job's time range
+    for (let i = job.startIndex; i <= job.endIndex; i++) {
+      job.lines.push(lines[i]);
+    }
+
+    // Only include jobs with meaningful data
     const hasCostData = job.lines.some(l => l.message.includes('Token usage & cost summary'));
     const hasCompletion = job.status === 'completed' || job.status === 'failed';
 
@@ -182,7 +191,8 @@ function extractStoryInfo(jobLines) {
   };
 
   for (const line of jobLines) {
-    const msg = line.message;
+    // Strip [DEBUG] prefix if present
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
 
     // Title
     const titleMatch = msg.match(/Extracted title.*?:\s*"(.+?)"/);
@@ -228,7 +238,8 @@ function extractCostSummary(jobLines) {
   };
 
   for (const line of jobLines) {
-    const msg = line.message;
+    // Strip [DEBUG] prefix if present
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
 
     // By function entries: "Outline: 4,107 in / 11,870 out (1 calls) $0.1904 [claude-sonnet-4-5-20250929]"
     // Also handles: "Scene Expand: 105,551 in / 23,349 out (15 calls) $0.6669 [claude-sonnet-4-5-20250929]"
@@ -312,15 +323,17 @@ function extractIssues(jobLines) {
     // Skip Flask development server warning
     if (msg.includes('development server') || msg.includes('WSGI server')) continue;
 
-    // Warnings
-    if (msg.includes('WARNING') || msg.includes('\u26a0\ufe0f') || line.level === 'wrn') {
+    // Warnings - look for actual warning indicators
+    if ((msg.includes('WARNING') || msg.includes('\u26a0\ufe0f') || msg.includes('[WARN]') || line.level === 'wrn') &&
+        !msg.includes('development server') && !msg.includes('WSGI')) {
       issues.warnings.push({ time: ts, message: msg.substring(0, 150) });
     }
 
-    // Errors
-    if (msg.includes('Error') || msg.includes('\u274c') || msg.includes('failed') || line.level === 'err') {
-      // Skip checkpoint errors and normal log messages
-      if (!msg.includes('checkpoint') && !msg.includes('story-failed')) {
+    // Errors - look for actual error indicators
+    if ((msg.includes('Error:') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
+         (msg.includes('failed') && !msg.includes('story-failed'))) || line.level === 'err') {
+      // Skip checkpoint errors, email templates, and normal log messages
+      if (!msg.includes('checkpoint') && !msg.includes('story-failed') && !msg.includes('email template')) {
         issues.errors.push({ time: ts, message: msg.substring(0, 150) });
       }
     }
@@ -330,12 +343,16 @@ function extractIssues(jobLines) {
       issues.fallbacks.push({ time: ts, message: msg.substring(0, 150) });
     }
 
-    // Low quality scores (< 80)
-    const scoreMatch = msg.match(/score:\s*(\d+)/i);
+    // Low quality scores (< 80) - look for quality evaluation score patterns
+    // Match patterns like "score: 75%" from [QUALITY RETRY] logs
+    const scoreMatch = msg.match(/score[:\s]+(\d+)%/i);
     if (scoreMatch) {
       const score = parseInt(scoreMatch[1]);
       if (score < 80) {
-        issues.lowQualityScores.push({ time: ts, score, message: msg.substring(0, 100) });
+        // Extract page number if present
+        const pageMatch = msg.match(/\[PAGE\s+(\d+)\]/);
+        const page = pageMatch ? parseInt(pageMatch[1]) : null;
+        issues.lowQualityScores.push({ time: ts, score, page, message: msg.substring(0, 120) });
       }
     }
 

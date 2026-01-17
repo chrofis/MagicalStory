@@ -625,8 +625,8 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
     const modelToUse = textModel || getActiveTextModel().modelId;
     log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language}, model: ${modelToUse})`);
 
-    // Use 8000 tokens to avoid truncation
-    const result = await callTextModel(prompt, 8000, null, modelToUse);
+    // Use 16000 tokens (same as image evaluation) to avoid truncation
+    const result = await callTextModel(prompt, 16000, null, modelToUse);
 
     if (!result?.text) {
       log.warn('⚠️  [TEXT CHECK] No response from text model');

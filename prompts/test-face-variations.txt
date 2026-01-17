@@ -1,41 +1,37 @@
-Generate 4 PHOTOREALISTIC portraits of THE SAME PERSON from the reference photo in a 2x2 grid.
+Generate 4 PHOTOREALISTIC face portraits in a 2x2 grid, each a DIFFERENT INTERPRETATION of the reference person.
 
 ## CONCEPT
-Create 4 photos of THE EXACT SAME CHILD/PERSON from the reference image.
-These should look like 4 different photos taken of the SAME person on different days.
-ALL 4 must be immediately recognizable as the person in the reference photo.
-The subtle variations are natural - like how anyone looks slightly different in different photos.
+Create 4 DIFFERENT ATTEMPTS at capturing this person's likeness.
+Each attempt should emphasize DIFFERENT facial features.
+The goal is variation in HOW accurately each captures the original - so user can SELECT the best match.
 
-## IDENTITY PRESERVATION (CRITICAL - match the reference photo)
-You MUST preserve these features EXACTLY from the reference:
-- Face shape and proportions
-- Eye shape, size, color, and spacing
-- Nose shape and size
-- Mouth and lip shape
-- Ear shape and position
-- Hairline shape
-- Skin tone and any freckles/marks
-- Overall facial structure and bone structure
+## THE 4 INTERPRETATIONS
+
+1. **Top-Left - EYE FOCUS**:
+   Prioritize EXACT match of: eye shape, eye color, eye spacing, eyebrow shape, eye expression
+   Other features can be approximate
+
+2. **Top-Right - STRUCTURE FOCUS**:
+   Prioritize EXACT match of: face shape, jaw line, cheekbone position, face proportions, head shape
+   Other features can be approximate
+
+3. **Bottom-Left - DETAIL FOCUS**:
+   Prioritize EXACT match of: nose shape, lip shape, ear shape, hairline, skin texture, any marks/freckles
+   Other features can be approximate
+
+4. **Bottom-Right - GESTALT FOCUS**:
+   Prioritize overall IMPRESSION and FEELING of the person
+   Capture the "essence" - how friends would recognize them
+   Balance all features equally
 
 ## OUTPUT FORMAT
-Create a 2x2 GRID with 4 PHOTOREALISTIC FACE PORTRAITS:
-- ALL 4 looking DIRECTLY AT CAMERA (frontal view)
-- ALL 4 with similar HAPPY expression (friendly smile)
-- ALL 4 in FULL COLOR
-- ALL 4 must look like THE SAME PERSON as the reference
+- 2x2 grid, 1024x1024 total
+- ALL 4 looking at camera, happy expression
+- ALL 4 same gender and age as reference
+- ALL 4 photorealistic
+- Simple solid background
 
-## THE 4 VARIATIONS (very subtle, natural differences)
-Like photos taken on different days - same person, tiny natural variations:
-1. Top-Left: Direct match to reference - neutral happy expression
-2. Top-Right: Same person - slightly wider smile, eyes slightly more open
-3. Bottom-Left: Same person - subtle head tilt (still frontal), relaxed smile
-4. Bottom-Right: Same person - biggest smile, showing teeth
-
-## CRITICAL REQUIREMENTS
-- ALL 4 faces must be IMMEDIATELY RECOGNIZABLE as the reference person
-- This is the SAME PERSON in all 4 photos, NOT siblings or relatives
-- Variations are ONLY in expression and lighting, NOT in facial features
-- PHOTOREALISTIC - must look like real photographs
-- Head and shoulders framing
-- Clean, simple background (solid pastel or soft gradient)
-- Professional portrait photography quality
+## KEY INSTRUCTION
+These 4 faces should look RELATED but NOT IDENTICAL.
+Each is a different artist's interpretation of the same person.
+Some will match the original better than others - THAT IS THE GOAL.

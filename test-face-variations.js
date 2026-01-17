@@ -111,11 +111,11 @@ async function generateFaceVariations(photoBase64, apiKey) {
   const requestBody = {
     systemInstruction: {
       parts: [{
-        text: `You are an expert portrait photographer specializing in identity-accurate portraits.
-Your task is to create 4 photos of THE SAME PERSON in a 2x2 grid layout.
-CRITICAL: All 4 faces must be IMMEDIATELY RECOGNIZABLE as the person in the reference photo.
-These are 4 photos of the SAME person taken on different days - NOT siblings, NOT relatives.
-PRESERVE: exact face shape, eye shape, nose, mouth, hairline, skin tone. VARY: only expression (smile width).`
+        text: `You are an expert portrait artist creating 4 DIFFERENT INTERPRETATIONS of the same person.
+Each interpretation emphasizes DIFFERENT facial features - eyes, structure, details, or overall impression.
+The 4 faces should look RELATED but NOT IDENTICAL - like 4 artists each drew the same person.
+GOAL: Create variation so some interpretations match the original better than others.
+User will SELECT which interpretation best captures the person's likeness.`
       }]
     },
     contents: [{
@@ -196,10 +196,10 @@ async function splitGrid(gridBase64) {
   // Note: quadrant names from split-grid API are legacy names from avatar grid format
   // For our 4-face test, they map to: top-left, top-right, bottom-left, bottom-right
   return [
-    { name: 'Face 1 (Neutral)', position: 'top-left', image: result.quadrants.faceFront },
-    { name: 'Face 2 (Gentle Smile)', position: 'top-right', image: result.quadrants.faceProfile },
-    { name: 'Face 3 (Curious)', position: 'bottom-left', image: result.quadrants.bodyFront },
-    { name: 'Face 4 (Happy Smile)', position: 'bottom-right', image: result.quadrants.bodyProfile }
+    { name: 'Face 1 (Eye Focus)', position: 'top-left', image: result.quadrants.faceFront },
+    { name: 'Face 2 (Structure Focus)', position: 'top-right', image: result.quadrants.faceProfile },
+    { name: 'Face 3 (Detail Focus)', position: 'bottom-left', image: result.quadrants.bodyFront },
+    { name: 'Face 4 (Gestalt Focus)', position: 'bottom-right', image: result.quadrants.bodyProfile }
   ];
 }
 
