@@ -882,7 +882,7 @@ class OutlineParser {
  * @returns {string[]} - Array of character names found (lowercased, trimmed)
  */
 function extractCharacterNamesFromScene(sceneDescription) {
-  if (!sceneDescription) return [];
+  if (!sceneDescription || typeof sceneDescription !== 'string') return [];
 
   const characterNames = [];
   const charactersKeywords = KEYWORDS.characters.join('|');

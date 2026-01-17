@@ -8825,8 +8825,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Get scene description - could be in different places depending on generation flow
               let sceneDescription = existingImage.description || existingImage.prompt || '';
               if (typeof sceneDescription !== 'string') {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has non-string description, using prompt instead`);
-                sceneDescription = existingImage.prompt || '';
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has non-string description (${typeof sceneDescription}), using prompt instead`);
+                sceneDescription = typeof existingImage.prompt === 'string' ? existingImage.prompt : '';
               }
               if (!sceneDescription) {
                 log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has no description, skipping`);

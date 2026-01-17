@@ -182,7 +182,7 @@ function stripSceneMetadata(sceneDescription) {
  * @returns {Object|null} Parsed metadata or null if not found/invalid
  */
 function extractSceneMetadata(sceneDescription) {
-  if (!sceneDescription) return null;
+  if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
   // Look for ```json block
   const jsonBlockMatch = sceneDescription.match(/```json\s*([\s\S]*?)```/i);
@@ -576,7 +576,7 @@ function calculateStoryPageCount(storyData, includeCoverPages = true) {
  * @returns {Array} Characters that appear in this scene
  */
 function getCharactersInScene(sceneDescription, characters) {
-  if (!sceneDescription || !characters || characters.length === 0) {
+  if (!sceneDescription || typeof sceneDescription !== 'string' || !characters || characters.length === 0) {
     return [];
   }
 
@@ -712,7 +712,7 @@ function getCharacterPhotos(characters, clothingCategory = null) {
  * @returns {string|null} Clothing category (winter, summer, formal, standard) or null if not found
  */
 function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
-  if (!sceneDescription) return null;
+  if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
   // Step 0: Try JSON metadata block first (most reliable)
   const metadata = extractSceneMetadata(sceneDescription);
