@@ -2199,7 +2199,7 @@ ${landmarkEntries}`;
       .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
 
     // Get model to use
-    const { callTextModel, getModelDefaults } = require('./server/lib/textModels');
+    const { callTextModelStreaming, getModelDefaults } = require('./server/lib/textModels');
     const modelDefaults = getModelDefaults();
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
@@ -2208,12 +2208,11 @@ ${landmarkEntries}`;
     // Load single-story prompt template
     const singlePromptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-idea-single.txt'), 'utf-8');
 
-    // Helper function to parse [FINAL] from response
+    // Helper function to parse [FINAL] from streaming text
     const parseFinal = (text) => {
       const match = text.match(/\[FINAL\]\s*([\s\S]*?)$/i);
       if (match) return match[1].trim();
-      // Fallback: return the whole text if no marker
-      return text.trim();
+      return null; // Return null if [FINAL] not yet reached
     };
 
     // Build prompt for a single story
@@ -2237,41 +2236,73 @@ ${landmarkEntries}`;
         .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
     };
 
-    // Send initial event
+    // Build prompts for both stories
     const prompt1 = buildSinglePrompt('Use local landmarks if available. Create an engaging story that uses the setting naturally.');
+    const prompt2 = buildSinglePrompt('Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.');
+
+    // Send initial event with prompt info for dev mode
     res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse })}\n\n`);
 
-    // Track full responses for dev mode
+    // Track state for both stories
     let fullResponse1 = '';
     let fullResponse2 = '';
+    let lastStory1Length = 0;
+    let lastStory2Length = 0;
+    let story1Complete = false;
+    let story2Complete = false;
 
-    // Generate Story 1
-    log.debug('  Generating story 1...');
-    try {
-      fullResponse1 = await callTextModel(prompt1, 3000, modelToUse);
-      const story1 = parseFinal(fullResponse1);
-      res.write(`data: ${JSON.stringify({ story1 })}\n\n`);
-      log.debug('  Story 1 sent to client');
-    } catch (err) {
+    log.debug('  Starting parallel story generation...');
+
+    // Stream Story 1 - progressively send [FINAL] content as it arrives
+    const streamStory1 = callTextModelStreaming(prompt1, 3000, (delta, fullText) => {
+      fullResponse1 = fullText;
+      const finalContent = parseFinal(fullText);
+      if (finalContent && finalContent.length > 50 && finalContent.length > lastStory1Length + 20) {
+        res.write(`data: ${JSON.stringify({ story1: finalContent })}\n\n`);
+        lastStory1Length = finalContent.length;
+        if (!story1Complete) {
+          log.debug('  Story 1 streaming started');
+          story1Complete = true;
+        }
+      }
+    }, modelToUse).then(() => {
+      // Send final story 1 content
+      const finalContent = parseFinal(fullResponse1) || fullResponse1.trim();
+      if (finalContent && finalContent.length > lastStory1Length) {
+        res.write(`data: ${JSON.stringify({ story1: finalContent })}\n\n`);
+      }
+      log.debug('  Story 1 complete');
+    }).catch(err => {
       log.error('  Story 1 generation failed:', err.message);
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
-      res.end();
-      return;
-    }
+    });
 
-    // Generate Story 2 (different approach)
-    log.debug('  Generating story 2...');
-    const prompt2 = buildSinglePrompt('Create a DIFFERENT story from before. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.');
-    try {
-      fullResponse2 = await callTextModel(prompt2, 3000, modelToUse);
-      const story2 = parseFinal(fullResponse2);
-      res.write(`data: ${JSON.stringify({ story2 })}\n\n`);
-      log.debug('  Story 2 sent to client');
-    } catch (err) {
+    // Stream Story 2 - progressively send [FINAL] content as it arrives
+    const streamStory2 = callTextModelStreaming(prompt2, 3000, (delta, fullText) => {
+      fullResponse2 = fullText;
+      const finalContent = parseFinal(fullText);
+      if (finalContent && finalContent.length > 50 && finalContent.length > lastStory2Length + 20) {
+        res.write(`data: ${JSON.stringify({ story2: finalContent })}\n\n`);
+        lastStory2Length = finalContent.length;
+        if (!story2Complete) {
+          log.debug('  Story 2 streaming started');
+          story2Complete = true;
+        }
+      }
+    }, modelToUse).then(() => {
+      // Send final story 2 content
+      const finalContent = parseFinal(fullResponse2) || fullResponse2.trim();
+      if (finalContent && finalContent.length > lastStory2Length) {
+        res.write(`data: ${JSON.stringify({ story2: finalContent })}\n\n`);
+      }
+      log.debug('  Story 2 complete');
+    }).catch(err => {
       log.error('  Story 2 generation failed:', err.message);
-      // Story 1 already sent, just log error for story 2
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate second story idea' })}\n\n`);
-    }
+    });
+
+    // Wait for both to complete
+    await Promise.all([streamStory1, streamStory2]);
 
     // Send completion with full responses for dev mode
     const combinedResponse = `=== STORY 1 ===\n${fullResponse1}\n\n=== STORY 2 ===\n${fullResponse2}`;

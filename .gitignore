@@ -32,9 +32,14 @@ API key.txt
 .claude/
 
 # Server data (sensitive - don't commit to Git)
-data/
-data/uploads/
-data/files.json
+/data/
+/data/uploads/
+/data/files.json
+
+# But include server/data for historical locations (needs deployment)
+!server/data/
+server/data/*
+!server/data/historical-locations.json
 
 # User content and uploads
 # Images/ - now included in git for Railway deployment
