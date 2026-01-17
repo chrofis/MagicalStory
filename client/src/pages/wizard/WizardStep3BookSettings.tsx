@@ -311,11 +311,8 @@ export function WizardStep3BookSettings({
                     );
                   })}
 
-                  {/* Separator */}
-                  <div className="border-t border-gray-200 my-1 mx-2" />
-                  <div className="px-3 py-1 text-xs text-gray-400 font-medium">
-                    {language === 'de' ? 'Varianten' : language === 'fr' ? 'Variantes' : 'Variants'}
-                  </div>
+                  {/* Separator - just a line */}
+                  <div className="border-t border-gray-300 my-1" />
 
                   {/* Variants for current language family */}
                   {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
