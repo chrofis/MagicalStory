@@ -181,6 +181,7 @@ export function SceneEditModal({
                     src={consistencyRegen.originalImage}
                     alt="Original"
                     className="w-full rounded-lg border border-gray-300"
+                    draggable={false}
                   />
                 </div>
                 <div>
@@ -191,6 +192,7 @@ export function SceneEditModal({
                     src={consistencyRegen.fixedImage}
                     alt="Fixed"
                     className="w-full rounded-lg border-2 border-green-500"
+                    draggable={false}
                   />
                 </div>
               </div>
@@ -257,8 +259,8 @@ export function SceneEditModal({
           </div>
         </div>
 
-        <div className="p-4 border-t border-gray-200 flex justify-between items-center">
-          <div className="text-sm text-gray-500">
+        <div className="p-4 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <div className="text-sm text-gray-500 text-center sm:text-left">
             {selectedCharacterIds.length > 0 && (
               <span>
                 {language === 'de' ? `${selectedCharacterIds.length} Charakter(e) ausgewählt` :
@@ -267,18 +269,18 @@ export function SceneEditModal({
               </span>
             )}
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <button
               onClick={onClose}
               disabled={isRegenerating}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium disabled:opacity-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700 font-medium disabled:opacity-50 order-2 sm:order-1"
             >
               {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
             </button>
             <button
               onClick={onRegenerate}
               disabled={isRegenerating || !scene.trim()}
-              className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center gap-2 ${
+              className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 order-1 sm:order-2 ${
                 isRegenerating || !scene.trim() ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'
               }`}
             >
@@ -291,7 +293,7 @@ export function SceneEditModal({
                 <>
                   <RefreshCw size={16} />
                   {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                  <span className="text-xs opacity-80">({imageRegenerationCost} credits)</span>
+                  <span className="text-xs opacity-80">({imageRegenerationCost})</span>
                 </>
               )}
             </button>

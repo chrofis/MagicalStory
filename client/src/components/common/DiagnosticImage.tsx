@@ -100,6 +100,7 @@ export function DiagnosticImage({ src, alt, className, label }: DiagnosticImageP
       className={className}
       onLoad={handleLoad}
       onError={handleError}
+      draggable={false}
     />
   );
 }
