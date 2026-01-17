@@ -911,25 +911,11 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             return matchingKey;
           };
 
-          // First priority: styled costumed avatar (already in target art style)
-          const styledCostumeKey = artStyle && avatars?.styledAvatars?.[artStyle]?.costumed
-            ? findCostumeByPrefix(avatars.styledAvatars[artStyle].costumed, costumeKey)
-            : null;
-          if (styledCostumeKey) {
-            photoUrl = avatars.styledAvatars[artStyle].costumed[styledCostumeKey];
-            photoType = `styled-costumed-${styledCostumeKey}`;
-            usedClothingCategory = `costumed:${styledCostumeKey}`;
-            log.debug(`[AVATAR STYLED] ${char.name}: using styled ${styledCostumeKey}@${artStyle}`);
-            // Get clothing description
-            if (avatars?.clothing?.costumed?.[styledCostumeKey]) {
-              const clothingData = avatars.clothing.costumed[styledCostumeKey];
-              clothingDescription = typeof clothingData === 'string'
-                ? clothingData
-                : formatClothingObject(clothingData);
-            }
-          }
-          // Second priority: regular costumed avatar
-          else {
+          // NOTE: We intentionally skip looking up pre-existing styled costumed avatars
+          // from character data. This ensures fresh styled avatars are generated via
+          // applyStyledAvatars() from the current story's base costumed avatars.
+          // Use base costumed avatar (styling will be applied later via cache)
+          {
             const regularCostumeKey = findCostumeByPrefix(avatars?.costumed, costumeKey);
             if (regularCostumeKey) {
               let avatarData = avatars.costumed[regularCostumeKey];
@@ -957,19 +943,10 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           }
         }
       }
-      // Check for styled avatar FIRST (standard, winter, summer in target art style)
-      else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && artStyle && avatars?.styledAvatars?.[artStyle]?.[effectiveClothingCategory]) {
-        photoType = `styled-${effectiveClothingCategory}`;
-        photoUrl = avatars.styledAvatars[artStyle][effectiveClothingCategory];
-        usedClothingCategory = effectiveClothingCategory;
-        log.debug(`[AVATAR STYLED] ${char.name}: using styled ${effectiveClothingCategory}@${artStyle}`);
-        // Get extracted clothing description
-        if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
-          const clothingData = avatars.clothing[effectiveClothingCategory];
-          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
-        }
-      }
-      // Fallback to unstyled clothing avatar (standard, winter, summer)
+      // NOTE: We intentionally skip looking up pre-existing styled avatars from character data.
+      // This ensures fresh styled avatars are generated via applyStyledAvatars() from the
+      // current story's base avatars. Use base clothing avatar (styling applied later via cache).
+      // Use unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
         photoUrl = avatars[effectiveClothingCategory];
@@ -994,41 +971,23 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       }
 
       // Try fallback clothing avatars before falling back to body photo
-      // Check styled fallbacks first, then unstyled
+      // NOTE: We skip styled avatar fallbacks - only use unstyled base avatars
+      // applyStyledAvatars() will convert to target style via fresh cache
       if (!photoUrl && effectiveClothingCategory && avatars) {
         const fallbacks = clothingFallbackOrder[effectiveClothingCategory] || ['standard', 'summer', 'winter'];
 
-        // First pass: check styled avatars
-        if (artStyle && avatars?.styledAvatars?.[artStyle]) {
-          for (const fallbackCategory of fallbacks) {
-            if (avatars.styledAvatars[artStyle][fallbackCategory]) {
-              photoType = `styled-${fallbackCategory}`;
-              photoUrl = avatars.styledAvatars[artStyle][fallbackCategory];
-              usedClothingCategory = fallbackCategory;
-              if (avatars.clothing && avatars.clothing[fallbackCategory]) {
-                const clothingData = avatars.clothing[fallbackCategory];
-                clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
-              }
-              log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using styled ${fallbackCategory}@${artStyle}`);
-              break;
+        // Check unstyled avatars only (styling applied later via cache)
+        for (const fallbackCategory of fallbacks) {
+          if (avatars[fallbackCategory]) {
+            photoType = `clothing-${fallbackCategory}`;
+            photoUrl = avatars[fallbackCategory];
+            usedClothingCategory = fallbackCategory;
+            if (avatars.clothing && avatars.clothing[fallbackCategory]) {
+              const clothingData = avatars.clothing[fallbackCategory];
+              clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
             }
-          }
-        }
-
-        // Second pass: check unstyled avatars
-        if (!photoUrl) {
-          for (const fallbackCategory of fallbacks) {
-            if (avatars[fallbackCategory]) {
-              photoType = `clothing-${fallbackCategory}`;
-              photoUrl = avatars[fallbackCategory];
-              usedClothingCategory = fallbackCategory;
-              if (avatars.clothing && avatars.clothing[fallbackCategory]) {
-                const clothingData = avatars.clothing[fallbackCategory];
-                clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
-              }
-              log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using unstyled ${fallbackCategory}`);
-              break;
-            }
+            log.debug(`[AVATAR FALLBACK] ${char.name}: wanted ${effectiveClothingCategory}, using unstyled ${fallbackCategory}`);
+            break;
           }
         }
       }

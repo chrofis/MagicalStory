@@ -377,39 +377,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     return new Map();
   }
 
-  // Pre-populate cache with any existing styled avatars from character data
-  // This avoids regenerating avatars that were created in previous story generations
-  let preloadedCount = 0;
-  for (const char of characters) {
-    const existingStyled = char.avatars?.styledAvatars?.[artStyle];
-    if (existingStyled) {
-      for (const [clothingCategory, styledAvatarOrObject] of Object.entries(existingStyled)) {
-        // Handle nested costumed structure: { costumed: { pirate: "...", superhero: "..." } }
-        if (clothingCategory === 'costumed' && typeof styledAvatarOrObject === 'object' && styledAvatarOrObject !== null) {
-          for (const [costumeType, styledAvatar] of Object.entries(styledAvatarOrObject)) {
-            if (styledAvatar && typeof styledAvatar === 'string' && styledAvatar.startsWith('data:image')) {
-              const cacheKey = getAvatarCacheKey(char.name, `costumed:${costumeType}`, artStyle);
-              if (!styledAvatarCache.has(cacheKey)) {
-                styledAvatarCache.set(cacheKey, styledAvatar);
-                preloadedCount++;
-              }
-            }
-          }
-        }
-        // Standard categories (winter, summer, standard, formal)
-        else if (typeof styledAvatarOrObject === 'string' && styledAvatarOrObject.startsWith('data:image')) {
-          const cacheKey = getAvatarCacheKey(char.name, clothingCategory, artStyle);
-          if (!styledAvatarCache.has(cacheKey)) {
-            styledAvatarCache.set(cacheKey, styledAvatarOrObject);
-            preloadedCount++;
-          }
-        }
-      }
-    }
-  }
-  if (preloadedCount > 0) {
-    log.debug(`♻️ [STYLED AVATARS] Preloaded ${preloadedCount} existing ${artStyle} avatars from character data`);
-  }
+  // NOTE: We intentionally do NOT preload existing styled avatars from character data.
+  // This ensures covers and pages always use freshly generated styled avatars from
+  // the current story's source avatars (standard, winter, summer, costumed).
+  // Previously, preloading caused covers to use different styled avatars than pages
+  // when the character's saved styledAvatars differed from freshly generated ones.
 
   // Collect all unique character + clothing combinations needed
   const neededAvatars = new Map(); // key -> { characterName, clothingCategory, originalAvatar, facePhoto }
