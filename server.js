@@ -8022,7 +8022,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const storyPages = parser.extractPages();
 
     // Construct fullStoryText from parsed pages (for storage compatibility)
-    const fullStoryText = storyPages.map(page =>
+    // Use let so it can be modified by text consistency corrections
+    let fullStoryText = storyPages.map(page =>
       `--- Page ${page.pageNumber} ---\n${page.text}`
     ).join('\n\n');
 
