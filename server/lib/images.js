@@ -2787,6 +2787,157 @@ async function autoRepairImage(imageData, maxAttempts = 2, options = {}) {
  * @param {Array<string>} options.referencePhotos - Reference photos for character comparison
  * @returns {Promise<object>} Consistency analysis result
  */
+/**
+ * Evaluate a single batch of images for consistency
+ * @private
+ */
+async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo = '') {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  // Load prompt template
+  const promptTemplate = PROMPT_TEMPLATES.finalConsistencyCheck;
+  if (!promptTemplate) {
+    log.error('❌ [CONSISTENCY] Missing prompt template: final-consistency-check.txt');
+    return null;
+  }
+
+  // Build image info for prompt - include scene context (characters, clothing)
+  const imageInfo = imagesToCheck.map((img, idx) => {
+    const pageNum = img.pageNumber || 'unknown';
+    // Get character names from metadata or reference photos
+    const chars = img.characters?.length > 0
+      ? img.characters.join(', ')
+      : (img.referenceCharacters?.length > 0 ? img.referenceCharacters.join(', ') : 'unknown');
+    const clothing = img.clothing || 'standard';
+    return `Image ${idx + 1}: Page ${pageNum} - Characters: [${chars}], Clothing: ${clothing}`;
+  }).join('\n');
+
+  // Fill template
+  const prompt = fillTemplate(promptTemplate, {
+    CHECK_TYPE: checkType.toUpperCase(),
+    CHARACTER_NAME: options.characterName || 'all characters',
+    IMAGE_INFO: imageInfo
+  });
+
+  // Build parts array with all images
+  const parts = [];
+
+  // Add reference photos first (if doing character check)
+  if (checkType === 'character' && options.referencePhotos?.length > 0) {
+    for (const refPhoto of options.referencePhotos.slice(0, 3)) {
+      if (refPhoto && refPhoto.startsWith('data:image')) {
+        const imageHash = hashImageData(refPhoto);
+        let compressedBase64 = compressedRefCache.get(imageHash);
+
+        if (!compressedBase64) {
+          const compressed = await compressImageToJPEG(refPhoto, 80, 512);
+          compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          compressedRefCache.set(imageHash, compressedBase64);
+        }
+
+        parts.push({
+          text: `Reference photo for ${options.characterName}:`
+        });
+        parts.push({
+          inline_data: {
+            mime_type: 'image/jpeg',
+            data: compressedBase64
+          }
+        });
+      }
+    }
+  }
+
+  // Add all scene images
+  for (let i = 0; i < imagesToCheck.length; i++) {
+    const img = imagesToCheck[i];
+    const imageData = img.imageData || img;
+
+    if (!imageData || !imageData.startsWith('data:image')) {
+      continue;
+    }
+
+    // Compress image for efficiency
+    const compressed = await compressImageToJPEG(imageData, 80, 768);
+    const base64Data = compressed.replace(/^data:image\/\w+;base64,/, '');
+
+    parts.push({
+      text: `Image ${i + 1} (Page ${img.pageNumber || 'unknown'}):`
+    });
+    parts.push({
+      inline_data: {
+        mime_type: 'image/jpeg',
+        data: base64Data
+      }
+    });
+  }
+
+  // Add the evaluation prompt
+  parts.push({ text: prompt });
+
+  // Call Gemini API
+  const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+  log.info(`🔍 [CONSISTENCY] Checking ${imagesToCheck.length} images${batchInfo} (type: ${checkType})`);
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        maxOutputTokens: 8000,
+        temperature: 0.2
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    log.error(`❌ [CONSISTENCY] API error: ${error.substring(0, 200)}`);
+    return null;
+  }
+
+  const data = await response.json();
+
+  // Log token usage
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  log.verbose(`📊 [CONSISTENCY] Tokens - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+
+  // Extract response text
+  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  // Parse JSON response
+  try {
+    // Extract JSON from response (handle markdown code blocks)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+      return { ...result, usage: { inputTokens, outputTokens, model: modelId } };
+    }
+  } catch (parseError) {
+    log.error(`❌ [CONSISTENCY] Failed to parse response: ${parseError.message}`);
+    log.debug(`Response was: ${responseText.substring(0, 500)}`);
+  }
+
+  return { usage: { inputTokens, outputTokens, model: modelId } };
+}
+
+/**
+ * Evaluate consistency across images with batching
+ * - Max 10 images per batch
+ * - 5 image overlap between batches (1-10, 6-15, 11-20, ...)
+ * - Merges results and deduplicates issues
+ */
 async function evaluateConsistencyAcrossImages(images, checkType = 'full', options = {}) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -2801,151 +2952,135 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
       return { consistent: true, overallScore: 10, issues: [], summary: 'Single image - no consistency check needed' };
     }
 
-    // Limit to 15 images per call (practical limit for performance)
-    const imagesToCheck = images.slice(0, 15);
-    if (images.length > 15) {
-      log.warn(`⚠️  [CONSISTENCY] Limited to first 15 images (had ${images.length})`);
-    }
+    const BATCH_SIZE = 10;
+    const OVERLAP = 5;
 
-    // Load prompt template
-    const promptTemplate = PROMPT_TEMPLATES.finalConsistencyCheck;
-    if (!promptTemplate) {
-      log.error('❌ [CONSISTENCY] Missing prompt template: final-consistency-check.txt');
-      return null;
-    }
-
-    // Build image info for prompt
-    const imageInfo = imagesToCheck.map((img, idx) =>
-      `Image ${idx + 1}: Page ${img.pageNumber || 'unknown'}`
-    ).join('\n');
-
-    // Fill template
-    const prompt = fillTemplate(promptTemplate, {
-      CHECK_TYPE: checkType.toUpperCase(),
-      CHARACTER_NAME: options.characterName || 'all characters',
-      IMAGE_INFO: imageInfo
-    });
-
-    // Build parts array with all images
-    const parts = [];
-
-    // Add reference photos first (if doing character check)
-    if (checkType === 'character' && options.referencePhotos?.length > 0) {
-      for (const refPhoto of options.referencePhotos.slice(0, 3)) {
-        if (refPhoto && refPhoto.startsWith('data:image')) {
-          const imageHash = hashImageData(refPhoto);
-          let compressedBase64 = compressedRefCache.get(imageHash);
-
-          if (!compressedBase64) {
-            const compressed = await compressImageToJPEG(refPhoto, 80, 512);
-            compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
-            compressedRefCache.set(imageHash, compressedBase64);
-          }
-
-          parts.push({
-            text: `Reference photo for ${options.characterName}:`
-          });
-          parts.push({
-            inline_data: {
-              mime_type: 'image/jpeg',
-              data: compressedBase64
-            }
-          });
-        }
-      }
-    }
-
-    // Add all scene images
-    for (let i = 0; i < imagesToCheck.length; i++) {
-      const img = imagesToCheck[i];
-      const imageData = img.imageData || img;
-
-      if (!imageData || !imageData.startsWith('data:image')) {
-        continue;
-      }
-
-      // Compress image for efficiency
-      const compressed = await compressImageToJPEG(imageData, 80, 768);
-      const base64Data = compressed.replace(/^data:image\/\w+;base64,/, '');
-
-      parts.push({
-        text: `Image ${i + 1} (Page ${img.pageNumber || 'unknown'}):`
-      });
-      parts.push({
-        inline_data: {
-          mime_type: 'image/jpeg',
-          data: base64Data
-        }
-      });
-    }
-
-    // Add the evaluation prompt
-    parts.push({ text: prompt });
-
-    // Call Gemini API
-    const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-    log.info(`🔍 [CONSISTENCY] Checking ${imagesToCheck.length} images (type: ${checkType})`);
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          maxOutputTokens: 8000,
-          temperature: 0.2
-        },
-        safetySettings: [
-          { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-          { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-        ]
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      log.error(`❌ [CONSISTENCY] API error: ${error.substring(0, 200)}`);
-      return null;
-    }
-
-    const data = await response.json();
-
-    // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    log.verbose(`📊 [CONSISTENCY] Tokens - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
-
-    // Extract response text
-    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-
-    // Parse JSON response
-    try {
-      // Extract JSON from response (handle markdown code blocks)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const result = JSON.parse(jsonMatch[0]);
-
-        // Log summary
+    // If 10 or fewer images, just run single batch
+    if (images.length <= BATCH_SIZE) {
+      const result = await evaluateSingleBatch(images, checkType, options);
+      if (result) {
         const issueCount = result.issues?.length || 0;
         if (issueCount > 0) {
           log.warn(`⚠️  [CONSISTENCY] Found ${issueCount} issue(s): ${result.summary || 'see details'}`);
         } else {
           log.info(`✅ [CONSISTENCY] All images consistent (score: ${result.overallScore || 'N/A'})`);
         }
-
-        return { ...result, usage: { inputTokens, outputTokens, model: modelId } };
       }
-    } catch (parseError) {
-      log.error(`❌ [CONSISTENCY] Failed to parse response: ${parseError.message}`);
-      log.debug(`Response was: ${responseText.substring(0, 500)}`);
+      return result;
     }
 
-    return { usage: { inputTokens, outputTokens, model: modelId } };
+    // Create batches with overlap: 1-10, 6-15, 11-20, ...
+    const batches = [];
+    for (let start = 0; start < images.length; start += (BATCH_SIZE - OVERLAP)) {
+      const end = Math.min(start + BATCH_SIZE, images.length);
+      const batch = images.slice(start, end);
+
+      // Only add batch if it has at least 2 images
+      if (batch.length >= 2) {
+        batches.push({
+          images: batch,
+          startIndex: start,
+          endIndex: end - 1,
+          pageNumbers: batch.map(img => img.pageNumber)
+        });
+      }
+
+      // Stop if we've reached the end
+      if (end >= images.length) break;
+    }
+
+    log.info(`🔍 [CONSISTENCY] Processing ${images.length} images in ${batches.length} batches (size: ${BATCH_SIZE}, overlap: ${OVERLAP})`);
+
+    // Process all batches
+    const batchResults = [];
+    let totalInputTokens = 0;
+    let totalOutputTokens = 0;
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchInfo = ` [batch ${i + 1}/${batches.length}, pages ${batch.pageNumbers[0]}-${batch.pageNumbers[batch.pageNumbers.length - 1]}]`;
+
+      const result = await evaluateSingleBatch(batch.images, checkType, options, batchInfo);
+
+      if (result) {
+        // Track token usage
+        if (result.usage) {
+          totalInputTokens += result.usage.inputTokens || 0;
+          totalOutputTokens += result.usage.outputTokens || 0;
+        }
+
+        // Map batch-local image indices to actual page numbers
+        if (result.issues && result.issues.length > 0) {
+          result.issues = result.issues.map(issue => {
+            // Convert batch-local indices (1-based) to actual page numbers
+            if (issue.images && Array.isArray(issue.images)) {
+              issue.images = issue.images.map(localIdx => {
+                // localIdx is 1-based index within the batch
+                const batchIdx = localIdx - 1;
+                if (batchIdx >= 0 && batchIdx < batch.images.length) {
+                  return batch.images[batchIdx].pageNumber;
+                }
+                return localIdx; // Fallback
+              });
+            }
+            return issue;
+          });
+        }
+
+        batchResults.push(result);
+      }
+    }
+
+    // Merge results from all batches
+    const mergedIssues = [];
+    const seenIssueKeys = new Set();
+    let lowestScore = 10;
+    let anyInconsistent = false;
+
+    for (const result of batchResults) {
+      if (!result.consistent) {
+        anyInconsistent = true;
+      }
+      if (result.overallScore !== undefined && result.overallScore < lowestScore) {
+        lowestScore = result.overallScore;
+      }
+
+      // Deduplicate issues (same pages + same type = same issue)
+      if (result.issues && result.issues.length > 0) {
+        for (const issue of result.issues) {
+          const issueKey = `${issue.images?.sort().join('-')}_${issue.type}_${issue.characterInvolved || ''}`;
+          if (!seenIssueKeys.has(issueKey)) {
+            seenIssueKeys.add(issueKey);
+            mergedIssues.push(issue);
+          }
+        }
+      }
+    }
+
+    // Build final result
+    const finalResult = {
+      consistent: !anyInconsistent && mergedIssues.length === 0,
+      overallScore: lowestScore,
+      issues: mergedIssues,
+      summary: mergedIssues.length === 0
+        ? `All ${images.length} images checked across ${batches.length} batches - consistent`
+        : `Found ${mergedIssues.length} issue(s) across ${images.length} images (${batches.length} batches)`,
+      usage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        model: MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+        batches: batches.length
+      }
+    };
+
+    // Log summary
+    if (mergedIssues.length > 0) {
+      log.warn(`⚠️  [CONSISTENCY] Found ${mergedIssues.length} issue(s) across ${batches.length} batches`);
+    } else {
+      log.info(`✅ [CONSISTENCY] All ${images.length} images consistent (score: ${lowestScore}, ${batches.length} batches)`);
+    }
+
+    return finalResult;
   } catch (error) {
     log.error(`❌ [CONSISTENCY] Error: ${error.message}`);
     return null;

@@ -266,7 +266,7 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
   const markCompletionViewed = useCallback(() => {
     setHasUnviewedCompletion(false);
     setIsComplete(false);
-    setCompletedStoryId(null);
+    // Don't clear completedStoryId - navigation effect needs it
   }, []);
 
   const clearError = useCallback(() => {

@@ -7,31 +7,38 @@ Analyze the provided images and identify any inconsistencies that would break im
 
 ## Check Type: {CHECK_TYPE}
 
+## Scene Context (IMPORTANT - Read Carefully)
+{IMAGE_INFO}
+
+**CRITICAL: The scene context tells you which characters appear in each image and what clothing they should wear.**
+
+- Different characters appearing in different images is EXPECTED - do NOT flag this as inconsistent
+- Clothing changes between scenes are INTENTIONAL if the clothing category differs (e.g., "standard" vs "winter" vs "costumed:pirate")
+- Only flag as inconsistent if:
+  1. The SAME character looks different in scenes with the SAME clothing requirement
+  2. A character's core features (face, hair color, skin tone) change unexpectedly
+  3. Art style or quality varies significantly between images
+
 ### For CHARACTER checks:
-Focus on whether {CHARACTER_NAME} looks like the same person across all images:
+Focus on whether {CHARACTER_NAME} looks like the same person across images WHERE THEY APPEAR:
 - Face shape and features (eyes, nose, mouth proportions)
 - Hair color, style, and length
 - Skin tone
 - Body build and proportions
 - Age appearance
-- Clothing should match the scene requirements (may vary by scene)
+- Clothing should match the listed category for each scene
 
 ### For SEQUENCE checks:
 Focus on continuity between consecutive scenes:
-- Character positions should be logically consistent (if someone is on the left in one image, they shouldn't teleport to the right)
-- Objects and props should remain consistent
-- Environmental elements should match between related scenes
+- Character positions should be logically consistent
+- Objects and props should remain consistent within the same scene
 - Actions should flow naturally from one scene to the next
 
 ### For FULL checks:
 Review all images for overall visual coherence:
 - Art style should be consistent throughout
 - Color palette should feel unified
-- Character appearances should remain recognizable
-- No sudden unexplained changes in setting or props
-
-## Image Information
-{IMAGE_INFO}
+- Characters should be recognizable when they appear in multiple scenes
 
 ## Output Format
 
@@ -42,9 +49,15 @@ Return ONLY valid JSON (no markdown, no explanation):
   "overallScore": 1-10,
   "issues": [
     {
-      "images": [1, 3],
+      "images": [2, 4],
       "type": "character_appearance" | "position_swap" | "clothing_mismatch" | "prop_inconsistency" | "style_drift",
+      "characterInvolved": "Character name if applicable",
       "description": "Clear description of what's inconsistent",
+      "details": {
+        "image2": "What it looks like in image 2",
+        "image4": "What it looks like in image 4"
+      },
+      "recommendation": "Specific fix suggestion (e.g., 'Regenerate page 4 with red hair to match page 2')",
       "severity": "low" | "medium" | "high"
     }
   ],

@@ -160,16 +160,21 @@ export interface RepairAttempt {
 export interface FinalChecksImageIssue {
   images: number[];
   type: 'character_appearance' | 'position_swap' | 'clothing_mismatch' | 'prop_inconsistency' | 'style_drift';
+  characterInvolved?: string;  // Which character has the issue
   description: string;
+  details?: Record<string, string>;  // Per-image details (e.g., { "image2": "red hair", "image4": "blonde hair" })
+  recommendation?: string;  // Specific fix suggestion
   severity: 'low' | 'medium' | 'high';
 }
 
 export interface FinalChecksTextIssue {
   page?: number;
   type: 'spelling' | 'grammar' | 'flow' | 'character' | 'logic';
-  text?: string;
+  text?: string;  // Legacy field
+  originalText?: string;  // The problematic text
+  correctedText?: string;  // The corrected version
   issue: string;
-  suggestion?: string;
+  suggestion?: string;  // Legacy field
   severity: 'low' | 'medium' | 'high';
 }
 
@@ -187,6 +192,7 @@ export interface FinalChecksTextCheck {
   overallScore?: number;
   issues: FinalChecksTextIssue[];
   summary?: string;
+  fullCorrectedText?: string;  // Complete story text with all corrections applied
 }
 
 export interface FinalChecksReport {

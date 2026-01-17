@@ -5,6 +5,11 @@ You are a professional editor reviewing a children's story for quality and consi
 ## Language
 The story is written in: {LANGUAGE}
 
+## Language & Spelling Requirements (CRITICAL)
+{LANGUAGE_INSTRUCTION}
+
+**You MUST check that the story follows these spelling rules exactly.**
+
 ## Story Text
 {STORY_TEXT}
 
@@ -15,10 +20,11 @@ These are the main characters: {CHARACTER_NAMES}
 Review the story text carefully for the following issues:
 
 ### 1. Spelling and Grammar
-- Spelling mistakes (in {LANGUAGE})
+- Spelling mistakes according to the language rules above
 - Grammar errors
 - Punctuation issues
 - Awkward phrasing
+- **IMPORTANT**: Check spelling rules from the Language Requirements section above
 
 ### 2. Story Flow
 - Missing transitions between scenes
@@ -49,13 +55,14 @@ Return ONLY valid JSON (no markdown, no explanation):
     {
       "page": 3,
       "type": "spelling" | "grammar" | "flow" | "character" | "logic",
-      "text": "The exact problematic text",
+      "originalText": "The exact problematic text",
+      "correctedText": "The corrected version of the text",
       "issue": "Description of the problem",
-      "suggestion": "How to fix it",
       "severity": "low" | "medium" | "high"
     }
   ],
-  "summary": "Brief overall assessment of story quality"
+  "summary": "Brief overall assessment of story quality",
+  "fullCorrectedText": "If there are issues, provide the complete story text with ALL corrections applied. If no issues, leave this field empty."
 }
 
 ## Severity Guide
@@ -68,5 +75,6 @@ If no issues found, return:
   "quality": "good",
   "overallScore": 10,
   "issues": [],
-  "summary": "Story text is well-written and consistent"
+  "summary": "Story text is well-written and consistent",
+  "fullCorrectedText": ""
 }

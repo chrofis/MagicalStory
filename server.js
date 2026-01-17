@@ -7145,21 +7145,31 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         );
         log.info(`🔍 [STORYBOOK] Running final consistency checks...`);
 
-        // Run image consistency checks
+        // Run image consistency checks - include scene context for accurate evaluation
         const imageCheckData = {
-          sceneImages: allImages.map((img, idx) => ({
-            imageData: img.imageData,
-            pageNumber: img.pageNumber || idx + 1
-          }))
+          sceneImages: allImages.map((img, idx) => {
+            // Extract metadata from scene description (characters, clothing, objects)
+            const metadata = extractSceneMetadata(img.description) || {};
+            return {
+              imageData: img.imageData,
+              pageNumber: img.pageNumber || idx + 1,
+              characters: metadata.characters || [],  // Which characters appear in this scene
+              clothing: metadata.clothing || 'standard',  // Clothing category for this scene
+              // Also include character names from reference photos as fallback
+              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean)
+            };
+          })
         };
         finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
         });
 
-        // Run text consistency check
+        // Run text consistency check - include detailed language instructions
         if (fullStoryText && fullStoryText.length > 100) {
           const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
-          const textCheck = await evaluateTextConsistency(fullStoryText, inputData.language || lang, characterNames);
+          const langCode = inputData.language || lang;
+          const languageInstruction = getLanguageInstruction(langCode);
+          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction);
           if (textCheck) {
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {
@@ -8676,21 +8686,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
         log.info(`🔍 [UNIFIED] Running final consistency checks...`);
 
-        // Run image consistency checks
+        // Run image consistency checks - include scene context for accurate evaluation
         const imageCheckData = {
-          sceneImages: allImages.map((img, idx) => ({
-            imageData: img.imageData,
-            pageNumber: img.pageNumber || idx + 1
-          }))
+          sceneImages: allImages.map((img, idx) => {
+            // Extract metadata from scene description (characters, clothing, objects)
+            const metadata = extractSceneMetadata(img.description) || {};
+            return {
+              imageData: img.imageData,
+              pageNumber: img.pageNumber || idx + 1,
+              characters: metadata.characters || [],  // Which characters appear in this scene
+              clothing: metadata.clothing || 'standard',  // Clothing category for this scene
+              // Also include character names from reference photos as fallback
+              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean)
+            };
+          })
         };
         finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
         });
 
-        // Run text consistency check
+        // Run text consistency check - include detailed language instructions
         if (fullStoryText && fullStoryText.length > 100) {
           const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
-          const textCheck = await evaluateTextConsistency(fullStoryText, inputData.language || 'en', characterNames);
+          const langCode = inputData.language || 'en';
+          const { getLanguageInstruction } = require('./server/lib/languages');
+          const languageInstruction = getLanguageInstruction(langCode);
+          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction);
           if (textCheck) {
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {

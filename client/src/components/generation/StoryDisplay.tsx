@@ -1742,7 +1742,7 @@ export function StoryDisplay({
                                 issue.severity === 'medium' ? 'bg-amber-50 border-l-4 border-amber-400' :
                                 'bg-gray-50 border-l-4 border-gray-300'
                               }`}>
-                                <div className="flex items-start gap-2">
+                                <div className="flex items-start gap-2 flex-wrap">
                                   <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                                     issue.severity === 'high' ? 'bg-red-200 text-red-800' :
                                     issue.severity === 'medium' ? 'bg-amber-200 text-amber-800' :
@@ -1754,8 +1754,27 @@ export function StoryDisplay({
                                   <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
                                     {issue.type?.replace(/_/g, ' ')}
                                   </span>
+                                  {issue.characterInvolved && (
+                                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">
+                                      {issue.characterInvolved}
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-gray-700 mt-1">{issue.description}</p>
+                                {issue.details && Object.keys(issue.details).length > 0 && (
+                                  <div className="mt-1 pl-2 border-l-2 border-gray-200">
+                                    {Object.entries(issue.details).map(([imgKey, detail]) => (
+                                      <p key={imgKey} className="text-gray-500 text-[10px]">
+                                        <span className="font-medium">{imgKey}:</span> {detail}
+                                      </p>
+                                    ))}
+                                  </div>
+                                )}
+                                {issue.recommendation && (
+                                  <p className="text-green-700 mt-1 font-medium">
+                                    💡 {issue.recommendation}
+                                  </p>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -1818,10 +1837,20 @@ export function StoryDisplay({
                                 </span>
                               </div>
                               <p className="text-gray-700 mt-1">{issue.issue}</p>
-                              {issue.text && (
-                                <p className="text-gray-500 mt-1 italic">"{issue.text}"</p>
+                              {/* Show original text (new field or legacy field) */}
+                              {(issue.originalText || issue.text) && (
+                                <p className="text-red-600 mt-1 line-through">
+                                  "{issue.originalText || issue.text}"
+                                </p>
                               )}
-                              {issue.suggestion && (
+                              {/* Show corrected text if available */}
+                              {issue.correctedText && (
+                                <p className="text-green-700 mt-1 font-medium">
+                                  ✓ "{issue.correctedText}"
+                                </p>
+                              )}
+                              {/* Fallback to suggestion if no correctedText */}
+                              {!issue.correctedText && issue.suggestion && (
                                 <p className="text-green-700 mt-1">→ {issue.suggestion}</p>
                               )}
                             </div>
@@ -1830,6 +1859,17 @@ export function StoryDisplay({
                       )}
                       {finalChecksReport.textCheck.summary && (
                         <p className="text-xs text-gray-500 mt-2 italic">{finalChecksReport.textCheck.summary}</p>
+                      )}
+                      {/* Full corrected text (collapsible) */}
+                      {finalChecksReport.textCheck.fullCorrectedText && (
+                        <details className="mt-3 bg-green-50 border border-green-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-green-800">
+                            📋 View Full Corrected Text
+                          </summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                            {finalChecksReport.textCheck.fullCorrectedText}
+                          </pre>
+                        </details>
                       )}
                     </div>
                   </div>

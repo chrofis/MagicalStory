@@ -565,9 +565,10 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
  * @param {string} storyText - Full story text (all pages concatenated)
  * @param {string} language - Language code (e.g., 'de-ch', 'en', 'fr')
  * @param {Array<string>} characterNames - Names of main characters
+ * @param {string} languageInstruction - Detailed language/spelling instructions
  * @returns {Promise<object>} Text quality analysis result
  */
-async function evaluateTextConsistency(storyText, language = 'en', characterNames = []) {
+async function evaluateTextConsistency(storyText, language = 'en', characterNames = [], languageInstruction = '') {
   try {
     if (!storyText || storyText.length < 100) {
       log.verbose('[TEXT CHECK] Story text too short for consistency check');
@@ -593,11 +594,12 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
     };
     const languageName = languageNames[language] || language;
 
-    // Fill template
+    // Fill template - include detailed language/spelling instructions
     const prompt = fillTemplate(promptTemplate, {
       LANGUAGE: languageName,
       STORY_TEXT: storyText,
-      CHARACTER_NAMES: characterNames.join(', ') || 'Not specified'
+      CHARACTER_NAMES: characterNames.join(', ') || 'Not specified',
+      LANGUAGE_INSTRUCTION: languageInstruction || `Write in ${languageName}.`
     });
 
     log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language})`);
