@@ -524,7 +524,10 @@ export function StoryCategorySelector({
   }
 
   // Render step 3: Optional theme wrapper (for life-challenge and educational with topic selected)
+  // Show only popular adventure themes (same as "Beliebt" section)
   if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic && storyTheme === 'realistic') {
+    const popularThemes = getStoryTypesByGroup('popular');
+
     return (
       <div className="space-y-4">
         {/* Selected category and topic indicator */}
@@ -532,7 +535,7 @@ export function StoryCategorySelector({
           <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
             {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
           </span>
-          <span className="bg-green-100 text-green-700 px-2 py-1 rounded">
+          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
             {getTopicName(storyTopic)}
           </span>
           <button
@@ -553,16 +556,16 @@ export function StoryCategorySelector({
               onClick={() => handleThemeWrapperSelect('realistic')}
               className={`p-2 rounded-lg border-2 transition-all ${
                 storyTheme === 'realistic'
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-gray-200 hover:border-green-300'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-blue-300'
               }`}
             >
               <div className="text-2xl mb-1">{realisticSetting.emoji}</div>
               <div className="font-semibold text-xs">{t.noTheme}</div>
             </button>
 
-            {/* Theme options (exclude custom since it doesn't make sense as a wrapper) */}
-            {storyTypes.filter(type => type.group !== 'custom').map((type) => (
+            {/* Popular theme options only (same as "Beliebt" section) */}
+            {popularThemes.map((type) => (
               <button
                 key={type.id}
                 onClick={() => handleThemeWrapperSelect(type.id)}
