@@ -107,9 +107,13 @@ function hashImageData(imageData) {
 
 /**
  * Generate cache key for image generation
- * Creates a hash from prompt + character photo hashes
+ * Creates a hash from prompt + character photo hashes + page context
+ * @param {string} prompt - The image generation prompt
+ * @param {Array} characterPhotos - Array of character photo URLs or objects
+ * @param {string} sequentialMarker - Marker for sequential mode ('seq' or null)
+ * @param {string} pageContext - Optional page context to ensure uniqueness (e.g., 'page_3', 'page_4')
  */
-function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null) {
+function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null, pageContext = null) {
   // Hash each photo and sort them for consistency
   // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   const photoHashes = characterPhotos
@@ -122,8 +126,9 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
     .sort()
     .join('|');
 
-  // Combine prompt + photo hashes + sequential marker (to distinguish sequential vs parallel cache)
-  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}`;
+  // Combine prompt + photo hashes + sequential marker + page context
+  // Page context ensures different pages get different cache keys even with identical prompts
+  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}|${pageContext || ''}`;
   return crypto.createHash('sha256').update(combined).digest('hex');
 }
 
@@ -736,7 +741,8 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  */
 async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0) {
   // Check cache first (include previousImage presence in cache key for sequential mode)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
+  // Also include pageContext to prevent duplicate images for pages with similar prompts
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageContext);
 
   if (imageCache.has(cacheKey)) {
     log.debug(`💾 [IMAGE CACHE] HIT (${imageCache.size} cached)`);

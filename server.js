@@ -2359,9 +2359,12 @@ ${landmarkEntries}`;
       }
     }, modelToUse).then(() => {
       // Send final story 1 content (extract [FINAL] if present for clean output)
-      const finalContent = parseFinal(fullResponse1) || fullResponse1.trim();
-      if (finalContent && finalContent.length > lastStory1Length) {
-        res.write(`data: ${JSON.stringify({ story1: finalContent })}\n\n`);
+      const extractedFinal = parseFinal(fullResponse1);
+      const finalContent = extractedFinal || fullResponse1.trim();
+      // Always send final content - if [FINAL] was extracted, it replaces the streamed raw content
+      if (finalContent) {
+        res.write(`data: ${JSON.stringify({ story1: finalContent, isFinal: true })}\n\n`);
+        log.debug(`  Story 1 final: ${extractedFinal ? 'extracted [FINAL] section' : 'using full response'} (${finalContent.length} chars)`);
       }
       log.debug('  Story 1 complete');
     }).catch(err => {
@@ -2383,9 +2386,12 @@ ${landmarkEntries}`;
       }
     }, modelToUse).then(() => {
       // Send final story 2 content (extract [FINAL] if present for clean output)
-      const finalContent = parseFinal(fullResponse2) || fullResponse2.trim();
-      if (finalContent && finalContent.length > lastStory2Length) {
-        res.write(`data: ${JSON.stringify({ story2: finalContent })}\n\n`);
+      const extractedFinal = parseFinal(fullResponse2);
+      const finalContent = extractedFinal || fullResponse2.trim();
+      // Always send final content - if [FINAL] was extracted, it replaces the streamed raw content
+      if (finalContent) {
+        res.write(`data: ${JSON.stringify({ story2: finalContent, isFinal: true })}\n\n`);
+        log.debug(`  Story 2 final: ${extractedFinal ? 'extracted [FINAL] section' : 'using full response'} (${finalContent.length} chars)`);
       }
       log.debug('  Story 2 complete');
     }).catch(err => {
