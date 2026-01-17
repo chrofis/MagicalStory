@@ -341,11 +341,15 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
           value={character.physical?.skinTone || ''}
           placeholder={language === 'de' ? 'z.B. hell, mittel' : 'e.g. fair, medium'}
           onChange={(e) => updatePhysical('skinTone', e.target.value)}
-          className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded ${
-            changedTraits?.skinTone && !isUserEdited('skinTone')
-              ? 'border-amber-400 bg-amber-50'
-              : 'border-gray-300'
-          } ${isUserEdited('skinTone') ? 'ring-2 ring-blue-400' : ''}`}
+          className={`flex-1 min-w-0 px-2 py-1 text-sm border rounded focus:outline-none focus:border-indigo-400 hover:border-gray-300 ${
+            isUserEdited('skinTone')
+              ? 'border-blue-400 bg-blue-50 ring-1 ring-blue-200'
+              : changedTraits?.skinTone
+                ? 'border-amber-400 bg-amber-50'
+                : isAiExtracted
+                  ? 'border-gray-200 bg-gray-50 text-gray-500'
+                  : 'border-gray-200 bg-white'
+          }`}
         />
         <UserEditedIndicator field="skinTone" />
         {changedTraits?.skinTone && !isUserEdited('skinTone') && <span className="text-amber-500 text-xs" title="Changed">●</span>}

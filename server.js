@@ -8663,6 +8663,60 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [95, 'Finalizing story...', jobId]
     );
 
+    // =========================================================================
+    // FINAL CONSISTENCY CHECKS (if enabled)
+    // =========================================================================
+    let finalChecksReport = null;
+    if (enableFinalChecks && !skipImages && allImages.length >= 2) {
+      try {
+        genLog.setStage('final_checks');
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [97, 'Running final consistency checks...', jobId]
+        );
+        log.info(`🔍 [UNIFIED] Running final consistency checks...`);
+
+        // Run image consistency checks
+        const imageCheckData = {
+          sceneImages: allImages.map((img, idx) => ({
+            imageData: img.imageData,
+            pageNumber: img.pageNumber || idx + 1
+          }))
+        };
+        finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
+          checkCharacters: true
+        });
+
+        // Run text consistency check
+        if (fullStoryText && fullStoryText.length > 100) {
+          const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
+          const textCheck = await evaluateTextConsistency(fullStoryText, inputData.language || 'en', characterNames);
+          if (textCheck) {
+            finalChecksReport.textCheck = textCheck;
+            if (textCheck.quality !== 'good') {
+              finalChecksReport.overallConsistent = false;
+            }
+            finalChecksReport.totalIssues += textCheck.issues?.length || 0;
+          }
+        }
+
+        // Log results to generation log
+        genLog.info('final_checks_result', `Final checks: ${finalChecksReport.summary}`, null, {
+          imageChecks: finalChecksReport.imageChecks?.length || 0,
+          textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
+          totalIssues: finalChecksReport.totalIssues || 0,
+          overallConsistent: finalChecksReport.overallConsistent,
+          summary: finalChecksReport.summary
+        });
+
+        log.info(`📋 [UNIFIED] Final checks complete: ${finalChecksReport.summary}`);
+      } catch (checkErr) {
+        log.error('❌ [UNIFIED] Final checks failed:', checkErr.message);
+        genLog.error('final_checks_failed', checkErr.message);
+        // Non-fatal - story generation continues
+      }
+    }
+
     // Log API usage to generationLog BEFORE saving story (so it's included in the saved data)
     genLog.setStage('finalize');
     log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
@@ -8805,61 +8859,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.error('❌ [UNIFIED] Failed to log credit completion:', creditErr.message);
     }
 
-    // =========================================================================
-    // FINAL CONSISTENCY CHECKS (if enabled)
-    // =========================================================================
-    let finalChecksReport = null;
-    if (enableFinalChecks && !skipImages && allImages.length >= 2) {
-      try {
-        genLog.setStage('final_checks');
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [97, 'Running final consistency checks...', jobId]
-        );
-        log.info(`🔍 [UNIFIED] Running final consistency checks...`);
-
-        // Run image consistency checks
-        const imageCheckData = {
-          sceneImages: allImages.map((img, idx) => ({
-            imageData: img.imageData,
-            pageNumber: img.pageNumber || idx + 1
-          }))
-        };
-        finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
-          checkCharacters: true
-        });
-
-        // Run text consistency check
-        if (fullStoryText && fullStoryText.length > 100) {
-          const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
-          const textCheck = await evaluateTextConsistency(fullStoryText, inputData.language || 'en', characterNames);
-          if (textCheck) {
-            finalChecksReport.textCheck = textCheck;
-            if (textCheck.quality !== 'good') {
-              finalChecksReport.overallConsistent = false;
-            }
-            finalChecksReport.totalIssues += textCheck.issues?.length || 0;
-          }
-        }
-
-        // Log results to generation log
-        genLog.info('final_checks_result', `Final checks: ${finalChecksReport.summary}`, null, {
-          imageChecks: finalChecksReport.imageChecks?.length || 0,
-          textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
-          totalIssues: finalChecksReport.totalIssues || 0,
-          overallConsistent: finalChecksReport.overallConsistent,
-          summary: finalChecksReport.summary
-        });
-
-        log.info(`📋 [UNIFIED] Final checks complete: ${finalChecksReport.summary}`);
-      } catch (checkErr) {
-        log.error('❌ [UNIFIED] Final checks failed:', checkErr.message);
-        genLog.error('final_checks_failed', checkErr.message);
-        // Non-fatal - story generation continues
-      }
-    }
-
-    // Build final result (genLog already finalized before story save)
+    // Build final result
     const resultData = {
       storyId,
       title,
