@@ -2478,25 +2478,33 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
 function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   if (!visualBible?.locations || !sceneMetadata?.objects) return [];
 
-  // Extract LOC IDs from objects like "Burgruine Stein [LOC002]" or just "LOC002"
+  // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001]"
   const locIds = [];
+  const locNames = [];
   for (const obj of sceneMetadata.objects) {
-    // Match [LOC###] pattern in string like "Burgruine Stein [LOC002]"
+    // Match [LOC###] pattern in string like "Kennedy Space Center [LOC001]"
     const bracketMatch = obj.match(/\[LOC(\d+)\]/i);
     if (bracketMatch) {
       locIds.push(`LOC${bracketMatch[1].padStart(3, '0')}`);
+      // Also extract the name before the bracket
+      const namePart = obj.replace(/\s*\[LOC\d+\]\s*/i, '').trim();
+      if (namePart) locNames.push(namePart.toLowerCase());
     }
     // Also match plain "LOC002" format
     else if (obj.match(/^LOC\d+$/i)) {
       locIds.push(obj.toUpperCase());
     }
+    // Fallback: treat as location name (for historical locations)
+    else if (obj.trim()) {
+      locNames.push(obj.trim().toLowerCase());
+    }
   }
 
-  if (locIds.length === 0) return [];
+  if (locIds.length === 0 && locNames.length === 0) return [];
 
   return visualBible.locations
     .filter(loc =>
-      locIds.includes(loc.id) &&
+      (locIds.includes(loc.id) || locNames.includes(loc.name?.toLowerCase())) &&
       loc.isRealLandmark &&
       loc.referencePhotoData &&
       loc.photoFetchStatus === 'success'

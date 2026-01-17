@@ -189,18 +189,26 @@ async function evaluateImage(base64Data, locationName, locationType) {
 
   const [, mimeType, data] = matches;
 
-  const prompt = `Evaluate this photo of "${locationName}" (a ${locationType}) for use as a children's book illustration background.
+  const prompt = `Analyze this photo of "${locationName}"${locationType ? ` (a ${locationType})` : ''} for use in children's book illustration.
 
-Score 1-10 based on:
-- Clarity: Is it sharp and well-lit? (not blurry or dark)
-- Composition: Does it show the landmark clearly and completely?
-- Suitability: Would it work as a book background? (not too busy, no distracting elements like people/cars/signs)
-- Quality: Is it a good representative image of this place?
+TASK 1 - SCORE (1-10):
+Rate suitability as a children's book background based on:
+- Clarity: Sharp and well-lit? (not blurry or dark)
+- Composition: Shows the landmark clearly and completely?
+- Suitability: Works as background? (not too busy, no distracting people/cars/signs)
 
-Also provide a 2-sentence description of what's visible in the photo for use in image generation prompts.
+TASK 2 - DESCRIPTION:
+Write a detailed visual description (4-6 sentences) focusing on:
+- The main architectural/natural features visible
+- Colors, materials, textures
+- Distinctive elements that make it recognizable
+- The setting/surroundings visible in the photo
+- Lighting and atmosphere
+
+Be specific and visual. Do NOT mention "the photo" or "the image" - describe as if painting the scene.
 
 Return ONLY valid JSON (no markdown):
-{"score": N, "reason": "brief explanation", "description": "2-sentence visual description"}`;
+{"score": N, "reason": "1-sentence scoring explanation", "description": "4-6 sentence detailed visual description"}`;
 
   try {
     const response = await fetch(
@@ -216,7 +224,7 @@ Return ONLY valid JSON (no markdown):
             ]
           }],
           generationConfig: {
-            maxOutputTokens: 300,
+            maxOutputTokens: 500,
             temperature: 0.3
           }
         }),

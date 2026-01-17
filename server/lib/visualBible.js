@@ -1558,16 +1558,30 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
     return;
   }
 
+  // Initialize locations array if needed
+  visualBible.locations = visualBible.locations || [];
+
+  // Find the highest existing LOC number to continue from
+  let maxLocNum = 0;
+  for (const loc of visualBible.locations) {
+    const match = loc.id?.match(/^LOC(\d+)$/);
+    if (match) {
+      maxLocNum = Math.max(maxLocNum, parseInt(match[1], 10));
+    }
+  }
+
   let injectedCount = 0;
   for (const loc of historicalLocations) {
     // Check if this location already exists in the Visual Bible
-    const existingIndex = visualBible.locations?.findIndex(
+    const existingIndex = visualBible.locations.findIndex(
       existing => existing.name.toLowerCase() === loc.name.toLowerCase() ||
                   existing.landmarkQuery?.toLowerCase() === loc.query?.toLowerCase()
     );
 
+    // Generate numeric ID like LOC001, LOC002, etc.
+    maxLocNum++;
     const locationEntry = {
-      id: `LOC-${loc.name.replace(/\s+/g, '-').toUpperCase().substring(0, 20)}`,
+      id: generateId('LOC', maxLocNum - 1),
       name: loc.name,
       appearsInPages: [], // Will be filled during story generation
       description: loc.description || `Historic ${loc.type}: ${loc.name}`,
@@ -1600,7 +1614,6 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
       }
     } else {
       // Add new location
-      visualBible.locations = visualBible.locations || [];
       visualBible.locations.push(locationEntry);
       injectedCount++;
       log.debug(`[HISTORICAL-LOC] Injected "${loc.name}" (${loc.type})`);

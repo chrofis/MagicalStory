@@ -1090,6 +1090,7 @@ def health_check():
         "status": "ok",
         "service": "photo-analyzer",
         "mediapipe_available": MEDIAPIPE_AVAILABLE,
+        "rembg_available": REMBG_AVAILABLE,
         "lpips_available": lpips_available
     })
 

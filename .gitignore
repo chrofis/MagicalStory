@@ -75,3 +75,7 @@ test-gemini*.js
 # Inpainting test outputs
 test-*.png
 test-scene*.jpg
+
+# Historical location images (local editing)
+historical-location-images/
+historical-location-images-uploaded/
