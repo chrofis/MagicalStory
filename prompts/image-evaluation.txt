@@ -20,9 +20,8 @@ Objectively audit a generated illustration for technical rendering errors and ch
 
 Examine the generated image. For EACH distinct figure, describe:
 - Scene Position: (Foreground/Background, Left/Center/Right)
-- Demographic Category: (infant/toddler/preschooler/young child/child/pre-teen/teenager/young adult/adult/senior)
+- Role: (main character/supporting character/background figure)
 - Gender: (male/female)
-- Silhouette/Frame: (slender/average/robust)
 - Hair: (color, length, style)
 - Attire: (describe all visible clothing items with colors)
 - Activity: (current action/pose)
@@ -36,7 +35,7 @@ You MUST describe each figure individually. Do not just state a count.
 
 Compare Step 1 findings to the Reference Images:
 - Reference Match: Identify by name (if in prompt) or index (reference 1, 2, 3...)
-- Validation: Compare facial structure, hair, and demographic alignment
+- Validation: Compare facial structure and hair
 - Attire Audit: Check garment color and type against reference
 - If no match: state "no matching reference" or "extra character"
 
@@ -131,9 +130,8 @@ Output your COMPLETE analysis as JSON (no other text):
     {
       "figure": 1,
       "position": "Foreground, Center",
-      "demographic": "young child",
+      "role": "main character",
       "gender": "male",
-      "frame": "slender",
       "hair": "blonde, short, slightly messy",
       "attire": "blue hoodie with zipper, dark blue pants, white sneakers",
       "activity": "standing, holding stuffed elephant",
@@ -173,7 +171,7 @@ Output your COMPLETE analysis as JSON (no other text):
   "verdict": "PASS",
   "issues_summary": "Manuel missing from scene; Lukas pants missing green accents; Eli ear patch on wrong side",
   "fix_targets": [
-    {"bbox": [0.6, 0.36, 0.85, 0.5], "issue": "pants missing green accents", "fix": "Add neon green stripe accents to the dark blue pants of the young boy standing in the center foreground"}
+    {"bbox": [0.6, 0.36, 0.85, 0.5], "issue": "pants missing green accents", "fix": "Add neon green stripe accents to the dark blue pants of the boy standing in the center foreground"}
   ]
 }
 ```
@@ -185,7 +183,7 @@ Output your COMPLETE analysis as JSON (no other text):
 - Include ALL analysis steps in the JSON structure
 - **CRITICAL for `fix` field**: Write as a SELF-CONTAINED VISUAL DESCRIPTION. The image editor does NOT know character names - describe by appearance and position only.
   - BAD: "Add black gloves to Lukas"
-  - GOOD: "Add black knitted gloves to the hands of the young boy with short brown hair and blue striped hoodie on the right side"
+  - GOOD: "Add black knitted gloves to the hands of the boy with short brown hair and blue striped hoodie on the right side"
   - BAD: "Fix Eli's eye patch"
   - GOOD: "Add a black eye patch over the left eye of the small brown stuffed animal being held"
   - BAD: "Sophie's jacket should be floral"
