@@ -2203,7 +2203,7 @@ export default function StoryWizard() {
       log.info('Saving characters with relationships:', updatedCharacters.length);
       // Save characters along with relationships
       // Include photos for new characters (server preserves existing photos from DB)
-      const hasNewCharWithPhotos = !isEdit && latestCurrentChar.photos?.original;
+      const hasNewCharWithPhotos = !isEdit && !!latestCurrentChar.photos?.original;
       await characterService.saveCharacterData({
         characters: updatedCharacters,
         relationships,
@@ -3191,7 +3191,7 @@ export default function StoryWizard() {
 
                 // Save characters along with relationships
                 // Include photos for new characters (server preserves existing photos from DB)
-                const hasNewCharWithPhotos = !isEdit && currentCharacter.photos?.original;
+                const hasNewCharWithPhotos = !isEdit && !!currentCharacter.photos?.original;
                 await characterService.saveCharacterData({
                   characters: updatedCharacters,
                   relationships,
