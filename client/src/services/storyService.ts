@@ -884,15 +884,18 @@ export const storyService = {
                   callbacks.onStatus?.(eventData.status, eventData.prompt, eventData.model);
                 }
                 if (eventData.story1) {
+                  console.log('[IDEAS STREAM] Received story1 update:', eventData.story1.length, 'chars');
                   callbacks.onStory1?.(eventData.story1);
                 }
                 if (eventData.story2) {
+                  console.log('[IDEAS STREAM] Received story2 update:', eventData.story2.length, 'chars');
                   callbacks.onStory2?.(eventData.story2);
                 }
                 if (eventData.error) {
                   callbacks.onError?.(eventData.error);
                 }
                 if (eventData.done) {
+                  console.log('[IDEAS STREAM] Received done event');
                   callbacks.onDone?.(eventData.fullResponse);
                 }
               } catch {

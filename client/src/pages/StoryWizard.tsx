@@ -2573,20 +2573,24 @@ export default function StoryWizard() {
           }
         },
         onStory1: (story1) => {
+          log.info('[IDEAS] onStory1 callback called, updating state...');
           setGeneratedIdeas(prev => {
             const newIdeas = [...prev];
             newIdeas[0] = story1;
             return newIdeas;
           });
           setIsGeneratingIdea1(false);
+          log.info('[IDEAS] onStory1 state update complete');
         },
         onStory2: (story2) => {
+          log.info('[IDEAS] onStory2 callback called, updating state...');
           setGeneratedIdeas(prev => {
             const newIdeas = [...prev];
             newIdeas[1] = story2;
             return newIdeas;
           });
           setIsGeneratingIdea2(false);
+          log.info('[IDEAS] onStory2 state update complete');
         },
         onError: (error) => {
           log.error('Failed to generate story ideas:', error);
@@ -2600,6 +2604,7 @@ export default function StoryWizard() {
           setIsGeneratingIdea2(false);
         },
         onDone: (fullResponse) => {
+          log.info('[IDEAS] onDone callback called, finalizing...');
           setIsGeneratingIdeas(false);
           setIsGeneratingIdea1(false);
           setIsGeneratingIdea2(false);
@@ -2607,6 +2612,7 @@ export default function StoryWizard() {
             setLastIdeaFullResponse(fullResponse);
           }
           streamAbortRef.current = null;
+          log.info('[IDEAS] onDone complete');
         },
       }
     );
