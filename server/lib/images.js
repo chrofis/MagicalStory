@@ -107,9 +107,13 @@ function hashImageData(imageData) {
 
 /**
  * Generate cache key for image generation
- * Creates a hash from prompt + character photo hashes
+ * Creates a hash from prompt + character photo hashes + page number
+ * @param {string} prompt - The image generation prompt
+ * @param {Array} characterPhotos - Array of character photos (URLs or {name, photoUrl} objects)
+ * @param {string|null} sequentialMarker - Optional marker for sequential mode
+ * @param {number|null} pageNumber - Optional page number to ensure unique cache keys per page
  */
-function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null) {
+function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = null, pageNumber = null) {
   // Hash each photo and sort them for consistency
   // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   const photoHashes = characterPhotos
@@ -122,8 +126,9 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
     .sort()
     .join('|');
 
-  // Combine prompt + photo hashes + sequential marker (to distinguish sequential vs parallel cache)
-  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}`;
+  // Combine prompt + photo hashes + sequential marker + page number
+  // Page number ensures different pages never get the same cached image
+  const combined = `${prompt}|${photoHashes}|${sequentialMarker || ''}|${pageNumber !== null ? `page${pageNumber}` : ''}`;
   return crypto.createHash('sha256').update(combined).digest('hex');
 }
 
@@ -735,8 +740,12 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
 async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0) {
-  // Check cache first (include previousImage presence in cache key for sequential mode)
-  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null);
+  // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
+  const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
+  const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
+
+  // Check cache first (include previousImage presence and page number in cache key)
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber);
 
   if (imageCache.has(cacheKey)) {
     log.debug(`💾 [IMAGE CACHE] HIT (${imageCache.size} cached)`);
@@ -1300,6 +1309,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
+
+  // Extract page number from pageContext for cache key uniqueness
+  const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
+  const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
+
   let bestResult = null;
   let bestScore = -1;
   let attempts = 0;
@@ -1315,7 +1329,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     // Clear cache for retries to force new generation
     if (attempts > 1) {
-      const cacheKey = generateImageCacheKey(currentPrompt, characterPhotos, previousImage ? 'seq' : null);
+      const cacheKey = generateImageCacheKey(currentPrompt, characterPhotos, previousImage ? 'seq' : null, pageNumber);
       imageCache.delete(cacheKey);
     }
 
