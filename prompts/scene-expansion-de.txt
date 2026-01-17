@@ -77,7 +77,62 @@ Erfinde KEINE neuen Charaktere oder Objekte.
 - **Objekt-Trennung:**
   - Wenn Objekte sich berühren, nutze unterschiedliche Materialien/Farben: "Ein [holzbrauner] Stock in einer [rosafarbenen] Hand"
 
-**TIEFE & ZEIGE-GEOMETRIE - KRITISCH:**
+**MASSSTAB-MACHBARKEITSPRÜFUNG:**
+Bevor du die Komposition finalisierst, prüfe ob ALLE beschriebenen Details bei der gewählten Kameradistanz sichtbar sein können:
+
+- **REGEL**: Wenn die Szene GROSSE OBJEKTE zeigt (Fahrzeuge, Gebäude, Landschaften), müssen Charakterdetails BEGRENZT sein:
+  - Totale eines Hauses → Charaktere können winken aber KEINE Gesichtsausdrücke sichtbar
+  - Zwei Raumschiffe im Bild → Astronauten sind bestenfalls SILHOUETTEN, keine Handpositionen
+  - Ganzer Spielplatz → Kinder sind kleine Figuren, beschreibe nach FARBE/GRÖSSE nicht Ausdrücken
+
+- **INKOMPATIBLE KOMBINATIONEN** (automatisch ablehnen):
+  - "Zwei Autos UND Gesichtsausdrücke der Fahrer" → UNMÖGLICH
+  - "Ganzes Schloss UND Augendetails der Prinzessin" → UNMÖGLICH
+  - "Raumschiff-Innenraum UND Aussenansicht im selben Bild" → UNMÖGLICH
+
+- **LÖSUNG**: Entweder HERANZOOMEN (Fokus auf Charaktere, grosse Objekte andeuten) oder HERAUSZOOMEN (Charaktere generisch beschreiben)
+
+**KAMERADISTANZ (Wähle EINE):**
+Wähle basierend darauf, was die Szene zeigen MUSS, dann folge den Detailgrenzen:
+
+- **EXTREME TOTALE** (ganzes Gebäude/Fahrzeug/Landschaft sichtbar):
+  - Charaktere: Silhouetten, nur Farben, KEINE Gesichter oder Hände
+  - Beispiel: "Eine kleine rote Figur winkt aus dem Fenster"
+
+- **TOTALE** (Raumgrösse, mehrere Personen):
+  - Charaktere: Körpersprache, Haarfarbe, Kleidungsfarben
+  - Beispiel: "Sophie lehnt sich vor, Arme erhoben"
+
+- **HALBNAH** (1-3 Charaktere, Hüfte aufwärts):
+  - Charaktere: Ausdrücke, Handpositionen, Kleidungsdetails
+  - Beispiel: "Breites Lächeln, hochgezogene Augenbrauen, rechte Hand zeigt"
+
+- **NAHAUFNAHME** (Gesicht/Hände Fokus):
+  - Charaktere: volle Gesichtsdetails, Fingerpositionen
+  - Objekte: müssen mit Charakteren ins Bild passen
+
+⚠️ Wenn Szenen-Zusammenfassung EXTREME TOTALE + detaillierte Ausdrücke erfordert → SZENE NEU KOMPONIEREN
+
+**ILLUSTRATOR-REALITÄTSCHECK:**
+
+❌ UNMÖGLICH (ablehnen und neu komponieren):
+- "Zwei Raumschiffe schweben im All, Astronauten winken durch Fenster mit begeisterten Ausdrücken"
+  → Bei Raumschiff-Massstab sind Fenster Punkte. Astronauten unsichtbar.
+
+- "Der ganze Eiffelturm mit Sophie oben, ihre Augen funkeln vor Freude"
+  → Bei Turm-Gesamtansicht ist Sophie 1 Pixel gross.
+
+- "Eine mittelalterliche Schlacht mit 100 Soldaten, Nahaufnahme des entschlossenen Gesichts des Ritters"
+  → Weite Schlacht = keine Gesichtsdetails. Gesichtsdetails = keine Schlacht.
+
+✅ MÖGLICH (gute Kompositionen):
+- "Im Raumschiff schaut Neil durch ein Bullauge zur Erde, Hand am Glas, Augen weit offen"
+- "Sophie auf der Eiffelturm-Aussichtsplattform, Turm-Geländer und Paris-Skyline hinter ihr"
+- "Ritter im Vordergrund umklammert Schwert, Schlacht-Chaos verschwommen im Hintergrund"
+
+**GOLDENE REGEL**: Ein Massstab pro Szene. Wähle MENSCHLICHER MASSSTAB (Ausdrücke) oder OBJEKT-MASSSTAB (ganze Gebäude/Fahrzeuge), niemals beides.
+
+**TIEFE & ZEIGE-GEOMETRIE:**
 - Wenn ein Charakter auf ein Objekt ZEIGT oder SCHAUT, prüfe ob die TIEFENEBENEN übereinstimmen:
   - Charakter im VORDERGRUND zeigt auf Objekt im HINTERGRUND = Charakter muss sich von der Kamera ABWENDEN (Rückenansicht) oder umdrehen
   - Charakter im VORDERGRUND zeigt auf Objekt im VORDERGRUND = Charakter kann zur Kamera schauen (Frontansicht)

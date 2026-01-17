@@ -132,7 +132,7 @@ Choose based on what the scene MUST show, then follow detail limits:
 
 **GOLDEN RULE**: One scale per scene. Pick HUMAN SCALE (expressions) or OBJECT SCALE (full buildings/vehicles), never both.
 
-**DEPTH & POINTING GEOMETRY:
+**DEPTH & POINTING GEOMETRY:**
 - When a character POINTS at or LOOKS at an object, verify the DEPTH LAYERS match:
   - Character in FOREGROUND pointing at object in BACKGROUND = character must face AWAY from camera (back view) or turn around
   - Character in FOREGROUND pointing at object in FOREGROUND = character can face camera (front view)

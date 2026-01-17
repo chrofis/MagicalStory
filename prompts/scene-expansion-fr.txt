@@ -77,7 +77,62 @@ N'inventez PAS de nouveaux personnages ou objets.
 - **Séparation des Objets:**
   - Quand les objets se touchent, utilisez des matériaux/couleurs distincts: "Un bâton [bois-marron] dans une main [peau-rose]"
 
-**PROFONDEUR & GÉOMÉTRIE DU POINTAGE - CRITIQUE:**
+**VÉRIFICATION DE FAISABILITÉ D'ÉCHELLE:**
+Avant de finaliser la composition, vérifiez que TOUS les détails décrits peuvent être visibles à la distance de caméra choisie:
+
+- **RÈGLE**: Si la scène montre de GRANDS OBJETS (véhicules, bâtiments, paysages), les détails des personnages doivent être LIMITÉS:
+  - Plan large d'une maison → les personnages peuvent saluer mais PAS d'expressions faciales visibles
+  - Deux vaisseaux spatiaux dans le cadre → les astronautes sont au mieux des SILHOUETTES, pas de positions de mains
+  - Aire de jeux entière → les enfants sont de petites figures, décrire par COULEUR/TAILLE pas par expressions
+
+- **COMBINAISONS INCOMPATIBLES** (rejeter automatiquement):
+  - "Deux voitures ET expressions faciales des conducteurs" → IMPOSSIBLE
+  - "Château entier ET détails des yeux de la princesse" → IMPOSSIBLE
+  - "Intérieur ET extérieur du vaisseau spatial dans le même cadre" → IMPOSSIBLE
+
+- **SOLUTION**: Soit ZOOMER (focus sur les personnages, suggérer les grands objets) soit DÉZOOMER (décrire les personnages de manière générique)
+
+**DISTANCE DE CAMÉRA (Sélectionner UNE):**
+Choisissez en fonction de ce que la scène DOIT montrer, puis suivez les limites de détails:
+
+- **PLAN TRÈS LARGE** (bâtiment/véhicule/paysage entier visible):
+  - Personnages: silhouettes, couleurs uniquement, PAS de visages ni de mains
+  - Exemple: "Une petite figure rouge salue depuis la fenêtre"
+
+- **PLAN LARGE** (taille d'une pièce, plusieurs personnes):
+  - Personnages: langage corporel, couleur des cheveux, couleurs des vêtements
+  - Exemple: "Sophie se penche en avant, bras levés"
+
+- **PLAN MOYEN** (1-3 personnages, de la taille aux épaules):
+  - Personnages: expressions, positions des mains, détails des vêtements
+  - Exemple: "Large sourire, sourcils levés, main droite pointant"
+
+- **GROS PLAN** (focus visage/mains):
+  - Personnages: détails faciaux complets, positions des doigts
+  - Objets: doivent tenir dans le cadre avec les personnages
+
+⚠️ Si le résumé de scène nécessite PLAN TRÈS LARGE + expressions détaillées → RECOMPOSER la scène
+
+**VÉRIFICATION RÉALISTE DE L'ILLUSTRATEUR:**
+
+❌ IMPOSSIBLE (rejeter et recomposer):
+- "Deux vaisseaux spatiaux flottant dans l'espace, astronautes saluant par les fenêtres avec des expressions enthousiastes"
+  → À l'échelle des vaisseaux, les fenêtres sont des points. Astronautes invisibles.
+
+- "La Tour Eiffel entière avec Sophie au sommet, ses yeux brillant de joie"
+  → À l'échelle de la tour complète, Sophie fait 1 pixel de haut.
+
+- "Une bataille médiévale avec 100 soldats, gros plan sur le visage déterminé du chevalier"
+  → Bataille large = pas de détails faciaux. Détails faciaux = pas de bataille.
+
+✅ POSSIBLE (bonnes compositions):
+- "À l'intérieur du vaisseau, Neil regarde par le hublot vers la Terre, main sur la vitre, yeux écarquillés"
+- "Sophie sur la plateforme d'observation de la Tour Eiffel, balustrade et skyline de Paris derrière elle"
+- "Chevalier au premier plan agrippant son épée, chaos de bataille flou en arrière-plan"
+
+**RÈGLE D'OR**: Une seule échelle par scène. Choisir ÉCHELLE HUMAINE (expressions) ou ÉCHELLE OBJET (bâtiments/véhicules entiers), jamais les deux.
+
+**PROFONDEUR & GÉOMÉTRIE DU POINTAGE:**
 - Quand un personnage POINTE ou REGARDE un objet, vérifiez que les COUCHES DE PROFONDEUR correspondent:
   - Personnage au PREMIER PLAN pointant vers un objet en ARRIÈRE-PLAN = le personnage doit être DOS à la caméra ou se retourner
   - Personnage au PREMIER PLAN pointant vers un objet au PREMIER PLAN = le personnage peut faire face à la caméra (vue de face)
