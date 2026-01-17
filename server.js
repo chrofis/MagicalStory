@@ -8993,6 +8993,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               );
 
               if (imageResult?.imageData) {
+                // Summarize avatar info (without base64 data)
+                const avatarsUsed = pagePhotos.map(p => ({
+                  name: p.name,
+                  hasPhoto: p.hasPhoto,
+                  category: p.category,
+                  photoType: p.photoType
+                }));
+
                 // Store original image and prompt before replacing (with retry history for dev mode)
                 existingImage.consistencyRegen = {
                   originalImage: existingImage.imageData,
@@ -9008,7 +9016,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   retryHistory: imageResult.retryHistory || [],
                   totalAttempts: imageResult.totalAttempts || 1,
                   wasRegenerated: imageResult.wasRegenerated || false,
-                  clothing: originalClothing
+                  clothing: originalClothing,
+                  avatarsUsed: avatarsUsed
                 };
 
                 // Replace with fixed image

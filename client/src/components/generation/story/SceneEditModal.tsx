@@ -18,6 +18,13 @@ interface ConsistencyIssue {
   severity: string;
 }
 
+interface AvatarUsed {
+  name: string;
+  hasPhoto: boolean;
+  category?: string;
+  photoType?: string;
+}
+
 interface ConsistencyRegenData {
   originalImage: string;
   originalPrompt: string;
@@ -35,6 +42,7 @@ interface ConsistencyRegenData {
   wasRegenerated?: boolean;
   // Clothing/avatar info
   clothing?: string;
+  avatarsUsed?: AvatarUsed[];
 }
 
 interface SceneEditModalProps {
@@ -248,6 +256,35 @@ export function SceneEditModal({
                   </span>
                 )}
               </div>
+
+              {/* Avatars Used */}
+              {consistencyRegen.avatarsUsed && consistencyRegen.avatarsUsed.length > 0 && (
+                <div className="mt-3 p-2 bg-blue-50 rounded border border-blue-200">
+                  <p className="text-xs font-medium text-blue-700 mb-1">
+                    {language === 'de' ? 'Verwendete Avatare:' :
+                     language === 'fr' ? 'Avatars utilisés:' :
+                     'Avatars used:'}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {consistencyRegen.avatarsUsed.map((avatar, idx) => (
+                      <span
+                        key={idx}
+                        className={`text-xs px-2 py-1 rounded ${
+                          avatar.hasPhoto
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {avatar.name}
+                        {avatar.category && avatar.category !== 'standard' && (
+                          <span className="ml-1 opacity-75">({avatar.category})</span>
+                        )}
+                        {!avatar.hasPhoto && ' ⚠️'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Retry History (if multiple attempts) */}
               {consistencyRegen.retryHistory && consistencyRegen.retryHistory.length > 0 && (
