@@ -952,10 +952,25 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           // If not found, will fall through to standard avatar fallback below
         }
       }
-      // NOTE: We intentionally skip looking up pre-existing styled avatars from character data.
-      // This ensures fresh styled avatars are generated via applyStyledAvatars() from the
-      // current story's base avatars. Use base clothing avatar (styling applied later via cache).
-      // Use unstyled clothing avatar (standard, winter, summer)
+      // Check styled avatars first (with signature items from this story)
+      else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' &&
+               artStyle && avatars?.styledAvatars?.[artStyle]?.[effectiveClothingCategory]) {
+        let avatarData = avatars.styledAvatars[artStyle][effectiveClothingCategory];
+        if (typeof avatarData === 'object' && avatarData.imageData) {
+          photoUrl = avatarData.imageData;
+          if (avatarData.clothing) {
+            clothingDescription = typeof avatarData.clothing === 'string'
+              ? avatarData.clothing
+              : formatClothingObject(avatarData.clothing);
+          }
+        } else {
+          photoUrl = avatarData;
+        }
+        photoType = `styled-${effectiveClothingCategory}`;
+        usedClothingCategory = effectiveClothingCategory;
+        log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${effectiveClothingCategory} for ${artStyle}`);
+      }
+      // Fall back to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
         photoUrl = avatars[effectiveClothingCategory];
@@ -965,6 +980,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           const clothingData = avatars.clothing[effectiveClothingCategory];
           clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
         }
+        log.debug(`[AVATAR LOOKUP] ${char.name}: using unstyled ${effectiveClothingCategory} (no styled avatar found)`);
       }
 
       // Backwards compatibility: use legacy 'formal' avatar for costumed requests

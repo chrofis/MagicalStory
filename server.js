@@ -8540,7 +8540,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (pageLandmarkPhotos.length > 0) {
           log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
         }
-        const allReferencePhotos = [...pagePhotos, ...pageLandmarkPhotos];
+        const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
 
         const imagePrompt = buildImagePrompt(
           scene.sceneDescription,
@@ -8812,7 +8812,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Get landmark photos
               const sceneMetadata = extractSceneMetadata(sceneDescription);
               const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
-              const allReferencePhotos = [...pagePhotos, ...pageLandmarkPhotos];
+              const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
 
               // Build new image prompt
               const imagePrompt = buildImagePrompt(
