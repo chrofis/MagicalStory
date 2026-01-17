@@ -1101,7 +1101,7 @@ function buildCharacterPhysicalDescription(char) {
  * Build relative height description for characters
  * Instead of absolute cm values, describes relative heights which AI understands better
  * @param {Array} characters - Array of character objects with name and height properties
- * @returns {string} Description like "Height order: Emma (shortest), Max (much taller), Dad (slightly taller)"
+ * @returns {string} Description like "Height order: Emma (shortest) -> Max (taller) -> Dad (slightly taller)"
  */
 function buildRelativeHeightDescription(characters) {
   if (!characters || characters.length < 2) return '';
@@ -1134,17 +1134,13 @@ function buildRelativeHeightDescription(characters) {
 
       let descriptor;
       if (diff <= 3) {
-        descriptor = 'about the same height';
-      } else if (diff <= 8) {
+        descriptor = 'similar height';
+      } else if (diff <= 10) {
         descriptor = 'slightly taller';
-      } else if (diff <= 15) {
-        descriptor = 'a bit taller';
       } else if (diff <= 25) {
         descriptor = 'taller';
-      } else if (diff <= 40) {
-        descriptor = 'much taller';
       } else {
-        descriptor = 'a lot taller';
+        descriptor = 'noticeably taller';
       }
 
       descriptions.push(`${char.name} (${descriptor})`);
