@@ -1573,10 +1573,22 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
   let injectedCount = 0;
   for (const loc of historicalLocations) {
     // Check if this location already exists in the Visual Bible
-    const existingIndex = visualBible.locations.findIndex(
-      existing => existing.name.toLowerCase() === loc.name.toLowerCase() ||
-                  existing.landmarkQuery?.toLowerCase() === loc.query?.toLowerCase()
-    );
+    // Support aliases for translations (e.g., "Moon Surface" matches "Mondoberfläche")
+    const locAliases = loc.aliases || [];
+    const allLocNames = [loc.name.toLowerCase(), ...locAliases.map(a => a.toLowerCase())];
+
+    const existingIndex = visualBible.locations.findIndex(existing => {
+      const existingNameLower = existing.name.toLowerCase();
+      // Exact match on name or aliases
+      if (allLocNames.includes(existingNameLower)) return true;
+      // Query match
+      if (existing.landmarkQuery?.toLowerCase() === loc.query?.toLowerCase()) return true;
+      // Partial match - check if any alias keyword appears in the VB location name
+      for (const alias of allLocNames) {
+        if (existingNameLower.includes(alias) || alias.includes(existingNameLower)) return true;
+      }
+      return false;
+    });
 
     // Generate numeric ID like LOC001, LOC002, etc.
     maxLocNum++;

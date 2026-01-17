@@ -1859,11 +1859,14 @@ ${landmarkEntries}`;
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
 
-    // Load category-specific story requirements
-    const storyRequirementsFile = effectiveCategory === 'historical'
-      ? 'story-idea-requirements-historical.txt'
-      : 'story-idea-requirements-adventure.txt';
-    const storyRequirements = await fs.readFile(path.join(__dirname, 'prompts', storyRequirementsFile), 'utf-8');
+    // Load category-specific story requirements (separate files for story 1 and story 2)
+    const requirementsBase = effectiveCategory === 'historical'
+      ? 'story-idea-requirements-historical'
+      : 'story-idea-requirements-adventure';
+    const storyRequirements1 = await fs.readFile(path.join(__dirname, 'prompts', `${requirementsBase}-1.txt`), 'utf-8');
+    const storyRequirements2 = await fs.readFile(path.join(__dirname, 'prompts', `${requirementsBase}-2.txt`), 'utf-8');
+    // Combined for backwards compatibility with non-streaming endpoint
+    const storyRequirements = storyRequirements1 + '\n\n' + storyRequirements2;
 
     const prompt = promptTemplate
       .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
@@ -2175,11 +2178,14 @@ ${landmarkEntries}`;
     // Load prompt from file and replace placeholders
     const promptTemplate = await fs.readFile(path.join(__dirname, 'prompts', 'generate-story-ideas.txt'), 'utf-8');
 
-    // Load category-specific story requirements
-    const storyRequirementsFile = effectiveCategory === 'historical'
-      ? 'story-idea-requirements-historical.txt'
-      : 'story-idea-requirements-adventure.txt';
-    const storyRequirements = await fs.readFile(path.join(__dirname, 'prompts', storyRequirementsFile), 'utf-8');
+    // Load category-specific story requirements (separate files for story 1 and story 2)
+    const requirementsBase = effectiveCategory === 'historical'
+      ? 'story-idea-requirements-historical'
+      : 'story-idea-requirements-adventure';
+    const storyRequirements1 = await fs.readFile(path.join(__dirname, 'prompts', `${requirementsBase}-1.txt`), 'utf-8');
+    const storyRequirements2 = await fs.readFile(path.join(__dirname, 'prompts', `${requirementsBase}-2.txt`), 'utf-8');
+    // Combined for backwards compatibility with non-streaming endpoint
+    const storyRequirements = storyRequirements1 + '\n\n' + storyRequirements2;
 
     const prompt = promptTemplate
       .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
@@ -2215,8 +2221,9 @@ ${landmarkEntries}`;
       return null; // Return null if [FINAL] not yet reached
     };
 
-    // Build prompt for a single story
-    const buildSinglePrompt = (variantInstruction) => {
+    // Build prompt for a single story (storyNum: 1 or 2)
+    const buildSinglePrompt = (storyNum, variantInstruction) => {
+      const requirements = storyNum === 1 ? storyRequirements1 : storyRequirements2;
       return singlePromptTemplate
         .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
         .replace('{STORY_TYPE_NAME}', effectiveTheme)
@@ -2232,13 +2239,13 @@ ${landmarkEntries}`;
         .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
         .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
         .replace('{STORY_VARIANT_INSTRUCTION}', variantInstruction)
-        .replace('{STORY_REQUIREMENTS}', storyRequirements)
+        .replace('{STORY_REQUIREMENTS}', requirements)
         .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
     };
 
-    // Build prompts for both stories
-    const prompt1 = buildSinglePrompt('Use local landmarks if available. Create an engaging story that uses the setting naturally.');
-    const prompt2 = buildSinglePrompt('Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.');
+    // Build prompts for both stories (each with its own requirements)
+    const prompt1 = buildSinglePrompt(1, 'Use local landmarks if available. Create an engaging story that uses the setting naturally.');
+    const prompt2 = buildSinglePrompt(2, 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure. Avoid local landmarks - use the theme setting instead.');
 
     // Send initial event with prompt info for dev mode
     res.write(`data: ${JSON.stringify({ status: 'generating', prompt: prompt1, model: modelToUse })}\n\n`);

@@ -1,0 +1,6 @@
+--- STORY REQUIREMENTS ---
+
+- IGNORE the user's location completely
+- Start DIRECTLY in the adventure world from the first sentence
+- No transition from real life - the adventure is already happening
+- Example: Characters wake up on a pirate ship, are already exploring a castle, find themselves in a jungle

@@ -1,0 +1,6 @@
+--- STORY REQUIREMENTS ---
+
+- USE the user's location if provided (blend real-world setting into the adventure)
+- If AVAILABLE LANDMARKS are provided, incorporate 1-2 of them into the story
+- Start in NORMAL LIFE, then transition into the adventure world
+- Example: Characters are at home/school/park, then discover a portal/magic item/hidden entrance

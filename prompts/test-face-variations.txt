@@ -7,11 +7,13 @@ Create a 2x2 GRID with 4 PHOTOREALISTIC FACE PORTRAITS:
 - ALL 4 must have the SAME HAPPY expression (friendly, approachable)
 
 ## THE 4 VARIATIONS
-All faces should look HAPPY and FRIENDLY. The only differences are subtle:
+All faces should look HAPPY and FRIENDLY. The only differences are subtle lighting:
 1. Top-Left: Happy expression, soft frontal studio lighting
-2. Top-Right: Happy expression, warm lighting from upper-left
-3. Bottom-Left: Happy expression, cool/natural daylight feel
-4. Bottom-Right: Happy expression, bright even lighting
+2. Top-Right: Happy expression, warm golden lighting from upper-left
+3. Bottom-Left: Happy expression, natural outdoor daylight (MUST BE FULL COLOR)
+4. Bottom-Right: Happy expression, bright even studio lighting
+
+IMPORTANT: ALL 4 images must be in FULL COLOR. No grayscale or black-and-white.
 
 ## CRITICAL REQUIREMENTS
 - PHOTOREALISTIC - must look like real photographs
