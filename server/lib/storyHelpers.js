@@ -921,11 +921,38 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             return matchingKey;
           };
 
-          // NOTE: We intentionally skip looking up pre-existing styled costumed avatars
-          // from character data. This ensures fresh styled avatars are generated via
-          // applyStyledAvatars() from the current story's base costumed avatars.
-          // Use base costumed avatar (styling will be applied later via cache)
-          {
+          // First check styled costumed avatars (generated during story creation with art style)
+          // These are stored at styledAvatars[artStyle].costumed[costumeKey]
+          if (artStyle && avatars?.styledAvatars?.[artStyle]?.costumed) {
+            const styledCostumeKey = findCostumeByPrefix(avatars.styledAvatars[artStyle].costumed, costumeKey);
+            if (styledCostumeKey) {
+              let avatarData = avatars.styledAvatars[artStyle].costumed[styledCostumeKey];
+              if (typeof avatarData === 'object' && avatarData.imageData) {
+                photoUrl = avatarData.imageData;
+                if (avatarData.clothing) {
+                  clothingDescription = typeof avatarData.clothing === 'string'
+                    ? avatarData.clothing
+                    : formatClothingObject(avatarData.clothing);
+                }
+              } else {
+                photoUrl = avatarData;
+              }
+              photoType = `styled-costumed-${styledCostumeKey}`;
+              usedClothingCategory = `costumed:${styledCostumeKey}`;
+              log.debug(`[AVATAR LOOKUP] ${char.name}: found styled costumed "${styledCostumeKey}" for ${artStyle}`);
+
+              // Get clothing description from separate clothing object if not already set
+              if (!clothingDescription && avatars?.clothing?.costumed?.[styledCostumeKey]) {
+                const clothingData = avatars.clothing.costumed[styledCostumeKey];
+                clothingDescription = typeof clothingData === 'string'
+                  ? clothingData
+                  : formatClothingObject(clothingData);
+              }
+            }
+          }
+
+          // Fallback: check base costumed avatar (if exists from previous generation)
+          if (!photoUrl) {
             const regularCostumeKey = findCostumeByPrefix(avatars?.costumed, costumeKey);
             if (regularCostumeKey) {
               let avatarData = avatars.costumed[regularCostumeKey];
@@ -941,6 +968,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
               }
               photoType = `costumed-${regularCostumeKey}`;
               usedClothingCategory = `costumed:${regularCostumeKey}`;
+              log.debug(`[AVATAR LOOKUP] ${char.name}: found base costumed "${regularCostumeKey}" (will be styled later)`);
 
               // Get clothing description from separate clothing object if not already set
               if (!clothingDescription && avatars?.clothing?.costumed?.[regularCostumeKey]) {
