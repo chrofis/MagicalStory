@@ -9,7 +9,7 @@ Du bist ein erfahrener Art Director, der eine kurze Szenenbeschreibung in ein de
 
 **WIEDERKEHRENDE ELEMENTE (Visual Bible):**
 {RECURRING_ELEMENTS}
-
+{CORRECTION_NOTES}
 **AUFGABE:**
 Erweitere die obige Szenen-Zusammenfassung zu einer vollständigen, detaillierten visuellen Beschreibung.
 Verwende NUR Charaktere und Elemente, die in der Zusammenfassung erwähnt oder oben aufgelistet sind.

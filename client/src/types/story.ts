@@ -416,6 +416,8 @@ export interface SavedStory {
   totalPages?: number;
   // Generation log for debugging (dev mode)
   generationLog?: GenerationLogEntry[];
+  // Final consistency checks report (for evaluation-guided regeneration)
+  finalChecksReport?: FinalChecksReport;
 }
 
 export interface StoryGenerationProgress {

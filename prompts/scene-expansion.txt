@@ -9,7 +9,7 @@ You are an expert Art Director expanding a brief scene summary into a detailed i
 
 **RECURRING ELEMENTS (Visual Bible):**
 {RECURRING_ELEMENTS}
-
+{CORRECTION_NOTES}
 **TASK:**
 Expand the scene summary above into a complete, detailed visual description.
 Use ONLY characters and elements mentioned in the summary or listed above.

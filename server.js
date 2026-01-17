@@ -2517,18 +2517,53 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       log.debug(`👥 [REGEN] Detected ${sceneCharacters.length} characters from text: ${sceneCharacters.map(c => c.name).join(', ')}`);
     }
 
+    // Build correction notes from finalChecksReport if available
+    let correctionNotes = '';
+    const finalChecksReport = storyData.finalChecksReport;
+    if (finalChecksReport?.imageChecks?.length > 0) {
+      // Find all issues that affect this page
+      const pageIssues = [];
+      for (const check of finalChecksReport.imageChecks) {
+        if (check.issues?.length > 0) {
+          for (const issue of check.issues) {
+            if (issue.images?.includes(pageNumber)) {
+              // Build issue description
+              let issueText = `- ${issue.type.replace(/_/g, ' ').toUpperCase()}`;
+              if (issue.characterInvolved) {
+                issueText += ` (${issue.characterInvolved})`;
+              }
+              issueText += `: ${issue.description}`;
+              if (issue.recommendation) {
+                issueText += `\n  FIX: ${issue.recommendation}`;
+              }
+              if (issue.details?.[`image${pageNumber}`]) {
+                issueText += `\n  DETAIL: ${issue.details[`image${pageNumber}`]}`;
+              }
+              pageIssues.push(issueText);
+            }
+          }
+        }
+      }
+      if (pageIssues.length > 0) {
+        correctionNotes = `The previous image for this page had the following issues that need to be corrected:\n${pageIssues.join('\n\n')}`;
+        console.log(`📋 [REGEN] Found ${pageIssues.length} correction note(s) from evaluation for page ${pageNumber}`);
+      }
+    }
+
     // Expand scene to full Art Director format
     // ALWAYS expand if user edited the scene (to ensure fresh, consistent prompts)
     // Also expand if it's a short summary without Art Director sections
+    // Also expand if we have correction notes from evaluation (to incorporate fixes)
     let expandedDescription = inputDescription;
     const hasArtDirectorFormat = inputDescription.includes('**Setting') || inputDescription.includes('**Character Composition');
-    const shouldExpand = sceneWasEdited || (!hasArtDirectorFormat && inputDescription.length < 1500);
+    const hasCorrectionNotes = correctionNotes.length > 0;
+    const shouldExpand = sceneWasEdited || hasCorrectionNotes || (!hasArtDirectorFormat && inputDescription.length < 1500);
 
     if (shouldExpand) {
-      console.log(`📝 [REGEN] Expanding scene to full Art Director format (edited: ${sceneWasEdited}, length: ${inputDescription.length} chars)...`);
+      console.log(`📝 [REGEN] Expanding scene to full Art Director format (edited: ${sceneWasEdited}, corrections: ${hasCorrectionNotes}, length: ${inputDescription.length} chars)...`);
       // Use language code (e.g., 'de-ch', 'en') not name (e.g., 'English')
       const language = storyData.language || 'en';
-      const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language);
+      const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language, correctionNotes);
 
       try {
         const expansionResult = await callClaudeAPI(expansionPrompt, 2048);

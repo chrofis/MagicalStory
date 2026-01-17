@@ -2094,7 +2094,7 @@ Important:
  * Build scene expansion prompt for regeneration
  * Takes a short scene summary and expands it to full Art Director format
  */
-function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, visualBible, language = 'en') {
+function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, visualBible, language = 'en', correctionNotes = '') {
   // Build character details for prompt
   let characterDetails = '';
   if (sceneCharacters && sceneCharacters.length > 0) {
@@ -2178,10 +2178,15 @@ function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, vis
   if (template) {
     // Use centralized language functions
     const { getLanguageNameEnglish } = require('./languages');
+    // Build correction notes section if provided
+    const correctionSection = correctionNotes
+      ? `\n**CORRECTION NOTES (from previous evaluation):**\n${correctionNotes}\n`
+      : '';
     return fillTemplate(template, {
       SCENE_SUMMARY: sceneSummary,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
+      CORRECTION_NOTES: correctionSection,
       LANGUAGE: getLanguageNameEnglish(langCode),
       LANGUAGE_NOTE: getLanguageNote(langCode)
     });

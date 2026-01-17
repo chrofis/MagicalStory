@@ -9,7 +9,7 @@ Vous êtes un directeur artistique expert qui développe un bref résumé de sc�
 
 **ÉLÉMENTS RÉCURRENTS (Visual Bible):**
 {RECURRING_ELEMENTS}
-
+{CORRECTION_NOTES}
 **TÂCHE:**
 Développez le résumé de scène ci-dessus en une description visuelle complète et détaillée.
 Utilisez UNIQUEMENT les personnages et éléments mentionnés dans le résumé ou listés ci-dessus.
