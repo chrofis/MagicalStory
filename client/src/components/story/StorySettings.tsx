@@ -57,6 +57,8 @@ interface StorySettingsProps {
   // Generate Ideas
   onGenerateIdeas?: () => Promise<void>;
   isGeneratingIdeas?: boolean;
+  isGeneratingIdea1?: boolean;
+  isGeneratingIdea2?: boolean;
   ideaPrompt?: { prompt: string; model: string } | null;
   generatedIdeas?: string[];
   onSelectIdea?: (idea: string) => void;
@@ -92,6 +94,8 @@ export function StorySettings({
   onImageGenModeChange,
   onGenerateIdeas,
   isGeneratingIdeas = false,
+  isGeneratingIdea1 = false,
+  isGeneratingIdea2 = false,
   ideaPrompt,
   generatedIdeas = [],
   onSelectIdea,
@@ -453,8 +457,8 @@ export function StorySettings({
             </details>
           )}
 
-          {/* Two-idea selection UI */}
-          {editableIdeas.length >= 2 ? (
+          {/* Two-idea selection UI - show progressively as ideas arrive */}
+          {(isGeneratingIdeas || editableIdeas.length > 0) ? (
             <div className="space-y-4">
               <p className="text-sm text-gray-600 mb-2">
                 {language === 'de'
@@ -464,27 +468,68 @@ export function StorySettings({
                   : 'Choose an idea or edit it:'}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {editableIdeas.map((idea, index) => (
-                  <div key={index} className="flex flex-col">
-                    <textarea
-                      value={idea}
-                      onChange={(e) => {
-                        const newIdeas = [...editableIdeas];
-                        newIdeas[index] = e.target.value;
-                        setEditableIdeas(newIdeas);
-                      }}
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
-                      rows={6}
-                    />
-                    <button
-                      onClick={() => onSelectIdea?.(editableIdeas[index])}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
-                    >
-                      <Check size={18} />
-                      {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this'}
-                    </button>
-                  </div>
-                ))}
+                {/* Idea 1 */}
+                <div className="flex flex-col">
+                  {editableIdeas[0] ? (
+                    <>
+                      <textarea
+                        value={editableIdeas[0]}
+                        onChange={(e) => {
+                          const newIdeas = [...editableIdeas];
+                          newIdeas[0] = e.target.value;
+                          setEditableIdeas(newIdeas);
+                        }}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
+                        rows={6}
+                      />
+                      <button
+                        onClick={() => onSelectIdea?.(editableIdeas[0])}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
+                      >
+                        <Check size={18} />
+                        {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this'}
+                      </button>
+                    </>
+                  ) : isGeneratingIdea1 ? (
+                    <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                      <span className="text-sm text-gray-500">
+                        {language === 'de' ? 'Idee 1 wird generiert...' : language === 'fr' ? 'Génération idée 1...' : 'Generating idea 1...'}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+                {/* Idea 2 */}
+                <div className="flex flex-col">
+                  {editableIdeas[1] ? (
+                    <>
+                      <textarea
+                        value={editableIdeas[1]}
+                        onChange={(e) => {
+                          const newIdeas = [...editableIdeas];
+                          newIdeas[1] = e.target.value;
+                          setEditableIdeas(newIdeas);
+                        }}
+                        className="w-full px-3 py-2 border-2 border-gray-300 rounded-t-lg focus:border-indigo-600 focus:outline-none text-base resize-none"
+                        rows={6}
+                      />
+                      <button
+                        onClick={() => onSelectIdea?.(editableIdeas[1])}
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-b-lg font-semibold hover:bg-green-700 transition-all"
+                      >
+                        <Check size={18} />
+                        {language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this'}
+                      </button>
+                    </>
+                  ) : isGeneratingIdea2 ? (
+                    <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                      <span className="text-sm text-gray-500">
+                        {language === 'de' ? 'Idee 2 wird generiert...' : language === 'fr' ? 'Génération idée 2...' : 'Generating idea 2...'}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           ) : (

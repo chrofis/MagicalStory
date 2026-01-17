@@ -682,9 +682,52 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             fullSession.amount_total, fullSession.currency, fullSession.payment_status
           ]);
 
+          // Credit tokens for book purchase: 10 per page (or 20 with 2x promo)
+          const totalPages = parseInt(fullSession.metadata?.totalPages) || 0;
+          let tokensToCredit = 0;
+          if (totalPages > 0 && userId) {
+            // Check for 2x promo multiplier
+            const promoResult = await dbPool.query(
+              "SELECT value FROM config WHERE key = 'token_promo_multiplier'"
+            );
+            const multiplier = promoResult.rows[0]?.value ? parseInt(promoResult.rows[0].value) : 1;
+            const tokensPerPage = 10 * multiplier;
+            tokensToCredit = totalPages * tokensPerPage;
+
+            // Credit tokens to user
+            await dbPool.query(
+              'UPDATE users SET credits = credits + $1 WHERE id = $2',
+              [tokensToCredit, userId]
+            );
+
+            // Record transaction
+            const balanceResult = await dbPool.query('SELECT credits FROM users WHERE id = $1', [userId]);
+            await dbPool.query(`
+              INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+              VALUES ($1, $2, $3, 'book_purchase_reward', $4, $5)
+            `, [
+              userId,
+              tokensToCredit,
+              balanceResult.rows[0]?.credits || tokensToCredit,
+              fullSession.id,
+              `Book purchase reward: ${totalPages} pages × ${tokensPerPage} tokens${multiplier > 1 ? ' (2x promo)' : ''}`
+            ]);
+
+            // Update order with tokens credited
+            await dbPool.query(
+              'UPDATE orders SET tokens_credited = $1 WHERE stripe_session_id = $2',
+              [tokensToCredit, fullSession.id]
+            );
+
+            log.info(`💰 [STRIPE WEBHOOK] Credited ${tokensToCredit} tokens to user ${userId} for book purchase (${totalPages} pages × ${tokensPerPage})`);
+          }
+
           log.debug('💾 [STRIPE WEBHOOK] Order saved to database');
           log.debug('   User ID:', userId);
           log.debug('   Story IDs:', validatedStoryIds.join(', '));
+          if (tokensToCredit > 0) {
+            log.debug('   Tokens credited:', tokensToCredit);
+          }
 
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
@@ -1498,6 +1541,48 @@ app.post('/api/admin/config', authenticateToken, async (req, res) => {
   }
 });
 
+// Token promotion config (admin only)
+app.get('/api/admin/config/token-promo', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const result = await dbPool.query("SELECT value FROM config WHERE key = 'token_promo_multiplier'");
+    const multiplier = result.rows[0]?.value ? parseInt(result.rows[0].value) : 1;
+    res.json({ multiplier, isPromoActive: multiplier > 1 });
+  } catch (err) {
+    log.error('Token promo config fetch error:', err);
+    res.status(500).json({ error: 'Failed to fetch token promo config' });
+  }
+});
+
+app.post('/api/admin/config/token-promo', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { multiplier } = req.body;
+    if (!multiplier || ![1, 2].includes(multiplier)) {
+      return res.status(400).json({ error: 'Multiplier must be 1 or 2' });
+    }
+
+    await dbPool.query(`
+      INSERT INTO config (key, value) VALUES ('token_promo_multiplier', $1)
+      ON CONFLICT (key) DO UPDATE SET value = $1
+    `, [multiplier.toString()]);
+
+    await logActivity(req.user.id, req.user.username, 'TOKEN_PROMO_UPDATED', { multiplier });
+    log.info(`🎁 [ADMIN] Token promo multiplier set to ${multiplier}x by ${req.user.username}`);
+
+    res.json({ success: true, multiplier });
+  } catch (err) {
+    log.error('Token promo config update error:', err);
+    res.status(500).json({ error: 'Failed to update token promo config' });
+  }
+});
+
 // NOTE: AI proxy endpoints moved to server/routes/ai-proxy.js
 // - POST /api/claude
 // - POST /api/gemini
@@ -2255,25 +2340,25 @@ ${landmarkEntries}`;
     let fullResponse2 = '';
     let lastStory1Length = 0;
     let lastStory2Length = 0;
-    let story1Complete = false;
-    let story2Complete = false;
+    let story1Started = false;
+    let story2Started = false;
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 - progressively send [FINAL] content as it arrives
+    // Stream Story 1 - progressively send raw content as it arrives
     const streamStory1 = callTextModelStreaming(prompt1, 3000, (delta, fullText) => {
       fullResponse1 = fullText;
-      const finalContent = parseFinal(fullText);
-      if (finalContent && finalContent.length > 50 && finalContent.length > lastStory1Length + 20) {
-        res.write(`data: ${JSON.stringify({ story1: finalContent })}\n\n`);
-        lastStory1Length = finalContent.length;
-        if (!story1Complete) {
+      // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
+      if (fullText.length > 50 && fullText.length > lastStory1Length + 50) {
+        res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
+        lastStory1Length = fullText.length;
+        if (!story1Started) {
           log.debug('  Story 1 streaming started');
-          story1Complete = true;
+          story1Started = true;
         }
       }
     }, modelToUse).then(() => {
-      // Send final story 1 content
+      // Send final story 1 content (extract [FINAL] if present for clean output)
       const finalContent = parseFinal(fullResponse1) || fullResponse1.trim();
       if (finalContent && finalContent.length > lastStory1Length) {
         res.write(`data: ${JSON.stringify({ story1: finalContent })}\n\n`);
@@ -2284,20 +2369,20 @@ ${landmarkEntries}`;
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 - progressively send [FINAL] content as it arrives
+    // Stream Story 2 - progressively send raw content as it arrives
     const streamStory2 = callTextModelStreaming(prompt2, 3000, (delta, fullText) => {
       fullResponse2 = fullText;
-      const finalContent = parseFinal(fullText);
-      if (finalContent && finalContent.length > 50 && finalContent.length > lastStory2Length + 20) {
-        res.write(`data: ${JSON.stringify({ story2: finalContent })}\n\n`);
-        lastStory2Length = finalContent.length;
-        if (!story2Complete) {
+      // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
+      if (fullText.length > 50 && fullText.length > lastStory2Length + 50) {
+        res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
+        lastStory2Length = fullText.length;
+        if (!story2Started) {
           log.debug('  Story 2 streaming started');
-          story2Complete = true;
+          story2Started = true;
         }
       }
     }, modelToUse).then(() => {
-      // Send final story 2 content
+      // Send final story 2 content (extract [FINAL] if present for clean output)
       const finalContent = parseFinal(fullResponse2) || fullResponse2.trim();
       if (finalContent && finalContent.length > lastStory2Length) {
         res.write(`data: ${JSON.stringify({ story2: finalContent })}\n\n`);
@@ -5427,6 +5512,15 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
       const shippingDetails = session.shipping_details || {};
       const shippingAddress = shippingDetails.address || {};
 
+      // Calculate expected tokens (webhook may not have run yet)
+      const totalPages = parseInt(session.metadata?.totalPages) || 0;
+      let tokensExpected = 0;
+      if (totalPages > 0) {
+        const promoResult = await dbPool.query("SELECT value FROM config WHERE key = 'token_promo_multiplier'");
+        const multiplier = promoResult.rows[0]?.value ? parseInt(promoResult.rows[0].value) : 1;
+        tokensExpected = totalPages * 10 * multiplier;
+      }
+
       log.debug(`📦 Constructing order from Stripe session data`);
       return res.json({
         status: 'processing', // Webhook hasn't completed yet but payment succeeded
@@ -5439,7 +5533,8 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
           shipping_postal_code: shippingAddress.postal_code || '',
           shipping_country: shippingAddress.country || '',
           amount_total: session.amount_total,
-          currency: session.currency
+          currency: session.currency,
+          tokens_credited: tokensExpected // Expected tokens (will be credited when webhook completes)
         }
       });
     }
