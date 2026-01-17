@@ -1321,7 +1321,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     // Clear cache for retries to force new generation
     if (attempts > 1) {
-      const cacheKey = generateImageCacheKey(currentPrompt, characterPhotos, previousImage ? 'seq' : null);
+      const cacheKey = generateImageCacheKey(currentPrompt, characterPhotos, previousImage ? 'seq' : null, pageContext);
       imageCache.delete(cacheKey);
     }
 
