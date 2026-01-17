@@ -335,9 +335,11 @@ For famous buildings, monuments, or locations that exist in reality:
 ---COVER SCENE HINTS---
 
 **Title Page**
-Hint: [1-2 sentences - main character, mood, setting. Keep simple.]
+Hint: [1-2 sentences - ALL main characters together, mood, setting. Keep simple.]
 Characters:
 - [CharacterName]: [standard | winter | summer | costumed:type]
+- [CharacterName]: [clothing category]
+(List ALL main characters - they should all appear on the front cover)
 
 **Initial Page**
 Hint: [1-2 sentences - all characters together, welcoming atmosphere]

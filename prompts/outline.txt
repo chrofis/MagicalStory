@@ -227,7 +227,7 @@ In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for th
 - Do NOT over-specify details like weather effects, lighting, or props
 - Let the AI image generator handle composition
 
-**Title Page Scene**: A simple, striking scene featuring the MAIN CHARACTER prominently. Describe the mood, setting, and what the main character is doing. Keep supporting characters minimal or in background. (2-3 sentences)
+**Title Page Scene**: A simple, striking scene featuring ALL MAIN CHARACTERS together prominently. Describe the mood, setting, and what the characters are doing together. (2-3 sentences)
 
 **Initial Scene**: A warm group scene showing all characters together in a welcoming setting. Focus on the overall mood and atmosphere. (2-3 sentences)
 
@@ -438,7 +438,7 @@ For EACH of the {PAGES} story pages, provide:
 
 ## Cover Scenes
 
-Title Page Scene: [2-3 sentences: Main character doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
+Title Page Scene: [2-3 sentences: ALL main characters together doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
 Clothing: [Use PRIMARY clothing from Clothing Continuity]
 
 Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]

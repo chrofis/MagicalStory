@@ -196,11 +196,11 @@ TITLE: [Creative story title]
 ---TITLE PAGE---
 SCENE: (visual only - do NOT mention title text)
 Setting: [Cover scene that sets the mood for the story]
-Characters: [MAIN CHARACTER ONLY or with 1-2 supporting characters maximum - main character must be the STAR of this image, large and center]
-Action: [An inviting cover moment featuring primarily the main character]
+Characters: [ALL MAIN CHARACTERS together - list each one]
+Action: [An inviting cover moment featuring all main characters together]
 Mood: [Welcoming, magical, exciting, etc.]
 Clothing: [winter/summer/standard OR costumed:type]
-**CHARACTER RULE: Feature the MAIN CHARACTER prominently in the CENTER. Include few or no other characters - this is the main character's spotlight moment.**
+**CHARACTER RULE: Include ALL main characters on the front cover. They should all be prominently visible and recognizable.**
 
 ---INITIAL PAGE---
 SCENE: (visual only - do NOT mention dedication text)
