@@ -1672,6 +1672,11 @@ async function inspectImageForErrors(imageData) {
 
     const data = await response.json();
 
+    // Extract and log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    log.debug(`📊 [INSPECT] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
+
     // Extract text response
     if (data.candidates && data.candidates[0]?.content?.parts) {
       const textPart = data.candidates[0].content.parts.find(p => p.text);
@@ -1696,21 +1701,22 @@ async function inspectImageForErrors(imageData) {
               errorType: result.error_type,
               description: result.description,
               boundingBox: result.bounding_box,
-              fixPrompt: result.fix_prompt
+              fixPrompt: result.fix_prompt,
+              usage: { inputTokens, outputTokens, model: modelId }
             };
           } else {
             log.info('🔍 [INSPECT] No errors detected');
-            return { errorFound: false };
+            return { errorFound: false, usage: { inputTokens, outputTokens, model: modelId } };
           }
         } catch (parseError) {
           log.warn('⚠️ [INSPECT] Failed to parse JSON response:', parseError.message);
-          return { errorFound: false };
+          return { errorFound: false, usage: { inputTokens, outputTokens, model: modelId } };
         }
       }
     }
 
     log.warn('⚠️ [INSPECT] No valid response from inspection');
-    return { errorFound: false };
+    return { errorFound: false, usage: { inputTokens, outputTokens, model: modelId } };
   } catch (error) {
     log.error('❌ [INSPECT] Error inspecting image:', error);
     throw error;

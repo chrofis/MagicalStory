@@ -610,6 +610,11 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
       return null;
     }
 
+    // Log token usage
+    if (result?.usage) {
+      log.debug(`📊 [TEXT CHECK] Token usage - input: ${result.usage.input_tokens || 0}, output: ${result.usage.output_tokens || 0}, model: gemini-2.0-flash`);
+    }
+
     // Parse JSON response
     try {
       // Extract JSON from response (handle markdown code blocks)
@@ -625,7 +630,7 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
           log.info(`✅ [TEXT CHECK] Text is well-written (score: ${textCheck.overallScore || 'N/A'})`);
         }
 
-        return textCheck;
+        return { ...textCheck, usage: result.usage };
       }
     } catch (parseError) {
       log.error(`❌ [TEXT CHECK] Failed to parse response: ${parseError.message}`);
