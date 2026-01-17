@@ -3,12 +3,20 @@ import { BookOpen, MapPin } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
-// Story language options
+// Primary story language options (shown first)
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
+];
+
+// German regional variants (shown after separator)
+const GERMAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'de-de', name: 'Deutsch (Standard)', flag: '🇩🇪' },
+  { code: 'de-de-north', name: 'Deutsch (Nord)', flag: '🇩🇪' },
+  { code: 'de-de-south', name: 'Deutsch (Süd)', flag: '🇩🇪' },
+  { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
+  { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
 ];
 
 // Season options
@@ -197,6 +205,14 @@ export function WizardStep3BookSettings({
                 className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
               >
                 {STORY_LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
+                <option disabled className="text-gray-400">
+                  ──── {language === 'de' ? 'Regionale Varianten' : language === 'fr' ? 'Variantes régionales' : 'Regional Variants'} ────
+                </option>
+                {GERMAN_VARIANTS.map((lang) => (
                   <option key={lang.code} value={lang.code}>
                     {lang.name}
                   </option>

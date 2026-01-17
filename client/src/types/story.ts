@@ -6,7 +6,11 @@ export type UILanguage = 'en' | 'de' | 'fr';
 export type Language = UILanguage;
 
 // Story Language - used for AI story generation (supports regional variants)
-export type StoryLanguageCode = 'en' | 'de' | 'de-ch' | 'de-de' | 'fr';
+export type StoryLanguageCode =
+  | 'en' | 'fr'                                     // Non-German
+  | 'de-ch' | 'de-de' | 'de-at' | 'de-it'           // German regions
+  | 'de-de-north' | 'de-de-south'                   // German sub-variants
+  | 'de';                                           // Legacy fallback
 export type LanguageLevel = '1st-grade' | 'standard' | 'advanced';
 
 export type AdventureThemeGroupId = 'popular' | 'historical' | 'fantasy' | 'locations' | 'professions' | 'seasonal' | 'custom';

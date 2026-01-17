@@ -14,12 +14,24 @@ export type CharacterRole = 'out' | 'in' | 'main';
 // Re-export for backwards compatibility
 export type StoryLanguage = StoryLanguageCode;
 
+// Primary story language options (shown first)
 export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
   { code: 'fr', name: 'Français', flag: '🇫🇷' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
+
+// German regional variants (shown after separator)
+export const GERMAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'de-de', name: 'Deutsch (Standard)', flag: '🇩🇪' },
+  { code: 'de-de-north', name: 'Deutsch (Nord)', flag: '🇩🇪' },
+  { code: 'de-de-south', name: 'Deutsch (Süd)', flag: '🇩🇪' },
+  { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
+  { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
+];
+
+// Combined list for lookups
+const ALL_LANGUAGES = [...STORY_LANGUAGES, ...GERMAN_VARIANTS];
 
 interface StorySettingsProps {
   characters: Character[];
@@ -148,7 +160,7 @@ export function StorySettings({
   };
 
   const getStoryLanguageInfo = () => {
-    return STORY_LANGUAGES.find(l => l.code === storyLanguage) || STORY_LANGUAGES[0];
+    return ALL_LANGUAGES.find(l => l.code === storyLanguage) || STORY_LANGUAGES[0];
   };
 
   // Get main character names
@@ -286,7 +298,8 @@ export function StorySettings({
                 <span className="font-medium text-gray-700 truncate">{getStoryLanguageInfo().name}</span>
               </button>
               {isLanguageDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[180px]">
+                <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px]">
+                  {/* Primary languages */}
                   {STORY_LANGUAGES.map((langOption) => (
                     <button
                       key={langOption.code}
@@ -294,9 +307,28 @@ export function StorySettings({
                         onStoryLanguageChange(langOption.code);
                         setIsLanguageDropdownOpen(false);
                       }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 first:rounded-t-lg ${
                         storyLanguage === langOption.code ? 'bg-blue-50' : ''
                       }`}
+                    >
+                      <span className="font-medium text-gray-700">{langOption.name}</span>
+                    </button>
+                  ))}
+                  {/* Separator */}
+                  <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
+                    {language === 'de' ? 'Regionale Varianten' : language === 'fr' ? 'Variantes régionales' : 'Regional Variants'}
+                  </div>
+                  {/* German regional variants */}
+                  {GERMAN_VARIANTS.map((langOption, idx) => (
+                    <button
+                      key={langOption.code}
+                      onClick={() => {
+                        onStoryLanguageChange(langOption.code);
+                        setIsLanguageDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 ${
+                        idx === GERMAN_VARIANTS.length - 1 ? 'last:rounded-b-lg' : ''
+                      } ${storyLanguage === langOption.code ? 'bg-blue-50' : ''}`}
                     >
                       <span className="font-medium text-gray-700">{langOption.name}</span>
                     </button>
