@@ -243,52 +243,51 @@ export function WizardStep3BookSettings({
 
         {/* Language, Location, Season Row - full width */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Language Selection - Dropdown + Variants below */}
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">
-                {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
-              </span>
-              {/* Main Language Dropdown */}
-              <div className="relative">
-                <select
-                  value={getLanguageFamily(storyLanguage)}
-                  onChange={(e) => {
-                    const family = e.target.value as LanguageFamily;
-                    // Select the first (Swiss) variant for the new language family
-                    const defaultVariant = LANGUAGE_VARIANTS[family][0];
+          {/* Language Selection - Single dropdown with languages and variants */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">
+              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
+            </span>
+            <div className="relative">
+              <select
+                value={storyLanguage}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Check if user selected a main language (family identifier)
+                  const mainLang = MAIN_LANGUAGES.find(l => l.family === value);
+                  if (mainLang) {
+                    // Switch to the first variant of that family (Swiss by default)
+                    const defaultVariant = LANGUAGE_VARIANTS[mainLang.family][0];
                     onStoryLanguageChange(defaultVariant.code);
-                  }}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
-                >
-                  {MAIN_LANGUAGES.map((lang) => (
-                    <option key={lang.family} value={lang.family}>
-                      {lang.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
+                  } else {
+                    // User selected a specific variant
+                    onStoryLanguageChange(value as StoryLanguageCode);
+                  }
+                }}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+              >
+                {/* Main Languages */}
+                {MAIN_LANGUAGES.map((lang) => (
+                  <option key={lang.family} value={lang.family}>
+                    {lang.name}
+                  </option>
+                ))}
+                {/* Separator */}
+                <option disabled className="text-gray-400">
+                  ──── {language === 'de' ? 'Varianten' : language === 'fr' ? 'Variantes' : 'Variants'} ────
+                </option>
+                {/* Variants for current language family */}
+                {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
+                  <option key={variant.code} value={variant.code}>
+                    {variant.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
               </div>
-            </div>
-            {/* Variant buttons - shown below the dropdown */}
-            <div className="flex flex-wrap gap-1.5">
-              {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
-                <button
-                  key={variant.code}
-                  onClick={() => onStoryLanguageChange(variant.code)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
-                    storyLanguage === variant.code
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {variant.name}
-                </button>
-              ))}
             </div>
           </div>
 
