@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { BookOpen, MapPin } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { BookOpen, MapPin, ChevronDown } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 
@@ -127,6 +127,30 @@ export function WizardStep3BookSettings({
   const [isEditingLocation, setIsEditingLocation] = useState(false);
   const [editCity, setEditCity] = useState(userLocation?.city || '');
   const [editCountry, setEditCountry] = useState(userLocation?.country || '');
+  const [isLanguageDropdownOpen, setIsLanguageDropdownOpen] = useState(false);
+  const languageDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (languageDropdownRef.current && !languageDropdownRef.current.contains(event.target as Node)) {
+        setIsLanguageDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Get display text for the closed dropdown: "Language (Variant)"
+  const getLanguageDisplayText = useCallback(() => {
+    const family = getLanguageFamily(storyLanguage);
+    const mainLang = MAIN_LANGUAGES.find(l => l.family === family);
+    const variant = LANGUAGE_VARIANTS[family].find(v => v.code === storyLanguage);
+    if (mainLang && variant) {
+      return `${mainLang.name} (${variant.name})`;
+    }
+    return mainLang?.name || storyLanguage;
+  }, [storyLanguage]);
 
   // Update edit fields when userLocation changes
   useEffect(() => {
@@ -243,51 +267,76 @@ export function WizardStep3BookSettings({
 
         {/* Language, Location, Season Row - full width */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Language Selection - Single dropdown with languages and variants */}
+          {/* Language Selection - Custom dropdown with languages and variants */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">
               {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
             </span>
-            <div className="relative">
-              <select
-                value={storyLanguage}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  // Check if user selected a main language (family identifier)
-                  const mainLang = MAIN_LANGUAGES.find(l => l.family === value);
-                  if (mainLang) {
-                    // Switch to the first variant of that family (Swiss by default)
-                    const defaultVariant = LANGUAGE_VARIANTS[mainLang.family][0];
-                    onStoryLanguageChange(defaultVariant.code);
-                  } else {
-                    // User selected a specific variant
-                    onStoryLanguageChange(value as StoryLanguageCode);
-                  }
-                }}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+            <div className="relative" ref={languageDropdownRef}>
+              {/* Dropdown trigger button */}
+              <button
+                type="button"
+                onClick={() => setIsLanguageDropdownOpen(!isLanguageDropdownOpen)}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium bg-white cursor-pointer pr-8 flex items-center gap-1 min-w-[160px]"
               >
-                {/* Main Languages */}
-                {MAIN_LANGUAGES.map((lang) => (
-                  <option key={lang.family} value={lang.family}>
-                    {lang.name}
-                  </option>
-                ))}
-                {/* Separator */}
-                <option disabled className="text-gray-400">
-                  ──── {language === 'de' ? 'Varianten' : language === 'fr' ? 'Variantes' : 'Variants'} ────
-                </option>
-                {/* Variants for current language family */}
-                {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
-                  <option key={variant.code} value={variant.code}>
-                    {variant.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
+                {getLanguageDisplayText()}
+                <ChevronDown
+                  size={16}
+                  className={`absolute right-2 text-gray-400 transition-transform ${isLanguageDropdownOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Dropdown menu */}
+              {isLanguageDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-50 min-w-[180px] py-1">
+                  {/* Main Languages */}
+                  {MAIN_LANGUAGES.map((lang) => {
+                    const isCurrentFamily = getLanguageFamily(storyLanguage) === lang.family;
+                    return (
+                      <button
+                        key={lang.family}
+                        type="button"
+                        onClick={() => {
+                          // Switch to the first variant of that family (Swiss by default)
+                          const defaultVariant = LANGUAGE_VARIANTS[lang.family][0];
+                          onStoryLanguageChange(defaultVariant.code);
+                          // Keep dropdown open when switching language family
+                        }}
+                        className={`w-full text-left px-3 py-1.5 text-sm hover:bg-indigo-50 ${
+                          isCurrentFamily ? 'font-semibold text-indigo-600' : 'text-gray-700'
+                        }`}
+                      >
+                        {lang.name}
+                      </button>
+                    );
+                  })}
+
+                  {/* Separator */}
+                  <div className="border-t border-gray-200 my-1 mx-2" />
+                  <div className="px-3 py-1 text-xs text-gray-400 font-medium">
+                    {language === 'de' ? 'Varianten' : language === 'fr' ? 'Variantes' : 'Variants'}
+                  </div>
+
+                  {/* Variants for current language family */}
+                  {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
+                    <button
+                      key={variant.code}
+                      type="button"
+                      onClick={() => {
+                        onStoryLanguageChange(variant.code);
+                        setIsLanguageDropdownOpen(false); // Close dropdown when selecting variant
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-indigo-50 ${
+                        storyLanguage === variant.code
+                          ? 'bg-indigo-100 text-indigo-700 font-medium'
+                          : 'text-gray-700'
+                      }`}
+                    >
+                      {variant.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
