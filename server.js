@@ -6356,27 +6356,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           for (const [category, config] of Object.entries(requirements)) {
             if (!config.used) continue;
 
-            // Check if avatar already exists
-            let avatarExists = false;
-            if (category === 'costumed' && config.costume) {
-              const costumeKey = config.costume.toLowerCase();
-              if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+            // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
+            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+            if (category === 'costumed') {
               if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-              avatarExists = !!char.avatars.styledAvatars[artStyle].costumed[costumeKey];
-            } else if (config.signature) {
-              // For signature items: always regenerate (signature is story-specific)
-              avatarExists = false;
-            } else {
-              // For regular categories: check base avatar (style conversion happens later)
-              avatarExists = !!char.avatars[category];
             }
 
-            if (avatarExists) {
-              log.debug(`👕 [STORYBOOK] ${char.name} already has ${category} avatar, skipping`);
-              continue;
-            }
-
-            // Generate missing avatar
             const logCategory = config.costume ? `costumed:${config.costume}` : category;
             log.debug(`👕 [STORYBOOK] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
             const avatarPromise = (async () => {
