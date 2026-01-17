@@ -8732,6 +8732,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       clothingRequirements: clothingRequirements, // Per-character clothing requirements
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: genLog.getEntries(), // Generation log for dev mode
+      finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
