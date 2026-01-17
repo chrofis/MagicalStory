@@ -1190,6 +1190,8 @@ export default function AdminDashboard() {
                           tx.type === 'admin_add' ? 'bg-purple-100 text-purple-700' :
                           tx.type === 'admin_deduct' ? 'bg-red-100 text-red-700' :
                           tx.type === 'initial' ? 'bg-gray-100 text-gray-700' :
+                          tx.type === 'book_purchase_reward' ? 'bg-amber-100 text-amber-700' :
+                          tx.type === 'purchase' ? 'bg-emerald-100 text-emerald-700' :
                           'bg-gray-100 text-gray-700'
                         }`}>
                           {tx.type.replace(/_/g, ' ')}
@@ -1479,6 +1481,8 @@ export default function AdminDashboard() {
                                   tx.type === 'story_complete' ? 'bg-green-100 text-green-700' :
                                   tx.type === 'story_refund' ? 'bg-blue-100 text-blue-700' :
                                   tx.type === 'story_reserve' ? 'bg-yellow-100 text-yellow-700' :
+                                  tx.type === 'book_purchase_reward' ? 'bg-amber-100 text-amber-700' :
+                                  tx.type === 'purchase' ? 'bg-emerald-100 text-emerald-700' :
                                   'bg-gray-100 text-gray-700'
                                 }`}>
                                   {tx.type.replace(/_/g, ' ')}

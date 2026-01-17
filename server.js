@@ -9007,7 +9007,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   timestamp: new Date().toISOString(),
                   retryHistory: imageResult.retryHistory || [],
                   totalAttempts: imageResult.totalAttempts || 1,
-                  wasRegenerated: imageResult.wasRegenerated || false
+                  wasRegenerated: imageResult.wasRegenerated || false,
+                  clothing: originalClothing
                 };
 
                 // Replace with fixed image

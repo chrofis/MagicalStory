@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { RefreshCw, Edit3, Users, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { RetryHistoryDisplay } from './RetryHistoryDisplay';
+import type { RetryAttempt } from '@/types/story';
 
 interface CharacterOption {
   id: number;
@@ -27,6 +29,12 @@ interface ConsistencyRegenData {
   issues: ConsistencyIssue[];
   score: number;
   timestamp: string;
+  // Retry history from image generation
+  retryHistory?: RetryAttempt[];
+  totalAttempts?: number;
+  wasRegenerated?: boolean;
+  // Clothing/avatar info
+  clothing?: string;
 }
 
 interface SceneEditModalProps {
@@ -228,11 +236,29 @@ export function SceneEditModal({
                 )}
               </div>
 
-              <p className="text-xs text-gray-400 mt-2">
-                {language === 'de' ? `Korrigiert am ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
-                 language === 'fr' ? `Corrigé le ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
-                 `Fixed at ${new Date(consistencyRegen.timestamp).toLocaleString()}`}
-              </p>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-xs text-gray-400">
+                  {language === 'de' ? `Korrigiert am ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
+                   language === 'fr' ? `Corrigé le ${new Date(consistencyRegen.timestamp).toLocaleString()}` :
+                   `Fixed at ${new Date(consistencyRegen.timestamp).toLocaleString()}`}
+                </p>
+                {consistencyRegen.clothing && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                    🎨 {consistencyRegen.clothing}
+                  </span>
+                )}
+              </div>
+
+              {/* Retry History (if multiple attempts) */}
+              {consistencyRegen.retryHistory && consistencyRegen.retryHistory.length > 0 && (
+                <div className="mt-4">
+                  <RetryHistoryDisplay
+                    retryHistory={consistencyRegen.retryHistory}
+                    totalAttempts={consistencyRegen.totalAttempts || 1}
+                    language={language}
+                  />
+                </div>
+              )}
             </div>
           )}
 

@@ -49,7 +49,7 @@ export interface CreditTransaction {
   id: number;
   amount: number;
   balanceAfter: number;
-  type: 'initial' | 'story_reserve' | 'story_complete' | 'story_refund' | 'admin_add' | 'admin_deduct' | 'purchase';
+  type: 'initial' | 'story_reserve' | 'story_complete' | 'story_refund' | 'admin_add' | 'admin_deduct' | 'purchase' | 'book_purchase_reward';
   referenceId?: string;
   description: string;
   createdAt: string;
