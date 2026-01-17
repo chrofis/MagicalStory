@@ -17,7 +17,7 @@ export type StoryLanguage = StoryLanguageCode;
 // Primary story language options (shown first)
 export const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
@@ -30,8 +30,16 @@ export const GERMAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: str
   { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
 ];
 
+// French regional variants (shown after separator)
+export const FRENCH_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'fr-fr', name: 'Français (France)', flag: '🇫🇷' },
+  { code: 'fr-be', name: 'Français (Belgique)', flag: '🇧🇪' },
+  { code: 'fr-ca', name: 'Français (Québec)', flag: '🇨🇦' },
+  { code: 'fr-af', name: 'Français (Afrique)', flag: '🌍' },
+];
+
 // Combined list for lookups
-const ALL_LANGUAGES = [...STORY_LANGUAGES, ...GERMAN_VARIANTS];
+const ALL_LANGUAGES = [...STORY_LANGUAGES, ...GERMAN_VARIANTS, ...FRENCH_VARIANTS];
 
 interface StorySettingsProps {
   characters: Character[];
@@ -314,12 +322,29 @@ export function StorySettings({
                       <span className="font-medium text-gray-700">{langOption.name}</span>
                     </button>
                   ))}
-                  {/* Separator */}
+                  {/* German Separator */}
                   <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
-                    {language === 'de' ? 'Regionale Varianten' : language === 'fr' ? 'Variantes régionales' : 'Regional Variants'}
+                    {language === 'de' ? 'Deutsch Varianten' : language === 'fr' ? 'Variantes allemandes' : 'German Variants'}
                   </div>
                   {/* German regional variants */}
-                  {GERMAN_VARIANTS.map((langOption, idx) => (
+                  {GERMAN_VARIANTS.map((langOption) => (
+                    <button
+                      key={langOption.code}
+                      onClick={() => {
+                        onStoryLanguageChange(langOption.code);
+                        setIsLanguageDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 ${storyLanguage === langOption.code ? 'bg-blue-50' : ''}`}
+                    >
+                      <span className="font-medium text-gray-700">{langOption.name}</span>
+                    </button>
+                  ))}
+                  {/* French Separator */}
+                  <div className="px-3 py-1.5 text-xs text-gray-400 font-medium border-t border-gray-100">
+                    {language === 'de' ? 'Französisch Varianten' : language === 'fr' ? 'Variantes françaises' : 'French Variants'}
+                  </div>
+                  {/* French regional variants */}
+                  {FRENCH_VARIANTS.map((langOption, idx) => (
                     <button
                       key={langOption.code}
                       onClick={() => {
@@ -327,7 +352,7 @@ export function StorySettings({
                         setIsLanguageDropdownOpen(false);
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 ${
-                        idx === GERMAN_VARIANTS.length - 1 ? 'last:rounded-b-lg' : ''
+                        idx === FRENCH_VARIANTS.length - 1 ? 'last:rounded-b-lg' : ''
                       } ${storyLanguage === langOption.code ? 'bg-blue-50' : ''}`}
                     >
                       <span className="font-medium text-gray-700">{langOption.name}</span>

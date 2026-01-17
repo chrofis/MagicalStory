@@ -6,7 +6,7 @@ import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 // Primary story language options (shown first)
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
 ];
 
@@ -17,6 +17,14 @@ const GERMAN_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[]
   { code: 'de-de-south', name: 'Süddeutsch', flag: '🇩🇪' },
   { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
   { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
+];
+
+// French regional variants (shown after separator)
+const FRENCH_VARIANTS: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  { code: 'fr-fr', name: 'Français (France)', flag: '🇫🇷' },
+  { code: 'fr-be', name: 'Français (Belgique)', flag: '🇧🇪' },
+  { code: 'fr-ca', name: 'Français (Québec)', flag: '🇨🇦' },
+  { code: 'fr-af', name: 'Français (Afrique)', flag: '🌍' },
 ];
 
 // Season options
@@ -210,9 +218,17 @@ export function WizardStep3BookSettings({
                   </option>
                 ))}
                 <option disabled className="text-gray-400">
-                  ──── {language === 'de' ? 'Regionale Varianten' : language === 'fr' ? 'Variantes régionales' : 'Regional Variants'} ────
+                  ──── {language === 'de' ? 'Deutsch Varianten' : language === 'fr' ? 'Variantes allemandes' : 'German Variants'} ────
                 </option>
                 {GERMAN_VARIANTS.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.name}
+                  </option>
+                ))}
+                <option disabled className="text-gray-400">
+                  ──── {language === 'de' ? 'Französisch Varianten' : language === 'fr' ? 'Variantes françaises' : 'French Variants'} ────
+                </option>
+                {FRENCH_VARIANTS.map((lang) => (
                   <option key={lang.code} value={lang.code}>
                     {lang.name}
                   </option>

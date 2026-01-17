@@ -176,11 +176,12 @@ export default function StoryWizard() {
       return 'standard';
     }
   });
-  // Story language (de-ch is default, de-de only selectable here)
+  // Story language (de-ch is default for German, fr-ch for French)
   const [storyLanguage, setStoryLanguage] = useState<StoryLanguageCode>(() => {
     try {
       const saved = localStorage.getItem('story_language');
-      if (saved && ['de-ch', 'de-de', 'fr', 'en'].includes(saved)) {
+      // Accept all valid language codes (German, French, English variants)
+      if (saved && (saved.startsWith('de') || saved.startsWith('fr') || saved === 'en')) {
         return saved as StoryLanguageCode;
       }
       return 'de-ch'; // Default to Swiss German
@@ -420,6 +421,7 @@ export default function StoryWizard() {
       });
     }
     // If generation completed and we have a story ID, navigate to it
+    log.debug('Auto-nav check:', { generationComplete, completedStoryId, urlStoryId, hasActiveJob: !!activeJob });
     if (generationComplete && completedStoryId && !urlStoryId) {
       log.info('Generation completed, navigating to story:', completedStoryId);
       setSearchParams({ storyId: completedStoryId }, { replace: true });

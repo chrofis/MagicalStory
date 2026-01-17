@@ -146,7 +146,8 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
 
       // Check for completion
       if (status.status === 'completed' && status.result) {
-        logger.success('[GenerationContext] Job completed:', jobId);
+        logger.success('[GenerationContext] Job completed:', jobId, 'storyId:', status.result.storyId);
+        logger.debug('[GenerationContext] Result object:', JSON.stringify(status.result).substring(0, 200));
         setIsComplete(true);
         setCompletedStoryId(status.result.storyId);
         setHasUnviewedCompletion(true);

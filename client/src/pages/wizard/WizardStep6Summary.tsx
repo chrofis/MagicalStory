@@ -7,12 +7,25 @@ import type { Character } from '@/types/character';
 import type { StoryLanguageCode } from '@/types/story';
 import type { GenerationMode } from '@/hooks/useDeveloperMode';
 
-// Story language options (same as WizardStep3BookSettings)
+// All story language options for display lookup
 const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
+  // Primary
   { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'de-de', name: 'Deutsch (Deutschland)', flag: '🇩🇪' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
   { code: 'en', name: 'English', flag: '🇬🇧' },
+  // German variants
+  { code: 'de-de', name: 'Deutsch (Standard)', flag: '🇩🇪' },
+  { code: 'de-de-north', name: 'Norddeutsch', flag: '🇩🇪' },
+  { code: 'de-de-south', name: 'Süddeutsch', flag: '🇩🇪' },
+  { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
+  { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
+  // French variants
+  { code: 'fr-fr', name: 'Français (France)', flag: '🇫🇷' },
+  { code: 'fr-be', name: 'Français (Belgique)', flag: '🇧🇪' },
+  { code: 'fr-ca', name: 'Français (Québec)', flag: '🇨🇦' },
+  { code: 'fr-af', name: 'Français (Afrique)', flag: '🌍' },
+  // Legacy
+  { code: 'fr', name: 'Français (Suisse)', flag: '🇨🇭' },
 ];
 
 interface UserLocation {

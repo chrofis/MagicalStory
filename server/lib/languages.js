@@ -68,16 +68,61 @@ const LANGUAGES = {
   },
 
   // ============================================================================
-  // OTHER LANGUAGES
+  // FRENCH VARIANTS
   // ============================================================================
 
-  'fr': {
-    code: 'fr',
-    name: 'Français',
-    nameEnglish: 'French',
-    instruction: 'You MUST write your response in French. Use standard French spelling and grammar. Use passé simple for literary/narrative prose, passé composé in dialogue.',
-    note: ''
+  'fr-fr': {
+    code: 'fr-fr',
+    name: 'Français (France)',
+    nameEnglish: 'French (France)',
+    instruction: 'You MUST write your response in French. Use standard metropolitan French. CRITICAL RULES: (1) Use "soixante-dix" (70), "quatre-vingts" (80), "quatre-vingt-dix" (90). (2) Meal names: "petit-déjeuner" (breakfast), "déjeuner" (lunch), "dîner" (dinner). (3) Use standard vocabulary: "voiture" (car), "portable" (mobile phone), "week-end", "e-mail", "parking", "shopping". (4) Informal "tu" common among peers. CORRECT: "soixante-dix", "le petit-déjeuner", "le portable", "le week-end", "faire du shopping" | WRONG: "septante", "le déjeuner" for breakfast, "le natel", "la fin de semaine", "magasiner".',
+    note: '(French France: soixante-dix/quatre-vingt-dix. "petit-déjeuner/déjeuner/dîner". CORRECT: "le portable", "le week-end" | WRONG: "septante", "le natel")'
   },
+
+  'fr-ch': {
+    code: 'fr-ch',
+    name: 'Français (Suisse)',
+    nameEnglish: 'French (Switzerland)',
+    instruction: 'You MUST write your response in French. Use Swiss French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "huitante" (80, in Vaud) or "quatre-vingts" (elsewhere), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Swiss vocabulary: "Natel" (not "portable"), "action" (special offer), "cornet" (plastic bag), "poutser" (to clean), "fourrer" (to put/stuff), "bancomat" (ATM), "course d\'école" (school trip), "régie" (property management). (4) More formal register, prefer "vous". CORRECT: "septante", "nonante", "le souper", "le Natel", "un cornet", "une action" | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", "un sac plastique", "une promo".',
+    note: '(Swiss French: septante/nonante. "déjeuner/dîner/souper". "Natel", "cornet". CORRECT: "septante", "le Natel" | WRONG: "soixante-dix", "le portable")'
+  },
+
+  'fr-be': {
+    code: 'fr-be',
+    name: 'Français (Belgique)',
+    nameEnglish: 'French (Belgium)',
+    instruction: 'You MUST write your response in French. Use Belgian French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "quatre-vingts" (80), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Belgian vocabulary: "GSM" (not "portable"), "aubette" (bus shelter), "drache" (heavy rain), "kot" (student room), "sacoche" (bag), "pistolet" (bread roll), "praline" (chocolate), "torchon" (floor cloth), "savoir" used as "pouvoir" in some contexts ("tu sais me dire...?"). (4) Flemish influences in vocabulary. CORRECT: "septante", "nonante", "le souper", "le GSM", "une drache", "une aubette", "il drache" | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", "une averse", "un abribus".',
+    note: '(Belgian French: septante/nonante. "déjeuner/dîner/souper". "GSM", "drache". CORRECT: "septante", "il drache" | WRONG: "soixante-dix", "le portable")'
+  },
+
+  'fr-ca': {
+    code: 'fr-ca',
+    name: 'Français (Québec)',
+    nameEnglish: 'French (Quebec)',
+    instruction: 'You MUST write your response in French. Use Quebec French vocabulary and expressions. CRITICAL RULES: (1) Use "soixante-dix" (70), "quatre-vingts" (80), "quatre-vingt-dix" (90) like France. (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Avoid anglicisms, use Quebec terms: "fin de semaine" (not "week-end"), "courriel" (not "e-mail"), "stationnement" (not "parking"), "magasiner" (not "faire du shopping"), "char" (car, informal), "blonde/chum" (girlfriend/boyfriend), "bienvenue" (you\'re welcome), "dépanneur" (corner store), "tuque" (winter hat), "pogner" (to grab/catch). (4) More informal "tu" usage. CORRECT: "la fin de semaine", "le courriel", "magasiner", "bienvenue", "le dépanneur", "une tuque" | WRONG: "le week-end", "l\'e-mail", "faire du shopping", "de rien", "l\'épicerie du coin", "un bonnet".',
+    note: '(Quebec French: soixante-dix but "fin de semaine", "courriel", "magasiner". CORRECT: "la fin de semaine", "bienvenue" | WRONG: "le week-end", "de rien")'
+  },
+
+  'fr-af': {
+    code: 'fr-af',
+    name: 'Français (Afrique)',
+    nameEnglish: 'French (African)',
+    instruction: 'You MUST write your response in French. Use African French based on French (France) with local adaptations. CRITICAL RULES: (1) Use "soixante-dix", "quatre-vingts", "quatre-vingt-dix". (2) More formal register overall. (3) Common vocabulary additions: "essencerie" (petrol station), "présentement" (currently), "être fatigué de" (to be sick of), "gérer" used broadly, "ça va aller" (it will be fine). (4) Often preserves older French expressions. (5) Direct, clear sentence structure preferred. (6) Avoid overly casual French slang from France. CORRECT: "soixante-dix", "présentement", "l\'essencerie", "ça va aller" | WRONG: "septante", "actuellement" (when meaning "now"), "la station-service" (acceptable but less common), French verlan slang.',
+    note: '(African French: Based on France French. "présentement", "essencerie". CORRECT: "soixante-dix", "présentement" | WRONG: "septante", verlan slang)'
+  },
+
+  // Legacy 'fr' maps to Swiss French for backwards compatibility (Swiss is our primary market)
+  'fr': {
+    code: 'fr-ch',
+    name: 'Français (Suisse)',
+    nameEnglish: 'French (Switzerland)',
+    instruction: 'You MUST write your response in French. Use Swiss French vocabulary and expressions. CRITICAL RULES: (1) Use "septante" (70), "huitante" (80, in Vaud) or "quatre-vingts" (elsewhere), "nonante" (90). (2) Meal names: "déjeuner" (breakfast), "dîner" (lunch), "souper" (dinner). (3) Use Swiss vocabulary: "Natel" (not "portable"), "action" (special offer), "cornet" (plastic bag), "poutser" (to clean), "fourrer" (to put/stuff), "bancomat" (ATM), "course d\'école" (school trip), "régie" (property management). (4) More formal register, prefer "vous". CORRECT: "septante", "nonante", "le souper", "le Natel", "un cornet", "une action" | WRONG: "soixante-dix", "quatre-vingt-dix", "le dîner" for dinner, "le portable", "un sac plastique", "une promo".',
+    note: '(Swiss French: septante/nonante. "déjeuner/dîner/souper". "Natel", "cornet". CORRECT: "septante", "le Natel" | WRONG: "soixante-dix", "le portable")'
+  },
+
+  // ============================================================================
+  // OTHER LANGUAGES
+  // ============================================================================
 
   'en': {
     code: 'en',
@@ -90,7 +135,7 @@ const LANGUAGES = {
 
 /**
  * Get full language instruction for a language code
- * @param {string} langCode - 'de-ch', 'de-de', 'de-at', 'de-it', 'de-de-north', 'de-de-south', 'de', 'fr', 'en'
+ * @param {string} langCode - German: 'de-ch', 'de-de', 'de-at', 'de-it', 'de-de-north', 'de-de-south', 'de' | French: 'fr-fr', 'fr-ch', 'fr-be', 'fr-ca', 'fr-af', 'fr' | 'en'
  * @returns {string} Full instruction for AI
  */
 function getLanguageInstruction(langCode) {
@@ -134,13 +179,20 @@ function getLanguageNameEnglish(langCode) {
  */
 function getAvailableLanguages() {
   return [
+    // German variants
     { code: 'de-de', name: 'Deutsch (Standard)', nameEnglish: 'German (Standard)' },
-    { code: 'de-de-north', name: 'Deutsch (Nord)', nameEnglish: 'German (North)' },
-    { code: 'de-de-south', name: 'Deutsch (Süd)', nameEnglish: 'German (South)' },
+    { code: 'de-de-north', name: 'Norddeutsch', nameEnglish: 'German (North)' },
+    { code: 'de-de-south', name: 'Süddeutsch', nameEnglish: 'German (South)' },
     { code: 'de-at', name: 'Deutsch (Österreich)', nameEnglish: 'Austrian German' },
     { code: 'de-ch', name: 'Deutsch (Schweiz)', nameEnglish: 'Swiss German' },
     { code: 'de-it', name: 'Deutsch (Südtirol)', nameEnglish: 'South Tyrolean German' },
-    { code: 'fr', name: 'Français', nameEnglish: 'French' },
+    // French variants
+    { code: 'fr-fr', name: 'Français (France)', nameEnglish: 'French (France)' },
+    { code: 'fr-ch', name: 'Français (Suisse)', nameEnglish: 'French (Switzerland)' },
+    { code: 'fr-be', name: 'Français (Belgique)', nameEnglish: 'French (Belgium)' },
+    { code: 'fr-ca', name: 'Français (Québec)', nameEnglish: 'French (Quebec)' },
+    { code: 'fr-af', name: 'Français (Afrique)', nameEnglish: 'French (African)' },
+    // English
     { code: 'en', name: 'English', nameEnglish: 'English' }
   ];
 }

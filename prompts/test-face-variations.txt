@@ -1,0 +1,24 @@
+Generate 4 PHOTOREALISTIC face variations of this person in a 2x2 grid.
+
+## OUTPUT FORMAT
+Create a 2x2 GRID with 4 PHOTOREALISTIC FACE PORTRAITS:
+- ALL 4 must show the face looking DIRECTLY AT CAMERA (frontal view)
+- ALL 4 must be the SAME person with IDENTICAL features
+- ALL 4 must have the SAME HAPPY expression (friendly, approachable)
+
+## THE 4 VARIATIONS
+All faces should look HAPPY and FRIENDLY. The only differences are subtle:
+1. Top-Left: Happy expression, soft frontal studio lighting
+2. Top-Right: Happy expression, warm lighting from upper-left
+3. Bottom-Left: Happy expression, cool/natural daylight feel
+4. Bottom-Right: Happy expression, bright even lighting
+
+## CRITICAL REQUIREMENTS
+- PHOTOREALISTIC - must look like real photographs
+- ALL faces looking FORWARD at camera - NO profiles, NO 3/4 views
+- ALL faces with SAME HAPPY EMOTION - no sad, neutral, or varied expressions
+- SAME face shape, hair color, eye color, skin tone in all 4
+- Head and shoulders framing
+- Clean, simple background (solid color or soft gradient)
+- Professional portrait photography quality
+- PRESERVE THE PERSON'S IDENTITY exactly as in the reference photo
