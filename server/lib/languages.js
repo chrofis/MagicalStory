@@ -121,15 +121,64 @@ const LANGUAGES = {
   },
 
   // ============================================================================
-  // OTHER LANGUAGES
+  // ENGLISH VARIANTS
   // ============================================================================
 
+  'en-gb': {
+    code: 'en-gb',
+    name: 'English (UK)',
+    nameEnglish: 'English (UK - British)',
+    instruction: 'You MUST write your response in English. Use British spelling: "-our" (colour, favour, honour), "-ise" (organise, realise), "-re" (centre, theatre), "-lled/-lling" (travelled, travelling), "grey", "catalogue", "cheque". Use British vocabulary: "flat" (not "apartment"), "lift" (not "elevator"), "lorry" (not "truck"), "boot" (not "trunk"), "bonnet" (not "hood"), "trousers" (not "pants"), "holiday" (not "vacation"), "pavement" (not "sidewalk"), "post" (not "mail"), "rubbish" (not "garbage"), "nappy" (not "diaper"), "biscuit" (not "cookie"), "crisps" (not "chips"), "chips" (not "fries"), "queue" (not "line"), "torch" (not "flashlight"), "cinema" (not "movie theater"). Use "have got" more freely. Date format: day-month-year. CORRECT: "colour", "travelled", "the flat", "in hospital", "at the weekend", "have you got" | WRONG: "color", "traveled", "the apartment", "in the hospital", "on the weekend", "do you have".',
+    note: '(British English: -our, -ise, -re spellings. "flat", "lift", "lorry", "holiday". CORRECT: "colour", "travelled" | WRONG: "color", "traveled")'
+  },
+
+  'en-us': {
+    code: 'en-us',
+    name: 'English (US)',
+    nameEnglish: 'English (US - American)',
+    instruction: 'You MUST write your response in English. Use American spelling: "-or" (color, favor, honor), "-ize" (organize, realize), "-er" (center, theater), "-ed/-ing" (traveled, traveling), "gray", "catalog", "check". Use American vocabulary: "apartment" (not "flat"), "elevator" (not "lift"), "truck" (not "lorry"), "trunk" (not "boot"), "hood" (not "bonnet"), "pants" (not "trousers"), "vacation" (not "holiday"), "sidewalk" (not "pavement"), "mail" (not "post"), "garbage/trash" (not "rubbish"), "diaper" (not "nappy"), "cookie" (not "biscuit"), "chips" (not "crisps"), "fries" (not "chips"), "line" (not "queue"), "flashlight" (not "torch"), "movie theater" (not "cinema"). Use "do you have" over "have you got". Date format: month-day-year. CORRECT: "color", "traveled", "the apartment", "in the hospital", "on the weekend", "do you have" | WRONG: "colour", "travelled", "the flat", "in hospital", "at the weekend", "have you got".',
+    note: '(American English: -or, -ize, -er spellings. "apartment", "elevator", "truck", "vacation". CORRECT: "color", "traveled" | WRONG: "colour", "travelled")'
+  },
+
+  'en-ca': {
+    code: 'en-ca',
+    name: 'English (Canada)',
+    nameEnglish: 'English (Canada)',
+    instruction: 'You MUST write your response in English. Mix of British and American conventions. Use British spelling: "-our" (colour, favour), "-re" (centre, theatre), but American "-ize" (organize, realize). Use "travelled", "grey". Vocabulary mostly American with some British: "apartment", "elevator", "truck", "vacation", but "zed" (not "zee"), "washroom" (not "bathroom/restroom"), "toque" (winter hat), "runners" (sneakers), "garburator" (garbage disposal), "hydro" (electricity), "loonie/toonie" (coins), "grade one/two" (not "first/second grade"), "college" (also for technical schools), "eh" as conversation filler. Date format: varies, often day-month-year officially. CORRECT: "colour", "organize", "centre", "the washroom", "zed", "toque", "runners", "eh" | WRONG: "color", "organise", "center", "the restroom", "zee", "beanie", "sneakers".',
+    note: '(Canadian English: British -our/-re but American -ize. "washroom", "toque", "runners", "eh". CORRECT: "colour", "organize" | WRONG: "color", "organise")'
+  },
+
+  'en-au': {
+    code: 'en-au',
+    name: 'English (Australia)',
+    nameEnglish: 'English (Australia)',
+    instruction: 'You MUST write your response in English. Use British spelling: "-our" (colour), "-ise" (organise), "-re" (centre), "travelled", "grey". Australian vocabulary: "arvo" (afternoon), "brekkie" (breakfast), "servo" (petrol station), "bottle-o" (bottle shop), "ute" (pickup truck), "thongs" (flip-flops), "capsicum" (bell pepper), "rockmelon" (cantaloupe), "footpath" (sidewalk), "chemist" (pharmacy), "boot" (car trunk), "bonnet" (car hood), "petrol" (not "gas"), "rubbish" (not "garbage"), "barrack for" (support a team), "heaps" (very/lots), "reckon" used frequently, "no worries" (you\'re welcome). Use "have got". Informal, abbreviated style common. CORRECT: "colour", "organise", "the chemist", "no worries", "heaps good", "I reckon", "this arvo" | WRONG: "color", "organize", "the pharmacy", "you\'re welcome", "very good", "I think", "this afternoon".',
+    note: '(Australian English: British spelling. "arvo", "brekkie", "servo", "no worries", "heaps". CORRECT: "colour", "this arvo" | WRONG: "color", "this afternoon")'
+  },
+
+  'en-ie': {
+    code: 'en-ie',
+    name: 'English (Ireland)',
+    nameEnglish: 'English (Ireland)',
+    instruction: 'You MUST write your response in English. Use British spelling: "-our" (colour), "-ise" (organise), "-re" (centre). Irish vocabulary and expressions: "press" (cupboard), "messages" (shopping/errands), "bold" (naughty), "mineral" (soft drink), "runner" (sneaker), "yoke" (thing/object), "give out" (to complain), "gas" (funny), "grand" (fine/okay), "fierce" (very), "half [number]" for time (half two = 2:30), "amn\'t" (am not), "so" at end of sentences, "your man/your one" (that guy/that woman), "craic" (fun). Distinctive use of "after" + gerund: "I\'m after finishing". Often omit "yes/no" in responses. CORRECT: "colour", "the press", "doing the messages", "that\'s gas", "he\'s fierce tired", "I\'m after eating", "grand so" | WRONG: "color", "the cupboard", "running errands", "that\'s funny", "he\'s very tired", "I just ate", "fine then".',
+    note: '(Irish English: British spelling. "press", "messages", "gas", "grand", "fierce", "craic". CORRECT: "I\'m after eating" | WRONG: "I just ate")'
+  },
+
+  'en-za': {
+    code: 'en-za',
+    name: 'English (South Africa)',
+    nameEnglish: 'English (South Africa)',
+    instruction: 'You MUST write your response in English. Use British spelling: "-our" (colour), "-ise" (organise), "-re" (centre). South African vocabulary (including Afrikaans influences): "robot" (traffic light), "bakkie" (pickup truck), "braai" (barbecue), "lekker" (nice/great), "ja" (yes), "now-now" (soon), "just now" (later/eventually), "shame" (expression of sympathy, not embarrassment), "howzit" (hello), "is it?" (really?), "café" (corner shop), "circle" (roundabout), "globe" (lightbulb), "tackies" (sneakers), "biltong" (dried meat). "Busy" + gerund for ongoing action: "I\'m busy cooking". CORRECT: "colour", "the robot", "a bakkie", "lekker", "shame, man", "now-now", "I\'m busy reading" | WRONG: "color", "the traffic light", "a pickup", "nice", "that\'s sad", "soon", "I\'m reading".',
+    note: '(South African English: British spelling + Afrikaans. "robot", "bakkie", "braai", "lekker", "now-now". CORRECT: "the robot" | WRONG: "the traffic light")'
+  },
+
+  // Legacy 'en' maps to British English for backwards compatibility
   'en': {
-    code: 'en',
-    name: 'English',
-    nameEnglish: 'English',
-    instruction: 'You MUST write your response in English. Use standard English spelling and grammar.',
-    note: ''
+    code: 'en-gb',
+    name: 'English (UK)',
+    nameEnglish: 'English (UK - British)',
+    instruction: 'You MUST write your response in English. Use British spelling: "-our" (colour, favour, honour), "-ise" (organise, realise), "-re" (centre, theatre), "-lled/-lling" (travelled, travelling), "grey", "catalogue", "cheque". Use British vocabulary: "flat" (not "apartment"), "lift" (not "elevator"), "lorry" (not "truck"), "boot" (not "trunk"), "bonnet" (not "hood"), "trousers" (not "pants"), "holiday" (not "vacation"), "pavement" (not "sidewalk"), "post" (not "mail"), "rubbish" (not "garbage"), "nappy" (not "diaper"), "biscuit" (not "cookie"), "crisps" (not "chips"), "chips" (not "fries"), "queue" (not "line"), "torch" (not "flashlight"), "cinema" (not "movie theater"). Use "have got" more freely. Date format: day-month-year. CORRECT: "colour", "travelled", "the flat", "in hospital", "at the weekend", "have you got" | WRONG: "color", "traveled", "the apartment", "in the hospital", "on the weekend", "do you have".',
+    note: '(British English: -our, -ise, -re spellings. "flat", "lift", "lorry", "holiday". CORRECT: "colour", "travelled" | WRONG: "color", "traveled")'
   }
 };
 
@@ -192,8 +241,13 @@ function getAvailableLanguages() {
     { code: 'fr-be', name: 'Français (Belgique)', nameEnglish: 'French (Belgium)' },
     { code: 'fr-ca', name: 'Français (Québec)', nameEnglish: 'French (Quebec)' },
     { code: 'fr-af', name: 'Français (Afrique)', nameEnglish: 'French (African)' },
-    // English
-    { code: 'en', name: 'English', nameEnglish: 'English' }
+    // English variants
+    { code: 'en-gb', name: 'English (UK)', nameEnglish: 'English (UK - British)' },
+    { code: 'en-us', name: 'English (US)', nameEnglish: 'English (US - American)' },
+    { code: 'en-ca', name: 'English (Canada)', nameEnglish: 'English (Canada)' },
+    { code: 'en-au', name: 'English (Australia)', nameEnglish: 'English (Australia)' },
+    { code: 'en-ie', name: 'English (Ireland)', nameEnglish: 'English (Ireland)' },
+    { code: 'en-za', name: 'English (South Africa)', nameEnglish: 'English (South Africa)' }
   ];
 }
 

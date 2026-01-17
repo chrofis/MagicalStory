@@ -7,7 +7,7 @@ export type Language = UILanguage;
 
 // Story Language - used for AI story generation (supports regional variants)
 export type StoryLanguageCode =
-  | 'en'                                            // English
+  | 'en' | 'en-gb' | 'en-us' | 'en-ca' | 'en-au' | 'en-ie' | 'en-za'  // English variants
   | 'fr' | 'fr-fr' | 'fr-ch' | 'fr-be' | 'fr-ca' | 'fr-af'  // French regions
   | 'de-ch' | 'de-de' | 'de-at' | 'de-it'           // German regions
   | 'de-de-north' | 'de-de-south'                   // German sub-variants
