@@ -699,15 +699,18 @@ These elements are NOT required - only include them if they naturally fit the im
 }
 
 /**
- * Build Visual Bible prompt for covers (all main characters + 2-3 key story elements)
+ * Build Visual Bible prompt for covers (key story elements, optionally main characters)
+ * @param {object} visualBible - Visual bible data
+ * @param {object} options - Options
+ * @param {boolean} options.skipMainCharacters - Skip main characters section (use when CHARACTER_REFERENCE_LIST already includes them)
  */
-function buildFullVisualBiblePrompt(visualBible) {
+function buildFullVisualBiblePrompt(visualBible, options = {}) {
   if (!visualBible) return '';
 
   let prompt = '';
 
-  // Add ALL main characters with their style DNA
-  if (visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
+  // Add ALL main characters with their style DNA (unless skipped - e.g., for covers with CHARACTER_REFERENCE_LIST)
+  if (!options.skipMainCharacters && visualBible.mainCharacters && visualBible.mainCharacters.length > 0) {
     prompt += '\n\n**MAIN CHARACTERS - Must match reference photos exactly:**\n';
     for (const char of visualBible.mainCharacters) {
       prompt += `**${char.name}:**\n`;

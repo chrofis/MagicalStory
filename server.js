@@ -2882,7 +2882,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
 
     // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
     const visualBible = storyData.visualBible || null;
-    const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
+    const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
     // Extract cover scenes with clothing info
     const coverScenes = extractCoverScenes(storyData.outline || '');
@@ -6203,7 +6203,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Build the prompt
         let coverPrompt;
-        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
+        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
         const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
 
         if (coverType === 'titlePage') {
@@ -6920,7 +6920,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const backCoverScene = coverScenes.backCover?.scene || (typeof coverScenes.backCover === 'string' ? coverScenes.backCover : null) || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
         // Build visual bible prompt for covers (shows recurring elements like pets, artifacts)
-        const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
+        const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
         // Usage tracker for cover images
         const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
@@ -7835,7 +7835,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Build cover prompt using proper templates (not generic buildImagePrompt)
         const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
-        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible) : '';
+        const visualBibleText = streamingVisualBible ? buildFullVisualBiblePrompt(streamingVisualBible, { skipMainCharacters: true }) : '';
         const characterRefList = buildCharacterReferenceList(coverPhotos, inputData.characters);
 
         let coverPrompt;
@@ -9795,7 +9795,7 @@ async function processStoryJob(jobId) {
       const backCoverScene = coverScenes.backCover?.scene || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
       // Build visual bible prompt for covers
-      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible) : '';
+      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
       // Prepare all cover generation promises
       // Front cover - pass artStyle for styled costumed avatars
