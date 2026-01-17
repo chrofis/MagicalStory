@@ -419,24 +419,46 @@ test.describe('Character Management', () => {
     await expect(franziskaName).toBeVisible({ timeout: 10000 });
     console.log('Verified: Franziska exists on character list');
 
-    // Try to find her card and avatar
-    const recreatedCard = page.locator('div').filter({ hasText: /Franziska.*Female.*52/i }).first();
-    const hasCard = await recreatedCard.isVisible({ timeout: 5000 }).catch(() => false);
-    console.log(`Franziska card found: ${hasCard}`);
+    // Find Franziska's card specifically - use the card structure with border and rounded
+    // Each character card is a div.border.rounded containing character info
+    const allCards = page.locator('div.border.rounded-lg, div.border.rounded');
+    const cardCount = await allCards.count();
+    console.log(`Found ${cardCount} character cards`);
 
-    // Check for avatar image
-    const avatarImg = recreatedCard.locator('img').first();
-    const hasAvatar = await avatarImg.isVisible({ timeout: 3000 }).catch(() => false);
+    let verifyCard = null;
+    let franziskaAvatarSrc = null;
+    for (let i = 0; i < cardCount; i++) {
+      const card = allCards.nth(i);
+      const cardText = await card.textContent().catch(() => '');
+      if (cardText?.includes('Franziska')) {
+        verifyCard = card;
+        console.log(`Found Franziska card at index ${i}`);
 
-    if (hasAvatar) {
-      const avatarSrc = await avatarImg.getAttribute('src');
-      expect(avatarSrc).toBeTruthy();
-      console.log(`Verified: Franziska has avatar: ${avatarSrc?.substring(0, 80)}...`);
-    } else {
-      // Avatar might still be generating - log warning but don't fail
-      console.log('Warning: Franziska avatar not yet visible (may still be generating)');
-      // Take screenshot for debugging
+        // Check for avatar image within THIS specific card
+        const img = card.locator('img').first();
+        const imgVisible = await img.isVisible({ timeout: 1000 }).catch(() => false);
+        if (imgVisible) {
+          franziskaAvatarSrc = await img.getAttribute('src');
+          console.log(`Franziska card has img with src: ${franziskaAvatarSrc?.substring(0, 50) || 'empty'}...`);
+        } else {
+          console.log('Franziska card has no visible img');
+        }
+        break;
+      }
+    }
+
+    if (!verifyCard) {
+      console.log('ERROR: Could not find Franziska card!');
+      await page.screenshot({ path: 'test-results/t1-09b-no-card.png', fullPage: true });
+    } else if (!franziskaAvatarSrc || franziskaAvatarSrc.length < 100) {
+      // Avatar src should be a base64 image (long string) or URL
+      console.log('WARNING: Franziska has NO avatar or placeholder only!');
       await page.screenshot({ path: 'test-results/t1-09b-no-avatar.png', fullPage: true });
+      // This is the actual bug - fail the test to surface it
+      expect(franziskaAvatarSrc).toBeTruthy();
+      expect(franziskaAvatarSrc!.length).toBeGreaterThan(100);
+    } else {
+      console.log(`Verified: Franziska has avatar: ${franziskaAvatarSrc.substring(0, 80)}...`);
     }
 
     // Step 10: Verify Franziska has relationships
@@ -470,8 +492,41 @@ test.describe('Character Management', () => {
     const hasRogerRelationship = await rogerRelationship.isVisible({ timeout: 5000 }).catch(() => false);
     console.log(`Verified: Franziska relationship to Roger visible: ${hasRogerRelationship}`);
 
-    // For now, we just verify relationships section is accessible
-    // The relationship setup happens during character creation wizard
+    // IMPORTANT: Close the edit form WITHOUT saving to avoid overwriting avatar data
+    // The edit form may not have loaded all photo/avatar data, so saving would erase it
+    console.log('Step 11: Close edit form (without saving to preserve avatar)');
+
+    // Navigate back to character list - this closes the edit form without saving
+    await page.goto('/create');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
+    // Final check - find Franziska's card again and verify avatar
+    const finalCards = page.locator('div.border.rounded-lg, div.border.rounded');
+    const finalCardCount = await finalCards.count();
+    let finalAvatarSrc = null;
+    for (let i = 0; i < finalCardCount; i++) {
+      const card = finalCards.nth(i);
+      const cardText = await card.textContent().catch(() => '');
+      if (cardText?.includes('Franziska')) {
+        const img = card.locator('img').first();
+        if (await img.isVisible({ timeout: 1000 }).catch(() => false)) {
+          finalAvatarSrc = await img.getAttribute('src');
+        }
+        break;
+      }
+    }
+    const hasRealAvatar = finalAvatarSrc && finalAvatarSrc.length > 100;
+    console.log(`Final check: Franziska avatar present: ${hasRealAvatar}`);
+
+    await page.screenshot({ path: 'test-results/t1-11-final-save.png', fullPage: true });
+
+    // FAIL the test if Franziska doesn't have an avatar
+    if (!hasRealAvatar) {
+      console.log('FAIL: Franziska does not have an avatar after recreation!');
+      throw new Error('Franziska avatar not saved properly - avatar generation completed but avatar not visible');
+    }
+
     console.log('Franziska recreation with avatar verified!');
   });
 

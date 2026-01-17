@@ -1,26 +1,41 @@
-Generate 4 PHOTOREALISTIC face variations of this person in a 2x2 grid.
+Generate 4 PHOTOREALISTIC portraits of THE SAME PERSON from the reference photo in a 2x2 grid.
+
+## CONCEPT
+Create 4 photos of THE EXACT SAME CHILD/PERSON from the reference image.
+These should look like 4 different photos taken of the SAME person on different days.
+ALL 4 must be immediately recognizable as the person in the reference photo.
+The subtle variations are natural - like how anyone looks slightly different in different photos.
+
+## IDENTITY PRESERVATION (CRITICAL - match the reference photo)
+You MUST preserve these features EXACTLY from the reference:
+- Face shape and proportions
+- Eye shape, size, color, and spacing
+- Nose shape and size
+- Mouth and lip shape
+- Ear shape and position
+- Hairline shape
+- Skin tone and any freckles/marks
+- Overall facial structure and bone structure
 
 ## OUTPUT FORMAT
 Create a 2x2 GRID with 4 PHOTOREALISTIC FACE PORTRAITS:
-- ALL 4 must show the face looking DIRECTLY AT CAMERA (frontal view)
-- ALL 4 must be the SAME person with IDENTICAL features
-- ALL 4 must have the SAME HAPPY expression (friendly, approachable)
+- ALL 4 looking DIRECTLY AT CAMERA (frontal view)
+- ALL 4 with similar HAPPY expression (friendly smile)
+- ALL 4 in FULL COLOR
+- ALL 4 must look like THE SAME PERSON as the reference
 
-## THE 4 VARIATIONS
-All faces should look HAPPY and FRIENDLY. The only differences are subtle lighting:
-1. Top-Left: Happy expression, soft frontal studio lighting
-2. Top-Right: Happy expression, warm golden lighting from upper-left
-3. Bottom-Left: Happy expression, natural outdoor daylight (MUST BE FULL COLOR)
-4. Bottom-Right: Happy expression, bright even studio lighting
-
-IMPORTANT: ALL 4 images must be in FULL COLOR. No grayscale or black-and-white.
+## THE 4 VARIATIONS (very subtle, natural differences)
+Like photos taken on different days - same person, tiny natural variations:
+1. Top-Left: Direct match to reference - neutral happy expression
+2. Top-Right: Same person - slightly wider smile, eyes slightly more open
+3. Bottom-Left: Same person - subtle head tilt (still frontal), relaxed smile
+4. Bottom-Right: Same person - biggest smile, showing teeth
 
 ## CRITICAL REQUIREMENTS
+- ALL 4 faces must be IMMEDIATELY RECOGNIZABLE as the reference person
+- This is the SAME PERSON in all 4 photos, NOT siblings or relatives
+- Variations are ONLY in expression and lighting, NOT in facial features
 - PHOTOREALISTIC - must look like real photographs
-- ALL faces looking FORWARD at camera - NO profiles, NO 3/4 views
-- ALL faces with SAME HAPPY EMOTION - no sad, neutral, or varied expressions
-- SAME face shape, hair color, eye color, skin tone in all 4
 - Head and shoulders framing
-- Clean, simple background (solid color or soft gradient)
+- Clean, simple background (solid pastel or soft gradient)
 - Professional portrait photography quality
-- PRESERVE THE PERSON'S IDENTITY exactly as in the reference photo

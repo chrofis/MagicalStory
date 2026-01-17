@@ -1481,6 +1481,73 @@ def split_grid():
         }), 500
 
 
+@app.route('/add-background', methods=['POST'])
+def add_background():
+    """
+    Add a solid background to a transparent PNG image.
+
+    Expected JSON:
+    {
+        "image": "data:image/png;base64,...",  # PNG with transparency
+        "background_color": [R, G, B]          # Optional, default light gray [240, 240, 240]
+    }
+
+    Returns:
+    {
+        "success": true,
+        "image": "data:image/jpeg;base64,..."  # Image with solid background
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Missing 'image' in request body"
+            }), 400
+
+        # Decode base64 image
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+
+        image_bytes = base64.b64decode(image_data)
+
+        # Open with PIL to handle transparency
+        pil_image = Image.open(BytesIO(image_bytes))
+
+        # Get background color (default light gray)
+        bg_color = tuple(data.get('background_color', [240, 240, 240]))
+
+        # If image has alpha channel, composite on background
+        if pil_image.mode == 'RGBA':
+            # Create solid background
+            background = Image.new('RGB', pil_image.size, bg_color)
+            # Paste image using alpha as mask
+            background.paste(pil_image, mask=pil_image.split()[3])
+            pil_image = background
+            print(f"[ADD-BACKGROUND] Added {bg_color} background to transparent image")
+        elif pil_image.mode != 'RGB':
+            pil_image = pil_image.convert('RGB')
+
+        # Encode as JPEG
+        buffer = BytesIO()
+        pil_image.save(buffer, format='JPEG', quality=95)
+        encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+        return jsonify({
+            "success": True,
+            "image": f"data:image/jpeg;base64,{encoded}"
+        }), 200
+
+    except Exception as e:
+        print(f"[ADD-BACKGROUND] Error: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @app.route('/extract-face', methods=['POST'])
 def extract_face():
     """

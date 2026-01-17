@@ -2003,29 +2003,49 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       try {
         log.debug(`💾 [AVATAR JOB ${jobId}] Updating character ${characterId} (internal ID) in database with extracted data`);
 
-        // Get current character data - query by user_id since there's one row per user
-        // Note: dbQuery returns rows array directly, not { rows: [...] }
-        const rows = await dbQuery(`
-          SELECT id, data FROM characters WHERE user_id = $1
-        `, [user.id]);
+        // Retry logic: character might not be saved yet if avatar job finishes before wizard completes
+        let charIndex = -1;
+        let rows = null;
+        let charData = null;
+        let characters = null;
+        let rowId = null;
 
-        if (rows.length > 0) {
-          const rowId = rows[0].id; // e.g., "characters_1764881868108"
-          const charData = rows[0].data || {};
-          const characters = charData.characters || [];
+        for (let retryAttempt = 0; retryAttempt < 10; retryAttempt++) {
+          // Get current character data - query by user_id since there's one row per user
+          // Note: dbQuery returns rows array directly, not { rows: [...] }
+          rows = await dbQuery(`
+            SELECT id, data FROM characters WHERE user_id = $1
+          `, [user.id]);
 
-          // Find the character by its internal ID (characterId is the character's id within the array)
-          let charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+          if (rows.length > 0) {
+            rowId = rows[0].id; // e.g., "characters_1764881868108"
+            charData = rows[0].data || {};
+            characters = charData.characters || [];
 
-          // Fallback: find by name if ID match fails
-          if (charIndex < 0 && name) {
-            charIndex = characters.findIndex(c => c.name === name);
+            // Find the character by its internal ID (characterId is the character's id within the array)
+            charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+
+            // Fallback: find by name if ID match fails
+            if (charIndex < 0 && name) {
+              charIndex = characters.findIndex(c => c.name === name);
+            }
           }
 
-          // If we still can't find the character, log error and skip update (don't save to wrong character!)
-          if (charIndex < 0) {
-            log.error(`❌ [AVATAR JOB ${jobId}] Could not find character by ID ${characterId} or name ${name} - skipping database update to prevent saving to wrong character`);
-          } else {
+          if (charIndex >= 0) {
+            if (retryAttempt > 0) {
+              log.info(`💾 [AVATAR JOB ${jobId}] Found character after ${retryAttempt + 1} attempts (wizard may have just saved)`);
+            }
+            break;
+          }
+
+          // Character not found yet - wait and retry (wizard might still be saving)
+          if (retryAttempt < 9) {
+            log.debug(`💾 [AVATAR JOB ${jobId}] Character not found (attempt ${retryAttempt + 1}/10), waiting 2s for wizard to save...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
+
+        if (rows && rows.length > 0 && charIndex >= 0) {
             log.debug(`💾 [AVATAR JOB ${jobId}] Found character at index ${charIndex} (rowId: ${rowId})`);
 
 
@@ -2132,7 +2152,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId} (data + metadata)`);
           }
-          } // close else block for charIndex >= 0
+        } else {
+          // Character still not found after all retries
+          log.error(`❌ [AVATAR JOB ${jobId}] Could not find character by ID ${characterId} or name ${name} after 10 retries - skipping database update`);
         }
       } catch (dbErr) {
         log.warn(`[AVATAR JOB ${jobId}] Failed to update character in database:`, dbErr.message);

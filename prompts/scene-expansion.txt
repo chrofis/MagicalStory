@@ -77,6 +77,18 @@ Do NOT invent new characters or objects.
 - **Object Separation:**
   - When objects touch, use distinct materials/colors: "A [wooden-brown] stick in a [pink-skin] hand"
 
+**DEPTH & POINTING GEOMETRY - CRITICAL:**
+- When a character POINTS at or LOOKS at an object, verify the DEPTH LAYERS match:
+  - Character in FOREGROUND pointing at object in BACKGROUND = character must face AWAY from camera (back view) or turn around
+  - Character in FOREGROUND pointing at object in FOREGROUND = character can face camera (front view)
+  - Character facing camera CANNOT point at something BEHIND them without turning
+- **WRONG:** "Manuel faces camera (front view), points upward at the rocket behind him"
+  → Pointing forward while facing camera aims TOWARD camera, not backward at rocket
+- **RIGHT:** "Manuel turns to face the rocket behind him (back to camera), points upward"
+  → OR: "Manuel faces camera, looks over his shoulder at the rocket, thumb pointing backward"
+  → OR: Reposition camera so rocket is in front of characters, not behind
+- Always verify: If target is BEHIND character, character must TURN AROUND or camera must be repositioned
+
 **ANATOMICAL CONSISTENCY:**
 - Humans have exactly 2 arms - account for BOTH arms explicitly
 - WRONG: "both arms gesticulating wildly, left arm holds X"

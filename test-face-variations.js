@@ -64,10 +64,45 @@ function saveImage(base64Data, filename) {
 }
 
 /**
+ * Add solid background to transparent PNG images
+ */
+async function addBackgroundIfTransparent(photoBase64) {
+  // Check if it's a PNG (might have transparency)
+  if (!photoBase64.includes('image/png')) {
+    return photoBase64;
+  }
+
+  try {
+    // Call photo_analyzer to add background
+    const response = await fetch(`${PHOTO_ANALYZER_URL}/add-background`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: photoBase64,
+        background_color: [200, 220, 240] // Light blue-gray
+      })
+    });
+
+    const result = await response.json();
+    if (result.success && result.image) {
+      console.log('   Added solid background to transparent image');
+      return result.image;
+    }
+  } catch (err) {
+    console.log('   Note: Could not add background, using original');
+  }
+
+  return photoBase64;
+}
+
+/**
  * Generate 2x2 grid of face variations using Gemini
  */
 async function generateFaceVariations(photoBase64, apiKey) {
   const prompt = fs.readFileSync(PROMPT_FILE, 'utf8');
+
+  // Handle transparent backgrounds
+  photoBase64 = await addBackgroundIfTransparent(photoBase64);
 
   // Extract just the base64 data
   const photoData = photoBase64.replace(/^data:image\/\w+;base64,/, '');
@@ -76,9 +111,11 @@ async function generateFaceVariations(photoBase64, apiKey) {
   const requestBody = {
     systemInstruction: {
       parts: [{
-        text: `You are an expert children's book illustrator specializing in character portraits.
-Your task is to create 4 variations of the same child's face in a 2x2 grid layout.
-CRITICAL: All 4 faces must be recognizably the SAME child - only expression/lighting varies.`
+        text: `You are an expert portrait photographer specializing in identity-accurate portraits.
+Your task is to create 4 photos of THE SAME PERSON in a 2x2 grid layout.
+CRITICAL: All 4 faces must be IMMEDIATELY RECOGNIZABLE as the person in the reference photo.
+These are 4 photos of the SAME person taken on different days - NOT siblings, NOT relatives.
+PRESERVE: exact face shape, eye shape, nose, mouth, hairline, skin tone. VARY: only expression (smile width).`
       }]
     },
     contents: [{
@@ -93,7 +130,7 @@ CRITICAL: All 4 faces must be recognizably the SAME child - only expression/ligh
       ]
     }],
     generationConfig: {
-      temperature: 1.0,
+      temperature: 1.2,  // Slightly higher for variation but stable
       responseModalities: ["TEXT", "IMAGE"],
       imageConfig: {
         aspectRatio: "1:1"

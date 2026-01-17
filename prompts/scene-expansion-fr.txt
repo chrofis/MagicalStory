@@ -77,6 +77,18 @@ N'inventez PAS de nouveaux personnages ou objets.
 - **Séparation des Objets:**
   - Quand les objets se touchent, utilisez des matériaux/couleurs distincts: "Un bâton [bois-marron] dans une main [peau-rose]"
 
+**PROFONDEUR & GÉOMÉTRIE DU POINTAGE - CRITIQUE:**
+- Quand un personnage POINTE ou REGARDE un objet, vérifiez que les COUCHES DE PROFONDEUR correspondent:
+  - Personnage au PREMIER PLAN pointant vers un objet en ARRIÈRE-PLAN = le personnage doit être DOS à la caméra ou se retourner
+  - Personnage au PREMIER PLAN pointant vers un objet au PREMIER PLAN = le personnage peut faire face à la caméra (vue de face)
+  - Un personnage face à la caméra NE PEUT PAS pointer vers quelque chose DERRIÈRE lui sans se retourner
+- **FAUX:** "Manuel fait face à la caméra (vue de face), pointe vers le haut vers la fusée derrière lui"
+  → Pointer vers l'avant en faisant face à la caméra vise VERS la caméra, pas vers l'arrière vers la fusée
+- **CORRECT:** "Manuel se tourne vers la fusée derrière lui (dos à la caméra), pointe vers le haut"
+  → OU: "Manuel fait face à la caméra, regarde par-dessus son épaule vers la fusée, pouce pointant vers l'arrière"
+  → OU: Repositionner la caméra pour que la fusée soit DEVANT les personnages, pas derrière
+- Toujours vérifier: Si la cible est DERRIÈRE le personnage, le personnage doit SE RETOURNER ou la caméra doit être repositionnée
+
 **COHÉRENCE ANATOMIQUE:**
 - Les humains ont exactement 2 bras - comptez EXPLICITEMENT les DEUX bras
 - FAUX: "les deux bras gesticulent, le bras gauche tient X"

@@ -77,6 +77,18 @@ Erfinde KEINE neuen Charaktere oder Objekte.
 - **Objekt-Trennung:**
   - Wenn Objekte sich berühren, nutze unterschiedliche Materialien/Farben: "Ein [holzbrauner] Stock in einer [rosafarbenen] Hand"
 
+**TIEFE & ZEIGE-GEOMETRIE - KRITISCH:**
+- Wenn ein Charakter auf ein Objekt ZEIGT oder SCHAUT, prüfe ob die TIEFENEBENEN übereinstimmen:
+  - Charakter im VORDERGRUND zeigt auf Objekt im HINTERGRUND = Charakter muss sich von der Kamera ABWENDEN (Rückenansicht) oder umdrehen
+  - Charakter im VORDERGRUND zeigt auf Objekt im VORDERGRUND = Charakter kann zur Kamera schauen (Frontansicht)
+  - Charakter der zur Kamera schaut KANN NICHT auf etwas HINTER ihm zeigen ohne sich umzudrehen
+- **FALSCH:** "Manuel schaut zur Kamera (Frontansicht), zeigt nach oben auf die Rakete hinter ihm"
+  → Nach vorne zeigen während man zur Kamera schaut zielt ZUR Kamera, nicht nach hinten zur Rakete
+- **RICHTIG:** "Manuel dreht sich zur Rakete hinter ihm (Rücken zur Kamera), zeigt nach oben"
+  → ODER: "Manuel schaut zur Kamera, blickt über seine Schulter zur Rakete, Daumen nach hinten zeigend"
+  → ODER: Kamera neu positionieren, damit die Rakete VOR den Charakteren ist, nicht dahinter
+- Immer prüfen: Wenn Ziel HINTER dem Charakter ist, muss sich der Charakter UMDREHEN oder die Kamera neu positioniert werden
+
 **ANATOMISCHE KONSISTENZ:**
 - Menschen haben genau 2 Arme - berücksichtige BEIDE Arme explizit
 - FALSCH: "beide Arme gestikulieren wild, linker Arm hält X"
