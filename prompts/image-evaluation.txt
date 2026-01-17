@@ -180,7 +180,7 @@ Output your COMPLETE analysis as JSON (no other text):
 
 **RULES:**
 - Output ONLY the JSON block - no preamble, no explanation
-- `fix_targets` array: include only if score < 8 and issues are fixable by re-rendering a region
+- `fix_targets` array: include only if score < 9 and issues are fixable by re-rendering a region
 - `bbox` coordinates: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left
 - Include ALL analysis steps in the JSON structure
 - **CRITICAL for `fix` field**: Write as a SELF-CONTAINED VISUAL DESCRIPTION. The image editor does NOT know character names - describe by appearance and position only.
