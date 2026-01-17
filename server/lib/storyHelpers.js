@@ -355,15 +355,18 @@ let historicalLocationsCache = null;
  */
 function loadHistoricalLocationsDatabank() {
   if (historicalLocationsCache !== null) {
+    log.debug(`[LOCATIONS] Using cached databank with ${Object.keys(historicalLocationsCache).length} events`);
     return historicalLocationsCache;
   }
 
+  log.info(`[LOCATIONS] Loading historical locations from: ${HISTORICAL_LOCATIONS_FILE}`);
   try {
     if (fs.existsSync(HISTORICAL_LOCATIONS_FILE)) {
       historicalLocationsCache = JSON.parse(fs.readFileSync(HISTORICAL_LOCATIONS_FILE, 'utf-8'));
-      log.info(`[LOCATIONS] Loaded historical locations databank with ${Object.keys(historicalLocationsCache).length} events`);
+      const eventIds = Object.keys(historicalLocationsCache);
+      log.info(`[LOCATIONS] Loaded historical locations databank with ${eventIds.length} events: ${eventIds.slice(0, 5).join(', ')}${eventIds.length > 5 ? '...' : ''}`);
     } else {
-      log.debug('[LOCATIONS] Historical locations databank not found');
+      log.warn(`[LOCATIONS] Historical locations databank NOT FOUND at: ${HISTORICAL_LOCATIONS_FILE}`);
       historicalLocationsCache = {};
     }
   } catch (err) {
@@ -381,14 +384,21 @@ function loadHistoricalLocationsDatabank() {
  * @returns {Array} Array of location objects with randomly selected photo
  */
 function getHistoricalLocations(eventId) {
-  if (!eventId) return [];
+  if (!eventId) {
+    log.debug(`[LOCATIONS] getHistoricalLocations called with no eventId`);
+    return [];
+  }
 
+  log.info(`[LOCATIONS] Getting locations for event: ${eventId}`);
   const databank = loadHistoricalLocationsDatabank();
   const eventData = databank[eventId];
 
   if (!eventData?.locations?.length) {
+    log.warn(`[LOCATIONS] No locations found for event: ${eventId} (event exists: ${!!eventData})`);
     return [];
   }
+
+  log.info(`[LOCATIONS] Found ${eventData.locations.length} locations for ${eventId}`);
 
   // For each location, randomly pick one of the stored photos
   return eventData.locations.map(loc => {
