@@ -504,15 +504,6 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
       generatedOutfits: char.generatedOutfits || char.generated_outfits || {}
     };
 
-    // Debug: Log what physical data we're using
-    log.debug(`[VISUAL BIBLE] Added main character: ${char.name} (id: ${char.id})`);
-    log.debug(`[VISUAL BIBLE]   - physical.age: "${mainChar.physical.age}"`);
-    log.debug(`[VISUAL BIBLE]   - physical.gender: "${mainChar.physical.gender}"`);
-    log.debug(`[VISUAL BIBLE]   - physical.height: "${mainChar.physical.height}"`);
-    log.debug(`[VISUAL BIBLE]   - physical.build: "${mainChar.physical.build}"`);
-    log.debug(`[VISUAL BIBLE]   - physical.face: "${mainChar.physical.face?.substring(0, 60)}..."`);
-    log.debug(`[VISUAL BIBLE]   - physical.hair: "${mainChar.physical.hair}"`);
-    log.debug(`[VISUAL BIBLE]   - physical.other: "${mainChar.physical.other}"`);
     return mainChar;
   });
 
