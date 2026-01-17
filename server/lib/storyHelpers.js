@@ -921,15 +921,12 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             return matchingKey;
           };
 
-          // Check styled costumed avatars first (generated during this story's creation)
-          // Then fall back to base costumed avatars
-          const styledCostumeKey = artStyle && findCostumeByPrefix(avatars?.styledAvatars?.[artStyle]?.costumed, costumeKey);
-          const regularCostumeKey = !styledCostumeKey && findCostumeByPrefix(avatars?.costumed, costumeKey);
-          const foundKey = styledCostumeKey || regularCostumeKey;
-          const costumeSource = styledCostumeKey ? avatars.styledAvatars[artStyle].costumed : avatars?.costumed;
+          // Check styled costumed avatars (generated during this story's creation)
+          // No fallback to base costumed - different stories have different costumes
+          const foundKey = artStyle && findCostumeByPrefix(avatars?.styledAvatars?.[artStyle]?.costumed, costumeKey);
 
-          if (foundKey && costumeSource) {
-            let avatarData = costumeSource[foundKey];
+          if (foundKey) {
+            let avatarData = avatars.styledAvatars[artStyle].costumed[foundKey];
             if (typeof avatarData === 'object' && avatarData.imageData) {
               photoUrl = avatarData.imageData;
               if (avatarData.clothing) {
@@ -942,7 +939,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             }
             photoType = `costumed-${foundKey}`;
             usedClothingCategory = `costumed:${foundKey}`;
-            log.debug(`[AVATAR LOOKUP] ${char.name}: using ${styledCostumeKey ? 'styled' : 'base'} costumed "${foundKey}"`);
+            log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${foundKey}"`);
 
             // Get clothing description from separate clothing object if not already set
             if (!clothingDescription && avatars?.clothing?.costumed?.[foundKey]) {
@@ -952,6 +949,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
                 : formatClothingObject(clothingData);
             }
           }
+          // If not found, will fall through to standard avatar fallback below
         }
       }
       // NOTE: We intentionally skip looking up pre-existing styled avatars from character data.
