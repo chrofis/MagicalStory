@@ -7220,12 +7220,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         });
 
         // Run text consistency check - include detailed language instructions and reading level
+        // Use same model as story generation for language consistency
         if (fullStoryText && fullStoryText.length > 100) {
           const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
           const langCode = inputData.language || lang;
           const languageInstruction = getLanguageInstruction(langCode);
           const languageLevel = inputData.languageLevel || 'standard';
-          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel);
+          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, streamingTextModelId);
           if (textCheck) {
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {
@@ -8773,13 +8774,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         });
 
         // Run text consistency check - include detailed language instructions and reading level
+        // Use same model as story generation for language consistency
         if (fullStoryText && fullStoryText.length > 100) {
           const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
           const langCode = inputData.language || 'en';
           const { getLanguageInstruction } = require('./server/lib/languages');
           const languageInstruction = getLanguageInstruction(langCode);
           const languageLevel = inputData.languageLevel || 'standard';
-          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel);
+          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, unifiedModelId);
           if (textCheck) {
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {

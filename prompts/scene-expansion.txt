@@ -77,7 +77,62 @@ Do NOT invent new characters or objects.
 - **Object Separation:**
   - When objects touch, use distinct materials/colors: "A [wooden-brown] stick in a [pink-skin] hand"
 
-**DEPTH & POINTING GEOMETRY - CRITICAL:**
+**SCALE FEASIBILITY CHECK:**
+Before finalizing the composition, verify that ALL described details can be visible at the chosen camera distance:
+
+- **RULE**: If the scene shows LARGE OBJECTS (vehicles, buildings, landscapes), character details must be LIMITED:
+  - Wide shot of a house → characters can wave but NO facial expressions visible
+  - Two spacecraft in frame → astronauts are SILHOUETTES at best, no hand positions
+  - Entire playground → children are small figures, describe by COLOR/SIZE not expressions
+
+- **INCOMPATIBLE COMBINATIONS** (auto-reject):
+  - "Two cars AND driver's facial expressions" → IMPOSSIBLE
+  - "Entire castle AND princess's eye details" → IMPOSSIBLE
+  - "Spaceship interior AND exterior in same frame" → IMPOSSIBLE
+
+- **FIX**: Either ZOOM IN (focus on characters, imply large objects) or ZOOM OUT (describe characters generically)
+
+**CAMERA DISTANCE (Select ONE):**
+Choose based on what the scene MUST show, then follow detail limits:
+
+- **EXTREME WIDE** (entire building/vehicle/landscape visible):
+  - Characters: silhouettes, colors only, NO faces or hands
+  - Example: "A small red figure waves from the window"
+
+- **WIDE** (room-sized, multiple people):
+  - Characters: body language, hair color, clothing colors
+  - Example: "Sophie leans forward, arms raised"
+
+- **MEDIUM** (1-3 characters, waist-up):
+  - Characters: expressions, hand positions, clothing details
+  - Example: "Wide smile, eyebrows raised, right hand pointing"
+
+- **CLOSE-UP** (face/hands focus):
+  - Characters: full facial detail, finger positions
+  - Objects: must fit in frame with characters
+
+⚠️ If scene summary requires EXTREME WIDE + detailed expressions → RECOMPOSE the scene
+
+**ILLUSTRATOR'S REALITY CHECK:**
+
+❌ IMPOSSIBLE (reject and recompose):
+- "Two spacecraft floating in space, astronauts waving through windows with excited expressions"
+  → At spacecraft scale, windows are dots. Astronauts invisible.
+
+- "The entire Eiffel Tower with Sophie at the top, her eyes sparkling with joy"
+  → At full-tower scale, Sophie is 1 pixel tall.
+
+- "A medieval battle with 100 soldiers, close-up on the knight's determined grimace"
+  → Wide battle = no face detail. Face detail = no battle.
+
+✅ POSSIBLE (good compositions):
+- "Inside the spacecraft, Neil peers through porthole at Earth, hand on glass, eyes wide"
+- "Sophie at Eiffel Tower observation deck, tower railing and Paris skyline behind her"
+- "Knight in foreground gripping sword, battle chaos blurred in background"
+
+**GOLDEN RULE**: One scale per scene. Pick HUMAN SCALE (expressions) or OBJECT SCALE (full buildings/vehicles), never both.
+
+**DEPTH & POINTING GEOMETRY:
 - When a character POINTS at or LOOKS at an object, verify the DEPTH LAYERS match:
   - Character in FOREGROUND pointing at object in BACKGROUND = character must face AWAY from camera (back view) or turn around
   - Character in FOREGROUND pointing at object in FOREGROUND = character can face camera (front view)

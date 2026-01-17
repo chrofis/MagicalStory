@@ -567,9 +567,10 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
  * @param {Array<string>} characterNames - Names of main characters
  * @param {string} languageInstruction - Detailed language/spelling instructions
  * @param {string} languageLevel - Reading level ('1st-grade', 'standard', 'advanced')
+ * @param {string} textModel - Model to use (should match story generation model)
  * @returns {Promise<object>} Text quality analysis result
  */
-async function evaluateTextConsistency(storyText, language = 'en', characterNames = [], languageInstruction = '', languageLevel = 'standard') {
+async function evaluateTextConsistency(storyText, language = 'en', characterNames = [], languageInstruction = '', languageLevel = 'standard', textModel = null) {
   try {
     if (!storyText || storyText.length < 100) {
       log.verbose('[TEXT CHECK] Story text too short for consistency check');
@@ -620,11 +621,12 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
       TEXT_FORMAT_REQUIREMENTS: textFormatRequirements
     });
 
-    log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language})`);
+    // Use same model as story generation for consistency
+    const modelToUse = textModel || getActiveTextModel().modelId;
+    log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language}, model: ${modelToUse})`);
 
-    // Use Gemini for text check (faster and cheaper than Claude for this task)
-    // Use 8000 tokens to avoid truncation (4000 was hitting the limit)
-    const result = await callGeminiTextAPI(prompt, 8000, 'gemini-2.0-flash');
+    // Use 8000 tokens to avoid truncation
+    const result = await callTextModel(prompt, 8000, null, modelToUse);
 
     if (!result?.text) {
       log.warn('⚠️  [TEXT CHECK] No response from text model');
@@ -633,7 +635,7 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
 
     // Log token usage
     if (result?.usage) {
-      log.debug(`📊 [TEXT CHECK] Token usage - input: ${result.usage.input_tokens || 0}, output: ${result.usage.output_tokens || 0}, model: gemini-2.0-flash`);
+      log.debug(`📊 [TEXT CHECK] Token usage - input: ${result.usage.input_tokens || 0}, output: ${result.usage.output_tokens || 0}, model: ${modelToUse}`);
     }
 
     // Parse JSON response
