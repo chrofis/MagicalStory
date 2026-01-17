@@ -2043,7 +2043,7 @@ export function CharacterForm({
           {/* Physical Traits Section */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
             <h4 className="font-semibold text-gray-700 mb-3">Physical Traits</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 text-sm">
               <div>
                 <span className="text-gray-500 text-xs">Eye Color:</span>
                 <div className="font-medium flex items-center gap-1">
