@@ -247,6 +247,13 @@ function extractStoryInfo(jobLines) {
     const streamingPagesMatch = msg.match(/Streaming efficiency:\s*\d+\/(\d+)\s*pages/);
     if (streamingPagesMatch && !info.pages) info.pages = parseInt(streamingPagesMatch[1]);
 
+    // Pages from consistency check: "pages 1-10" or "pages 6-15"
+    const consistencyPagesMatch = msg.match(/pages\s+\d+-(\d+)\]/);
+    if (consistencyPagesMatch) {
+      const maxPage = parseInt(consistencyPagesMatch[1]);
+      if (!info.pages || maxPage > info.pages) info.pages = maxPage;
+    }
+
     // Returning full story (backup for title)
     const returnMatch = msg.match(/Returning full story:\s*(.+?)\s+with\s+(\d+)\s+images/);
     if (returnMatch && !info.title) {
