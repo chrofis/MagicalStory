@@ -37,21 +37,9 @@ interface DeveloperModeState {
   setModelSelections: React.Dispatch<React.SetStateAction<ModelSelections>>;
 }
 
-// Default model selections for developers (cheap/fast models to save credits)
-const DEV_MODEL_DEFAULTS: ModelSelections = {
-  ideaModel: 'gemini-2.0-flash',
-  outlineModel: 'gemini-2.0-flash',
-  textModel: 'claude-haiku',
-  sceneDescriptionModel: 'gemini-2.0-flash',
-  imageModel: null,  // Server default
-  coverImageModel: null,
-  qualityModel: 'gemini-2.5-flash',  // 2.5 needed for fix_targets (spatial reasoning)
-  imageBackend: 'runware',  // Cheapest image backend ($0.0006/image)
-  avatarModel: 'gemini-2.5-flash-image',  // Fast avatar generation
-};
-
-// Default model selections for production (null = server defaults = best quality)
-const PROD_MODEL_DEFAULTS: ModelSelections = {
+// Default model selections (null = server defaults from server/config/models.js)
+// Same defaults for both dev and prod - server has the best quality models configured
+const MODEL_DEFAULTS: ModelSelections = {
   ideaModel: null,
   outlineModel: null,
   textModel: null,
@@ -63,13 +51,22 @@ const PROD_MODEL_DEFAULTS: ModelSelections = {
   avatarModel: null,
 };
 
+// Feature flag defaults (must match server/config/models.js MODEL_DEFAULTS)
+const FEATURE_DEFAULTS = {
+  enableAutoRepair: false,    // Auto-repair: fix detected issues in generated images
+  enableFinalChecks: true,    // Final checks: run consistency checks at end of generation
+};
+
 /**
  * Hook to manage developer mode state for story wizard
  * Persists developer mode setting in localStorage for admins
  *
+ * Model defaults are the same for dev and prod (null = server defaults from server/config/models.js)
+ * Feature defaults (enableAutoRepair, enableFinalChecks) also match server/config/models.js
+ *
  * When developer mode is enabled:
- * - Skip cover images by default (saves credits)
- * - Use cheapest models by default (haiku for text, runware for images)
+ * - Skip cover images by default (saves credits during testing)
+ * - Shows additional debug info and controls in the UI
  */
 export function useDeveloperMode(): DeveloperModeState {
   // Check if dev mode was previously enabled
@@ -89,33 +86,30 @@ export function useDeveloperMode(): DeveloperModeState {
   // Skip covers by default in dev mode
   const [devSkipCovers, setDevSkipCovers] = useState(wasDevMode);
 
-  // Auto-repair: automatically fix detected issues in generated images (default: OFF)
-  const [enableAutoRepair, setEnableAutoRepair] = useState(false);
+  // Auto-repair: automatically fix detected issues in generated images
+  const [enableAutoRepair, setEnableAutoRepair] = useState(FEATURE_DEFAULTS.enableAutoRepair);
 
-  // Final checks: run image and text consistency checks at end of generation (default: OFF)
-  const [enableFinalChecks, setEnableFinalChecks] = useState(false);
+  // Final checks: run image and text consistency checks at end of generation
+  const [enableFinalChecks, setEnableFinalChecks] = useState(FEATURE_DEFAULTS.enableFinalChecks);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
 
-  // Developer model selection - initialize based on dev mode
-  const [modelSelections, setModelSelections] = useState<ModelSelections>(
-    wasDevMode ? { ...DEV_MODEL_DEFAULTS } : { ...PROD_MODEL_DEFAULTS }
-  );
+  // Model selection - same defaults for dev and prod (null = server defaults)
+  const [modelSelections, setModelSelections] = useState<ModelSelections>({ ...MODEL_DEFAULTS });
 
-  // Custom setter that also updates defaults when toggling dev mode
+  // Custom setter that also updates skip flags when toggling dev mode
   const setDeveloperMode = (enabled: boolean) => {
     setDeveloperModeInternal(enabled);
 
     if (enabled) {
-      // Switching TO developer mode: set cheap defaults
+      // Switching TO developer mode: skip covers by default (saves credits during testing)
       setDevSkipCovers(true);
-      setModelSelections({ ...DEV_MODEL_DEFAULTS });
     } else {
-      // Switching FROM developer mode: reset to production defaults
+      // Switching FROM developer mode: enable covers
       setDevSkipCovers(false);
-      setModelSelections({ ...PROD_MODEL_DEFAULTS });
     }
+    // Model selections stay the same (server defaults) regardless of dev mode
   };
 
   // Persist developer mode changes

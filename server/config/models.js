@@ -69,7 +69,11 @@ const MODEL_DEFAULTS = {
   // Image generation backend (can be overridden in dev mode)
   // 'gemini' = Gemini API (default, best quality)
   // 'runware' = Runware FLUX Schnell (super cheap, good for testing)
-  imageBackend: 'gemini'               // Default: Gemini for production quality
+  imageBackend: 'gemini',              // Default: Gemini for production quality
+
+  // Feature flags for generation pipeline
+  enableAutoRepair: false,             // Auto-repair: fix detected issues in generated images
+  enableFinalChecks: true              // Final checks: run consistency checks at end of generation
 };
 
 // Available inpaint backends
