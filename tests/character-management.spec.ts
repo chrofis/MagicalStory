@@ -699,22 +699,39 @@ test.describe('Character Management', () => {
     await page.waitForTimeout(5000);
     await page.screenshot({ path: 'test-results/t2-05-final.png', fullPage: true });
 
-    // Step 7: Wait for avatar generation and verify avatar changed
-    console.log('Step 7: Verify avatar changed');
+    // Step 7: Wait for avatar generation to COMPLETE and verify success
+    console.log('Step 7: Wait for avatar generation to complete');
 
-    // Wait for avatar generation to start/complete
-    let avatarStarted = false;
-    for (let i = 0; i < 20; i++) {
-      if (logs.some(log => log.includes('Avatar job') && log.includes('started'))) {
-        avatarStarted = true;
-        console.log('Avatar generation started');
+    // Wait for avatar generation to complete (success or failure)
+    let avatarCompleted = false;
+    let avatarFailed = false;
+    for (let i = 0; i < 60; i++) { // Wait up to 2 minutes
+      if (logs.some(log => log.includes('Avatar job') && log.includes('completed'))) {
+        avatarCompleted = true;
+        console.log('Avatar generation completed successfully!');
+        break;
+      }
+      if (logs.some(log => log.includes('Avatar job') && log.includes('Failed'))) {
+        avatarFailed = true;
+        const failLog = logs.find(log => log.includes('Failed'));
+        console.log(`Avatar generation FAILED: ${failLog}`);
         break;
       }
       await page.waitForTimeout(2000);
     }
 
-    // Wait a bit longer for generation
-    await page.waitForTimeout(10000);
+    // FAIL the test if avatar generation failed
+    if (avatarFailed) {
+      await page.screenshot({ path: 'test-results/t2-06-avatar-FAILED.png', fullPage: true });
+      throw new Error('Avatar generation failed - check server logs for IMAGE_OTHER or other errors');
+    }
+
+    if (!avatarCompleted) {
+      console.log('Warning: Avatar generation did not complete within timeout');
+    }
+
+    // Wait a bit for database update
+    await page.waitForTimeout(3000);
 
     // Reload page and check avatar
     await page.goto('/create');
@@ -732,11 +749,15 @@ test.describe('Character Management', () => {
     expect(avatarAfter).toMatch(/http|data:image|blob:/);
     console.log(`Verified: Roger has valid avatar`);
 
-    // Note: Avatar may be same if generation still in progress, but src should be valid
-    if (avatarBefore !== avatarAfter) {
-      console.log('Verified: Avatar changed after photo upload!');
-    } else {
-      console.log('Note: Avatar src same (may still be generating)');
+    // Verify avatar actually changed (if generation completed)
+    if (avatarCompleted) {
+      if (avatarBefore !== avatarAfter) {
+        console.log('Verified: Avatar changed after photo upload!');
+      } else {
+        console.log('ERROR: Avatar did not change even though generation completed');
+        await page.screenshot({ path: 'test-results/t2-06-avatar-unchanged.png', fullPage: true });
+        throw new Error('Avatar generation completed but avatar did not change');
+      }
     }
 
     await page.screenshot({ path: 'test-results/t2-06-avatar-verified.png', fullPage: true });
