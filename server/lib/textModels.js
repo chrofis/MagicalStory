@@ -566,9 +566,10 @@ async function callClaudeAPI(prompt, maxTokens = 4096) {
  * @param {string} language - Language code (e.g., 'de-ch', 'en', 'fr')
  * @param {Array<string>} characterNames - Names of main characters
  * @param {string} languageInstruction - Detailed language/spelling instructions
+ * @param {string} languageLevel - Reading level ('1st-grade', 'standard', 'advanced')
  * @returns {Promise<object>} Text quality analysis result
  */
-async function evaluateTextConsistency(storyText, language = 'en', characterNames = [], languageInstruction = '') {
+async function evaluateTextConsistency(storyText, language = 'en', characterNames = [], languageInstruction = '', languageLevel = 'standard') {
   try {
     if (!storyText || storyText.length < 100) {
       log.verbose('[TEXT CHECK] Story text too short for consistency check');
@@ -577,6 +578,7 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
 
     // Use lazy-loaded prompt templates to avoid circular dependency
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+    const { getReadingLevel } = require('./storyHelpers');
 
     // Load prompt template
     const promptTemplate = PROMPT_TEMPLATES.textConsistencyCheck;
@@ -585,21 +587,37 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
       return null;
     }
 
-    // Language name mapping
+    // Language name mapping (all supported variants)
     const languageNames = {
       'de-ch': 'Swiss German (de-ch)',
+      'de-de': 'German Standard (de-de)',
+      'de-de-north': 'German North (de-de-north)',
+      'de-de-south': 'German South (de-de-south)',
+      'de-at': 'Austrian German (de-at)',
+      'de-it': 'South Tyrolean German (de-it)',
       'de': 'German (de)',
       'en': 'English (en)',
       'fr': 'French (fr)'
     };
     const languageName = languageNames[language] || language;
 
+    // Get reading level and text formatting requirements
+    const readingLevelText = getReadingLevel(languageLevel);
+    const textFormatRequirements = `**Reading Level:** ${readingLevelText}
+
+**Text Formatting Rules:**
+- Write in flowing paragraphs with 2-4 sentences each
+- Maximum 3-4 paragraphs per page
+- Dialogues flow inline with the narrative text
+- Scene changes or location changes should start a new page`;
+
     // Fill template - include detailed language/spelling instructions
     const prompt = fillTemplate(promptTemplate, {
       LANGUAGE: languageName,
       STORY_TEXT: storyText,
       CHARACTER_NAMES: characterNames.join(', ') || 'Not specified',
-      LANGUAGE_INSTRUCTION: languageInstruction || `Write in ${languageName}.`
+      LANGUAGE_INSTRUCTION: languageInstruction || `Write in ${languageName}.`,
+      TEXT_FORMAT_REQUIREMENTS: textFormatRequirements
     });
 
     log.info(`🔍 [TEXT CHECK] Checking story text (${storyText.length} chars, ${language})`);

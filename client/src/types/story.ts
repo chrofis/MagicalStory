@@ -173,7 +173,7 @@ export interface FinalChecksImageIssue {
 
 export interface FinalChecksTextIssue {
   page?: number;
-  type: 'spelling' | 'grammar' | 'flow' | 'character' | 'logic';
+  type: 'spelling' | 'grammar' | 'formatting' | 'flow' | 'character' | 'logic';
   text?: string;  // Legacy field
   originalText?: string;  // The problematic text
   correctedText?: string;  // The corrected version

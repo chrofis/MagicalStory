@@ -7145,12 +7145,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           checkCharacters: true
         });
 
-        // Run text consistency check - include detailed language instructions
+        // Run text consistency check - include detailed language instructions and reading level
         if (fullStoryText && fullStoryText.length > 100) {
           const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
           const langCode = inputData.language || lang;
           const languageInstruction = getLanguageInstruction(langCode);
-          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction);
+          const languageLevel = inputData.languageLevel || 'standard';
+          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel);
           if (textCheck) {
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {
@@ -8686,13 +8687,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           checkCharacters: true
         });
 
-        // Run text consistency check - include detailed language instructions
+        // Run text consistency check - include detailed language instructions and reading level
         if (fullStoryText && fullStoryText.length > 100) {
           const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
           const langCode = inputData.language || 'en';
           const { getLanguageInstruction } = require('./server/lib/languages');
           const languageInstruction = getLanguageInstruction(langCode);
-          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction);
+          const languageLevel = inputData.languageLevel || 'standard';
+          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel);
           if (textCheck) {
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {

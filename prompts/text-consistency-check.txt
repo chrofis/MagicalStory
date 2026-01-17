@@ -10,6 +10,11 @@ The story is written in: {LANGUAGE}
 
 **You MUST check that the story follows these spelling rules exactly.**
 
+## Text Length & Formatting Requirements
+{TEXT_FORMAT_REQUIREMENTS}
+
+**Check that pages have appropriate length and paragraph structure.**
+
 ## Story Text
 {STORY_TEXT}
 
@@ -26,19 +31,25 @@ Review the story text carefully for the following issues:
 - Awkward phrasing
 - **IMPORTANT**: Check spelling rules from the Language Requirements section above
 
-### 2. Story Flow
+### 2. Text Length & Formatting
+- Pages that are too short or too long for the reading level
+- Too many or too few paragraphs per page
+- Overly long paragraphs (more than 4 sentences)
+- Missing page breaks at scene changes
+
+### 3. Story Flow
 - Missing transitions between scenes
 - Abrupt jumps in narrative
 - Paragraphs that seem incomplete
 - Text that doesn't make sense in context
 
-### 3. Character Consistency
+### 4. Character Consistency
 - Character names used correctly throughout
 - No sudden name changes or misspellings
 - Characters acting consistently with their established personality
 - No characters appearing who weren't introduced
 
-### 4. Logical Issues
+### 5. Logical Issues
 - Timeline inconsistencies (afternoon becoming morning without explanation)
 - Physical impossibilities (character in two places at once)
 - Plot holes or unexplained events
@@ -54,7 +65,7 @@ Return ONLY valid JSON (no markdown, no explanation):
   "issues": [
     {
       "page": 3,
-      "type": "spelling" | "grammar" | "flow" | "character" | "logic",
+      "type": "spelling" | "grammar" | "formatting" | "flow" | "character" | "logic",
       "originalText": "The exact problematic text",
       "correctedText": "The corrected version of the text",
       "issue": "Description of the problem",
