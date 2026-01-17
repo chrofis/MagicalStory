@@ -524,7 +524,7 @@ export function StoryCategorySelector({
   }
 
   // Render step 3: Optional theme wrapper (for life-challenge and educational with topic selected)
-  // Show only popular adventure themes (same as "Beliebt" section)
+  // Show popular themes first, then all other themes in collapsed groups
   if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic && storyTheme === 'realistic') {
     const popularThemes = getStoryTypesByGroup('popular');
 
@@ -550,7 +550,7 @@ export function StoryCategorySelector({
           <h3 className="font-bold text-gray-800 mb-1">{t.optionalTheme}</h3>
           <p className="text-sm text-gray-600 mb-3">{t.optionalThemeDesc}</p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2 mb-4">
             {/* Realistic option first */}
             <button
               onClick={() => handleThemeWrapperSelect('realistic')}
@@ -564,7 +564,7 @@ export function StoryCategorySelector({
               <div className="font-semibold text-xs">{t.noTheme}</div>
             </button>
 
-            {/* Popular theme options only (same as "Beliebt" section) */}
+            {/* Popular theme options */}
             {popularThemes.map((type) => (
               <button
                 key={type.id}
@@ -579,6 +579,47 @@ export function StoryCategorySelector({
                 <div className="font-semibold text-xs">{type.name[lang] || type.name.en}</div>
               </button>
             ))}
+          </div>
+
+          {/* All other theme groups (collapsed) */}
+          <div className="space-y-2 border-t border-amber-200 pt-3">
+            {adventureThemeGroups.filter(g => g.id !== 'popular' && g.id !== 'custom').map((group) => {
+              const themes = getStoryTypesByGroup(group.id);
+              const isExpanded = expandedAdventureGroups.includes(group.id);
+
+              return (
+                <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                  <button
+                    onClick={() => toggleAdventureGroup(group.id)}
+                    className="w-full flex items-center justify-between p-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="font-medium text-sm text-gray-700">
+                      {group.name[lang] || group.name.en}
+                    </span>
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-2">
+                      {themes.map((type) => (
+                        <button
+                          key={type.id}
+                          onClick={() => handleThemeWrapperSelect(type.id)}
+                          className={`p-2 rounded-lg border-2 transition-all text-center ${
+                            storyTheme === type.id
+                              ? 'border-indigo-500 bg-indigo-50'
+                              : 'border-gray-200 hover:border-indigo-300'
+                          }`}
+                        >
+                          <div className="text-xl mb-1">{type.emoji}</div>
+                          <div className="font-semibold text-xs">{type.name[lang] || type.name.en}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
