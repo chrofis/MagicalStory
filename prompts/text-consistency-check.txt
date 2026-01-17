@@ -16,7 +16,27 @@ The story is written in: {LANGUAGE}
 **Check that pages have appropriate length and paragraph structure.**
 
 ## ⚠️ PARAGRAPH FORMATTING - CHECK CAREFULLY
-This is frequently wrong in generated stories. Verify EVERY page. If wrong, fix it in fullCorrectedText with proper paragraph breaks.
+This is frequently wrong in generated stories. Verify EVERY page:
+- **Each page should have 2-4 paragraphs separated by BLANK LINES**
+- If a page is ONE SOLID BLOCK of text with no blank lines → FIX IT by adding paragraph breaks
+- A paragraph should be 2-4 sentences, then a blank line, then the next paragraph
+- If you see 5+ sentences with no blank line between them → that's a formatting issue
+
+**Example of WRONG formatting (one solid block):**
+```
+Sophie ran across the meadow. She could see the tree in the distance. "Wait!" called Max. He struggled to keep up. They finally reached the tree together.
+```
+
+**Example of CORRECT formatting (paragraphs with blank lines):**
+```
+Sophie ran across the meadow. She could see the tree in the distance.
+
+"Wait!" called Max. He struggled to keep up.
+
+They finally reached the tree together.
+```
+
+If wrong, fix it in fullCorrectedText with proper paragraph breaks (blank lines between paragraphs).
 
 ## Story Text
 {STORY_TEXT}

@@ -609,8 +609,14 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
 **Text Formatting Rules:**
 - Write in flowing paragraphs with 2-4 sentences each
 - Maximum 3-4 paragraphs per page
+- **Paragraphs MUST be separated by blank lines** - if a page is one solid block of text with no blank lines, it needs paragraph breaks added
 - Dialogues flow inline with the narrative text
-- Scene changes or location changes should start a new page`;
+- Scene changes or location changes should start a new page
+
+**How to check paragraph formatting:**
+- Look for blank lines (empty lines) between paragraphs
+- If a page has 5+ sentences with NO blank lines, it's missing paragraph breaks
+- Each page should have 2-4 distinct paragraphs separated by blank lines`;
 
     // Fill template - include detailed language/spelling instructions
     const prompt = fillTemplate(promptTemplate, {

@@ -640,6 +640,7 @@ export default function StoryWizard() {
                           totalAttempts: devData.totalAttempts ?? img.totalAttempts,
                           faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
                           referencePhotos: devData.referencePhotos ?? img.referencePhotos,
+                          consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
                         };
                       }
                       return img;

@@ -72,9 +72,19 @@ Stay within the word count. Count your words. Aim for the middle of the range, n
 **Text formatting:**
 - Write in flowing paragraphs with 2-4 sentences each
 - Maximum 3-4 paragraphs per page
+- **IMPORTANT: Separate paragraphs with a blank line** (not just a newline, a BLANK LINE)
 - Dialogues flow inline with the narrative text
 - Scene changes or location changes = start a NEW PAGE, not a new paragraph
 - Create a readable, engaging style appropriate for the target age
+
+**Example of correct paragraph formatting:**
+```
+Sophie ran across the meadow, her hair flying in the wind. She could see the old oak tree in the distance.
+
+"Wait for me!" called Max, struggling to keep up. His shorter legs made it hard to match her pace.
+
+When they reached the tree, both children stopped to catch their breath. The view from here was amazing.
+```
 
 ## Page Formatting (CRITICAL FOR PARSING)
 

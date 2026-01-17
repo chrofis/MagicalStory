@@ -394,7 +394,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        referencePhotos: img.referencePhotos || null
+        referencePhotos: img.referencePhotos || null,
+        // Consistency regeneration data (includes before/after images for comparison)
+        consistencyRegen: img.consistencyRegen || null
       })) || [],
       // Cover images dev data
       coverImages: story.coverImages ? {
