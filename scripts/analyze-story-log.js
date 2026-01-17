@@ -307,6 +307,109 @@ function extractCostSummary(jobLines) {
   return costs;
 }
 
+function extractImageStats(jobLines) {
+  const stats = {
+    // Image retries (how many pages needed multiple attempts)
+    retries: {
+      attempt1: 0,  // Success on first try
+      attempt2: 0,  // Needed 2nd attempt
+      attempt3: 0,  // Needed 3rd attempt
+      pages: {}     // Track by page: { 1: 1, 2: 3, ... } (page -> final attempt)
+    },
+    // Auto-repair
+    autoRepair: {
+      enabled: null,    // true/false/null if unknown
+      skipped: 0,       // Times skipped (disabled)
+      executed: 0,      // Times actually run
+      inpaintCalls: 0   // Number of inpaint API calls
+    },
+    // Covers
+    covers: {
+      generated: false,
+      skipped: false,
+      skipReason: null,
+      count: 0
+    },
+    // Content blocked retries
+    contentBlocked: 0
+  };
+
+  for (const line of jobLines) {
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
+
+    // Cover images
+    if (msg.includes('skipCovers=true') || msg.includes('skipCovers') || msg.includes('No cover images to generate')) {
+      stats.covers.skipped = true;
+      stats.covers.skipReason = 'disabled';
+    }
+    if (msg.match(/cover_images:\s*(\d+)\s*calls/)) {
+      const match = msg.match(/cover_images:\s*(\d+)\s*calls/);
+      stats.covers.count = parseInt(match[1]);
+      if (stats.covers.count > 0) {
+        stats.covers.generated = true;
+      } else {
+        // 0 cover calls means covers were skipped
+        stats.covers.skipped = true;
+        if (!stats.covers.skipReason) stats.covers.skipReason = 'disabled or not requested';
+      }
+    }
+    if (msg.includes('[COVERS]') && msg.includes('Generated')) {
+      stats.covers.generated = true;
+    }
+
+    // Track current page being processed (from attempt messages)
+    // Pattern: "🎨 [QUALITY RETRY] [PAGE 8] Attempt 2/3"
+    const attemptStartMatch = msg.match(/\[QUALITY RETRY\]\s+\[PAGE\s+(\d+)\]\s+Attempt\s+(\d+)\/(\d+)/);
+    if (attemptStartMatch) {
+      const page = parseInt(attemptStartMatch[1]);
+      const attempt = parseInt(attemptStartMatch[2]);
+      // Track highest attempt for each page
+      if (!stats.retries.pages[page] || attempt > stats.retries.pages[page]) {
+        stats.retries.pages[page] = attempt;
+      }
+    }
+
+    // Quality retry success - count totals
+    // Pattern: "✅ [QUALITY RETRY] Success on attempt X!"
+    const successMatch = msg.match(/\[QUALITY RETRY\].*Success on attempt (\d+)/);
+    if (successMatch) {
+      const attempt = parseInt(successMatch[1]);
+      if (attempt === 1) stats.retries.attempt1++;
+      else if (attempt === 2) stats.retries.attempt2++;
+      else if (attempt === 3) stats.retries.attempt3++;
+    }
+
+    // Auto-repair skipped (disabled)
+    if (msg.includes('Auto-repair skipped (disabled)')) {
+      stats.autoRepair.skipped++;
+      stats.autoRepair.enabled = false;
+    }
+
+    // Auto-repair executed (would be something like "[AUTO-REPAIR] Executing..." or inpaint calls)
+    if (msg.includes('[AUTO-REPAIR]') && !msg.includes('skipped')) {
+      stats.autoRepair.executed++;
+      stats.autoRepair.enabled = true;
+    }
+
+    // Inpaint calls from cost summary
+    const inpaintMatch = msg.match(/inpaint:\s*(\d+)\s*calls/);
+    if (inpaintMatch) {
+      stats.autoRepair.inpaintCalls = parseInt(inpaintMatch[1]);
+      if (stats.autoRepair.inpaintCalls > 0) {
+        stats.autoRepair.enabled = true;
+        stats.autoRepair.executed = stats.autoRepair.inpaintCalls;
+      }
+    }
+
+    // Content blocked (PROHIBITED_CONTENT)
+    if (msg.includes('PROHIBITED_CONTENT') || msg.includes('Content blocked')) {
+      stats.contentBlocked++;
+    }
+  }
+
+  return stats;
+}
+
 function extractIssues(jobLines) {
   const issues = {
     warnings: [],
@@ -372,7 +475,7 @@ function extractIssues(jobLines) {
 // OUTPUT
 // ============================================================================
 
-function printAnalysis(job, storyInfo, costs, issues) {
+function printAnalysis(job, storyInfo, costs, issues, imageStats) {
   const duration = job.endTime ? job.endTime - job.startTime : null;
 
   console.log('\n' + '='.repeat(70));
@@ -393,6 +496,53 @@ function printAnalysis(job, storyInfo, costs, issues) {
   if (job.endTime) {
     console.log(`   Ended: ${job.endTime.toISOString().substring(11, 19)}`);
     console.log(`   Total Duration: ${formatDuration(duration)}`);
+  }
+
+  // Image Generation Stats
+  console.log('\n\ud83c\udfa8 IMAGE GENERATION');
+
+  // Covers
+  if (imageStats.covers.skipped) {
+    console.log(`   Covers: SKIPPED (${imageStats.covers.skipReason || 'disabled'})`);
+  } else if (imageStats.covers.generated) {
+    console.log(`   Covers: Generated (${imageStats.covers.count} images)`);
+  } else {
+    console.log(`   Covers: ${imageStats.covers.count > 0 ? 'Generated' : 'Not generated'}`);
+  }
+
+  // Image Retries
+  const totalImages = imageStats.retries.attempt1 + imageStats.retries.attempt2 + imageStats.retries.attempt3;
+  const retriedImages = imageStats.retries.attempt2 + imageStats.retries.attempt3;
+  console.log(`   Page Images: ${totalImages} total`);
+  console.log(`   - First attempt success: ${imageStats.retries.attempt1}`);
+  if (imageStats.retries.attempt2 > 0) {
+    console.log(`   - Needed 2nd attempt: ${imageStats.retries.attempt2}`);
+  }
+  if (imageStats.retries.attempt3 > 0) {
+    console.log(`   - Needed 3rd attempt: ${imageStats.retries.attempt3}`);
+  }
+  if (retriedImages > 0) {
+    const retriedPages = Object.entries(imageStats.retries.pages)
+      .filter(([_, attempts]) => attempts > 1)
+      .map(([page, attempts]) => `p${page}(${attempts} attempts)`)
+      .join(', ');
+    if (retriedPages) {
+      console.log(`   - Retried pages: ${retriedPages}`);
+    }
+  }
+
+  // Content blocked
+  if (imageStats.contentBlocked > 0) {
+    console.log(`   Content blocked retries: ${imageStats.contentBlocked}`);
+  }
+
+  // Auto-repair
+  if (imageStats.autoRepair.enabled === false) {
+    console.log(`   Auto-repair: DISABLED (${imageStats.autoRepair.skipped} opportunities skipped)`);
+  } else if (imageStats.autoRepair.enabled === true) {
+    console.log(`   Auto-repair: ENABLED (${imageStats.autoRepair.executed} repairs, ${imageStats.autoRepair.inpaintCalls} inpaints)`);
+  } else {
+    console.log(`   Auto-repair: Unknown status`);
   }
 
   // Costs
@@ -499,7 +649,8 @@ function analyzeLog(logPath) {
     const storyInfo = extractStoryInfo(job.lines);
     const costs = extractCostSummary(job.lines);
     const issues = extractIssues(job.lines);
-    printAnalysis(job, storyInfo, costs, issues);
+    const imageStats = extractImageStats(job.lines);
+    printAnalysis(job, storyInfo, costs, issues, imageStats);
   }
 }
 

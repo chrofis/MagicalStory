@@ -333,75 +333,86 @@ test.describe('Character Management', () => {
 
     await page.screenshot({ path: 'test-results/t1-07b-traits-selected.png', fullPage: true });
 
-    // Step 8: Set relationships for Franziska
-    console.log('Step 8: Set relationships');
+    // Step 8: Navigate from traits → characteristics → relationships
+    console.log('Step 8: Navigate to relationships step');
 
-    // Click Next to go to relationships step
-    const nextToRelationships = page.locator('button:has-text("Next"), button:has-text("Weiter")').first();
-    if (await nextToRelationships.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await nextToRelationships.click();
+    // First click Next to go from traits to characteristics (hobbies step)
+    const nextToChars = page.locator('button:has-text("Next"), button:has-text("Weiter")').first();
+    if (await nextToChars.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await nextToChars.click();
+      console.log('Clicked Next (traits → characteristics)');
       await page.waitForTimeout(2000);
     }
+    await page.screenshot({ path: 'test-results/t1-08a-characteristics.png', fullPage: true });
 
-    await page.screenshot({ path: 'test-results/t1-08a-relationships-step.png', fullPage: true });
+    // Second click Next to go from characteristics to relationships
+    const nextToRels = page.locator('button:has-text("Next"), button:has-text("Weiter")').first();
+    if (await nextToRels.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await nextToRels.click();
+      console.log('Clicked Next (characteristics → relationships)');
+      await page.waitForTimeout(2000);
+    }
+    await page.screenshot({ path: 'test-results/t1-08b-relationships-step.png', fullPage: true });
 
-    // Find relationship dropdowns and set them
-    // Franziska should be: Parent of Lukas, Sophie, Manuel; Married to Roger
-    const relationshipSelects = page.locator('select');
-    const relSelectCount = await relationshipSelects.count();
-    console.log(`Found ${relSelectCount} relationship selects`);
+    // Now we should be on the relationships step - look for the "Relationships" header
+    const relationshipsHeader = page.locator('h3:has-text("Relationships"), h3:has-text("Beziehungen")');
+    const onRelationshipsStep = await relationshipsHeader.isVisible({ timeout: 5000 }).catch(() => false);
+    console.log(`On relationships step: ${onRelationshipsStep}`);
 
-    // Log all selects to understand the structure
-    for (let i = 0; i < relSelectCount; i++) {
-      const select = relationshipSelects.nth(i);
+    // Find relationship cards (rounded divs with border)
+    // Each card has: [Franziska photo] [select dropdown] [Other character photo + name]
+    // The card structure is: div.rounded-lg containing a select and spans with names
+    const relationshipCards = page.locator('div.rounded-lg').filter({ has: page.locator('select') });
+    const relCardCount = await relationshipCards.count();
+    console.log(`Found ${relCardCount} relationship cards`);
+
+    // Set relationships for each card
+    for (let i = 0; i < relCardCount; i++) {
+      const card = relationshipCards.nth(i);
+      if (!await card.isVisible({ timeout: 500 }).catch(() => false)) continue;
+
+      // Get the other character's name (it's the last span in the card)
+      const cardText = await card.textContent().catch(() => '');
+      console.log(`Card ${i} text: ${cardText?.substring(0, 100)}`);
+
+      // Find the select within this card
+      const select = card.locator('select').first();
       if (!await select.isVisible({ timeout: 500 }).catch(() => false)) continue;
 
-      // Get the label/context for this select (the character name it's for)
-      const parent = select.locator('xpath=ancestor::div[contains(@class, "rounded")]').first();
-      const parentText = await parent.textContent().catch(() => '');
-
-      if (parentText?.includes('Lukas') || parentText?.includes('Sophie') || parentText?.includes('Manuel')) {
-        // Set as parent (Elternteil von)
+      // Determine which relationship to set based on the card content
+      if (cardText?.includes('Lukas') || cardText?.includes('Sophie') || cardText?.includes('Manuel')) {
+        // Set as "Parent of" (Elternteil von) for children
         try {
           await select.selectOption({ label: 'Parent of' });
-          console.log(`Set relationship to ${parentText?.split(/\s/)[0]}: Parent of`);
+          console.log(`Set Parent of for card containing: ${cardText?.match(/Lukas|Sophie|Manuel/)?.[0]}`);
         } catch {
           try {
             await select.selectOption({ label: 'Elternteil von' });
-            console.log(`Set relationship to ${parentText?.split(/\s/)[0]}: Elternteil von`);
-          } catch {
-            // Try by value
-            const options = await select.locator('option').allTextContents();
-            const parentOption = options.find(o => o.toLowerCase().includes('parent') || o.toLowerCase().includes('eltern'));
-            if (parentOption) {
-              await select.selectOption({ label: parentOption });
-              console.log(`Set relationship: ${parentOption}`);
-            }
+            console.log(`Set Elternteil von for card containing: ${cardText?.match(/Lukas|Sophie|Manuel/)?.[0]}`);
+          } catch (e) {
+            console.log(`Failed to set parent relationship: ${e}`);
           }
         }
-      } else if (parentText?.includes('Roger')) {
-        // Set as married to
+        await page.waitForTimeout(500);
+      } else if (cardText?.includes('Roger')) {
+        // Set as "Married to" (Verheiratet mit) for spouse
         try {
           await select.selectOption({ label: 'Married to' });
-          console.log(`Set relationship to Roger: Married to`);
+          console.log('Set Married to for Roger');
         } catch {
           try {
             await select.selectOption({ label: 'Verheiratet mit' });
-            console.log(`Set relationship to Roger: Verheiratet mit`);
-          } catch {
-            // Try by value
-            const options = await select.locator('option').allTextContents();
-            const marriedOption = options.find(o => o.toLowerCase().includes('married') || o.toLowerCase().includes('verheiratet'));
-            if (marriedOption) {
-              await select.selectOption({ label: marriedOption });
-              console.log(`Set relationship: ${marriedOption}`);
-            }
+            console.log('Set Verheiratet mit for Roger');
+          } catch (e) {
+            console.log(`Failed to set married relationship: ${e}`);
           }
         }
+        await page.waitForTimeout(500);
       }
     }
 
-    await page.screenshot({ path: 'test-results/t1-08b-relationships-set.png', fullPage: true });
+    await page.screenshot({ path: 'test-results/t1-08c-relationships-set.png', fullPage: true });
+    console.log('Relationships set');
 
     // Step 9: Navigate through remaining wizard steps until character is saved
     console.log('Step 9: Navigate through wizard to save character');

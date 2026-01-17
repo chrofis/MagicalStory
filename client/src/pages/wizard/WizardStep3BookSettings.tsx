@@ -6,56 +6,56 @@ import type { LanguageLevel, StoryLanguageCode } from '@/types/story';
 // Language family type
 type LanguageFamily = 'de' | 'fr' | 'it' | 'en' | 'gsw';
 
-// Main language options (shown first - default variant for each language)
-const MAIN_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string; family: LanguageFamily }[] = [
-  { code: 'de-ch', name: 'Deutsch', flag: '🇨🇭', family: 'de' },
-  { code: 'fr-ch', name: 'Français', flag: '🇨🇭', family: 'fr' },
-  { code: 'it-ch', name: 'Italiano', flag: '🇨🇭', family: 'it' },
-  { code: 'en-gb', name: 'English', flag: '🇬🇧', family: 'en' },
-  { code: 'gsw-zh', name: 'Mundart', flag: '🇨🇭', family: 'gsw' },
+// Main language options (shown in dropdown)
+const MAIN_LANGUAGES: { code: StoryLanguageCode; name: string; family: LanguageFamily }[] = [
+  { code: 'de-ch', name: 'Deutsch', family: 'de' },
+  { code: 'fr-ch', name: 'Français', family: 'fr' },
+  { code: 'it-ch', name: 'Italiano', family: 'it' },
+  { code: 'en-gb', name: 'English', family: 'en' },
+  { code: 'gsw-zh', name: 'Mundart', family: 'gsw' },
 ];
 
-// Regional variants for each language family
-const LANGUAGE_VARIANTS: Record<LanguageFamily, { code: StoryLanguageCode; name: string; flag: string }[]> = {
+// Regional variants for each language family (user-friendly names, no codes)
+const LANGUAGE_VARIANTS: Record<LanguageFamily, { code: StoryLanguageCode; name: string }[]> = {
   de: [
-    { code: 'de-ch', name: 'Schweiz', flag: '🇨🇭' },
-    { code: 'de-de', name: 'Standard', flag: '🇩🇪' },
-    { code: 'de-de-north', name: 'Nord', flag: '🇩🇪' },
-    { code: 'de-de-south', name: 'Süd', flag: '🇩🇪' },
-    { code: 'de-at', name: 'Österreich', flag: '🇦🇹' },
-    { code: 'de-it', name: 'Südtirol', flag: '🇮🇹' },
+    { code: 'de-ch', name: 'Schweiz' },
+    { code: 'de-de', name: 'Hochdeutsch' },
+    { code: 'de-de-north', name: 'Norddeutsch' },
+    { code: 'de-de-south', name: 'Süddeutsch' },
+    { code: 'de-at', name: 'Österreich' },
+    { code: 'de-it', name: 'Südtirol' },
   ],
   fr: [
-    { code: 'fr-ch', name: 'Suisse', flag: '🇨🇭' },
-    { code: 'fr-fr', name: 'France', flag: '🇫🇷' },
-    { code: 'fr-be', name: 'Belgique', flag: '🇧🇪' },
-    { code: 'fr-ca', name: 'Québec', flag: '🇨🇦' },
-    { code: 'fr-af', name: 'Afrique', flag: '🌍' },
+    { code: 'fr-ch', name: 'Suisse' },
+    { code: 'fr-fr', name: 'France' },
+    { code: 'fr-be', name: 'Belgique' },
+    { code: 'fr-ca', name: 'Québec' },
+    { code: 'fr-af', name: 'Afrique' },
   ],
   it: [
-    { code: 'it-ch', name: 'Svizzera', flag: '🇨🇭' },
-    { code: 'it-it', name: 'Standard', flag: '🇮🇹' },
-    { code: 'it-it-north', name: 'Nord', flag: '🇮🇹' },
-    { code: 'it-it-central', name: 'Centro/Toscana', flag: '🇮🇹' },
-    { code: 'it-it-south', name: 'Sud', flag: '🇮🇹' },
-    { code: 'it-sm', name: 'San Marino', flag: '🇸🇲' },
+    { code: 'it-ch', name: 'Svizzera' },
+    { code: 'it-it', name: 'Standard' },
+    { code: 'it-it-north', name: 'Nord' },
+    { code: 'it-it-central', name: 'Toscana' },
+    { code: 'it-it-south', name: 'Sud' },
+    { code: 'it-sm', name: 'San Marino' },
   ],
   en: [
-    { code: 'en-gb', name: 'UK', flag: '🇬🇧' },
-    { code: 'en-us', name: 'US', flag: '🇺🇸' },
-    { code: 'en-ca', name: 'Canada', flag: '🇨🇦' },
-    { code: 'en-au', name: 'Australia', flag: '🇦🇺' },
-    { code: 'en-ie', name: 'Ireland', flag: '🇮🇪' },
-    { code: 'en-za', name: 'South Africa', flag: '🇿🇦' },
+    { code: 'en-gb', name: 'British' },
+    { code: 'en-us', name: 'American' },
+    { code: 'en-ca', name: 'Canadian' },
+    { code: 'en-au', name: 'Australian' },
+    { code: 'en-ie', name: 'Irish' },
+    { code: 'en-za', name: 'South African' },
   ],
   gsw: [
-    { code: 'gsw-zh', name: 'Züritüütsch', flag: '🇨🇭' },
-    { code: 'gsw-be', name: 'Bärndütsch', flag: '🇨🇭' },
-    { code: 'gsw-bs', name: 'Baseldytsch', flag: '🇨🇭' },
-    { code: 'gsw-lu', name: 'Luzärndütsch', flag: '🇨🇭' },
-    { code: 'gsw-sg', name: 'Sanggallerdütsch', flag: '🇨🇭' },
-    { code: 'gsw-vs', name: 'Walliserdütsch', flag: '🇨🇭' },
-    { code: 'gsw-gr', name: 'Bündnerdütsch', flag: '🇨🇭' },
+    { code: 'gsw-zh', name: 'Züritüütsch' },
+    { code: 'gsw-be', name: 'Bärndütsch' },
+    { code: 'gsw-bs', name: 'Baseldytsch' },
+    { code: 'gsw-lu', name: 'Luzärndütsch' },
+    { code: 'gsw-sg', name: 'Sanggallerdütsch' },
+    { code: 'gsw-vs', name: 'Walliserdütsch' },
+    { code: 'gsw-gr', name: 'Bündnerdütsch' },
   ],
 };
 
@@ -243,45 +243,52 @@ export function WizardStep3BookSettings({
 
         {/* Language, Location, Season Row - full width */}
         <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* Language Selection */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">
-              {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
-            </span>
-            {/* Main Language Buttons */}
-            <div className="flex gap-1">
-              {MAIN_LANGUAGES.map((lang) => (
+          {/* Language Selection - Dropdown + Variants below */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">
+                {language === 'de' ? 'Sprache:' : language === 'fr' ? 'Langue:' : 'Language:'}
+              </span>
+              {/* Main Language Dropdown */}
+              <div className="relative">
+                <select
+                  value={getLanguageFamily(storyLanguage)}
+                  onChange={(e) => {
+                    const family = e.target.value as LanguageFamily;
+                    // Select the first (Swiss) variant for the new language family
+                    const defaultVariant = LANGUAGE_VARIANTS[family][0];
+                    onStoryLanguageChange(defaultVariant.code);
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-8"
+                >
+                  {MAIN_LANGUAGES.map((lang) => (
+                    <option key={lang.family} value={lang.family}>
+                      {lang.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            {/* Variant buttons - shown below the dropdown */}
+            <div className="flex flex-wrap gap-1.5">
+              {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
                 <button
-                  key={lang.family}
-                  onClick={() => onStoryLanguageChange(lang.code)}
-                  className={`px-2 py-1 text-sm font-medium rounded transition-colors ${
-                    getLanguageFamily(storyLanguage) === lang.family
+                  key={variant.code}
+                  onClick={() => onStoryLanguageChange(variant.code)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                    storyLanguage === variant.code
                       ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
-                  {lang.name}
+                  {variant.name}
                 </button>
               ))}
-            </div>
-            {/* Variant Dropdown - shows variants for selected language family */}
-            <div className="relative">
-              <select
-                value={storyLanguage}
-                onChange={(e) => onStoryLanguageChange(e.target.value as StoryLanguageCode)}
-                className="px-2 py-1 border border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-sm font-medium appearance-none bg-white cursor-pointer pr-7"
-              >
-                {LANGUAGE_VARIANTS[getLanguageFamily(storyLanguage)].map((variant) => (
-                  <option key={variant.code} value={variant.code}>
-                    {variant.flag} {variant.name}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 right-0 flex items-center pr-1.5 pointer-events-none">
-                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
             </div>
           </div>
 
