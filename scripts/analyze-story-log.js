@@ -194,9 +194,18 @@ function extractStoryInfo(jobLines) {
     // Strip [DEBUG] prefix if present
     const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
 
-    // Title
+    // Title - multiple patterns
+    // Pattern 1: "Extracted title: "Title""
     const titleMatch = msg.match(/Extracted title.*?:\s*"(.+?)"/);
     if (titleMatch) info.title = titleMatch[1];
+
+    // Pattern 2: "[UPSERT] Saving story job_XXX for user YYY, title: "Title""
+    const upsertTitleMatch = msg.match(/\[UPSERT\].*title:\s*"(.+?)"/);
+    if (upsertTitleMatch && !info.title) info.title = upsertTitleMatch[1];
+
+    // Pattern 3: "Returning story metadata: Title (X images to load)"
+    const metadataTitleMatch = msg.match(/Returning story metadata:\s*(.+?)\s*\(\d+\s*images/);
+    if (metadataTitleMatch && !info.title) info.title = metadataTitleMatch[1];
 
     // Story type, language, characters from idea generation
     const ideaMatch = msg.match(/Story type:\s*(.+?),\s*Language:\s*(\S+),\s*Characters:\s*(\d+)/);
@@ -479,12 +488,17 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
   const duration = job.endTime ? job.endTime - job.startTime : null;
 
   console.log('\n' + '='.repeat(70));
-  console.log(`STORY RUN ANALYSIS: ${job.id}`);
+  // Show story title prominently at the top
+  if (storyInfo.title) {
+    console.log(`📚 ${storyInfo.title}`);
+    console.log('-'.repeat(70));
+  }
+  console.log(`Job: ${job.id}`);
   console.log('='.repeat(70));
 
   // Story Info
   console.log('\n\ud83d\udcd6 STORY INFO');
-  console.log(`   Title: ${storyInfo.title || '(not found)'}`);
+  if (!storyInfo.title) console.log(`   Title: (not found)`);
   console.log(`   Language: ${storyInfo.language || '?'} (${storyInfo.languageLevel || '?'})`);
   console.log(`   Characters: ${storyInfo.characters || '?'}`);
   console.log(`   Pages: ${storyInfo.pages || '?'}`);
@@ -630,8 +644,16 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
 // ============================================================================
 
 function analyzeLog(logPath) {
-  console.log(`\nAnalyzing: ${logPath}`);
-  console.log(`File size: ${(fs.statSync(logPath).size / 1024).toFixed(1)} KB`);
+  const stats = fs.statSync(logPath);
+  const fileDate = stats.mtime;
+  const formattedDate = fileDate.toLocaleDateString('en-US', {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  console.log(`\nAnalyzing: ${path.basename(logPath)}`);
+  console.log(`File date: ${formattedDate}`);
+  console.log(`File size: ${(stats.size / 1024).toFixed(1)} KB`);
 
   const lines = parseLogFile(logPath);
   console.log(`Total log lines: ${lines.length}`);

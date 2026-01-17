@@ -7,25 +7,48 @@ import type { Character } from '@/types/character';
 import type { StoryLanguageCode } from '@/types/story';
 import type { GenerationMode } from '@/hooks/useDeveloperMode';
 
-// All story language options for display lookup
-const STORY_LANGUAGES: { code: StoryLanguageCode; name: string; flag: string }[] = [
-  // Primary
-  { code: 'de-ch', name: 'Deutsch (Schweiz)', flag: '🇨🇭' },
-  { code: 'fr-ch', name: 'Français (Suisse)', flag: '🇨🇭' },
-  { code: 'en', name: 'English', flag: '🇬🇧' },
+// All story language options for display lookup (user-friendly names, no codes shown)
+const STORY_LANGUAGES: { code: StoryLanguageCode; name: string }[] = [
   // German variants
-  { code: 'de-de', name: 'Deutsch (Standard)', flag: '🇩🇪' },
-  { code: 'de-de-north', name: 'Norddeutsch', flag: '🇩🇪' },
-  { code: 'de-de-south', name: 'Süddeutsch', flag: '🇩🇪' },
-  { code: 'de-at', name: 'Deutsch (Österreich)', flag: '🇦🇹' },
-  { code: 'de-it', name: 'Deutsch (Südtirol)', flag: '🇮🇹' },
+  { code: 'de-ch', name: 'Deutsch (Schweiz)' },
+  { code: 'de-de', name: 'Hochdeutsch' },
+  { code: 'de-de-north', name: 'Norddeutsch' },
+  { code: 'de-de-south', name: 'Süddeutsch' },
+  { code: 'de-at', name: 'Deutsch (Österreich)' },
+  { code: 'de-it', name: 'Deutsch (Südtirol)' },
   // French variants
-  { code: 'fr-fr', name: 'Français (France)', flag: '🇫🇷' },
-  { code: 'fr-be', name: 'Français (Belgique)', flag: '🇧🇪' },
-  { code: 'fr-ca', name: 'Français (Québec)', flag: '🇨🇦' },
-  { code: 'fr-af', name: 'Français (Afrique)', flag: '🌍' },
-  // Legacy
-  { code: 'fr', name: 'Français (Suisse)', flag: '🇨🇭' },
+  { code: 'fr-ch', name: 'Français (Suisse)' },
+  { code: 'fr-fr', name: 'Français (France)' },
+  { code: 'fr-be', name: 'Français (Belgique)' },
+  { code: 'fr-ca', name: 'Français (Québec)' },
+  { code: 'fr-af', name: 'Français (Afrique)' },
+  // Italian variants
+  { code: 'it-ch', name: 'Italiano (Svizzera)' },
+  { code: 'it-it', name: 'Italiano (Standard)' },
+  { code: 'it-it-north', name: 'Italiano (Nord)' },
+  { code: 'it-it-central', name: 'Italiano (Toscana)' },
+  { code: 'it-it-south', name: 'Italiano (Sud)' },
+  { code: 'it-sm', name: 'Italiano (San Marino)' },
+  // English variants
+  { code: 'en-gb', name: 'English (British)' },
+  { code: 'en-us', name: 'English (American)' },
+  { code: 'en-ca', name: 'English (Canadian)' },
+  { code: 'en-au', name: 'English (Australian)' },
+  { code: 'en-ie', name: 'English (Irish)' },
+  { code: 'en-za', name: 'English (South African)' },
+  // Swiss German dialects (Mundart)
+  { code: 'gsw-zh', name: 'Züritüütsch' },
+  { code: 'gsw-be', name: 'Bärndütsch' },
+  { code: 'gsw-bs', name: 'Baseldytsch' },
+  { code: 'gsw-lu', name: 'Luzärndütsch' },
+  { code: 'gsw-sg', name: 'Sanggallerdütsch' },
+  { code: 'gsw-vs', name: 'Walliserdütsch' },
+  { code: 'gsw-gr', name: 'Bündnerdütsch' },
+  // Legacy codes
+  { code: 'en', name: 'English (British)' },
+  { code: 'fr', name: 'Français (Suisse)' },
+  { code: 'de', name: 'Deutsch (Schweiz)' },
+  { code: 'it', name: 'Italiano (Standard)' },
 ];
 
 interface UserLocation {

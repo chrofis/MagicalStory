@@ -1860,6 +1860,17 @@ export function StoryDisplay({
                       {finalChecksReport.textCheck.summary && (
                         <p className="text-xs text-gray-500 mt-2 italic">{finalChecksReport.textCheck.summary}</p>
                       )}
+                      {/* Full original text (collapsible) */}
+                      {finalChecksReport.textCheck.fullOriginalText && (
+                        <details className="mt-3 bg-gray-50 border border-gray-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-gray-700">
+                            📄 View Original Text
+                          </summary>
+                          <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                            {finalChecksReport.textCheck.fullOriginalText}
+                          </pre>
+                        </details>
+                      )}
                       {/* Full corrected text (collapsible) */}
                       {finalChecksReport.textCheck.fullCorrectedText && (
                         <details className="mt-3 bg-green-50 border border-green-200 rounded p-2">
@@ -1868,6 +1879,17 @@ export function StoryDisplay({
                           </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
                             {finalChecksReport.textCheck.fullCorrectedText}
+                          </pre>
+                        </details>
+                      )}
+                      {/* Evaluation prompt (collapsible) - for debugging */}
+                      {finalChecksReport.textCheck.evaluationPrompt && (
+                        <details className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-blue-800">
+                            🔍 View Evaluation Prompt
+                          </summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                            {finalChecksReport.textCheck.evaluationPrompt}
                           </pre>
                         </details>
                       )}

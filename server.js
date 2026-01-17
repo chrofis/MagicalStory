@@ -7228,6 +7228,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const languageLevel = inputData.languageLevel || 'standard';
           const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, streamingTextModelId);
           if (textCheck) {
+            // Add original text to textCheck for display
+            textCheck.fullOriginalText = fullStoryText;
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {
               finalChecksReport.overallConsistent = false;
@@ -8783,6 +8785,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const languageLevel = inputData.languageLevel || 'standard';
           const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, unifiedModelId);
           if (textCheck) {
+            // Add original text to textCheck for display
+            textCheck.fullOriginalText = fullStoryText;
             finalChecksReport.textCheck = textCheck;
             if (textCheck.quality !== 'good') {
               finalChecksReport.overallConsistent = false;

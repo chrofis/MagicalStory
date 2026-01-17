@@ -2202,6 +2202,8 @@ export default function StoryWizard() {
 
       log.info('Saving characters with relationships:', updatedCharacters.length);
       // Save characters along with relationships
+      // Include photos for new characters (server preserves existing photos from DB)
+      const hasNewCharWithPhotos = !isEdit && latestCurrentChar.photos?.original;
       await characterService.saveCharacterData({
         characters: updatedCharacters,
         relationships,
@@ -2210,7 +2212,7 @@ export default function StoryWizard() {
         customStrengths: [],
         customWeaknesses: [],
         customFears: [],
-      });
+      }, { includePhotos: hasNewCharWithPhotos });
       relationshipsDirty.current = false; // Reset - relationships were just saved
       log.success('Character data saved successfully');
 
@@ -3182,6 +3184,8 @@ export default function StoryWizard() {
                   : [...characters, currentCharacter];
 
                 // Save characters along with relationships
+                // Include photos for new characters (server preserves existing photos from DB)
+                const hasNewCharWithPhotos = !isEdit && currentCharacter.photos?.original;
                 await characterService.saveCharacterData({
                   characters: updatedCharacters,
                   relationships,
@@ -3190,7 +3194,7 @@ export default function StoryWizard() {
                   customStrengths: [],
                   customWeaknesses: [],
                   customFears: [],
-                });
+                }, { includePhotos: hasNewCharWithPhotos });
 
                 setCharacters(updatedCharacters);
                 autoSelectMainCharacters(updatedCharacters);

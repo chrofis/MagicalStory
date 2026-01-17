@@ -199,7 +199,9 @@ export interface FinalChecksTextCheck {
   overallScore?: number;
   issues: FinalChecksTextIssue[];
   summary?: string;
+  fullOriginalText?: string;   // Original story text before corrections
   fullCorrectedText?: string;  // Complete story text with all corrections applied
+  evaluationPrompt?: string;   // The prompt used for evaluation (for debugging)
 }
 
 export interface FinalChecksReport {

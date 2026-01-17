@@ -653,14 +653,14 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
           log.info(`✅ [TEXT CHECK] Text is well-written (score: ${textCheck.overallScore || 'N/A'})`);
         }
 
-        return { ...textCheck, usage: result.usage };
+        return { ...textCheck, usage: result.usage, evaluationPrompt: prompt };
       }
     } catch (parseError) {
       log.error(`❌ [TEXT CHECK] Failed to parse response: ${parseError.message}`);
       log.debug(`Response was: ${result.text.substring(0, 500)}`);
     }
 
-    return null;
+    return { evaluationPrompt: prompt }; // Return prompt even on parse failure for debugging
   } catch (error) {
     log.error(`❌ [TEXT CHECK] Error: ${error.message}`);
     return null;
