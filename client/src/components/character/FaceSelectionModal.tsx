@@ -74,6 +74,7 @@ export function FaceSelectionModal({
               {/* Face thumbnail */}
               <div className="aspect-square overflow-hidden rounded-lg mb-3">
                 <img
+                    draggable={false}
                   src={face.thumbnail}
                   alt={`Face ${index + 1}`}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"

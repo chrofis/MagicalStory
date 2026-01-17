@@ -177,6 +177,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             {/* Good example 1: Full body */}
             <div className="text-center">
               <img
+                    draggable={false}
                 src="/images/Full body.jpg"
                 alt="Full body example"
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
@@ -188,6 +189,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             {/* Good example 2: Upper body */}
             <div className="text-center">
               <img
+                    draggable={false}
                 src="/images/Upper body.jpg"
                 alt="Upper body example"
                 className="w-full md:max-h-32 object-contain rounded border-2 border-green-400 mb-1"
@@ -199,6 +201,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             {/* Bad example 1: Close up or blurry */}
             <div className="text-center">
               <img
+                    draggable={false}
                 src="/images/No zoomed in close up.jpg"
                 alt="Too close example"
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
@@ -210,6 +213,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             {/* Bad example 2: Sunglasses, hat, helmet */}
             <div className="text-center">
               <img
+                    draggable={false}
                 src="/images/No sunglasses, hat or helmets.jpg"
                 alt="No accessories example"
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"
@@ -221,6 +225,7 @@ export function PhotoUpload({ onPhotoSelect, showExamples = true }: PhotoUploadP
             {/* Bad example 3: Multiple people */}
             <div className="text-center">
               <img
+                    draggable={false}
                 src="/images/One person not many.jpg"
                 alt="One person only example"
                 className="w-full md:max-h-32 object-contain rounded border-2 border-red-400 mb-1"

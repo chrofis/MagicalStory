@@ -367,4 +367,13 @@ export const adminService = {
   async getTokenUsage(days = 30, limit = 1000): Promise<TokenUsageResponse> {
     return api.get<TokenUsageResponse>(`/api/admin/token-usage?days=${days}&limit=${limit}`);
   },
+
+  // Token Promotion Config
+  async getTokenPromo(): Promise<{ multiplier: number; isPromoActive: boolean }> {
+    return api.get<{ multiplier: number; isPromoActive: boolean }>('/api/admin/config/token-promo');
+  },
+
+  async setTokenPromo(multiplier: number): Promise<{ success: boolean; multiplier: number }> {
+    return api.post<{ success: boolean; multiplier: number }>('/api/admin/config/token-promo', { multiplier });
+  },
 };

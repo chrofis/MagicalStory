@@ -92,6 +92,10 @@ export default function AdminDashboard() {
   const [editMinPages, setEditMinPages] = useState('');
   const [editMaxPages, setEditMaxPages] = useState('');
 
+  // Token promo state
+  const [tokenPromoMultiplier, setTokenPromoMultiplier] = useState(1);
+  const [isLoadingPromo, setIsLoadingPromo] = useState(false);
+
   // Use extracted translations
   const texts = adminTranslations[language as keyof typeof adminTranslations] || adminTranslations.en;
 
@@ -106,6 +110,37 @@ export default function AdminDashboard() {
       console.error('Failed to load stats:', err);
     } finally {
       setIsLoadingStats(false);
+    }
+  };
+
+  // Fetch token promo status
+  const fetchTokenPromo = async () => {
+    try {
+      const data = await adminService.getTokenPromo();
+      setTokenPromoMultiplier(data.multiplier);
+    } catch (err) {
+      console.error('Failed to load token promo:', err);
+    }
+  };
+
+  // Toggle token promo (1x <-> 2x)
+  const handleToggleTokenPromo = async () => {
+    setIsLoadingPromo(true);
+    try {
+      const newMultiplier = tokenPromoMultiplier === 1 ? 2 : 1;
+      await adminService.setTokenPromo(newMultiplier);
+      setTokenPromoMultiplier(newMultiplier);
+      setActionMessage({
+        type: 'success',
+        text: newMultiplier === 2 ? '2x Token Promotion ENABLED' : '2x Token Promotion DISABLED'
+      });
+    } catch (err) {
+      setActionMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Failed to toggle token promo'
+      });
+    } finally {
+      setIsLoadingPromo(false);
     }
   };
 
@@ -149,10 +184,11 @@ export default function AdminDashboard() {
     }
   }, [isAuthenticated, user, isImpersonating]);
 
-  // Load stats only when stats tab is active
+  // Load stats and promo status only when stats tab is active
   useEffect(() => {
     if (isAuthenticated && (user?.role === 'admin' || isImpersonating) && activeTab === 'stats') {
       fetchStats();
+      fetchTokenPromo();
     }
   }, [isAuthenticated, user, isImpersonating, activeTab]);
 
@@ -664,6 +700,47 @@ export default function AdminDashboard() {
                   <RefreshCw size={16} />
                   {texts.clearCache}
                 </Button>
+              </div>
+            </div>
+
+            {/* Promotions */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+              <h2 className="text-xl font-bold mb-4">
+                {language === 'de' ? 'Aktionen' : language === 'fr' ? 'Promotions' : 'Promotions'}
+              </h2>
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <h3 className="font-semibold text-gray-800">
+                    {language === 'de' ? '2x Token Aktion' : language === 'fr' ? 'Promotion 2x Jetons' : '2x Token Promotion'}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {language === 'de'
+                      ? 'Kunden erhalten die doppelte Anzahl Tokens beim Buchkauf (20 pro Seite statt 10)'
+                      : language === 'fr'
+                      ? 'Les clients reçoivent le double de jetons lors de l\'achat de livres (20 par page au lieu de 10)'
+                      : 'Customers receive double tokens on book purchases (20 per page instead of 10)'}
+                  </p>
+                </div>
+                <button
+                  onClick={handleToggleTokenPromo}
+                  disabled={isLoadingPromo}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                    tokenPromoMultiplier === 2
+                      ? 'bg-green-500 text-white hover:bg-green-600'
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  }`}
+                >
+                  {isLoadingPromo ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : tokenPromoMultiplier === 2 ? (
+                    <ToggleRight size={20} />
+                  ) : (
+                    <ToggleLeft size={20} />
+                  )}
+                  {tokenPromoMultiplier === 2
+                    ? (language === 'de' ? 'AKTIV' : language === 'fr' ? 'ACTIF' : 'ACTIVE')
+                    : (language === 'de' ? 'INAKTIV' : language === 'fr' ? 'INACTIF' : 'INACTIVE')}
+                </button>
               </div>
             </div>
           </>

@@ -376,9 +376,14 @@ export default function StoryWizard() {
           partialPages: status.partialPages?.length || 0
         });
 
-        // Update progress
+        // Update progress (with backwards guard - never show lower progress)
         if (status.progress) {
-          setGenerationProgress(status.progress);
+          setGenerationProgress(prev => {
+            if (status.progress!.current >= prev.current) {
+              return status.progress!;
+            }
+            return { ...prev, message: status.progress!.message };
+          });
         }
 
         // Restore story text for progressive display

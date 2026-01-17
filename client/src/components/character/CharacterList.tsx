@@ -116,6 +116,7 @@ export function CharacterList({
                       title={t.editCharacter}
                     >
                       <img
+                    draggable={false}
                         src={char.avatars?.faceThumbnails?.standard || char.photos?.face || char.photos?.original}
                         alt={char.name}
                         className={`w-20 h-20 rounded-full object-cover object-top border-2 border-indigo-200 cursor-pointer hover:border-indigo-400 transition-colors ${isOut ? 'grayscale opacity-50' : ''}`}

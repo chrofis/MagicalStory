@@ -693,7 +693,7 @@ function applyStyledAvatars(characterPhotos, artStyle) {
  * @returns {Array<{pageNumber, clothingCategory, characterNames}>}
  */
 function collectAvatarRequirements(sceneDescriptions, characters, pageClothing = {}, defaultClothing = 'standard', clothingRequirements = null) {
-  const { getCharactersInScene, parseClothingCategory } = require('./storyHelpers');
+  const { getCharactersInScene, parseClothingCategory, parseCharacterClothing } = require('./storyHelpers');
 
   const requirements = [];
 
@@ -755,25 +755,40 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
       }
     }
   } else {
-    // Fallback: infer from page clothing (old behavior)
+    // Fallback: infer from page clothing or scene description metadata
     for (const scene of sceneDescriptions) {
       const pageNum = scene.pageNumber;
       const description = scene.description || '';
 
       // Get characters in this scene
       const sceneCharacters = getCharactersInScene(description, characters);
-      const characterNames = sceneCharacters.map(c => c.name);
 
-      // Get clothing for this page
-      // pageClothing[pageNum] can be a string ('standard') or object (per-character) - only use if string
+      // Try to get per-character clothing from scene description metadata first
+      const perCharClothing = parseCharacterClothing(description);
+
+      // Get page-level clothing as fallback
       const pageClothingValue = pageClothing[pageNum];
-      const clothingCategory = (typeof pageClothingValue === 'string' ? pageClothingValue : null) || parseClothingCategory(description) || defaultClothing;
+      const pageLevelClothing = (typeof pageClothingValue === 'string' ? pageClothingValue : null) ||
+                                 parseClothingCategory(description) ||
+                                 defaultClothing;
 
-      requirements.push({
-        pageNumber: pageNum,
-        clothingCategory,
-        characterNames
-      });
+      // Add requirement for each character with their specific clothing
+      for (const char of sceneCharacters) {
+        // Priority: per-character from scene metadata > page-level > default
+        let clothingCategory = pageLevelClothing;
+        if (perCharClothing && perCharClothing[char.name]) {
+          clothingCategory = perCharClothing[char.name];
+        } else if (typeof pageClothingValue === 'object' && pageClothingValue[char.name]) {
+          // Also check pageClothing if it's per-character
+          clothingCategory = pageClothingValue[char.name];
+        }
+
+        requirements.push({
+          pageNumber: pageNum,
+          clothingCategory,
+          characterNames: [char.name]
+        });
+      }
     }
 
     // Add cover requirements for clothing categories used in the story

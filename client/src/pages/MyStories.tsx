@@ -308,20 +308,28 @@ export default function MyStories() {
             sessionStorage.removeItem('mystories_selected');
 
             const amount = `CHF ${(data.order.amount_total / 100).toFixed(2)}`;
+            const tokensCredited = data.order.tokens_credited || 0;
             const titles = {
               en: 'Payment Successful!',
               de: 'Zahlung erfolgreich!',
               fr: 'Paiement réussi!',
             };
             const messages = {
-              en: 'Your book order has been received and will be printed soon.',
-              de: 'Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
-              fr: 'Votre commande de livre a été reçue et sera bientôt imprimée.',
+              en: tokensCredited > 0
+                ? `Your book order has been received and will be printed soon. You earned ${tokensCredited} tokens!`
+                : 'Your book order has been received and will be printed soon.',
+              de: tokensCredited > 0
+                ? `Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt. Sie haben ${tokensCredited} Tokens erhalten!`
+                : 'Ihre Buchbestellung wurde entgegengenommen und wird bald gedruckt.',
+              fr: tokensCredited > 0
+                ? `Votre commande de livre a été reçue et sera bientôt imprimée. Vous avez gagné ${tokensCredited} jetons!`
+                : 'Votre commande de livre a été reçue et sera bientôt imprimée.',
             };
             const details = [
               `${language === 'de' ? 'Kunde' : language === 'fr' ? 'Client' : 'Customer'}: ${data.order.customer_name}`,
               `Email: ${data.order.customer_email}`,
               `${language === 'de' ? 'Betrag' : language === 'fr' ? 'Montant' : 'Amount'}: ${amount}`,
+              ...(tokensCredited > 0 ? [`${language === 'de' ? 'Tokens erhalten' : language === 'fr' ? 'Jetons gagnés' : 'Tokens earned'}: ${tokensCredited}`] : []),
               `${language === 'de' ? 'Versand an' : language === 'fr' ? 'Expédié à' : 'Shipping to'}: ${data.order.shipping_name}`,
               `${data.order.shipping_address_line1}`,
               `${data.order.shipping_postal_code} ${data.order.shipping_city}`,

@@ -201,7 +201,9 @@ function extractSceneMetadata(sceneDescription) {
 
     return {
       characters: metadata.characters || [],
-      clothing: metadata.clothing || null,
+      // Support both new per-character format and legacy single-value format
+      characterClothing: metadata.characterClothing || null,
+      clothing: metadata.clothing || null, // Legacy support
       objects: metadata.objects || []
     };
   } catch (e) {
@@ -799,6 +801,36 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
     }
   }
 
+  return null;
+}
+
+/**
+ * Parse per-character clothing from scene description metadata
+ * Returns a map of character name to clothing category
+ * @param {string} sceneDescription - The scene description text
+ * @returns {Object|null} Map of {characterName: clothingCategory} or null if not found
+ */
+function parseCharacterClothing(sceneDescription) {
+  if (!sceneDescription || typeof sceneDescription !== 'string') return null;
+
+  // Try JSON metadata block first (most reliable)
+  const metadata = extractSceneMetadata(sceneDescription);
+  if (metadata && metadata.characterClothing && typeof metadata.characterClothing === 'object') {
+    // Normalize keys to handle case differences
+    const normalized = {};
+    for (const [name, clothing] of Object.entries(metadata.characterClothing)) {
+      if (typeof clothing === 'string') {
+        normalized[name] = clothing.toLowerCase();
+      }
+    }
+    if (Object.keys(normalized).length > 0) {
+      log.debug(`[CLOTHING] Per-character clothing from metadata: ${JSON.stringify(normalized)}`);
+      return normalized;
+    }
+  }
+
+  // Fallback: if we have legacy single clothing value, we can't determine per-character
+  // Return null and let caller use the legacy parseClothingCategory
   return null;
 }
 
@@ -2574,6 +2606,7 @@ module.exports = {
   getCharactersInScene,
   getCharacterPhotos,
   parseClothingCategory,
+  parseCharacterClothing,
   getCharacterPhotoDetails,
   buildCharacterPhysicalDescription,
   buildRelativeHeightDescription,

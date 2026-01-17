@@ -672,6 +672,7 @@ export function CharacterForm({
                   </div>
                 ) : displayPhoto ? (
                   <img
+                    draggable={false}
                     src={displayPhoto}
                     alt="Character"
                     className="w-24 h-24 rounded-full object-cover border-4 border-indigo-400 shadow-lg cursor-pointer hover:opacity-80 transition-opacity"
@@ -803,6 +804,7 @@ export function CharacterForm({
         <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
           {displayPhoto && (
             <img
+                    draggable={false}
               src={displayPhoto}
               alt={character.name}
               className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
@@ -888,6 +890,7 @@ export function CharacterForm({
         <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
           {displayPhoto && (
             <img
+                    draggable={false}
               src={displayPhoto}
               alt={character.name}
               className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
@@ -954,6 +957,7 @@ export function CharacterForm({
         <div className="flex items-center gap-4 pb-4 border-b border-gray-200">
           {displayPhoto && (
             <img
+                    draggable={false}
               src={displayPhoto}
               alt={character.name}
               className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
@@ -1046,6 +1050,7 @@ export function CharacterForm({
           {hasAvatar ? (
             <div className="relative">
               <img
+                    draggable={false}
                 src={displayAvatar}
                 alt={`${character.name} avatar`}
                 className="w-64 h-80 object-contain rounded-lg bg-white shadow-lg border-2 border-indigo-200 cursor-pointer hover:opacity-90 transition-opacity"
@@ -1192,6 +1197,7 @@ export function CharacterForm({
                 </div>
               ) : displayPhoto ? (
                 <img
+                    draggable={false}
                   src={displayPhoto}
                   alt={character.name}
                   className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
@@ -1288,6 +1294,7 @@ export function CharacterForm({
                 return (
                   <div className="relative">
                     <img
+                    draggable={false}
                       src={avatarToShow}
                       alt={`${character.name} avatar`}
                       className={`w-full max-w-[180px] lg:max-w-full aspect-[3/4] object-contain rounded-lg bg-white cursor-pointer hover:opacity-90 transition-opacity ${character.avatars?.stale ? 'opacity-80' : ''}`}
@@ -1327,6 +1334,7 @@ export function CharacterForm({
                 onClick={() => setEnlargedAvatar(false)}
               >
                 <img
+                    draggable={false}
                   src={character.avatars?.standard || character.avatars?.faceThumbnails?.standard}
                   alt={`${character.name} avatar`}
                   className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
@@ -1457,6 +1465,7 @@ export function CharacterForm({
                       <span className="font-semibold block mb-1">Source Photo:</span>
                       {(character.photos?.face || character.photos?.original) ? (
                         <img
+                    draggable={false}
                           src={character.photos?.face || character.photos?.original}
                           alt="Source"
                           className="w-16 h-16 object-cover rounded border"
@@ -1559,6 +1568,7 @@ export function CharacterForm({
           </h4>
           <div className="flex justify-center">
             <img
+                    draggable={false}
               src={character.photos.bodyNoBg}
               alt={`${character.name} body crop`}
               className="max-h-48 object-contain rounded border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
@@ -1636,6 +1646,7 @@ export function CharacterForm({
                     title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                   >
                     <img
+                    draggable={false}
                       src={character.avatars?.[category]}
                       alt={`${character.name} - ${category}`}
                       className={`w-full h-40 object-contain rounded border bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02] ${character.avatars?.stale ? 'border-amber-400 opacity-75' : 'border-teal-200'}`}
@@ -1761,6 +1772,7 @@ export function CharacterForm({
                 <div className="font-medium mb-1">Input Photo for Generation:</div>
                 <div className="flex items-start gap-2">
                   <img
+                    draggable={false}
                     src={character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original}
                     alt="Generation input"
                     className="w-16 h-20 object-contain rounded border border-orange-300"
@@ -1848,6 +1860,7 @@ export function CharacterForm({
                       title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                     >
                       <img
+                    draggable={false}
                         src={imageUrl}
                         alt={`${character.name} - ${costumeType}`}
                         className="w-full h-40 object-contain rounded border border-orange-200 bg-white transition-all group-hover:shadow-lg group-hover:scale-[1.02]"
@@ -1924,6 +1937,7 @@ export function CharacterForm({
                           </div>
                           {avatar ? (
                             <img
+                    draggable={false}
                               src={avatar}
                               alt={`${character.name} - ${artStyle} - ${category}`}
                               className="w-full h-32 object-contain rounded border border-purple-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
@@ -1955,6 +1969,7 @@ export function CharacterForm({
                               </div>
                               {avatar ? (
                                 <img
+                    draggable={false}
                                   src={avatar}
                                   alt={`${character.name} - ${artStyle} - ${costumeType}`}
                                   className="w-full h-32 object-contain rounded border border-orange-200 bg-orange-50/50 cursor-pointer hover:opacity-80 transition-opacity"
@@ -2222,6 +2237,7 @@ export function CharacterForm({
                 <div className="flex-shrink-0 flex justify-center md:justify-start">
                   {(character.avatars?.faceThumbnails?.standard || character.avatars?.standard) ? (
                     <img
+                    draggable={false}
                       src={character.avatars?.faceThumbnails?.standard || character.avatars?.standard}
                       alt={`${character.name} avatar`}
                       className="w-48 h-64 object-contain rounded-lg border-2 border-indigo-300 bg-white shadow-lg"
@@ -2526,6 +2542,7 @@ export function CharacterForm({
                   }`}
                 >
                   <img
+                    draggable={false}
                     src={option.imageData}
                     alt={`Option ${option.id + 1}`}
                     className="w-full aspect-[9/16] object-cover"

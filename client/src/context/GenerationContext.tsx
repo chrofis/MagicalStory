@@ -135,12 +135,18 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     try {
       const status = await storyService.getJobStatus(jobId);
 
-      // Update progress
+      // Update progress (with backwards guard - never show lower progress)
       if (status.progress) {
-        setProgress({
-          current: status.progress.current,
-          total: status.progress.total,
-          message: status.progress.message
+        setProgress(prev => {
+          if (status.progress!.current >= prev.current) {
+            return {
+              current: status.progress!.current,
+              total: status.progress!.total,
+              message: status.progress!.message
+            };
+          }
+          // Keep current progress but update message
+          return { ...prev, message: status.progress!.message };
         });
       }
 

@@ -1345,6 +1345,7 @@ export const storyService = {
       shipping_country: string;
       amount_total: number;
       currency: string;
+      tokens_credited?: number;
     };
     session?: {
       id: string;
@@ -1365,6 +1366,7 @@ export const storyService = {
         shipping_country: string;
         amount_total: number;
         currency: string;
+        tokens_credited?: number;
       };
       session?: {
         id: string;
