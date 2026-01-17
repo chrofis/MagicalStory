@@ -188,10 +188,10 @@ export const popularLifeChallengeIds = [
 
 export const lifeChallengeGroups: LifeChallengeGroup[] = [
   { id: 'popular', name: { en: 'Popular', de: 'Beliebt', fr: 'Populaires' }, ageRange: 'all' },
+  { id: 'family', name: { en: 'Family Changes', de: 'Familien-Veränderungen', fr: 'Changements familiaux' }, ageRange: 'all' },
   { id: 'toddler', name: { en: 'Toddler (2-4)', de: 'Kleinkind (2-4)', fr: 'Tout-petit (2-4)' }, ageRange: '2-4' },
   { id: 'preschool', name: { en: 'Preschool (4-6)', de: 'Vorschule (4-6)', fr: 'Préscolaire (4-6)' }, ageRange: '4-6' },
   { id: 'early-school', name: { en: 'Early School (6-9)', de: 'Grundschule (6-9)', fr: 'École primaire (6-9)' }, ageRange: '6-9' },
-  { id: 'family', name: { en: 'Family Changes', de: 'Familien-Veränderungen', fr: 'Changements familiaux' }, ageRange: 'all' },
   { id: 'preteen', name: { en: 'Pre-Teen (9-12)', de: 'Vorpubertät (9-12)', fr: 'Préadolescent (9-12)' }, ageRange: '9-12' },
 ];
 
