@@ -343,6 +343,34 @@ export const storyService = {
       totalAttempts: number | null;
       faceEvaluation: unknown | null;
       referencePhotos: ReferencePhoto[] | null;
+      consistencyRegen?: {
+        originalImage: string;
+        originalPrompt: string;
+        originalDescription: string;
+        fixedImage: string;
+        fixedPrompt: string;
+        fixedDescription: string;
+        correctionNotes: string;
+        issues: Array<{
+          type: string;
+          characterInvolved?: string;
+          description: string;
+          recommendation: string;
+          severity: string;
+        }>;
+        score: number;
+        timestamp: string;
+        retryHistory?: RetryAttempt[];
+        totalAttempts?: number;
+        wasRegenerated?: boolean;
+        clothing?: string;
+        avatarsUsed?: Array<{
+          name: string;
+          hasPhoto: boolean;
+          category?: string;
+          photoType?: string;
+        }>;
+      } | null;
     }>;
     coverImages: {
       frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
