@@ -8742,7 +8742,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           for (const check of finalChecksReport.imageChecks) {
             for (const issue of (check.issues || [])) {
               log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, images=${JSON.stringify(issue.images)}`);
-              if (issue.severity === 'high' || issue.severity === 'medium') {
+              if (issue.severity === 'high') {  // Only regenerate high severity issues
                 for (const pageNum of (issue.images || [])) {
                   pagesToRegenerate.add(pageNum);
                   if (!pageIssueMap.has(pageNum)) pageIssueMap.set(pageNum, []);

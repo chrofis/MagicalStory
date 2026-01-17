@@ -788,6 +788,12 @@ class OutlineParser {
         const parsed = JSON.parse(jsonBlockMatch[1]);
         if (parsed.clothingRequirements) {
           this._cache.clothingRequirements = parsed.clothingRequirements;
+          // Log details about what was extracted
+          for (const [charName, reqs] of Object.entries(parsed.clothingRequirements)) {
+            const categories = Object.keys(reqs);
+            const signatures = categories.filter(cat => reqs[cat]?.signature && reqs[cat].signature !== 'none');
+            log.debug(`[OUTLINE-PARSER] ${charName}: categories=${categories.join(',')}, signatures=${signatures.length > 0 ? signatures.map(c => `${c}:"${reqs[c].signature}"`).join(',') : 'none'}`);
+          }
           log.debug(`[OUTLINE-PARSER] Extracted clothingRequirements for ${Object.keys(parsed.clothingRequirements).length} characters`);
           return this._cache.clothingRequirements;
         }

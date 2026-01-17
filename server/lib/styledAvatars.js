@@ -482,9 +482,15 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         // Also check for signature items to include
         // First try char.avatars.signatures, then fallback to clothingRequirements
         let signature = char.avatars?.signatures?.[clothingCategory];
-        if (!signature && clothingRequirements?.[charName]?.[clothingCategory]?.signature) {
-          signature = clothingRequirements[charName][clothingCategory].signature;
-          log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - using signature from clothingRequirements`);
+
+        // Debug: log what's in clothingRequirements for this character
+        const charReqs = clothingRequirements?.[charName];
+        const catReqs = charReqs?.[clothingCategory];
+        log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - charReqs keys: ${charReqs ? Object.keys(charReqs).join(',') : 'none'}, catReqs: ${JSON.stringify(catReqs || 'none')}`);
+
+        if (!signature && catReqs?.signature && catReqs.signature !== 'none') {
+          signature = catReqs.signature;
+          log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - using signature from clothingRequirements: "${signature}"`);
         }
         log.debug(`🔍 [STYLED AVATARS] ${charName}:${clothingCategory} - clothing: ${clothingDescription ? 'yes' : 'no'}, signature: ${signature ? signature.substring(0, 50) + '...' : 'no'}`);
         if (signature && clothingDescription) {
