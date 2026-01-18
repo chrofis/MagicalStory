@@ -1007,17 +1007,16 @@ export const characterService = {
       // Just fetch fresh data to get the server's version with extracted traits/clothing
       onProgress?.('saving', `Fetching updated data for ${character.name}...`);
 
-      // Fetch fresh data from server (avatar job already saved everything)
-      // IMPORTANT: includeAllAvatars=true to get the actual avatar images
+      // Fetch FULL character data from server (avatar job already saved everything)
+      // Use loadFullCharacter which works for all users (not just admins)
       // Use retry logic to handle race condition where avatar job DB write may still be in progress
-      let freshCharacter: Character | undefined = undefined;
+      let freshCharacter: Character | null = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) {
           log.info(`[AVATAR] Retry ${attempt + 1}/3: waiting for avatar data to be available in DB...`);
           await new Promise(r => setTimeout(r, 500)); // 500ms delay on retry
         }
-        const freshData = await characterService.getCharacterData(true);
-        freshCharacter = freshData.characters.find(c => c.id === character.id);
+        freshCharacter = await characterService.loadFullCharacter(character.id);
         // Check if avatars are actually present in the response
         if (freshCharacter?.avatars?.standard || freshCharacter?.avatars?.winter || freshCharacter?.avatars?.summer) {
           log.info(`[AVATAR] Got fresh data with avatars on attempt ${attempt + 1}`);
