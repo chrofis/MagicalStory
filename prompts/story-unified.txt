@@ -131,9 +131,6 @@ For all other characters:
 
 ---PLOT STRUCTURE---
 
-**Primary Clothing**: [standard | winter | summer | costumed:type]
-**Clothing Changes**: [List pages with changes, or "None"]
-
 **Inciting Incident**: [Event that sets the story in motion]
 **Rising Action**: [Building tension, obstacles, challenges]
 **Climax**: [Peak tension, main conflict reaches highest point]
@@ -161,7 +158,52 @@ Analyze the draft above for logical issues. Be harsh and critical.
 2. List any reading level violations.
 3. For each issue, write a specific instruction on how you will fix it in the final version.
 
-**Example STORY DRAFT and CRITICAL ANALYSIS:**
+
+---CLOTHING REQUIREMENTS---
+Based on the story draft, determine which clothing variants each character needs.
+
+**Guidelines:**
+- Prefer `standard` when story doesn't require special clothing
+- **Indoor scenes should use `standard` clothing, NOT winter** - winter clothing is only for outdoor cold weather scenes
+- For standard/winter/summer: describe ONE **signature element** - a single visible clothing addition or accessory
+  - Must be ONE item only (not a list)
+  - Prefer clothing modifications over carried objects
+  - Examples by theme:
+    - Space story: "NASA mission patch on shoulder"
+    - Camping story: "scout vest with badges"
+    - Birthday story: "colorful party suspenders"
+    - Cooking story: "kid-sized apron"
+    - Detective story: "magnifying glass on belt"
+  - If no addition needed, write "none"
+- For costumed: Provide **complete outfit description** (CLOTHING ONLY - do NOT include pets, companions, animals, carried objects, or items in pockets/pouches)
+  - ✅ INCLUDE: clothes, shoes, belts, jewelry, capes, vests, aprons worn on body
+  - ❌ EXCLUDE: pets ("elephant peeking from pocket"), companions, toys, bag contents
+  - Example WRONG: "brown vest with a pocket where Eli the mouse peeks out"
+  - Example RIGHT: "brown vest with brass buttons and a small pocket"
+- Only mark `used: true` for variations that actually appear
+- **CRITICAL - No Face Coverings**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
+- **CRITICAL - Distinct Styles**: Each character must have a structurally DIFFERENT outfit, not just color variations:
+  - Give different ROLES (princess vs scribe, captain vs sailor, knight vs squire)
+  - Vary outfit TYPES (dress vs tunic, long robes vs short practical clothes)
+  - Vary ACCESSORIES (one has jewelry, another has tools, another has rope/belt)
+  - Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
+  - Example RIGHT: One has "priestess robes with ceremonial sash" + other has "explorer tunic with leather sandal straps and rope belt"
+
+**Output format:**
+```json
+{
+  "clothingRequirements": {
+    "[CharacterName]": {
+      "standard": { "used": true/false, "signature": "[story-theme items: badge, backpack, etc.]" },
+      "winter": { "used": true/false, "signature": "[cold weather additions]" },
+      "summer": { "used": true/false, "signature": "[warm weather items]" },
+      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
+    }
+  }
+}
+```
+
+**Complete workflow example (STORY DRAFT → CRITICAL ANALYSIS → CLOTHING REQUIREMENTS):**
 ```
 ---STORY DRAFT---
 
@@ -198,7 +240,7 @@ Outside, the garden looked like a white blanket. Sophie rolled the first snowbal
   "clothingRequirements": {
     "Sophie": {
       "standard": { "used": false },
-      "winter": { "used": true, "signature": "red scarf, mittens" },
+      "winter": { "used": true, "signature": "red knitted scarf" },
       "summer": { "used": false },
       "costumed": { "used": false }
     }
@@ -207,58 +249,8 @@ Outside, the garden looked like a white blanket. Sophie rolled the first snowbal
 ```
 
 
----CLOTHING REQUIREMENTS---
-Based on the story draft, determine which clothing variants each character needs.
-
-```json
-{
-  "clothingRequirements": {
-    "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "[story-theme items: badge, backpack, etc.]" },
-      "winter": { "used": true/false, "signature": "[cold weather additions]" },
-      "summer": { "used": true/false, "signature": "[warm weather items]" },
-      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit]" }
-    }
-  }
-}
-```
-
-Guidelines for clothing:
-- Prefer `standard` when story doesn't require special clothing
-- **Indoor scenes should use `standard` clothing, NOT winter** - winter clothing is only for outdoor cold weather scenes
-- For standard/winter/summer: describe ONE **signature element** - a single visible clothing addition or accessory
-  - Must be ONE item only (not a list)
-  - Prefer clothing modifications over carried objects
-  - Examples by theme:
-    - Space story: "NASA mission patch on shoulder"
-    - Camping story: "scout vest with badges"
-    - Birthday story: "colorful party suspenders"
-    - Cooking story: "kid-sized apron"
-    - Detective story: "magnifying glass on belt"
-  - If no addition needed, write "none"
-- For costumed: Provide **complete outfit description** (CLOTHING ONLY - do NOT include pets, companions, animals, carried objects, or items in pockets/pouches)
-  - ✅ INCLUDE: clothes, shoes, belts, jewelry, capes, vests, aprons worn on body
-  - ❌ EXCLUDE: pets ("elephant peeking from pocket"), companions, toys, bag contents
-  - Example WRONG: "brown vest with a pocket where Eli the mouse peeks out"
-  - Example RIGHT: "brown vest with brass buttons and a small pocket"
-- Only mark `used: true` for variations that actually appear
-- **CRITICAL - No Face Coverings**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
-- **CRITICAL - Distinct Styles**: Each character must have a structurally DIFFERENT outfit, not just color variations:
-  - Give different ROLES (princess vs scribe, captain vs sailor, knight vs squire)
-  - Vary outfit TYPES (dress vs tunic, long robes vs short practical clothes)
-  - Vary ACCESSORIES (one has jewelry, another has tools, another has rope/belt)
-  - Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
-  - Example RIGHT: One has "priestess robes with ceremonial sash" + other has "explorer tunic with leather sandal straps and rope belt"
-
-
 ---VISUAL BIBLE---
-Scan the draft and extract all elements that need to be consistent for visualization. Use unique identifiers:
-- Secondary Characters: CHR001, CHR002...
-- Animals & Creatures: ANI001, ANI002...
-- Artifacts (Objects): ART001, ART002...
-- Locations: LOC001, LOC002...
-- Vehicles: VEH001, VEH002...
-- Clothing & Costumes: CLO001, CLO002...
+Scan the draft and extract all elements that need to be consistent for visualization.
 
 **What to include:**
 - **ALL LOCATIONS** - Every distinct place (rooms, outdoor areas, buildings)
@@ -268,12 +260,23 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 - **ALL SECONDARY CHARACTERS** - Anyone who is not a main character
 - **ALL CLOTHING/COSTUMES** - Capes, costumes, hats, uniforms, masks (MUST include character name!)
 
+**Rules:**
+- Do NOT include main characters ({CHARACTER_NAMES}) - they have reference photos
+- Add at least {PAGES} entries. Even if an element appears only once, add it for visual consistency
+- Use empty arrays `[]` for categories with no elements
+
 **Every element MUST have:**
 1. **Specific colors** - Never "a car" → Always "a bright red car"
 2. **One signature element** - Unique and easy to recognize
 3. **Self-contained description** - Works without seeing other scenes
 
-Add at least {PAGES} entries. Even if an element appears only once, add it for visual consistency.
+**Use unique identifiers:**
+- Secondary Characters: CHR001, CHR002...
+- Animals & Creatures: ANI001, ANI002...
+- Artifacts (Objects): ART001, ART002...
+- Locations: LOC001, LOC002...
+- Vehicles: VEH001, VEH002...
+- Clothing & Costumes: CLO001, CLO002...
 
 
 
@@ -338,11 +341,6 @@ For famous buildings, monuments, or locations that exist in reality:
 
 {AVAILABLE_LANDMARKS_SECTION}
 
-**Rules:**
-- Do NOT include main characters ({CHARACTER_NAMES}) - they have reference photos
-- Use empty arrays `[]` for categories with no elements
-- Every element needs specific colors and ONE signature element
-
 ---COVER SCENE HINTS---
 
 **COVER RULES (CRITICAL):**
@@ -372,8 +370,6 @@ Characters:
 ---STORY PAGES---
 Rewrite the story based on the draft, BUT YOU MUST APPLY ALL FIXES from the CRITICAL ANALYSIS section.
 The final output must be logically consistent and error-free.
-
-**IMPORTANT:** If you wrote joke variations earlier, select the BEST one and write it inline here. NO `[JOKE ...]` placeholders in the final text - write the actual joke.
 
 **DO NOT include word count in the final STORY PAGES section.** Word counts are only for the draft - the final output should be clean text only.
 
@@ -418,7 +414,7 @@ Characters:
 3. **Scene hints are BRIEF** - Just 1-2 sentences, not full descriptions
 4. **Follow reading level** - Match text length to specified reading level
 5. **Show don't tell** - Demonstrate character traits through actions
-6. **Per-character clothing** - EVERY character in each scene MUST have explicit clothing: `- Name: category`. NEVER use "same". Valid categories: standard, winter, summer, costumed:type
+6. **Per-character clothing** - Follow the format above exactly (machine-parsed)
 7. **Visual Bible accuracy** - Add all scenes and elements, with specific colors
 8. **Character names in illustrations** - Use the character's REAL NAME from the provided list, even if the story uses a nickname or alias. Add alias in parentheses: `- Tim (as Superbrain): costumed:superhero`
 9. **Positional consistency** - EVERY scene hint MUST specify left/right positions for each character: "Luna (left) talks to Max (right)". Maintain consistent positions across scenes in the same setting.
