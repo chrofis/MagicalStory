@@ -7301,13 +7301,30 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           sceneImages: allImages.map((img, idx) => {
             // Extract metadata from scene description (characters, clothing, objects)
             const metadata = extractSceneMetadata(img.description) || {};
+
+            // Extract scene summary (text before the JSON block, first 150 chars)
+            let sceneSummary = '';
+            if (img.description) {
+              const beforeJson = img.description.split('```json')[0].trim();
+              // Get first meaningful line (skip markdown headers)
+              const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+              sceneSummary = lines[0]?.substring(0, 150) || '';
+            }
+
             return {
               imageData: img.imageData,
               pageNumber: img.pageNumber || idx + 1,
               characters: metadata.characters || [],  // Which characters appear in this scene
               clothing: metadata.clothing || 'standard',  // Clothing category for this scene
+              characterClothing: metadata.characterClothing || null,  // Per-character clothing
+              sceneSummary,  // Brief description of what's in the scene
               // Also include character names from reference photos as fallback
-              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean)
+              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
+              // Include per-character clothing from referencePhotos if available
+              referenceClothing: (img.referencePhotos || []).reduce((acc, p) => {
+                if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
+                return acc;
+              }, {})
             };
           })
         };
@@ -8851,13 +8868,30 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneImages: allImages.map((img, idx) => {
             // Extract metadata from scene description (characters, clothing, objects)
             const metadata = extractSceneMetadata(img.description) || {};
+
+            // Extract scene summary (text before the JSON block, first 150 chars)
+            let sceneSummary = '';
+            if (img.description) {
+              const beforeJson = img.description.split('```json')[0].trim();
+              // Get first meaningful line (skip markdown headers)
+              const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+              sceneSummary = lines[0]?.substring(0, 150) || '';
+            }
+
             return {
               imageData: img.imageData,
               pageNumber: img.pageNumber || idx + 1,
               characters: metadata.characters || [],  // Which characters appear in this scene
               clothing: metadata.clothing || 'standard',  // Clothing category for this scene
+              characterClothing: metadata.characterClothing || null,  // Per-character clothing
+              sceneSummary,  // Brief description of what's in the scene
               // Also include character names from reference photos as fallback
-              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean)
+              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
+              // Include per-character clothing from referencePhotos if available
+              referenceClothing: (img.referencePhotos || []).reduce((acc, p) => {
+                if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
+                return acc;
+              }, {})
             };
           })
         };

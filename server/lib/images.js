@@ -2822,15 +2822,28 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
     return null;
   }
 
-  // Build image info for prompt - include scene context (characters, clothing)
+  // Build image info for prompt - include scene context (characters, clothing, summary)
   const imageInfo = imagesToCheck.map((img, idx) => {
     const pageNum = img.pageNumber || 'unknown';
+
     // Get character names from metadata or reference photos
     const chars = img.characters?.length > 0
       ? img.characters.join(', ')
       : (img.referenceCharacters?.length > 0 ? img.referenceCharacters.join(', ') : 'unknown');
-    const clothing = img.clothing || 'standard';
-    return `Image ${idx + 1}: Page ${pageNum} - Characters: [${chars}], Clothing: ${clothing}`;
+
+    // Build per-character clothing string if available
+    let clothingInfo = img.clothing || 'standard';
+    const charClothing = img.characterClothing || img.referenceClothing;
+    if (charClothing && Object.keys(charClothing).length > 0) {
+      clothingInfo = Object.entries(charClothing)
+        .map(([name, cat]) => `${name}: ${cat}`)
+        .join(', ');
+    }
+
+    // Include scene summary if available
+    const summary = img.sceneSummary ? `\n   Scene: "${img.sceneSummary}"` : '';
+
+    return `Image ${idx + 1}: Page ${pageNum} - Characters: [${chars}], Clothing: [${clothingInfo}]${summary}`;
   }).join('\n');
 
   // Fill template
