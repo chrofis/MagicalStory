@@ -9220,6 +9220,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             for (const issue of (check.issues || [])) {
               const pagesToFix = issue.pagesToFix || issue.images || [];
               log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, pagesToFix=${JSON.stringify(pagesToFix)}, images=${JSON.stringify(issue.images)}`);
+              if (!issue.severity) {
+                log.warn(`⚠️ [CONSISTENCY] Issue ${issue.type} missing severity field, skipping`);
+              }
               if (issue.severity === 'high') {
                 for (const pageNum of pagesToFix) {
                   pagesToRegenerate.add(pageNum);
@@ -9242,6 +9245,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             );
 
             for (const pageNum of pagesToRegenerate) {
+              try {
               const pageIssues = pageIssueMap.get(pageNum);
               const pageIndex = pageNum - 1;
               const existingImage = allImages.find(img => img.pageNumber === pageNum);
@@ -9298,10 +9302,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               );
 
               const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel);
+
+              // Track token usage for scene expansion (Issue #1 fix)
+              if (expandedDescriptionResult?.usage) {
+                addUsage('anthropic', expandedDescriptionResult.usage, 'consistency_regen_expansion', expandedDescriptionResult.modelId);
+              }
+
+              // Validate expansion result (Issue #2 fix)
+              if (!expandedDescriptionResult?.text) {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} expansion failed, skipping`);
+                continue;
+              }
               const expandedDescription = expandedDescriptionResult.text;
 
-              // Get reference photos for this scene with CORRECT clothing (not hardcoded 'standard')
-              const sceneMetadataForClothing = extractSceneMetadata(existingImage.description) || {};
+              // Get reference photos for this scene with CORRECT clothing
+              // Use NEW expanded description for metadata (Issue #3 fix)
+              const sceneMetadataForClothing = extractSceneMetadata(expandedDescription) || {};
 
               // Build per-character clothing requirements for this page
               // Priority: 1) per-character from scene metadata, 2) story-level clothingRequirements, 3) existingImage.clothing, 4) 'standard'
@@ -9458,6 +9474,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image updated in memory (will be saved with story)`);
               } else {
                 log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Regeneration failed, keeping original`);
+              }
+              } catch (pageErr) {
+                // Issue #4 fix: Catch per-page errors so other pages can still regenerate
+                log.error(`❌ [CONSISTENCY REGEN] [PAGE ${pageNum}] Error during regeneration: ${pageErr.message}`);
+                log.debug(`   Stack: ${pageErr.stack?.split('\n').slice(0, 3).join(' -> ')}`);
+                // Continue to next page
               }
             }
 
