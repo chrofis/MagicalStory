@@ -3154,7 +3154,14 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
     textCheck: null,
     overallConsistent: true,
     totalIssues: 0,
-    summary: ''
+    summary: '',
+    // Token usage tracking for consistency checks
+    tokenUsage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      calls: 0,
+      model: null
+    }
   };
 
   try {
@@ -3190,6 +3197,13 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
         report.overallConsistent = false;
       }
       report.totalIssues += fullCheck.issues?.length || 0;
+      // Aggregate token usage
+      if (fullCheck.usage) {
+        report.tokenUsage.inputTokens += fullCheck.usage.inputTokens || 0;
+        report.tokenUsage.outputTokens += fullCheck.usage.outputTokens || 0;
+        report.tokenUsage.calls += fullCheck.usage.batches || 1;
+        report.tokenUsage.model = fullCheck.usage.model;
+      }
     }
 
     // 2. Character-specific checks (one per main character)
@@ -3219,6 +3233,15 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
               report.overallConsistent = false;
             }
             report.totalIssues += charCheck.issues?.length || 0;
+            // Aggregate token usage
+            if (charCheck.usage) {
+              report.tokenUsage.inputTokens += charCheck.usage.inputTokens || 0;
+              report.tokenUsage.outputTokens += charCheck.usage.outputTokens || 0;
+              report.tokenUsage.calls += charCheck.usage.batches || 1;
+              if (!report.tokenUsage.model) {
+                report.tokenUsage.model = charCheck.usage.model;
+              }
+            }
           }
         }
       }

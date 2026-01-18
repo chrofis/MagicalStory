@@ -6012,7 +6012,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Avatar generation tracking
       avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() }
+      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      // Consistency check tracking
+      consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() }
     }
   };
 
@@ -7444,6 +7447,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const languageLevel = inputData.languageLevel || 'standard';
           const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, streamingTextModelId);
           if (textCheck) {
+            // Track token usage for text check
+            if (textCheck.usage) {
+              const textCheckProvider = streamingTextModelId?.startsWith('gemini') ? 'gemini_text' : 'anthropic';
+              addUsage(textCheckProvider, {
+                input_tokens: textCheck.usage.input_tokens || 0,
+                output_tokens: textCheck.usage.output_tokens || 0
+              }, 'text_check', streamingTextModelId);
+            }
             // Add original text to textCheck for display
             textCheck.fullOriginalText = fullStoryText;
             finalChecksReport.textCheck = textCheck;
@@ -7796,7 +7807,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Avatar generation tracking
       avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() }
+      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      // Consistency check tracking
+      consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() }
     }
   };
 
@@ -9363,6 +9377,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const languageLevel = inputData.languageLevel || 'standard';
           const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, unifiedModelId);
           if (textCheck) {
+            // Track token usage for text check
+            if (textCheck.usage) {
+              const textCheckProvider = unifiedModelId?.startsWith('gemini') ? 'gemini_text' : 'anthropic';
+              addUsage(textCheckProvider, {
+                input_tokens: textCheck.usage.input_tokens || 0,
+                output_tokens: textCheck.usage.output_tokens || 0
+              }, 'text_check', unifiedModelId);
+            }
             // Add original text to textCheck for display
             textCheck.fullOriginalText = fullStoryText;
             finalChecksReport.textCheck = textCheck;
@@ -9669,7 +9691,10 @@ async function processStoryJob(jobId) {
       inpaint: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Avatar generation tracking
       avatar_styled: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
-      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() }
+      avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
+      // Consistency check tracking
+      consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
+      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() }
     }
   };
 
