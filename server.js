@@ -8308,17 +8308,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     }
 
-    // Start cover generation now that we have full cover hints
-    if (!skipImages && !skipCovers && coverHints) {
-      const coverTypes = ['titlePage', 'initialPage', 'backCover'];
-      for (const coverType of coverTypes) {
-        const hint = coverHints[coverType];
-        if (hint && !streamingCoverPromises.has(coverType)) {
-          startCoverGeneration(coverType, hint);
-        }
-      }
-      log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations`);
-    }
+    // NOTE: Cover generation moved to AFTER avatar generation (covers need avatars as reference photos)
 
     // PHASE 2: Wait for avatar generation to complete
     genLog.setStage('avatars');
@@ -8460,6 +8450,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
       await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements);
+    }
+
+    // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
+    if (!skipImages && !skipCovers && coverHints) {
+      const coverTypes = ['titlePage', 'initialPage', 'backCover'];
+      for (const coverType of coverTypes) {
+        const hint = coverHints[coverType];
+        if (hint && !streamingCoverPromises.has(coverType)) {
+          startCoverGeneration(coverType, hint);
+        }
+      }
+      log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations (avatars ready)`);
     }
 
     // PHASE 3: Wait for scene expansion to complete (most should be done by now)
