@@ -120,6 +120,8 @@ export const adminTranslations = {
     runware: 'Runware',
     thinkingTokens: 'Thinking',
     calls: 'Calls',
+    // Failed Jobs Tab
+    failedJobs: 'Failed Jobs',
   },
   de: {
     title: 'Admin-Dashboard',
@@ -238,6 +240,8 @@ export const adminTranslations = {
     runware: 'Runware',
     thinkingTokens: 'Denken',
     calls: 'Aufrufe',
+    // Failed Jobs Tab
+    failedJobs: 'Fehlgeschlagene Jobs',
   },
   fr: {
     title: 'Tableau de bord Admin',
@@ -356,6 +360,8 @@ export const adminTranslations = {
     runware: 'Runware',
     thinkingTokens: 'Réflexion',
     calls: 'Appels',
+    // Failed Jobs Tab
+    failedJobs: 'Jobs échoués',
   },
 };
 

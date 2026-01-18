@@ -242,6 +242,47 @@ export interface TokenUsageResponse {
   recentStories: RecentStoryTokenUsage[];
 }
 
+// Failed Jobs Types
+export interface FailedJob {
+  id: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  progress: number;
+  progress_message: string;
+  error_message: string;
+  user_id: string;
+  username: string;
+  email: string;
+  story_type: string;
+  story_category: string;
+  story_theme: string;
+  pages: string;
+  language: string;
+  art_style: string;
+  story_preview: string;
+  dedication: string;
+}
+
+export interface FailedJobDetails extends FailedJob {
+  input_data: {
+    pages: number;
+    artStyle: string;
+    language: string;
+    storyType: string;
+    storyCategory: string;
+    storyDetails: string;
+    dedication: string;
+    characters: Array<{
+      name: string;
+      age: string;
+      gender: string;
+      traits?: Record<string, unknown>;
+      photos?: { hasBody: boolean; hasFace: boolean };
+    }>;
+  };
+}
+
 export interface UserDetailsResponse {
   user: {
     id: string;
@@ -375,5 +416,22 @@ export const adminService = {
 
   async setTokenPromo(multiplier: number): Promise<{ success: boolean; multiplier: number }> {
     return api.post<{ success: boolean; multiplier: number }>('/api/admin/config/token-promo', { multiplier });
+  },
+
+  // Failed Jobs Management
+  async getFailedJobs(): Promise<{ jobs: FailedJob[] }> {
+    return api.get<{ jobs: FailedJob[] }>('/api/admin/jobs/failed');
+  },
+
+  async retryFailedJob(jobId: string): Promise<{ success: boolean; newJobId: string; originalJobId: string }> {
+    return api.post<{ success: boolean; newJobId: string; originalJobId: string }>(`/api/admin/jobs/${jobId}/retry`);
+  },
+
+  async startJob(jobId: string): Promise<{ success: boolean; jobId: string }> {
+    return api.post<{ success: boolean; jobId: string }>(`/api/admin/jobs/${jobId}/start`);
+  },
+
+  async getJobDetails(jobId: string): Promise<{ job: FailedJobDetails }> {
+    return api.get<{ job: FailedJobDetails }>(`/api/admin/jobs/${jobId}`);
   },
 };

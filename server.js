@@ -1731,6 +1731,50 @@ app.get('/api/admin/job-input', async (req, res) => {
   }
 });
 
+// Admin endpoint to start processing a job (used after retry creates the job)
+app.post('/api/admin/jobs/:jobId/start', authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { jobId } = req.params;
+
+    // Verify job exists and is pending
+    const jobResult = await dbPool.query(
+      'SELECT id, status, user_id FROM story_jobs WHERE id = $1',
+      [jobId]
+    );
+
+    if (jobResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const job = jobResult.rows[0];
+    if (job.status !== 'pending') {
+      return res.status(400).json({
+        error: 'Can only start pending jobs',
+        currentStatus: job.status
+      });
+    }
+
+    // Start processing the job asynchronously
+    log.info(`[ADMIN] Starting job ${jobId} for user ${job.user_id}`);
+    processStoryJob(jobId).catch(err => {
+      log.error(`❌ Admin-started job ${jobId} failed:`, err);
+    });
+
+    res.json({
+      success: true,
+      jobId,
+      message: 'Job processing started'
+    });
+  } catch (err) {
+    log.error('Error starting job:', err);
+    res.status(500).json({ error: 'Failed to start job', details: err.message });
+  }
+});
+
 // Trigger landmark discovery early (called when user enters wizard or gets location)
 // This runs in background so landmarks are ready when story generation starts
 app.post('/api/landmarks/discover', async (req, res) => {
@@ -12028,7 +12072,7 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
       languageLevel: sanitizeString(req.body.languageLevel || 'standard', 50),
       storyType: sanitizeString(req.body.storyType || '', 100),
       artStyle: sanitizeString(req.body.artStyle || 'pixar', 50),
-      storyDetails: sanitizeString(req.body.storyDetails || '', 2000),
+      storyDetails: sanitizeString(req.body.storyDetails || '', 10000),
       dedication: sanitizeString(req.body.dedication || '', 500)
     };
     // Remove idempotencyKey from input_data as it's stored separately

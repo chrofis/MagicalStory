@@ -3402,6 +3402,7 @@ export default function StoryWizard() {
             ideaFullResponse={lastIdeaFullResponse}
             generatedIdeas={generatedIdeas}
             onSelectIdea={handleSelectIdea}
+            onUseDirectly={() => generateStory()}
             onEditStep={safeSetStep}
             developerMode={developerMode}
             imageGenMode={imageGenMode}

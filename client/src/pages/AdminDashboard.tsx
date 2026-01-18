@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo } from '@/services';
+import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob } from '@/services';
 import {
   Users,
   BookOpen,
@@ -35,7 +35,9 @@ import {
   Check,
   ToggleLeft,
   ToggleRight,
-  TrendingUp
+  TrendingUp,
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -49,8 +51,8 @@ export default function AdminDashboard() {
   const { language } = useLanguage();
 
   // Read initial tab from URL query parameter
-  const tabFromUrl = searchParams.get('tab') as 'stats' | 'users' | 'products' | 'tokens' | null;
-  const initialTab = tabFromUrl && ['stats', 'users', 'products', 'tokens'].includes(tabFromUrl) ? tabFromUrl : 'stats';
+  const tabFromUrl = searchParams.get('tab') as 'stats' | 'users' | 'products' | 'tokens' | 'jobs' | null;
+  const initialTab = tabFromUrl && ['stats', 'users', 'products', 'tokens', 'jobs'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -60,7 +62,7 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products' | 'tokens'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'stats' | 'users' | 'products' | 'tokens' | 'jobs'>(initialTab);
 
   // Modal states
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
@@ -95,6 +97,11 @@ export default function AdminDashboard() {
   // Token promo state
   const [tokenPromoMultiplier, setTokenPromoMultiplier] = useState(1);
   const [isLoadingPromo, setIsLoadingPromo] = useState(false);
+
+  // Failed jobs state
+  const [failedJobs, setFailedJobs] = useState<FailedJob[]>([]);
+  const [isLoadingJobs, setIsLoadingJobs] = useState(false);
+  const [retryingJobId, setRetryingJobId] = useState<string | null>(null);
 
   // Use extracted translations
   const texts = adminTranslations[language as keyof typeof adminTranslations] || adminTranslations.en;
@@ -193,7 +200,7 @@ export default function AdminDashboard() {
   }, [isAuthenticated, user, isImpersonating, activeTab]);
 
   // Update URL when tab changes
-  const handleTabChange = (tab: 'stats' | 'users' | 'products' | 'tokens') => {
+  const handleTabChange = (tab: 'stats' | 'users' | 'products' | 'tokens' | 'jobs') => {
     setActiveTab(tab);
     setSearchParams(tab === 'stats' ? {} : { tab });
   };
@@ -499,6 +506,43 @@ export default function AdminDashboard() {
     }
   }, [activeTab]);
 
+  // Failed jobs handlers
+  const fetchFailedJobs = async () => {
+    setIsLoadingJobs(true);
+    try {
+      const result = await adminService.getFailedJobs();
+      setFailedJobs(result.jobs || []);
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to load jobs' });
+    } finally {
+      setIsLoadingJobs(false);
+    }
+  };
+
+  const handleRetryJob = async (jobId: string) => {
+    setRetryingJobId(jobId);
+    try {
+      // First create a new job from the failed one
+      const retryResult = await adminService.retryFailedJob(jobId);
+      // Then start processing the new job
+      await adminService.startJob(retryResult.newJobId);
+      setActionMessage({ type: 'success', text: `Job retried successfully. New job ID: ${retryResult.newJobId}` });
+      // Refresh the failed jobs list
+      fetchFailedJobs();
+    } catch (err) {
+      setActionMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to retry job' });
+    } finally {
+      setRetryingJobId(null);
+    }
+  };
+
+  // Load failed jobs when jobs tab is selected
+  useEffect(() => {
+    if (activeTab === 'jobs') {
+      fetchFailedJobs();
+    }
+  }, [activeTab]);
+
   // Wait for auth to finish loading before showing access denied
   if (isAuthLoading) {
     return (
@@ -617,6 +661,22 @@ export default function AdminDashboard() {
           >
             <TrendingUp size={18} />
             {texts.tokenUsage}
+          </button>
+          <button
+            onClick={() => handleTabChange('jobs')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              activeTab === 'jobs'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-white text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            <AlertCircle size={18} />
+            {texts.failedJobs || 'Failed Jobs'}
+            {failedJobs.length > 0 && (
+              <span className="bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                {failedJobs.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -1106,6 +1166,124 @@ export default function AdminDashboard() {
         {/* Token Usage Tab */}
         {activeTab === 'tokens' && (
           <TokenUsageTab texts={texts} />
+        )}
+
+        {/* Failed Jobs Tab */}
+        {activeTab === 'jobs' && (
+          <div className="bg-white rounded-xl shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                <AlertCircle className="text-red-500" />
+                {texts.failedJobs || 'Failed Jobs'} ({failedJobs.length})
+              </h2>
+              <Button
+                onClick={fetchFailedJobs}
+                variant="secondary"
+                className="flex items-center gap-2"
+                disabled={isLoadingJobs}
+              >
+                <RefreshCw size={16} className={isLoadingJobs ? 'animate-spin' : ''} />
+                Refresh
+              </Button>
+            </div>
+
+            {isLoadingJobs ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <span className="ml-3 text-gray-600">Loading failed jobs...</span>
+              </div>
+            ) : failedJobs.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <AlertCircle size={48} className="mx-auto mb-4 text-gray-300" />
+                <p>No failed jobs in the last 7 days</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Job ID</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">User</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Story</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Progress</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Error</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Created</th>
+                      <th className="text-left py-3 px-4 text-sm font-medium text-gray-500">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {failedJobs.map((job) => (
+                      <tr key={job.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-3 px-4">
+                          <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                            {job.id.substring(0, 20)}...
+                          </code>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="text-sm font-medium text-gray-900">{job.username || 'Unknown'}</div>
+                          <div className="text-xs text-gray-500">{job.email}</div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="text-sm">
+                            <span className="font-medium">{job.story_category || job.story_type}</span>
+                            <span className="text-gray-500 ml-2">{job.pages} pages</span>
+                          </div>
+                          <div className="text-xs text-gray-500 truncate max-w-xs" title={job.story_preview}>
+                            {job.story_preview || 'No preview'}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-red-500 h-2 rounded-full"
+                                style={{ width: `${job.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-gray-500">{job.progress}%</span>
+                          </div>
+                          <div className="text-xs text-gray-500 truncate max-w-xs">
+                            {job.progress_message}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="text-xs text-red-600 max-w-xs truncate" title={job.error_message}>
+                            {job.error_message || 'Unknown error'}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 text-sm text-gray-500">
+                          {formatDate(job.created_at)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleRetryJob(job.id)}
+                              disabled={retryingJobId === job.id}
+                              className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                              title="Retry this job"
+                            >
+                              {retryingJobId === job.id ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <RotateCcw size={16} />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => impersonate(job.user_id)}
+                              className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Impersonate user"
+                            >
+                              <Eye size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         )}
       </div>
 

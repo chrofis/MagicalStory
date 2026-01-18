@@ -89,6 +89,7 @@ interface WizardStep6Props {
   ideaFullResponse?: string;
   generatedIdeas: string[];
   onSelectIdea: (idea: string) => void;
+  onUseDirectly?: () => void;  // Called when "Use my theme directly" is clicked to start generation
   // Navigation
   onEditStep: (step: number) => void;
   // Developer options
@@ -132,6 +133,7 @@ export function WizardStep6Summary({
   ideaFullResponse,
   generatedIdeas,
   onSelectIdea,
+  onUseDirectly,
   onEditStep,
   developerMode,
   imageGenMode,
@@ -348,19 +350,20 @@ export function WizardStep6Summary({
 
       {/* Custom Theme - shown when storyTheme is 'custom' */}
       {storyTheme === 'custom' && (
-        <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
+        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <label className="text-lg font-semibold text-purple-800 flex items-center gap-2">
+            <label className="text-lg font-semibold text-indigo-800 flex items-center gap-2">
               ✨ {t.customTheme}
             </label>
             <button
               onClick={() => {
                 if (customThemeText.trim()) {
                   onSelectIdea(customThemeText);
+                  onUseDirectly?.();
                 }
               }}
               disabled={!customThemeText.trim()}
-              className="flex items-center gap-1 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               <Check size={14} />
               {t.useMyTheme}
@@ -370,10 +373,10 @@ export function WizardStep6Summary({
             value={customThemeText}
             onChange={(e) => onCustomThemeTextChange?.(e.target.value)}
             placeholder={t.customThemePlaceholder}
-            className="w-full px-3 py-2 border-2 border-purple-300 rounded-lg focus:border-purple-500 focus:outline-none text-base bg-white"
+            className="w-full px-3 py-2 border-2 border-indigo-300 rounded-lg focus:border-indigo-500 focus:outline-none text-base bg-white"
             rows={3}
           />
-          <p className="text-xs text-purple-600 mt-1">
+          <p className="text-xs text-indigo-600 mt-1">
             {language === 'de'
               ? 'Dieses Thema wird für die Ideengenerierung verwendet. Du kannst es auch direkt als Handlung verwenden.'
               : language === 'fr'
