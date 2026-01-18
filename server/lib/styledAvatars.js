@@ -240,7 +240,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
 
     // Track usage if callback provided
     if (addUsage && result.imageUsage) {
-      addUsage('styled_avatars', result.imageUsage);
+      addUsage('gemini_image', result.imageUsage, 'avatar_styled', result.modelId);
     }
 
     // Downsize the result for efficient storage (512px is enough for reference)
@@ -675,6 +675,7 @@ function applyStyledAvatars(characterPhotos, artStyle) {
   if (artStyle === 'realistic') return characterPhotos;
 
   let appliedCount = 0;
+  const missed = [];
   const result = characterPhotos.map(photo => {
     const styledAvatar = getStyledAvatar(photo.name, photo.clothingCategory, artStyle);
     if (styledAvatar) {
@@ -686,11 +687,16 @@ function applyStyledAvatars(characterPhotos, artStyle) {
         originalPhotoUrl: photo.photoUrl // Keep original for debugging
       };
     }
+    // Track cache misses for debugging
+    missed.push(`${photo.name}:${photo.clothingCategory}`);
     return photo;
   });
 
   if (appliedCount > 0) {
-    log.debug(`🎨 [STYLED AVATARS] Applied ${appliedCount}/${characterPhotos.length} styled avatars`);
+    log.debug(`🎨 [STYLED AVATARS] Applied ${appliedCount}/${characterPhotos.length} styled avatars for ${artStyle}`);
+  }
+  if (missed.length > 0) {
+    log.warn(`⚠️ [STYLED AVATARS] Cache miss for ${artStyle}: ${missed.join(', ')} - using fallback avatars`);
   }
 
   return result;

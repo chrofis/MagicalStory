@@ -502,10 +502,13 @@ function extractIssues(jobLines) {
     }
 
     // Errors - look for actual error indicators
-    const isError = msg.includes('Error') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
+    // But DON'T classify as error if it's a WARN-level log (avoid duplicates in warnings + errors)
+    const isWarnLevel = msg.includes('[WARN]') || line.level === 'wrn';
+    const isError = !isWarnLevel && (
+                    msg.includes('Error') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
                     (msg.includes('failed') && !msg.includes('story-failed')) ||
                     (msg.includes('Failed') && !msg.includes('story-failed')) ||
-                    line.level === 'err';
+                    line.level === 'err');
     if (isError) {
       // Skip checkpoint errors, email templates, CONSISTENCY/TEXT CHECK, and normal log messages
       if (!msg.includes('checkpoint') && !msg.includes('story-failed') &&
