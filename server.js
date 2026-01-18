@@ -1659,7 +1659,7 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
     }
 
     const result = await dbPool.query(
-      "SELECT city, country, language, landmarks FROM landmarks_discovery WHERE LOWER(city) = LOWER($1)",
+      "SELECT location_key, city, country, landmarks FROM discovered_landmarks WHERE LOWER(city) = LOWER($1)",
       [city]
     );
 
@@ -1674,7 +1674,7 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
           photos.push({
             name: l.name,
             type: l.type,
-            language: row.language,
+            locationKey: row.location_key,
             photoData: l.photoData,
             photoDescription: l.photoDescription || null,
             sizeKB: Math.round(l.photoData.length * 0.75 / 1024)
