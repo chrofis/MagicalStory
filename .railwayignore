@@ -12,6 +12,3 @@ coverage
 .idea
 __pycache__
 *.pyc
-# Large test files
-test-*.png
-docs/plans
