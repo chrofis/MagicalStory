@@ -3345,11 +3345,12 @@ export default function StoryWizard() {
         );
 
       case 6:
-        // Step 6: Show StoryDisplay when we have any content to display
-        // During generation: show as soon as we have story text OR any cover image
+        // Step 6: Show StoryDisplay when we have visual content to display
+        // During generation: show when we have front cover OR any page image (not just text)
         // After generation: show if we have the final story
-        if (generatedStory || progressiveStoryData ||
-            (isGenerating && (coverImages.frontCover || coverImages.initialPage || coverImages.backCover))) {
+        const hasAnyImage = coverImages.frontCover || coverImages.initialPage || Object.keys(completedPageImages).length > 0;
+        if (generatedStory || (progressiveStoryData && hasAnyImage) ||
+            (isGenerating && hasAnyImage)) {
           // Build scene images from progressive data if still generating
           const displaySceneImages = generatedStory
             ? sceneImages
