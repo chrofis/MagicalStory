@@ -236,6 +236,7 @@ router.post('/', authenticateToken, async (req, res) => {
       `;
       const preserveResult = await dbQuery(preserveQuery, [characterId]);
       const existingCharacters = preserveResult[0]?.preserved || [];
+      console.log(`[Characters] POST - PreserveQuery returned ${existingCharacters.length} chars, first has avatars: ${!!existingCharacters[0]?.avatars}`);
 
       // Merge server-side data from existing characters into new characters
       // This preserves avatar data AND character fields that may not be sent by the frontend
@@ -458,6 +459,11 @@ router.post('/', authenticateToken, async (req, res) => {
 
         // Start with DB avatars (has all images, thumbnails, etc.)
         // If no DB avatars but frontend sent something, use frontend as base
+        const dbAvatarKeys = existingChar.avatars ? Object.keys(existingChar.avatars) : [];
+        const hasDbStandard = !!existingChar.avatars?.standard;
+        const hasDbFaceThumbs = !!existingChar.avatars?.faceThumbnails;
+        console.log(`[Characters] POST - DB avatars for ${newChar.name}: keys=[${dbAvatarKeys.join(',')}], standard=${hasDbStandard}, faceThumbs=${hasDbFaceThumbs}`);
+
         const mergedAvatars = existingChar.avatars
           ? { ...existingChar.avatars }
           : { ...newChar.avatars };
@@ -467,7 +473,8 @@ router.post('/', authenticateToken, async (req, res) => {
         if (newChar.avatars?.generatedAt) mergedAvatars.generatedAt = newChar.avatars.generatedAt;
         if (newChar.avatars?.stale !== undefined) mergedAvatars.stale = newChar.avatars.stale;
 
-        console.log(`[Characters] POST - Using DB avatars for ${newChar.name}, updated metadata from frontend`);
+        const mergedKeys = Object.keys(mergedAvatars);
+        console.log(`[Characters] POST - Merged avatars for ${newChar.name}: keys=[${mergedKeys.join(',')}]`);
         hasChanges = true;
 
         // DB avatars already have everything (images, thumbnails, styledAvatars, etc.)
