@@ -510,14 +510,6 @@ export function StoryDisplay({
   // - Standard/Advanced: text page on left, image page on right (separate pages)
   const isPictureBook = languageLevel === '1st-grade';
 
-  // Debug layout detection
-  console.log('[StoryDisplay] Layout detection:', {
-    languageLevel,
-    isPictureBook,
-    sceneImagesLength: sceneImages.length,
-    storyPagesLength: storyPages.length
-  });
-
   // Progressive mode: Calculate max viewable page
   // For picture book: User can see page N if page N-1 has an image (1:1 text:image)
   // For normal story: User can see page N if scene ceil(N/2) has an image (2:1 text:image)
@@ -1625,8 +1617,7 @@ export function StoryDisplay({
             </details>
           )}
 
-          {/* Generation Log - Debug: check console for generationLog count */}
-          {(() => { console.log('[StoryDisplay] generationLog:', generationLog?.length, 'entries, developerMode:', developerMode); return null; })()}
+          {/* Generation Log */}
           {generationLog && generationLog.length > 0 && (
             <details className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4">
               <summary className="cursor-pointer text-lg font-bold text-slate-800 hover:text-slate-900 flex items-center gap-2">

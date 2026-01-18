@@ -3359,15 +3359,6 @@ export default function StoryWizard() {
                 description: progressiveStoryData?.sceneDescriptions.find(s => s.pageNumber === parseInt(pageNum))?.description || ''
               }));
 
-          // Debug scene images
-          console.log('[StoryWizard] Scene images debug:', {
-            generatedStory: !!generatedStory,
-            sceneImagesCount: sceneImages.length,
-            completedPageImagesCount: Object.keys(completedPageImages).length,
-            displaySceneImagesCount: displaySceneImages.length,
-            displaySceneImages: displaySceneImages.map(img => ({ pageNumber: img.pageNumber, hasImage: !!img.imageData }))
-          });
-
           // Build story text from progressive data if still generating
           const displayStory = generatedStory || Object.entries(progressiveStoryData?.pageTexts || {})
             .sort(([a], [b]) => parseInt(a) - parseInt(b))
