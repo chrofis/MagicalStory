@@ -6544,10 +6544,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             const avatarPromise = (async () => {
               try {
                 let result;
+                let isCostumed = false;
 
                 if (category === 'costumed' && config.costume) {
                   // For costumed: generate styled version directly (costume + art style in one call)
                   result = await generateStyledCostumedAvatar(char, config, artStyle);
+                  isCostumed = true;
 
                   if (result.success && result.imageData) {
                     const costumeKey = result.costumeType;
@@ -6586,8 +6588,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                     log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
                   }
                 }
+
+                // Return token usage for tracking
+                return { tokenUsage: result?.tokenUsage, isCostumed };
               } catch (e) {
                 log.error(`❌ [STORYBOOK] Failed to generate ${logCategory} avatar for ${char.name}: ${e.message}`);
+                return { tokenUsage: null, isCostumed: false };
               }
             })();
             avatarGenerationPromises.push(avatarPromise);
@@ -6600,7 +6606,21 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // This ensures images generated during streaming have access to styled avatar cache
     if (artStyle !== 'realistic' && avatarGenerationPromises.length > 0) {
       log.debug(`🎨 [STORYBOOK] Waiting for ${avatarGenerationPromises.length} avatar generations before preparing styles...`);
-      await Promise.all(avatarGenerationPromises);
+      const avatarResults = await Promise.all(avatarGenerationPromises);
+
+      // Aggregate avatar token usage
+      for (const avatarResult of avatarResults) {
+        if (avatarResult?.tokenUsage?.byModel) {
+          for (const [modelId, usage] of Object.entries(avatarResult.tokenUsage.byModel)) {
+            const functionName = avatarResult.isCostumed ? 'avatar_costumed' : 'avatar_styled';
+            addUsage('gemini_image', {
+              input_tokens: usage.input_tokens || 0,
+              output_tokens: usage.output_tokens || 0
+            }, functionName, modelId);
+          }
+        }
+      }
+
       avatarGenerationPromises.length = 0; // Clear to avoid double-await later
       log.debug(`✅ [STORYBOOK] Avatar generations complete, preparing styled avatars...`);
     }
@@ -7285,6 +7305,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       coverPrompts: coverPrompts,  // Cover image prompts for dev mode
       styledAvatarGeneration: getStyledAvatarGenerationLog(),  // Styled avatar generation log for dev mode
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(),  // Costumed avatar generation log for dev mode
+      finalChecksReport: finalChecksReport || null,  // Final consistency checks report (dev mode)
       storyType: inputData.storyType,
       storyDetails: inputData.storyDetails,
       pages: sceneCount,
@@ -7405,6 +7426,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
         });
+
+        // Track consistency check token usage
+        if (finalChecksReport?.tokenUsage) {
+          addUsage('gemini_quality', {
+            input_tokens: finalChecksReport.tokenUsage.inputTokens || 0,
+            output_tokens: finalChecksReport.tokenUsage.outputTokens || 0
+          }, 'consistency_check', finalChecksReport.tokenUsage.model || 'gemini-2.5-flash');
+        }
 
         // Run text consistency check - include detailed language instructions and reading level
         // Use same model as story generation for language consistency
@@ -7892,9 +7921,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Queue avatar generation
         const avatarPromise = streamAvatarLimit(async () => {
           try {
+            let result;
+            let isCostumed = false;
+
             if (category === 'costumed' && config.costume) {
               log.debug(`⚡ [STREAM-AVATAR] Generating costumed avatar for ${char.name}: ${config.costume}`);
-              const result = await generateStyledCostumedAvatar(char, config, artStyle);
+              result = await generateStyledCostumedAvatar(char, config, artStyle);
+              isCostumed = true;
               if (result?.success && result?.imageData) {
                 if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                 if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
@@ -7912,7 +7945,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               }
             } else if (['winter', 'summer', 'standard'].includes(category)) {
               log.debug(`⚡ [STREAM-AVATAR] Generating ${category} avatar for ${char.name}`);
-              const result = await generateDynamicAvatar(char, category, config);
+              result = await generateDynamicAvatar(char, category, config);
               if (result?.success && result?.imageData) {
                 char.avatars[category] = result.imageData;
                 // Invalidate any cached styled versions since source avatar changed
@@ -7920,10 +7953,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 log.debug(`✅ [STREAM-AVATAR] ${char.name} ${category} complete`);
               }
             }
+
+            // Return token usage for tracking
+            return { tokenUsage: result?.tokenUsage, isCostumed };
           } catch (err) {
             // Bug #14 fix: Include more context for avatar generation failures
             log.error(`❌ [STREAM-AVATAR] Failed for ${char.name} ${category}: ${err.message}`);
             log.debug(`   Stack: ${err.stack?.split('\n').slice(0, 3).join(' -> ')}`);
+            return { tokenUsage: null, isCostumed: false };
           }
         });
         streamingAvatarPromises.push(avatarPromise);
@@ -8412,8 +8449,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     if (streamingAvatarPromises.length > 0) {
       log.debug(`⏳ [UNIFIED] Waiting for ${streamingAvatarPromises.length} avatar generations started during streaming...`);
-      await Promise.all(streamingAvatarPromises);
+      const streamAvatarResults = await Promise.all(streamingAvatarPromises);
       log.debug(`✅ [UNIFIED] All streaming avatar generations complete`);
+
+      // Aggregate streaming avatar token usage
+      for (const avatarResult of streamAvatarResults) {
+        if (avatarResult?.tokenUsage?.byModel) {
+          for (const [modelId, usage] of Object.entries(avatarResult.tokenUsage.byModel)) {
+            const functionName = avatarResult.isCostumed ? 'avatar_costumed' : 'avatar_styled';
+            addUsage('gemini_image', {
+              input_tokens: usage.input_tokens || 0,
+              output_tokens: usage.output_tokens || 0
+            }, functionName, modelId);
+          }
+        }
+      }
     }
 
     // Collect avatar requirements and prepare styled avatars
@@ -8480,10 +8530,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const avatarPromise = (async () => {
             try {
               let result;
+              let isCostumed = false;
 
               if (category === 'costumed' && config.costume) {
                 // For costumed: generate styled version directly (costume + art style in one call)
                 result = await generateStyledCostumedAvatar(char, config, artStyle);
+                isCostumed = true;
 
                 if (result.success && result.imageData) {
                   const costumeKey = result.costumeType;
@@ -8523,8 +8575,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   log.warn(`⚠️ [UNIFIED] FALLBACK: Generated ${category} avatar for ${char.name} - investigate why it was missing`);
                 }
               }
+
+              // Return token usage for tracking
+              return { tokenUsage: result?.tokenUsage, isCostumed };
             } catch (err) {
               log.error(`❌ [UNIFIED] Failed to generate ${logCategory} avatar for ${char.name}:`, err.message);
+              return { tokenUsage: null, isCostumed: false };
             }
           })();
 
@@ -8534,8 +8590,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       if (avatarGenerationPromises.length > 0) {
         log.debug(`👕 [UNIFIED] Waiting for ${avatarGenerationPromises.length} avatar generations...`);
-        await Promise.all(avatarGenerationPromises);
+        const avatarResults = await Promise.all(avatarGenerationPromises);
         log.debug(`✅ [UNIFIED] All avatar generations complete`);
+
+        // Aggregate avatar token usage
+        for (const avatarResult of avatarResults) {
+          if (avatarResult?.tokenUsage?.byModel) {
+            for (const [modelId, usage] of Object.entries(avatarResult.tokenUsage.byModel)) {
+              const functionName = avatarResult.isCostumed ? 'avatar_costumed' : 'avatar_styled';
+              addUsage('gemini_image', {
+                input_tokens: usage.input_tokens || 0,
+                output_tokens: usage.output_tokens || 0
+              }, functionName, modelId);
+            }
+          }
+        }
       }
     }
 
@@ -8996,6 +9065,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
         });
+
+        // Track consistency check token usage
+        if (finalChecksReport?.tokenUsage) {
+          addUsage('gemini_quality', {
+            input_tokens: finalChecksReport.tokenUsage.inputTokens || 0,
+            output_tokens: finalChecksReport.tokenUsage.outputTokens || 0
+          }, 'consistency_check', finalChecksReport.tokenUsage.model || 'gemini-2.5-flash');
+        }
 
         // =====================================================================
         // AUTO-REGENERATE IMAGES WITH CONSISTENCY ISSUES
@@ -10031,10 +10108,12 @@ async function processStoryJob(jobId) {
 
           try {
             let result;
+            let isCostumed = false;
 
             if (category === 'costumed' && config.costume) {
               // For costumed: generate styled version directly (costume + art style in one call)
               result = await generateStyledCostumedAvatar(char, config, artStyle);
+              isCostumed = true;
 
               if (result.success && result.imageData) {
                 const costumeKey = result.costumeType;
@@ -10090,6 +10169,17 @@ async function processStoryJob(jobId) {
               } else {
                 avatarsFailed.push(`${char.name}:${logCategory}`);
                 log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
+              }
+            }
+
+            // Track avatar token usage
+            if (result?.tokenUsage?.byModel) {
+              for (const [modelId, usage] of Object.entries(result.tokenUsage.byModel)) {
+                const functionName = isCostumed ? 'avatar_costumed' : 'avatar_styled';
+                addUsage('gemini_image', {
+                  input_tokens: usage.input_tokens || 0,
+                  output_tokens: usage.output_tokens || 0
+                }, functionName, modelId);
               }
             }
           } catch (err) {
