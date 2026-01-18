@@ -355,6 +355,15 @@ function extractSceneMetadata(sceneDescription) {
       obj.id ? `${obj.name} [${obj.id}]` : obj.name
     );
 
+    // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
+    // This ensures landmark photos are passed to image generation
+    if (parsed.output.setting?.location) {
+      const locMatch = parsed.output.setting.location.match(/\[LOC\d+\]/i);
+      if (locMatch) {
+        objectIds.push(parsed.output.setting.location);
+      }
+    }
+
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
