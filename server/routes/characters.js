@@ -197,6 +197,7 @@ router.post('/', authenticateToken, async (req, res) => {
             'id', c->>'id',
             'name', c->>'name',
             'avatars', c->'avatars',
+            'photos', c->'photos',
             'photo_url', c->>'photo_url',
             'thumbnail_url', c->>'thumbnail_url',
             'body_photo_url', c->>'body_photo_url',
