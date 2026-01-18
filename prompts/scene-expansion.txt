@@ -42,17 +42,18 @@ Do NOT invent new characters or objects.
        - EXPRESSION: Facial expression using visual terms (not emotions)
        - POSITION: Where in the frame (left/right, foreground/background)
 
-4. **Clothing:** Select ONE category:
+4. **Clothing Categories:**
+   Valid categories: standard, winter, summer, costumed:type
+   - **standard** - Everyday casual
    - **winter** - Cold weather (coats, scarves, boots)
    - **summer** - Warm weather (t-shirts, shorts, light clothes)
-   - **formal** - Special occasions (suits, dresses)
-   - **standard** - Everyday casual
-   - **costumed:X** - Theme costume (e.g., "costumed:pirate", "costumed:knight", "costumed:astronaut") - use when characters wear adventure/theme costumes
+   - **costumed:X** - Theme costume (e.g., "costumed:pirate", "costumed:knight", "costumed:astronaut")
+   Each character can have a DIFFERENT clothing category based on the scene.
 
 5. **Characters:** For EACH character present:
    * **[Character Name]:**
      - PHYSICAL: Copy their full description from CHARACTERS above
-     - CLOTHING: Describe appropriate clothing for the scene
+     - CLOTHING: [category] - Describe appropriate clothing for the scene
 
 6. **Objects & Animals:** For EACH recurring element present:
    * **[Element Name]:**
@@ -61,11 +62,16 @@ Do NOT invent new characters or objects.
 
 7. **METADATA (JSON):** - REQUIRED, must be valid JSON
 ```json
-{"characters": ["Name1", "Name2"], "clothing": "standard", "objects": ["Object1", "Object2"]}
+{
+  "characters": ["Name1", "Name2"],
+  "characterClothing": {"Name1": "standard", "Name2": "winter"},
+  "objects": ["Object1", "Object2"]
+}
 ```
    - characters: ALL characters/animals described in section 3 (Composition) MUST be listed here
    - This is used to attach reference images - missing characters = missing references
-   - clothing: One of "winter", "summer", "formal", "standard", or "costumed:X" (where X is the theme like pirate, knight, astronaut)
+   - characterClothing: PER-CHARACTER clothing categories (each character can have different clothing)
+   - Valid categories: "standard", "winter", "summer", or "costumed:X" (where X is the theme like pirate, knight)
    - objects: Array of object/animal names from RECURRING ELEMENTS appearing in this scene
 
 **PHYSICS & CAMERA LOGIC:**

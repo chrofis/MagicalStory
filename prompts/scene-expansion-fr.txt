@@ -42,17 +42,18 @@ N'inventez PAS de nouveaux personnages ou objets.
        - EXPRESSION: Expression faciale en termes visuels (pas d'émotions)
        - POSITION: Où dans le cadre (gauche/droite, premier plan/arrière-plan)
 
-4. **Vêtements:** Sélectionnez UNE catégorie:
+4. **Catégories de Vêtements:**
+   Catégories valides: standard, winter, summer, costumed:type
+   - **standard** - Casual quotidien
    - **winter** - Temps froid (manteaux, écharpes, bottes)
    - **summer** - Temps chaud (t-shirts, shorts, vêtements légers)
-   - **formal** - Occasions spéciales (costumes, robes)
-   - **standard** - Casual quotidien
-   - **costumed:X** - Costume thématique (ex: "costumed:pirate", "costumed:knight", "costumed:astronaut") - quand les personnages portent des costumes d'aventure/thématiques
+   - **costumed:X** - Costume thématique (ex: "costumed:pirate", "costumed:knight", "costumed:astronaut")
+   Chaque personnage peut avoir une catégorie de vêtements DIFFÉRENTE.
 
 5. **Personnages:** Pour CHAQUE personnage présent:
    * **[Nom du Personnage]:**
      - PHYSICAL: Copiez leur description complète depuis PERSONNAGES ci-dessus
-     - VÊTEMENTS: Décrivez les vêtements appropriés pour la scène
+     - VÊTEMENTS: [catégorie] - Décrivez les vêtements appropriés pour la scène
 
 6. **Objets & Animaux:** Pour CHAQUE élément récurrent présent:
    * **[Nom de l'Élément]:**
@@ -61,11 +62,16 @@ N'inventez PAS de nouveaux personnages ou objets.
 
 7. **METADATA (JSON):** - OBLIGATOIRE, doit être un JSON valide
 ```json
-{"characters": ["Nom1", "Nom2"], "clothing": "standard", "objects": ["Objet1", "Objet2"]}
+{
+  "characters": ["Nom1", "Nom2"],
+  "characterClothing": {"Nom1": "standard", "Nom2": "winter"},
+  "objects": ["Objet1", "Objet2"]
+}
 ```
    - characters: TOUS les personnages/animaux décrits dans la section 3 (Composition) DOIVENT être listés ici
    - Ceci est utilisé pour attacher des images de référence - personnages manquants = références manquantes
-   - clothing: Un parmi "winter", "summer", "formal", "standard", ou "costumed:X" (où X est le thème, ex: pirate, knight, astronaut)
+   - characterClothing: Catégories de vêtements PAR-PERSONNAGE (chaque personnage peut avoir des vêtements différents)
+   - Catégories valides: "standard", "winter", "summer", ou "costumed:X" (où X est le thème, ex: pirate, knight)
    - objects: Tableau des noms d'objets/animaux des ÉLÉMENTS RÉCURRENTS dans cette scène
 
 **PHYSIQUE & LOGIQUE DE CAMÉRA:**

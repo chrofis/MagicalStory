@@ -121,28 +121,107 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 // ============================================================================
 
 /**
+ * Build readable text from JSON scene description output
+ * Converts the structured JSON to markdown text for image generation prompt
+ * @param {Object} output - The output section from JSON scene description
+ * @returns {string} Formatted text for image prompt
+ */
+function buildTextFromJson(output) {
+  if (!output) return '';
+
+  let text = '';
+
+  // Section 1: Image Summary
+  if (output.imageSummary) {
+    text += `## 1. Image Summary\n${output.imageSummary}\n\n`;
+  }
+
+  // Section 2: Setting & Atmosphere & Camera
+  if (output.setting) {
+    text += `## 2. Setting & Atmosphere & Camera\n`;
+    if (output.setting.location) {
+      text += `**${output.setting.location}**: `;
+    }
+    if (output.setting.description) {
+      text += `${output.setting.description} `;
+    }
+    if (output.setting.lighting) {
+      text += `${output.setting.lighting}. `;
+    }
+    text += '\n';
+    if (output.setting.camera) {
+      text += `Camera: ${output.setting.camera}\n`;
+    }
+    if (output.setting.depthLayers) {
+      text += `Depth layers: ${output.setting.depthLayers}\n`;
+    }
+    text += '\n';
+  }
+
+  // Section 3: Character Composition
+  if (output.characters && output.characters.length > 0) {
+    text += `## 3. Character Composition\n\n`;
+    for (const char of output.characters) {
+      text += `**${char.name}:**\n`;
+      if (char.position) text += `- POSITION: ${char.position}\n`;
+      if (char.pose) text += `- POSE: ${char.pose}\n`;
+      if (char.action) text += `- ACTION: ${char.action}\n`;
+      if (char.expression) text += `- EXPRESSION: ${char.expression}\n`;
+      text += '\n';
+    }
+  }
+
+  // Section 4: Objects & Animals
+  if (output.objects && output.objects.length > 0) {
+    text += `## 4. Objects & Animals\n`;
+    for (const obj of output.objects) {
+      const idPart = obj.id ? ` [${obj.id}]` : '';
+      text += `* ${obj.name}${idPart}: ${obj.position || 'in scene'}\n`;
+    }
+    text += '\n';
+  }
+
+  return text.trim();
+}
+
+/**
  * Strip JSON metadata block and translated summary from scene description (for image prompts)
- * Removes the ```json ... ``` block and section 6 (translated summary) - both are redundant for image generation
+ * Supports two formats:
+ * 1. NEW: Full JSON - extracts output section and converts to text
+ * 2. LEGACY: Markdown - removes thinking sections, JSON block, and translated summary
  * @param {string} sceneDescription - The scene description text
- * @returns {string} Scene description without JSON metadata block or translated summary
+ * @returns {string} Clean scene description for image generation
  */
 function stripSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return sceneDescription;
 
+  // Try NEW JSON format first
+  try {
+    const parsed = JSON.parse(sceneDescription.trim());
+    if (parsed.output) {
+      // Convert structured JSON to text for image prompt
+      return buildTextFromJson(parsed.output);
+    }
+  } catch (e) {
+    // Not valid JSON, continue with legacy parsing
+  }
+
+  // LEGACY: Regex-based stripping for markdown format
   let stripped = sceneDescription;
 
   // Remove DRAFT section (STEP 1) - internal process, not needed for image generation
   // Handles: "# STEP 1 - DRAFT", "**STEP 1 - DRAFT**", "DRAFT:", etc.
   stripped = stripped
-    .replace(/\n*#{1,3}\s*STEP\s*1\s*[-–]\s*DRAFT\s*\n[\s\S]*?(?=\n#{1,3}\s*STEP\s*2|\n---\s*\n#{1,3}|\n\*{0,2}STEP\s*2)/gi, '')
-    .replace(/\n*\*{0,2}(?:STEP\s*1\s*[-–]?\s*)?DRAFT\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*2|CONNECTION\s*REVIEW|CRITICISM))/gi, '')
+    .replace(/\n*#{1,3}\s*STEP\s*1\s*[-–]\s*DRAFT:?\s*\n[\s\S]*?(?=\n#{1,3}\s*STEP\s*2|\n\*{0,2}STEP\s*2)/gi, '')
+    .replace(/\n*\*{0,2}(?:STEP\s*1\s*[-–]?\s*)?DRAFT\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*2|(?:CONNECTION\s*)?REVIEW|CRITICISM))/gi, '')
     .trim();
 
-  // Remove CONNECTION REVIEW / CRITICISM section (STEP 2) - internal process
-  // Handles: "# STEP 2 - CONNECTION REVIEW", "**CONNECTION REVIEW**", etc.
+  // Remove REVIEW / CONNECTION REVIEW / CRITICISM section (STEP 2) - internal process
+  // Handles: "# STEP 2 - REVIEW", "# STEP 2 - CONNECTION REVIEW", "**STEP 2 - REVIEW:**", etc.
+  // End markers: "# STEP 3", "## 1. Image", "**1. Image", "---\n## 1.", "FINAL OUTPUT", or end of string
   stripped = stripped
-    .replace(/\n*#{1,3}\s*STEP\s*2\s*[-–]\s*CONNECTION\s*REVIEW\s*\n[\s\S]*?(?=\n#{1,3}\s*STEP\s*3|\n---\s*\n#{1,3}|\n\*{0,2}(?:STEP\s*3|FINAL)|$)/gi, '')
-    .replace(/\n*\*{0,2}(?:STEP\s*2\s*[-–]?\s*)?(?:CONNECTION\s*REVIEW|CRITICISM)\*{0,2}:?\s*\n[\s\S]*?(?=\n\*{0,2}(?:STEP\s*3|FINAL\s*OUTPUT|1\.\s)|$)/gi, '')
+    .replace(/\n*#{1,3}\s*STEP\s*2\s*[-–]\s*(?:CONNECTION\s*)?REVIEW:?\s*\n[\s\S]*?(?=\n#{1,3}\s*(?:STEP\s*3|1\.)|---\s*\n+#{1,3}\s*1\.|\n\*{0,2}(?:STEP\s*3|FINAL)|$)/gi, '')
+    .replace(/\n*\*{0,2}(?:STEP\s*2\s*[-–]?\s*)?(?:(?:CONNECTION\s*)?REVIEW|CRITICISM)\*{0,2}:?\s*\n[\s\S]*?(?=\n#{1,3}\s*1\.|\n\*{0,2}(?:STEP\s*3|FINAL\s*OUTPUT|1\.\s*\*{0,2}Image)|$)/gi, '')
     .trim();
 
   // Remove FINAL OUTPUT header (STEP 3) - keep the content, just remove the header
@@ -176,15 +255,53 @@ function stripSceneMetadata(sceneDescription) {
 }
 
 /**
- * Extract JSON metadata block from scene description
- * Looks for ```json ... ``` block containing characters, clothing, objects
+ * Extract metadata from scene description
+ * Supports two formats:
+ * 1. NEW: Full JSON with thinking.draft, thinking.review, output.* fields
+ * 2. LEGACY: Markdown with embedded ```json block
  * @param {string} sceneDescription - The scene description text
  * @returns {Object|null} Parsed metadata or null if not found/invalid
  */
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
-  // Look for ```json block
+  // Try NEW JSON format first (entire response is JSON)
+  try {
+    const parsed = JSON.parse(sceneDescription.trim());
+    if (parsed.output && parsed.output.characters) {
+      // Extract per-character clothing
+      const characterClothing = {};
+      const characterNames = [];
+      for (const char of parsed.output.characters) {
+        if (char.name) {
+          characterNames.push(char.name);
+          if (char.clothing) {
+            characterClothing[char.name] = char.clothing;
+          }
+        }
+      }
+
+      // Extract object IDs
+      const objectIds = (parsed.output.objects || []).map(obj =>
+        obj.id ? `${obj.name} [${obj.id}]` : obj.name
+      );
+
+      return {
+        characters: characterNames,
+        characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
+        clothing: null, // Per-character now, no single value
+        objects: objectIds,
+        // Store full parsed data for buildTextFromJson
+        fullData: parsed.output,
+        thinking: parsed.thinking || null,
+        isJsonFormat: true
+      };
+    }
+  } catch (e) {
+    // Not valid JSON, try legacy format
+  }
+
+  // LEGACY: Look for ```json block in markdown
   const jsonBlockMatch = sceneDescription.match(/```json\s*([\s\S]*?)```/i);
   if (!jsonBlockMatch || !jsonBlockMatch[1]) {
     return null;
@@ -204,7 +321,8 @@ function extractSceneMetadata(sceneDescription) {
       // Support both new per-character format and legacy single-value format
       characterClothing: metadata.characterClothing || null,
       clothing: metadata.clothing || null, // Legacy support
-      objects: metadata.objects || []
+      objects: metadata.objects || [],
+      isJsonFormat: false
     };
   } catch (e) {
     return null;

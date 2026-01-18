@@ -1686,7 +1686,7 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
     res.json({ city, count: photos.length, photos });
   } catch (err) {
     log.error('Error getting landmark photos:', err);
-    res.status(500).json({ error: 'Failed to get landmark photos' });
+    res.status(500).json({ error: 'Failed to get landmark photos', details: err.message, code: err.code });
   }
 });
 
@@ -7346,11 +7346,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             // Extract metadata from scene description (characters, clothing, objects)
             const metadata = extractSceneMetadata(img.description) || {};
 
-            // Extract scene summary (text before the JSON block, first 150 chars)
+            // Extract scene summary
+            // New JSON format: use imageSummary from fullData
+            // Legacy format: text before the ```json block
             let sceneSummary = '';
-            if (img.description) {
+            if (metadata.fullData?.imageSummary) {
+              sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
+            } else if (img.description) {
               const beforeJson = img.description.split('```json')[0].trim();
-              // Get first meaningful line (skip markdown headers)
               const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
               sceneSummary = lines[0]?.substring(0, 150) || '';
             }
@@ -7359,8 +7362,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               imageData: img.imageData,
               pageNumber: img.pageNumber || idx + 1,
               characters: metadata.characters || [],  // Which characters appear in this scene
-              clothing: metadata.clothing || 'standard',  // Clothing category for this scene
-              characterClothing: metadata.characterClothing || null,  // Per-character clothing
+              clothing: metadata.clothing || 'standard',  // Clothing category for this scene (legacy)
+              characterClothing: metadata.characterClothing || null,  // Per-character clothing (new JSON format)
               sceneSummary,  // Brief description of what's in the scene
               // Also include character names from reference photos as fallback
               referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
@@ -8915,11 +8918,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Extract metadata from scene description (characters, clothing, objects)
             const metadata = extractSceneMetadata(img.description) || {};
 
-            // Extract scene summary (text before the JSON block, first 150 chars)
+            // Extract scene summary
+            // New JSON format: use imageSummary from fullData
+            // Legacy format: text before the ```json block
             let sceneSummary = '';
-            if (img.description) {
+            if (metadata.fullData?.imageSummary) {
+              sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
+            } else if (img.description) {
               const beforeJson = img.description.split('```json')[0].trim();
-              // Get first meaningful line (skip markdown headers)
               const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
               sceneSummary = lines[0]?.substring(0, 150) || '';
             }
@@ -8928,8 +8934,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               imageData: img.imageData,
               pageNumber: img.pageNumber || idx + 1,
               characters: metadata.characters || [],  // Which characters appear in this scene
-              clothing: metadata.clothing || 'standard',  // Clothing category for this scene
-              characterClothing: metadata.characterClothing || null,  // Per-character clothing
+              clothing: metadata.clothing || 'standard',  // Clothing category for this scene (legacy)
+              characterClothing: metadata.characterClothing || null,  // Per-character clothing (new JSON format)
               sceneSummary,  // Brief description of what's in the scene
               // Also include character names from reference photos as fallback
               referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
@@ -9032,15 +9038,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
               // Get reference photos for this scene with CORRECT clothing (not hardcoded 'standard')
               const sceneMetadataForClothing = extractSceneMetadata(existingImage.description) || {};
-              const originalClothing = existingImage.clothing || sceneMetadataForClothing.clothing || 'standard';
-              let clothingCategory = originalClothing;
-              let costumeType = null;
-              if (originalClothing.startsWith('costumed:')) {
-                clothingCategory = 'costumed';
-                costumeType = originalClothing.split(':')[1];
-              }
+
               // Build per-character clothing requirements for this page
+              // Priority: 1) per-character from scene metadata, 2) story-level clothingRequirements, 3) existingImage.clothing, 4) 'standard'
               const pageClothingReqs = {};
+
+              // First, add story-level requirements
               if (clothingRequirements) {
                 for (const [charName, reqs] of Object.entries(clothingRequirements)) {
                   if (reqs && reqs._currentClothing) {
@@ -9048,7 +9051,36 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   }
                 }
               }
-              log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using clothing: ${originalClothing}`);
+
+              // Override with per-character clothing from scene metadata (new JSON format)
+              if (sceneMetadataForClothing.characterClothing && Object.keys(sceneMetadataForClothing.characterClothing).length > 0) {
+                for (const [charName, clothing] of Object.entries(sceneMetadataForClothing.characterClothing)) {
+                  pageClothingReqs[charName] = { _currentClothing: clothing };
+                }
+              }
+
+              // Determine default clothing for getCharacterPhotoDetails (for characters not in the map)
+              // Priority: existingImage.clothing, first character's clothing from metadata, or 'standard'
+              let originalClothing = existingImage.clothing;
+              if (!originalClothing && sceneMetadataForClothing.characterClothing) {
+                const firstCharClothing = Object.values(sceneMetadataForClothing.characterClothing)[0];
+                originalClothing = firstCharClothing || 'standard';
+              }
+              if (!originalClothing) {
+                originalClothing = sceneMetadataForClothing.clothing || 'standard'; // Legacy fallback
+              }
+
+              let clothingCategory = originalClothing;
+              let costumeType = null;
+              if (originalClothing.startsWith('costumed:')) {
+                clothingCategory = 'costumed';
+                costumeType = originalClothing.split(':')[1];
+              }
+
+              const clothingDebug = Object.keys(pageClothingReqs).length > 0
+                ? Object.entries(pageClothingReqs).map(([n, r]) => `${n}:${r._currentClothing}`).join(', ')
+                : originalClothing;
+              log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using clothing: ${clothingDebug}`);
               let pagePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, inputData.artStyle, pageClothingReqs);
               pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
 
