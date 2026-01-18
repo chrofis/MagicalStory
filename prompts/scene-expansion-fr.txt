@@ -164,7 +164,7 @@ Choisissez en fonction de ce que la scène DOIT montrer, puis suivez les limites
   - "posture nerveuse" → "épaules rentrées, mains serrées"
 - PAS de dialogues ou de texte dans la scène
 - Gardez la sortie totale sous 800 mots
-- **LANGUE DE SORTIE: Écrivez en français**
+- **LANGUE DE SORTIE: Écrivez TOUTES les sections en ANGLAIS** (pour la compatibilité de génération d'images)
 
 **SÉCURITÉ - À ÉVITER:**
 - Scènes de chambre/sommeil → utilisez salon, jardin, extérieur

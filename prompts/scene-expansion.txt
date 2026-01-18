@@ -164,7 +164,7 @@ Choose based on what the scene MUST show, then follow detail limits:
   - "nervous posture" → "hunched shoulders, hands clasped tightly"
 - Do NOT include dialogue or text in the scene
 - Keep total output under 800 words
-- **OUTPUT LANGUAGE: Write in {LANGUAGE}**
+- **OUTPUT LANGUAGE: Write ALL sections in ENGLISH** (for image generation compatibility)
 
 **SAFETY - AVOID:**
 - Bedroom/sleeping scenes → use living room, garden, outdoor

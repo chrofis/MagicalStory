@@ -335,8 +335,13 @@ Output raw JSON (no markdown code fences, no explanation text).
 
 ---
 
-## LANGUAGE FOR TRANSLATION
+## LANGUAGE RULES
 
+**ALL OUTPUT IN ENGLISH** - except `translatedSummary`:
+- `imageSummary`, `setting`, `characters`, `objects`, `thinking` → ALWAYS ENGLISH (for image generation)
+- `translatedSummary` → translate to target language below
+
+**Target Language for translatedSummary:**
 {LANGUAGE_INSTRUCTION}
 {LANGUAGE_NOTE}
 

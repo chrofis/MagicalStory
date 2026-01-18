@@ -164,7 +164,7 @@ Wähle basierend darauf, was die Szene zeigen MUSS, dann folge den Detailgrenzen
   - "nervöse Haltung" → "eingezogene Schultern, fest verschränkte Hände"
 - KEINE Dialoge oder Text in der Szene
 - Halte die Gesamtausgabe unter 800 Wörtern
-- **AUSGABESPRACHE: Schreibe auf Deutsch**
+- **AUSGABESPRACHE: Schreibe ALLE Abschnitte auf ENGLISCH** (für Bildgenerierungs-Kompatibilität)
 
 **SICHERHEIT - VERMEIDEN:**
 - Schlafzimmer-/Schlafszenen → verwende Wohnzimmer, Garten, Draussen
