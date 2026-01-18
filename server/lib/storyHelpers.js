@@ -121,6 +121,80 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 // ============================================================================
 
 /**
+ * Extract JSON object from a string that may have text before/after it or be wrapped in code blocks
+ * @param {string} text - Raw text that may contain JSON
+ * @returns {Object|null} Parsed JSON object or null if not found
+ */
+function extractJsonFromText(text) {
+  if (!text || typeof text !== 'string') return null;
+
+  let jsonToParse = text.trim();
+
+  // First, try to extract from ```json ... ``` code block
+  const codeBlockMatch = jsonToParse.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
+  if (codeBlockMatch) {
+    try {
+      return JSON.parse(codeBlockMatch[1].trim());
+    } catch (e) {
+      // Code block content wasn't valid JSON, continue
+    }
+  }
+
+  // Try parsing the whole thing as JSON
+  try {
+    return JSON.parse(jsonToParse);
+  } catch (e) {
+    // Not direct JSON, try to find JSON object
+  }
+
+  // Find the first { and try to extract a balanced JSON object
+  const jsonStart = jsonToParse.indexOf('{');
+  if (jsonStart === -1) return null;
+
+  // Try progressively longer substrings starting from {
+  // This handles cases where there's trailing text after the JSON
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = jsonStart; i < jsonToParse.length; i++) {
+    const char = jsonToParse[i];
+
+    if (escape) {
+      escape = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escape = true;
+      continue;
+    }
+
+    if (char === '"' && !escape) {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') depth++;
+      if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          // Found a complete JSON object
+          try {
+            return JSON.parse(jsonToParse.substring(jsonStart, i + 1));
+          } catch (e) {
+            // Not valid JSON, continue looking
+          }
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Build readable text from JSON scene description output
  * Converts the structured JSON to markdown text for image generation prompt
  * @param {Object} output - The output section from JSON scene description
@@ -195,15 +269,11 @@ function buildTextFromJson(output) {
 function stripSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return sceneDescription;
 
-  // Try NEW JSON format first
-  try {
-    const parsed = JSON.parse(sceneDescription.trim());
-    if (parsed.output) {
-      // Convert structured JSON to text for image prompt
-      return buildTextFromJson(parsed.output);
-    }
-  } catch (e) {
-    // Not valid JSON, continue with legacy parsing
+  // Try NEW JSON format first using robust extraction
+  const parsed = extractJsonFromText(sceneDescription);
+  if (parsed && parsed.output) {
+    // Convert structured JSON to text for image prompt
+    return buildTextFromJson(parsed.output);
   }
 
   // LEGACY: Regex-based stripping for markdown format
@@ -265,40 +335,36 @@ function stripSceneMetadata(sceneDescription) {
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
-  // Try NEW JSON format first (entire response is JSON)
-  try {
-    const parsed = JSON.parse(sceneDescription.trim());
-    if (parsed.output && parsed.output.characters) {
-      // Extract per-character clothing
-      const characterClothing = {};
-      const characterNames = [];
-      for (const char of parsed.output.characters) {
-        if (char.name) {
-          characterNames.push(char.name);
-          if (char.clothing) {
-            characterClothing[char.name] = char.clothing;
-          }
+  // Try NEW JSON format first using robust extraction
+  const parsed = extractJsonFromText(sceneDescription);
+  if (parsed && parsed.output && parsed.output.characters) {
+    // Extract per-character clothing
+    const characterClothing = {};
+    const characterNames = [];
+    for (const char of parsed.output.characters) {
+      if (char.name) {
+        characterNames.push(char.name);
+        if (char.clothing) {
+          characterClothing[char.name] = char.clothing;
         }
       }
-
-      // Extract object IDs
-      const objectIds = (parsed.output.objects || []).map(obj =>
-        obj.id ? `${obj.name} [${obj.id}]` : obj.name
-      );
-
-      return {
-        characters: characterNames,
-        characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
-        clothing: null, // Per-character now, no single value
-        objects: objectIds,
-        // Store full parsed data for buildTextFromJson
-        fullData: parsed.output,
-        thinking: parsed.thinking || null,
-        isJsonFormat: true
-      };
     }
-  } catch (e) {
-    // Not valid JSON, try legacy format
+
+    // Extract object IDs
+    const objectIds = (parsed.output.objects || []).map(obj =>
+      obj.id ? `${obj.name} [${obj.id}]` : obj.name
+    );
+
+    return {
+      characters: characterNames,
+      characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
+      clothing: null, // Per-character now, no single value
+      objects: objectIds,
+      // Store full parsed data for buildTextFromJson
+      fullData: parsed.output,
+      thinking: parsed.thinking || null,
+      isJsonFormat: true
+    };
   }
 
   // LEGACY: Look for ```json block in markdown
