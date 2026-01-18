@@ -1587,6 +1587,30 @@ export default function StoryWizard() {
             };
           });
 
+          // CRITICAL: Add new character to array immediately to prevent data loss
+          // If user switches to edit another character before completing this one,
+          // the save would overwrite DB and lose this character
+          const charIdToUse = serverCharacterId || currentCharacter?.id;
+          if (charIdToUse) {
+            setCharacters(prev => {
+              const exists = prev.some(c => c.id === charIdToUse);
+              if (!exists) {
+                // Add placeholder to array - will be updated when user completes form
+                const newChar: Character = {
+                  ...currentCharacter!,
+                  id: charIdToUse,
+                  photos: updatedPhotos,
+                  avatars: { status: 'generating' as const },
+                  clothing: updatedClothing,
+                  clothingSource: updatedClothingSource,
+                };
+                log.info(`📸 Adding new character ${charIdToUse} to array to prevent data loss`);
+                return [...prev, newChar];
+              }
+              return prev;
+            });
+          }
+
           // Auto-start avatar generation in BACKGROUND after face detection
           // Character already exists in DB (created during photo analysis), so avatar job can find it
           log.info(`🎨 Auto-starting avatar generation in background...`);
@@ -1776,6 +1800,30 @@ export default function StoryWizard() {
             clothingSource: updatedClothingSource,
           };
         });
+
+        // CRITICAL: Add new character to array immediately to prevent data loss
+        // If user switches to edit another character before completing this one,
+        // the save would overwrite DB and lose this character
+        const charIdToUse = serverCharacterId || currentCharacter?.id;
+        if (charIdToUse) {
+          setCharacters(prev => {
+            const exists = prev.some(c => c.id === charIdToUse);
+            if (!exists) {
+              // Add placeholder to array - will be updated when user completes form
+              const newChar: Character = {
+                ...currentCharacter!,
+                id: charIdToUse,
+                photos: updatedPhotos,
+                avatars: { status: 'generating' as const },
+                clothing: updatedClothing,
+                clothingSource: updatedClothingSource,
+              };
+              log.info(`📸 [FACE SELECT] Adding new character ${charIdToUse} to array to prevent data loss`);
+              return [...prev, newChar];
+            }
+            return prev;
+          });
+        }
 
         // Navigate based on whether character has a name:
         // - Has name: go to traits step to see avatar regenerating
