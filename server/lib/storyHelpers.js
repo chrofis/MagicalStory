@@ -1268,6 +1268,17 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         log.warn(`[PHOTO LOOKUP] No photo found for "${char.name}" (wanted: ${searchedFor}, hasAvatars: ${hasAvatars}, hasPhotos: ${hasPhotos})`);
       }
 
+      // Fallback: use signature from clothingRequirements if no clothingDescription found
+      // clothingRequirements has format: { "CharName": { "winter": { "used": true, "signature": "red scarf" } } }
+      if (!clothingDescription && clothingRequirements && clothingRequirements[char.name]) {
+        const charReqs = clothingRequirements[char.name];
+        const categoryToCheck = usedClothingCategory || effectiveClothingCategory;
+        if (categoryToCheck && charReqs[categoryToCheck]?.signature) {
+          clothingDescription = charReqs[categoryToCheck].signature;
+          log.debug(`[CLOTHING DESC] ${char.name}: using signature from clothingRequirements: "${clothingDescription}"`);
+        }
+      }
+
       return {
         name: char.name,
         id: char.id,
