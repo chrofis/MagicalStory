@@ -8,7 +8,7 @@ const sharp = require('sharp');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
-const { MODEL_DEFAULTS } = require('./textModels');
+const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
@@ -338,27 +338,29 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
     }
 
-    // Helper function to call the API
+    // Helper function to call the API with retry for socket errors
     const callQualityAPI = async (model) => {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            maxOutputTokens: 16000,  // High limit to accommodate Gemini 2.5 thinking tokens
-            temperature: 0.3
-          },
-          safetySettings: [
-            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-          ]
-        })
-      });
+      return withRetry(async () => {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        return fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts }],
+            generationConfig: {
+              maxOutputTokens: 16000,  // High limit to accommodate Gemini 2.5 thinking tokens
+              temperature: 0.3
+            },
+            safetySettings: [
+              { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+              { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+            ]
+          })
+        });
+      }, { maxRetries: 2, baseDelay: 2000 });
     };
 
     // Helper function to check if response indicates blocked content
@@ -1064,24 +1066,28 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt: ${prompt.substring(0, 100).replace(/\n/g, ' ')}...`);
   log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(requestBody)
+  const data = await withRetry(async () => {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    log.debug('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error('❌ [IMAGE GEN] Gemini API error response:', error);
+      const err = new Error(`Gemini API error (${response.status}): ${error}`);
+      err.status = response.status;
+      throw err;
     }
-  );
 
-  log.debug('🖼️  [IMAGE GEN] Response status:', response.status, response.statusText);
-
-  if (!response.ok) {
-    const error = await response.text();
-    log.error('❌ [IMAGE GEN] Gemini API error response:', error);
-    throw new Error(`Gemini API error (${response.status}): ${error}`);
-  }
-
-  const data = await response.json();
+    return response.json();
+  }, { maxRetries: 2, baseDelay: 2000 });
 
   // Extract token usage from response (including thinking tokens for Gemini 2.5)
   const imageUsage = {
@@ -2411,29 +2417,33 @@ IMPORTANT INSTRUCTIONS:
       }
     ];
 
-    // Use page image model for editing
+    // Use page image model for editing with retry for socket errors
     const modelId = MODEL_DEFAULTS.pageImage;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts }],
-        generationConfig: {
-          responseModalities: ["TEXT", "IMAGE"],
-          temperature: 0.6
-        }
-      })
-    });
+    const data = await withRetry(async () => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            responseModalities: ["TEXT", "IMAGE"],
+            temperature: 0.6
+          }
+        })
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      log.error('❌ [INPAINT] Gemini API error:', error);
-      throw new Error(`Gemini API error: ${response.status}`);
-    }
+      if (!response.ok) {
+        const error = await response.text();
+        log.error('❌ [INPAINT] Gemini API error:', error);
+        const err = new Error(`Gemini API error: ${response.status}`);
+        err.status = response.status;
+        throw err;
+      }
 
-    const data = await response.json();
+      return response.json();
+    }, { maxRetries: 2, baseDelay: 2000 });
 
     // Extract the edited image from the response
     if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -2913,38 +2923,48 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
   // Add the evaluation prompt
   parts.push({ text: prompt });
 
-  // Call Gemini API
+  // Call Gemini API with retry for socket errors
   const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   log.info(`🔍 [CONSISTENCY] Checking ${imagesToCheck.length} images${batchInfo} (type: ${checkType})`);
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts }],
-      generationConfig: {
-        maxOutputTokens: 8000,
-        temperature: 0.2
-      },
-      safetySettings: [
-        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-        { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-      ]
-    })
-  });
+  let data;
+  try {
+    data = await withRetry(async () => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            maxOutputTokens: 8000,
+            temperature: 0.2
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+          ]
+        })
+      });
 
-  if (!response.ok) {
-    const error = await response.text();
-    log.error(`❌ [CONSISTENCY] API error: ${error.substring(0, 200)}`);
+      if (!response.ok) {
+        const error = await response.text();
+        log.error(`❌ [CONSISTENCY] API error: ${error.substring(0, 200)}`);
+        const err = new Error(`Consistency API error (${response.status})`);
+        err.status = response.status;
+        throw err;
+      }
+
+      return response.json();
+    }, { maxRetries: 2, baseDelay: 2000 });
+  } catch (error) {
+    log.error(`❌ [CONSISTENCY] Request failed after retries: ${error.message}`);
     return null;
   }
-
-  const data = await response.json();
 
   // Log token usage
   const inputTokens = data.usageMetadata?.promptTokenCount || 0;

@@ -402,20 +402,22 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
   }
 
   const callAPI = async (model) => {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    return fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }]
-        }],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature: 0.7
-        }
-      })
-    });
+    return withRetry(async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{ text: prompt }]
+          }],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature: 0.7
+          }
+        })
+      });
+    }, { maxRetries: 2, baseDelay: 2000 });
   };
 
   let response = await callAPI(modelId);
@@ -684,6 +686,9 @@ module.exports = {
   getActiveTextModel,
   getTextModelName,
   calculateOptimalBatchSize,
+
+  // Utility
+  withRetry,
 
   // API functions
   callTextModel,
