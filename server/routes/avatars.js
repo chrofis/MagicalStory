@@ -2205,46 +2205,109 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               log.info(`📊 [AVATAR JOB ${jobId}] Token usage saved: ${JSON.stringify(existingUsage.byModel)}`);
             }
 
-            // Update in database using rowId (e.g., "characters_1764881868108")
-            charData.characters = characters;
+            // Use ATOMIC updates to prevent race conditions with concurrent saves
+            // Instead of read-modify-write on entire document, use jsonb_set for each field
+            const charPath = `{characters,${charIndex}}`;
 
-            // Also regenerate metadata column (used for fast list queries)
-            // Strip heavy fields and keep only lightweight avatar info
-            const lightCharacters = characters.map(char => {
-              // Strip heavy base64 fields
-              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, photos, ...lightChar } = char;
-              // Keep avatar metadata + only 'standard' faceThumbnail for list display
-              if (lightChar.avatars) {
-                const standardThumb = lightChar.avatars.faceThumbnails?.standard;
-                // Check for avatars in both old schema (top-level) and new schema (styledAvatars)
-                const hasOldSchemaAvatars = !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal);
-                const hasNewSchemaAvatars = !!(lightChar.avatars.styledAvatars && Object.keys(lightChar.avatars.styledAvatars).length > 0);
-                lightChar.avatars = {
-                  status: lightChar.avatars.status,
-                  stale: lightChar.avatars.stale,
-                  generatedAt: lightChar.avatars.generatedAt,
-                  error: lightChar.avatars.error,
-                  hasFullAvatars: hasOldSchemaAvatars || hasNewSchemaAvatars,
-                  faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
-                  clothing: lightChar.avatars.clothing
-                };
-              }
-              return lightChar;
-            });
-
-            const metadataObj = {
-              characters: lightCharacters,
-              relationships: charData.relationships || {},
-              relationshipTexts: charData.relationshipTexts || {},
-              customRelationships: charData.customRelationships || [],
-              customStrengths: charData.customStrengths || [],
-              customWeaknesses: charData.customWeaknesses || [],
-              customFears: charData.customFears || []
+            // Build avatar data for full data column
+            // NOTE: We intentionally DON'T spread old avatars here - we use SQL-level merge below
+            // to avoid race conditions with stale in-memory data
+            const newAvatarData = {
+              status: 'complete',
+              generatedAt: new Date().toISOString(),
+              ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
+              ...(results.standard && { standard: results.standard }),
+              ...(results.winter && { winter: results.winter }),
+              ...(results.summer && { summer: results.summer }),
+              ...(results.clothing && { clothing: results.clothing }),
             };
 
-            await dbQuery(`
-              UPDATE characters SET data = $1, metadata = $2 WHERE id = $3
-            `, [JSON.stringify(charData), JSON.stringify(metadataObj), rowId]);
+            // Build lightweight avatar data for metadata column
+            const lightAvatarData = {
+              status: 'complete',
+              generatedAt: newAvatarData.generatedAt,
+              hasFullAvatars: true,
+              faceThumbnails: results.faceThumbnails?.standard ? { standard: results.faceThumbnails.standard } : undefined,
+              clothing: results.clothing,
+            };
+
+            // Build atomic update SQL with all field updates
+            // Each jsonb_set wraps the previous, creating nested atomic updates
+            let dataUpdate = 'data';
+            let metaUpdate = 'metadata';
+            const params = [rowId]; // $1 = rowId
+            let paramIndex = 2;
+
+            // Avatar data (always update if we have results)
+            // Use SQL-level merge: COALESCE(existing, '{}') || new_data to preserve other avatar fields
+            // This avoids race conditions from using stale in-memory data
+            if (results.faceThumbnails || results.standard || results.winter || results.summer) {
+              // Merge new avatars with existing DB avatars (references current DB value, not stale in-memory)
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatars}', COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},avatars}', $${paramIndex + 1}::jsonb, true)`;
+              params.push(JSON.stringify(newAvatarData), JSON.stringify(lightAvatarData));
+              paramIndex += 2;
+            }
+
+            // Extracted traits - atomically update each field
+            if (results.extractedTraits) {
+              const t = results.extractedTraits;
+              const traitFields = [
+                ['apparent_age', t.apparentAge],
+                ['build', t.build],
+                ['eye_color', t.eyeColor],
+                ['hair_color', t.hairColor],
+                ['hair_length', t.hairLength],
+                ['hair_style', t.hairStyle],
+                ['skin_tone', t.skinTone],
+                ['skin_tone_hex', t.skinToneHex],
+                ['facial_hair', t.facialHair],
+                ['other_features', t.face],
+                ['other', t.other],
+                ['detailed_hair_analysis', t.detailedHairAnalysis],
+              ];
+
+              for (const [field, value] of traitFields) {
+                if (value) {
+                  dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
+                  metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
+                  params.push(JSON.stringify(value));
+                  paramIndex += 1;
+                }
+              }
+            }
+
+            // Structured clothing
+            if (results.structuredClothing?.standard) {
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              params.push(JSON.stringify(results.structuredClothing.standard));
+              paramIndex += 1;
+            }
+
+            // Token usage - merge with existing at SQL level to avoid race conditions
+            if (hasTokenUsage) {
+              // Build new token usage data
+              const newUsage = { byModel: {}, lastUpdated: new Date().toISOString() };
+              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
+                newUsage.byModel[modelId] = {
+                  input_tokens: usage.input_tokens || 0,
+                  output_tokens: usage.output_tokens || 0,
+                  calls: usage.calls || 0
+                };
+              }
+
+              // Use SQL-level merge for token usage (only in data column)
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatarTokenUsage}', COALESCE(data->'characters'->${charIndex}->'avatarTokenUsage', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              params.push(JSON.stringify(newUsage));
+              paramIndex += 1;
+
+              log.info(`📊 [AVATAR JOB ${jobId}] Token usage saved: ${JSON.stringify(newUsage.byModel)}`);
+            }
+
+            // Execute atomic update
+            const updateQuery = `UPDATE characters SET data = ${dataUpdate}, metadata = ${metaUpdate} WHERE id = $1`;
+            await dbQuery(updateQuery, params);
 
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId} (data + metadata)`);
             results.dbSaveSuccessful = true;
@@ -3016,98 +3079,100 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
 
           if (charIndex >= 0) {
-            // Accumulate token usage per model (if available)
-            if (hasTokenUsage) {
-              const existingUsage = characters[charIndex].avatarTokenUsage || { byModel: {} };
-              if (!existingUsage.byModel) existingUsage.byModel = {};
+            // Use ATOMIC updates to prevent race conditions with concurrent saves
+            // Instead of read-modify-write on entire document, use jsonb_set for each field
 
-              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
-                if (!existingUsage.byModel[modelId]) {
-                  existingUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
-                }
-                existingUsage.byModel[modelId].input_tokens += usage.input_tokens;
-                existingUsage.byModel[modelId].output_tokens += usage.output_tokens;
-                existingUsage.byModel[modelId].calls += usage.calls;
-              }
-              existingUsage.lastUpdated = new Date().toISOString();
-              characters[charIndex].avatarTokenUsage = existingUsage;
-            }
+            // Build avatar data for full data column (don't spread stale in-memory data)
+            const newAvatarData = {
+              status: 'complete',
+              generatedAt: new Date().toISOString(),
+              ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
+              ...(results.standard && { standard: results.standard }),
+              ...(results.winter && { winter: results.winter }),
+              ...(results.summer && { summer: results.summer }),
+              ...(results.clothing && { clothing: results.clothing }),
+            };
 
-            // Save extracted traits as FLAT properties (not nested in physical)
-            // This matches the format used by frontend save and photo analysis
-            if (results.extractedTraits) {
-              const t = results.extractedTraits;
-              if (t.apparentAge) characters[charIndex].apparent_age = t.apparentAge;
-              if (t.build) characters[charIndex].build = t.build;
-              if (t.eyeColor) characters[charIndex].eye_color = t.eyeColor;
-              if (t.hairColor) characters[charIndex].hair_color = t.hairColor;
-              if (t.hairLength) characters[charIndex].hair_length = t.hairLength;
-              if (t.hairStyle) characters[charIndex].hair_style = t.hairStyle;
-              if (t.skinTone) characters[charIndex].skin_tone = t.skinTone;
-              if (t.skinToneHex) characters[charIndex].skin_tone_hex = t.skinToneHex;
-              if (t.facialHair) characters[charIndex].facial_hair = t.facialHair;
-              if (t.face) characters[charIndex].other_features = t.face;
-              if (t.other) characters[charIndex].other = t.other;
-              if (t.detailedHairAnalysis) characters[charIndex].detailed_hair_analysis = t.detailedHairAnalysis;
-              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character (flat): apparent_age=${t.apparentAge}`);
-            }
+            // Build lightweight avatar data for metadata column
+            const lightAvatarData = {
+              status: 'complete',
+              generatedAt: newAvatarData.generatedAt,
+              hasFullAvatars: true,
+              faceThumbnails: results.faceThumbnails?.standard ? { standard: results.faceThumbnails.standard } : undefined,
+              clothing: results.clothing,
+            };
 
-            // Save extracted clothing
-            if (results.structuredClothing?.standard) {
-              characters[charIndex].structured_clothing = results.structuredClothing.standard;
-              log.debug(`💾 [CLOTHING AVATARS] Applied extracted clothing to character`);
-            }
+            // Build atomic update SQL with all field updates
+            let dataUpdate = 'data';
+            let metaUpdate = 'metadata';
+            const params = [rowId]; // $1 = rowId
+            let paramIndex = 2;
 
-            // Save avatar images to character (SYNC path - matches ASYNC path behavior)
+            // Avatar data - merge with existing at SQL level
             if (results.standard || results.winter || results.summer) {
-              characters[charIndex].avatars = {
-                ...(characters[charIndex].avatars || {}),
-                status: 'complete',
-                generatedAt: new Date().toISOString(),
-                ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
-                ...(results.standard && { standard: results.standard }),
-                ...(results.winter && { winter: results.winter }),
-                ...(results.summer && { summer: results.summer }),
-                ...(results.clothing && { clothing: results.clothing }),
-              };
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatars}', COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},avatars}', $${paramIndex + 1}::jsonb, true)`;
+              params.push(JSON.stringify(newAvatarData), JSON.stringify(lightAvatarData));
+              paramIndex += 2;
               log.debug(`💾 [CLOTHING AVATARS] Applied avatar data including faceThumbnails`);
             }
 
-            // Generate lightweight metadata for fast list queries (matches POST /api/characters behavior)
-            const lightCharacters = characters.map(char => {
-              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, photos, ...lightChar } = char;
-              if (lightChar.avatars) {
-                const standardThumb = lightChar.avatars.faceThumbnails?.standard;
-                // Check for avatars in both old schema (top-level) and new schema (styledAvatars)
-                const hasOldSchemaAvatars = !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal);
-                const hasNewSchemaAvatars = !!(lightChar.avatars.styledAvatars && Object.keys(lightChar.avatars.styledAvatars).length > 0);
-                lightChar.avatars = {
-                  status: lightChar.avatars.status,
-                  stale: lightChar.avatars.stale,
-                  generatedAt: lightChar.avatars.generatedAt,
-                  error: lightChar.avatars.error,
-                  hasFullAvatars: hasOldSchemaAvatars || hasNewSchemaAvatars,
-                  faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
-                  clothing: lightChar.avatars.clothing
+            // Extracted traits - atomically update each field
+            if (results.extractedTraits) {
+              const t = results.extractedTraits;
+              const traitFields = [
+                ['apparent_age', t.apparentAge],
+                ['build', t.build],
+                ['eye_color', t.eyeColor],
+                ['hair_color', t.hairColor],
+                ['hair_length', t.hairLength],
+                ['hair_style', t.hairStyle],
+                ['skin_tone', t.skinTone],
+                ['skin_tone_hex', t.skinToneHex],
+                ['facial_hair', t.facialHair],
+                ['other_features', t.face],
+                ['other', t.other],
+                ['detailed_hair_analysis', t.detailedHairAnalysis],
+              ];
+
+              for (const [field, value] of traitFields) {
+                if (value) {
+                  dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
+                  metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
+                  params.push(JSON.stringify(value));
+                  paramIndex += 1;
+                }
+              }
+              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character (flat): apparent_age=${t.apparentAge}`);
+            }
+
+            // Structured clothing
+            if (results.structuredClothing?.standard) {
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              params.push(JSON.stringify(results.structuredClothing.standard));
+              paramIndex += 1;
+              log.debug(`💾 [CLOTHING AVATARS] Applied extracted clothing to character`);
+            }
+
+            // Token usage - merge with existing at SQL level
+            if (hasTokenUsage) {
+              const newUsage = { byModel: {}, lastUpdated: new Date().toISOString() };
+              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
+                newUsage.byModel[modelId] = {
+                  input_tokens: usage.input_tokens || 0,
+                  output_tokens: usage.output_tokens || 0,
+                  calls: usage.calls || 0
                 };
               }
-              return lightChar;
-            });
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatarTokenUsage}', COALESCE(data->'characters'->${charIndex}->'avatarTokenUsage', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              params.push(JSON.stringify(newUsage));
+              paramIndex += 1;
+            }
 
-            const metadataObj = {
-              characters: lightCharacters,
-              relationships: data.relationships || {},
-              relationshipTexts: data.relationshipTexts || {},
-              customRelationships: data.customRelationships || [],
-              customStrengths: data.customStrengths || [],
-              customWeaknesses: data.customWeaknesses || [],
-              customFears: data.customFears || []
-            };
-
-            // Save back to database (both data and metadata columns)
-            data.characters = characters;
-            await dbQuery('UPDATE characters SET data = $1, metadata = $2 WHERE id = $3',
-              [JSON.stringify(data), JSON.stringify(metadataObj), rowId]);
+            // Execute atomic update
+            const updateQuery = `UPDATE characters SET data = ${dataUpdate}, metadata = ${metaUpdate} WHERE id = $1`;
+            await dbQuery(updateQuery, params);
 
             // Log summary
             if (hasTokenUsage) {

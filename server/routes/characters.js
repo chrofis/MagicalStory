@@ -187,58 +187,50 @@ router.post('/', authenticateToken, async (req, res) => {
 
     console.log(`[Characters] POST - Saving ${characters?.length || 0} characters for user.id: ${req.user.id}`);
 
+    // IMPORTANT: Strip avatar data from frontend input - avatars are backend-only
+    // This prevents the frontend from accidentally overwriting avatar data
+    const charactersWithoutAvatars = (characters || []).map(char => {
+      const { avatars, ...charWithoutAvatars } = char;
+      if (avatars) {
+        console.log(`[Characters] POST - Stripping frontend avatars for ${char.name}`);
+      }
+      return charWithoutAvatars;
+    });
+
     if (isDatabaseMode()) {
       // Use UPSERT to atomically update or insert character data
       // We use a stable ID per user to ensure only one record exists
       const characterId = `characters_${req.user.id}`;
       console.log(`[Characters] POST - Using characterId: ${characterId}`);
 
-      // Fetch ONLY the fields that need preserving (avatars, photos) - not entire 30MB blob
-      // This query extracts just the preservation-relevant fields per character
-      const preserveQuery = `
-        SELECT jsonb_agg(
-          jsonb_build_object(
-            'id', c->>'id',
-            'name', c->>'name',
-            'avatars', c->'avatars',
-            'photos', c->'photos',
-            'photo_url', c->>'photo_url',
-            'thumbnail_url', c->>'thumbnail_url',
-            'body_photo_url', c->>'body_photo_url',
-            'body_no_bg_url', c->>'body_no_bg_url',
-            'height', c->>'height',
-            'apparent_age', c->>'apparent_age',
-            'build', c->>'build',
-            'eye_color', c->>'eye_color',
-            'hair_color', c->>'hair_color',
-            'hair_style', c->>'hair_style',
-            'other_features', c->>'other_features',
-            'other', c->>'other',
-            'clothing', c->'clothing',
-            'structured_clothing', c->'structured_clothing',
-            'physical', c->'physical',
-            'hair_length', c->>'hair_length',
-            'skin_tone', c->>'skin_tone',
-            'skin_tone_hex', c->>'skin_tone_hex',
-            'facial_hair', c->>'facial_hair',
-            'detailed_hair_analysis', c->>'detailed_hair_analysis'
-          )
-        ) as preserved
-        FROM characters, jsonb_array_elements(data->'characters') c
-        WHERE id = $1
-      `;
-      const preserveResult = await dbQuery(preserveQuery, [characterId]);
-      const existingCharacters = preserveResult[0]?.preserved || [];
+      // Use transaction with row lock to prevent race conditions with avatar job
+      await dbQuery('BEGIN');
+
+      // Lock the row and read FULL data in one query (DB-first approach)
+      // This ensures we always start with the latest DB state including full avatars
+      const lockAndReadQuery = `SELECT data FROM characters WHERE id = $1 FOR UPDATE`;
+      const dbResult = await dbQuery(lockAndReadQuery, [characterId]);
+      const currentDbData = dbResult[0]?.data || { characters: [] };
+      const dbCharacters = currentDbData.characters || [];
+
+      // Debug: show what avatars we found in DB (from full data column, not JSONB extraction)
+      for (const dbChar of dbCharacters) {
+        const avatarKeys = dbChar.avatars ? Object.keys(dbChar.avatars) : [];
+        const hasStandard = dbChar.avatars?.standard ? dbChar.avatars.standard.length : 0;
+        console.log(`[Characters] POST - DB-first found id=${dbChar.id} name=${dbChar.name}: avatarKeys=[${avatarKeys.join(',')}], standardLen=${hasStandard}`);
+      }
+      console.log(`[Characters] POST - DB has ${dbCharacters.length} characters, frontend sending ${charactersWithoutAvatars.length}`)
 
       // Merge server-side data from existing characters into new characters
       // This preserves avatar data AND character fields that may not be sent by the frontend
+      // NOTE: We use charactersWithoutAvatars - frontend avatars have been stripped
       let preservedCount = 0;
-      const mergedCharacters = (characters || []).map(newChar => {
+      const mergedCharacters = (charactersWithoutAvatars || []).map(newChar => {
         // Compare IDs as strings to handle type mismatch (SQL returns string, frontend sends number)
         const newCharIdStr = String(newChar.id);
-        const existingChar = existingCharacters.find(c => String(c.id) === newCharIdStr || c.name === newChar.name);
+        const existingChar = dbCharacters.find(c => String(c.id) === newCharIdStr || c.name === newChar.name);
         if (!existingChar) {
-          console.log(`[Characters] POST - No existing data found for ${newChar.name} (id: ${newChar.id})`);
+          console.log(`[Characters] POST - No existing DB data found for ${newChar.name} (id: ${newChar.id})`);
           return newChar;
         }
 
@@ -521,6 +513,17 @@ router.post('/', authenticateToken, async (req, res) => {
       const metaSizeKB = (metadataJson.length / 1024).toFixed(0);
       console.log(`[Characters] POST - Full data: ${jsonSizeMB} MB, Metadata: ${metaSizeKB} KB`);
 
+      // Debug: verify data vs metadata column content before save
+      for (const char of characterData.characters) {
+        const dataAvatarKeys = char.avatars ? Object.keys(char.avatars) : [];
+        const dataStandardLen = char.avatars?.standard ? char.avatars.standard.length : 0;
+        console.log(`[Characters] POST - data column ${char.name}: avatarKeys=[${dataAvatarKeys.join(',')}], standardLen=${dataStandardLen}`);
+      }
+      for (const char of metadataObj.characters) {
+        const metaAvatarKeys = char.avatars ? Object.keys(char.avatars) : [];
+        console.log(`[Characters] POST - metadata column ${char.name}: avatarKeys=[${metaAvatarKeys.join(',')}]`);
+      }
+
       const upsertQuery = `
         INSERT INTO characters (id, user_id, data, metadata, created_at)
         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
@@ -533,8 +536,14 @@ router.post('/', authenticateToken, async (req, res) => {
       try {
         await dbQuery(upsertQuery, [characterId, req.user.id, jsonData, metadataJson]);
         console.log(`[Characters] POST - Database upsert successful`);
+
+        // Commit the transaction (releases the row lock)
+        await dbQuery('COMMIT');
+        console.log(`[Characters] POST - Transaction committed`);
       } catch (dbErr) {
-        console.error(`[Characters] POST - Database upsert FAILED:`, dbErr.message);
+        // Rollback on any error
+        await dbQuery('ROLLBACK');
+        console.error(`[Characters] POST - Database upsert FAILED, rolled back:`, dbErr.message);
         throw dbErr;
       }
 
@@ -554,9 +563,15 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: characters.length });
-    res.json({ message: 'Characters saved successfully', count: characters.length });
+    await logActivity(req.user.id, req.user.username, 'CHARACTERS_SAVED', { count: charactersWithoutAvatars.length });
+    res.json({ message: 'Characters saved successfully', count: charactersWithoutAvatars.length });
   } catch (err) {
+    // Attempt ROLLBACK in case transaction was started but not committed
+    try {
+      await dbQuery('ROLLBACK');
+    } catch (rollbackErr) {
+      // Ignore rollback errors - transaction may not have been started
+    }
     console.error('Error saving characters:', err);
     res.status(500).json({ error: 'Failed to save characters' });
   }
