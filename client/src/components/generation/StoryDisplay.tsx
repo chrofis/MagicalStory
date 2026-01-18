@@ -1884,6 +1884,34 @@ export function StoryDisplay({
                           </pre>
                         </details>
                       )}
+                      {/* Raw API response (collapsible) - for debugging */}
+                      {finalChecksReport.textCheck.rawResponse && (
+                        <details className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-purple-800">
+                            📝 View Raw Response
+                          </summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                            {finalChecksReport.textCheck.rawResponse}
+                          </pre>
+                        </details>
+                      )}
+                      {/* Parsed JSON result (collapsible) - for debugging */}
+                      {finalChecksReport.textCheck && (
+                        <details className="mt-3 bg-indigo-50 border border-indigo-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-indigo-800">
+                            🔧 View Parsed Result
+                          </summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                            {JSON.stringify({
+                              quality: finalChecksReport.textCheck.quality,
+                              overallScore: finalChecksReport.textCheck.overallScore,
+                              issues: finalChecksReport.textCheck.issues,
+                              summary: finalChecksReport.textCheck.summary,
+                              parseError: finalChecksReport.textCheck.parseError
+                            }, null, 2)}
+                          </pre>
+                        </details>
+                      )}
                       {/* Evaluation prompt (collapsible) - for debugging */}
                       {finalChecksReport.textCheck.evaluationPrompt && (
                         <details className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
