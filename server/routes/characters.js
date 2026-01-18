@@ -168,8 +168,12 @@ router.get('/:characterId/full', authenticateToken, async (req, res) => {
       return res.json({ character: legacyResult[0].character });
     }
 
-    console.log(`[Characters] GET /${characterId}/full - Loaded full character data`);
-    res.json({ character: result[0].character });
+    const char = result[0].character;
+    const hasAvatars = char?.avatars && Object.keys(char.avatars).length > 0;
+    const hasPhotos = char?.photos && Object.keys(char.photos).length > 0;
+    const hasPhotoUrl = !!char?.photo_url;
+    console.log(`[Characters] GET /${characterId}/full - Loaded: avatars=${hasAvatars}, photos=${hasPhotos}, photo_url=${hasPhotoUrl}, avatarKeys=[${hasAvatars ? Object.keys(char.avatars).join(',') : ''}]`);
+    res.json({ character: char });
   } catch (err) {
     console.error('Error fetching full character data:', err);
     res.status(500).json({ error: 'Failed to fetch character data' });
@@ -503,13 +507,12 @@ router.post('/', authenticateToken, async (req, res) => {
         customFears: customFears || []
       };
 
-      // Debug: check if avatars are in characterData
+      // Debug: check if avatars and photos are in characterData
       for (const char of characterData.characters) {
-        if (char.avatars) {
-          const keys = Object.keys(char.avatars);
-          const hasStd = !!char.avatars.standard;
-          console.log(`[Characters] POST - Final ${char.name} avatars: keys=[${keys.join(',')}], hasStandard=${hasStd}`);
-        }
+        const avatarKeys = char.avatars ? Object.keys(char.avatars) : [];
+        const hasPhotos = char.photos && Object.keys(char.photos).length > 0;
+        const hasPhotoUrl = !!char.photo_url;
+        console.log(`[Characters] POST - Final ${char.name}: avatarKeys=[${avatarKeys.join(',')}], photos=${hasPhotos}, photo_url=${hasPhotoUrl}`);
       }
 
       const jsonData = JSON.stringify(characterData);
