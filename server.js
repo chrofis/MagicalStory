@@ -689,9 +689,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           if (totalPages > 0 && userId) {
             // Check for 2x promo multiplier
             const promoResult = await dbPool.query(
-              "SELECT value FROM config WHERE key = 'token_promo_multiplier'"
+              "SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'"
             );
-            const multiplier = promoResult.rows[0]?.value ? parseInt(promoResult.rows[0].value) : 1;
+            const multiplier = promoResult.rows[0]?.config_value ? parseInt(promoResult.rows[0].config_value) : 1;
             const tokensPerPage = 10 * multiplier;
             tokensToCredit = totalPages * tokensPerPage;
 
@@ -1549,8 +1549,8 @@ app.get('/api/admin/config/token-promo', authenticateToken, async (req, res) => 
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const result = await dbPool.query("SELECT value FROM config WHERE key = 'token_promo_multiplier'");
-    const multiplier = result.rows[0]?.value ? parseInt(result.rows[0].value) : 1;
+    const result = await dbPool.query("SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'");
+    const multiplier = result.rows[0]?.config_value ? parseInt(result.rows[0].config_value) : 1;
     res.json({ multiplier, isPromoActive: multiplier > 1 });
   } catch (err) {
     log.error('Token promo config fetch error:', err);
@@ -1570,8 +1570,8 @@ app.post('/api/admin/config/token-promo', authenticateToken, async (req, res) =>
     }
 
     await dbPool.query(`
-      INSERT INTO config (key, value) VALUES ('token_promo_multiplier', $1)
-      ON CONFLICT (key) DO UPDATE SET value = $1
+      INSERT INTO config (config_key, config_value) VALUES ('token_promo_multiplier', $1)
+      ON CONFLICT (config_key) DO UPDATE SET config_value = $1
     `, [multiplier.toString()]);
 
     await logActivity(req.user.id, req.user.username, 'TOKEN_PROMO_UPDATED', { multiplier });
@@ -5708,8 +5708,8 @@ app.get('/api/stripe/order-status/:sessionId', async (req, res) => {
       const totalPages = parseInt(session.metadata?.totalPages) || 0;
       let tokensExpected = 0;
       if (totalPages > 0) {
-        const promoResult = await dbPool.query("SELECT value FROM config WHERE key = 'token_promo_multiplier'");
-        const multiplier = promoResult.rows[0]?.value ? parseInt(promoResult.rows[0].value) : 1;
+        const promoResult = await dbPool.query("SELECT config_value FROM config WHERE config_key = 'token_promo_multiplier'");
+        const multiplier = promoResult.rows[0]?.config_value ? parseInt(promoResult.rows[0].config_value) : 1;
         tokensExpected = totalPages * 10 * multiplier;
       }
 
