@@ -2623,7 +2623,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing);
-    const sceneResult = await callClaudeAPI(scenePrompt, 4000);
+    const sceneResult = await callClaudeAPI(scenePrompt, 6000);
     const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
@@ -2824,7 +2824,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language, correctionNotes);
 
       try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, 4000);
+        const expansionResult = await callClaudeAPI(expansionPrompt, 6000);
         expandedDescription = expansionResult.text;
         console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
@@ -8138,7 +8138,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageClothing
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 4000, null, modelOverrides.sceneDescriptionModel);
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel);
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
@@ -9291,7 +9291,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 correctionNotes
               );
 
-              const expandedDescription = await callClaudeAPI(expansionPrompt, 4000, modelOverrides?.textModel);
+              const expandedDescription = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel);
 
               // Get reference photos for this scene with CORRECT clothing (not hardcoded 'standard')
               const sceneMetadataForClothing = extractSceneMetadata(existingImage.description) || {};
