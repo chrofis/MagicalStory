@@ -67,12 +67,6 @@ router.get('/', authenticateToken, async (req, res) => {
         } else {
           characterData = { ...characterData, ...data };
         }
-        // Debug: Show what metadata includes for first character
-        const firstChar = characterData.characters[0];
-        if (firstChar) {
-          const avatarInfo = firstChar.avatars ? Object.keys(firstChar.avatars) : [];
-          console.log(`[Characters] GET - First char avatars: [${avatarInfo.join(',')}], hasStandard=${!!firstChar.avatars?.standard}`);
-        }
         console.log(`[Characters] GET - Characters count: ${characterData.characters.length}, total time: ${Date.now() - startTime}ms`);
       }
     } else {
@@ -174,13 +168,8 @@ router.get('/:characterId/full', authenticateToken, async (req, res) => {
       return res.json({ character: legacyResult[0].character });
     }
 
-    const char = result[0].character;
-    const hasAvatars = !!char.avatars;
-    const avatarKeys = char.avatars ? Object.keys(char.avatars) : [];
-    const hasStandard = !!char.avatars?.standard;
-    const hasFaceThumbs = !!char.avatars?.faceThumbnails;
-    console.log(`[Characters] GET /${characterId}/full - Loaded: avatars=${hasAvatars}, keys=[${avatarKeys.join(',')}], standard=${hasStandard}, faceThumbs=${hasFaceThumbs}`);
-    res.json({ character: char });
+    console.log(`[Characters] GET /${characterId}/full - Loaded full character data`);
+    res.json({ character: result[0].character });
   } catch (err) {
     console.error('Error fetching full character data:', err);
     res.status(500).json({ error: 'Failed to fetch character data' });
@@ -236,13 +225,6 @@ router.post('/', authenticateToken, async (req, res) => {
       `;
       const preserveResult = await dbQuery(preserveQuery, [characterId]);
       const existingCharacters = preserveResult[0]?.preserved || [];
-      // DEBUG: Show exactly what DB returned for avatars
-      for (const ec of existingCharacters) {
-        const avatarKeys = ec.avatars ? Object.keys(ec.avatars) : [];
-        const hasStandard = !!(ec.avatars?.standard);
-        const standardLen = ec.avatars?.standard?.length || 0;
-        console.log(`[Characters] POST - DB char ${ec.name}: avatarKeys=[${avatarKeys.join(',')}], hasStandard=${hasStandard}, standardLen=${standardLen}`);
-      }
 
       // Merge server-side data from existing characters into new characters
       // This preserves avatar data AND character fields that may not be sent by the frontend
@@ -455,40 +437,20 @@ router.post('/', authenticateToken, async (req, res) => {
           console.log(`[Characters] POST - Preserving fields for ${newChar.name}: ${preservedFields.join(', ')}`);
         }
 
-        // Avatar data is managed by backend (avatar generation saves directly to DB)
-        // Frontend only sends metadata (status, generatedAt, stale) - never images
-        // So we START with DB avatars and only update metadata from frontend
-        if (!existingChar.avatars && !newChar.avatars) {
+        // Avatar data is managed ONLY by backend (avatar generation saves directly to DB)
+        // Frontend avatars are IGNORED - DB is the single source of truth
+        if (!existingChar.avatars) {
+          // No DB avatars yet - that's fine, character may not have generated avatars
           if (hasChanges) preservedCount++;
           return mergedChar;
         }
 
-        // Start with DB avatars (has all images, thumbnails, etc.)
-        // If no DB avatars but frontend sent something, use frontend as base
-        const dbAvatarKeys = existingChar.avatars ? Object.keys(existingChar.avatars) : [];
-        const hasDbStandard = !!existingChar.avatars?.standard;
-        const hasDbFaceThumbs = !!existingChar.avatars?.faceThumbnails;
-        console.log(`[Characters] POST - DB avatars for ${newChar.name}: keys=[${dbAvatarKeys.join(',')}], standard=${hasDbStandard}, faceThumbs=${hasDbFaceThumbs}`);
-
-        const mergedAvatars = existingChar.avatars
-          ? { ...existingChar.avatars }
-          : { ...newChar.avatars };
-
-        // Update metadata from frontend if provided
-        if (newChar.avatars?.status) mergedAvatars.status = newChar.avatars.status;
-        if (newChar.avatars?.generatedAt) mergedAvatars.generatedAt = newChar.avatars.generatedAt;
-        if (newChar.avatars?.stale !== undefined) mergedAvatars.stale = newChar.avatars.stale;
-
-        const mergedKeys = Object.keys(mergedAvatars);
-        console.log(`[Characters] POST - Merged avatars for ${newChar.name}: keys=[${mergedKeys.join(',')}]`);
-        hasChanges = true;
-
-        // DB avatars already have everything (images, thumbnails, styledAvatars, etc.)
-        // No need to merge - avatar generation saves directly to DB
+        // Use ONLY DB avatars - never use frontend avatars
+        console.log(`[Characters] POST - Using DB avatars for ${newChar.name}`);
         preservedCount++;
         return {
           ...mergedChar,
-          avatars: mergedAvatars
+          avatars: existingChar.avatars
         };
       });
       if (preservedCount > 0) {

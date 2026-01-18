@@ -171,26 +171,11 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
   };
 }
 
-// Strip heavy base64 image data from avatars for saving
-// Server already has the images - we only need metadata
-function stripAvatarImages(avatars: Character['avatars']): Character['avatars'] {
-  if (!avatars) return avatars;
-  return {
-    status: avatars.status,
-    generatedAt: avatars.generatedAt,
-    stale: avatars.stale,
-    // faceThumbnails are 64-105KB each - don't send on save, server has them
-    // winter, standard, summer, formal, styledAvatars are NOT sent
-  };
-}
-
 // Convert frontend Character to API format
+// NOTE: Avatars are NEVER sent - backend manages them exclusively
 function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
   // Auto-compute ageCategory if not set but age is available
   const ageCategory = char.ageCategory || getAgeCategory(char.age);
-
-  // Strip heavy avatar images - server already has them from generation
-  const lightAvatars = stripAvatarImages(char.avatars);
 
   return {
     id: char.id,
@@ -227,11 +212,10 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     // Legacy fields (for backward compatibility)
     weaknesses: char.traits?.flaws,
     fears: char.traits?.challenges,
-    // Clothing
+    // Clothing (text descriptions only - avatars managed by backend)
     clothing: char.clothing?.current,
     structured_clothing: char.clothing?.structured,
-    clothing_avatars: lightAvatars,  // Only metadata, no images
-    avatars: lightAvatars,  // Only metadata, no images
+    // NOTE: avatars/clothing_avatars NOT sent - backend is source of truth
     // Generated outfits per page
     generated_outfits: char.generatedOutfits,
   };
@@ -354,17 +338,10 @@ export const characterService = {
     });
   },
 
-  async saveCharacterData(data: CharacterData, options?: { preserveAvatars?: boolean; includePhotos?: boolean }): Promise<void> {
-    // Map each character with optional avatar/photo inclusion
-    // - preserveAvatars: include full avatar images (after avatar generation)
-    // - includePhotos: include photo data (after photo upload)
-    // - default: strip both (server preserves existing data)
+  async saveCharacterData(data: CharacterData, options?: { includePhotos?: boolean }): Promise<void> {
+    // Map each character - avatars are NEVER sent (backend is source of truth)
     const mapCharacter = (char: Character) => {
-      let result = mapCharacterToApi(char);
-      if (options?.preserveAvatars) {
-        result.clothing_avatars = char.avatars;
-        result.avatars = char.avatars;
-      }
+      const result = mapCharacterToApi(char);
       if (options?.includePhotos) {
         result.photo_url = char.photos?.original;
         result.thumbnail_url = char.photos?.face;
@@ -1227,12 +1204,14 @@ export const characterService = {
         return updated || c;
       });
 
+      // NOTE: Avatars are already saved by backend avatar job - this save is just for
+      // any other character data that might have changed. Avatars NOT sent.
       await characterService.saveCharacterData({
         ...freshData,
         characters: updatedCharacters,
-      }, { preserveAvatars: true });
+      });
 
-      log.success(`💾 Saved avatar updates for ${updatedCharactersMap.size} characters`);
+      log.success(`💾 Saved character data for ${updatedCharactersMap.size} characters`);
     }
 
     const successCount = results.filter(r => r.success).length;
