@@ -9297,7 +9297,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 correctionNotes
               );
 
-              const expandedDescription = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel);
+              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel);
+              const expandedDescription = expandedDescriptionResult.text;
 
               // Get reference photos for this scene with CORRECT clothing (not hardcoded 'standard')
               const sceneMetadataForClothing = extractSceneMetadata(existingImage.description) || {};
