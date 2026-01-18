@@ -9466,7 +9466,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const pageList = [...pagesToRegenerate];
                 await dbPool.query(
                   `DELETE FROM story_images WHERE story_id = $1 AND image_type = 'scene' AND page_number = ANY($2)`,
-                  [storyId, pageList]
+                  [jobId, pageList]
                 );
                 log.debug(`🗑️ [CONSISTENCY REGEN] Deleted ${pageList.length} stale story_images entries for pages: ${pageList.join(', ')}`);
               } catch (deleteErr) {

@@ -340,8 +340,19 @@ export function StoryDisplay({
 
   // Extract just the Image Summary from a full scene description
   // IMPORTANT: Always extract Section 6 (translated/localized) for user editing, NOT Section 1 (English)
-  const extractImageSummary = (fullDescription: string): string => {
+  const extractImageSummary = (fullDescription: string | object): string => {
     if (!fullDescription) return '';
+    // Handle case where description is an object (e.g., JSON response not converted to string)
+    if (typeof fullDescription !== 'string') {
+      // Try to extract the output field if it's a JSON object with thinking/output structure
+      const obj = fullDescription as { output?: string; thinking?: unknown };
+      if (obj.output && typeof obj.output === 'string') {
+        fullDescription = obj.output;
+      } else {
+        // Fallback: stringify the object
+        fullDescription = JSON.stringify(fullDescription);
+      }
+    }
 
     // PRIORITY 1: Section 6 "Image Summary (Language)" - the TRANSLATED version for user editing
     // Handles multiple formats from LLM:
@@ -389,9 +400,15 @@ export function StoryDisplay({
   };
 
   // Detect which characters are mentioned in a scene description
-  const detectCharactersInScene = (sceneText: string): number[] => {
+  const detectCharactersInScene = (sceneText: string | object): number[] => {
     if (!sceneText || !characters.length) return characters.map(c => c.id); // Default to all
-    const lowerScene = sceneText.toLowerCase();
+    // Handle non-string values
+    let text = sceneText;
+    if (typeof text !== 'string') {
+      const obj = text as { output?: string };
+      text = obj.output && typeof obj.output === 'string' ? obj.output : JSON.stringify(text);
+    }
+    const lowerScene = text.toLowerCase();
     return characters
       .filter(c => lowerScene.includes(c.name.toLowerCase()))
       .map(c => c.id);
