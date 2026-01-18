@@ -168,9 +168,10 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     throw new Error('Anthropic API key not configured (ANTHROPIC_API_KEY)');
   }
 
-  console.log(`🌊 [STREAM] Starting streaming request to Anthropic (${maxTokens} max tokens)...`);
+  // Wrap entire request + stream reading in retry to handle mid-stream socket errors
+  return await withRetry(async () => {
+    console.log(`🌊 [STREAM] Starting streaming request to Anthropic (${maxTokens} max tokens)...`);
 
-  const response = await withRetry(async () => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -196,94 +197,78 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
       throw error;
     }
 
-    return res;
-  }, { maxRetries: 2, baseDelay: 2000 });
+    // Process the SSE stream
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
 
-  // Process the SSE stream
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let fullText = '';
-  let buffer = '';
-  let inputTokens = 0;
-  let outputTokens = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
+        if (done) {
+          log.debug('🌊 [STREAM] Stream complete');
+          break;
+        }
 
-      if (done) {
-        log.debug('🌊 [STREAM] Stream complete');
-        break;
-      }
+        // Decode the chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
 
-      // Decode the chunk and add to buffer
-      buffer += decoder.decode(value, { stream: true });
+        // Process complete events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-      // Process complete events from buffer
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6); // Remove 'data: ' prefix
 
-        const data = line.slice(6); // Remove 'data: ' prefix
+          if (data === '[DONE]') continue;
 
-        if (data === '[DONE]') continue;
+          try {
+            const event = JSON.parse(data);
 
-        try {
-          const event = JSON.parse(data);
-
-          // Handle different event types
-          if (event.type === 'content_block_delta' && event.delta?.text) {
-            const chunk = event.delta.text;
-            fullText += chunk;
-            if (onChunk) {
-              onChunk(chunk, fullText);
+            // Handle different event types
+            if (event.type === 'content_block_delta' && event.delta?.text) {
+              const chunk = event.delta.text;
+              fullText += chunk;
+              if (onChunk) {
+                onChunk(chunk, fullText);
+              }
+            } else if (event.type === 'message_delta' && event.usage) {
+              // Final message with usage stats
+              outputTokens = event.usage.output_tokens || 0;
+            } else if (event.type === 'message_start' && event.message?.usage) {
+              // Initial message with input token count
+              inputTokens = event.message.usage.input_tokens || 0;
             }
-          } else if (event.type === 'message_delta' && event.usage) {
-            // Final message with usage stats
-            outputTokens = event.usage.output_tokens || 0;
-          } else if (event.type === 'message_start' && event.message?.usage) {
-            // Initial message with input token count
-            inputTokens = event.message.usage.input_tokens || 0;
+          } catch {
+            // Skip malformed JSON
           }
-        } catch {
-          // Skip malformed JSON
         }
       }
+    } finally {
+      reader.releaseLock();
     }
-  } catch (streamError) {
-    // Handle socket/network errors gracefully
-    const isSocketError = streamError.code === 'UND_ERR_SOCKET' ||
-                          streamError.message?.includes('terminated') ||
-                          streamError.cause?.code === 'UND_ERR_SOCKET';
 
-    if (isSocketError && fullText.length > 0) {
-      // Socket closed but we have partial content - return what we have
-      log.warn(`⚠️ [ANTHROPIC STREAM] Socket closed mid-stream, returning ${fullText.length} chars of partial content`);
-    } else {
-      // No content or different error - rethrow
-      log.error(`❌ [ANTHROPIC STREAM] Stream error: ${streamError.message}`);
-      throw streamError;
+    // Always log token usage for debugging, even if 0
+    log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+    if (inputTokens === 0 && outputTokens === 0) {
+      log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
-  } finally {
-    reader.releaseLock();
-  }
 
-  // Always log token usage for debugging, even if 0
-  log.debug(`📊 [ANTHROPIC STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
-  if (inputTokens === 0 && outputTokens === 0) {
-    log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
-  }
-
-  return {
-    text: fullText,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens
-    },
-    modelId
-  };
+    return {
+      text: fullText,
+      usage: {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens
+      },
+      modelId
+    };
+  }, { maxRetries: 2, baseDelay: 2000 });
 }
 
 /**
@@ -301,119 +286,108 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     throw new Error('Gemini API key not configured (GEMINI_API_KEY)');
   }
 
-  console.log(`🌊 [STREAM] Starting streaming request to Gemini (${maxTokens} max tokens)...`);
+  // Wrap entire request + stream reading in retry to handle mid-stream socket errors
+  return await withRetry(async () => {
+    console.log(`🌊 [STREAM] Starting streaming request to Gemini (${maxTokens} max tokens)...`);
 
-  // Use streamGenerateContent endpoint for streaming
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
+    // Use streamGenerateContent endpoint for streaming
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: prompt }]
-      }],
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.7
-      }
-    })
-  });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{ text: prompt }]
+        }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          temperature: 0.7
+        }
+      })
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${error}`);
-  }
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Gemini API error (${response.status}): ${error}`);
+    }
 
-  // Process the SSE stream
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let fullText = '';
-  let buffer = '';
-  let inputTokens = 0;
-  let outputTokens = 0;
-  let thinkingTokens = 0;
+    // Process the SSE stream
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullText = '';
+    let buffer = '';
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let thinkingTokens = 0;
 
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
 
-      if (done) {
-        log.debug('🌊 [GEMINI STREAM] Stream complete');
-        break;
-      }
+        if (done) {
+          log.debug('🌊 [GEMINI STREAM] Stream complete');
+          break;
+        }
 
-      // Decode the chunk and add to buffer
-      buffer += decoder.decode(value, { stream: true });
+        // Decode the chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true });
 
-      // Process complete events from buffer
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        // Process complete events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
 
-        const data = line.slice(6); // Remove 'data: ' prefix
+          const data = line.slice(6); // Remove 'data: ' prefix
 
-        if (data === '[DONE]' || data.trim() === '') continue;
+          if (data === '[DONE]' || data.trim() === '') continue;
 
-        try {
-          const event = JSON.parse(data);
+          try {
+            const event = JSON.parse(data);
 
-          // Extract text from candidates
-          if (event.candidates?.[0]?.content?.parts?.[0]?.text) {
-            const chunk = event.candidates[0].content.parts[0].text;
-            fullText += chunk;
-            if (onChunk) {
-              onChunk(chunk, fullText);
+            // Extract text from candidates
+            if (event.candidates?.[0]?.content?.parts?.[0]?.text) {
+              const chunk = event.candidates[0].content.parts[0].text;
+              fullText += chunk;
+              if (onChunk) {
+                onChunk(chunk, fullText);
+              }
             }
-          }
 
-          // Extract usage metadata (usually in the last chunk)
-          if (event.usageMetadata) {
-            inputTokens = event.usageMetadata.promptTokenCount || inputTokens;
-            outputTokens = event.usageMetadata.candidatesTokenCount || outputTokens;
-            thinkingTokens = event.usageMetadata.thoughtsTokenCount || thinkingTokens;
+            // Extract usage metadata (usually in the last chunk)
+            if (event.usageMetadata) {
+              inputTokens = event.usageMetadata.promptTokenCount || inputTokens;
+              outputTokens = event.usageMetadata.candidatesTokenCount || outputTokens;
+              thinkingTokens = event.usageMetadata.thoughtsTokenCount || thinkingTokens;
+            }
+          } catch {
+            // Skip malformed JSON
           }
-        } catch {
-          // Skip malformed JSON
         }
       }
+    } finally {
+      reader.releaseLock();
     }
-  } catch (streamError) {
-    // Handle socket/network errors gracefully
-    const isSocketError = streamError.code === 'UND_ERR_SOCKET' ||
-                          streamError.message?.includes('terminated') ||
-                          streamError.cause?.code === 'UND_ERR_SOCKET';
 
-    if (isSocketError && fullText.length > 0) {
-      // Socket closed but we have partial content - return what we have
-      log.warn(`⚠️ [GEMINI STREAM] Socket closed mid-stream, returning ${fullText.length} chars of partial content`);
-    } else {
-      // No content or different error - rethrow
-      log.error(`❌ [GEMINI STREAM] Stream error: ${streamError.message}`);
-      throw streamError;
+    // Always log token usage for debugging, even if 0
+    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
+    log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+    if (inputTokens === 0 && outputTokens === 0) {
+      log.warn(`⚠️ [GEMINI STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
-  } finally {
-    reader.releaseLock();
-  }
 
-  // Always log token usage for debugging, even if 0
-  const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-  log.debug(`📊 [GEMINI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
-  if (inputTokens === 0 && outputTokens === 0) {
-    log.warn(`⚠️ [GEMINI STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
-  }
-
-  return {
-    text: fullText,
-    usage: {
-      input_tokens: inputTokens,
-      output_tokens: outputTokens,
-      thinking_tokens: thinkingTokens
-    },
-    modelId
-  };
+    return {
+      text: fullText,
+      usage: {
+        input_tokens: inputTokens,
+        output_tokens: outputTokens,
+        thinking_tokens: thinkingTokens
+      },
+      modelId
+    };
+  }, { maxRetries: 2, baseDelay: 2000 });
 }
 
 /**
