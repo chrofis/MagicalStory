@@ -252,6 +252,20 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         }
       }
     }
+  } catch (streamError) {
+    // Handle socket/network errors gracefully
+    const isSocketError = streamError.code === 'UND_ERR_SOCKET' ||
+                          streamError.message?.includes('terminated') ||
+                          streamError.cause?.code === 'UND_ERR_SOCKET';
+
+    if (isSocketError && fullText.length > 0) {
+      // Socket closed but we have partial content - return what we have
+      log.warn(`⚠️ [ANTHROPIC STREAM] Socket closed mid-stream, returning ${fullText.length} chars of partial content`);
+    } else {
+      // No content or different error - rethrow
+      log.error(`❌ [ANTHROPIC STREAM] Stream error: ${streamError.message}`);
+      throw streamError;
+    }
   } finally {
     reader.releaseLock();
   }
@@ -365,6 +379,20 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           // Skip malformed JSON
         }
       }
+    }
+  } catch (streamError) {
+    // Handle socket/network errors gracefully
+    const isSocketError = streamError.code === 'UND_ERR_SOCKET' ||
+                          streamError.message?.includes('terminated') ||
+                          streamError.cause?.code === 'UND_ERR_SOCKET';
+
+    if (isSocketError && fullText.length > 0) {
+      // Socket closed but we have partial content - return what we have
+      log.warn(`⚠️ [GEMINI STREAM] Socket closed mid-stream, returning ${fullText.length} chars of partial content`);
+    } else {
+      // No content or different error - rethrow
+      log.error(`❌ [GEMINI STREAM] Stream error: ${streamError.message}`);
+      throw streamError;
     }
   } finally {
     reader.releaseLock();
