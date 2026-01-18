@@ -1,7 +1,5 @@
 node_modules
 client/node_modules
-client/dist
-dist
 .git
 *.log
 .env*
@@ -12,3 +10,20 @@ coverage
 .idea
 __pycache__
 *.pyc
+
+# Large local folders (not needed for deploy)
+venv311
+test-output
+test-results
+playwright-report
+blob-report
+temp_photos
+data
+historical-location-images
+historical-location-images-uploaded
+MagicalStory
+Magical-Story-images
+test image inputs
+*.zip
+*.bak
+PLAN.md
