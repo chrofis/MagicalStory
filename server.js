@@ -11449,7 +11449,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                   originalImage: data.originalImage,
                   originalScore: data.originalScore,
                   originalReasoning: data.originalReasoning,
-                  modelId: data.modelId || null
+                  modelId: data.modelId || null,
+                  referencePhotos: data.referencePhotos || null  // For consistency check character names
                 });
               }
             } else if (cp.step_name === 'cover') {
