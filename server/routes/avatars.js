@@ -2212,7 +2212,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // Strip heavy fields and keep only lightweight avatar info
             const lightCharacters = characters.map(char => {
               // Strip heavy base64 fields
-              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, photos, ...lightChar } = char;
               // Keep avatar metadata + only 'standard' faceThumbnail for list display
               if (lightChar.avatars) {
                 const standardThumb = lightChar.avatars.faceThumbnails?.standard;
@@ -3075,7 +3075,7 @@ These corrections OVERRIDE what is visible in the reference photo.
 
             // Generate lightweight metadata for fast list queries (matches POST /api/characters behavior)
             const lightCharacters = characters.map(char => {
-              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+              const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, photos, ...lightChar } = char;
               if (lightChar.avatars) {
                 const standardThumb = lightChar.avatars.faceThumbnails?.standard;
                 // Check for avatars in both old schema (top-level) and new schema (styledAvatars)

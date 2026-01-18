@@ -445,8 +445,8 @@ router.post('/', authenticateToken, async (req, res) => {
       // Generate lightweight metadata for fast list queries
       // Strip ALL heavy fields - list view only needs basic info + one thumbnail for display
       const lightCharacters = mergedCharacters.map(char => {
-        // Strip heavy base64 fields
-        const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, ...lightChar } = char;
+        // Strip heavy base64 fields (including photos object which contains face, original, bodyNoBg)
+        const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, photos, ...lightChar } = char;
         // Keep avatar metadata + only 'standard' faceThumbnail for list display
         if (lightChar.avatars) {
           const standardThumb = lightChar.avatars.faceThumbnails?.standard;
