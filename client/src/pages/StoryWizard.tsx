@@ -206,6 +206,8 @@ export default function StoryWizard() {
   const [isGeneratingIdeas, setIsGeneratingIdeas] = useState(false);
   const [isGeneratingIdea1, setIsGeneratingIdea1] = useState(false);
   const [isGeneratingIdea2, setIsGeneratingIdea2] = useState(false);
+  const [ideaProgress1, setIdeaProgress1] = useState(0); // Progress 0-100 for idea 1
+  const [ideaProgress2, setIdeaProgress2] = useState(0); // Progress 0-100 for idea 2
   const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
   const [lastIdeaFullResponse, setLastIdeaFullResponse] = useState<string>('');
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
@@ -1192,6 +1194,44 @@ export default function StoryWizard() {
 
     return () => clearTimeout(timeoutId);
   }, [isGeneratingIdeas, language]);
+
+  // Animate idea progress bars: 0% -> 80% over 35 seconds with easing
+  useEffect(() => {
+    if (!isGeneratingIdea1 && !isGeneratingIdea2) {
+      // Reset progress when not generating
+      setIdeaProgress1(0);
+      setIdeaProgress2(0);
+      return;
+    }
+
+    const DURATION_MS = 35000; // 35 seconds to reach 80%
+    const TARGET_PROGRESS = 80;
+    const INTERVAL_MS = 100; // Update every 100ms for smooth animation
+    const startTime = Date.now();
+
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const linearProgress = Math.min(elapsed / DURATION_MS, 1);
+      // Ease-out cubic: fast start, slows down near end
+      const easedProgress = 1 - Math.pow(1 - linearProgress, 3);
+      const currentProgress = Math.round(easedProgress * TARGET_PROGRESS);
+
+      // Only update if still generating (not yet complete)
+      if (isGeneratingIdea1) {
+        setIdeaProgress1(currentProgress);
+      }
+      if (isGeneratingIdea2) {
+        setIdeaProgress2(currentProgress);
+      }
+
+      // Stop interval when we reach target
+      if (linearProgress >= 1) {
+        clearInterval(intervalId);
+      }
+    }, INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [isGeneratingIdea1, isGeneratingIdea2]);
 
   // Persist wizard step to localStorage (so navigating away and back preserves position)
   useEffect(() => {
@@ -2620,6 +2660,7 @@ export default function StoryWizard() {
             newIdeas[0] = story1;
             return newIdeas;
           });
+          setIdeaProgress1(100); // Complete!
           setIsGeneratingIdea1(false);
         },
         onStory2: (story2) => {
@@ -2628,6 +2669,7 @@ export default function StoryWizard() {
             newIdeas[1] = story2;
             return newIdeas;
           });
+          setIdeaProgress2(100); // Complete!
           setIsGeneratingIdea2(false);
         },
         onError: (error) => {
@@ -3331,6 +3373,8 @@ export default function StoryWizard() {
             isGeneratingIdeas={isGeneratingIdeas}
             isGeneratingIdea1={isGeneratingIdea1}
             isGeneratingIdea2={isGeneratingIdea2}
+            ideaProgress1={ideaProgress1}
+            ideaProgress2={ideaProgress2}
             ideaPrompt={lastIdeaPrompt}
             ideaFullResponse={lastIdeaFullResponse}
             generatedIdeas={generatedIdeas}

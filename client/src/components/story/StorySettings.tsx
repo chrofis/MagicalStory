@@ -59,6 +59,8 @@ interface StorySettingsProps {
   isGeneratingIdeas?: boolean;
   isGeneratingIdea1?: boolean;
   isGeneratingIdea2?: boolean;
+  ideaProgress1?: number;  // Progress 0-100 for idea 1
+  ideaProgress2?: number;  // Progress 0-100 for idea 2
   ideaPrompt?: { prompt: string; model: string } | null;
   generatedIdeas?: string[];
   onSelectIdea?: (idea: string) => void;
@@ -96,6 +98,8 @@ export function StorySettings({
   isGeneratingIdeas = false,
   isGeneratingIdea1 = false,
   isGeneratingIdea2 = false,
+  ideaProgress1 = 0,
+  ideaProgress2 = 0,
   ideaPrompt,
   generatedIdeas = [],
   onSelectIdea,
@@ -491,10 +495,20 @@ export function StorySettings({
                       </button>
                     </>
                   ) : isGeneratingIdea1 ? (
-                    <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                    <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 px-6">
+                      <div className="w-full max-w-xs mb-3">
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${ideaProgress1}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-400 text-right mt-1">{ideaProgress1}%</div>
+                      </div>
                       <span className="text-sm text-gray-500">
-                        {language === 'de' ? 'Idee 1 wird generiert...' : language === 'fr' ? 'Génération idée 1...' : 'Generating idea 1...'}
+                        {ideaProgress1 < 80
+                          ? (language === 'de' ? 'Denke nach...' : language === 'fr' ? 'Réflexion...' : 'Thinking...')
+                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : 'Writing idea...')}
                       </span>
                     </div>
                   ) : null}
@@ -522,10 +536,20 @@ export function StorySettings({
                       </button>
                     </>
                   ) : isGeneratingIdea2 ? (
-                    <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                    <div className="flex flex-col items-center justify-center h-48 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 px-6">
+                      <div className="w-full max-w-xs mb-3">
+                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${ideaProgress2}%` }}
+                          />
+                        </div>
+                        <div className="text-xs text-gray-400 text-right mt-1">{ideaProgress2}%</div>
+                      </div>
                       <span className="text-sm text-gray-500">
-                        {language === 'de' ? 'Idee 2 wird generiert...' : language === 'fr' ? 'Génération idée 2...' : 'Generating idea 2...'}
+                        {ideaProgress2 < 80
+                          ? (language === 'de' ? 'Denke nach...' : language === 'fr' ? 'Réflexion...' : 'Thinking...')
+                          : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : 'Writing idea...')}
                       </span>
                     </div>
                   ) : null}

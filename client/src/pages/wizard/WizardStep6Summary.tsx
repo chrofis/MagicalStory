@@ -83,6 +83,8 @@ interface WizardStep6Props {
   isGeneratingIdeas: boolean;
   isGeneratingIdea1?: boolean;
   isGeneratingIdea2?: boolean;
+  ideaProgress1?: number;  // Progress 0-100 for idea 1
+  ideaProgress2?: number;  // Progress 0-100 for idea 2
   ideaPrompt: { prompt: string; model: string } | null;
   ideaFullResponse?: string;
   generatedIdeas: string[];
@@ -124,6 +126,8 @@ export function WizardStep6Summary({
   isGeneratingIdeas,
   isGeneratingIdea1 = false,
   isGeneratingIdea2 = false,
+  ideaProgress1 = 0,
+  ideaProgress2 = 0,
   ideaPrompt,
   ideaFullResponse,
   generatedIdeas,
@@ -470,13 +474,24 @@ export function WizardStep6Summary({
 
                   {/* Content area */}
                   {isLoading ? (
-                    <div className="flex items-center justify-center h-64 bg-gray-50">
-                      <div className="text-center text-gray-500">
-                        <Loader2 size={32} className="animate-spin mx-auto mb-2" />
+                    <div className="flex items-center justify-center h-64 bg-gray-50 px-8">
+                      <div className="text-center text-gray-500 w-full max-w-xs">
+                        {/* Progress bar */}
+                        <div className="mb-4">
+                          <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-indigo-600 rounded-full transition-all duration-300 ease-out"
+                              style={{ width: `${index === 0 ? ideaProgress1 : ideaProgress2}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-400 text-right mt-1">
+                            {index === 0 ? ideaProgress1 : ideaProgress2}%
+                          </div>
+                        </div>
                         <p className="text-sm">
-                          {lang === 'de' ? 'Geschichte wird erstellt...' :
-                           lang === 'fr' ? 'Création de l\'histoire...' :
-                           'Creating story idea...'}
+                          {(index === 0 ? ideaProgress1 : ideaProgress2) < 80
+                            ? (lang === 'de' ? 'Denke nach...' : lang === 'fr' ? 'Réflexion...' : 'Thinking...')
+                            : (lang === 'de' ? 'Schreibe Idee...' : lang === 'fr' ? 'Rédaction...' : 'Writing idea...')}
                         </p>
                       </div>
                     </div>
