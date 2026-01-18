@@ -1032,18 +1032,36 @@ export const characterService = {
 
       // Fetch fresh data from server (avatar job already saved everything)
       // IMPORTANT: includeAllAvatars=true to get the actual avatar images
-      const freshData = await characterService.getCharacterData(true);
-      const freshCharacter = freshData.characters.find(c => c.id === character.id);
+      // Use retry logic to handle race condition where avatar job DB write may still be in progress
+      let freshCharacter: Character | undefined = undefined;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          log.info(`[AVATAR] Retry ${attempt + 1}/3: waiting for avatar data to be available in DB...`);
+          await new Promise(r => setTimeout(r, 500)); // 500ms delay on retry
+        }
+        const freshData = await characterService.getCharacterData(true);
+        freshCharacter = freshData.characters.find(c => c.id === character.id);
+        // Check if avatars are actually present in the response
+        if (freshCharacter?.avatars?.standard || freshCharacter?.avatars?.winter || freshCharacter?.avatars?.summer) {
+          log.info(`[AVATAR] Got fresh data with avatars on attempt ${attempt + 1}`);
+          break;
+        }
+      }
 
       if (freshCharacter) {
         result.character = freshCharacter;
-        log.info(`📋 Using server-saved data for ${character.name} (traits, clothing already saved by avatar job)`);
+        // Warn if avatars are missing - this indicates a server-side issue
+        const hasAvatars = freshCharacter.avatars?.standard || freshCharacter.avatars?.winter || freshCharacter.avatars?.summer;
+        if (!hasAvatars) {
+          log.warn(`⚠️ Fresh DB data for ${character.name} missing avatars after ${3} retries - server may not have saved them`);
+        }
+        log.info(`📋 Using server-saved data for ${character.name}`);
       } else {
-        // Fallback: build character locally if not found in server data (shouldn't happen)
-        log.warn(`⚠️ Character ${character.name} not found in server data after avatar job - using local data`);
+        // Character not found in DB - this is a server-side bug
+        log.error(`❌ Character ${character.name} (id: ${character.id}) not found in DB after avatar job - avatars lost!`);
         result.character = {
           ...character,
-          avatars: genResult.avatars,
+          avatars: { status: 'failed' as const },
           physical: genResult.extractedTraits ? {
             ...character.physical,
             apparentAge: (genResult.extractedTraits.apparentAge as AgeCategory) || character.physical?.apparentAge,

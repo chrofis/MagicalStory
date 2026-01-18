@@ -2077,7 +2077,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             // Fallback: find by name if ID match fails
             if (charIndex < 0 && name) {
+              const availableIds = characters.map(c => `${c.name}(${c.id})`).join(', ');
+              log.debug(`💾 [AVATAR JOB ${jobId}] Character ID ${characterId} not found, available: [${availableIds}], trying name fallback...`);
               charIndex = characters.findIndex(c => c.name === name);
+              if (charIndex >= 0) {
+                log.info(`📍 [AVATAR JOB ${jobId}] Found character "${name}" by name fallback at index ${charIndex} (ID mismatch: wanted ${characterId}, found ${characters[charIndex].id})`);
+              }
             }
           }
 
@@ -2093,6 +2098,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             log.debug(`💾 [AVATAR JOB ${jobId}] Character not found (attempt ${retryAttempt + 1}/10), waiting 2s for wizard to save...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
+        }
+
+        // Log warning if character still not found after all retries
+        if (charIndex < 0) {
+          const availableChars = characters.map(c => `${c.name}(${c.id})`).join(', ');
+          log.warn(`⚠️ [AVATAR JOB ${jobId}] CHARACTER NOT FOUND after 10 attempts! Wanted ID: ${characterId}, name: "${name}". Available: [${availableChars}]. Avatars generated but NOT saved to DB!`);
         }
 
         if (rows && rows.length > 0 && charIndex >= 0) {
@@ -2203,12 +2214,12 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId} (data + metadata)`);
           }
         } else {
-          // Character still not found after all retries
-          log.error(`❌ [AVATAR JOB ${jobId}] Could not find character by ID ${characterId} or name ${name} after 10 retries - skipping database update`);
+          // Character still not found after all retries - fail the job
+          throw new Error(`Character not found by ID ${characterId} or name "${name}" after 10 retries - cannot save avatars`);
         }
       } catch (dbErr) {
-        log.warn(`[AVATAR JOB ${jobId}] Failed to update character in database:`, dbErr.message);
-        // Don't fail the job, just log the warning
+        log.error(`❌ [AVATAR JOB ${jobId}] Failed to save avatars to database:`, dbErr.message);
+        throw new Error(`Database save failed: ${dbErr.message}`);
       }
     }
 
@@ -2263,6 +2274,12 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       return res.status(400).json({ error: 'Missing facePhoto' });
     }
 
+    // Validate characterId - must be a valid number for DB lookup
+    if (!characterId || (typeof characterId !== 'number' && isNaN(parseInt(characterId)))) {
+      return res.status(400).json({ error: 'Invalid or missing characterId' });
+    }
+    const validCharacterId = typeof characterId === 'number' ? characterId : parseInt(characterId);
+
     const geminiApiKey = process.env.GEMINI_API_KEY;
     if (!geminiApiKey) {
       return res.status(503).json({ error: 'Avatar generation service unavailable' });
@@ -2273,10 +2290,10 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       const crypto = require('crypto');
       const jobId = `avatar_${crypto.randomBytes(8).toString('hex')}`;
 
-      // Create job entry
+      // Create job entry with validated characterId
       avatarJobs.set(jobId, {
         userId: req.user.id,
-        characterId,
+        characterId: validCharacterId,
         characterName: name,
         status: 'pending',
         progress: 0,
@@ -2294,8 +2311,11 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
         message: 'Avatar generation started. Poll /api/avatar-jobs/' + jobId + ' for status.'
       });
 
+      // Update body with validated characterId for background processing
+      const validatedBody = { ...req.body, characterId: validCharacterId };
+
       // Continue processing in background (don't await)
-      processAvatarJobInBackground(jobId, req.body, req.user, geminiApiKey).catch(err => {
+      processAvatarJobInBackground(jobId, validatedBody, req.user, geminiApiKey).catch(err => {
         log.error(`[AVATAR JOB ${jobId}] Background processing failed:`, err.message);
         const job = avatarJobs.get(jobId);
         if (job) {
@@ -2938,7 +2958,24 @@ These corrections OVERRIDE what is visible in the reference photo.
 
           // Find the character and update its data
           const characters = data.characters || [];
-          const charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+          let charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+
+          // Fallback: find by name if ID match fails
+          if (charIndex < 0 && name) {
+            const availableIds = characters.map(c => `${c.name}(${c.id})`).join(', ');
+            log.debug(`💾 [CLOTHING AVATARS] Character ID ${characterId} not found, available: [${availableIds}], trying name fallback...`);
+            charIndex = characters.findIndex(c => c.name === name);
+            if (charIndex >= 0) {
+              log.info(`📍 [CLOTHING AVATARS] Found character "${name}" by name fallback at index ${charIndex} (ID mismatch: wanted ${characterId}, found ${characters[charIndex].id})`);
+            }
+          }
+
+          // Warn if character still not found
+          if (charIndex < 0) {
+            const availableChars = characters.map(c => `${c.name}(${c.id})`).join(', ');
+            log.warn(`⚠️ [CLOTHING AVATARS] CHARACTER NOT FOUND! Wanted ID: ${characterId}, name: "${name}". Available: [${availableChars}]. Avatars generated but NOT saved to DB!`);
+          }
+
           if (charIndex >= 0) {
             // Accumulate token usage per model (if available)
             if (hasTokenUsage) {
@@ -3044,8 +3081,9 @@ These corrections OVERRIDE what is visible in the reference photo.
             }
           }
         }
-      } catch (tokenErr) {
-        log.warn('Failed to store avatar token usage:', tokenErr.message);
+      } catch (dbErr) {
+        log.error(`❌ [CLOTHING AVATARS] Failed to save to database:`, dbErr.message);
+        throw new Error(`Database save failed: ${dbErr.message}`);
       }
     }
 
