@@ -1268,7 +1268,19 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         log.warn(`[PHOTO LOOKUP] No photo found for "${char.name}" (wanted: ${searchedFor}, hasAvatars: ${hasAvatars}, hasPhotos: ${hasPhotos})`);
       }
 
-      // Fallback: use signature from clothingRequirements if no clothingDescription found
+      // Fallback 1: Try avatars.clothing[category] directly
+      // This is needed because metadata strips avatar IMAGES but keeps clothing DESCRIPTIONS
+      // The actual image comes from styled avatar cache, but description is in character data
+      if (!clothingDescription && avatars?.clothing) {
+        const categoryToCheck = usedClothingCategory || effectiveClothingCategory;
+        if (categoryToCheck && avatars.clothing[categoryToCheck]) {
+          const clothingData = avatars.clothing[categoryToCheck];
+          clothingDescription = typeof clothingData === 'string' ? clothingData : formatClothingObject(clothingData);
+          log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${categoryToCheck}: "${clothingDescription}"`);
+        }
+      }
+
+      // Fallback 2: use signature from clothingRequirements if still no clothingDescription
       // clothingRequirements has format: { "CharName": { "winter": { "used": true, "signature": "red scarf" } } }
       if (!clothingDescription && clothingRequirements && clothingRequirements[char.name]) {
         const charReqs = clothingRequirements[char.name];
