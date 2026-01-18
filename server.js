@@ -1690,6 +1690,46 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
   }
 });
 
+// Admin endpoint to get job input data (for debugging failed jobs)
+app.get('/api/admin/job-input', async (req, res) => {
+  try {
+    const { jobId, secret } = req.query;
+    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
+    if (secret !== secretKey) {
+      return res.status(401).json({ error: 'Invalid secret' });
+    }
+    if (!jobId) {
+      return res.status(400).json({ error: 'jobId parameter required' });
+    }
+
+    const result = await dbPool.query(
+      `SELECT id, status, created_at, updated_at, progress, progress_message,
+              input_data, error_message
+       FROM story_jobs WHERE id = $1`,
+      [jobId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const job = result.rows[0];
+    res.json({
+      id: job.id,
+      status: job.status,
+      created_at: job.created_at,
+      updated_at: job.updated_at,
+      progress: job.progress,
+      progress_message: job.progress_message,
+      error_message: job.error_message,
+      input_data: job.input_data
+    });
+  } catch (err) {
+    log.error('Error getting job input:', err);
+    res.status(500).json({ error: 'Failed to get job input', details: err.message });
+  }
+});
+
 // Trigger landmark discovery early (called when user enters wizard or gets location)
 // This runs in background so landmarks are ready when story generation starts
 app.post('/api/landmarks/discover', async (req, res) => {
