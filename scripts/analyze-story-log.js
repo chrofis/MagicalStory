@@ -458,8 +458,11 @@ function extractIssues(jobLines) {
     lowQualityScores: [],
     retries: [],
     runtimeErrors: [],  // JavaScript runtime errors (TypeError, etc.)
-    nanIssues: []       // NaN in calculations
+    nanIssues: [],       // NaN in calculations
+    qualityFindings: []  // CONSISTENCY, TEXT CHECK findings (informational, not errors)
   };
+
+  const seenMessages = new Set(); // For deduplication
 
   for (const line of jobLines) {
     const msg = line.message;
@@ -468,10 +471,34 @@ function extractIssues(jobLines) {
     // Skip Flask development server warning
     if (msg.includes('development server') || msg.includes('WSGI server')) continue;
 
-    // Warnings - look for actual warning indicators
+    // CONSISTENCY and TEXT CHECK findings are INFORMATIONAL (normal part of generation)
+    // They report findings but are not errors or warnings
+    if (msg.includes('[CONSISTENCY]') && msg.includes('Found')) {
+      const key = `consistency-${ts}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.qualityFindings.push({ time: ts, type: 'CONSISTENCY', message: msg.substring(0, 200) });
+      }
+      continue; // Don't also add to warnings/errors
+    }
+    if (msg.includes('[TEXT CHECK]') && msg.includes('Found')) {
+      const key = `textcheck-${ts}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.qualityFindings.push({ time: ts, type: 'TEXT CHECK', message: msg.substring(0, 200) });
+      }
+      continue; // Don't also add to warnings/errors
+    }
+
+    // Warnings - look for actual warning indicators (but not CONSISTENCY/TEXT CHECK)
     if ((msg.includes('WARNING') || msg.includes('\u26a0\ufe0f') || msg.includes('[WARN]') || line.level === 'wrn') &&
-        !msg.includes('development server') && !msg.includes('WSGI')) {
-      issues.warnings.push({ time: ts, message: msg.substring(0, 150) });
+        !msg.includes('development server') && !msg.includes('WSGI') &&
+        !msg.includes('[CONSISTENCY]') && !msg.includes('[TEXT CHECK]')) {
+      const key = `warn-${msg.substring(0, 50)}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.warnings.push({ time: ts, message: msg.substring(0, 150) });
+      }
     }
 
     // Errors - look for actual error indicators
@@ -480,33 +507,44 @@ function extractIssues(jobLines) {
                     (msg.includes('Failed') && !msg.includes('story-failed')) ||
                     line.level === 'err';
     if (isError) {
-      // Skip checkpoint errors, email templates, and normal log messages
-      if (!msg.includes('checkpoint') && !msg.includes('story-failed') && !msg.includes('email template')) {
-        issues.errors.push({ time: ts, message: msg.substring(0, 150) });
+      // Skip checkpoint errors, email templates, CONSISTENCY/TEXT CHECK, and normal log messages
+      if (!msg.includes('checkpoint') && !msg.includes('story-failed') &&
+          !msg.includes('email template') && !msg.includes('[CONSISTENCY]') &&
+          !msg.includes('[TEXT CHECK]')) {
+        const key = `err-${msg.substring(0, 50)}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          issues.errors.push({ time: ts, message: msg.substring(0, 150) });
+        }
       }
     }
 
     // Fallbacks
     if (msg.toLowerCase().includes('fallback')) {
-      issues.fallbacks.push({ time: ts, message: msg.substring(0, 150) });
+      const key = `fallback-${msg.substring(0, 50)}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.fallbacks.push({ time: ts, message: msg.substring(0, 150) });
+      }
     }
 
     // Low quality scores (< 80) - look for quality evaluation score patterns
-    // Match patterns like "score: 75%" from [QUALITY RETRY] logs
-    const scoreMatch = msg.match(/score[:\s]+(\d+)%/i);
-    if (scoreMatch) {
+    // Only match final scores from [QUALITY RETRY] success messages or quality evaluations
+    // Pattern: "Attempt X score: 60%" or "Success on attempt X! Score 70%"
+    const scoreMatch = msg.match(/(?:Attempt \d+ )?[Ss]core[:\s]+(\d+)%/i);
+    if (scoreMatch && (msg.includes('[QUALITY') || msg.includes('Success on attempt'))) {
       const score = parseInt(scoreMatch[1]);
       if (score < 80) {
         // Extract page number if present
         const pageMatch = msg.match(/\[PAGE\s+(\d+)\]/);
         const page = pageMatch ? parseInt(pageMatch[1]) : null;
-        issues.lowQualityScores.push({ time: ts, score, page, message: msg.substring(0, 120) });
+        // Deduplicate by timestamp and score (same event may be logged with/without page)
+        const key = `quality-${ts}-${score}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          issues.lowQualityScores.push({ time: ts, score, page, message: msg.substring(0, 120) });
+        }
       }
-    }
-
-    // Retries
-    if (msg.includes('retry') || msg.includes('Retry') || msg.includes('attempt')) {
-      issues.retries.push({ time: ts, message: msg.substring(0, 150) });
     }
 
     // Runtime errors (JavaScript errors like TypeError, .match is not a function, etc.)
@@ -523,14 +561,22 @@ function extractIssues(jobLines) {
     ];
     for (const pattern of runtimeErrorPatterns) {
       if (pattern.test(msg)) {
-        issues.runtimeErrors.push({ time: ts, message: msg.substring(0, 200) });
+        const key = `runtime-${msg.substring(0, 50)}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          issues.runtimeErrors.push({ time: ts, message: msg.substring(0, 200) });
+        }
         break;
       }
     }
 
     // NaN issues in calculations
     if (msg.includes('NaN') && (msg.includes('TOTAL') || msg.includes('token') || msg.includes('cost'))) {
-      issues.nanIssues.push({ time: ts, message: msg.substring(0, 150) });
+      const key = `nan-${msg.substring(0, 50)}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.nanIssues.push({ time: ts, message: msg.substring(0, 150) });
+      }
     }
   }
 
@@ -637,52 +683,36 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
     }
   }
 
-  // Issues
+  // Issues (real problems)
   const totalIssues = issues.warnings.length + issues.errors.length +
                       issues.fallbacks.length + issues.lowQualityScores.length +
                       issues.runtimeErrors.length + issues.nanIssues.length;
 
-  console.log(`\n\u26a0\ufe0f  ISSUES (${totalIssues} found)`);
+  console.log(`\n⚠️  ISSUES (${totalIssues} found)`);
 
   if (totalIssues === 0) {
-    console.log('   (none)');
+    console.log('   ✅ No issues detected');
   } else {
     if (issues.errors.length > 0) {
-      console.log(`\n   \u274c Errors (${issues.errors.length}):`);
-      // Show critical errors first (TEXT CHECK, CONSISTENCY, fatal failures)
-      const criticalErrors = issues.errors.filter(e =>
-        e.message.includes('TEXT CHECK') ||
-        e.message.includes('CONSISTENCY') ||
-        e.message.includes('Job') ||
-        e.message.includes('fatal')
-      );
-      const otherErrors = issues.errors.filter(e => !criticalErrors.includes(e));
-
-      if (criticalErrors.length > 0) {
-        console.log('      CRITICAL:');
-        criticalErrors.forEach(e => console.log(`      [${e.time}] ${e.message}`));
-      }
-      if (otherErrors.length > 0) {
-        console.log('      OTHER:');
-        otherErrors.slice(0, 5).forEach(e => console.log(`      [${e.time}] ${e.message}`));
-        if (otherErrors.length > 5) console.log(`      ... and ${otherErrors.length - 5} more`);
-      }
+      console.log(`\n   ❌ Errors (${issues.errors.length}):`);
+      issues.errors.slice(0, 10).forEach(e => console.log(`      [${e.time}] ${e.message}`));
+      if (issues.errors.length > 10) console.log(`      ... and ${issues.errors.length - 10} more`);
     }
 
     if (issues.warnings.length > 0) {
-      console.log(`\n   \u26a0\ufe0f  Warnings (${issues.warnings.length}):`);
+      console.log(`\n   ⚠️  Warnings (${issues.warnings.length}):`);
       issues.warnings.slice(0, 5).forEach(w => console.log(`      [${w.time}] ${w.message}`));
       if (issues.warnings.length > 5) console.log(`      ... and ${issues.warnings.length - 5} more`);
     }
 
     if (issues.fallbacks.length > 0) {
-      console.log(`\n   \ud83d\udd04 Fallbacks (${issues.fallbacks.length}):`);
+      console.log(`\n   🔄 Fallbacks (${issues.fallbacks.length}):`);
       issues.fallbacks.slice(0, 5).forEach(f => console.log(`      [${f.time}] ${f.message}`));
       if (issues.fallbacks.length > 5) console.log(`      ... and ${issues.fallbacks.length - 5} more`);
     }
 
     if (issues.lowQualityScores.length > 0) {
-      console.log(`\n   \ud83d\udcca Low Quality Scores (${issues.lowQualityScores.length}):`);
+      console.log(`\n   📊 Low Quality Scores (${issues.lowQualityScores.length}):`);
       issues.lowQualityScores.forEach(q => {
         const pageStr = q.page ? ` Page ${q.page}:` : '';
         console.log(`      [${q.time}]${pageStr} Score: ${q.score}%`);
@@ -698,6 +728,14 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
       console.log(`\n   🔢 NaN Issues (${issues.nanIssues.length}):`);
       issues.nanIssues.forEach(n => console.log(`      [${n.time}] ${n.message}`));
     }
+  }
+
+  // Quality Findings (informational - normal part of story generation)
+  if (issues.qualityFindings.length > 0) {
+    console.log(`\n📋 QUALITY FINDINGS (${issues.qualityFindings.length} - informational)`);
+    issues.qualityFindings.forEach(f => {
+      console.log(`   [${f.time}] [${f.type}] ${f.message.substring(f.message.indexOf('Found'))}`);
+    });
   }
 
   // Status

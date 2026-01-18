@@ -1815,8 +1815,7 @@ export function StoryDisplay({
                               consistent: check.consistent,
                               overallScore: check.overallScore,
                               issues: check.issues,
-                              summary: check.summary,
-                              usage: check.usage
+                              summary: check.summary
                             }, null, 2)}
                           </pre>
                         </details>
