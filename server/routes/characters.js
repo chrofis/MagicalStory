@@ -225,8 +225,13 @@ router.post('/', authenticateToken, async (req, res) => {
       // This preserves avatar data AND character fields that may not be sent by the frontend
       let preservedCount = 0;
       const mergedCharacters = (characters || []).map(newChar => {
-        const existingChar = existingCharacters.find(c => c.id === newChar.id || c.name === newChar.name);
-        if (!existingChar) return newChar;
+        // Compare IDs as strings to handle type mismatch (SQL returns string, frontend sends number)
+        const newCharIdStr = String(newChar.id);
+        const existingChar = existingCharacters.find(c => String(c.id) === newCharIdStr || c.name === newChar.name);
+        if (!existingChar) {
+          console.log(`[Characters] POST - No existing data found for ${newChar.name} (id: ${newChar.id})`);
+          return newChar;
+        }
 
         let hasChanges = false;
         let mergedChar = { ...newChar };

@@ -1489,14 +1489,25 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         let charData = existingResult.length > 0 ? (existingResult[0].data || {}) : {};
         let characters = charData.characters || [];
 
+        // Build photos object (new structure used by frontend)
+        const photosObj = {
+          face: faceThumbnail,
+          original: imageData,
+          bodyNoBg: bodyNoBg,
+          body: bodyCrop
+        };
+
         if (isReupload) {
           // Update existing character's photo data (don't create new)
           const charIndex = characters.findIndex(c => c.id === characterId);
           if (charIndex >= 0) {
+            // Legacy flat fields (for backwards compatibility)
             characters[charIndex].photo_url = imageData;
             characters[charIndex].thumbnail_url = faceThumbnail;
             characters[charIndex].body_photo_url = bodyCrop;
             characters[charIndex].body_no_bg_url = bodyNoBg;
+            // New photos object structure (used by frontend)
+            characters[charIndex].photos = photosObj;
             characters[charIndex].avatars = { status: 'pending', stale: true }; // Mark stale since photo changed
             log.info(`📸 [PHOTO] Updated existing character ${characterId} with new photo for user ${req.user.id}`);
           } else {
@@ -1509,10 +1520,13 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
             name: '',  // User will fill in later
             gender: undefined,
             age: '',
-            photo_url: imageData,  // Original photo
+            // Legacy flat fields (for backwards compatibility)
+            photo_url: imageData,
             thumbnail_url: faceThumbnail,
             body_photo_url: bodyCrop,
             body_no_bg_url: bodyNoBg,
+            // New photos object structure (used by frontend)
+            photos: photosObj,
             avatars: { status: 'pending' },
             traits: { strengths: [], flaws: [], challenges: [] }
           };
