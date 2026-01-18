@@ -193,6 +193,8 @@ export interface FinalChecksImageCheck {
   issues: FinalChecksImageIssue[];
   summary?: string;
   evaluationPrompt?: string;  // Prompt used for evaluation (for dev mode)
+  evaluationPrompts?: string[];  // All prompts if batched (for dev mode)
+  rawResponses?: string[];  // Raw API responses for debugging/fine-tuning
 }
 
 export interface FinalChecksTextCheck {
@@ -203,6 +205,8 @@ export interface FinalChecksTextCheck {
   fullOriginalText?: string;   // Original story text before corrections
   fullCorrectedText?: string;  // Complete story text with all corrections applied
   evaluationPrompt?: string;   // The prompt used for evaluation (for debugging)
+  rawResponse?: string;        // Raw API response for debugging
+  parseError?: boolean;        // True if response couldn't be parsed as JSON
 }
 
 export interface FinalChecksReport {

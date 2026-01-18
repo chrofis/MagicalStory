@@ -1773,15 +1773,44 @@ export function StoryDisplay({
                         {check.summary && (
                           <p className="text-xs text-gray-500 mt-2 italic">{check.summary}</p>
                         )}
-                        {/* Evaluation prompt (collapsible) - for dev mode */}
-                        {check.evaluationPrompt && (
+                        {/* Evaluation prompts (collapsible) - for dev mode */}
+                        {(check.evaluationPrompts || check.evaluationPrompt) && (
                           <details className="mt-3 bg-blue-50 border border-blue-200 rounded p-2">
                             <summary className="cursor-pointer text-xs font-medium text-blue-800">
-                              🔍 View Evaluation Prompt
+                              🔍 View Evaluation Prompt{(check.evaluationPrompts?.length ?? 0) > 1 ? `s (${check.evaluationPrompts?.length} batches)` : ''}
                             </summary>
-                            <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
-                              {check.evaluationPrompt}
-                            </pre>
+                            <div className="mt-2 space-y-3">
+                              {(check.evaluationPrompts ?? (check.evaluationPrompt ? [check.evaluationPrompt] : [])).map((prompt, promptIdx) => (
+                                <div key={promptIdx}>
+                                  {(check.evaluationPrompts?.length ?? 0) > 1 && (
+                                    <div className="text-xs font-semibold text-blue-700 mb-1">Batch {promptIdx + 1}:</div>
+                                  )}
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto bg-white p-2 rounded border">
+                                    {prompt}
+                                  </pre>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        )}
+                        {/* Raw responses (collapsible) - for debugging/fine-tuning */}
+                        {check.rawResponses && check.rawResponses.length > 0 && (
+                          <details className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
+                            <summary className="cursor-pointer text-xs font-medium text-purple-800">
+                              📝 View Raw Response{check.rawResponses.length > 1 ? `s (${check.rawResponses.length} batches)` : ''}
+                            </summary>
+                            <div className="mt-2 space-y-3">
+                              {check.rawResponses.map((response, respIdx) => (
+                                <div key={respIdx}>
+                                  {(check.rawResponses?.length ?? 0) > 1 && (
+                                    <div className="text-xs font-semibold text-purple-700 mb-1">Batch {respIdx + 1}:</div>
+                                  )}
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto bg-white p-2 rounded border">
+                                    {response}
+                                  </pre>
+                                </div>
+                              ))}
+                            </div>
                           </details>
                         )}
                       </div>

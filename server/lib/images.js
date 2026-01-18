@@ -2956,14 +2956,14 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const result = JSON.parse(jsonMatch[0]);
-      return { ...result, usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt };
+      return { ...result, usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt, rawResponse: responseText };
     }
   } catch (parseError) {
     log.error(`❌ [CONSISTENCY] Failed to parse response: ${parseError.message}`);
     log.debug(`Response was: ${responseText.substring(0, 500)}`);
   }
 
-  return { usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt };
+  return { usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt, rawResponse: responseText };
 }
 
 /**
@@ -3071,11 +3071,15 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
     let lowestScore = 10;
     let anyInconsistent = false;
     const evaluationPrompts = [];
+    const rawResponses = [];
 
     for (const result of batchResults) {
-      // Collect prompts from each batch
+      // Collect prompts and raw responses from each batch
       if (result.evaluationPrompt) {
         evaluationPrompts.push(result.evaluationPrompt);
+      }
+      if (result.rawResponse) {
+        rawResponses.push(result.rawResponse);
       }
       if (!result.consistent) {
         anyInconsistent = true;
@@ -3112,7 +3116,9 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
       },
       evaluationPrompts: evaluationPrompts.length > 0 ? evaluationPrompts : undefined,
       // For backward compatibility, also include first prompt as singular
-      evaluationPrompt: evaluationPrompts[0] || undefined
+      evaluationPrompt: evaluationPrompts[0] || undefined,
+      // Raw responses for debugging/fine-tuning
+      rawResponses: rawResponses.length > 0 ? rawResponses : undefined
     };
 
     // Log summary
