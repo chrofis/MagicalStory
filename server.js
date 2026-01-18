@@ -9451,17 +9451,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 existingImage.qualityScore = imageResult.score;
                 log.info(`✅ [CONSISTENCY REGEN] [PAGE ${pageNum}] Replaced image (score: ${imageResult.score || 'N/A'}%)`);
 
-                // Update story_images table so frontend loads the new image (not cached old one)
-                try {
-                  await saveStoryImage(jobId, 'scene', pageNum, imageResult.imageData, {
-                    qualityScore: imageResult.score,
-                    generatedAt: new Date().toISOString(),
-                    versionIndex: 0
-                  });
-                  log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] Updated story_images table`);
-                } catch (saveErr) {
-                  log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Failed to update story_images: ${saveErr.message}`);
-                }
+                // Note: story_images update skipped during initial generation
+                // The story doesn't exist in the database yet - it's saved after consistency regen completes
+                // The regenerated image is already in allImages array and will be saved with the story
+                log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image updated in memory (will be saved with story)`);
               } else {
                 log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Regeneration failed, keeping original`);
               }
@@ -9471,20 +9464,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
             log.info(`📋 [CONSISTENCY REGEN] Regeneration complete for ${pagesToRegenerate.size} page(s)`);
 
-            // Delete stale story_images entries for regenerated pages
-            // This ensures the frontend loads the NEW images from data blob, not OLD cached ones
-            if (pagesToRegenerate.size > 0) {
-              try {
-                const pageList = [...pagesToRegenerate];
-                await dbPool.query(
-                  `DELETE FROM story_images WHERE story_id = $1 AND image_type = 'scene' AND page_number = ANY($2)`,
-                  [jobId, pageList]
-                );
-                log.debug(`🗑️ [CONSISTENCY REGEN] Deleted ${pageList.length} stale story_images entries for pages: ${pageList.join(', ')}`);
-              } catch (deleteErr) {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Failed to delete stale story_images: ${deleteErr.message}`);
-              }
-            }
+            // Note: story_images cleanup skipped during initial generation
+            // The story doesn't exist in the database yet, so there are no stale entries to delete
+            // story_images entries are only created when explicitly saving individual images later
 
             // Debug: Verify all images have unique data after consistency regen
             const imageHashes = allImages.map(img => ({
