@@ -3165,10 +3165,17 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
       return report;
     }
 
-    // Prepare images with page numbers
+    // Prepare images with page numbers and preserve all metadata for consistency evaluation
     const imagesWithPages = sceneImages.map((img, idx) => ({
       imageData: img.imageData || img,
-      pageNumber: img.pageNumber || idx + 1
+      pageNumber: img.pageNumber || idx + 1,
+      // Preserve metadata for scene context in consistency check prompt
+      characters: img.characters || [],
+      clothing: img.clothing || 'standard',
+      characterClothing: img.characterClothing || null,
+      referenceCharacters: img.referenceCharacters || [],
+      referenceClothing: img.referenceClothing || {},
+      sceneSummary: img.sceneSummary || null
     })).filter(img => img.imageData);
 
     // 1. Full consistency check across all images
