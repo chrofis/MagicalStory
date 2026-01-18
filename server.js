@@ -8731,6 +8731,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageNumber: pageNum,
           text: scene.text,
           description: scene.sceneDescription,
+          outlineExtract: scene.outlineExtract || scene.sceneHint || '',  // Short scene hint for re-expansion
           imageData: imageResult?.imageData || null,
           prompt: imagePrompt,
           // Dev mode: Art Director prompt used to create scene description
@@ -8914,21 +8915,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Re-expand scene with correction notes
               log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with corrections...`);
 
-              // Get scene description - could be in different places depending on generation flow
-              let sceneDescription = existingImage.description || existingImage.prompt || '';
-              if (typeof sceneDescription !== 'string') {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has non-string description (${typeof sceneDescription}), using prompt instead`);
-                sceneDescription = typeof existingImage.prompt === 'string' ? existingImage.prompt : '';
+              // Get short scene hint for re-expansion (NOT the already-expanded description)
+              // The outlineExtract contains the original short scene summary like "Sophie finds a magic key"
+              // Using the expanded description would cause "double expansion" - distorting the scene
+              let sceneHint = existingImage.outlineExtract || '';
+              if (sceneHint) {
+                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using original scene hint for re-expansion`);
+              } else {
+                // Fallback to description/prompt if no scene hint available (shouldn't happen in unified flow)
+                sceneHint = existingImage.description || existingImage.prompt || '';
+                log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] No scene hint available, using expanded description as fallback`);
               }
-              if (!sceneDescription) {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has no description, skipping`);
+              if (typeof sceneHint !== 'string') {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has non-string scene hint (${typeof sceneHint}), using prompt instead`);
+                sceneHint = typeof existingImage.prompt === 'string' ? existingImage.prompt : '';
+              }
+              if (!sceneHint) {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has no scene hint or description, skipping`);
                 continue;
               }
 
-              const sceneCharacters = getCharactersInScene(sceneDescription, inputData.characters);
+              // Use the full description (not hint) for character detection since it has more detail
+              const fullDescription = existingImage.description || sceneHint;
+              const sceneCharacters = getCharactersInScene(fullDescription, inputData.characters);
 
               const expansionPrompt = buildSceneExpansionPrompt(
-                sceneDescription,
+                sceneHint,
                 { characters: inputData.characters, visualBible },
                 sceneCharacters,
                 visualBible,
@@ -9032,6 +9044,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 const newHash = imageResult.imageData ? imageResult.imageData.slice(-20) : 'none';
                 log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] existingImage.pageNumber=${existingImage.pageNumber}, arrayIndex=${allImages.indexOf(existingImage)}`);
                 log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image hash: ${oldHash} -> ${newHash}`);
+
+                // Preserve original image in imageVersions before replacing (for version history/rollback)
+                if (!existingImage.imageVersions) {
+                  existingImage.imageVersions = [];
+                }
+                // Add original as version 0 if this is the first consistency regen
+                if (existingImage.imageVersions.length === 0 && existingImage.imageData) {
+                  existingImage.imageVersions.push({
+                    imageData: existingImage.imageData,
+                    prompt: existingImage.prompt,
+                    description: existingImage.description,
+                    qualityScore: existingImage.qualityScore,
+                    generatedAt: new Date().toISOString(),
+                    source: 'original'
+                  });
+                }
+                // Add consistency-fixed image as new version
+                existingImage.imageVersions.push({
+                  imageData: imageResult.imageData,
+                  prompt: imagePrompt,
+                  description: expandedDescription,
+                  qualityScore: imageResult.score,
+                  generatedAt: new Date().toISOString(),
+                  source: 'consistency-regen'
+                });
 
                 existingImage.imageData = imageResult.imageData;
                 existingImage.prompt = imagePrompt;
