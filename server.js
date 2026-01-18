@@ -106,7 +106,7 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Import modular routes and services
-const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory } = require('./server/services/database');
+const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
@@ -9450,6 +9450,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 existingImage.description = expandedDescription;
                 existingImage.qualityScore = imageResult.score;
                 log.info(`✅ [CONSISTENCY REGEN] [PAGE ${pageNum}] Replaced image (score: ${imageResult.score || 'N/A'}%)`);
+
+                // Update story_images table so frontend loads the new image (not cached old one)
+                try {
+                  await saveStoryImage(jobId, 'scene', pageNum, imageResult.imageData, {
+                    qualityScore: imageResult.score,
+                    generatedAt: new Date().toISOString(),
+                    versionIndex: 0
+                  });
+                  log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] Updated story_images table`);
+                } catch (saveErr) {
+                  log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Failed to update story_images: ${saveErr.message}`);
+                }
               } else {
                 log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Regeneration failed, keeping original`);
               }
