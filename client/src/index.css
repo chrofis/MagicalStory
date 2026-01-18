@@ -10,10 +10,16 @@
   --font-body: 'Libre Baskerville', serif;
 }
 
+html {
+  overscroll-behavior: none; /* Prevent pull-to-refresh and rubber-band on mobile */
+}
+
 body {
   @apply bg-white min-h-screen;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  overscroll-behavior: none; /* Prevent pull-to-refresh and rubber-band on mobile */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
 
 /* Prevent image dragging on all devices (especially mobile) */
@@ -55,6 +61,14 @@ img {
 * {
   scrollbar-width: thin;
   scrollbar-color: #a5b4fc #f3f4f6;
+}
+
+/* Prevent scroll chaining in scrollable containers (modals, etc.) */
+.overflow-y-auto,
+.overflow-auto,
+.overflow-y-scroll,
+.overflow-scroll {
+  overscroll-behavior-y: contain;
 }
 
 /* Animation utilities */
