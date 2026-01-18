@@ -1704,7 +1704,7 @@ app.get('/api/admin/job-input', async (req, res) => {
 
     const result = await dbPool.query(
       `SELECT id, status, created_at, updated_at, progress, progress_message,
-              input_data, error_message
+              input_data, error_message, result
        FROM story_jobs WHERE id = $1`,
       [jobId]
     );
@@ -1722,7 +1722,8 @@ app.get('/api/admin/job-input', async (req, res) => {
       progress: job.progress,
       progress_message: job.progress_message,
       error_message: job.error_message,
-      input_data: job.input_data
+      input_data: job.input_data,
+      result: job.result
     });
   } catch (err) {
     log.error('Error getting job input:', err);
