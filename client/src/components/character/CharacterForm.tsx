@@ -220,7 +220,7 @@ function PhysicalTraitsGrid({ character, language, updatePhysical, updateApparen
   };
 
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
       {/* Row 1: Eye Color | Visual Age */}
       <InlineEditField
         label={language === 'de' ? 'Augenfarbe' : language === 'fr' ? 'Couleur des yeux' : 'Eye Color'}
