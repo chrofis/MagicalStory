@@ -9084,6 +9084,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
             log.info(`📋 [CONSISTENCY REGEN] Regeneration complete for ${pagesToRegenerate.size} page(s)`);
 
+            // Delete stale story_images entries for regenerated pages
+            // This ensures the frontend loads the NEW images from data blob, not OLD cached ones
+            if (pagesToRegenerate.size > 0) {
+              try {
+                const pageList = [...pagesToRegenerate];
+                await dbPool.query(
+                  `DELETE FROM story_images WHERE story_id = $1 AND image_type = 'scene' AND page_number = ANY($2)`,
+                  [storyId, pageList]
+                );
+                log.debug(`🗑️ [CONSISTENCY REGEN] Deleted ${pageList.length} stale story_images entries for pages: ${pageList.join(', ')}`);
+              } catch (deleteErr) {
+                log.warn(`⚠️ [CONSISTENCY REGEN] Failed to delete stale story_images: ${deleteErr.message}`);
+              }
+            }
+
             // Debug: Verify all images have unique data after consistency regen
             const imageHashes = allImages.map(img => ({
               page: img.pageNumber,
