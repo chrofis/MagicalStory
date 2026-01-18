@@ -9053,7 +9053,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
 
               // Get landmark photos
-              const sceneMetadata = extractSceneMetadata(sceneDescription);
+              const sceneMetadata = extractSceneMetadata(expandedDescription);
               const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
               const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
 
