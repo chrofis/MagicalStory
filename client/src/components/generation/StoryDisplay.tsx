@@ -2109,7 +2109,11 @@ export function StoryDisplay({
                       <div className="bg-green-50 p-2 rounded text-xs">
                         <span className="font-semibold text-green-700">Scene Description:</span>
                         {scene.textModelId && <span className="ml-2 text-green-600">({scene.textModelId})</span>}
-                        <p className="text-gray-700 mt-1 whitespace-pre-wrap">{scene.description}</p>
+                        <p className="text-gray-700 mt-1 whitespace-pre-wrap">
+                          {typeof scene.description === 'string'
+                            ? scene.description
+                            : (scene.description as { text?: string })?.text || JSON.stringify(scene.description)}
+                        </p>
                       </div>
                     </div>
                   </details>
@@ -2186,7 +2190,9 @@ export function StoryDisplay({
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {frontCoverObj.description}
+                      {typeof frontCoverObj.description === 'string'
+                        ? frontCoverObj.description
+                        : (frontCoverObj.description as { text?: string })?.text || JSON.stringify(frontCoverObj.description)}
                     </pre>
                   </details>
                 )}
@@ -2318,7 +2324,9 @@ export function StoryDisplay({
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {initialPageObj.description}
+                      {typeof initialPageObj.description === 'string'
+                        ? initialPageObj.description
+                        : (initialPageObj.description as { text?: string })?.text || JSON.stringify(initialPageObj.description)}
                     </pre>
                   </details>
                 )}
@@ -3248,7 +3256,9 @@ export function StoryDisplay({
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {backCoverObj.description}
+                      {typeof backCoverObj.description === 'string'
+                        ? backCoverObj.description
+                        : (backCoverObj.description as { text?: string })?.text || JSON.stringify(backCoverObj.description)}
                     </pre>
                   </details>
                 )}
