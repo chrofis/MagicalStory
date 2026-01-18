@@ -67,6 +67,12 @@ router.get('/', authenticateToken, async (req, res) => {
         } else {
           characterData = { ...characterData, ...data };
         }
+        // Debug: Show what metadata includes for first character
+        const firstChar = characterData.characters[0];
+        if (firstChar) {
+          const avatarInfo = firstChar.avatars ? Object.keys(firstChar.avatars) : [];
+          console.log(`[Characters] GET - First char avatars: [${avatarInfo.join(',')}], hasStandard=${!!firstChar.avatars?.standard}`);
+        }
         console.log(`[Characters] GET - Characters count: ${characterData.characters.length}, total time: ${Date.now() - startTime}ms`);
       }
     } else {
@@ -168,8 +174,13 @@ router.get('/:characterId/full', authenticateToken, async (req, res) => {
       return res.json({ character: legacyResult[0].character });
     }
 
-    console.log(`[Characters] GET /${characterId}/full - Loaded full character data`);
-    res.json({ character: result[0].character });
+    const char = result[0].character;
+    const hasAvatars = !!char.avatars;
+    const avatarKeys = char.avatars ? Object.keys(char.avatars) : [];
+    const hasStandard = !!char.avatars?.standard;
+    const hasFaceThumbs = !!char.avatars?.faceThumbnails;
+    console.log(`[Characters] GET /${characterId}/full - Loaded: avatars=${hasAvatars}, keys=[${avatarKeys.join(',')}], standard=${hasStandard}, faceThumbs=${hasFaceThumbs}`);
+    res.json({ character: char });
   } catch (err) {
     console.error('Error fetching full character data:', err);
     res.status(500).json({ error: 'Failed to fetch character data' });
