@@ -342,15 +342,31 @@ export function StoryDisplay({
   // IMPORTANT: Always extract Section 6 (translated/localized) for user editing, NOT Section 1 (English)
   const extractImageSummary = (fullDescription: string | object): string => {
     if (!fullDescription) return '';
-    // Handle case where description is an object (e.g., JSON response not converted to string)
+
+    // Convert to string first
+    let desc: string;
     if (typeof fullDescription !== 'string') {
       // Try to extract the output field if it's a JSON object with thinking/output structure
       const obj = fullDescription as { output?: string; thinking?: unknown };
       if (obj.output && typeof obj.output === 'string') {
-        fullDescription = obj.output;
+        desc = obj.output;
       } else {
         // Fallback: stringify the object
-        fullDescription = JSON.stringify(fullDescription);
+        desc = JSON.stringify(fullDescription);
+      }
+    } else {
+      desc = fullDescription;
+    }
+
+    // Handle case where description is a JSON string (string containing JSON)
+    if (desc.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(desc);
+        if (parsed.output && typeof parsed.output === 'string') {
+          desc = parsed.output;
+        }
+      } catch {
+        // Not valid JSON, continue with original string
       }
     }
 
@@ -362,7 +378,7 @@ export function StoryDisplay({
     // Format 4: "6. **Bildzusammenfassung (Deutsch)**\nSophie kniet..." (fully translated header)
     // Format 5: "6. **Image Summary (German (Switzerland))**\n..." (nested parentheses)
     // NOTE: Uses (?:[^()]+|\([^()]*\))+ to handle nested parens like "German (Switzerland)"
-    const section6Match = fullDescription.match(
+    const section6Match = desc.match(
       /(?:#{1,3}\s*)?(?:\*\*)?6\.?\s*(?:\*\*)?\s*\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\((?:[^()]+|\([^()]*\))+\)\s*\*?\*?\s*:?\s*\n?([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n---|\n```|$)/i
     );
     if (section6Match && section6Match[2] && section6Match[2].trim()) {
@@ -372,7 +388,7 @@ export function StoryDisplay({
     // PRIORITY 2: Look for any "Image Summary (Language)" pattern anywhere (without section number)
     // This catches variations like "**Image Summary (Deutsch):**\nContent..." or "## Image Summary (Deutsch)"
     // NOTE: Uses (?:[^()]+|\([^()]*\))+ to handle nested parens like "German (Switzerland)"
-    const localizedSummaryMatch = fullDescription.match(
+    const localizedSummaryMatch = desc.match(
       /(?:#{1,3}\s*)?\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\s*\((?:[^()]+|\([^()]*\))+\)\s*:?\s*\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:#{1,3}\s*)?(?:\*\*)?\d+\.|\n\*\*|\n#{1,3}\s|$)/i
     );
     if (localizedSummaryMatch && localizedSummaryMatch[2] && localizedSummaryMatch[2].trim()) {
@@ -381,14 +397,14 @@ export function StoryDisplay({
 
     // PRIORITY 3: Fallback for simple descriptions (no markdown headers)
     // Just return as-is if short enough (e.g., user-edited simple text)
-    if (!fullDescription.includes('**') && fullDescription.length < 1000) {
-      return fullDescription.trim();
+    if (!desc.includes('**') && desc.length < 1000) {
+      return desc.trim();
     }
 
     // PRIORITY 4: If description has headers but no Section 6, try to extract first meaningful content
     // This handles edge cases where LLM didn't generate Section 6
     // Look for content after any "Image Summary" type header
-    const anyImageSummaryMatch = fullDescription.match(
+    const anyImageSummaryMatch = desc.match(
       /\*?\*?(Image Summary|Bildzusammenfassung|Résumé de l['']Image)\*?\*?\s*\n([\s\S]*?)(?=\n\s*(?:\*\*)?\d+\.\s*\*\*|\n\s*\*\*\d+\.|$)/i
     );
     if (anyImageSummaryMatch && anyImageSummaryMatch[2] && anyImageSummaryMatch[2].trim()) {
@@ -396,17 +412,32 @@ export function StoryDisplay({
     }
 
     // Last fallback: return truncated description
-    return fullDescription.substring(0, 500).trim() + '...';
+    return desc.substring(0, 500).trim() + '...';
   };
 
   // Detect which characters are mentioned in a scene description
   const detectCharactersInScene = (sceneText: string | object): number[] => {
     if (!sceneText || !characters.length) return characters.map(c => c.id); // Default to all
-    // Handle non-string values
-    let text = sceneText;
-    if (typeof text !== 'string') {
-      const obj = text as { output?: string };
-      text = obj.output && typeof obj.output === 'string' ? obj.output : JSON.stringify(text);
+
+    // Convert to string first
+    let text: string;
+    if (typeof sceneText !== 'string') {
+      const obj = sceneText as { output?: string };
+      text = obj.output && typeof obj.output === 'string' ? obj.output : JSON.stringify(sceneText);
+    } else {
+      text = sceneText;
+    }
+
+    // Handle JSON strings (string containing JSON)
+    if (text.trim().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.output && typeof parsed.output === 'string') {
+          text = parsed.output;
+        }
+      } catch {
+        // Not valid JSON, continue with original string
+      }
     }
     const lowerScene = text.toLowerCase();
     return characters
