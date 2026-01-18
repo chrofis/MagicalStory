@@ -57,6 +57,7 @@ Return ONLY valid JSON (no markdown, no explanation):
   "issues": [
     {
       "images": [2, 4],
+      "pagesToFix": [4],
       "type": "character_appearance" | "position_swap" | "clothing_mismatch" | "prop_inconsistency" | "style_drift",
       "characterInvolved": "Character name if applicable",
       "description": "Clear description of what's inconsistent",
@@ -64,12 +65,31 @@ Return ONLY valid JSON (no markdown, no explanation):
         "image2": "What it looks like in image 2",
         "image4": "What it looks like in image 4"
       },
-      "recommendation": "Specific fix suggestion (e.g., 'Regenerate page 4 with red hair to match page 2')",
+      "canonicalVersion": "Description of what the correct/target appearance should be (e.g., 'red hair as shown in image 2')",
+      "recommendation": "Single specific action to fix (e.g., 'Regenerate page 4: change hair to red to match page 2')",
       "severity": "low" | "medium" | "high"
     }
   ],
   "summary": "Brief overall assessment"
 }
+
+## Recommendation Rules (CRITICAL)
+
+When writing `recommendation` and `pagesToFix`:
+
+1. **NEVER give "either/or" options** - pick ONE specific direction
+2. **Minimize regeneration** - fix the FEWEST pages possible
+3. **Majority wins** - if 2 images show red hair and 1 shows brown, fix the brown one
+4. **First appearance wins** - if tied, match the earlier image (readers saw that first)
+5. **`pagesToFix`** - list ONLY the page numbers that need regeneration (not all involved pages)
+6. **`canonicalVersion`** - describe what the correct version looks like (used as reference)
+
+Example:
+- Images 1, 2, 3 all show Lukas
+- Images 1 & 2: no scarf
+- Image 3: blue scarf
+- WRONG: "Either add scarf to 1 & 2, or remove from 3"
+- CORRECT: `"pagesToFix": [3]`, `"canonicalVersion": "no scarf, as shown in images 1 and 2"`, `"recommendation": "Regenerate page 3: remove the scarf from Lukas to match images 1 and 2"`
 
 ## Severity Guide
 - **high**: Obvious inconsistency that readers will immediately notice (wrong hair color, character looks completely different)

@@ -2672,18 +2672,27 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     let correctionNotes = '';
     const finalChecksReport = storyData.finalChecksReport;
     if (finalChecksReport?.imageChecks?.length > 0) {
-      // Find all issues that affect this page
+      // Find all issues that affect this page (check both pagesToFix and images for relevance)
       const pageIssues = [];
       for (const check of finalChecksReport.imageChecks) {
         if (check.issues?.length > 0) {
           for (const issue of check.issues) {
-            if (issue.images?.includes(pageNumber)) {
+            // Check if this page is relevant to the issue
+            const pagesToFix = issue.pagesToFix || [];
+            const involvedImages = issue.images || [];
+            const isPageToFix = pagesToFix.includes(pageNumber);
+            const isInvolved = involvedImages.includes(pageNumber);
+
+            if (isPageToFix || isInvolved) {
               // Build issue description
               let issueText = `- ${issue.type.replace(/_/g, ' ').toUpperCase()}`;
               if (issue.characterInvolved) {
                 issueText += ` (${issue.characterInvolved})`;
               }
               issueText += `: ${issue.description}`;
+              if (issue.canonicalVersion) {
+                issueText += `\n  TARGET: ${issue.canonicalVersion}`;
+              }
               if (issue.recommendation) {
                 issueText += `\n  FIX: ${issue.recommendation}`;
               }
@@ -9096,11 +9105,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           const pageIssueMap = new Map(); // pageNum -> issues[]
 
           // Collect pages with high severity issues only (medium severity not auto-regenerated)
+          // Use pagesToFix (new) or fall back to images (legacy) for which pages to regenerate
           for (const check of finalChecksReport.imageChecks) {
             for (const issue of (check.issues || [])) {
-              log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, images=${JSON.stringify(issue.images)}`);
+              const pagesToFix = issue.pagesToFix || issue.images || [];
+              log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, pagesToFix=${JSON.stringify(pagesToFix)}, images=${JSON.stringify(issue.images)}`);
               if (issue.severity === 'high') {
-                for (const pageNum of (issue.images || [])) {
+                for (const pageNum of pagesToFix) {
                   pagesToRegenerate.add(pageNum);
                   if (!pageIssueMap.has(pageNum)) pageIssueMap.set(pageNum, []);
                   pageIssueMap.get(pageNum).push(issue);
@@ -9130,10 +9141,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 continue;
               }
 
-              // Build correction notes from issues
-              const correctionNotes = pageIssues.map(issue =>
-                `- ${issue.type.toUpperCase()}${issue.characterInvolved ? ` (${issue.characterInvolved})` : ''}: ${issue.description}\n  FIX: ${issue.recommendation}`
-              ).join('\n\n');
+              // Build correction notes from issues (include canonicalVersion for clear target)
+              const correctionNotes = pageIssues.map(issue => {
+                let note = `- ${issue.type.toUpperCase()}${issue.characterInvolved ? ` (${issue.characterInvolved})` : ''}: ${issue.description}`;
+                if (issue.canonicalVersion) {
+                  note += `\n  TARGET: ${issue.canonicalVersion}`;
+                }
+                note += `\n  FIX: ${issue.recommendation}`;
+                return note;
+              }).join('\n\n');
 
               // Re-expand scene with correction notes
               log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with corrections...`);

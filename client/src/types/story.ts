@@ -165,12 +165,14 @@ export interface RepairAttempt {
 
 // Final consistency checks report
 export interface FinalChecksImageIssue {
-  images: number[];
+  images: number[];  // All pages involved in the issue (for context)
+  pagesToFix?: number[];  // Specific pages to regenerate (subset of images)
   type: 'character_appearance' | 'position_swap' | 'clothing_mismatch' | 'prop_inconsistency' | 'style_drift';
   characterInvolved?: string;  // Which character has the issue
   description: string;
   details?: Record<string, string>;  // Per-image details (e.g., { "image2": "red hair", "image4": "blonde hair" })
-  recommendation?: string;  // Specific fix suggestion
+  canonicalVersion?: string;  // What the correct/target appearance should be
+  recommendation?: string;  // Specific fix suggestion (single action, not "either/or")
   severity: 'low' | 'medium' | 'high';
 }
 

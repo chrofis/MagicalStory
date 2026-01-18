@@ -1742,6 +1742,11 @@ export function StoryDisplay({
                                     {issue.severity}
                                   </span>
                                   <span className="text-gray-500">Pages {issue.images?.join(', ')}</span>
+                                  {issue.pagesToFix && issue.pagesToFix.length > 0 && (
+                                    <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px]">
+                                      Fix: {issue.pagesToFix.join(', ')}
+                                    </span>
+                                  )}
                                   <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
                                     {issue.type?.replace(/_/g, ' ')}
                                   </span>
@@ -1760,6 +1765,11 @@ export function StoryDisplay({
                                       </p>
                                     ))}
                                   </div>
+                                )}
+                                {issue.canonicalVersion && (
+                                  <p className="text-blue-700 mt-1">
+                                    🎯 Target: {issue.canonicalVersion}
+                                  </p>
                                 )}
                                 {issue.recommendation && (
                                   <p className="text-green-700 mt-1 font-medium">
@@ -1793,6 +1803,23 @@ export function StoryDisplay({
                             </div>
                           </details>
                         )}
+                        {/* Parsed result (collapsible) - shows full JSON structure */}
+                        <details className="mt-3 bg-indigo-50 border border-indigo-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-indigo-800">
+                            🔧 View Parsed Result (Full JSON)
+                          </summary>
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-96 overflow-y-auto bg-white p-2 rounded border">
+                            {JSON.stringify({
+                              type: check.type,
+                              characterName: check.characterName,
+                              consistent: check.consistent,
+                              overallScore: check.overallScore,
+                              issues: check.issues,
+                              summary: check.summary,
+                              usage: check.usage
+                            }, null, 2)}
+                          </pre>
+                        </details>
                         {/* Raw responses (collapsible) - for debugging/fine-tuning */}
                         {check.rawResponses && check.rawResponses.length > 0 && (
                           <details className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
