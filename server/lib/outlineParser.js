@@ -1258,9 +1258,17 @@ class UnifiedStoryParser {
 
       const block = blockMatch[1];
 
-      // Extract hint (first line after Hint: or just the first content line)
-      const hintMatch = block.match(/(?:Hint:\s*)?([^\n]+)/i);
-      const hint = hintMatch ? hintMatch[1].trim() : '';
+      // Extract hint - specifically look for "Hint:" line first
+      // The block may start with "(Front Cover)" label, so we need to find the actual hint
+      const hintLineMatch = block.match(/^Hint:\s*(.+)$/im);
+      let hint = '';
+      if (hintLineMatch) {
+        hint = hintLineMatch[1].trim();
+      } else {
+        // Fallback: get first non-empty line that isn't a label like "(Front Cover)"
+        const lines = block.split('\n').map(l => l.trim()).filter(l => l && !l.match(/^\(.*\)$/));
+        hint = lines[0] || '';
+      }
 
       // Extract per-character clothing
       const { characterClothing, characters } = parseCharacterClothingBlock(block);
