@@ -56,8 +56,35 @@ Write a quick draft of what you want to illustrate:
 - For any location, object, or landmark that characters point at, look at, or move toward - assign it a specific FRAME POSITION (e.g., "Bundeshaus: background-center", "the door: right edge")
 
 
-**STEP 2 - CONNECTION REVIEW:**
+**STEP 2 - REVIEW:**
 Check EVERY connection between elements. This is where errors happen - be thorough.
+
+**Scale Feasibility Check (CRITICAL - Do this FIRST):**
+Before proceeding, verify that your chosen camera distance allows ALL requested details to be visible:
+
+- Camera distance chosen: [EXTREME WIDE / WIDE / MEDIUM / CLOSE-UP]
+- Large objects in frame? [YES: list them / NO]
+- Character detail level needed: [SILHOUETTES ONLY / BODY LANGUAGE / EXPRESSIONS / FINE DETAIL]
+- COMPATIBLE? [YES / NO]
+
+**Compatibility Rules:**
+- EXTREME WIDE (buildings, vehicles, landscapes visible): Characters = silhouettes/colors only, NO faces
+- WIDE (room-sized): Characters = body language, hair/clothing colors, NO detailed expressions
+- MEDIUM (1-3 characters waist-up): Expressions OK, hand positions OK
+- CLOSE-UP (face/hands): Full detail OK, but large objects cannot fit in frame
+
+**Auto-reject combinations:**
+- Spacecraft/vehicle exterior + astronaut expressions = IMPOSSIBLE
+- Full building + character eye details = IMPOSSIBLE
+- Interior AND exterior of vehicle in same frame = IMPOSSIBLE
+
+**If INCOMPATIBLE:** You MUST choose ONE scale:
+- ZOOM IN: Focus on characters, imply large objects (through windows, partial views, off-frame)
+- ZOOM OUT: Show full scene, describe characters generically (colors, silhouettes, body language only)
+
+**Resolution (if incompatible):** [Describe how you will fix it]
+
+---
 
 Character ↔ Character connections:
 - Are they facing each other? If yes, are their bodies AND heads oriented correctly?
