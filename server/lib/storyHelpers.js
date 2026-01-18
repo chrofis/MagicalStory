@@ -363,6 +363,10 @@ function extractSceneMetadata(sceneDescription) {
       // Store full parsed data for buildTextFromJson
       fullData: parsed.output,
       thinking: parsed.thinking || null,
+      // Extract translated summary for display in user's language
+      translatedSummary: parsed.output.translatedSummary || null,
+      // Extract image summary (English) for reference
+      imageSummary: parsed.output.imageSummary || null,
       isJsonFormat: true
     };
   }
