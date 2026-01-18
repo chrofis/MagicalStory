@@ -236,7 +236,13 @@ router.post('/', authenticateToken, async (req, res) => {
       `;
       const preserveResult = await dbQuery(preserveQuery, [characterId]);
       const existingCharacters = preserveResult[0]?.preserved || [];
-      console.log(`[Characters] POST - PreserveQuery returned ${existingCharacters.length} chars, first has avatars: ${!!existingCharacters[0]?.avatars}`);
+      // DEBUG: Show exactly what DB returned for avatars
+      for (const ec of existingCharacters) {
+        const avatarKeys = ec.avatars ? Object.keys(ec.avatars) : [];
+        const hasStandard = !!(ec.avatars?.standard);
+        const standardLen = ec.avatars?.standard?.length || 0;
+        console.log(`[Characters] POST - DB char ${ec.name}: avatarKeys=[${avatarKeys.join(',')}], hasStandard=${hasStandard}, standardLen=${standardLen}`);
+      }
 
       // Merge server-side data from existing characters into new characters
       // This preserves avatar data AND character fields that may not be sent by the frontend
