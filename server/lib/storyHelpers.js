@@ -2275,8 +2275,9 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
       requiredObjectsSection = `\n${header}\n`;
       for (const obj of requiredObjects) {
-        const idLabel = obj.id ? ` [${obj.id}]` : '';
-        requiredObjectsSection += `* **${obj.name}**${idLabel} (${obj.type}): ${obj.description}\n`;
+        // Note: obj.id exists for Visual Bible tracking but is not included in image prompts
+        // as image models don't use these identifiers
+        requiredObjectsSection += `* **${obj.name}** (${obj.type}): ${obj.description}\n`;
       }
 
       log.debug(`[IMAGE PROMPT] Added ${requiredObjects.length} required objects from metadata (skipping full Visual Bible)`);
