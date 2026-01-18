@@ -7985,7 +7985,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Build per-character clothing requirements from hint.characterClothing
         // hint.characterClothing = { 'Manuel': 'winter', 'Sophie': 'standard', 'Roger': 'costumed:knight' }
-        const sceneDescription = hint.hint || hint.scene || '';
+        let sceneDescription = hint.hint || hint.scene || '';
+
+        // Fallback: If scene description is empty or too short, generate a meaningful one
+        if (!sceneDescription || sceneDescription.length < 20) {
+          const mainCharNames = inputData.characters
+            .filter(c => c.isMainCharacter)
+            .map(c => c.name)
+            .join(', ') || inputData.characters.map(c => c.name).slice(0, 3).join(', ');
+          const theme = inputData.storyTheme || inputData.storyTopic || 'adventure';
+
+          if (coverType === 'titlePage') {
+            sceneDescription = `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
+          } else if (coverType === 'initialPage') {
+            sceneDescription = `A warm, inviting introduction scene showing ${mainCharNames} at the beginning of their ${theme} story. A cozy atmosphere that welcomes readers into the adventure.`;
+          } else {
+            sceneDescription = `A satisfying conclusion scene showing ${mainCharNames} after their ${theme} adventure. They look happy and content, with visual elements reflecting how the story ended.`;
+          }
+          log.debug(`📕 [COVER] ${coverType}: Using fallback scene description (hint was empty)`);
+        }
+
         const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
 
         // Build coverClothingRequirements with _currentClothing for per-character lookup
