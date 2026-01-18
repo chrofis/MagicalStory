@@ -1646,6 +1646,50 @@ app.delete('/api/admin/landmarks-cache', async (req, res) => {
   }
 });
 
+// Admin endpoint to get landmark photos for a city (for debugging/review)
+app.get('/api/admin/landmarks-photos', async (req, res) => {
+  try {
+    const { city, secret } = req.query;
+    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
+    if (secret !== secretKey) {
+      return res.status(401).json({ error: 'Invalid secret' });
+    }
+    if (!city) {
+      return res.status(400).json({ error: 'city parameter required' });
+    }
+
+    const result = await dbPool.query(
+      "SELECT city, country, language, landmarks FROM landmarks_discovery WHERE LOWER(city) = LOWER($1)",
+      [city]
+    );
+
+    const photos = [];
+    for (const row of result.rows) {
+      let landmarks = row.landmarks;
+      if (typeof landmarks === 'string') landmarks = JSON.parse(landmarks);
+      if (!Array.isArray(landmarks)) continue;
+
+      for (const l of landmarks) {
+        if (l.photoData && l.photoData.startsWith('data:image')) {
+          photos.push({
+            name: l.name,
+            type: l.type,
+            language: row.language,
+            photoData: l.photoData,
+            photoDescription: l.photoDescription || null,
+            sizeKB: Math.round(l.photoData.length * 0.75 / 1024)
+          });
+        }
+      }
+    }
+
+    res.json({ city, count: photos.length, photos });
+  } catch (err) {
+    log.error('Error getting landmark photos:', err);
+    res.status(500).json({ error: 'Failed to get landmark photos' });
+  }
+});
+
 // Trigger landmark discovery early (called when user enters wizard or gets location)
 // This runs in background so landmarks are ready when story generation starts
 app.post('/api/landmarks/discover', async (req, res) => {
