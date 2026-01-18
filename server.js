@@ -2543,10 +2543,22 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     // Update the scene description in story data (sceneDescriptions already loaded above)
     const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
 
+    // Extract translatedSummary and imageSummary from JSON for easy access
+    const metadata = extractSceneMetadata(newSceneDescription);
+    const translatedSummary = metadata?.translatedSummary || null;
+    const imageSummary = metadata?.imageSummary || null;
+
+    const sceneEntry = {
+      pageNumber,
+      description: newSceneDescription,
+      translatedSummary,
+      imageSummary
+    };
+
     if (existingIndex >= 0) {
-      sceneDescriptions[existingIndex].description = newSceneDescription;
+      sceneDescriptions[existingIndex] = { ...sceneDescriptions[existingIndex], ...sceneEntry };
     } else {
-      sceneDescriptions.push({ pageNumber, description: newSceneDescription });
+      sceneDescriptions.push(sceneEntry);
       sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
@@ -2559,7 +2571,9 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     res.json({
       success: true,
       pageNumber,
-      sceneDescription: newSceneDescription
+      sceneDescription: newSceneDescription,
+      translatedSummary,
+      imageSummary
     });
 
   } catch (err) {
@@ -3725,10 +3739,23 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
       let sceneDescriptions = storyData.sceneDescriptions || [];
       const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
 
+      // Extract translatedSummary from JSON for easy access
+      const { extractSceneMetadata } = require('./server/lib/storyHelpers');
+      const metadata = extractSceneMetadata(sceneDescription);
+      const translatedSummary = metadata?.translatedSummary || null;
+      const imageSummary = metadata?.imageSummary || null;
+
+      const sceneEntry = {
+        pageNumber,
+        description: sceneDescription,
+        translatedSummary,
+        imageSummary
+      };
+
       if (existingIndex >= 0) {
-        sceneDescriptions[existingIndex].description = sceneDescription;
+        sceneDescriptions[existingIndex] = { ...sceneDescriptions[existingIndex], ...sceneEntry };
       } else {
-        sceneDescriptions.push({ pageNumber, description: sceneDescription });
+        sceneDescriptions.push(sceneEntry);
         sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
       }
       storyData.sceneDescriptions = sceneDescriptions;
@@ -10433,12 +10460,16 @@ Output Format:
             }
             addUsage(sceneDescProvider, sceneDescResult.usage, 'scene_descriptions', sceneModelConfig?.modelId || getActiveTextModel().modelId);
 
+            // Extract translatedSummary and imageSummary from JSON
+            const sceneMetadata = extractSceneMetadata(sceneDescription);
             allSceneDescriptions.push({
               pageNumber: pageNum,
               description: sceneDescription,
               outlineExtract: shortSceneDesc,
               scenePrompt: scenePrompt,
-              textModelId: sceneDescResult.modelId
+              textModelId: sceneDescResult.modelId,
+              translatedSummary: sceneMetadata?.translatedSummary || null,
+              imageSummary: sceneMetadata?.imageSummary || null
             });
 
             // Detect which characters appear in this scene
@@ -10901,12 +10932,16 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             }
             addUsage(seqSceneDescProvider, sceneDescResult.usage, 'scene_descriptions', seqSceneModelConfig?.modelId || getActiveTextModel().modelId);
 
+            // Extract translatedSummary and imageSummary from JSON
+            const sceneMetadata = extractSceneMetadata(sceneDescription);
             allSceneDescriptions.push({
               pageNumber: pageNum,
               description: sceneDescription,
               outlineExtract: shortSceneDesc,  // Store the outline extract for debugging
               scenePrompt: scenePrompt,        // Store the Art Director prompt for debugging
-              textModelId: sceneDescResult.modelId
+              textModelId: sceneDescResult.modelId,
+              translatedSummary: sceneMetadata?.translatedSummary || null,
+              imageSummary: sceneMetadata?.imageSummary || null
             });
 
             // Detect which characters appear in this scene

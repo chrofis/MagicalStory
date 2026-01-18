@@ -131,8 +131,18 @@ The JSON must have this exact structure:
 ```json
 {
   "thinking": {
-    "draft": "Your STEP 1 draft notes here as a single string",
-    "review": "Your STEP 2 review notes here as a single string"
+    "draft": "Your STEP 1 draft: moment chosen, characters present, positions, actions",
+    "scaleFeasibility": {
+      "cameraDistance": "EXTREME WIDE | WIDE | MEDIUM | CLOSE-UP",
+      "largeObjects": "list or 'none'",
+      "characterDetailLevel": "SILHOUETTES | BODY LANGUAGE | EXPRESSIONS | FINE DETAIL",
+      "compatible": true,
+      "resolution": "null or how you fixed incompatibility"
+    },
+    "characterConnections": "Who faces whom, gaze directions, positions, depth layers, closeness",
+    "objectConnections": "Which hand holds what, spatial relationships",
+    "bodyConsistency": "For each character: both arms accounted for, pose supports action",
+    "gazeGeometry": "For each pointing/looking: target position, pointer position, direction verified"
   },
   "output": {
     "imageSummary": "2-3 sentences describing the moment. What is visible: positions, actions, setting. End with: Main characters: Name1, Name2.",
@@ -166,8 +176,12 @@ The JSON must have this exact structure:
 ```
 
 **FIELD REQUIREMENTS:**
-- `thinking.draft`: Your STEP 1 thinking (can be multi-line, will be stored for debugging)
-- `thinking.review`: Your STEP 2 thinking (can be multi-line, will be stored for debugging)
+- `thinking.draft`: Your STEP 1 draft notes
+- `thinking.scaleFeasibility`: CRITICAL - verify camera distance vs detail level compatibility
+- `thinking.characterConnections`: How characters relate spatially
+- `thinking.objectConnections`: Character-to-object interactions
+- `thinking.bodyConsistency`: Verify each character has coherent pose
+- `thinking.gazeGeometry`: Verify pointing/looking directions are geometrically correct
 - `output.imageSummary`: English description of the moment
 - `output.setting`: All fields required
 - `output.characters`: Array of 1-3 characters. EACH character MUST have their own `clothing` field matching their specific clothing from the input
@@ -182,7 +196,17 @@ The JSON must have this exact structure:
 {
   "thinking": {
     "draft": "Moment: Sophie kneeling, making eye contact with prairie dog. Characters: Sophie (right), Prairie Dog (left). Sophie kneeling in grass, fingers drumming impatiently. Prairie dog on mound, paws waving. Frame positions: Prairie dog mound left-center, Sophie right side.",
-    "review": "Scale: MEDIUM shot - can show expressions and hand details. Character connections: Sophie faces left toward prairie dog, prairie dog faces right toward Sophie - correct orientation. Sophie's arms: right hand on knee drumming, left hand in grass - both accounted for, coordinated impatient pose. Gaze: Sophie looking left at prairie dog (left side), prairie dog looking right at Sophie (right side) - geometry correct."
+    "scaleFeasibility": {
+      "cameraDistance": "MEDIUM",
+      "largeObjects": "none",
+      "characterDetailLevel": "EXPRESSIONS",
+      "compatible": true,
+      "resolution": null
+    },
+    "characterConnections": "Sophie faces left toward prairie dog, prairie dog faces right toward Sophie - correct mutual orientation. Sophie: right side, middle ground. Prairie dog: left-center, on elevated mound at Sophie's eye level. Closeness: clear gap, about arm's reach.",
+    "objectConnections": "Sophie's right hand on knee (drumming), left hand in grass. Lasso coiled beside her. Backpack on back with Eli peeking out. Cowboy hat on head.",
+    "bodyConsistency": "Sophie: right hand on knee drumming, left hand resting in grass - both arms accounted for, unified impatient waiting pose. Prairie dog: standing upright, both front paws waving - coordinated greeting pose.",
+    "gazeGeometry": "Sophie (right side) looking LEFT toward prairie dog (left-center) - direction correct. Prairie dog (left-center) looking RIGHT toward Sophie (right side) - direction correct. Eye contact verified."
   },
   "output": {
     "imageSummary": "Sophie kneels in tall prairie grass, fingers drumming on her knee, while a prairie dog stands upright on a dirt mound, front paws waving. The golden grassland stretches to the horizon. Main characters: Sophie, Prairie Dog.",
