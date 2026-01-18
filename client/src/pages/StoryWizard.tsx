@@ -1541,10 +1541,18 @@ export default function StoryWizard() {
             log.info(`👕 Using new photo's clothing (cleared existing)`);
           }
 
+          // Use server-provided character ID (character already exists in DB)
+          // This ensures avatar job can find the character when updating
+          const serverCharacterId = analysis.characterId;
+          if (serverCharacterId) {
+            log.info(`📸 [PHOTO] Using server-created character ID: ${serverCharacterId}`);
+          }
+
           // Build character for avatar generation BEFORE state update
           // (React state updates are async, so we build the object we need now)
           const charForGeneration: Character | null = currentCharacter ? {
             ...currentCharacter,
+            id: serverCharacterId || currentCharacter.id,  // Use server ID if available
             photos: updatedPhotos,
             avatars: { status: 'generating' as const },
             clothing: updatedClothing,
@@ -1566,6 +1574,8 @@ export default function StoryWizard() {
             if (!prev) return null;
             return {
               ...prev,
+              // Use server-created character ID
+              id: serverCharacterId || prev.id,
               // Photos from face/body detection
               photos: updatedPhotos,
               // Clear avatars - will regenerate with new face
@@ -1577,42 +1587,17 @@ export default function StoryWizard() {
           });
 
           // Auto-start avatar generation in BACKGROUND after face detection
-          // Don't await - let user continue while avatar generates
+          // Character already exists in DB (created during photo analysis), so avatar job can find it
           log.info(`🎨 Auto-starting avatar generation in background...`);
           log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
 
           // Auto-start avatar generation immediately after photo analysis
-          // IMPORTANT: Save character to DB first so avatar job can find it when updating
+          // Server already created character in DB, so we can start right away
           if (charForGeneration && charForGeneration.id) {
             const charId = charForGeneration.id;
             setGeneratingAvatarForId(charId);
 
-            // First, ensure character exists in DB (with photo) so avatar job can find it
-            // Get current characters and add/update this one
-            const currentChars = await new Promise<Character[]>(resolve => {
-              setCharacters(prev => { resolve(prev); return prev; });
-            });
-            const isEdit = currentChars.find(c => c.id === charId);
-            const updatedChars = isEdit
-              ? currentChars.map(c => c.id === charId ? charForGeneration : c)
-              : [...currentChars, charForGeneration];
-
-            // Save to DB with photos so avatar job can find the character
-            await characterService.saveCharacterData({
-              characters: updatedChars,
-              relationships,
-              relationshipTexts,
-              customRelationships,
-              customStrengths: [],
-              customWeaknesses: [],
-              customFears: [],
-            }, { includePhotos: true });
-            log.info(`💾 Saved character ${charForGeneration.name || charId} to DB before avatar generation`);
-
-            // Update local state
-            setCharacters(updatedChars);
-
-            // Now start avatar generation (don't await)
+            // Start avatar generation (don't await) - character already exists in DB
             characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
               .then(result => {
                 if (result.success && result.character) {
@@ -1760,10 +1745,17 @@ export default function StoryWizard() {
           };
         }
 
+        // Use server-provided character ID (character already exists in DB)
+        const serverCharacterId = analysis.characterId;
+        if (serverCharacterId) {
+          log.info(`📸 [FACE SELECT] Using server-created character ID: ${serverCharacterId}`);
+        }
+
         // Build character for avatar generation BEFORE state update
         // (React state updates are async, so we build the object we need now)
         const charForGeneration: Character | null = currentCharacter ? {
           ...currentCharacter,
+          id: serverCharacterId || currentCharacter.id,  // Use server ID if available
           photos: updatedPhotos,
           avatars: { status: 'generating' as const },
           clothing: updatedClothing,
@@ -1775,6 +1767,8 @@ export default function StoryWizard() {
           if (!prev) return null;
           return {
             ...prev,
+            // Use server-created character ID
+            id: serverCharacterId || prev.id,
             photos: updatedPhotos,
             avatars: { status: 'generating' as const },
             clothing: updatedClothing,
@@ -1793,6 +1787,7 @@ export default function StoryWizard() {
         }
 
         // Auto-start avatar generation in background
+        // Character already exists in DB (created during photo analysis), so avatar job can find it
         log.info(`🎨 Auto-starting avatar generation in background after face selection...`);
         log.info(`📸 Photo for avatar: bodyNoBg=${!!updatedPhotos.bodyNoBg}, body=${!!updatedPhotos.body}, face=${!!updatedPhotos.face}`);
 
@@ -1800,28 +1795,7 @@ export default function StoryWizard() {
           const charId = charForGeneration.id;
           setGeneratingAvatarForId(charId);
 
-          // First, ensure character exists in DB (with photo) so avatar job can find it
-          const currentChars = await new Promise<Character[]>(resolve => {
-            setCharacters(prev => { resolve(prev); return prev; });
-          });
-          const isEdit = currentChars.find(c => c.id === charId);
-          const updatedChars = isEdit
-            ? currentChars.map(c => c.id === charId ? charForGeneration : c)
-            : [...currentChars, charForGeneration];
-
-          await characterService.saveCharacterData({
-            characters: updatedChars,
-            relationships,
-            relationshipTexts,
-            customRelationships,
-            customStrengths: [],
-            customWeaknesses: [],
-            customFears: [],
-          }, { includePhotos: true });
-          log.info(`💾 Saved character ${charForGeneration.name} to DB before avatar generation (face selection)`);
-          setCharacters(updatedChars);
-
-          // Now start avatar generation (don't await)
+          // Start avatar generation (don't await) - character already exists in DB
           characterService.generateAndSaveAvatarForCharacter(charForGeneration, undefined, { avatarModel: modelSelections.avatarModel || undefined })
             .then(result => {
               if (result.success && result.character) {

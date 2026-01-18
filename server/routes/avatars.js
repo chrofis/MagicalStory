@@ -1468,20 +1468,70 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         selectedFaceId: selectedFaceId
       });
 
+      // Create character in database immediately so avatar job can find it later
+      // This ensures the character exists before avatar generation starts
+      const characterId = Date.now();
+      const faceThumbnail = analyzerData.face_thumbnail || analyzerData.faceThumbnail;
+      const bodyCrop = analyzerData.body_crop || analyzerData.bodyCrop;
+      const bodyNoBg = analyzerData.body_no_bg || analyzerData.bodyNoBg;
+
+      try {
+        const rowId = `characters_${req.user.id}`;
+
+        // Get existing characters for this user
+        const existingResult = await dbQuery(
+          'SELECT data FROM characters WHERE id = $1',
+          [rowId]
+        );
+
+        let charData = existingResult.length > 0 ? (existingResult[0].data || {}) : {};
+        let characters = charData.characters || [];
+
+        // Create new character with photo data
+        const newCharacter = {
+          id: characterId,
+          name: '',  // User will fill in later
+          gender: undefined,
+          age: '',
+          photo_url: imageData,  // Original photo
+          thumbnail_url: faceThumbnail,
+          body_photo_url: bodyCrop,
+          body_no_bg_url: bodyNoBg,
+          avatars: { status: 'pending' },
+          traits: { strengths: [], flaws: [], challenges: [] }
+        };
+
+        characters.push(newCharacter);
+        charData.characters = characters;
+
+        // Upsert the characters row
+        await dbQuery(`
+          INSERT INTO characters (id, user_id, data, metadata)
+          VALUES ($1, $2, $3, $4)
+          ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4
+        `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify({ characters: characters.map(c => ({ id: c.id, name: c.name })) })]);
+
+        log.info(`📸 [PHOTO] Created character ${characterId} in database for user ${req.user.id}`);
+      } catch (dbErr) {
+        // Log but don't fail - character creation is a nice-to-have
+        log.warn(`📸 [PHOTO] Failed to create character in DB (avatar job will retry): ${dbErr.message}`);
+      }
+
       // Convert snake_case to camelCase for frontend compatibility
       const response = {
         success: analyzerData.success,
         multipleFacesDetected: false,
         faceCount: analyzerData.face_count,
         selectedFaceId: analyzerData.selected_face_id,
-        faceThumbnail: analyzerData.face_thumbnail || analyzerData.faceThumbnail,
-        bodyCrop: analyzerData.body_crop || analyzerData.bodyCrop,
-        bodyNoBg: analyzerData.body_no_bg || analyzerData.bodyNoBg,
+        characterId: characterId,  // Return the new character ID
+        faceThumbnail: faceThumbnail,
+        bodyCrop: bodyCrop,
+        bodyNoBg: bodyNoBg,
         faceBox: analyzerData.face_box || analyzerData.faceBox,
         bodyBox: analyzerData.body_box || analyzerData.bodyBox
       };
 
-      log.debug('📸 [PHOTO] Sending response (face/body detection)');
+      log.debug('📸 [PHOTO] Sending response (face/body detection) with characterId:', characterId);
       res.json(response);
 
     } catch (fetchErr) {

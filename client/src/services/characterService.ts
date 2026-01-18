@@ -816,6 +816,8 @@ export const characterService = {
   async analyzePhoto(imageData: string, language?: string, selectedFaceId?: number, cachedFaces?: Array<{ id: number; x: number; y: number; width: number; height: number; confidence: number }>): Promise<{
     success: boolean;
     error?: string;  // Error code (e.g., 'no_face_detected')
+    // Character ID created by server
+    characterId?: number;
     // Multi-face detection fields
     multipleFacesDetected?: boolean;
     faceCount?: number;
@@ -861,6 +863,8 @@ export const characterService = {
     try {
       const response = await api.post<{
         success: boolean;
+        // Character ID created by server
+        characterId?: number;
         // Multi-face detection fields
         multipleFacesDetected?: boolean;
         faceCount?: number;
@@ -935,6 +939,7 @@ export const characterService = {
 
       return {
         success: response.success,
+        characterId: response.characterId,  // Server-created character ID
         multipleFacesDetected: false,
         faceCount: response.faceCount,
         photos: {
