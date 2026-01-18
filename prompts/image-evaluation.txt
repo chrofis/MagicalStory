@@ -46,6 +46,19 @@ Compare Step 1 findings to the Reference Images:
 Do NOT penalize for missing prints/patterns when figure is seen from behind.
 If attire is DIFFERENT from reference, note it as an issue.
 
+**AGE & PROPORTION CHECK:**
+- Compare body proportions to reference (head-to-body ratio, limb length)
+- Children: larger head-to-body ratio (~1:5), shorter limbs, rounder face
+- Adults: smaller head-to-body ratio (~1:7), longer limbs, defined features
+- Flag if child appears adult-sized or vice versa
+- Flag if age appearance doesn't match reference photo
+
+**DUPLICATE CHARACTER CHECK:**
+- If two figures match the SAME reference, flag as duplicate
+- Exception: Mirrors, photos-within-scene, or intentional twins
+- Flag: "DUPLICATE: Figure X and Figure Y both appear to be [Character Name]"
+- This is a CRITICAL issue (-3 points) unless scene context justifies it
+
 ---
 
 **STEP 3: RENDERING INTEGRITY SCAN (Structural Audit)**
@@ -105,13 +118,18 @@ OBJECT-CHARACTER RELATIONSHIP:
 
 ---
 
-**SCORING GUIDE (0-10)**
-- 10: Perfect. All expected characters present and recognizable, no structural issues.
-- 8-9: Good. Minor issues (slight style variation, minor attire difference).
-- 5-7: Acceptable. Characters resemble references but some details incorrect.
-- 3-4: Poor. One major issue (missing expected character, unrecognizable character, significant structural issue).
-- 1-2: Bad. Multiple major issues.
-- 0: Severe structural issues or completely wrong scene.
+**SCORING GUIDE (0-10) with Severity Weights**
+
+ISSUE SEVERITY:
+- CRITICAL (-3 points): Missing expected character, wrong character entirely, severe anatomy errors (extra limbs, major distortion), duplicate character
+- MAJOR (-2 points): Unrecognizable character, wrong gender, significant structural issue (6+ fingers, floating limbs)
+- MODERATE (-1 point): Wrong clothing color/type, minor anatomy issues, missing important accessories
+- MINOR (-0.5 points): Slight style variation, small prop differences, minor color shade differences
+
+SCORE CALCULATION:
+- Start at 10
+- Subtract points based on issue severity
+- Minimum score: 0
 
 **VERDICT**
 - PASS: Score 5+ (usable image)
@@ -142,10 +160,13 @@ Output your COMPLETE analysis as JSON (no other text):
     {
       "figure": 1,
       "matched_reference": "Lukas",
+      "confidence": 0.85,
       "facial_match": "Good match - round face, blue eyes",
       "hair_match": "Correct blonde color and length",
+      "age_match": "Child proportions correct",
       "attire_audit": "Blue hoodie correct, pants missing neon green accents",
-      "issues": ["pants missing neon green accents"]
+      "issues": ["pants missing neon green accents"],
+      "issue_severities": ["MODERATE"]
     }
   ],
   "rendering_integrity": {
@@ -181,6 +202,12 @@ Output your COMPLETE analysis as JSON (no other text):
 - `fix_targets` array: include only if score < 9 and issues are fixable by re-rendering a region
 - `bbox` coordinates: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left
 - Include ALL analysis steps in the JSON structure
+- `confidence`: 0.0-1.0 score for how confident the reference match is
+  - 0.9-1.0: Strong match, clearly the same character
+  - 0.7-0.89: Good match, minor differences
+  - 0.5-0.69: Uncertain match, noticeable differences
+  - Below 0.5: Poor match, likely wrong character
+- `issue_severities`: Array matching issues array, with severity level for each (CRITICAL, MAJOR, MODERATE, MINOR)
 - **CRITICAL for `fix` field**: Write as a SELF-CONTAINED VISUAL DESCRIPTION. The image editor does NOT know character names - describe by appearance and position only.
   - BAD: "Add black gloves to Lukas"
   - GOOD: "Add black knitted gloves to the hands of the boy with short brown hair and blue striped hoodie on the right side"
