@@ -491,14 +491,17 @@ router.post('/', authenticateToken, async (req, res) => {
         throw dbErr;
       }
 
-      // Clean up legacy rows with old ID format (characters_{user_id}_{timestamp})
+      // Clean up orphaned rows from photo uploads (numeric IDs from Date.now())
+      // Only delete rows with numeric IDs or old format IDs - preserve the main characters_X row
       const cleanupQuery = `
         DELETE FROM characters
-        WHERE user_id = $1 AND id != $2
+        WHERE user_id = $1
+          AND id != $2
+          AND (id ~ '^[0-9]+$' OR id LIKE 'characters_%_%')
       `;
       const cleanupResult = await dbQuery(cleanupQuery, [req.user.id, characterId]);
       if (cleanupResult.rowCount > 0) {
-        console.log(`[Characters] POST - Cleaned up ${cleanupResult.rowCount} legacy rows for user ${req.user.id}`);
+        console.log(`[Characters] POST - Cleaned up ${cleanupResult.rowCount} orphaned/legacy rows for user ${req.user.id}`);
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });

@@ -1379,7 +1379,7 @@ Your task is to create a 2x2 grid:
  */
 router.post('/analyze-photo', authenticateToken, async (req, res) => {
   try {
-    const { imageData, selectedFaceId, cachedFaces } = req.body;
+    const { imageData, selectedFaceId, cachedFaces, existingCharacterId } = req.body;
 
     if (!imageData) {
       log.debug('📸 [PHOTO] Missing imageData in request');
@@ -1468,9 +1468,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         selectedFaceId: selectedFaceId
       });
 
-      // Create character in database immediately so avatar job can find it later
-      // This ensures the character exists before avatar generation starts
-      const characterId = Date.now();
+      // Create or update character in database immediately so avatar job can find it later
+      // If existingCharacterId provided, update that character (photo re-upload)
+      // Otherwise create new character
+      const isReupload = existingCharacterId && typeof existingCharacterId === 'number' && existingCharacterId > 0;
+      const characterId = isReupload ? existingCharacterId : Date.now();
       const faceThumbnail = analyzerData.face_thumbnail || analyzerData.faceThumbnail;
       const bodyCrop = analyzerData.body_crop || analyzerData.bodyCrop;
       const bodyNoBg = analyzerData.body_no_bg || analyzerData.bodyNoBg;
@@ -1487,21 +1489,38 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         let charData = existingResult.length > 0 ? (existingResult[0].data || {}) : {};
         let characters = charData.characters || [];
 
-        // Create new character with photo data
-        const newCharacter = {
-          id: characterId,
-          name: '',  // User will fill in later
-          gender: undefined,
-          age: '',
-          photo_url: imageData,  // Original photo
-          thumbnail_url: faceThumbnail,
-          body_photo_url: bodyCrop,
-          body_no_bg_url: bodyNoBg,
-          avatars: { status: 'pending' },
-          traits: { strengths: [], flaws: [], challenges: [] }
-        };
+        if (isReupload) {
+          // Update existing character's photo data (don't create new)
+          const charIndex = characters.findIndex(c => c.id === characterId);
+          if (charIndex >= 0) {
+            characters[charIndex].photo_url = imageData;
+            characters[charIndex].thumbnail_url = faceThumbnail;
+            characters[charIndex].body_photo_url = bodyCrop;
+            characters[charIndex].body_no_bg_url = bodyNoBg;
+            characters[charIndex].avatars = { status: 'pending', stale: true }; // Mark stale since photo changed
+            log.info(`📸 [PHOTO] Updated existing character ${characterId} with new photo for user ${req.user.id}`);
+          } else {
+            log.warn(`📸 [PHOTO] Existing character ${characterId} not found in DB, will be updated by avatar job`);
+          }
+        } else {
+          // Create new character with photo data
+          const newCharacter = {
+            id: characterId,
+            name: '',  // User will fill in later
+            gender: undefined,
+            age: '',
+            photo_url: imageData,  // Original photo
+            thumbnail_url: faceThumbnail,
+            body_photo_url: bodyCrop,
+            body_no_bg_url: bodyNoBg,
+            avatars: { status: 'pending' },
+            traits: { strengths: [], flaws: [], challenges: [] }
+          };
 
-        characters.push(newCharacter);
+          characters.push(newCharacter);
+          log.info(`📸 [PHOTO] Created new character ${characterId} in database for user ${req.user.id}`);
+        }
+
         charData.characters = characters;
 
         // Upsert the characters row
@@ -1510,8 +1529,6 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
           VALUES ($1, $2, $3, $4)
           ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4
         `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify({ characters: characters.map(c => ({ id: c.id, name: c.name })) })]);
-
-        log.info(`📸 [PHOTO] Created character ${characterId} in database for user ${req.user.id}`);
       } catch (dbErr) {
         // Log but don't fail - character creation is a nice-to-have
         log.warn(`📸 [PHOTO] Failed to create character in DB (avatar job will retry): ${dbErr.message}`);
@@ -2060,7 +2077,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         let characters = null;
         let rowId = null;
 
-        for (let retryAttempt = 0; retryAttempt < 10; retryAttempt++) {
+        // 30 retries × 2 seconds = 60 seconds max wait for character to be saved
+        for (let retryAttempt = 0; retryAttempt < 30; retryAttempt++) {
           // Get current character data - query by user_id since there's one row per user
           // Note: dbQuery returns rows array directly, not { rows: [...] }
           rows = await dbQuery(`
@@ -2075,13 +2093,16 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             // Find the character by its internal ID (characterId is the character's id within the array)
             charIndex = characters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
 
-            // Fallback: find by name if ID match fails
+            // Fallback: find by name if ID match fails - ONLY if exactly one match (avoid ambiguity)
             if (charIndex < 0 && name) {
               const availableIds = characters.map(c => `${c.name}(${c.id})`).join(', ');
               log.debug(`💾 [AVATAR JOB ${jobId}] Character ID ${characterId} not found, available: [${availableIds}], trying name fallback...`);
-              charIndex = characters.findIndex(c => c.name === name);
-              if (charIndex >= 0) {
-                log.info(`📍 [AVATAR JOB ${jobId}] Found character "${name}" by name fallback at index ${charIndex} (ID mismatch: wanted ${characterId}, found ${characters[charIndex].id})`);
+              const nameMatches = characters.filter(c => c.name === name);
+              if (nameMatches.length === 1) {
+                charIndex = characters.findIndex(c => c.name === name);
+                log.warn(`📍 [AVATAR JOB ${jobId}] Using name fallback: "${name}" found at index ${charIndex} (ID mismatch: wanted ${characterId}, found ${characters[charIndex].id})`);
+              } else if (nameMatches.length > 1) {
+                log.warn(`⚠️ [AVATAR JOB ${jobId}] Name fallback SKIPPED: ${nameMatches.length} characters named "${name}" - cannot determine which one`);
               }
             }
           }
@@ -2094,16 +2115,16 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           }
 
           // Character not found yet - wait and retry (wizard might still be saving)
-          if (retryAttempt < 9) {
-            log.debug(`💾 [AVATAR JOB ${jobId}] Character not found (attempt ${retryAttempt + 1}/10), waiting 2s for wizard to save...`);
+          if (retryAttempt < 29) {
+            log.debug(`💾 [AVATAR JOB ${jobId}] Character not found (attempt ${retryAttempt + 1}/30), waiting 2s for wizard to save...`);
             await new Promise(resolve => setTimeout(resolve, 2000));
           }
         }
 
         // Log warning if character still not found after all retries
         if (charIndex < 0) {
-          const availableChars = characters.map(c => `${c.name}(${c.id})`).join(', ');
-          log.warn(`⚠️ [AVATAR JOB ${jobId}] CHARACTER NOT FOUND after 10 attempts! Wanted ID: ${characterId}, name: "${name}". Available: [${availableChars}]. Avatars generated but NOT saved to DB!`);
+          const availableChars = characters ? characters.map(c => `${c.name}(${c.id})`).join(', ') : 'none';
+          log.warn(`⚠️ [AVATAR JOB ${jobId}] CHARACTER NOT FOUND after 30 attempts (60s)! Wanted ID: ${characterId}, name: "${name}". Available: [${availableChars}]. Avatars generated but NOT saved to DB!`);
         }
 
         if (rows && rows.length > 0 && charIndex >= 0) {
@@ -2212,6 +2233,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             `, [JSON.stringify(charData), JSON.stringify(metadataObj), rowId]);
 
             log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId} (data + metadata)`);
+            results.dbSaveSuccessful = true;
           }
         } else {
           // Character still not found after all retries - fail the job
@@ -2219,12 +2241,15 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         }
       } catch (dbErr) {
         log.error(`❌ [AVATAR JOB ${jobId}] Failed to save avatars to database:`, dbErr.message);
+        results.dbSaveSuccessful = false;
         throw new Error(`Database save failed: ${dbErr.message}`);
       }
     }
 
     results.status = 'complete';
     results.generatedAt = new Date().toISOString();
+    // Ensure dbSaveSuccessful is set (true if we got here without error)
+    if (results.dbSaveSuccessful === undefined) results.dbSaveSuccessful = true;
 
     if (!results.standard) {
       throw new Error('Failed to generate standard avatar');
@@ -3079,13 +3104,18 @@ These corrections OVERRIDE what is visible in the reference photo.
             if (results.extractedTraits) {
               log.debug(`📊 [AVATAR TRAITS] Saved to DB: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
             }
+            results.dbSaveSuccessful = true;
           }
         }
       } catch (dbErr) {
         log.error(`❌ [CLOTHING AVATARS] Failed to save to database:`, dbErr.message);
+        results.dbSaveSuccessful = false;
         throw new Error(`Database save failed: ${dbErr.message}`);
       }
     }
+
+    // Ensure dbSaveSuccessful is set (true if we got here without error)
+    if (results.dbSaveSuccessful === undefined) results.dbSaveSuccessful = true;
 
     log.debug(`✅ [CLOTHING AVATARS] Generated standard avatar for ${name || 'unnamed'}`);
     // Log extracted traits for debugging

@@ -126,6 +126,9 @@ export default function StoryWizard() {
   // Characters saved with the story (for regeneration when viewing saved stories)
   const [storyCharacters, setStoryCharacters] = useState<Array<{ id: number; name: string; photoData?: string }> | null>(null);
   const [currentCharacter, setCurrentCharacter] = useState<Character | null>(null);
+  // Refs to track latest state values (avoids stale closures and hacky setState patterns)
+  const charactersRef = useRef<Character[]>([]);
+  const currentCharacterRef = useRef<Character | null>(null);
   const [showCharacterCreated, setShowCharacterCreated] = useState(false);
   const [characterStep, setCharacterStep] = useState<'photo' | 'name' | 'traits' | 'characteristics' | 'relationships' | 'avatar'>('photo');
   const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
@@ -302,6 +305,10 @@ export default function StoryWizard() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<{ type: 'image' | 'cover'; pageNumber?: number; coverType?: 'front' | 'back' | 'initial' } | null>(null);
   const [editPromptText, setEditPromptText] = useState('');
+
+  // Keep refs synced with state for reliable access in callbacks/closures
+  useEffect(() => { charactersRef.current = characters; }, [characters]);
+  useEffect(() => { currentCharacterRef.current = currentCharacter; }, [currentCharacter]);
 
   // Redirect if not authenticated, preserving the current URL for after login
   // Wait for auth loading to complete before checking authentication
@@ -1467,7 +1474,9 @@ export default function StoryWizard() {
         const originalSize = Math.round(originalPhotoUrl.length / 1024);
         const resizedSize = Math.round(resizedPhoto.length / 1024);
         log.info(`Starting photo analysis... (${originalSize}KB -> ${resizedSize}KB)`);
-        const analysis = await characterService.analyzePhoto(resizedPhoto, language);
+        // Pass existing character ID if re-uploading photo (prevents orphan records in DB)
+        const existingId = currentCharacter?.id && currentCharacter.id > 0 ? currentCharacter.id : undefined;
+        const analysis = await characterService.analyzePhoto(resizedPhoto, language, undefined, undefined, existingId);
 
         if (analysis.success) {
           // Check if multiple faces were detected - show selection modal
@@ -1579,14 +1588,20 @@ export default function StoryWizard() {
 
           setCurrentCharacter(prev => {
             if (!prev) return null;
+            // Preserve existing avatars as stale fallback while generating new ones
+            const existingAvatars = prev.avatars?.standard ? {
+              ...prev.avatars,
+              status: 'generating' as const,
+              stale: true, // Mark as from previous photo
+            } : { status: 'generating' as const };
             return {
               ...prev,
               // Keep existing ID or use server ID for new character
               id: characterIdToUse || prev.id,
               // Photos from face/body detection
               photos: updatedPhotos,
-              // Clear avatars - will regenerate with new face
-              avatars: { status: 'generating' as const },
+              // Mark existing avatars as stale while regenerating
+              avatars: existingAvatars,
               // Update clothing based on user's choice
               clothing: updatedClothing,
               clothingSource: updatedClothingSource,
@@ -1624,7 +1639,8 @@ export default function StoryWizard() {
 
           // Auto-start avatar generation immediately after photo analysis
           // Server already created character in DB, so we can start right away
-          if (charForGeneration && charForGeneration.id) {
+          // Only generate if character has a name (consistent with handleFaceSelection)
+          if (charForGeneration && charForGeneration.id && charForGeneration.name && charForGeneration.name.trim()) {
             const charId = charForGeneration.id;
             setGeneratingAvatarForId(charId);
 
@@ -1667,6 +1683,11 @@ export default function StoryWizard() {
               .finally(() => {
                 setGeneratingAvatarForId(null);
               });
+          } else if (charForGeneration && charForGeneration.id) {
+            // Character has ID but no name - wait for user to enter name before generating
+            log.info(`⏭️ Skipping auto-generation: character has no name yet`);
+            setGeneratingAvatarForId(null);
+            setCurrentCharacter(prev => prev ? { ...prev, avatars: { status: 'pending' } } : prev);
           } else {
             // No character data - should not happen
             log.warn(`⏭️ Skipping auto-generation: no character data available`);
@@ -1724,7 +1745,9 @@ export default function StoryWizard() {
         height: f.faceBox.height,
         confidence: f.confidence,
       }));
-      const analysis = await characterService.analyzePhoto(pendingPhotoData, language, faceId, cachedFaces);
+      // Pass existing character ID if re-uploading photo (prevents orphan records in DB)
+      const existingId = currentCharacter?.id && currentCharacter.id > 0 ? currentCharacter.id : undefined;
+      const analysis = await characterService.analyzePhoto(pendingPhotoData, language, faceId, cachedFaces, existingId);
 
       if (analysis.success) {
         log.info('Photo analysis complete with selected face:', {
@@ -1803,12 +1826,18 @@ export default function StoryWizard() {
         // Update character with analysis results
         setCurrentCharacter(prev => {
           if (!prev) return null;
+          // Preserve existing avatars as stale fallback while generating new ones
+          const existingAvatars = prev.avatars?.standard ? {
+            ...prev.avatars,
+            status: 'generating' as const,
+            stale: true, // Mark as from previous photo
+          } : { status: 'generating' as const };
           return {
             ...prev,
             // Keep existing ID or use server ID for new character
             id: characterIdToUse || prev.id,
             photos: updatedPhotos,
-            avatars: { status: 'generating' as const },
+            avatars: existingAvatars,
             clothing: updatedClothing,
             clothingSource: updatedClothingSource,
           };
@@ -2340,26 +2369,14 @@ export default function StoryWizard() {
 
     setIsLoading(true);
     try {
-      // Get the LATEST currentCharacter from state to avoid stale closure issues
-      const latestCurrentChar = await new Promise<Character | null>(resolve => {
-        setCurrentCharacter(prev => {
-          resolve(prev);
-          return prev; // Don't modify, just read
-        });
-      });
+      // Use refs for reliable access to latest state values (avoids stale closures)
+      const latestCurrentChar = currentCharacterRef.current;
+      const latestCharacters = charactersRef.current;
 
       if (!latestCurrentChar) {
         log.warn('No current character to save');
         return;
       }
-
-      // Get the LATEST characters array from state
-      const latestCharacters = await new Promise<Character[]>(resolve => {
-        setCharacters(prev => {
-          resolve(prev);
-          return prev; // Don't modify, just read
-        });
-      });
 
       // Check if this is an edit (existing character) or new character
       const isEdit = latestCurrentChar.id && latestCharacters.find(c => c.id === latestCurrentChar.id);
@@ -2408,7 +2425,15 @@ export default function StoryWizard() {
             log.success(`✅ Avatars and traits saved for ${savedChar.name}`);
           } else if (!result.skipped) {
             log.warn(`Avatar generation failed for ${savedChar.name}: ${result.error}`);
+            setCharacters(prev => prev.map(c =>
+              c.id === savedChar.id ? { ...c, avatars: { status: 'failed' } } : c
+            ));
           }
+        }).catch(error => {
+          log.error(`❌ Background avatar generation error for ${savedChar.name}:`, error);
+          setCharacters(prev => prev.map(c =>
+            c.id === savedChar.id ? { ...c, avatars: { status: 'failed' } } : c
+          ));
         });
       }
 
