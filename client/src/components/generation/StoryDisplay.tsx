@@ -91,7 +91,7 @@ interface StoryDisplayProps {
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
   onRegenerateImage?: (pageNumber: number, editedScene?: string, characterIds?: number[]) => Promise<void>;
-  onRegenerateCover?: (coverType: 'front' | 'back' | 'initial') => Promise<void>;
+  onRegenerateCover?: (coverType: 'front' | 'back' | 'initial', editedScene?: string) => Promise<void>;
   // Characters for scene edit modal
   characters?: Array<{ id: number; name: string; photoData?: string }>;
   onEditImage?: (pageNumber: number) => void;
@@ -223,6 +223,9 @@ export function StoryDisplay({
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
   const [, setIsRegenerating] = useState(false); // Only setter used - tracks global regen state
   const [regeneratingPages, setRegeneratingPages] = useState<Set<number>>(new Set()); // Track which pages are regenerating (supports parallel)
+
+  // Cover edit modal state (for editing cover scene before regenerating)
+  const [coverEditModal, setCoverEditModal] = useState<{ coverType: 'front' | 'back' | 'initial'; scene: string } | null>(null);
 
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
@@ -435,6 +438,38 @@ export function StoryDisplay({
         }
         return current;
       });
+    }
+  };
+
+  // Open cover edit modal for regeneration (like openSceneEditModal but for covers)
+  const openCoverEditModal = (coverType: 'front' | 'back' | 'initial') => {
+    // Get the current cover's description
+    let coverDescription = '';
+    if (coverType === 'front' && coverImages?.frontCover) {
+      const frontCover = coverImages.frontCover;
+      coverDescription = typeof frontCover === 'object' ? (frontCover as CoverImageData).description || '' : '';
+    } else if (coverType === 'initial' && coverImages?.initialPage) {
+      const initialPage = coverImages.initialPage;
+      coverDescription = typeof initialPage === 'object' ? (initialPage as CoverImageData).description || '' : '';
+    } else if (coverType === 'back' && coverImages?.backCover) {
+      const backCover = coverImages.backCover;
+      coverDescription = typeof backCover === 'object' ? (backCover as CoverImageData).description || '' : '';
+    }
+    setCoverEditModal({ coverType, scene: coverDescription });
+  };
+
+  // Handle regenerate cover with edited scene
+  const handleRegenerateCoverWithScene = async () => {
+    if (!coverEditModal || !_onRegenerateCover) return;
+    const { coverType, scene } = coverEditModal;
+
+    // Close modal immediately
+    setCoverEditModal(null);
+
+    try {
+      await _onRegenerateCover(coverType, scene);
+    } catch (err) {
+      console.error('Failed to regenerate cover:', err);
     }
   };
 
@@ -2062,7 +2097,7 @@ export function StoryDisplay({
             {_onRegenerateCover && (
               <div className="mt-3">
                 <button
-                  onClick={() => _onRegenerateCover('front')}
+                  onClick={() => openCoverEditModal('front')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                     isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
@@ -2194,7 +2229,7 @@ export function StoryDisplay({
             {_onRegenerateCover && (
               <div className="mt-3">
                 <button
-                  onClick={() => _onRegenerateCover('initial')}
+                  onClick={() => openCoverEditModal('initial')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                     isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
@@ -3124,7 +3159,7 @@ export function StoryDisplay({
             {_onRegenerateCover && (
               <div className="mt-3">
                 <button
-                  onClick={() => _onRegenerateCover('back')}
+                  onClick={() => openCoverEditModal('back')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                     isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
@@ -3360,6 +3395,70 @@ export function StoryDisplay({
           onCharacterSelectionChange={(ids) => setSceneEditModal({ ...sceneEditModal, selectedCharacterIds: ids })}
           consistencyRegen={developerMode ? sceneImages.find(img => img.pageNumber === sceneEditModal.pageNumber)?.consistencyRegen : undefined}
         />
+      )}
+
+      {/* Cover Edit Modal - for editing cover scene before regenerating */}
+      {coverEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <RefreshCw size={20} />
+                {language === 'de' ? 'Cover bearbeiten' :
+                 language === 'fr' ? 'Modifier la couverture' :
+                 'Edit Cover'}
+                {' - '}
+                {coverEditModal.coverType === 'front'
+                  ? (language === 'de' ? 'Titelseite' : language === 'fr' ? 'Couverture' : 'Front Cover')
+                  : coverEditModal.coverType === 'initial'
+                  ? (language === 'de' ? 'Einleitungsseite' : language === 'fr' ? 'Page de dédicace' : 'Dedication Page')
+                  : (language === 'de' ? 'Rückseite' : language === 'fr' ? 'Dos' : 'Back Cover')}
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">
+                {language === 'de'
+                  ? 'Beschreibe was auf dem Bild zu sehen sein soll'
+                  : language === 'fr'
+                  ? 'Décrivez ce que l\'image doit montrer'
+                  : 'Describe what should be shown in the image'}
+              </p>
+            </div>
+            <div className="p-4">
+              <textarea
+                value={coverEditModal.scene}
+                onChange={(e) => setCoverEditModal({ ...coverEditModal, scene: e.target.value })}
+                placeholder={language === 'de'
+                  ? 'z.B. "Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang"'
+                  : language === 'fr'
+                  ? 'par ex. "Le personnage principal devant un château magique au coucher du soleil"'
+                  : 'e.g. "The main character standing in front of a magical castle at sunset"'}
+                className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+              />
+            </div>
+            <div className="p-4 border-t border-gray-200 flex gap-3 justify-end">
+              <button
+                onClick={() => setCoverEditModal(null)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium"
+              >
+                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+              </button>
+              <button
+                onClick={handleRegenerateCoverWithScene}
+                disabled={regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover')}
+                className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center gap-2 ${
+                  regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover')
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-indigo-700'
+                }`}
+              >
+                <RefreshCw size={16} />
+                {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                <span className="text-xs opacity-80">
+                  ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Image History Modal */}

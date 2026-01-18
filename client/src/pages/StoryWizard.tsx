@@ -3739,12 +3739,12 @@ export default function StoryWizard() {
                 // Go back to step 1
                 setStep(1);
               }}
-              onRegenerateCover={storyId ? async (coverType: 'front' | 'back' | 'initial') => {
+              onRegenerateCover={storyId ? async (coverType: 'front' | 'back' | 'initial', editedScene?: string) => {
                 const coverKey = coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage';
                 try {
-                  log.info('Regenerating cover:', coverType);
+                  log.info('Regenerating cover:', coverType, editedScene ? `with scene: "${editedScene.substring(0, 50)}..."` : '');
                   setRegeneratingCovers(prev => new Set(prev).add(coverKey));
-                  const result = await storyService.regenerateCover(storyId, coverType);
+                  const result = await storyService.regenerateCover(storyId, coverType, editedScene);
                   // Update the cover images with all metadata (including quality evaluation)
                   setCoverImages(prev => {
                     if (!prev) return prev;

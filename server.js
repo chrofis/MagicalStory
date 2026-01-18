@@ -3058,7 +3058,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, coverType } = req.params;
-    const { customPrompt } = req.body;
+    const { customPrompt, editedScene } = req.body;
 
     // Accept both 'initial' and 'initialPage' for backwards compatibility
     const normalizedCoverType = coverType === 'initial' ? 'initialPage' : coverType;
@@ -3156,6 +3156,12 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     } else {
       sceneDescription = coverScenes.backCover?.scene || 'A satisfying, conclusive ending scene.';
       coverClothing = coverScenes.backCover?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+    }
+
+    // Override scene description with user-provided edit (like regular image regeneration)
+    if (editedScene && editedScene.trim()) {
+      log.debug(`📕 [COVER REGEN] Using user-provided scene description: "${editedScene.substring(0, 100)}..."`);
+      sceneDescription = editedScene.trim();
     }
 
     // Handle costumed:type format

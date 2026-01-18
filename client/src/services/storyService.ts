@@ -606,7 +606,7 @@ export const storyService = {
     return response;
   },
 
-  async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial'): Promise<{
+  async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial', editedScene?: string): Promise<{
     imageData: string;
     description?: string;
     prompt?: string;
@@ -628,7 +628,8 @@ export const storyService = {
       creditsUsed?: number;
       creditsRemaining?: number;
     }>(
-      `/api/stories/${storyId}/regenerate/cover/${coverType}`
+      `/api/stories/${storyId}/regenerate/cover/${coverType}`,
+      editedScene ? { editedScene } : undefined
     );
     return response;
   },
