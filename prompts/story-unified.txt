@@ -163,8 +163,10 @@ Analyze the draft above for logical issues. Be harsh and critical.
 Based on the story draft, determine which clothing variants each character needs.
 
 **Guidelines:**
-- Prefer `standard` when story doesn't require special clothing
-- **Indoor scenes should use `standard` clothing, NOT winter** - winter clothing is only for outdoor cold weather scenes
+- **COSTUME PRIORITY RULE:**
+  1. If outline/story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed:type`
+  2. If no costumes defined → use `standard` (or create appropriate costumes if story theme warrants it)
+  3. Winter clothing is ONLY for outdoor cold weather scenes, NOT indoor scenes
 - For standard/winter/summer: describe ONE **signature element** - a single visible clothing addition or accessory
   - Must be ONE item only (not a list)
   - Prefer clothing modifications over carried objects
@@ -350,10 +352,12 @@ For famous buildings, monuments, or locations that exist in reality:
 - **MAIN CHARACTERS**: The protagonist(s) with isMainCharacter=true, NOT all family members
 
 **Title Page** (Front Cover)
-Hint: [1-2 sentences - ONLY the main character(s), simple generic setting, mood. NO specific building names.]
+Hint: [1-2 sentences - ALL main character(s), simple generic setting, mood. NO specific building names.]
 Characters:
-- [MainCharacterName]: [standard | winter | summer | costumed:type]
-(List ONLY protagonist(s) marked as main character - typically 1-2 characters, NOT the whole family)
+- [MainCharacter1]: [clothing category - use costumed:type if costumes are defined]
+- [MainCharacter2]: [clothing category]
+- [MainCharacter3]: [clothing category]
+(List ALL protagonists marked as main character - if story has 3 main characters, list all 3)
 
 **Initial Page**
 Hint: [1-2 sentences - main characters, welcoming atmosphere, generic setting]
@@ -384,6 +388,7 @@ SCENE HINT:
 Characters:
 - [CharacterName]: [standard | winter | summer | costumed:type]
 - [CharacterName]: [standard | winter | summer | costumed:type]
+Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/overcast/rainy/snowy]
 
 --- Page 2 ---
 TEXT:
@@ -393,9 +398,15 @@ SCENE HINT:
 [Key visual moment with left/right positions]
 Characters:
 - [CharacterName]: [clothing category]
-- [CharacterName]: [clothing category]
+Setting: [indoor/outdoor] | Time: [time of day] | Weather: [weather - use SAME as previous outdoor scenes unless story requires change]
 
 ... continue for ALL {PAGES} pages ...
+
+**IMPORTANT - Setting/Time/Weather Consistency:**
+- Weather should be CONSISTENT across outdoor scenes unless the story explicitly describes a weather change
+- Time should progress LOGICALLY (don't jump from sunset back to midday)
+- Indoor scenes: use "indoor" for Setting, omit Weather (or write "n/a")
+- This prevents jarring visual inconsistencies between scene illustrations
 
 **IMPORTANT - Character Clothing Format:**
 - List EVERY character appearing in the scene on a separate line

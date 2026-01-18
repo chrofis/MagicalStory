@@ -65,7 +65,10 @@ For each main character ({CHARACTER_NAMES}), specify which clothing variations a
 - **costumed** - Full costume transformation (pirate, superhero, cowboy, princess, etc.)
 
 **Guidelines:**
-- Prefer `standard` when the story doesn't require special clothing
+- **COSTUME PRIORITY RULE:**
+  1. If story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed:type`
+  2. If no costumes defined → use `standard` (or create appropriate costumes if story theme warrants it)
+  3. Winter clothing is ONLY for outdoor cold weather scenes
 - For `costumed`: Provide **complete outfit description** (full transformation)
 - Only mark variations as `used: true` if they actually appear in the story
 
