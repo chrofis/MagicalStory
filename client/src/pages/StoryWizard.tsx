@@ -3413,14 +3413,12 @@ export default function StoryWizard() {
 
       case 6:
         // Step 6: Show StoryDisplay when we have visual content to display
-        // During generation/progressive: only show when we have at least one image (not just text)
-        // Completed story (not partial): always show as fallback even if no images
+        // ALWAYS require at least one image before showing the display
+        // This prevents showing an empty display for incomplete stories
         const hasAnyImage = coverImages.frontCover || coverImages.initialPage ||
           Object.keys(completedPageImages).length > 0 ||
           sceneImages.some(img => img.imageData);
-        const isCompletedStory = generatedStory && !isPartialStory && !isGenerating;
-        if (isCompletedStory ||
-            (generatedStory && hasAnyImage) ||
+        if ((generatedStory && hasAnyImage) ||
             (progressiveStoryData && hasAnyImage) ||
             (isGenerating && hasAnyImage)) {
           // Build scene images from progressive data if still generating
