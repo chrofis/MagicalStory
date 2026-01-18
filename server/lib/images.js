@@ -2822,29 +2822,33 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
     return null;
   }
 
-  // Build image info for prompt - include scene context (characters, clothing, summary)
-  const imageInfo = imagesToCheck.map((img, idx) => {
+  // Build image info as JSON array for cleaner parsing
+  const imageInfoArray = imagesToCheck.map((img, idx) => {
     const pageNum = img.pageNumber || 'unknown';
 
     // Get character names from metadata or reference photos
     const chars = img.characters?.length > 0
-      ? img.characters.join(', ')
-      : (img.referenceCharacters?.length > 0 ? img.referenceCharacters.join(', ') : 'unknown');
+      ? img.characters
+      : (img.referenceCharacters?.length > 0 ? img.referenceCharacters : []);
 
-    // Build per-character clothing string if available
-    let clothingInfo = img.clothing || 'standard';
-    const charClothing = img.characterClothing || img.referenceClothing;
-    if (charClothing && Object.keys(charClothing).length > 0) {
-      clothingInfo = Object.entries(charClothing)
-        .map(([name, cat]) => `${name}: ${cat}`)
-        .join(', ');
+    // Build per-character clothing object
+    let clothing = img.characterClothing || img.referenceClothing || {};
+    if (Object.keys(clothing).length === 0 && img.clothing) {
+      // Fallback: single clothing category for all characters
+      clothing = { _default: img.clothing };
     }
 
-    // Include scene summary if available
-    const summary = img.sceneSummary ? `\n   Scene: "${img.sceneSummary}"` : '';
+    return {
+      image: idx + 1,
+      page: pageNum,
+      characters: chars,
+      clothing: clothing,
+      scene: img.sceneSummary || null
+    };
+  });
 
-    return `Image ${idx + 1}: Page ${pageNum} - Characters: [${chars}], Clothing: [${clothingInfo}]${summary}`;
-  }).join('\n');
+  // Convert to formatted JSON string
+  const imageInfo = JSON.stringify(imageInfoArray, null, 2);
 
   // Fill template
   const prompt = fillTemplate(promptTemplate, {

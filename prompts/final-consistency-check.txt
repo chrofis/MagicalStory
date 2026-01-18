@@ -7,10 +7,17 @@ Analyze the provided images and identify any inconsistencies that would break im
 
 ## Check Type: {CHECK_TYPE}
 
-## Scene Context (IMPORTANT - Read Carefully)
+## Scene Context (JSON format)
 {IMAGE_INFO}
 
-**CRITICAL: The scene context tells you which characters appear in each image and what clothing they should wear.**
+Each entry contains:
+- "image": Image number (1-indexed, matches "Image N" labels below)
+- "page": Story page number
+- "characters": Array of character names appearing in this scene
+- "clothing": Object mapping character names to clothing category (or "_default" if same for all)
+- "scene": Brief description of what happens in the scene
+
+**CRITICAL: Use this JSON data to understand which characters appear in each image and what clothing they should wear.**
 
 - Different characters appearing in different images is EXPECTED - do NOT flag this as inconsistent
 - Clothing changes between scenes are INTENTIONAL if the clothing category differs (e.g., "standard" vs "winter" vs "costumed:pirate")
