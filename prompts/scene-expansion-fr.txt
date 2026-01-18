@@ -42,37 +42,31 @@ N'inventez PAS de nouveaux personnages ou objets.
        - EXPRESSION: Expression faciale en termes visuels (pas d'émotions)
        - POSITION: Où dans le cadre (gauche/droite, premier plan/arrière-plan)
 
-4. **Catégories de Vêtements:**
-   Catégories valides: standard, winter, summer, costumed:type
+4. **Catégories de Vêtements:** (NE PAS répéter les descriptions physiques - elles viennent des photos de référence)
+   Catégories valides: standard, winter, summer, costumed:X
    - **standard** - Casual quotidien
    - **winter** - Temps froid (manteaux, écharpes, bottes)
    - **summer** - Temps chaud (t-shirts, shorts, vêtements légers)
-   - **costumed:X** - Costume thématique (ex: "costumed:pirate", "costumed:knight", "costumed:astronaut")
-   Chaque personnage peut avoir une catégorie de vêtements DIFFÉRENTE.
+   - **costumed:X** - Costume thématique (ex: "costumed:pirate", "costumed:knight")
 
-5. **Personnages:** Pour CHAQUE personnage présent:
-   * **[Nom du Personnage]:**
-     - PHYSICAL: Copiez leur description complète depuis PERSONNAGES ci-dessus
-     - VÊTEMENTS: [catégorie] - Décrivez les vêtements appropriés pour la scène
+   Listez la catégorie de vêtements de chaque personnage:
+   * **[Nom du Personnage]:** [catégorie]
 
-6. **Objets & Animaux:** Pour CHAQUE élément récurrent présent:
-   * **[Nom de l'Élément]:**
-     - Caractéristiques: Copiez la description depuis ÉLÉMENTS RÉCURRENTS ci-dessus
-     - POSITION: Où il apparaît dans la scène
+5. **Objets dans la Scène:** (NE PAS copier les descriptions complètes - référencez par nom et ID)
+   * **[Nom de l'Élément]** [ID]: Position dans la scène
+   Exemple: "Le kart-baignoire [ART001]: Arrière-plan droite, brillant au coucher du soleil"
 
-7. **METADATA (JSON):** - OBLIGATOIRE, doit être un JSON valide
+6. **METADATA (JSON):** - OBLIGATOIRE, doit être un JSON valide
 ```json
 {
-  "characters": ["Nom1", "Nom2"],
-  "characterClothing": {"Nom1": "standard", "Nom2": "winter"},
-  "objects": ["Objet1", "Objet2"]
+  "characters": ["Anuk", "Loris"],
+  "characterClothing": {"Anuk": "summer", "Loris": "standard"},
+  "objects": ["ART001", "LOC008"]
 }
 ```
-   - characters: TOUS les personnages/animaux décrits dans la section 3 (Composition) DOIVENT être listés ici
-   - Ceci est utilisé pour attacher des images de référence - personnages manquants = références manquantes
-   - characterClothing: Catégories de vêtements PAR-PERSONNAGE (chaque personnage peut avoir des vêtements différents)
-   - Catégories valides: "standard", "winter", "summer", ou "costumed:X" (où X est le thème, ex: pirate, knight)
-   - objects: Tableau des noms d'objets/animaux des ÉLÉMENTS RÉCURRENTS dans cette scène
+   - characters: TOUS les personnages principaux de la section 3 (Composition) - DOIVENT être listés pour les photos de référence
+   - characterClothing: Catégories de vêtements par personnage
+   - objects: Utilisez les IDs D'ÉLÉMENTS (ART001, LOC003, etc.) des ÉLÉMENTS RÉCURRENTS, PAS les noms complets
 
 **PHYSIQUE & LOGIQUE DE CAMÉRA:**
 - **Orientation de la Caméra:**

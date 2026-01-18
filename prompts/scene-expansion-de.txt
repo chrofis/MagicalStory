@@ -42,37 +42,31 @@ Erfinde KEINE neuen Charaktere oder Objekte.
        - AUSDRUCK: Gesichtsausdruck mit visuellen Begriffen (keine Emotionen)
        - POSITION: Wo im Bild (links/rechts, Vordergrund/Hintergrund)
 
-4. **Kleidungskategorien:**
-   Gültige Kategorien: standard, winter, summer, costumed:type
+4. **Kleidungskategorien:** (KEINE Charakter-Beschreibungen wiederholen - diese kommen aus den Referenzfotos)
+   Gültige Kategorien: standard, winter, summer, costumed:X
    - **standard** - Alltägliche Freizeitkleidung
    - **winter** - Kaltes Wetter (Mäntel, Schals, Stiefel)
    - **summer** - Warmes Wetter (T-Shirts, Shorts, leichte Kleidung)
-   - **costumed:X** - Themenkostüm (z.B. "costumed:pirate", "costumed:knight", "costumed:astronaut")
-   Jeder Charakter kann eine ANDERE Kleidungskategorie haben.
+   - **costumed:X** - Themenkostüm (z.B. "costumed:pirate", "costumed:knight")
 
-5. **Charaktere:** Für JEDEN anwesenden Charakter:
-   * **[Charaktername]:**
-     - PHYSICAL: Kopiere die vollständige Beschreibung aus CHARAKTERE oben
-     - KLEIDUNG: [Kategorie] - Beschreibe passende Kleidung für die Szene
+   Liste die Kleidungskategorie jedes Charakters:
+   * **[Charaktername]:** [Kategorie]
 
-6. **Objekte & Tiere:** Für JEDES anwesende wiederkehrende Element:
-   * **[Elementname]:**
-     - Merkmale: Kopiere Beschreibung aus WIEDERKEHRENDE ELEMENTE oben
-     - POSITION: Wo es in der Szene erscheint
+5. **Objekte in Szene:** (KEINE vollständigen Beschreibungen kopieren - nur Name und ID referenzieren)
+   * **[Elementname]** [ID]: Position in der Szene
+   Beispiel: "Die Badewannen-Seifenkiste [ART001]: Hintergrund rechts, leuchtet im Sonnenuntergang"
 
-7. **METADATA (JSON):** - ERFORDERLICH, muss gültiges JSON sein
+6. **METADATA (JSON):** - ERFORDERLICH, muss gültiges JSON sein
 ```json
 {
-  "characters": ["Name1", "Name2"],
-  "characterClothing": {"Name1": "standard", "Name2": "winter"},
-  "objects": ["Objekt1", "Objekt2"]
+  "characters": ["Anuk", "Loris"],
+  "characterClothing": {"Anuk": "summer", "Loris": "standard"},
+  "objects": ["ART001", "LOC008"]
 }
 ```
-   - characters: ALLE Charaktere/Tiere aus Abschnitt 3 (Komposition) MÜSSEN hier aufgelistet sein
-   - Dies wird verwendet um Referenzbilder anzuhängen - fehlende Charaktere = fehlende Referenzen
-   - characterClothing: PRO-CHARAKTER Kleidungskategorien (jeder Charakter kann andere Kleidung haben)
-   - Gültige Kategorien: "standard", "winter", "summer", oder "costumed:X" (wobei X das Thema ist, z.B. pirate, knight)
-   - objects: Array der Objekt-/Tiernamen aus WIEDERKEHRENDE ELEMENTE in dieser Szene
+   - characters: ALLE Hauptcharaktere aus Abschnitt 3 (Komposition) - MÜSSEN aufgelistet sein für Referenzfotos
+   - characterClothing: Pro-Charakter Kleidungskategorien
+   - objects: Verwende ELEMENT-IDs (ART001, LOC003, etc.) aus WIEDERKEHRENDE ELEMENTE, NICHT vollständige Namen
 
 **PHYSIK & KAMERA-LOGIK:**
 - **Kamera-Orientierung:**

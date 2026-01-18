@@ -1,6 +1,52 @@
 import { useState } from 'react';
-import { History, ChevronRight, ChevronDown } from 'lucide-react';
+import { History, ChevronRight, ChevronDown, Download } from 'lucide-react';
 import type { RetryAttempt } from '@/types/story';
+
+/**
+ * Download text content as a file
+ */
+function downloadAsText(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Format evaluation data as readable text for download
+ */
+function formatEvaluationAsText(data: unknown, indent = 0): string {
+  const prefix = '  '.repeat(indent);
+
+  if (data === null || data === undefined) return `${prefix}null`;
+  if (typeof data === 'boolean') return `${prefix}${data ? 'YES' : 'NO'}`;
+  if (typeof data === 'number') return `${prefix}${data}`;
+  if (typeof data === 'string') return `${prefix}${data}`;
+
+  if (Array.isArray(data)) {
+    if (data.length === 0) return `${prefix}[]`;
+    return data.map((item, i) => `${prefix}[${i}]: ${formatEvaluationAsText(item, 0)}`).join('\n');
+  }
+
+  if (typeof data === 'object') {
+    const entries = Object.entries(data as Record<string, unknown>);
+    if (entries.length === 0) return `${prefix}{}`;
+    return entries.map(([k, v]) => {
+      const valueStr = formatEvaluationAsText(v, indent + 1);
+      if (typeof v === 'object' && v !== null) {
+        return `${prefix}${k}:\n${valueStr}`;
+      }
+      return `${prefix}${k}: ${valueStr.trim()}`;
+    }).join('\n');
+  }
+
+  return `${prefix}${String(data)}`;
+}
 
 interface RetryHistoryDisplayProps {
   retryHistory: RetryAttempt[];
@@ -12,11 +58,11 @@ interface RetryHistoryDisplayProps {
 /**
  * Format and display evaluation data with expandable sections
  */
-function EvaluationDisplay({ data, language }: { data: unknown; language: string }) {
+function EvaluationDisplay({ data, language, title }: { data: unknown; language: string; title?: string }) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   if (!data) {
-    return <div className="text-gray-400 italic text-xs">{language === 'de' ? 'Keine Daten' : 'No data'}</div>;
+    return <div className="text-gray-400 italic text-sm">{language === 'de' ? 'Keine Daten' : 'No data'}</div>;
   }
 
   // Parse string data if needed
@@ -26,7 +72,20 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
       parsed = JSON.parse(data);
     } catch {
       // If it's not JSON, show as text
-      return <pre className="text-[11px] whitespace-pre-wrap bg-gray-50 p-2 rounded max-h-60 overflow-auto">{data}</pre>;
+      return (
+        <div>
+          <div className="flex justify-end mb-1">
+            <button
+              onClick={() => downloadAsText(data, `${title || 'evaluation'}.txt`)}
+              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+              title="Download as text file"
+            >
+              <Download size={12} /> Download
+            </button>
+          </div>
+          <pre className="text-sm whitespace-pre-wrap bg-gray-50 p-3 rounded max-h-80 overflow-auto font-mono">{data}</pre>
+        </div>
+      );
     }
   }
 
@@ -38,6 +97,12 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
       newExpanded.add(key);
     }
     setExpandedSections(newExpanded);
+  };
+
+  // Download handler for parsed data
+  const handleDownload = () => {
+    const textContent = formatEvaluationAsText(parsed);
+    downloadAsText(textContent, `${title || 'evaluation'}.txt`);
   };
 
   // Render evaluation object with nice formatting
@@ -67,11 +132,11 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
               onClick={() => toggleSection(key)}
               className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
             >
-              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               {isExpanded ? 'Collapse' : `Show (${value.length} chars)`}
             </button>
             {isExpanded && (
-              <div className="mt-1 p-2 bg-gray-100 rounded text-[11px] whitespace-pre-wrap">{value}</div>
+              <div className="mt-1 p-2 bg-gray-100 rounded text-sm whitespace-pre-wrap font-mono">{value}</div>
             )}
           </div>
         );
@@ -85,7 +150,7 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
         <div className="ml-2 border-l-2 border-gray-200 pl-2">
           {value.map((item, idx) => (
             <div key={idx} className="mb-1">
-              <span className="text-gray-400 text-[10px]">[{idx}]</span> {renderValue(`${key}.${idx}`, item, depth + 1)}
+              <span className="text-gray-400 text-xs">[{idx}]</span> {renderValue(`${key}.${idx}`, item, depth + 1)}
             </div>
           ))}
         </div>
@@ -104,7 +169,7 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
               onClick={() => toggleSection(key)}
               className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
             >
-              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               {isExpanded ? 'Collapse' : `{${entries.length} fields}`}
             </button>
             {isExpanded && (
@@ -136,7 +201,16 @@ function EvaluationDisplay({ data, language }: { data: unknown; language: string
   };
 
   return (
-    <div className="text-[11px] space-y-1 max-h-80 overflow-auto">
+    <div className="text-sm space-y-1 max-h-96 overflow-auto">
+      <div className="flex justify-end mb-2">
+        <button
+          onClick={handleDownload}
+          className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded hover:bg-blue-100"
+          title="Download as text file"
+        >
+          <Download size={12} /> Download
+        </button>
+      </div>
       {renderValue('root', parsed)}
     </div>
   );
@@ -349,31 +423,33 @@ export function RetryHistoryDisplay({
                 )}
 
                 {/* Before/After Evaluations */}
-                <details className="text-xs">
+                <details className="text-sm">
                   <summary className="cursor-pointer text-amber-700 font-medium hover:text-amber-900">
                     📊 {language === 'de' ? 'Bewertungen anzeigen' : 'View Evaluations'}
                   </summary>
                   <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                     {/* Before evaluation */}
-                    <div className="bg-white p-3 rounded-lg border-2 border-red-200 shadow-sm">
-                      <div className="font-bold text-red-700 mb-2 text-sm flex items-center gap-2">
+                    <div className="bg-white p-4 rounded-lg border-2 border-red-200 shadow-sm">
+                      <div className="font-bold text-red-700 mb-2 text-base flex items-center gap-2">
                         <span className="bg-red-100 px-2 py-0.5 rounded">Before</span>
                         <span className="text-red-600">{attempt.preRepairScore}%</span>
                       </div>
                       <EvaluationDisplay
                         data={attempt.preRepairEval || attempt.reasoning}
                         language={language}
+                        title={`evaluation-before-attempt-${idx}`}
                       />
                     </div>
                     {/* After evaluation */}
-                    <div className="bg-white p-3 rounded-lg border-2 border-green-200 shadow-sm">
-                      <div className="font-bold text-green-700 mb-2 text-sm flex items-center gap-2">
+                    <div className="bg-white p-4 rounded-lg border-2 border-green-200 shadow-sm">
+                      <div className="font-bold text-green-700 mb-2 text-base flex items-center gap-2">
                         <span className="bg-green-100 px-2 py-0.5 rounded">After</span>
                         <span className="text-green-600">{attempt.postRepairScore}%</span>
                       </div>
                       <EvaluationDisplay
                         data={attempt.postRepairEval}
                         language={language}
+                        title={`evaluation-after-attempt-${idx}`}
                       />
                     </div>
                   </div>
@@ -381,30 +457,39 @@ export function RetryHistoryDisplay({
 
                 {/* Repair Details with images */}
                 {attempt.repairDetails && attempt.repairDetails.length > 0 && (
-                  <details className="text-xs">
+                  <details className="text-sm">
                     <summary className="cursor-pointer text-amber-700 font-medium hover:text-amber-900">
                       🖼️ {language === 'de' ? 'Reparatur-Details' : 'Repair Details'} ({attempt.repairDetails.length})
                     </summary>
                     <div className="mt-3 space-y-3">
                       {attempt.repairDetails.map((repair, rIdx) => (
-                        <div key={rIdx} className="bg-white p-3 rounded-lg border shadow-sm">
-                          <div className="flex justify-between items-start mb-1">
-                            <div className="font-medium text-amber-800">{repair.description}</div>
+                        <div key={rIdx} className="bg-white p-4 rounded-lg border shadow-sm">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="font-medium text-amber-800 text-base">{repair.description}</div>
                             {repair.modelId && (
-                              <span className="text-[10px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{repair.modelId}</span>
+                              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">{repair.modelId}</span>
                             )}
                           </div>
-                          <details className="mb-2">
-                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700 text-[11px]">
+                          <details className="mb-3">
+                            <summary className="text-gray-500 cursor-pointer hover:text-gray-700 text-sm flex items-center gap-2">
                               Show fix prompt
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  downloadAsText(repair.fullPrompt || repair.fixPrompt || '', `fix-prompt-${rIdx}.txt`);
+                                }}
+                                className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-0.5 bg-blue-50 rounded"
+                              >
+                                <Download size={10} /> Download
+                              </button>
                             </summary>
-                            <div className="mt-1 p-2 bg-gray-50 rounded text-[11px] text-gray-600 whitespace-pre-wrap">{repair.fullPrompt || repair.fixPrompt}</div>
+                            <div className="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-wrap font-mono max-h-96 overflow-auto">{repair.fullPrompt || repair.fixPrompt}</div>
                           </details>
                           <div className="flex gap-4 items-start">
                             {/* Before with Mask Overlay */}
                             {repair.beforeImage && repair.maskImage ? (
                               <div>
-                                <div className="text-[10px] text-gray-500 mb-1 font-medium">Before + Mask</div>
+                                <div className="text-xs text-gray-500 mb-1 font-medium">Before + Mask</div>
                                 <MaskOverlayImage
                                   beforeImage={repair.beforeImage}
                                   maskImage={repair.maskImage}
@@ -413,7 +498,7 @@ export function RetryHistoryDisplay({
                               </div>
                             ) : repair.beforeImage && (
                               <div>
-                                <div className="text-[10px] text-gray-500 mb-1 font-medium">Before</div>
+                                <div className="text-xs text-gray-500 mb-1 font-medium">Before</div>
                                 <img
                                   src={repair.beforeImage}
                                   alt="Before"
@@ -427,7 +512,7 @@ export function RetryHistoryDisplay({
                             {/* After */}
                             {repair.afterImage && (
                               <div>
-                                <div className="text-[10px] text-gray-500 mb-1 font-medium">After</div>
+                                <div className="text-xs text-gray-500 mb-1 font-medium">After</div>
                                 <img
                                   src={repair.afterImage}
                                   alt="After"
@@ -439,12 +524,12 @@ export function RetryHistoryDisplay({
                           </div>
                           {/* Verification Results */}
                           {repair.verification && (
-                            <div className="mt-2 p-2 bg-gray-50 rounded border text-[11px]">
-                              <div className="font-medium text-gray-700 mb-1">🔍 Verification:</div>
+                            <div className="mt-3 p-3 bg-gray-50 rounded border text-sm">
+                              <div className="font-medium text-gray-700 mb-2">🔍 Verification:</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {/* LPIPS Result */}
                                 {repair.verification.lpips && (
-                                  <div className={`p-1.5 rounded ${repair.verification.lpips.changed ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                                  <div className={`p-2 rounded ${repair.verification.lpips.changed ? 'bg-green-100' : 'bg-yellow-100'}`}>
                                     <span className="font-medium">LPIPS: </span>
                                     <span className={repair.verification.lpips.changed ? 'text-green-700' : 'text-yellow-700'}>
                                       {repair.verification.lpips.lpipsScore?.toFixed(4)}
@@ -456,7 +541,7 @@ export function RetryHistoryDisplay({
                                 )}
                                 {/* LLM Result */}
                                 {repair.verification.llm && (
-                                  <div className={`p-1.5 rounded ${repair.verification.llm.fixed ? 'bg-green-100' : 'bg-red-100'}`}>
+                                  <div className={`p-2 rounded ${repair.verification.llm.fixed ? 'bg-green-100' : 'bg-red-100'}`}>
                                     <span className="font-medium">LLM: </span>
                                     <span className={repair.verification.llm.fixed ? 'text-green-700' : 'text-red-700'}>
                                       {repair.verification.llm.fixed ? '✓ Fixed' : '✗ Not fixed'}
@@ -469,7 +554,7 @@ export function RetryHistoryDisplay({
                               </div>
                               {/* LLM Explanation */}
                               {repair.verification.llm?.explanation && (
-                                <div className="mt-1 text-gray-600 text-[10px] italic">
+                                <div className="mt-2 text-gray-600 text-sm italic">
                                   {repair.verification.llm.explanation}
                                 </div>
                               )}
@@ -485,19 +570,19 @@ export function RetryHistoryDisplay({
 
             {/* Regular attempt feedback */}
             {attempt.type !== 'auto_repair' && attempt.reasoning ? (
-              <details className="text-xs text-gray-600 mb-2">
+              <details className="text-sm text-gray-600 mb-2">
                 <summary className="cursor-pointer">{language === 'de' ? 'Feedback' : 'Feedback'}</summary>
-                <pre className="mt-1 whitespace-pre-wrap bg-gray-50 p-2 rounded text-[10px] overflow-auto max-h-40">{attempt.reasoning}</pre>
+                <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded text-sm overflow-auto max-h-60 font-mono">{attempt.reasoning}</pre>
               </details>
             ) : attempt.type !== 'auto_repair' && attempt.score === 0 && (
-              <div className="text-xs text-gray-500 italic mb-2">
+              <div className="text-sm text-gray-500 italic mb-2">
                 {language === 'de' ? 'Qualitätsbewertung fehlgeschlagen' : language === 'fr' ? 'Évaluation de qualité échouée' : 'Quality evaluation failed'}
               </div>
             )}
 
             {attempt.imageData && attempt.type !== 'auto_repair' && (
               <details>
-                <summary className="cursor-pointer text-xs text-blue-600">
+                <summary className="cursor-pointer text-sm text-blue-600">
                   {language === 'de' ? 'Bild anzeigen' : language === 'fr' ? 'Voir image' : 'View image'}
                 </summary>
                 <img

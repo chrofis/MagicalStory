@@ -42,37 +42,31 @@ Do NOT invent new characters or objects.
        - EXPRESSION: Facial expression using visual terms (not emotions)
        - POSITION: Where in the frame (left/right, foreground/background)
 
-4. **Clothing Categories:**
-   Valid categories: standard, winter, summer, costumed:type
+4. **Clothing Categories:** (DO NOT repeat character physical descriptions - those come from reference photos)
+   Valid categories: standard, winter, summer, costumed:X
    - **standard** - Everyday casual
    - **winter** - Cold weather (coats, scarves, boots)
    - **summer** - Warm weather (t-shirts, shorts, light clothes)
-   - **costumed:X** - Theme costume (e.g., "costumed:pirate", "costumed:knight", "costumed:astronaut")
-   Each character can have a DIFFERENT clothing category based on the scene.
+   - **costumed:X** - Theme costume (e.g., "costumed:pirate", "costumed:knight")
 
-5. **Characters:** For EACH character present:
-   * **[Character Name]:**
-     - PHYSICAL: Copy their full description from CHARACTERS above
-     - CLOTHING: [category] - Describe appropriate clothing for the scene
+   List each character's clothing category:
+   * **[Character Name]:** [category]
 
-6. **Objects & Animals:** For EACH recurring element present:
-   * **[Element Name]:**
-     - Features: Copy description from RECURRING ELEMENTS above
-     - POSITION: Where it appears in the scene
+5. **Objects in Scene:** (DO NOT copy full descriptions - just reference by name and ID)
+   * **[Element Name]** [ID]: Position in scene
+   Example: "Die Badewannen-Seifenkiste [ART001]: Background right, glowing in sunset"
 
-7. **METADATA (JSON):** - REQUIRED, must be valid JSON
+6. **METADATA (JSON):** - REQUIRED, must be valid JSON
 ```json
 {
-  "characters": ["Name1", "Name2"],
-  "characterClothing": {"Name1": "standard", "Name2": "winter"},
-  "objects": ["Object1", "Object2"]
+  "characters": ["Anuk", "Loris"],
+  "characterClothing": {"Anuk": "summer", "Loris": "standard"},
+  "objects": ["ART001", "LOC008"]
 }
 ```
-   - characters: ALL characters/animals described in section 3 (Composition) MUST be listed here
-   - This is used to attach reference images - missing characters = missing references
-   - characterClothing: PER-CHARACTER clothing categories (each character can have different clothing)
-   - Valid categories: "standard", "winter", "summer", or "costumed:X" (where X is the theme like pirate, knight)
-   - objects: Array of object/animal names from RECURRING ELEMENTS appearing in this scene
+   - characters: ALL main characters in section 3 (Composition) - MUST be listed to attach reference photos
+   - characterClothing: Per-character clothing categories
+   - objects: Use ELEMENT IDs (ART001, LOC003, etc.) from RECURRING ELEMENTS, NOT full names
 
 **PHYSICS & CAMERA LOGIC:**
 - **Camera Orientation:**
