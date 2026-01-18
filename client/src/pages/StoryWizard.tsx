@@ -2407,8 +2407,9 @@ export default function StoryWizard() {
 
       // Generate clothing avatars in the background (non-blocking)
       // Only if character has a photo and doesn't already have avatars
+      // Guard: Skip if avatar generation already in progress for this character (prevents double generation)
       const savedChar = updatedCharacters.find(c => c.id === currentCharacter.id);
-      if (savedChar && characterService.needsAvatars(savedChar)) {
+      if (savedChar && characterService.needsAvatars(savedChar) && generatingAvatarForId !== savedChar.id) {
         // Fire and forget - the service handles generation + saving
         log.info(`🎨 Starting background avatar generation for ${savedChar.name}...`);
         characterService.generateAndSaveAvatarForCharacter(savedChar, undefined, { avatarModel: modelSelections.avatarModel || undefined }).then(result => {
@@ -2456,40 +2457,19 @@ export default function StoryWizard() {
     setCharacterStep('traits'); // Go directly to traits when editing
     setShowCharacterCreated(false);
 
-    // Load full character data on-demand (heavy fields stripped from list view)
-    // Check if bodyNoBg is missing - it's stripped from list view but needed for editing
-    if (!char.photos?.bodyNoBg) {
-      const fullChar = await characterService.loadFullCharacter(char.id);
-      if (fullChar) {
-        // Merge full data into the character
-        setCurrentCharacter(prev => prev && prev.id === char.id ? {
-          ...prev,
-          ...fullChar,
-          // Keep existing avatars if they were already loaded
-          avatars: prev.avatars?.standard ? prev.avatars : fullChar.avatars
-        } : prev);
-        // Also update in the characters list
-        setCharacters(prev => prev.map(c =>
-          c.id === char.id ? { ...c, ...fullChar } : c
-        ));
-        return; // Full character includes avatars, no need to load separately
-      }
-    }
-
-    // Fallback: Load avatars on-demand if character has avatars but they weren't loaded
-    if (char.avatars?.hasFullAvatars && !char.avatars?.standard) {
-      const fullAvatars = await characterService.loadCharacterAvatars(char.id);
-      if (fullAvatars) {
-        // Merge full avatars into the character
-        setCurrentCharacter(prev => prev && prev.id === char.id ? {
-          ...prev,
-          avatars: { ...prev.avatars, ...fullAvatars }
-        } : prev);
-        // Also update in the characters list
-        setCharacters(prev => prev.map(c =>
-          c.id === char.id ? { ...c, avatars: { ...c.avatars, ...fullAvatars } } : c
-        ));
-      }
+    // Always load full character data on-demand when editing
+    // This ensures avatars are loaded even after page reload (metadata doesn't include full avatars)
+    const fullChar = await characterService.loadFullCharacter(char.id);
+    if (fullChar) {
+      // Merge full data into the character
+      setCurrentCharacter(prev => prev && prev.id === char.id ? {
+        ...prev,
+        ...fullChar,
+      } : prev);
+      // Also update in the characters list
+      setCharacters(prev => prev.map(c =>
+        c.id === char.id ? { ...c, ...fullChar } : c
+      ));
     }
   };
 
