@@ -7493,6 +7493,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         });
 
         log.info(`📋 [STORYBOOK] Final checks complete: ${finalChecksReport.summary}`);
+
+        // Update resultData with final checks report and corrected text (resultData was built before checks ran)
+        resultData.finalChecksReport = finalChecksReport;
+        if (finalChecksReport.textCorrectionApplied) {
+          resultData.storyText = fullStoryText;  // Use corrected text
+        }
       } catch (checkErr) {
         log.error('❌ [STORYBOOK] Final checks failed:', checkErr.message);
         genLog.error('final_checks_failed', checkErr.message);
