@@ -67,6 +67,22 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 - Characters moving away → Back view, seen from behind
 - Focus on main character → slightly blur background
 
+**PHYSICS & CAMERA LOGIC:**
+- Camera Orientation:
+  - Characters moving away: "Back view, seen from behind"
+  - Characters interacting: "Side profile view" or "Wide angle action shot"
+- Physics Enforcement:
+  - Pulling/towing: "Taut rope," "Straight line tension," "Leaning body weight back"
+  - Carrying heavy: "Posture straining," "Knees bent"
+- Object Separation:
+  - When objects touch, use distinct materials/colors: "A [wooden-brown] stick in a [pink-skin] hand"
+
+**CHARACTER DIFFERENTIATION:**
+- Each character must have UNIQUE pose and action
+- NEVER have multiple characters doing identical gestures
+- WRONG: "All children hold a finger to their lips"
+- RIGHT: "Sophie signals silence, Manuel freezes mid-step, Lukas cups his ear listening"
+
 **Scale Feasibility (CRITICAL):**
 
 | Camera Distance | What Fits | Character Detail |
@@ -81,6 +97,23 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 - Spacecraft exterior + astronaut expressions = IMPOSSIBLE
 - Full building + character eye details = IMPOSSIBLE
 - Interior AND exterior of vehicle = IMPOSSIBLE
+
+**GOLDEN RULE**: One scale per scene. Pick HUMAN SCALE (expressions) or OBJECT SCALE (full buildings/vehicles), never both.
+
+**ILLUSTRATOR'S REALITY CHECK:**
+
+❌ IMPOSSIBLE (reject and recompose):
+- "Two spacecraft floating in space, astronauts waving through windows with excited expressions"
+  → At spacecraft scale, windows are dots. Astronauts invisible.
+- "The entire Eiffel Tower with Sophie at the top, her eyes sparkling with joy"
+  → At full-tower scale, Sophie is 1 pixel tall.
+- "A medieval battle with 100 soldiers, close-up on the knight's determined grimace"
+  → Wide battle = no face detail. Face detail = no battle.
+
+✅ POSSIBLE (good compositions):
+- "Inside the spacecraft, Neil peers through porthole at Earth, hand on glass, eyes wide"
+- "Sophie at Eiffel Tower observation deck, tower railing and Paris skyline behind her"
+- "Knight in foreground gripping sword, battle chaos blurred in background"
 
 **Distant Characters (for wide shots):**
 - Specify frame regions: "Roger on left edge, Lukas on right edge"
@@ -145,7 +178,10 @@ Quick draft of what to illustrate:
 - If holding: which hand? (default RIGHT) Is the other hand accounted for?
 - If near: spatial relationship clear? (left of, behind, on top of)
 
-**Body Consistency:**
+**Body Consistency (ANATOMICAL):**
+- Humans have exactly 2 arms - account for BOTH arms explicitly
+- WRONG: "both arms gesticulating wildly, left arm holds X"
+- RIGHT: "left arm holds X tucked under armpit, right arm points upward"
 - Both arms: where is each one? Working together or fighting each other?
 - Body facing vs head facing: same or different? (if different, is it intentional?)
 - Does the full pose support ONE clear action?
@@ -156,11 +192,26 @@ For EACH pointing/looking action, verify:
 - POINTER position in frame
 - DIRECTION: does the described direction actually reach the target?
 
-Example:
+Example (left/right):
 - Character at center-left points at object at background-center
 - They must point toward the RIGHT to reach it
 - WRONG: "pointing left" — points away from target
 - CORRECT: "pointing toward center-right/background"
+
+**DEPTH & POINTING GEOMETRY (CRITICAL):**
+When a character POINTS at or LOOKS at an object, verify the DEPTH LAYERS match:
+- Character in FOREGROUND pointing at object in BACKGROUND = character must face AWAY from camera (back view) or turn around
+- Character in FOREGROUND pointing at object in FOREGROUND = character can face camera (front view)
+- Character facing camera CANNOT point at something BEHIND them without turning
+
+WRONG: "Manuel faces camera (front view), points upward at the rocket behind him"
+→ Pointing forward while facing camera aims TOWARD camera, not backward at rocket
+
+RIGHT: "Manuel turns to face the rocket behind him (back to camera), points upward"
+→ OR: "Manuel faces camera, looks over his shoulder at the rocket, thumb pointing backward"
+→ OR: Reposition camera so rocket is in front of characters, not behind
+
+Always verify: If target is BEHIND character, character must TURN AROUND or camera must be repositioned
 
 ### STEP 3 - OUTPUT
 
@@ -180,7 +231,10 @@ Output raw JSON (no markdown code fences, no explanation text).
     "characterConnections": "Who faces whom, gaze directions, positions, closeness",
     "objectConnections": "Which hand holds what, spatial relationships",
     "bodyConsistency": "Both arms accounted for, pose supports action",
-    "gazeGeometry": "Target position, pointer position, direction verified"
+    "gazeGeometry": "Left/right pointing: target position, pointer position, direction verified",
+    "depthGeometry": "Depth check: if target in BACKGROUND and character faces camera = INVALID. Solution: back view OR reposition camera OR over-shoulder pointing",
+    "characterDifferentiation": "Each character has UNIQUE pose? No identical gestures?",
+    "physicsCheck": "Ropes taut? Heavy objects = straining posture? Touching objects have distinct colors/materials?"
   },
   "output": {
     "imageSummary": "2-3 sentences: positions, actions, setting. End with: Main characters: Name1, Name2.",
@@ -216,7 +270,10 @@ Output raw JSON (no markdown code fences, no explanation text).
 **Field Notes:**
 - `characters`: Array of 1-3 characters. For animals/creatures, omit the `clothing` field.
 - `objects`: Only include `id` for items from RECURRING VISUAL ELEMENTS. For incidental objects, omit `id`.
-- All `thinking` fields are required for validation.
+- All `thinking` fields are required for validation:
+  - `depthGeometry`: MUST verify depth layers match for any pointing/looking actions
+  - `characterDifferentiation`: MUST confirm each character has unique pose
+  - `physicsCheck`: MUST verify physics (ropes taut, heavy = straining, etc.)
 
 ---
 
@@ -236,7 +293,10 @@ Output raw JSON (no markdown code fences, no explanation text).
     "characterConnections": "Sophie faces left toward prairie dog. Prairie dog faces right toward Sophie. Sophie: right side, middle ground. Prairie dog: left-center on mound. Closeness: arm's reach.",
     "objectConnections": "Sophie's right hand on knee drumming, left hand in grass. Lasso coiled beside. Backpack on back.",
     "bodyConsistency": "Sophie: right hand drumming on knee, left hand resting - unified impatient pose. Prairie dog: both paws waving - coordinated greeting.",
-    "gazeGeometry": "Sophie (right) looking LEFT toward prairie dog (left-center) - correct. Prairie dog looking RIGHT toward Sophie - correct. Eye contact verified."
+    "gazeGeometry": "Sophie (right) looking LEFT toward prairie dog (left-center) - correct direction.",
+    "depthGeometry": "Both characters in MIDDLE GROUND, same depth layer. Sophie faces LEFT toward prairie dog - no depth conflict, can see each other. VALID.",
+    "characterDifferentiation": "Sophie: impatient drumming pose. Prairie dog: excited waving pose. UNIQUE poses, no duplicates.",
+    "physicsCheck": "No ropes or heavy objects. Lasso coiled (not taut). Backpack worn normally. N/A for this scene."
   },
   "output": {
     "imageSummary": "Sophie kneels in tall prairie grass, fingers drumming on her knee, while a prairie dog stands upright on a dirt mound, front paws waving. The golden grassland stretches to the horizon. Main characters: Sophie, Prairie Dog.",
