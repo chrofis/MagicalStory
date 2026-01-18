@@ -216,6 +216,7 @@ const {
   getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
+  stripSceneMetadata,
   getHistoricalLocations
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
@@ -2795,14 +2796,26 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       }
     }
 
+    // First, convert JSON format to text if needed (scene descriptions from initial generation are JSON)
+    // This ensures we have readable text for the image prompt and display
+    let textDescription = inputDescription;
+    const isJsonFormat = inputDescription.trim().startsWith('{') && inputDescription.includes('"output"');
+    if (isJsonFormat) {
+      const converted = stripSceneMetadata(inputDescription);
+      if (converted && converted !== inputDescription) {
+        log.debug(`📝 [REGEN] Converted JSON scene description to text format (${inputDescription.length} -> ${converted.length} chars)`);
+        textDescription = converted;
+      }
+    }
+
     // Expand scene to full Art Director format
     // ALWAYS expand if user edited the scene (to ensure fresh, consistent prompts)
     // Also expand if it's a short summary without Art Director sections
     // Also expand if we have correction notes from evaluation (to incorporate fixes)
-    let expandedDescription = inputDescription;
-    const hasArtDirectorFormat = inputDescription.includes('**Setting') || inputDescription.includes('**Character Composition');
+    let expandedDescription = textDescription;
+    const hasArtDirectorFormat = textDescription.includes('**Setting') || textDescription.includes('**Character Composition') || textDescription.includes('## 1. Image Summary');
     const hasCorrectionNotes = correctionNotes.length > 0;
-    const shouldExpand = sceneWasEdited || hasCorrectionNotes || (!hasArtDirectorFormat && inputDescription.length < 1500);
+    const shouldExpand = sceneWasEdited || hasCorrectionNotes || (!hasArtDirectorFormat && textDescription.length < 1500);
 
     if (shouldExpand) {
       console.log(`📝 [REGEN] Expanding scene to full Art Director format (edited: ${sceneWasEdited}, corrections: ${hasCorrectionNotes}, length: ${inputDescription.length} chars)...`);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
@@ -81,6 +81,7 @@ interface StoryDisplayProps {
   sceneImages: SceneImage[];
   sceneDescriptions?: SceneDescription[];
   coverImages?: CoverImages;
+  regeneratingCovers?: Set<string>;  // Track which covers are being regenerated
   languageLevel?: LanguageLevel;
   storyLanguage?: StoryLanguageCode;  // Language of the story content (for correct labels)
   isGenerating?: boolean;
@@ -147,6 +148,7 @@ export function StoryDisplay({
   sceneImages,
   sceneDescriptions = [],
   coverImages,
+  regeneratingCovers = new Set(),  // Track which covers are being regenerated
   languageLevel = 'standard', // Used to determine layout: '1st-grade' = picture book, others = standard
   storyLanguage,
   isGenerating = false,
@@ -2043,20 +2045,27 @@ export function StoryDisplay({
             <p className="text-sm text-gray-500 text-center mb-2">
               {storyLang === 'de' ? 'Titelseite' : storyLang === 'fr' ? 'Couverture' : 'Front Cover'}
             </p>
-            <DiagnosticImage
-              src={getCoverImageData(coverImages.frontCover)!}
-              alt="Front Cover"
-              className="w-full rounded-lg shadow-lg"
-              label="Front Cover"
-            />
+            <div className="relative">
+              <DiagnosticImage
+                src={getCoverImageData(coverImages.frontCover)!}
+                alt="Front Cover"
+                className="w-full rounded-lg shadow-lg"
+                label="Front Cover"
+              />
+              {regeneratingCovers.has('frontCover') && (
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+                  <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+                </div>
+              )}
+            </div>
             {/* Regenerate Cover - visible to all users */}
             {_onRegenerateCover && (
               <div className="mt-3">
                 <button
                   onClick={() => _onRegenerateCover('front')}
-                  disabled={isGenerating || !hasEnoughCredits}
+                  disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                   title={!hasEnoughCredits
                     ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
@@ -2168,20 +2177,27 @@ export function StoryDisplay({
             <p className="text-sm text-gray-500 text-center mb-2">
               {storyLang === 'de' ? 'Widmungsseite' : storyLang === 'fr' ? 'Page de dédicace' : 'Dedication Page'}
             </p>
-            <DiagnosticImage
-              src={getCoverImageData(coverImages.initialPage)!}
-              alt="Dedication Page"
-              className="w-full rounded-lg shadow-lg"
-              label="Dedication Page"
-            />
+            <div className="relative">
+              <DiagnosticImage
+                src={getCoverImageData(coverImages.initialPage)!}
+                alt="Dedication Page"
+                className="w-full rounded-lg shadow-lg"
+                label="Dedication Page"
+              />
+              {regeneratingCovers.has('initialPage') && (
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+                  <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+                </div>
+              )}
+            </div>
             {/* Regenerate Cover - visible to all users */}
             {_onRegenerateCover && (
               <div className="mt-3">
                 <button
                   onClick={() => _onRegenerateCover('initial')}
-                  disabled={isGenerating || !hasEnoughCredits}
+                  disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                   title={!hasEnoughCredits
                     ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
@@ -3091,20 +3107,27 @@ export function StoryDisplay({
             <p className="text-sm text-gray-500 text-center mb-2">
               {storyLang === 'de' ? 'Rückseite' : storyLang === 'fr' ? 'Quatrième de couverture' : 'Back Cover'}
             </p>
-            <DiagnosticImage
-              src={getCoverImageData(coverImages.backCover)!}
-              alt="Back Cover"
-              className="w-full rounded-lg shadow-lg"
-              label="Back Cover"
-            />
+            <div className="relative">
+              <DiagnosticImage
+                src={getCoverImageData(coverImages.backCover)!}
+                alt="Back Cover"
+                className="w-full rounded-lg shadow-lg"
+                label="Back Cover"
+              />
+              {regeneratingCovers.has('backCover') && (
+                <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
+                  <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
+                </div>
+              )}
+            </div>
             {/* Regenerate Cover - visible to all users */}
             {_onRegenerateCover && (
               <div className="mt-3">
                 <button
                   onClick={() => _onRegenerateCover('back')}
-                  disabled={isGenerating || !hasEnoughCredits}
+                  disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                   title={!hasEnoughCredits
                     ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')

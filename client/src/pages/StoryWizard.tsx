@@ -219,7 +219,8 @@ export default function StoryWizard() {
 
   // Step 7: Generation & Display
   const [isGenerating, setIsGenerating] = useState(false); // Full story generation
-  const [isRegenerating, setIsRegenerating] = useState(false); // Single image/cover regeneration
+  const [regeneratingCovers, setRegeneratingCovers] = useState<Set<string>>(new Set()); // Track which covers are regenerating
+  const [isEditing, setIsEditing] = useState(false); // Track if edit modal is processing
   const [isProgressMinimized, setIsProgressMinimized] = useState(false); // Track if progress modal is minimized
   const [showMinimizeDialog, setShowMinimizeDialog] = useState(false); // Show dialog when user clicks minimize
   const [showSingleCharacterDialog, setShowSingleCharacterDialog] = useState(false); // Show dialog when only 1 character
@@ -3476,6 +3477,7 @@ export default function StoryWizard() {
               progressiveData={progressiveStoryData || undefined}
               completedPageImages={completedPageImages}
               coverImages={coverImages}
+              regeneratingCovers={regeneratingCovers}
               languageLevel={languageLevel}
               storyLanguage={storyLanguage}
               isGenerating={isGenerating}
@@ -3738,9 +3740,10 @@ export default function StoryWizard() {
                 setStep(1);
               }}
               onRegenerateCover={storyId ? async (coverType: 'front' | 'back' | 'initial') => {
+                const coverKey = coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage';
                 try {
                   log.info('Regenerating cover:', coverType);
-                  setIsRegenerating(true);
+                  setRegeneratingCovers(prev => new Set(prev).add(coverKey));
                   const result = await storyService.regenerateCover(storyId, coverType);
                   // Update the cover images with all metadata (including quality evaluation)
                   setCoverImages(prev => {
@@ -3770,7 +3773,11 @@ export default function StoryWizard() {
                     ? `Échec de la régénération: ${errorMsg}`
                     : `Cover regeneration failed: ${errorMsg}`);
                 } finally {
-                  setIsRegenerating(false);
+                  setRegeneratingCovers(prev => {
+                    const next = new Set(prev);
+                    next.delete(coverKey);
+                    return next;
+                  });
                 }
               } : undefined}
               onEditImage={(pageNumber: number) => {
@@ -4354,8 +4361,8 @@ export default function StoryWizard() {
         </div>
       )}
 
-      {/* Simple Regeneration Overlay - Single image/cover */}
-      {isRegenerating && (
+      {/* Edit Processing Overlay - Shows when editing via prompt modal */}
+      {isEditing && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center">
             <div className="relative inline-block mb-4">
@@ -4414,7 +4421,7 @@ export default function StoryWizard() {
                 onClick={async () => {
                   if (!editPromptText.trim() || !storyId) return;
                   setEditModalOpen(false);
-                  setIsRegenerating(true);
+                  setIsEditing(true);
                   try {
                     if (editTarget.type === 'image' && editTarget.pageNumber) {
                       const result = await storyService.editImage(storyId, editTarget.pageNumber, editPromptText);
@@ -4467,7 +4474,7 @@ export default function StoryWizard() {
                       ? 'Échec de la modification. Veuillez réessayer.'
                       : 'Edit failed. Please try again.');
                   } finally {
-                    setIsRegenerating(false);
+                    setIsEditing(false);
                     setEditTarget(null);
                     setEditPromptText('');
                   }
