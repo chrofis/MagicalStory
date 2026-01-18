@@ -446,7 +446,10 @@ router.post('/', authenticateToken, async (req, res) => {
         }
 
         // Use ONLY DB avatars - never use frontend avatars
-        console.log(`[Characters] POST - Using DB avatars for ${newChar.name}`);
+        const avatarKeys = Object.keys(existingChar.avatars);
+        const hasStandard = !!existingChar.avatars.standard;
+        const standardLen = existingChar.avatars.standard ? existingChar.avatars.standard.length : 0;
+        console.log(`[Characters] POST - DB avatars for ${newChar.name}: keys=[${avatarKeys.join(',')}], hasStandard=${hasStandard}, len=${standardLen}`);
         preservedCount++;
         return {
           ...mergedChar,
@@ -499,6 +502,15 @@ router.post('/', authenticateToken, async (req, res) => {
         customWeaknesses: customWeaknesses || [],
         customFears: customFears || []
       };
+
+      // Debug: check if avatars are in characterData
+      for (const char of characterData.characters) {
+        if (char.avatars) {
+          const keys = Object.keys(char.avatars);
+          const hasStd = !!char.avatars.standard;
+          console.log(`[Characters] POST - Final ${char.name} avatars: keys=[${keys.join(',')}], hasStandard=${hasStd}`);
+        }
+      }
 
       const jsonData = JSON.stringify(characterData);
       const metadataJson = JSON.stringify(metadataObj);
