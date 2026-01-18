@@ -159,7 +159,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {string} clothingCategory - Clothing category (standard, winter, summer) for logging
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard') {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null) {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   const hasClothing = !!clothingDescription;
@@ -236,6 +236,11 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
 
     if (!result || !result.imageData) {
       throw new Error('No image returned from API');
+    }
+
+    // Track usage if callback provided
+    if (addUsage && result.imageUsage) {
+      addUsage('styled_avatars', result.imageUsage);
     }
 
     // Downsize the result for efficient storage (512px is enough for reference)
@@ -324,7 +329,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {string} clothingDescription - Text description of clothing (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -344,7 +349,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage);
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -368,7 +373,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
  * @param {Array<{pageNumber, clothingCategory, characterNames}>} pageRequirements - What's needed for each page
  * @returns {Promise<Map>} Map of cacheKey -> styledAvatar
  */
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null) {
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // Skip for realistic style (no conversion needed)
@@ -534,7 +539,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   const conversionPromises = [];
   for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription }] of neededAvatars) {
     conversionPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription)
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage)
         .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
         .catch(error => {
           // Bug #14 fix: Include stack trace for better debugging

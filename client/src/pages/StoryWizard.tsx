@@ -1542,10 +1542,16 @@ export default function StoryWizard() {
             log.info(`👕 Using new photo's clothing (cleared existing)`);
           }
 
-          // Use server-provided character ID (character already exists in DB)
-          // This ensures avatar job can find the character when updating
+          // Determine character ID:
+          // - If currentCharacter has an ID, KEEP IT (this is a photo re-upload for existing character)
+          // - Only use server ID for brand new characters (no existing ID)
           const serverCharacterId = analysis.characterId;
-          if (serverCharacterId) {
+          const isExistingCharacter = currentCharacter?.id && currentCharacter.id > 0;
+          const characterIdToUse = isExistingCharacter ? currentCharacter.id : serverCharacterId;
+
+          if (isExistingCharacter) {
+            log.info(`📸 [PHOTO] Keeping existing character ID: ${currentCharacter.id} (server created new ID ${serverCharacterId} but ignoring)`);
+          } else if (serverCharacterId) {
             log.info(`📸 [PHOTO] Using server-created character ID: ${serverCharacterId}`);
           }
 
@@ -1553,7 +1559,7 @@ export default function StoryWizard() {
           // (React state updates are async, so we build the object we need now)
           const charForGeneration: Character | null = currentCharacter ? {
             ...currentCharacter,
-            id: serverCharacterId || currentCharacter.id,  // Use server ID if available
+            id: characterIdToUse || currentCharacter.id,  // Keep existing ID or use server ID for new
             photos: updatedPhotos,
             avatars: { status: 'generating' as const },
             clothing: updatedClothing,
@@ -1575,8 +1581,8 @@ export default function StoryWizard() {
             if (!prev) return null;
             return {
               ...prev,
-              // Use server-created character ID
-              id: serverCharacterId || prev.id,
+              // Keep existing ID or use server ID for new character
+              id: characterIdToUse || prev.id,
               // Photos from face/body detection
               photos: updatedPhotos,
               // Clear avatars - will regenerate with new face
@@ -1587,24 +1593,24 @@ export default function StoryWizard() {
             };
           });
 
-          // CRITICAL: Add new character to array immediately to prevent data loss
+          // CRITICAL: For NEW characters, add to array immediately to prevent data loss
           // If user switches to edit another character before completing this one,
           // the save would overwrite DB and lose this character
-          const charIdToUse = serverCharacterId || currentCharacter?.id;
-          if (charIdToUse) {
+          // Note: For EXISTING characters, they're already in the array
+          if (characterIdToUse && !isExistingCharacter) {
             setCharacters(prev => {
-              const exists = prev.some(c => c.id === charIdToUse);
+              const exists = prev.some(c => c.id === characterIdToUse);
               if (!exists) {
                 // Add placeholder to array - will be updated when user completes form
                 const newChar: Character = {
                   ...currentCharacter!,
-                  id: charIdToUse,
+                  id: characterIdToUse,
                   photos: updatedPhotos,
                   avatars: { status: 'generating' as const },
                   clothing: updatedClothing,
                   clothingSource: updatedClothingSource,
                 };
-                log.info(`📸 Adding new character ${charIdToUse} to array to prevent data loss`);
+                log.info(`📸 Adding new character ${characterIdToUse} to array to prevent data loss`);
                 return [...prev, newChar];
               }
               return prev;
@@ -1770,9 +1776,16 @@ export default function StoryWizard() {
           };
         }
 
-        // Use server-provided character ID (character already exists in DB)
+        // Determine character ID:
+        // - If currentCharacter has an ID, KEEP IT (this is a photo re-upload for existing character)
+        // - Only use server ID for brand new characters (no existing ID)
         const serverCharacterId = analysis.characterId;
-        if (serverCharacterId) {
+        const isExistingCharacter = currentCharacter?.id && currentCharacter.id > 0;
+        const characterIdToUse = isExistingCharacter ? currentCharacter.id : serverCharacterId;
+
+        if (isExistingCharacter) {
+          log.info(`📸 [FACE SELECT] Keeping existing character ID: ${currentCharacter.id} (server created new ID ${serverCharacterId} but ignoring)`);
+        } else if (serverCharacterId) {
           log.info(`📸 [FACE SELECT] Using server-created character ID: ${serverCharacterId}`);
         }
 
@@ -1780,7 +1793,7 @@ export default function StoryWizard() {
         // (React state updates are async, so we build the object we need now)
         const charForGeneration: Character | null = currentCharacter ? {
           ...currentCharacter,
-          id: serverCharacterId || currentCharacter.id,  // Use server ID if available
+          id: characterIdToUse || currentCharacter.id,  // Keep existing ID or use server ID for new
           photos: updatedPhotos,
           avatars: { status: 'generating' as const },
           clothing: updatedClothing,
@@ -1792,8 +1805,8 @@ export default function StoryWizard() {
           if (!prev) return null;
           return {
             ...prev,
-            // Use server-created character ID
-            id: serverCharacterId || prev.id,
+            // Keep existing ID or use server ID for new character
+            id: characterIdToUse || prev.id,
             photos: updatedPhotos,
             avatars: { status: 'generating' as const },
             clothing: updatedClothing,
@@ -1801,24 +1814,24 @@ export default function StoryWizard() {
           };
         });
 
-        // CRITICAL: Add new character to array immediately to prevent data loss
+        // CRITICAL: For NEW characters, add to array immediately to prevent data loss
         // If user switches to edit another character before completing this one,
         // the save would overwrite DB and lose this character
-        const charIdToUse = serverCharacterId || currentCharacter?.id;
-        if (charIdToUse) {
+        // Note: For EXISTING characters, they're already in the array
+        if (characterIdToUse && !isExistingCharacter) {
           setCharacters(prev => {
-            const exists = prev.some(c => c.id === charIdToUse);
+            const exists = prev.some(c => c.id === characterIdToUse);
             if (!exists) {
               // Add placeholder to array - will be updated when user completes form
               const newChar: Character = {
                 ...currentCharacter!,
-                id: charIdToUse,
+                id: characterIdToUse,
                 photos: updatedPhotos,
                 avatars: { status: 'generating' as const },
                 clothing: updatedClothing,
                 clothingSource: updatedClothingSource,
               };
-              log.info(`📸 [FACE SELECT] Adding new character ${charIdToUse} to array to prevent data loss`);
+              log.info(`📸 [FACE SELECT] Adding new character ${characterIdToUse} to array to prevent data loss`);
               return [...prev, newChar];
             }
             return prev;
