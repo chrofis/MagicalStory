@@ -343,15 +343,31 @@ export function StoryDisplay({
   const extractImageSummary = (fullDescription: string | object): string => {
     if (!fullDescription) return '';
 
-    // Convert to string first
+    // Handle case where description is an object (JSON response not converted to string)
     let desc: string;
     if (typeof fullDescription !== 'string') {
-      // Try to extract the output field if it's a JSON object with thinking/output structure
-      const obj = fullDescription as { output?: string; thinking?: unknown };
-      if (obj.output && typeof obj.output === 'string') {
-        desc = obj.output;
+      const obj = fullDescription as {
+        output?: string | { translatedSummary?: string; imageSummary?: string };
+        thinking?: unknown
+      };
+
+      // Try to extract the translated image summary from nested output object
+      if (obj.output) {
+        if (typeof obj.output === 'string') {
+          desc = obj.output;
+        } else if (typeof obj.output === 'object') {
+          // Extract translatedSummary (preferred) or imageSummary from output object
+          const summary = obj.output.translatedSummary || obj.output.imageSummary || '';
+          if (summary) {
+            return summary; // Return directly - it's already the clean summary
+          }
+          // No summary found, stringify as fallback
+          desc = JSON.stringify(fullDescription);
+        } else {
+          desc = JSON.stringify(fullDescription);
+        }
       } else {
-        // Fallback: stringify the object
+        // No output field, stringify as fallback
         desc = JSON.stringify(fullDescription);
       }
     } else {
@@ -362,8 +378,16 @@ export function StoryDisplay({
     if (desc.trim().startsWith('{')) {
       try {
         const parsed = JSON.parse(desc);
-        if (parsed.output && typeof parsed.output === 'string') {
-          desc = parsed.output;
+        if (parsed.output) {
+          if (typeof parsed.output === 'string') {
+            desc = parsed.output;
+          } else if (typeof parsed.output === 'object') {
+            // Extract translatedSummary (preferred) or imageSummary from nested object
+            const summary = parsed.output.translatedSummary || parsed.output.imageSummary;
+            if (summary) {
+              return summary;
+            }
+          }
         }
       } catch {
         // Not valid JSON, continue with original string
