@@ -212,7 +212,12 @@ router.post('/', authenticateToken, async (req, res) => {
             'other', c->>'other',
             'clothing', c->'clothing',
             'structured_clothing', c->'structured_clothing',
-            'physical', c->'physical'
+            'physical', c->'physical',
+            'hair_length', c->>'hair_length',
+            'skin_tone', c->>'skin_tone',
+            'skin_tone_hex', c->>'skin_tone_hex',
+            'facial_hair', c->>'facial_hair',
+            'detailed_hair_analysis', c->>'detailed_hair_analysis'
           )
         ) as preserved
         FROM characters, jsonb_array_elements(data->'characters') c
@@ -294,6 +299,41 @@ router.post('/', authenticateToken, async (req, res) => {
         if (existingChar.other && !newChar.other) {
           mergedChar.other = existingChar.other;
           preservedFields.push('other');
+          hasChanges = true;
+        }
+
+        // Preserve hair_length (extracted from photo analysis)
+        if (existingChar.hair_length && !newChar.hair_length) {
+          mergedChar.hair_length = existingChar.hair_length;
+          preservedFields.push('hair_length');
+          hasChanges = true;
+        }
+
+        // Preserve skin_tone (extracted from photo analysis)
+        if (existingChar.skin_tone && !newChar.skin_tone) {
+          mergedChar.skin_tone = existingChar.skin_tone;
+          preservedFields.push('skin_tone');
+          hasChanges = true;
+        }
+
+        // Preserve skin_tone_hex (extracted from photo analysis)
+        if (existingChar.skin_tone_hex && !newChar.skin_tone_hex) {
+          mergedChar.skin_tone_hex = existingChar.skin_tone_hex;
+          preservedFields.push('skin_tone_hex');
+          hasChanges = true;
+        }
+
+        // Preserve facial_hair (extracted from photo analysis)
+        if (existingChar.facial_hair && !newChar.facial_hair) {
+          mergedChar.facial_hair = existingChar.facial_hair;
+          preservedFields.push('facial_hair');
+          hasChanges = true;
+        }
+
+        // Preserve detailed_hair_analysis (extracted from photo analysis)
+        if (existingChar.detailed_hair_analysis && !newChar.detailed_hair_analysis) {
+          mergedChar.detailed_hair_analysis = existingChar.detailed_hair_analysis;
+          preservedFields.push('detailed_hair_analysis');
           hasChanges = true;
         }
 
@@ -446,7 +486,7 @@ router.post('/', authenticateToken, async (req, res) => {
       // Strip ALL heavy fields - list view only needs basic info + one thumbnail for display
       const lightCharacters = mergedCharacters.map(char => {
         // Strip heavy base64 fields (including photos object which contains face, original, bodyNoBg)
-        const { body_no_bg_url, body_photo_url, photo_url, clothing_avatars, photos, ...lightChar } = char;
+        const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...lightChar } = char;
         // Keep avatar metadata + only 'standard' faceThumbnail for list display
         if (lightChar.avatars) {
           const standardThumb = lightChar.avatars.faceThumbnails?.standard;
