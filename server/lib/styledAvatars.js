@@ -415,10 +415,15 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         const existingStyledCostumed = char.avatars?.styledAvatars?.[artStyle]?.costumed;
         if (existingStyledCostumed) {
           // Check for exact match or any costume that starts with this type
-          const hasMatch = Object.keys(existingStyledCostumed).some(key =>
+          const matchingKey = Object.keys(existingStyledCostumed).find(key =>
             key === costumeType || key.startsWith(costumeType) || costumeType.startsWith(key)
           );
-          if (hasMatch) {
+          if (matchingKey && existingStyledCostumed[matchingKey]) {
+            // FIX: Ensure cache is populated even if setStyledAvatar was missed
+            if (!styledAvatarCache.has(cacheKey)) {
+              styledAvatarCache.set(cacheKey, existingStyledCostumed[matchingKey]);
+              log.debug(`📥 [STYLED AVATARS] ${charName}:${clothingCategory} - populated cache from character data (costumed)`);
+            }
             log.debug(`⏭️ [STYLED AVATARS] Skipping ${charName}:${clothingCategory} - already has styled costumed avatar`);
             continue;
           }
@@ -438,6 +443,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         // Also check if already styled (generateStyledCostumedAvatar creates styled directly)
         const existingStyled = avatars?.styledAvatars?.[artStyle]?.costumed?.[costumeType];
         if (existingStyled) {
+          // FIX: Ensure cache is populated even if setStyledAvatar was missed
+          if (!styledAvatarCache.has(cacheKey)) {
+            styledAvatarCache.set(cacheKey, existingStyled);
+            log.debug(`📥 [STYLED AVATARS] ${charName}: costumed:${costumeType} - populated cache from character data`);
+          }
           log.debug(`⏭️ [STYLED AVATARS] ${charName}: costumed:${costumeType} already styled, skipping`);
           continue;
         }
@@ -452,6 +462,12 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         if (char.avatars?.signatures?.[clothingCategory]) {
           const existingStyled = avatars?.styledAvatars?.[artStyle]?.[clothingCategory];
           if (existingStyled) {
+            // FIX: Ensure cache is populated even if setStyledAvatar was missed
+            // This fixes race condition where avatar exists in character data but not in cache
+            if (!styledAvatarCache.has(cacheKey)) {
+              styledAvatarCache.set(cacheKey, existingStyled);
+              log.debug(`📥 [STYLED AVATARS] ${charName}:${clothingCategory} - populated cache from character data (signature avatar)`);
+            }
             log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} already styled with signature, skipping`);
             continue;
           }
