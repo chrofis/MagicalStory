@@ -474,8 +474,8 @@ export function StoryDisplay({
     const image = sceneImages.find(img => img.pageNumber === pageNumber);
     const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
     const fullDescription = image?.description || sceneDesc?.description || '';
-    // Extract just the summary for editing
-    const summary = extractImageSummary(fullDescription);
+    // Use pre-extracted summaries if available, otherwise try to extract from description
+    const summary = sceneDesc?.translatedSummary || sceneDesc?.imageSummary || extractImageSummary(fullDescription);
     // Detect characters mentioned in the scene
     const detectedCharacterIds = detectCharactersInScene(fullDescription);
     setSceneEditModal({ pageNumber, scene: summary, selectedCharacterIds: detectedCharacterIds });

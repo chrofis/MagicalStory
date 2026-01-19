@@ -94,9 +94,11 @@ export interface ArtStyle {
 export interface SceneDescription {
   pageNumber: number;
   description: string;
-  outlineExtract?: string;  // Short scene description from outline
-  scenePrompt?: string;     // Art Director prompt used to generate description
-  textModelId?: string;     // Text model used to generate the scene description
+  translatedSummary?: string;  // Pre-extracted translated summary (user's language)
+  imageSummary?: string;       // Pre-extracted image summary (English)
+  outlineExtract?: string;     // Short scene description from outline
+  scenePrompt?: string;        // Art Director prompt used to generate description
+  textModelId?: string;        // Text model used to generate the scene description
 }
 
 export interface EvaluationData {
