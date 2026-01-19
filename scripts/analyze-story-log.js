@@ -299,6 +299,20 @@ function extractCostSummary(jobLines) {
       continue;
     }
 
+    // Avatar cost entries: "[GEN:finalize]  avatar_styled: gemini-2.5-flash-image (885 in / 1,300 out) $0.0393"
+    const avatarCostMatch = msg.match(/(?:\[GEN:finalize\]\s+)?(avatar_\w+):\s+(\S+)\s+\(([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\)\s+\$([\d.]+)/);
+    if (avatarCostMatch) {
+      const name = avatarCostMatch[1].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); // avatar_styled -> Avatar Styled
+      costs.byFunction[name] = {
+        inputTokens: parseInt(avatarCostMatch[3].replace(/,/g, '')),
+        outputTokens: parseInt(avatarCostMatch[4].replace(/,/g, '')),
+        calls: 1,
+        cost: parseFloat(avatarCostMatch[5]),
+        model: avatarCostMatch[2]
+      };
+      continue;
+    }
+
     // Provider entries without calls count: "Anthropic: 116,579 in / 40,362 out $0.9552"
     // Also with thinking: "Gemini Quality: 77,694 in / 26,828 out + 53,243 think $0.0398"
     const providerMatch = msg.match(/^\s*(Anthropic|Gemini\s*\w*):\s+([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out(?:\s+\+\s+([\d,]+)\s+think)?\s+\$([\d.]+)/);
@@ -605,6 +619,9 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
     console.log('-'.repeat(70));
   }
   console.log(`Job: ${job.id}`);
+  if (job.user) {
+    console.log(`User: ${job.user}`);
+  }
   console.log('='.repeat(70));
 
   // Story Info
