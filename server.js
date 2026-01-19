@@ -131,6 +131,7 @@ const {
   prepareStyledAvatars,
   applyStyledAvatars,
   collectAvatarRequirements,
+  setStyledAvatar,
   clearStyledAvatarCache,
   invalidateStyledAvatarForCategory,
   getStyledAvatarCacheStats,
@@ -3173,18 +3174,46 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     }
     const clothingRequirements = storyData.clothingRequirements || null;
 
+    // Fetch fresh avatar data from characters table (fallback for missing avatars)
+    const freshCharResult = await dbPool.query(
+      'SELECT data FROM characters WHERE user_id = $1',
+      [req.user.id]
+    );
+    const freshCharData = freshCharResult.rows[0]?.data || {};
+    const freshCharacters = freshCharData.characters || [];
+
+    // Merge avatars: story avatars first, then fresh from characters table as fallback
+    const mergedCharacters = (storyData.characters || []).map(storyChar => {
+      // If story character already has avatars, use them
+      if (storyChar.avatars) {
+        return storyChar;
+      }
+      // Otherwise, try to get avatars from characters table
+      const freshChar = freshCharacters.find(fc =>
+        fc.id === storyChar.id || fc.name === storyChar.name
+      );
+      if (freshChar?.avatars) {
+        log.debug(`📕 [COVER REGEN] Using fresh avatars for ${storyChar.name} (missing in story)`);
+        return {
+          ...storyChar,
+          avatars: freshChar.avatars
+        };
+      }
+      return storyChar;
+    });
+
     // Get character photos with correct clothing variant
     let coverCharacterPhotos;
     if (normalizedCoverType === 'front') {
       // Front cover: use only MAIN characters (isMainCharacter: true)
-      const allCharacters = storyData.characters || [];
+      const allCharacters = mergedCharacters;
       const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
       const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
       coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else {
       // Initial/Back covers: use ALL characters
-      coverCharacterPhotos = getCharacterPhotoDetails(storyData.characters || [], effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      coverCharacterPhotos = getCharacterPhotoDetails(mergedCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
     }
     // Apply styled avatars for non-costumed characters
@@ -6670,6 +6699,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                   if (result.success && result.imageData) {
                     const costumeKey = result.costumeType;
                     char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                    // Add to cache so applyStyledAvatars can find it
+                    setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, result.imageData);
                     if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
                     if (result.clothing) {
                       char.avatars.clothing.costumed[costumeKey] = result.clothing;
@@ -6683,6 +6714,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                   if (result.success && result.imageData) {
                     if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                     char.avatars.styledAvatars[artStyle][category] = result.imageData;
+                    // Add to cache so applyStyledAvatars can find it
+                    setStyledAvatar(char.name, category, artStyle, result.imageData);
                     if (result.clothing) {
                       char.avatars.clothing[category] = result.clothing;
                     }
@@ -8065,6 +8098,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                 if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
                 char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.imageData;
+                // Add to cache so applyStyledAvatars can find it
+                setStyledAvatar(char.name, `costumed:${config.costume.toLowerCase()}`, artStyle, result.imageData);
                 // Store clothing description for image prompt
                 if (result.clothing) {
                   if (!char.avatars.clothing) char.avatars.clothing = {};
@@ -8673,6 +8708,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (result.success && result.imageData) {
                   const costumeKey = result.costumeType;
                   char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                  // Add to cache so applyStyledAvatars can find it
+                  setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, result.imageData);
                   if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
                   if (result.clothing) {
                     char.avatars.clothing.costumed[costumeKey] = result.clothing;
@@ -8686,6 +8723,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (result.success && result.imageData) {
                   if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                   char.avatars.styledAvatars[artStyle][category] = result.imageData;
+                  // Add to cache so applyStyledAvatars can find it
+                  setStyledAvatar(char.name, category, artStyle, result.imageData);
                   if (result.clothing) {
                     char.avatars.clothing[category] = result.clothing;
                   }
@@ -9954,13 +9993,12 @@ async function processStoryJob(jobId) {
 
             if (dbChar?.avatars) {
               // Merge avatar data: DB as fallback, request data wins (later spread overwrites)
+              // NOTE: styledAvatars intentionally NOT merged - regenerate fresh per story
+              // This ensures consistency between covers and pages (see styledAvatars.js line 385-389)
               char.avatars = {
                 ...dbChar.avatars,      // DB data first (fallback)
                 ...char.avatars,        // Request data wins (new avatars override stale DB)
-                styledAvatars: {
-                  ...dbChar.avatars?.styledAvatars,
-                  ...char.avatars?.styledAvatars
-                },
+                styledAvatars: {},      // Clear - always regenerate fresh for each story
                 costumed: {
                   ...dbChar.avatars?.costumed,
                   ...char.avatars?.costumed
@@ -10294,6 +10332,8 @@ async function processStoryJob(jobId) {
                 const costumeKey = result.costumeType;
                 // Store in styledAvatars structure
                 char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
+                // Add to cache so applyStyledAvatars can find it
+                setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, result.imageData);
                 // Store clothing description
                 if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
                 if (result.clothing) {
@@ -10314,6 +10354,8 @@ async function processStoryJob(jobId) {
                 // Store in styledAvatars structure (not base avatar)
                 if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
                 char.avatars.styledAvatars[artStyle][category] = result.imageData;
+                // Add to cache so applyStyledAvatars can find it
+                setStyledAvatar(char.name, category, artStyle, result.imageData);
                 // Store clothing + signature info
                 if (result.clothing) {
                   char.avatars.clothing[category] = result.clothing;

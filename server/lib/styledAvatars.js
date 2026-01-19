@@ -408,6 +408,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
       // For costumed avatars, check if styled version already exists in character data
       // (generateStyledCostumedAvatar creates styled versions directly)
+      // NOTE: With fresh avatars per story, styledAvatars is cleared at job start,
+      // so these checks should not match. Keeping for defensive coding.
       if (clothingCategory.startsWith('costumed:')) {
         const costumeType = clothingCategory.split(':')[1];
         const existingStyledCostumed = char.avatars?.styledAvatars?.[artStyle]?.costumed;
@@ -587,6 +589,20 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
 function hasStyledAvatar(characterName, clothingCategory, artStyle) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
   return styledAvatarCache.has(cacheKey);
+}
+
+/**
+ * Add a styled avatar to cache (for avatars generated elsewhere)
+ * Use this when generating styled avatars directly (e.g., with signature items)
+ * @param {string} characterName
+ * @param {string} clothingCategory
+ * @param {string} artStyle
+ * @param {string} imageData - Base64 image data
+ */
+function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
+  const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
+  styledAvatarCache.set(cacheKey, imageData);
+  log.debug(`📥 [STYLED AVATARS] Added to cache: ${cacheKey}`);
 }
 
 /**
@@ -1021,6 +1037,7 @@ module.exports = {
 
   // Cache access
   getStyledAvatar,
+  setStyledAvatar,
   hasStyledAvatar,
   clearStyledAvatarCache,
   invalidateStyledAvatarForCategory,
