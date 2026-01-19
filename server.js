@@ -8811,15 +8811,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📊 [UNIFIED] Streaming efficiency: ${pagesFromStreaming}/${storyPages.length} pages started during streaming`);
 
     // Create allSceneDescriptions array for storage compatibility
-    const allSceneDescriptions = expandedScenes.map(scene => ({
-      pageNumber: scene.pageNumber,
-      description: scene.sceneDescription,
-      characterClothing: scene.characterClothing || {},
-      outlineExtract: scene.outlineExtract || scene.sceneHint || '',
-      // Dev mode: Art Director prompt and model used
-      scenePrompt: scene.sceneDescriptionPrompt,
-      textModelId: scene.sceneDescriptionModelId
-    }));
+    const allSceneDescriptions = expandedScenes.map(scene => {
+      // Extract translatedSummary and imageSummary for edit modal display
+      const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+      return {
+        pageNumber: scene.pageNumber,
+        description: scene.sceneDescription,
+        characterClothing: scene.characterClothing || {},
+        outlineExtract: scene.outlineExtract || scene.sceneHint || '',
+        // Dev mode: Art Director prompt and model used
+        scenePrompt: scene.sceneDescriptionPrompt,
+        textModelId: scene.sceneDescriptionModelId,
+        // Pre-extracted summaries for edit modal (avoids JSON parsing on frontend)
+        translatedSummary: sceneMetadata?.translatedSummary || null,
+        imageSummary: sceneMetadata?.imageSummary || null
+      };
+    });
 
     // Update pageClothing for storage compatibility (per-character format)
     storyPages.forEach((page, index) => {
