@@ -523,6 +523,12 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           facePhoto,
           clothingDescription
         });
+      } else {
+        // Log why we can't convert this avatar - helps debug cache misses later
+        const reason = !originalAvatar ? 'no base avatar found' :
+                       typeof originalAvatar !== 'string' ? `avatar is ${typeof originalAvatar}, not string` :
+                       !originalAvatar.startsWith('data:image') ? 'avatar is not base64 image' : 'unknown';
+        log.warn(`⚠️ [STYLED AVATARS] Cannot convert ${charName}:${clothingCategory} to ${artStyle}: ${reason}`);
       }
     }
   }
@@ -703,6 +709,73 @@ function applyStyledAvatars(characterPhotos, artStyle) {
 }
 
 /**
+ * Find nearest matching clothing category using fuzzy matching
+ * Handles typos like "COSTUUM" → "costumed", "sommer" → "summer", "winer" → "winter"
+ *
+ * @param {string} raw - Raw clothing value from scene description
+ * @returns {string|null} Normalized clothing category or null if no match
+ */
+function findNearestClothingCategory(raw) {
+  if (!raw) return null;
+  const normalized = raw.toLowerCase().trim();
+
+  // Valid categories
+  const validCategories = ['standard', 'winter', 'summer', 'costumed'];
+
+  // Exact match
+  if (validCategories.includes(normalized)) return normalized;
+
+  // Handle costumed:type format (including typos like "costuum:", "costume:", "kostüm:")
+  if (normalized.startsWith('costumed:') || normalized.startsWith('costume:') ||
+      normalized.startsWith('costuum:') || normalized.startsWith('kostüm:') ||
+      normalized.startsWith('kostum:')) {
+    // Extract costume type after the colon
+    const colonIdx = raw.indexOf(':');
+    if (colonIdx > 0) {
+      return `costumed:${raw.substring(colonIdx + 1).trim().toLowerCase()}`;
+    }
+    return 'costumed';
+  }
+
+  // Check if it's any variation of "costumed" without colon
+  if (normalized.startsWith('costum') || normalized.startsWith('kostüm') ||
+      normalized.startsWith('kostum')) {
+    return 'costumed';
+  }
+
+  // Fuzzy match: prefix matching
+  for (const cat of validCategories) {
+    if (cat.startsWith(normalized) || normalized.startsWith(cat)) {
+      return cat;
+    }
+  }
+
+  // Simple similarity: find closest match (handles "sommer" → "summer", "winer" → "winter")
+  const similarity = (a, b) => {
+    const longer = a.length > b.length ? a : b;
+    const shorter = a.length > b.length ? b : a;
+    if (longer.length === 0) return 1;
+    const matches = [...shorter].filter((c, i) => longer[i] === c).length;
+    return matches / longer.length;
+  };
+
+  let best = null, bestScore = 0;
+  for (const cat of validCategories) {
+    const score = similarity(normalized, cat);
+    if (score > bestScore && score > 0.5) { // At least 50% character match
+      bestScore = score;
+      best = cat;
+    }
+  }
+
+  if (best) {
+    log.debug(`[CLOTHING] Fuzzy matched "${raw}" → "${best}" (score: ${bestScore.toFixed(2)})`);
+  }
+
+  return best;
+}
+
+/**
  * Collect all avatar requirements from scene data
  * Used to prepare all needed avatars before image generation
  *
@@ -799,11 +872,36 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
       for (const char of sceneCharacters) {
         // Priority: per-character from scene metadata > page-level > default
         let clothingCategory = pageLevelClothing;
-        if (perCharClothing && perCharClothing[char.name]) {
-          clothingCategory = perCharClothing[char.name];
-        } else if (typeof pageClothingValue === 'object' && pageClothingValue[char.name]) {
-          // Also check pageClothing if it's per-character
-          clothingCategory = pageClothingValue[char.name];
+        let rawClothing = null;
+
+        // Try per-character clothing with case-insensitive lookup
+        if (perCharClothing) {
+          rawClothing = perCharClothing[char.name];
+          if (!rawClothing) {
+            // Fallback: case-insensitive lookup
+            const charNameLower = char.name.toLowerCase();
+            const matchingKey = Object.keys(perCharClothing).find(k => k.toLowerCase() === charNameLower);
+            if (matchingKey) {
+              rawClothing = perCharClothing[matchingKey];
+            }
+          }
+        }
+
+        // If no per-char clothing found, try pageClothing with case-insensitive lookup
+        if (!rawClothing && typeof pageClothingValue === 'object') {
+          rawClothing = pageClothingValue[char.name];
+          if (!rawClothing) {
+            const charNameLower = char.name.toLowerCase();
+            const matchingKey = Object.keys(pageClothingValue).find(k => k.toLowerCase() === charNameLower);
+            if (matchingKey) {
+              rawClothing = pageClothingValue[matchingKey];
+            }
+          }
+        }
+
+        // Normalize clothing category with fuzzy matching
+        if (rawClothing) {
+          clothingCategory = findNearestClothingCategory(rawClothing) || pageLevelClothing;
         }
 
         requirements.push({

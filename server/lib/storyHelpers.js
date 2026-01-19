@@ -245,9 +245,22 @@ function buildTextFromJson(output) {
     }
   }
 
-  // Section 4: Objects & Animals
+  // Section 4: Clothing Categories (from JSON character clothing data)
+  // This ensures the correct clothing from JSON metadata is used, not the potentially
+  // inconsistent text section the AI generated
+  if (output.characters && output.characters.some(c => c.clothing)) {
+    text += `## 4. Clothing Categories\n`;
+    for (const char of output.characters) {
+      if (char.name && char.clothing) {
+        text += `* **${char.name}:** ${char.clothing}\n`;
+      }
+    }
+    text += '\n';
+  }
+
+  // Section 5: Objects & Animals
   if (output.objects && output.objects.length > 0) {
-    text += `## 4. Objects & Animals\n`;
+    text += `## 5. Objects & Animals\n`;
     for (const obj of output.objects) {
       const idPart = obj.id ? ` [${obj.id}]` : '';
       text += `* ${obj.name}${idPart}: ${obj.position || 'in scene'}\n`;
@@ -1032,6 +1045,42 @@ function parseCharacterClothing(sceneDescription) {
 }
 
 /**
+ * Extract scene metadata (setting, time, weather) from scene hint
+ * Parses format: "Setting: indoor | Time: midday | Weather: n/a"
+ *
+ * @param {string} sceneHint - The scene hint text from outline
+ * @returns {Object|null} { setting, time, weather } or null if not found
+ */
+function parseSceneHintMetadata(sceneHint) {
+  if (!sceneHint || typeof sceneHint !== 'string') return null;
+
+  const result = { setting: null, time: null, weather: null };
+
+  // Try to match "Setting: X | Time: Y | Weather: Z" format
+  const settingMatch = sceneHint.match(/Setting:\s*([^|]+)/i);
+  if (settingMatch) {
+    result.setting = settingMatch[1].trim();
+  }
+
+  const timeMatch = sceneHint.match(/Time:\s*([^|]+)/i);
+  if (timeMatch) {
+    result.time = timeMatch[1].trim();
+  }
+
+  const weatherMatch = sceneHint.match(/Weather:\s*([^|\n]+)/i);
+  if (weatherMatch) {
+    result.weather = weatherMatch[1].trim();
+  }
+
+  // Return null if nothing was extracted
+  if (!result.setting && !result.time && !result.weather) {
+    return null;
+  }
+
+  return result;
+}
+
+/**
  * Get detailed photo info for characters (for dev mode display)
  * @param {Array} characters - Array of character objects
  * @param {string} clothingCategory - Optional clothing category to show which avatar is used
@@ -1198,6 +1247,15 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         photoType = `styled-${effectiveClothingCategory}`;
         usedClothingCategory = effectiveClothingCategory;
         log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${effectiveClothingCategory} for ${artStyle}`);
+
+        // Fallback to avatars.clothing if not already set from avatarData
+        if (!clothingDescription && avatars?.clothing?.[effectiveClothingCategory]) {
+          const clothingData = avatars.clothing[effectiveClothingCategory];
+          clothingDescription = typeof clothingData === 'string'
+            ? clothingData
+            : formatClothingObject(clothingData);
+          log.debug(`[CLOTHING DESC] ${char.name}: using avatars.clothing.${effectiveClothingCategory} for styled avatar`);
+        }
       }
       // Fall back to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
@@ -2014,6 +2072,26 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     characterClothingText = 'All characters: standard';
   }
 
+  // Extract scene context (setting, time, weather) from scene hint
+  let sceneContextText = '';
+  const sceneMetadata = parseSceneHintMetadata(shortSceneDesc);
+  if (sceneMetadata) {
+    const contextParts = [];
+    if (sceneMetadata.setting && sceneMetadata.setting.toLowerCase() !== 'n/a') {
+      contextParts.push(`- Setting: ${sceneMetadata.setting}`);
+    }
+    if (sceneMetadata.time && sceneMetadata.time.toLowerCase() !== 'n/a') {
+      contextParts.push(`- Time of day: ${sceneMetadata.time}`);
+    }
+    if (sceneMetadata.weather && sceneMetadata.weather.toLowerCase() !== 'n/a') {
+      contextParts.push(`- Weather: ${sceneMetadata.weather}`);
+    }
+    if (contextParts.length > 0) {
+      sceneContextText = '**Scene Context:**\n' + contextParts.join('\n') + '\n\n';
+      log.debug(`[SCENE PROMPT P${pageNumber}] Scene context: ${JSON.stringify(sceneMetadata)}`);
+    }
+  }
+
   // Use template from file if available
   if (PROMPT_TEMPLATES.sceneDescriptions) {
     // Get the full language instruction with spelling rules (e.g., 'Write in German with Swiss spelling. Use ä,ö,ü...')
@@ -2022,6 +2100,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       PREVIOUS_SCENES: previousScenesText,
       SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
+      SCENE_CONTEXT: sceneContextText,
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
@@ -2852,6 +2931,7 @@ module.exports = {
   extractPageClothing,
   extractSceneMetadata,
   stripSceneMetadata,
+  parseSceneHintMetadata,
 
   // Prompt builders
   buildBasePrompt,

@@ -133,7 +133,7 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 
 **CURRENT SCENE (Page {PAGE_NUMBER}):**
 {SCENE_SUMMARY}
-
+{SCENE_CONTEXT}
 **Story Text:**
 {PAGE_CONTENT}
 

@@ -504,7 +504,12 @@ function extractIssues(jobLines) {
     // Errors - look for actual error indicators
     // But DON'T classify as error if it's a WARN-level log (avoid duplicates in warnings + errors)
     const isWarnLevel = msg.includes('[WARN]') || line.level === 'wrn';
-    const isError = !isWarnLevel && (
+    // Skip JSON-like lines (debug output from quality eval, etc.)
+    const trimmedMsg = msg.trim();
+    const isJsonLine = trimmedMsg.startsWith('{') || trimmedMsg.startsWith('}') ||
+                       trimmedMsg.startsWith('[') || trimmedMsg.startsWith(']') ||
+                       trimmedMsg.startsWith('"') || trimmedMsg.startsWith('```');
+    const isError = !isWarnLevel && !isJsonLine && (
                     msg.includes('Error') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
                     (msg.includes('failed') && !msg.includes('story-failed')) ||
                     (msg.includes('Failed') && !msg.includes('story-failed')) ||
