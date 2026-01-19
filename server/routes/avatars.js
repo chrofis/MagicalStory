@@ -1508,7 +1508,14 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
             characters[charIndex].body_no_bg_url = bodyNoBg;
             // New photos object structure (used by frontend)
             characters[charIndex].photos = photosObj;
-            characters[charIndex].avatars = { status: 'pending', stale: true }; // Mark stale since photo changed
+            // Mark avatars as stale, but PRESERVE existing avatar images
+            // This prevents data loss if avatar generation fails
+            if (characters[charIndex].avatars) {
+              characters[charIndex].avatars.stale = true;
+              characters[charIndex].avatars.status = 'pending';
+            } else {
+              characters[charIndex].avatars = { status: 'pending', stale: true };
+            }
             log.info(`📸 [PHOTO] Updated existing character ${characterId} with new photo for user ${req.user.id}`);
           } else {
             log.warn(`📸 [PHOTO] Existing character ${characterId} not found in DB, will be updated by avatar job`);

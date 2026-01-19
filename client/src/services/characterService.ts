@@ -1009,12 +1009,16 @@ export const characterService = {
 
       // Fetch FULL character data from server (avatar job already saved everything)
       // Use loadFullCharacter which works for all users (not just admins)
-      // Use retry logic to handle race condition where avatar job DB write may still be in progress
+      // Use retry logic with exponential backoff to handle race condition where avatar job
+      // DB write may still be in progress. Avatar jobs take 10-15 seconds, so we need patience.
       let freshCharacter: Character | null = null;
-      for (let attempt = 0; attempt < 3; attempt++) {
+      const maxAttempts = 30; // 30 attempts with backoff = up to ~60 seconds total
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (attempt > 0) {
-          log.info(`[AVATAR] Retry ${attempt + 1}/3: waiting for avatar data to be available in DB...`);
-          await new Promise(r => setTimeout(r, 500)); // 500ms delay on retry
+          // Exponential backoff: 500ms, 600ms, 720ms, ... up to 3000ms max
+          const backoffDelay = Math.min(500 * Math.pow(1.2, attempt), 3000);
+          log.info(`[AVATAR] Retry ${attempt + 1}/${maxAttempts}: waiting ${Math.round(backoffDelay)}ms for avatar data...`);
+          await new Promise(r => setTimeout(r, backoffDelay));
         }
         freshCharacter = await characterService.loadFullCharacter(character.id);
         // Check if avatars are actually present in the response
@@ -1029,7 +1033,7 @@ export const characterService = {
         // Warn if avatars are missing - this indicates a server-side issue
         const hasAvatars = freshCharacter.avatars?.standard || freshCharacter.avatars?.winter || freshCharacter.avatars?.summer;
         if (!hasAvatars) {
-          log.warn(`⚠️ Fresh DB data for ${character.name} missing avatars after ${3} retries - server may not have saved them`);
+          log.warn(`⚠️ Fresh DB data for ${character.name} missing avatars after ${maxAttempts} retries - server may not have saved them`);
         }
         log.info(`📋 Using server-saved data for ${character.name}`);
       } else {
