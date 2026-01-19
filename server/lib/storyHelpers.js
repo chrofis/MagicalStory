@@ -2191,16 +2191,26 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     const requiredObjects = [];
 
     // Helper function to match by name OR ID
-    const matchesEntry = (entry, searchTerm) => {
+    // NOTE: For character names, we use STRICT matching to avoid "Luis" matching "Luis' Mama"
+    const matchesEntry = (entry, searchTerm, strictMode = false) => {
       const searchLower = searchTerm.toLowerCase().trim();
       const nameLower = (entry.name || '').toLowerCase().trim();
       const idLower = (entry.id || '').toLowerCase().trim();
 
-      // Match by ID (exact match, e.g., "CLO001")
+      // Match by ID (exact match, e.g., "CLO001", "CHR002")
       if (idLower && idLower === searchLower) return true;
 
-      // Match by name (exact, contains, or contained)
+      // Extract ID from search term if present (e.g., "Der weise Ritter [CHR002]" -> "CHR002")
+      const idMatch = searchTerm.match(/\[([A-Z]{3}\d{3})\]/);
+      if (idMatch && idLower === idMatch[1].toLowerCase()) return true;
+
+      // Exact name match (always allowed)
       if (nameLower === searchLower) return true;
+
+      // For strict mode (characters), only allow exact matches or ID matches
+      if (strictMode) return false;
+
+      // For non-strict mode (objects/locations), allow partial matches
       if (nameLower.includes(searchLower)) return true;
       if (searchLower.includes(nameLower) && nameLower.length >= 3) return true;
 
@@ -2208,10 +2218,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     };
 
     // First, look up secondary characters from metadata.characters
+    // Use STRICT matching to avoid "Luis" matching "Luis' Mama"
     if (metadata.characters && metadata.characters.length > 0) {
       for (const charName of metadata.characters) {
-        // Look up in secondaryCharacters
-        const secondaryChar = (visualBible.secondaryCharacters || []).find(sc => matchesEntry(sc, charName));
+        // Look up in secondaryCharacters with strict mode to prevent partial name matches
+        const secondaryChar = (visualBible.secondaryCharacters || []).find(sc => matchesEntry(sc, charName, true));
         if (secondaryChar) {
           const description = secondaryChar.extractedDescription || secondaryChar.description;
           requiredObjects.push({ name: secondaryChar.name, id: secondaryChar.id, type: 'secondary character', description });
