@@ -145,7 +145,8 @@ export function WizardStep3BookSettings({
   const getLanguageDisplayText = useCallback(() => {
     const family = getLanguageFamily(storyLanguage);
     const mainLang = MAIN_LANGUAGES.find(l => l.family === family);
-    const variant = LANGUAGE_VARIANTS[family].find(v => v.code === storyLanguage);
+    const variant = LANGUAGE_VARIANTS[family].find(v => v.code === storyLanguage)
+      || LANGUAGE_VARIANTS[family][0]; // Fall back to first variant (e.g., de -> de-ch)
     if (mainLang && variant) {
       return `${mainLang.name} (${variant.name})`;
     }
