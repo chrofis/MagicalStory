@@ -35,12 +35,6 @@ Your task is to create a compelling, well-structured story outline that will gui
 
 {CATEGORY_GUIDELINES}
 
-# TEXT LENGTH RULES - CRITICAL
-
-**{READING_LEVEL}**
-
-You MUST follow these text length guidelines strictly. Each page's story text must match the reading level specified above. The scene descriptions will be separate from the text, so plan accordingly.
-
 # IMPORTANT: Character Portrayal Guidelines
 
 - **CRITICAL: ONLY use the character names listed in "Characters" above.** Do NOT invent new character names or use names from other stories. If a name is not in the character list, do NOT use it in the story.
@@ -300,6 +294,17 @@ For all other characters:
 
 ---
 
+# TEXT LENGTH RULES - CRITICAL
+
+**{READING_LEVEL}**
+
+- Stay within the word count range. Aim for the MIDDLE of the range.
+- Pages UNDER the minimum are violations - add more content.
+- Write in flowing paragraphs with 2-4 sentences each.
+- Maximum 3-4 paragraphs per page.
+
+---
+
 # Part 6: Page-by-Page Breakdown
 
 For EACH of the {PAGES} story pages, provide:
@@ -515,7 +520,21 @@ Now that you have drafted the complete story with all pages, create a title that
 Format:
 Title: [Your creative title based on the story above]
 
+## Critical Analysis
+
+After completing all pages and the title, perform a self-review:
+
+**Word Count Check:**
+First, state the target: "Target word count: [X-Y words per page]" (copy from TEXT LENGTH RULES above)
+Then list any pages that violate the range:
+- UNDER minimum = violation (needs more content)
+- OVER maximum = violation (needs trimming)
+Pages within the range are correct - do NOT list them as violations.
+
+**Logical Consistency Check:**
+List any plot holes, timeline issues, or character inconsistencies.
+
 ---
 
-**REMINDER: Do not stop until you have written all {PAGES} pages AND the final title.**
+**REMINDER: Do not stop until you have written all {PAGES} pages, the title, AND the critical analysis.**
 
