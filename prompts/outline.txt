@@ -309,6 +309,9 @@ For EACH of the {PAGES} story pages, provide:
 **Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
 
 **Scene**: One sentence describing the key visual moment for the illustrator.
+- **MAX 3 CHARACTERS per scene** - Pick the 1-3 most important characters for THIS visual moment
+- Other characters can be mentioned in the story text, but the illustration focuses on 3 or fewer
+- For group scenes: focus on the emotional center (e.g., "Sophie hugs Grandma while others watch" → illustrate Sophie + Grandma, not all 7 people)
 
 **Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
 - Write **[same]** if clothing matches the previous page
@@ -491,12 +494,12 @@ Challenge: [One scene where this character shines]
 
 Page 1: [Key Action/Plot Point]
 Character Focus: [Which character(s) and what trait/development is shown]
-Scene: [One sentence - the key visual moment]
+Scene: [One sentence - the key visual moment, MAX 3 characters in the illustration]
 Clothing: [same] or [change to: X - reason]
 
 Page 2: [Key Action/Plot Point]
 Character Focus: [Description]
-Scene: [One sentence - the key visual moment]
+Scene: [One sentence - the key visual moment, MAX 3 characters]
 Clothing: [same]
 
 ...continue for ALL {PAGES} pages (Page 3, Page 4, ... Page {PAGES}). Use [same] for most pages; only use [change to: X] when there's an explicit reason.
