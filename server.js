@@ -214,6 +214,7 @@ const {
   buildImagePrompt,
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt,
+  buildPreviousScenesContext,
   getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
@@ -2819,10 +2820,24 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     const shouldExpand = sceneWasEdited || hasCorrectionNotes || (!hasArtDirectorFormat && textDescription.length < 1500);
 
     if (shouldExpand) {
-      console.log(`📝 [REGEN] Expanding scene to full Art Director format (edited: ${sceneWasEdited}, corrections: ${hasCorrectionNotes}, length: ${inputDescription.length} chars)...`);
+      console.log(`📝 [REGEN] Expanding scene using unified 3-step prompt (edited: ${sceneWasEdited}, corrections: ${hasCorrectionNotes}, length: ${inputDescription.length} chars)...`);
       // Use language code (e.g., 'de-ch', 'en') not name (e.g., 'English')
       const language = storyData.language || 'en';
-      const expansionPrompt = buildSceneExpansionPrompt(inputDescription, storyData, sceneCharacters, visualBible, language, correctionNotes);
+      // Build context for scene description prompt (same as original generation)
+      const pageText = getPageText(storyData.storyText, pageNumber);
+      const previousScenes = buildPreviousScenesContext(sceneDescriptions, pageNumber);
+      const clothingData = storyData.clothingRequirements || {};
+      const expansionPrompt = buildSceneDescriptionPrompt(
+        pageNumber,
+        pageText || inputDescription,  // Fallback to description if no page text
+        sceneCharacters,
+        inputDescription,  // Use as shortSceneDesc
+        language,
+        visualBible,
+        previousScenes,
+        clothingData,
+        correctionNotes
+      );
 
       try {
         const expansionResult = await callClaudeAPI(expansionPrompt, 6000);
@@ -9311,8 +9326,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 return note;
               }).join('\n\n');
 
-              // Re-expand scene with correction notes
-              log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with corrections...`);
+              // Re-expand scene using unified 3-step prompt with correction notes
+              log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with unified 3-step prompt and corrections...`);
 
               // Get short scene hint for re-expansion (NOT the already-expanded description)
               // The outlineExtract contains the original short scene summary like "Sophie finds a magic key"
@@ -9338,12 +9353,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const fullDescription = existingImage.description || sceneHint;
               const sceneCharacters = getCharactersInScene(fullDescription, inputData.characters);
 
-              const expansionPrompt = buildSceneExpansionPrompt(
-                sceneHint,
-                { characters: inputData.characters, visualBible },
+              // Build context for unified 3-step scene description prompt (same as original generation)
+              const pageText = existingImage.text || '';
+              // Build previous scenes context from allImages (which have descriptions)
+              const previousScenes = allImages
+                .filter(img => img.pageNumber < pageNum)
+                .sort((a, b) => b.pageNumber - a.pageNumber)
+                .slice(0, 2)
+                .map(img => ({
+                  pageNumber: img.pageNumber,
+                  summary: img.description?.substring(0, 200) || ''
+                }));
+              const clothingDataForPrompt = clothingRequirements || {};
+              const expansionPrompt = buildSceneDescriptionPrompt(
+                pageNum,
+                pageText || sceneHint,  // Fallback to scene hint if no page text
                 sceneCharacters,
-                visualBible,
+                sceneHint,  // Use as shortSceneDesc
                 inputData.language,
+                visualBible,
+                previousScenes,
+                clothingDataForPrompt,
                 correctionNotes
               );
 

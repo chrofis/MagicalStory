@@ -183,9 +183,16 @@ export default function StoryWizard() {
   const [storyLanguage, setStoryLanguage] = useState<StoryLanguageCode>(() => {
     try {
       const saved = localStorage.getItem('story_language');
-      // Accept all valid language codes (German, French, English variants)
-      if (saved && (saved.startsWith('de') || saved.startsWith('fr') || saved === 'en')) {
-        return saved as StoryLanguageCode;
+      if (saved) {
+        // Normalize legacy codes to proper variants
+        if (saved === 'de') return 'de-ch';
+        if (saved === 'fr') return 'fr-ch';
+        if (saved === 'it') return 'it-ch';
+        if (saved === 'en') return 'en-gb';
+        // Accept all valid variant codes
+        if (saved.startsWith('de') || saved.startsWith('fr') || saved.startsWith('it') || saved.startsWith('en') || saved.startsWith('gsw')) {
+          return saved as StoryLanguageCode;
+        }
       }
       return 'de-ch'; // Default to Swiss German
     } catch {

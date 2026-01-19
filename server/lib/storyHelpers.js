@@ -1941,8 +1941,9 @@ ${historicalGuide}${locationsSection}
  * @param {Object} visualBible - Visual Bible data
  * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2)
  * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string
+ * @param {string} correctionNotes - Notes from previous failed attempt (for regeneration)
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}) {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '') {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -2108,7 +2109,8 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CHARACTER_CLOTHING: characterClothingText,
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,
-      LANGUAGE_NOTE: getLanguageNote(language)
+      LANGUAGE_NOTE: getLanguageNote(language),
+      CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : ''
     });
   }
 
@@ -2897,6 +2899,27 @@ Your "name" can be creative, but "landmarkQuery" MUST match the original name ex
 // EXPORTS
 // ============================================================================
 
+/**
+ * Build previous scenes context for scene description prompts
+ * Used when regenerating images to provide context from earlier pages
+ * @param {Array} sceneDescriptions - Array of scene description objects with pageNumber and description
+ * @param {number} currentPage - The current page number being generated
+ * @param {number} maxPrevious - Maximum number of previous scenes to include (default 2)
+ * @returns {Array} Array of {pageNumber, summary} objects for previous scenes
+ */
+function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious = 2) {
+  if (!sceneDescriptions || !Array.isArray(sceneDescriptions)) return [];
+
+  return sceneDescriptions
+    .filter(s => s.pageNumber < currentPage)
+    .sort((a, b) => b.pageNumber - a.pageNumber)  // Most recent first
+    .slice(0, maxPrevious)
+    .map(s => ({
+      pageNumber: s.pageNumber,
+      summary: s.description?.substring(0, 200) || ''
+    }));
+}
+
 module.exports = {
   // Config
   ART_STYLES,
@@ -2940,6 +2963,7 @@ module.exports = {
   buildImagePrompt,
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt,
+  buildPreviousScenesContext,
 
   // Teaching guides
   getTeachingGuide,

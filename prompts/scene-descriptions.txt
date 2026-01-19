@@ -146,7 +146,7 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 
 **Recurring Visual Elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}
-
+{CORRECTION_NOTES}
 ---
 
 ## PROCESS
