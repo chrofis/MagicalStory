@@ -151,92 +151,81 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 
 ## PROCESS
 
-### STEP 1 - DRAFT
+### STEP 1 - DRAFT (Complete Scene)
 
-Quick draft of what to illustrate:
-- Which moment to capture
-- Which characters (max 3), who is the MAIN character
-- What each character is doing
-- Position of each character (use frame regions)
-- Position of any objects/landmarks characters interact with
+Create COMPLETE scene description with ALL fields:
 
-### STEP 2 - REVIEW
+**Draft must include:**
+- `imageSummary`: 2-3 sentences describing the scene
+- `setting`: location, description, lighting, camera, depthLayers
+- `characters`: array with position, pose, action, expression, clothing for each
+- `objects`: array with name and position for each
 
-**Scale Feasibility Check (DO FIRST):**
-- Camera distance: EXTREME WIDE / WIDE / FULL BODY / MEDIUM / CLOSE-UP
-- Large objects in frame? List them or "none"
-- Character detail needed: SILHOUETTES / BODY LANGUAGE / FULL BODY / EXPRESSIONS / FINE DETAIL
-- Compatible? If NO, choose to ZOOM IN (focus on characters) or ZOOM OUT (generic character descriptions)
+(Skip `translatedSummary` in draft - only needed in final output)
 
-**Character-to-Character:**
-- Facing each other? Bodies AND heads oriented correctly?
-- Gaze: who looks at whom? Does the other look back or elsewhere?
-- Frame positions and depth layers
-- Closeness: touching / arm's reach / clear gap / far apart
+This is your FIRST ATTEMPT - it may have issues that will be caught in Step 2.
 
-**Character-to-Object:**
-- If holding: which hand? (default RIGHT) Is the other hand accounted for?
-- If near: spatial relationship clear? (left of, behind, on top of)
+### STEP 2 - CRITICIZE (Find All Issues)
 
-**Body Consistency (ANATOMICAL):**
-- Humans have exactly 2 arms - account for BOTH arms explicitly
-- WRONG: "both arms gesticulating wildly, left arm holds X"
-- RIGHT: "left arm holds X tucked under armpit, right arm points upward"
-- Both arms: where is each one? Working together or fighting each other?
-- Body facing vs head facing: same or different? (if different, is it intentional?)
-- Does the full pose support ONE clear action?
+Review your draft against EVERY check below. Be harsh - find ALL problems.
 
-**Gaze & Pointing Geometry:**
-For EACH pointing/looking action, verify:
-- TARGET position in frame (left/center/right)
-- POINTER position in frame
-- DIRECTION: does the described direction actually reach the target?
+**1. Scale Feasibility:**
+- Camera distance vs character detail level - compatible?
+- Large objects + facial expressions = IMPOSSIBLE
 
-Example (left/right):
-- Character at center-left points at object at background-center
-- They must point toward the RIGHT to reach it
-- WRONG: "pointing left" — points away from target
-- CORRECT: "pointing toward center-right/background"
+**2. Object Orientation & Placement:**
+- Is each object VERTICAL (standing door, wall) or HORIZONTAL (floor, trap door, table)?
+- Does the setting description match the object orientation?
+- CONFLICT EXAMPLE: "door in floor" (horizontal) + "pulling door handle" (vertical action) = INCONSISTENT
 
-**DEPTH & POINTING GEOMETRY (CRITICAL):**
-When a character POINTS at or LOOKS at an object, verify the DEPTH LAYERS match:
-- Character in FOREGROUND pointing at object in BACKGROUND = character must face AWAY from camera (back view) or turn around
-- Character in FOREGROUND pointing at object in FOREGROUND = character can face camera (front view)
-- Character facing camera CANNOT point at something BEHIND them without turning
+**3. Action-Object Compatibility:**
+- Do character actions physically make sense with object orientation?
+- Pulling a horizontal trap door = squat and lift UP
+- Pulling a vertical door = stand and pull TOWARD you
+- Bracing against wall while pulling = vertical door, NOT floor trap door
 
-WRONG: "Manuel faces camera (front view), points upward at the rocket behind him"
-→ Pointing forward while facing camera aims TOWARD camera, not backward at rocket
+**4. Character Connections:**
+- Facing directions correct?
+- Gaze directions reach their targets?
+- Positions and depth layers clear?
 
-RIGHT: "Manuel turns to face the rocket behind him (back to camera), points upward"
-→ OR: "Manuel faces camera, looks over his shoulder at the rocket, thumb pointing backward"
-→ OR: Reposition camera so rocket is in front of characters, not behind
+**5. Body Consistency:**
+- Both arms accounted for each character?
+- Poses support ONE clear action?
 
-Always verify: If target is BEHIND character, character must TURN AROUND or camera must be repositioned
+**6. Gaze & Pointing Geometry:**
+- Left/right directions correct?
+- Depth layers allow the interaction?
 
-### STEP 3 - OUTPUT
+**7. Camera-View Compatibility:**
+| View Type | Expressions Allowed |
+|-----------|-------------------|
+| FRONT / THREE-QUARTER FRONT | Full expressions OK |
+| SIDE PROFILE | Profile only (jaw, one eye) |
+| THREE-QUARTER BACK | Minimal (ear, cheek) |
+| BACK | NONE - body language only |
+
+**8. Character Differentiation:**
+- Each character has UNIQUE pose?
+- No identical gestures?
+
+**9. Physics Check:**
+- Ropes taut? Heavy = straining posture?
+- Distinct materials where objects touch?
+
+**After checking, list:**
+- `issues`: Every problem found (be specific)
+- `corrections`: How to fix each issue
+
+### STEP 3 - OUTPUT (Corrected Final Version)
+
+Apply ALL corrections from Step 2 to produce the final scene description.
 
 Output raw JSON (no markdown code fences, no explanation text).
 
 ```
 {
-  "thinking": {
-    "draft": "Your STEP 1 draft: moment, characters, positions, actions",
-    "scaleFeasibility": {
-      "cameraDistance": "EXTREME WIDE | WIDE | FULL BODY | MEDIUM | CLOSE-UP",
-      "largeObjects": "list or 'none'",
-      "characterDetailLevel": "SILHOUETTES | BODY LANGUAGE | FULL BODY | EXPRESSIONS | FINE DETAIL",
-      "compatible": true,
-      "resolution": "null or how you fixed incompatibility"
-    },
-    "characterConnections": "Who faces whom, gaze directions, positions, closeness",
-    "objectConnections": "Which hand holds what, spatial relationships",
-    "bodyConsistency": "Both arms accounted for, pose supports action",
-    "gazeGeometry": "Left/right pointing: target position, pointer position, direction verified",
-    "depthGeometry": "Depth check: if target in BACKGROUND and character faces camera = INVALID. Solution: back view OR reposition camera OR over-shoulder pointing",
-    "characterDifferentiation": "Each character has UNIQUE pose? No identical gestures?",
-    "physicsCheck": "Ropes taut? Heavy objects = straining posture? Touching objects have distinct colors/materials?"
-  },
-  "output": {
+  "draft": {
     "imageSummary": "2-3 sentences: positions, actions, setting. End with: Main characters: Name1, Name2.",
     "setting": {
       "location": "Location name with [ID] if from Visual Bible",
@@ -261,74 +250,150 @@ Output raw JSON (no markdown code fences, no explanation text).
         "name": "Object name",
         "position": "Where in scene"
       }
+    ]
+  },
+  "critique": {
+    "scaleFeasibility": "Camera distance: X, Detail needed: Y, Compatible: YES/NO",
+    "objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, setting says X, action requires Y - CONSISTENT/INCONSISTENT",
+    "actionCompatibility": "For EACH character-object interaction: [action] + [object orientation] = VALID/INVALID",
+    "characterConnections": "Who faces whom, gaze directions, positions, closeness",
+    "bodyConsistency": "Both arms accounted for, pose supports action",
+    "gazeGeometry": "Left/right pointing verified, depth layers verified",
+    "cameraViewCheck": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
+    "characterDifferentiation": "Each character has UNIQUE pose? YES/NO",
+    "physicsCheck": "Ropes taut? Heavy = straining? Materials distinct?",
+    "issues": ["List every problem found - be specific"],
+    "corrections": ["How each issue was fixed in the output"]
+  },
+  "output": {
+    "imageSummary": "CORRECTED: 2-3 sentences with all issues fixed",
+    "setting": {
+      "location": "Location name with [ID] if from Visual Bible",
+      "description": "CORRECTED location details",
+      "lighting": "Time of day, lighting, weather",
+      "camera": "CORRECTED camera angle and framing",
+      "depthLayers": "Foreground, middle ground, background"
+    },
+    "characters": [
+      {
+        "name": "CharacterName",
+        "position": "CORRECTED frame region + depth layer",
+        "pose": "CORRECTED body position, facing direction",
+        "action": "CORRECTED physical action",
+        "expression": "CORRECTED visible features (compatible with camera view)",
+        "clothing": "standard | winter | summer | costumed:type"
+      }
     ],
-    "translatedSummary": "Translation of imageSummary (see LANGUAGE below)"
+    "objects": [
+      {
+        "id": "ART001 (only if from RECURRING ELEMENTS)",
+        "name": "Object name",
+        "position": "CORRECTED position (consistent with orientation)"
+      }
+    ],
+    "translatedSummary": "Translation of CORRECTED imageSummary"
   }
 }
 ```
 
 **Field Notes:**
+- `draft`: Your FIRST ATTEMPT - may contain errors
+- `critique`: Harsh self-review finding ALL issues
+- `output`: FINAL CORRECTED version with all issues fixed
 - `characters`: Array of 1-3 characters. For animals/creatures, omit the `clothing` field.
-- `objects`: Only include `id` for items from RECURRING VISUAL ELEMENTS. For incidental objects, omit `id`.
-- All `thinking` fields are required for validation:
-  - `depthGeometry`: MUST verify depth layers match for any pointing/looking actions
-  - `characterDifferentiation`: MUST confirm each character has unique pose
-  - `physicsCheck`: MUST verify physics (ropes taut, heavy = straining, etc.)
+- `objects`: Only include `id` for items from RECURRING VISUAL ELEMENTS.
+- If `issues` array is empty, `output` can match `draft` exactly
+- If `issues` array has items, `output` MUST differ from `draft` with fixes applied
 
 ---
 
-## EXAMPLE
+## EXAMPLE (Issue Found and Fixed)
 
 ```
 {
-  "thinking": {
-    "draft": "Moment: Sophie kneeling, eye contact with prairie dog. Characters: Sophie (right), Prairie Dog (left). Sophie kneeling, fingers drumming. Prairie dog on mound, paws waving.",
-    "scaleFeasibility": {
-      "cameraDistance": "MEDIUM",
-      "largeObjects": "none",
-      "characterDetailLevel": "EXPRESSIONS",
-      "compatible": true,
-      "resolution": null
-    },
-    "characterConnections": "Sophie faces left toward prairie dog. Prairie dog faces right toward Sophie. Sophie: right side, middle ground. Prairie dog: left-center on mound. Closeness: arm's reach.",
-    "objectConnections": "Sophie's right hand on knee drumming, left hand in grass. Lasso coiled beside. Backpack on back.",
-    "bodyConsistency": "Sophie: right hand drumming on knee, left hand resting - unified impatient pose. Prairie dog: both paws waving - coordinated greeting.",
-    "gazeGeometry": "Sophie (right) looking LEFT toward prairie dog (left-center) - correct direction.",
-    "depthGeometry": "Both characters in MIDDLE GROUND, same depth layer. Sophie faces LEFT toward prairie dog - no depth conflict, can see each other. VALID.",
-    "characterDifferentiation": "Sophie: impatient drumming pose. Prairie dog: excited waving pose. UNIQUE poses, no duplicates.",
-    "physicsCheck": "No ropes or heavy objects. Lasso coiled (not taut). Backpack worn normally. N/A for this scene."
-  },
-  "output": {
-    "imageSummary": "Sophie kneels in tall prairie grass, fingers drumming on her knee, while a prairie dog stands upright on a dirt mound, front paws waving. The golden grassland stretches to the horizon. Main characters: Sophie, Prairie Dog.",
+  "draft": {
+    "imageSummary": "Manuel pulls open the magical door glowing with golden light while Sophie kneels at the floor gap pushing stones aside. The tower ruins surround them. Main characters: Manuel, Sophie.",
     "setting": {
-      "location": "Prairie grassland",
-      "description": "Wide grassland with hip-high golden prairie grass. Prairie dog burrow with mounded brown earth.",
-      "lighting": "Morning sun, warm golden light",
-      "camera": "Medium shot, slightly elevated (adult eye level). Sophie right, prairie dog left on elevated mound.",
-      "depthLayers": "Tall grass foreground, characters middle ground, endless prairie background"
+      "location": "Ruine Stein [LOC001]",
+      "description": "Interior of tower ruins, gap in floor stones revealing the magical door beneath.",
+      "lighting": "Winter afternoon, golden glow from opened door",
+      "camera": "Wide angle, slightly elevated",
+      "depthLayers": "Sophie foreground at floor gap, Manuel middle ground at door, stone walls background"
     },
     "characters": [
       {
         "name": "Sophie",
-        "position": "Right side, middle ground, three-quarter profile facing left",
-        "pose": "Kneeling, upper body leaning slightly forward",
-        "action": "Right hand on knee drumming fingers, left hand resting in grass",
-        "expression": "Pressed lips, eyebrows furrowed, jaw tight",
-        "clothing": "standard"
+        "position": "Left side, foreground, kneeling",
+        "pose": "Kneeling, leaning forward over floor gap",
+        "action": "Right hand pushing stone aside, left hand braced on floor",
+        "expression": "Eyes wide, mouth open",
+        "clothing": "winter"
       },
       {
-        "name": "Prairie Dog [ANI001]",
-        "position": "Left-center, on elevated mound at Sophie's eye level",
-        "pose": "Standing upright on hind legs",
-        "action": "Front paws waving",
-        "expression": "Mouth open, eyes wide, head tilted"
+        "name": "Manuel",
+        "position": "Center, middle ground, facing door",
+        "pose": "Standing, leaning back with effort",
+        "action": "Right hand gripping door handle pulling it open, left hand braced against wall",
+        "expression": "Focused gaze, jaw set",
+        "clothing": "winter"
       }
     ],
     "objects": [
-      {"id": "ART001", "name": "Lasso", "position": "Coiled beside Sophie in grass"},
-      {"id": "ART002", "name": "Backpack", "position": "On Sophie's back"}
+      {"id": "ART001", "name": "Die magische Tür", "position": "Center, set into floor stones, partially opened"}
+    ]
+  },
+  "critique": {
+    "scaleFeasibility": "Camera: WIDE, Detail: FULL BODY, Compatible: YES",
+    "objectPlacement": "Die magische Tür: Setting says 'set into floor stones' = HORIZONTAL trap door. But object is described as ornate door with handle = typically VERTICAL. INCONSISTENT.",
+    "actionCompatibility": "Manuel 'gripping door handle pulling it open, braced against wall' = VERTICAL door pulling action. But door is 'in floor stones' = HORIZONTAL. Bracing against wall doesn't help lift a floor door. INVALID.",
+    "characterConnections": "Sophie left foreground, Manuel center middle ground. Both focused on door area.",
+    "bodyConsistency": "Sophie: both arms accounted. Manuel: both arms accounted.",
+    "gazeGeometry": "Both looking at door in center - valid.",
+    "cameraViewCheck": "Elevated camera + characters looking DOWN at floor door = tops of heads visible, not faces. Sophie 'eyes wide, mouth open' INCOMPATIBLE with elevated camera seeing her from above/behind.",
+    "characterDifferentiation": "Sophie kneeling/pushing, Manuel standing/pulling - UNIQUE poses.",
+    "physicsCheck": "Door pulling mechanics inconsistent with floor placement.",
+    "issues": [
+      "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
+      "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
+      "3. Camera-expression conflict: elevated camera can't see faces of characters looking down"
     ],
-    "translatedSummary": "Sophie kniet im hohen Präriegras, trommelt mit den Fingern auf ihr Knie, während ein Präriehund aufrecht auf einem Erdhügel steht und mit den Vorderpfoten winkt. Das goldene Grasland erstreckt sich bis zum Horizont. Hauptfiguren: Sophie, Präriehund."
+    "corrections": [
+      "1. Make door VERTICAL: set into stone wall, not floor. Remove 'floor gap' from setting.",
+      "2. Manuel's action now valid: pulling vertical door toward him, bracing against adjacent wall",
+      "3. Change camera to floor level, looking at characters from across the room to see their faces"
+    ]
+  },
+  "output": {
+    "imageSummary": "Manuel pulls open an ancient wooden door set into the stone wall, golden light spilling out, while Sophie stands beside him pushing aside a loose stone. The weathered tower ruins surround them. Main characters: Manuel, Sophie.",
+    "setting": {
+      "location": "Ruine Stein [LOC001]",
+      "description": "Interior of tower ruins, weathered grey stone walls. Ancient wooden door set into the far wall, partially hidden behind loose stones.",
+      "lighting": "Winter afternoon light through gaps, golden magical glow spilling from opened door",
+      "camera": "Medium wide shot, floor level, looking across room at characters and door",
+      "depthLayers": "Stone debris foreground, characters and door middle ground, tower walls background"
+    },
+    "characters": [
+      {
+        "name": "Sophie",
+        "position": "Left of door, middle ground, three-quarter view facing right",
+        "pose": "Standing, body angled toward the wall",
+        "action": "Right hand pushing a loose stone aside, left hand raised in surprise",
+        "expression": "Eyes wide, mouth open, eyebrows raised",
+        "clothing": "winter"
+      },
+      {
+        "name": "Manuel",
+        "position": "Center-right at door, middle ground, three-quarter view",
+        "pose": "Standing, body leaning back with effort",
+        "action": "Right hand gripping ornate door handle pulling toward him, left hand braced against door frame",
+        "expression": "Focused gaze on door, jaw set, brow furrowed",
+        "clothing": "winter"
+      }
+    ],
+    "objects": [
+      {"id": "ART001", "name": "Die magische Tür", "position": "Center-right, set into stone wall, swinging open toward Manuel"}
+    ],
+    "translatedSummary": "Manuel zieht eine alte Holztür in der Steinmauer auf, goldenes Licht strömt heraus, während Sophie neben ihm steht und einen losen Stein beiseiteschiebt. Die verwitterten Turmruinen umgeben sie. Hauptfiguren: Manuel, Sophie."
   }
 }
 ```
