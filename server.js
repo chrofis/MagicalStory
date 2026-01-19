@@ -12195,6 +12195,7 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
 
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
     log.debug(`📝 [JOB INPUT] pages: ${req.body.pages} → ${inputData.pages}${req.body.pages !== inputData.pages ? ' (clamped!)' : ''}, level: ${inputData.languageLevel}`);
+    log.debug(`📝 [JOB INPUT] language: ${req.body.language} → ${inputData.language}`);
     log.debug(`📝 [JOB INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
 
     // Check email verification (skip for admins and impersonating admins)

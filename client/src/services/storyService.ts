@@ -995,6 +995,8 @@ export const storyService = {
     };
     // User location for landmark discovery
     userLocation?: { city: string | null; region: string | null; country: string | null };
+    // Season for story setting
+    season?: string;
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1031,6 +1033,8 @@ export const storyService = {
       modelOverrides: data.modelOverrides,
       // User location for landmark discovery
       userLocation: data.userLocation,
+      // Season for story setting
+      season: data.season,
     });
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },

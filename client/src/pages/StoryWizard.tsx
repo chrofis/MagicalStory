@@ -3025,6 +3025,8 @@ export default function StoryWizard() {
         } : undefined,
         // User location for landmark discovery
         userLocation: userLocation || undefined,
+        // Season for story setting
+        season: season || undefined,
       });
 
       setJobId(newJobId);
