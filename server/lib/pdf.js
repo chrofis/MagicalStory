@@ -73,17 +73,21 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
 
   // Calculate minimum font size needed for each page
   for (let i = 0; i < pageTexts.length; i++) {
-    const cleanText = pageTexts[i].trim().replace(/^-+|-+$/g, '').trim();
+    // Compress multiple newlines to single newline (paragraphGap handles spacing)
+    const cleanText = pageTexts[i].trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
     let fontSize = startFontSize;
+    // Paragraph gap: half a line height for tighter paragraph spacing
+    const paragraphGap = fontSize * 0.5;
 
     doc.fontSize(fontSize).font('Helvetica');
-    let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap });
+    let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap, paragraphGap });
 
     // Reduce font size until text fits
     while (textHeight > availableHeight && fontSize > minFontSize) {
       fontSize -= 0.5;
+      const newParagraphGap = fontSize * 0.5;
       doc.fontSize(fontSize);
-      textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap });
+      textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap, paragraphGap: newParagraphGap });
     }
 
     // Track the smallest font size needed
@@ -102,10 +106,11 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
   // Check if text still doesn't fit at minimum size
   if (minNeededFontSize <= minFontSize) {
     // Verify all pages fit at this size
+    const finalParagraphGap = minNeededFontSize * 0.5;
     doc.fontSize(minNeededFontSize).font('Helvetica');
     for (let i = 0; i < pageTexts.length; i++) {
-      const cleanText = pageTexts[i].trim().replace(/^-+|-+$/g, '').trim();
-      const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap });
+      const cleanText = pageTexts[i].trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
+      const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap, paragraphGap: finalParagraphGap });
       if (textHeight > availableHeight) {
         const errorMsg = `Page ${i + 1} text too long even at minimum font size (${minFontSize}pt). Please shorten the text.`;
         log.error(`❌ [PDF] ${errorMsg}`);
@@ -198,7 +203,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     fontSizeWarning = fontResult.warning;
   } else {
     // Standard: full page for text
-    const margin = 28;
+    const margin = 20;
     const availableWidth = pageWidth - (margin * 2);
     const availableHeight = (pageHeight - (margin * 2)) * 0.9;
 
@@ -290,23 +295,26 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
  * @param {number} fontSize - Consistent font size for all pages
  */
 function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13) {
-  const margin = 28;
+  const margin = 20;
   const availableWidth = pageWidth - (margin * 2);
   const availableHeight = pageHeight - (margin * 2);
   const lineGap = -2;
+  // Paragraph gap: half a line height (fontSize * 0.5) for tighter paragraph spacing
+  const paragraphGap = fontSize * 0.5;
 
   storyPages.forEach((pageText, index) => {
     const pageNumber = index + 1;
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-    const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+    // Clean text and compress multiple newlines to single newline (paragraphGap handles spacing)
+    const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
 
     // Add text page with consistent font size
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: margin, bottom: margin, left: margin, right: margin } });
 
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-    const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+    const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap, paragraphGap });
     const yPosition = margin + (availableHeight - textHeight) / 2;
-    doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
+    doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
 
     // Add image page if available (full-bleed, no margin)
     if (image && image.imageData) {
@@ -589,7 +597,7 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, 14, 6, 'center');
     consistentFontSize = fontResult.fontSize;
   } else {
-    const margin = 28;
+    const margin = 20;
     const availableWidth = pageWidth - (margin * 2);
     const availableHeight = (pageHeight - (margin * 2)) * 0.9;
     const fontResult = calculateConsistentFontSize(doc, storyPages, availableWidth, availableHeight, 13, 6, 'left');

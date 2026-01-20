@@ -5297,7 +5297,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     // Helper: Add story content pages (text + images)
     const addStoryContentPages = (storyData, storyPages) => {
       const isPictureBook = storyData.languageLevel === '1st-grade';
-      const textMargin = 28;
+      const textMargin = 20;  // Reduced from 28pt (~7mm instead of ~10mm)
       const textMarginMm = mmToPoints(3);
 
       if (isPictureBook) {
@@ -5311,7 +5311,8 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         storyPages.forEach((pageText, index) => {
           const pageNumber = index + 1;
           const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-          const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+          // Compress multiple newlines to single newline (paragraphGap handles spacing)
+          const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
 
           doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
@@ -5332,17 +5333,20 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
 
           // Add text with vertical centering (text has margin)
           let fontSize = 14;  // Scaled for 20x20cm (was 10pt for 14x14cm)
+          const paragraphGap = fontSize * 0.5;  // Half-line spacing for paragraph breaks
           doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-          let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+          let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap, paragraphGap });
 
           while (textHeight > availableTextHeight && fontSize > 6) {
             fontSize -= 0.5;
+            const newParagraphGap = fontSize * 0.5;
             doc.fontSize(fontSize);
-            textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
+            textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap, paragraphGap: newParagraphGap });
           }
 
+          const finalParagraphGap = fontSize * 0.5;
           const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-          doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
+          doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap, paragraphGap: finalParagraphGap });
         });
       } else {
         // Standard: separate text and image pages
@@ -5353,24 +5357,27 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         storyPages.forEach((pageText, index) => {
           const pageNumber = index + 1;
           const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
-          const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
+          // Compress multiple newlines to single newline (paragraphGap handles spacing)
+          const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
 
           // Text page (has margin)
           doc.addPage({ size: [pageWidth, pageHeight], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
           totalStoryPages++;
 
           let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
+          let paragraphGap = fontSize * 0.5;  // Half-line spacing for paragraph breaks
           doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-          let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+          let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap, paragraphGap });
 
           while (textHeight > availableHeight * 0.9 && fontSize > 6) {
             fontSize -= 0.5;
+            paragraphGap = fontSize * 0.5;
             doc.fontSize(fontSize);
-            textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
+            textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap, paragraphGap });
           }
 
           const yPosition = textMargin + (availableHeight - textHeight) / 2;
-          doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
+          doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
 
           // Image page (full-bleed, no margin)
           if (image && image.imageData) {
