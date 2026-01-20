@@ -1757,6 +1757,190 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
   }
 });
 
+// ============================================================================
+// SWISS LANDMARKS PRE-INDEXED ENDPOINTS
+// ============================================================================
+
+// Track active indexing job
+let swissLandmarkIndexingJob = null;
+
+// Admin endpoint to trigger Swiss landmark indexing
+app.post('/api/admin/swiss-landmarks/index', authenticateToken, async (req, res) => {
+  try {
+    // Verify admin role
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    // Check if already running
+    if (swissLandmarkIndexingJob && swissLandmarkIndexingJob.status === 'running') {
+      return res.json({
+        status: 'already_running',
+        progress: swissLandmarkIndexingJob.progress,
+        message: `Indexing already in progress: ${swissLandmarkIndexingJob.currentCity} (${swissLandmarkIndexingJob.citiesProcessed}/${swissLandmarkIndexingJob.totalCities})`
+      });
+    }
+
+    const { analyzePhotos = true, dryRun = false } = req.body;
+
+    // Start indexing in background
+    swissLandmarkIndexingJob = {
+      status: 'running',
+      startedAt: new Date(),
+      citiesProcessed: 0,
+      totalCities: SWISS_CITIES.length,
+      currentCity: '',
+      progress: 0,
+      landmarksFound: 0,
+      landmarksSaved: 0,
+      errors: []
+    };
+
+    log.info(`[ADMIN] Starting Swiss landmark indexing (analyzePhotos=${analyzePhotos}, dryRun=${dryRun})`);
+
+    // Run in background (don't await)
+    discoverAllSwissLandmarks({
+      analyzePhotos,
+      dryRun,
+      onProgress: (city, current, total) => {
+        swissLandmarkIndexingJob.currentCity = city;
+        swissLandmarkIndexingJob.citiesProcessed = current;
+        swissLandmarkIndexingJob.progress = Math.round((current / total) * 100);
+      }
+    }).then(result => {
+      swissLandmarkIndexingJob.status = 'completed';
+      swissLandmarkIndexingJob.completedAt = new Date();
+      swissLandmarkIndexingJob.landmarksFound = result.totalDiscovered;
+      swissLandmarkIndexingJob.landmarksSaved = result.totalSaved;
+      swissLandmarkIndexingJob.errors = result.errors || [];
+      log.info(`[ADMIN] Swiss landmark indexing completed: ${result.totalSaved} saved`);
+    }).catch(err => {
+      swissLandmarkIndexingJob.status = 'failed';
+      swissLandmarkIndexingJob.error = err.message;
+      log.error(`[ADMIN] Swiss landmark indexing failed:`, err);
+    });
+
+    res.json({
+      status: 'started',
+      message: `Started indexing ${SWISS_CITIES.length} Swiss cities`,
+      analyzePhotos,
+      dryRun
+    });
+  } catch (err) {
+    log.error('[ADMIN] Swiss landmark index error:', err);
+    res.status(500).json({ error: 'Failed to start indexing', details: err.message });
+  }
+});
+
+// Admin endpoint to get indexing progress
+app.get('/api/admin/swiss-landmarks/index/status', authenticateToken, async (req, res) => {
+  try {
+    if (!swissLandmarkIndexingJob) {
+      return res.json({ status: 'not_started', message: 'No indexing job has been started' });
+    }
+    res.json(swissLandmarkIndexingJob);
+  } catch (err) {
+    log.error('[ADMIN] Swiss landmark status error:', err);
+    res.status(500).json({ error: 'Failed to get status' });
+  }
+});
+
+// Admin endpoint to get Swiss landmark stats
+app.get('/api/admin/swiss-landmarks/stats', async (req, res) => {
+  try {
+    const { secret } = req.query;
+    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
+
+    // Check auth: either valid admin JWT or secret key
+    const hasValidSecret = secret === secretKey;
+    if (!hasValidSecret) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role !== 'admin') {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+      } catch (jwtErr) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    }
+
+    const stats = await getSwissLandmarkStats();
+    res.json(stats);
+  } catch (err) {
+    log.error('[ADMIN] Swiss landmark stats error:', err);
+    res.status(500).json({ error: 'Failed to get stats' });
+  }
+});
+
+// Admin endpoint to get Swiss landmarks (for review/debugging)
+app.get('/api/admin/swiss-landmarks', async (req, res) => {
+  try {
+    const { secret, city, lat, lon, radius = 20, limit = 50 } = req.query;
+    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
+
+    // Check auth
+    const hasValidSecret = secret === secretKey;
+    if (!hasValidSecret) {
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role !== 'admin') {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+      } catch (jwtErr) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
+    }
+
+    let landmarks;
+    if (city) {
+      landmarks = await getSwissLandmarksByCity(city, parseInt(limit));
+    } else if (lat && lon) {
+      landmarks = await getSwissLandmarksNearLocation(
+        parseFloat(lat),
+        parseFloat(lon),
+        parseFloat(radius),
+        parseInt(limit)
+      );
+    } else {
+      // Return top landmarks overall
+      const result = await dbPool.query(
+        `SELECT * FROM swiss_landmarks ORDER BY score DESC LIMIT $1`,
+        [parseInt(limit)]
+      );
+      landmarks = result.rows;
+    }
+
+    res.json({
+      count: landmarks.length,
+      landmarks: landmarks.map(l => ({
+        id: l.id,
+        name: l.name,
+        type: l.type,
+        city: l.nearest_city,
+        canton: l.canton,
+        score: l.score,
+        photoUrl: l.photo_url,
+        photoDescription: l.photo_description?.substring(0, 100) + (l.photo_description?.length > 100 ? '...' : ''),
+        latitude: l.latitude,
+        longitude: l.longitude
+      }))
+    });
+  } catch (err) {
+    log.error('[ADMIN] Swiss landmarks list error:', err);
+    res.status(500).json({ error: 'Failed to get landmarks', details: err.message });
+  }
+});
+
 // Admin endpoint to get job input data (for debugging failed jobs)
 app.get('/api/admin/job-input', async (req, res) => {
   try {
@@ -10122,31 +10306,65 @@ async function processStoryJob(jobId) {
       const cacheKey = `${inputData.userLocation.city}_${inputData.userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
       let landmarks = null;
 
-      // Try database first (persistent)
-      try {
-        const dbResult = await dbPool.query(
-          'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
-          [cacheKey]
-        );
-        if (dbResult.rows.length > 0) {
-          const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-          if (age < LANDMARK_CACHE_TTL) {
-            // Parse JSON if stored as string (TEXT column) vs JSONB
-            const rawLandmarks = dbResult.rows[0].landmarks;
-            landmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
-            log.info(`[LANDMARK] 📍 Injecting ${landmarks?.length || 0} DB-cached landmarks for ${inputData.userLocation.city}`);
+      // Check if Swiss location - use pre-indexed swiss_landmarks table
+      const isSwiss = /switzerland|schweiz|suisse|svizzera|svizra/i.test(inputData.userLocation.country || '');
+
+      if (isSwiss) {
+        try {
+          // Query Swiss pre-indexed landmarks (no TTL - permanent database)
+          const swissLandmarks = await getSwissLandmarksByCity(inputData.userLocation.city, 30);
+          if (swissLandmarks.length > 0) {
+            // Convert Swiss landmarks to the format expected by linkPreDiscoveredLandmarks
+            landmarks = swissLandmarks.map(l => ({
+              name: l.name,
+              query: l.name,
+              type: l.type,
+              lat: parseFloat(l.latitude),
+              lon: parseFloat(l.longitude),
+              score: l.score,
+              // Swiss landmarks don't have photoData - they have photoUrl for lazy loading
+              photoUrl: l.photo_url,
+              photoDescription: l.photo_description,
+              attribution: l.photo_attribution,
+              // Flag for lazy photo loading
+              isSwissPreIndexed: true,
+              swissLandmarkId: l.id
+            }));
+            log.info(`[LANDMARK] 🇨🇭 Injecting ${landmarks.length} Swiss pre-indexed landmarks for ${inputData.userLocation.city}`);
           }
+        } catch (swissErr) {
+          log.debug(`[LANDMARK] Swiss landmarks lookup failed: ${swissErr.message}`);
         }
-      } catch (dbErr) {
-        log.debug(`[LANDMARK] DB lookup failed: ${dbErr.message}`);
       }
 
-      // Fall back to in-memory cache if database didn't have it
+      // For non-Swiss locations (or if Swiss lookup found nothing), use original discovery system
       if (!landmarks) {
-        const cachedLandmarks = userLandmarkCache.get(cacheKey);
-        if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
-          landmarks = cachedLandmarks.landmarks;
-          log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} in-memory cached landmarks for ${inputData.userLocation.city}`);
+        // Try database first (persistent)
+        try {
+          const dbResult = await dbPool.query(
+            'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
+            [cacheKey]
+          );
+          if (dbResult.rows.length > 0) {
+            const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+            if (age < LANDMARK_CACHE_TTL) {
+              // Parse JSON if stored as string (TEXT column) vs JSONB
+              const rawLandmarks = dbResult.rows[0].landmarks;
+              landmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
+              log.info(`[LANDMARK] 📍 Injecting ${landmarks?.length || 0} DB-cached landmarks for ${inputData.userLocation.city}`);
+            }
+          }
+        } catch (dbErr) {
+          log.debug(`[LANDMARK] DB lookup failed: ${dbErr.message}`);
+        }
+
+        // Fall back to in-memory cache if database didn't have it
+        if (!landmarks) {
+          const cachedLandmarks = userLandmarkCache.get(cacheKey);
+          if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
+            landmarks = cachedLandmarks.landmarks;
+            log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} in-memory cached landmarks for ${inputData.userLocation.city}`);
+          }
         }
       }
 

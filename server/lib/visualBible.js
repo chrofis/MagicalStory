@@ -1522,6 +1522,26 @@ function linkPreDiscoveredLandmarks(visualBible, availableLandmarks) {
       linkedCount++;
 
       log.info(`[LANDMARK-LINK] ✅ Linked "${location.name}" → "${preDiscovered.name}" (${Math.round(preDiscovered.photoData.length/1024)}KB${preDiscovered.photoDescription ? ', +desc' : ''})`);
+    } else if (preDiscovered && preDiscovered.isSwissPreIndexed) {
+      // Swiss pre-indexed landmark - has photoUrl but no photoData (lazy loading)
+      // Link metadata and description, photo will be fetched later by prefetchLandmarkPhotos
+      location.referencePhotoUrl = preDiscovered.photoUrl;
+      location.photoAttribution = preDiscovered.attribution;
+      location.photoSource = 'wikimedia';
+      location.photoFetchStatus = 'pending_lazy'; // Special status for lazy loading
+      location.landmarkQuery = preDiscovered.name;
+      location.isSwissPreIndexed = true;
+      location.swissLandmarkId = preDiscovered.swissLandmarkId;
+
+      // Apply photo description even without photoData - this is the analyzed description
+      if (preDiscovered.photoDescription) {
+        location.extractedDescription = preDiscovered.photoDescription;
+        location.firstAppearanceAnalyzed = true;
+        log.info(`[LANDMARK-LINK] 📝 Using Swiss pre-indexed description for "${location.name}"`);
+      }
+
+      linkedCount++;
+      log.info(`[LANDMARK-LINK] 🇨🇭 Linked Swiss landmark "${location.name}" → "${preDiscovered.name}" (lazy load, ${preDiscovered.photoDescription ? '+desc' : 'no desc'})`);
     } else if (preDiscovered) {
       log.warn(`[LANDMARK-LINK] ⚠️ Found "${preDiscovered.name}" but no photoData`);
     } else {

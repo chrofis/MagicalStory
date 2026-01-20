@@ -635,6 +635,7 @@ Write 2-3 sentences. Be specific and visual. Do NOT mention the photo itself or 
 /**
  * Pre-fetch photos for all landmarks in a Visual Bible
  * Designed to run in background as soon as landmarks are detected
+ * Handles both regular discovery and Swiss pre-indexed landmarks (lazy loading)
  * @param {Object} visualBible - Parsed Visual Bible object
  * @returns {Promise<Object>} Updated Visual Bible with photo data
  */
@@ -644,7 +645,7 @@ async function prefetchLandmarkPhotos(visualBible) {
   }
 
   // Find locations marked as real landmarks that don't already have photos
-  // (Skip landmarks that were already linked from pre-discovered cache)
+  // (Skip landmarks that were already linked from pre-discovered cache with photoData)
   const landmarks = visualBible.locations.filter(
     loc => loc.isRealLandmark && loc.landmarkQuery && loc.photoFetchStatus !== 'success'
   );
@@ -654,11 +655,40 @@ async function prefetchLandmarkPhotos(visualBible) {
     return visualBible;
   }
 
-  log.info(`[LANDMARK] 🌍 Pre-fetching photos for ${landmarks.length} landmark(s) (skipping pre-linked)`);
+  // Separate Swiss pre-indexed landmarks (have photoUrl, need lazy load) from regular landmarks
+  const swissLandmarks = landmarks.filter(loc => loc.photoFetchStatus === 'pending_lazy' && loc.isSwissPreIndexed);
+  const regularLandmarks = landmarks.filter(loc => loc.photoFetchStatus !== 'pending_lazy');
+
+  log.info(`[LANDMARK] 🌍 Pre-fetching photos: ${swissLandmarks.length} Swiss (lazy), ${regularLandmarks.length} regular`);
   const startTime = Date.now();
 
-  // Fetch all in parallel with Promise.allSettled (don't fail on individual errors)
-  const results = await Promise.allSettled(landmarks.map(async (loc) => {
+  // Fetch Swiss landmarks using lazy loading (from stored URL)
+  const swissResults = await Promise.allSettled(swissLandmarks.map(async (loc) => {
+    try {
+      // Use the landmark object directly for lazy loading
+      const photo = await getLandmarkPhotoOnDemand({
+        id: loc.swissLandmarkId,
+        name: loc.landmarkQuery,
+        photo_url: loc.referencePhotoUrl
+      });
+
+      if (photo) {
+        loc.referencePhotoData = photo.photoData;
+        loc.photoFetchStatus = 'success';
+        return { name: loc.name, success: true, type: 'swiss' };
+      } else {
+        loc.photoFetchStatus = 'failed';
+        return { name: loc.name, success: false, type: 'swiss' };
+      }
+    } catch (err) {
+      loc.photoFetchStatus = 'failed';
+      log.error(`[LANDMARK] Error lazy-loading Swiss photo for "${loc.name}":`, err.message);
+      return { name: loc.name, success: false, error: err.message, type: 'swiss' };
+    }
+  }));
+
+  // Fetch regular landmarks using full discovery
+  const regularResults = await Promise.allSettled(regularLandmarks.map(async (loc) => {
     try {
       const photo = await fetchLandmarkPhoto(loc.landmarkQuery);
 
@@ -668,22 +698,24 @@ async function prefetchLandmarkPhotos(visualBible) {
         loc.photoAttribution = photo.attribution;
         loc.photoSource = photo.source;
         loc.photoFetchStatus = 'success';
-        return { name: loc.name, success: true };
+        return { name: loc.name, success: true, type: 'regular' };
       } else {
         loc.photoFetchStatus = 'failed';
-        return { name: loc.name, success: false };
+        return { name: loc.name, success: false, type: 'regular' };
       }
     } catch (err) {
       loc.photoFetchStatus = 'failed';
       log.error(`[LANDMARK] Error fetching photo for "${loc.name}":`, err.message);
-      return { name: loc.name, success: false, error: err.message };
+      return { name: loc.name, success: false, error: err.message, type: 'regular' };
     }
   }));
 
+  const allResults = [...swissResults, ...regularResults];
   const elapsed = Date.now() - startTime;
-  const successCount = results.filter(r => r.status === 'fulfilled' && r.value?.success).length;
+  const successCount = allResults.filter(r => r.status === 'fulfilled' && r.value?.success).length;
+  const swissSuccess = swissResults.filter(r => r.status === 'fulfilled' && r.value?.success).length;
 
-  log.info(`[LANDMARK] ✅ Pre-fetch complete: ${successCount}/${landmarks.length} photos fetched in ${elapsed}ms`);
+  log.info(`[LANDMARK] ✅ Pre-fetch complete: ${successCount}/${landmarks.length} photos (${swissSuccess} Swiss lazy-loaded) in ${elapsed}ms`);
 
   return visualBible;
 }
@@ -1368,14 +1400,14 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
 /**
  * Get a landmark photo on-demand (lazy loading)
  * Used when a pre-indexed landmark is actually needed for story generation
- * @param {Object} landmark - Landmark object with name, wikipedia_page_id, lang
+ * @param {Object} landmark - Landmark object with name, photo_url, wikipedia_page_id, lang
  * @returns {Promise<{photoData: string, attribution: string}|null>}
  */
 async function getLandmarkPhotoOnDemand(landmark) {
   if (!landmark?.name) return null;
 
   // Check in-memory cache first
-  const cacheKey = landmark.wikidata_qid || `${landmark.lang}:${landmark.wikipedia_page_id}` || landmark.name;
+  const cacheKey = landmark.wikidata_qid || landmark.id || `${landmark.lang}:${landmark.wikipedia_page_id}` || landmark.name;
   const cached = photoCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     log.debug(`[LANDMARK-LAZY] Cache hit for "${landmark.name}"`);
@@ -1385,23 +1417,54 @@ async function getLandmarkPhotoOnDemand(landmark) {
   log.info(`[LANDMARK-LAZY] Fetching photo on-demand for "${landmark.name}"`);
 
   try {
-    // Use existing fetchLandmarkPhoto function
-    const result = await fetchLandmarkPhoto(
-      landmark.name,
-      landmark.wikipedia_page_id,
-      landmark.lang
-    );
+    let photoData = null;
 
-    if (result) {
+    // If we have a stored photo_url (Swiss pre-indexed), fetch directly from that URL
+    if (landmark.photo_url) {
+      log.debug(`[LANDMARK-LAZY] Using stored URL: ${landmark.photo_url.substring(0, 80)}...`);
+      try {
+        const response = await fetch(landmark.photo_url, {
+          headers: WIKI_HEADERS,
+          signal: AbortSignal.timeout(10000)
+        });
+
+        if (response.ok) {
+          const buffer = await response.arrayBuffer();
+          const base64 = Buffer.from(buffer).toString('base64');
+          const contentType = response.headers.get('content-type') || 'image/jpeg';
+          const mimeType = contentType.split(';')[0].trim();
+
+          // Compress to JPEG if needed (keeping consistent with fetchLandmarkPhoto)
+          photoData = await compressImageToJPEG(`data:${mimeType};base64,${base64}`, 800, 85);
+          log.debug(`[LANDMARK-LAZY] Fetched from stored URL: ${Math.round(photoData.length / 1024)}KB`);
+        }
+      } catch (urlErr) {
+        log.debug(`[LANDMARK-LAZY] Stored URL failed: ${urlErr.message}, falling back to search`);
+      }
+    }
+
+    // Fall back to search-based fetch if URL didn't work
+    if (!photoData) {
+      const result = await fetchLandmarkPhoto(
+        landmark.name,
+        landmark.wikipedia_page_id,
+        landmark.lang
+      );
+      if (result?.photoData) {
+        photoData = result.photoData;
+      }
+    }
+
+    if (photoData) {
       // Cache the result
       photoCache.set(cacheKey, {
-        data: result,
+        data: photoData,
         attribution: landmark.photo_attribution || 'Wikimedia Commons',
         timestamp: Date.now()
       });
 
       return {
-        photoData: result,
+        photoData: photoData,
         attribution: landmark.photo_attribution || 'Wikimedia Commons'
       };
     }
