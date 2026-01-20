@@ -41,12 +41,19 @@ Your task is to create a compelling, well-structured story outline that will gui
 - **CRITICAL: ONLY use the character names listed in "Characters" above.** Do NOT invent new character names or use names from other stories. If a name is not in the character list, do NOT use it in the story.
 - Write in third person (he/she/they)
 
+**CRITICAL: Write in PRESENT TENSE**
+- The story should be written in PRESENT TENSE (e.g., "Sophie walks into the forest", "Max finds a treasure")
+- This creates immediacy and engagement for young readers
+- Exception: Use past tense only when a character recalls or talks about something that happened before the story (flashbacks, memories)
+- Example CORRECT: "Sophie opens the door and sees a magical garden."
+- Example WRONG: "Sophie opened the door and saw a magical garden."
+
 When writing about characters' strengths and weaknesses:
-- NEVER mention the trait words directly (e.g., don't write "She was brave" or "He was shy")
+- NEVER mention the trait words directly (e.g., don't write "She is brave" or "He is shy")
 - SHOW the traits through actions, dialogue, and behavior instead
 - Let the reader discover the character's personality through what they DO, not what they ARE told
-- Example: Instead of "Max was curious", show Max asking lots of questions and exploring new places
-- Example: Instead of "Emma was afraid of the dark", show Emma hesitating at a dark doorway or asking for a nightlight
+- Example: Instead of "Max is curious", show Max asking lots of questions and exploring new places
+- Example: Instead of "Emma is afraid of the dark", show Emma hesitating at a dark doorway or asking for a nightlight
 
 ---
 

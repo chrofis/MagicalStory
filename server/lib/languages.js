@@ -14,48 +14,48 @@ const LANGUAGES = {
     code: 'de-de',
     name: 'Deutsch (Standard)',
     nameEnglish: 'German (Standard)',
-    instruction: 'You MUST write your response in German. Use standard German spelling (Hochdeutsch). CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Use Präteritum for narrative prose, Perfekt in dialogue. (4) Standard vocabulary throughout. CORRECT: "größer", "süß", "er lief", "der Junge", "die Mütze", "der Eimer", "im Januar", "die Tomate", "gucken", "die Treppe" | WRONG: "groesser", "grösser", "der Bub", "die Kappe", "der Kübel".',
-    note: '(Standard German: ß after long vowels, ss after short. Präteritum in narrative. CORRECT: "größer", "süß", "er lief" | WRONG: "grösser", "der Bub")'
+    instruction: 'You MUST write your response in German. Use standard German spelling (Hochdeutsch). CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Standard vocabulary throughout. CORRECT: "größer", "süß", "der Junge", "die Mütze", "der Eimer", "im Januar", "die Tomate", "gucken", "die Treppe" | WRONG: "groesser", "grösser", "der Bub", "die Kappe", "der Kübel".',
+    note: '(Standard German: ß after long vowels, ss after short. CORRECT: "größer", "süß" | WRONG: "grösser", "der Bub")'
   },
 
   'de-de-north': {
     code: 'de-de-north',
     name: 'Deutsch (Nord)',
     nameEnglish: 'German (North)',
-    instruction: 'You MUST write your response in German. Use standard German spelling. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Strongly prefer Präteritum even in dialogue. (4) Use northern vocabulary: "Junge" (not "Bub"), "Mütze" (not "Kappe"), "Eimer" (not "Kübel"), "gucken/kucken" (not "schauen"), "Treppe" (not "Stiege"), "Januar", "dieses Jahr", "Tomate". (5) Crisper, more understated tone. CORRECT: "er lief", "er rief", "der Junge", "die Mütze", "gucken" | WRONG: "er ist gelaufen", "der Bub", "die Kappe", "schauen", "heuer", "grösser".',
-    note: '(Northern German: Präteritum preferred. "Junge", "Mütze", "gucken". CORRECT: "er lief", "der Junge" | WRONG: "der Bub", "schauen")'
+    instruction: 'You MUST write your response in German. Use standard German spelling. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Use northern vocabulary: "Junge" (not "Bub"), "Mütze" (not "Kappe"), "Eimer" (not "Kübel"), "gucken/kucken" (not "schauen"), "Treppe" (not "Stiege"), "Januar", "dieses Jahr", "Tomate". (4) Crisper, more understated tone. CORRECT: "der Junge", "die Mütze", "gucken" | WRONG: "der Bub", "die Kappe", "schauen", "heuer", "grösser".',
+    note: '(Northern German: "Junge", "Mütze", "gucken". CORRECT: "der Junge" | WRONG: "der Bub", "schauen")'
   },
 
   'de-de-south': {
     code: 'de-de-south',
     name: 'Deutsch (Süd)',
     nameEnglish: 'German (South)',
-    instruction: 'You MUST write your response in German. Use standard German spelling. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Prefer Perfekt in dialogue, Präteritum acceptable in narrative. (4) Use southern vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "schauen" (not "gucken"), may use "Stiege" alongside "Treppe", "heuer" for "dieses Jahr". (5) Warmer, softer tone. CORRECT: "er hat gelacht", "der Bub", "die Kappe", "schauen", "heuer" | WRONG: "grösser", "der Junge", "gucken", "Jänner", "Paradeiser".',
-    note: '(Southern German: Perfekt in dialogue. "Bub", "Kappe", "schauen", "heuer". CORRECT: "der Bub", "schauen" | WRONG: "grösser", "Jänner")'
+    instruction: 'You MUST write your response in German. Use standard German spelling. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Use southern vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "schauen" (not "gucken"), may use "Stiege" alongside "Treppe", "heuer" for "dieses Jahr". (4) Warmer, softer tone. CORRECT: "der Bub", "die Kappe", "schauen", "heuer" | WRONG: "grösser", "der Junge", "gucken", "Jänner", "Paradeiser".',
+    note: '(Southern German: "Bub", "Kappe", "schauen", "heuer". CORRECT: "der Bub", "schauen" | WRONG: "grösser", "Jänner")'
   },
 
   'de-at': {
     code: 'de-at',
     name: 'Deutsch (Österreich)',
     nameEnglish: 'Austrian German',
-    instruction: 'You MUST write your response in German. Use Austrian German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Strongly prefer Perfekt for all past tense, including narrative. (4) Use Austrian vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "Kübel" (not "Eimer"), "Stiege" (not "Treppe"), "schauen" (not "gucken"), "Jänner" (not "Januar"), "Feber" (not "Februar"), "heuer" (not "dieses Jahr"), "Paradeiser" (not "Tomate"), "Erdapfel" (not "Kartoffel"), "Sackerl" (not "Tüte"), "Sessel" (not "Stuhl"). CORRECT: "er ist gelaufen", "im Jänner", "der Bub", "die Stiege", "heuer", "das Sackerl" | WRONG: "er lief", "im Januar", "der Junge", "die Treppe", "die Tüte", "grösser".',
-    note: '(Austrian German: Perfekt preferred. "Bub", "Jänner", "Paradeiser", "Sackerl". CORRECT: "er ist gelaufen", "im Jänner" | WRONG: "er lief", "grösser")'
+    instruction: 'You MUST write your response in German. Use Austrian German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Use Austrian vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "Kübel" (not "Eimer"), "Stiege" (not "Treppe"), "schauen" (not "gucken"), "Jänner" (not "Januar"), "Feber" (not "Februar"), "heuer" (not "dieses Jahr"), "Paradeiser" (not "Tomate"), "Erdapfel" (not "Kartoffel"), "Sackerl" (not "Tüte"), "Sessel" (not "Stuhl"). CORRECT: "im Jänner", "der Bub", "die Stiege", "heuer", "das Sackerl" | WRONG: "im Januar", "der Junge", "die Treppe", "die Tüte", "grösser".',
+    note: '(Austrian German: "Bub", "Jänner", "Paradeiser", "Sackerl". CORRECT: "im Jänner", "der Bub" | WRONG: "der Junge", "grösser")'
   },
 
   'de-ch': {
     code: 'de-ch',
     name: 'Deutsch (Schweiz)',
     nameEnglish: 'Swiss German',
-    instruction: 'You MUST write your response in German. Use Swiss Standard German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) NEVER use "ß", always use "ss" instead. (3) Prefer Perfekt for all past tense, including narrative. (4) Use Swiss vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "Rüebli" (not "Karotte"), "Velo" (not "Fahrrad"), "parkieren" (not "parken"), "grillieren" (not "grillen"), "Trottoir" (not "Bürgersteig"), "Lavabo" (not "Waschbecken"), "Natel" (not "Handy"), "Poulet" (not "Hähnchen"), "Glace" (not "Eis"), "Znüni/Zvieri" for snacks. (5) More formal register, no contractions. CORRECT: "grösser", "süss", "er ist gelaufen", "das Velo", "das Rüebli", "parkieren", "das Poulet" | WRONG: "größer", "süß", "er lief", "das Fahrrad", "die Karotte", "parken", "das Hähnchen".',
-    note: '(Swiss German: NEVER ß, always ss. Perfekt preferred. "Velo", "Rüebli", "Poulet". CORRECT: "grösser", "süss" | WRONG: "größer", "süß")'
+    instruction: 'You MUST write your response in German. Use Swiss Standard German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) NEVER use "ß", always use "ss" instead. (3) Use Swiss vocabulary: "Bub" (not "Junge"), "Kappe" (not "Mütze"), "Rüebli" (not "Karotte"), "Velo" (not "Fahrrad"), "parkieren" (not "parken"), "grillieren" (not "grillen"), "Trottoir" (not "Bürgersteig"), "Lavabo" (not "Waschbecken"), "Natel" (not "Handy"), "Poulet" (not "Hähnchen"), "Glace" (not "Eis"), "Znüni/Zvieri" for snacks. (4) More formal register, no contractions. CORRECT: "grösser", "süss", "das Velo", "das Rüebli", "parkieren", "das Poulet" | WRONG: "größer", "süß", "das Fahrrad", "die Karotte", "parken", "das Hähnchen".',
+    note: '(Swiss German: NEVER ß, always ss. "Velo", "Rüebli", "Poulet". CORRECT: "grösser", "süss" | WRONG: "größer", "süß")'
   },
 
   'de-it': {
     code: 'de-it',
     name: 'Deutsch (Südtirol)',
     nameEnglish: 'South Tyrolean German',
-    instruction: 'You MUST write your response in German. Use South Tyrolean German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs like Austrian standard. (3) Strongly prefer Perfekt for all past tense. (4) Use Austrian vocabulary as base: "Bub", "Kappe", "Kübel", "Stiege", "schauen", "Jänner", "heuer", "Paradeiser". (5) May include Italian-influenced words: "Ciao" for greetings, "Bar" (not "Café"), "Matura" (not "Abitur"). (6) Warmer, melodic tone similar to Austrian. CORRECT: "er ist gegangen", "der Bub", "die Kappe", "im Jänner", "heuer", "Ciao" | WRONG: "er ging", "der Junge", "die Mütze", "im Januar", "grösser", "dieses Jahr".',
-    note: '(South Tyrolean: Austrian base + Italian influence. Perfekt preferred. "Bub", "Jänner", "Ciao". CORRECT: "er ist gegangen" | WRONG: "er ging", "grösser")'
+    instruction: 'You MUST write your response in German. Use South Tyrolean German spelling and vocabulary. CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs like Austrian standard. (3) Use Austrian vocabulary as base: "Bub", "Kappe", "Kübel", "Stiege", "schauen", "Jänner", "heuer", "Paradeiser". (4) May include Italian-influenced words: "Ciao" for greetings, "Bar" (not "Café"), "Matura" (not "Abitur"). (5) Warmer, melodic tone similar to Austrian. CORRECT: "der Bub", "die Kappe", "im Jänner", "heuer", "Ciao" | WRONG: "der Junge", "die Mütze", "im Januar", "grösser", "dieses Jahr".',
+    note: '(South Tyrolean: Austrian base + Italian influence. "Bub", "Jänner", "Ciao". CORRECT: "der Bub", "im Jänner" | WRONG: "der Junge", "grösser")'
   },
 
   // Legacy 'de' maps to Standard German for backwards compatibility
@@ -63,8 +63,8 @@ const LANGUAGES = {
     code: 'de-de',
     name: 'Deutsch (Standard)',
     nameEnglish: 'German (Standard)',
-    instruction: 'You MUST write your response in German. Use standard German spelling (Hochdeutsch). CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Use Präteritum for narrative prose, Perfekt in dialogue. (4) Standard vocabulary throughout. CORRECT: "größer", "süß", "er lief", "der Junge", "die Mütze", "der Eimer", "im Januar", "die Tomate", "gucken", "die Treppe" | WRONG: "groesser", "grösser", "der Bub", "die Kappe", "der Kübel".',
-    note: '(Standard German: ß after long vowels, ss after short. Präteritum in narrative. CORRECT: "größer", "süß", "er lief" | WRONG: "grösser", "der Bub")'
+    instruction: 'You MUST write your response in German. Use standard German spelling (Hochdeutsch). CRITICAL RULES: (1) Use ä, ö, ü - NEVER ae, oe, ue. (2) Use "ß" after long vowels and diphthongs, "ss" after short vowels. (3) Standard vocabulary throughout. CORRECT: "größer", "süß", "der Junge", "die Mütze", "der Eimer", "im Januar", "die Tomate", "gucken", "die Treppe" | WRONG: "groesser", "grösser", "der Bub", "die Kappe", "der Kübel".',
+    note: '(Standard German: ß after long vowels, ss after short. CORRECT: "größer", "süß" | WRONG: "grösser", "der Bub")'
   },
 
   // ============================================================================
