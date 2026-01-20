@@ -7468,7 +7468,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             frontCoverClothingCat = 'costumed';
           }
           // Use detailed photo info (with names) for labeled reference images
-          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothingCat, frontCoverCostumeType, artStyleId, streamingClothingRequirements);
+          // Convert clothingRequirements to _currentClothing format so all characters use story costumes
+          const convertedFrontClothingReqs = convertClothingToCurrentFormat(streamingClothingRequirements);
+          let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothingCat, frontCoverCostumeType, artStyleId, convertedFrontClothingReqs);
           // Apply styled avatars (pre-converted to target art style) for non-costumed
           if (frontCoverClothingCat !== 'costumed') {
             frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
@@ -7517,7 +7519,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             initialCostumeType = initialPageClothing.split(':')[1];
             initialClothingCat = 'costumed';
           }
-          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialClothingCat, initialCostumeType, artStyleId, streamingClothingRequirements);
+          // Convert clothingRequirements to _currentClothing format so all characters use story costumes
+          const convertedInitialClothingReqs = convertClothingToCurrentFormat(streamingClothingRequirements);
+          let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialClothingCat, initialCostumeType, artStyleId, convertedInitialClothingReqs);
           // Apply styled avatars (pre-converted to target art style) for non-costumed
           if (initialClothingCat !== 'costumed') {
             initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
@@ -7574,7 +7578,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             backCostumeType = backCoverClothing.split(':')[1];
             backClothingCat = 'costumed';
           }
-          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backClothingCat, backCostumeType, artStyleId, streamingClothingRequirements);
+          // Convert clothingRequirements to _currentClothing format so all characters use story costumes
+          const convertedBackClothingReqs = convertClothingToCurrentFormat(streamingClothingRequirements);
+          let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backClothingCat, backCostumeType, artStyleId, convertedBackClothingReqs);
           // Apply styled avatars (pre-converted to target art style) for non-costumed
           if (backClothingCat !== 'costumed') {
             backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
@@ -10735,7 +10741,9 @@ async function processStoryJob(jobId) {
         frontCoverClothing = 'costumed';
         frontCoverCostumeType = frontCoverClothingRaw.split(':')[1];
       }
-      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, frontCoverCostumeType, artStyle, clothingRequirements);
+      // Convert clothingRequirements to _currentClothing format so all characters use story costumes
+      const convertedPipelineClothingReqs = convertClothingToCurrentFormat(clothingRequirements);
+      let frontCoverPhotos = getCharacterPhotoDetails(frontCoverCharacters, frontCoverClothing, frontCoverCostumeType, artStyle, convertedPipelineClothingReqs);
       // For non-costumed avatars, apply styled avatars from cache
       if (frontCoverClothing !== 'costumed') {
         frontCoverPhotos = applyStyledAvatars(frontCoverPhotos, artStyle);
@@ -10757,7 +10765,8 @@ async function processStoryJob(jobId) {
         initialPageClothing = 'costumed';
         initialPageCostumeType = initialPageClothingRaw.split(':')[1];
       }
-      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, initialPageCostumeType, artStyle, clothingRequirements);
+      // Use converted clothing requirements (defined earlier for front cover)
+      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, initialPageCostumeType, artStyle, convertedPipelineClothingReqs);
       if (initialPageClothing !== 'costumed') {
         initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
       }
@@ -10786,7 +10795,8 @@ async function processStoryJob(jobId) {
         backCoverClothing = 'costumed';
         backCoverCostumeType = backCoverClothingRaw.split(':')[1];
       }
-      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, backCoverCostumeType, artStyle, clothingRequirements);
+      // Use converted clothing requirements (defined earlier for front cover)
+      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, backCoverCostumeType, artStyle, convertedPipelineClothingReqs);
       if (backCoverClothing !== 'costumed') {
         backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
       }
