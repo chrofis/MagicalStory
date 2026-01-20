@@ -213,6 +213,17 @@ Review your draft against EVERY check below. Be harsh - find ALL problems.
 - Ropes taut? Heavy = straining posture?
 - Distinct materials where objects touch?
 
+**10. Weather & Indoor/Outdoor Consistency:**
+- If INDOOR: Weather should NOT be directly visible (no rain/snow falling on characters)
+  - Weather CAN be visible through windows (snow seen outside, rain on window panes)
+  - Describe HOW weather is shown: "snow visible through frost-covered window" NOT "snow falling"
+- If OUTDOOR: Weather affects the scene directly (snow on ground, rain on characters)
+- Weather must match Scene Context (if provided) unless story text describes a weather CHANGE
+- IMPOSSIBLE combinations:
+  - "Snow falling" + "indoor" = WRONG (use "snow visible through window")
+  - "Rain soaking characters" + "indoor" = WRONG
+  - "Sunny sky above" + "indoor" = WRONG (unless skylight/outdoor area visible)
+
 **After checking, list:**
 - `issues`: Every problem found (be specific)
 - `corrections`: How to fix each issue
@@ -229,8 +240,11 @@ Output raw JSON (no markdown code fences, no explanation text).
     "imageSummary": "2-3 sentences: positions, actions, setting. End with: Main characters: Name1, Name2.",
     "setting": {
       "location": "Location name with [ID] if from Visual Bible",
+      "indoorOutdoor": "indoor | outdoor | mixed (e.g., doorway, window view)",
       "description": "Location details, background",
-      "lighting": "Time of day, lighting, weather",
+      "lighting": "Time of day, lighting",
+      "weather": "Weather condition (sunny, cloudy, rainy, snowy, etc.)",
+      "weatherVisibility": "How weather is shown: 'directly on scene' (outdoor) OR 'visible through window/door' (indoor) OR 'not visible' (indoor, no windows)",
       "camera": "Camera angle and framing",
       "depthLayers": "Foreground, middle ground, background"
     },
@@ -264,6 +278,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "cameraViewCheck": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
     "characterDifferentiation": "Each character has UNIQUE pose? YES/NO",
     "physicsCheck": "Ropes taut? Heavy = straining? Materials distinct?",
+    "weatherCheck": "Scene is INDOOR/OUTDOOR. Weather: X. Weather visibility: [how weather is shown - e.g., 'through window' or 'directly on characters']. Compatible: YES/NO",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
@@ -271,8 +286,11 @@ Output raw JSON (no markdown code fences, no explanation text).
     "imageSummary": "CORRECTED: 2-3 sentences with all issues fixed",
     "setting": {
       "location": "Location name with [ID] if from Visual Bible",
+      "indoorOutdoor": "CORRECTED: indoor | outdoor | mixed",
       "description": "CORRECTED location details",
-      "lighting": "Time of day, lighting, weather",
+      "lighting": "Time of day, lighting",
+      "weather": "Weather condition",
+      "weatherVisibility": "CORRECTED: how weather is shown (must be compatible with indoor/outdoor)",
       "camera": "CORRECTED camera angle and framing",
       "depthLayers": "Foreground, middle ground, background"
     },

@@ -501,11 +501,15 @@ Challenge: [One scene where this character shines]
 Page 1: [Key Action/Plot Point]
 Character Focus: [Which character(s) and what trait/development is shown]
 Scene: [One sentence - the key visual moment, MAX 3 characters in the illustration]
+Scene Characters: [List only characters IN THIS SCENE with their clothing, e.g., "Luis: costumed:knight, Noel: standard"]
+Scene Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/etc]
 Clothing: [same] or [change to: X - reason]
 
 Page 2: [Key Action/Plot Point]
 Character Focus: [Description]
 Scene: [One sentence - the key visual moment, MAX 3 characters]
+Scene Characters: [Characters in this scene with clothing]
+Scene Setting: [setting] | Time: [time] | Weather: [weather]
 Clothing: [same]
 
 ...continue for ALL {PAGES} pages (Page 3, Page 4, ... Page {PAGES}). Use [same] for most pages; only use [change to: X] when there's an explicit reason.

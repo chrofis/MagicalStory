@@ -320,7 +320,8 @@ class OutlineParser {
 
   /**
    * Extract short scene descriptions for each page
-   * @returns {Object<number, string>} - Map of page number to scene description
+   * Now includes Scene Characters and Scene Setting metadata when available
+   * @returns {Object<number, string>} - Map of page number to scene description (with metadata appended)
    */
   extractSceneDescriptions() {
     if (this._cache.sceneDescriptions) return this._cache.sceneDescriptions;
@@ -342,8 +343,13 @@ class OutlineParser {
       // Method 1: Look for explicit Scene: field
       scene = this.findFieldValue(pageLines, sceneKeywords);
       if (scene && scene.length > 10) {
-        descriptions[pageNum] = scene;
+        // Also look for Scene Characters and Scene Setting metadata
+        const metadata = this._extractSceneMetadata(pageLines);
+        descriptions[pageNum] = this._buildFullSceneDescription(scene, metadata);
         log.debug(`[OUTLINE-PARSER] Page ${pageNum} scene (field): ${scene.substring(0, 60)}...`);
+        if (metadata.characters || metadata.setting) {
+          log.debug(`[OUTLINE-PARSER] Page ${pageNum} metadata: chars=${!!metadata.characters}, setting=${!!metadata.setting}`);
+        }
         continue;
       }
 
@@ -353,7 +359,8 @@ class OutlineParser {
         new RegExp(`(?:${sceneKeywords.join('|')})(?:\\s+Description)?[:\\s]+(.+)`, 'i')
       );
       if (inlineMatch && inlineMatch[1].trim().length > 10) {
-        descriptions[pageNum] = inlineMatch[1].trim();
+        const metadata = this._extractSceneMetadata(pageLines);
+        descriptions[pageNum] = this._buildFullSceneDescription(inlineMatch[1].trim(), metadata);
         log.debug(`[OUTLINE-PARSER] Page ${pageNum} scene (inline): ${descriptions[pageNum].substring(0, 60)}...`);
         continue;
       }
@@ -372,7 +379,8 @@ class OutlineParser {
         if (!trimmed || trimmed.length < 20) continue;
         if (skipPatterns.test(trimmed)) continue;
 
-        descriptions[pageNum] = this.cleanMarkdown(trimmed);
+        const metadata = this._extractSceneMetadata(pageLines);
+        descriptions[pageNum] = this._buildFullSceneDescription(this.cleanMarkdown(trimmed), metadata);
         log.debug(`[OUTLINE-PARSER] Page ${pageNum} scene (fallback): ${descriptions[pageNum].substring(0, 60)}...`);
         break;
       }
@@ -381,6 +389,64 @@ class OutlineParser {
     this._cache.sceneDescriptions = descriptions;
     log.debug(`[OUTLINE-PARSER] Extracted ${Object.keys(descriptions).length} scene descriptions`);
     return descriptions;
+  }
+
+  /**
+   * Extract Scene Characters and Scene Setting metadata from page lines
+   * @private
+   */
+  _extractSceneMetadata(pageLines) {
+    const metadata = { characters: null, setting: null, time: null, weather: null };
+
+    for (const line of pageLines) {
+      const trimmed = line.trim();
+
+      // Match "Scene Characters:" or "Characters:" at start of line
+      const charsMatch = trimmed.match(/^(?:Scene\s+)?Characters?:\s*(.+)/i);
+      if (charsMatch) {
+        metadata.characters = charsMatch[1].trim();
+      }
+
+      // Match "Scene Setting:" or combined "Setting: X | Time: Y | Weather: Z"
+      const settingMatch = trimmed.match(/^(?:Scene\s+)?Setting:\s*([^|]+)/i);
+      if (settingMatch) {
+        metadata.setting = settingMatch[1].trim();
+
+        // Also extract Time and Weather if on same line
+        const timeMatch = trimmed.match(/Time:\s*([^|]+)/i);
+        if (timeMatch) metadata.time = timeMatch[1].trim();
+
+        const weatherMatch = trimmed.match(/Weather:\s*([^|\n]+)/i);
+        if (weatherMatch) metadata.weather = weatherMatch[1].trim();
+      }
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Build full scene description with metadata appended
+   * @private
+   */
+  _buildFullSceneDescription(scene, metadata) {
+    let full = scene;
+
+    // Append characters if available
+    if (metadata.characters) {
+      full += `\nCharacters: ${metadata.characters}`;
+    }
+
+    // Append setting/time/weather if available
+    const settingParts = [];
+    if (metadata.setting) settingParts.push(`Setting: ${metadata.setting}`);
+    if (metadata.time) settingParts.push(`Time: ${metadata.time}`);
+    if (metadata.weather) settingParts.push(`Weather: ${metadata.weather}`);
+
+    if (settingParts.length > 0) {
+      full += `\n${settingParts.join(' | ')}`;
+    }
+
+    return full;
   }
 
   // --------------------------------------------------------------------------

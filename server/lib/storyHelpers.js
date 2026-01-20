@@ -1045,16 +1045,22 @@ function parseCharacterClothing(sceneDescription) {
 }
 
 /**
- * Extract scene metadata (setting, time, weather) from scene hint
- * Parses format: "Setting: indoor | Time: midday | Weather: n/a"
+ * Extract scene metadata (characters, setting, time, weather) from scene hint
+ * Parses format: "Characters: Luis: knight, Noel: standard\nSetting: indoor | Time: midday | Weather: n/a"
  *
  * @param {string} sceneHint - The scene hint text from outline
- * @returns {Object|null} { setting, time, weather } or null if not found
+ * @returns {Object|null} { characters, setting, time, weather } or null if not found
  */
 function parseSceneHintMetadata(sceneHint) {
   if (!sceneHint || typeof sceneHint !== 'string') return null;
 
-  const result = { setting: null, time: null, weather: null };
+  const result = { characters: null, setting: null, time: null, weather: null };
+
+  // Try to match "Characters: Luis: knight, Noel: standard" format
+  const charsMatch = sceneHint.match(/Characters?:\s*([^\n]+)/i);
+  if (charsMatch) {
+    result.characters = charsMatch[1].trim();
+  }
 
   // Try to match "Setting: X | Time: Y | Weather: Z" format
   const settingMatch = sceneHint.match(/Setting:\s*([^|]+)/i);
@@ -1073,7 +1079,7 @@ function parseSceneHintMetadata(sceneHint) {
   }
 
   // Return null if nothing was extracted
-  if (!result.setting && !result.time && !result.weather) {
+  if (!result.characters && !result.setting && !result.time && !result.weather) {
     return null;
   }
 
@@ -2074,11 +2080,15 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     characterClothingText = 'All characters: standard';
   }
 
-  // Extract scene context (setting, time, weather) from scene hint
+  // Extract scene context (characters, setting, time, weather) from scene hint
   let sceneContextText = '';
   const sceneMetadata = parseSceneHintMetadata(shortSceneDesc);
   if (sceneMetadata) {
     const contextParts = [];
+    // Characters in this scene (with their clothing for this scene)
+    if (sceneMetadata.characters) {
+      contextParts.push(`- Characters in this scene: ${sceneMetadata.characters}`);
+    }
     if (sceneMetadata.setting && sceneMetadata.setting.toLowerCase() !== 'n/a') {
       contextParts.push(`- Setting: ${sceneMetadata.setting}`);
     }
