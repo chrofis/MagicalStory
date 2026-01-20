@@ -19,6 +19,7 @@ const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
 const fetch = require('node-fetch');
+const sharp = require('sharp');
 
 // ============================================================================
 // CONFIG
@@ -115,6 +116,41 @@ function saveImage(base64Data, filePath) {
   fs.writeFileSync(filePath, Buffer.from(data, 'base64'));
 }
 
+async function extractFaceThumbnail(imageBase64, box, padding = 0.3) {
+  // Extract face region from image using bounding box
+  // box: { x, y, width, height } in pixels
+  // padding: extra margin around face (0.3 = 30%)
+  try {
+    const base64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64, 'base64');
+
+    // Get image dimensions
+    const metadata = await sharp(imageBuffer).metadata();
+    const imgWidth = metadata.width;
+    const imgHeight = metadata.height;
+
+    // Add padding to bounding box
+    const padX = box.width * padding;
+    const padY = box.height * padding;
+
+    const left = Math.max(0, Math.round(box.x - padX));
+    const top = Math.max(0, Math.round(box.y - padY));
+    const width = Math.min(imgWidth - left, Math.round(box.width + padX * 2));
+    const height = Math.min(imgHeight - top, Math.round(box.height + padY * 2));
+
+    // Extract face region
+    const faceBuffer = await sharp(imageBuffer)
+      .extract({ left, top, width, height })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    return 'data:image/jpeg;base64,' + faceBuffer.toString('base64');
+  } catch (err) {
+    console.error(`Failed to extract face thumbnail: ${err.message}`);
+    return null;
+  }
+}
+
 function getCharacterReference(character) {
   // Get the best reference photo for a character
   // Priority: face photo > styled avatar > original photo
@@ -201,15 +237,29 @@ async function analyzeStory(storyId) {
       existingFixTargets: scene.fixTargets || [],
     };
 
+    // Get image dimensions for percentage conversion
+    const imgBase64 = scene.imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imgBuffer = Buffer.from(imgBase64, 'base64');
+    const imgMetadata = await sharp(imgBuffer).metadata();
+    const imgWidth = imgMetadata.width;
+    const imgHeight = imgMetadata.height;
+
     // Match each detected face to a character
     for (let i = 0; i < faces.length; i++) {
       const face = faces[i];
       const faceId = `page${pageNum}_face${i}`;
 
-      // Save face crop
-      if (face.face_thumbnail) {
-        const facePath = path.join(facesDir, `${faceId}.jpg`);
-        saveImage(face.face_thumbnail, facePath);
+      // Extract face thumbnail using bounding box
+      // API returns face.box with {x, y, width, height} in pixels
+      const box = face.box;
+      let faceThumbnail = null;
+
+      if (box && box.width > 0 && box.height > 0) {
+        faceThumbnail = await extractFaceThumbnail(scene.imageData, box);
+        if (faceThumbnail) {
+          const facePath = path.join(facesDir, `${faceId}.jpg`);
+          saveImage(faceThumbnail, facePath);
+        }
       }
 
       // Try to match to known characters
@@ -217,9 +267,9 @@ async function analyzeStory(storyId) {
       let bestScore = 0;
 
       for (const [charName, charData] of Object.entries(characterRefs)) {
-        if (face.face_thumbnail && charData.reference) {
+        if (faceThumbnail && charData.reference) {
           const comparison = await compareToReference(
-            face.face_thumbnail,
+            faceThumbnail,
             charData.reference
           );
 
@@ -236,11 +286,19 @@ async function analyzeStory(storyId) {
         }
       }
 
+      // Convert bounding box to percentages
+      const boundingBox = box ? {
+        x: box.x / imgWidth,
+        y: box.y / imgHeight,
+        width: box.width / imgWidth,
+        height: box.height / imgHeight,
+      } : null;
+
       const extraction = {
         faceId,
         pageNumber: pageNum,
         faceIndex: i,
-        boundingBox: face.bounding_box,  // {x, y, width, height} as percentages
+        boundingBox,  // {x, y, width, height} as percentages (0-1)
         confidence: face.confidence,
         match: bestMatch,
         faceThumbnailPath: `faces/${faceId}.jpg`,
@@ -249,7 +307,13 @@ async function analyzeStory(storyId) {
       pageExtractions.extractions.push(extraction);
 
       // Group by character
-      if (bestMatch && bestMatch.samePerson) {
+      // For illustrated stories, the similarity to real photos is low
+      // Accept any match above a minimum threshold for grouping
+      const MIN_SIMILARITY_THRESHOLD = 0.05;  // Very low for illustrated faces
+      const isConfidentMatch = bestMatch && bestMatch.samePerson;
+      const isProbableMatch = bestMatch && bestScore > MIN_SIMILARITY_THRESHOLD;
+
+      if (isConfidentMatch || isProbableMatch) {
         const charName = bestMatch.characterName;
         if (!extractions.characters[charName]) {
           extractions.characters[charName] = {
@@ -258,7 +322,8 @@ async function analyzeStory(storyId) {
           };
         }
         extractions.characters[charName].appearances.push(extraction);
-        console.log(`      ✓ Face ${i}: ${charName} (${(bestScore * 100).toFixed(1)}%)`);
+        const marker = isConfidentMatch ? '✓' : '~';
+        console.log(`      ${marker} Face ${i}: ${charName} (${(bestScore * 100).toFixed(1)}%)`);
       } else if (bestMatch) {
         console.log(`      ? Face ${i}: maybe ${bestMatch.characterName} (${(bestScore * 100).toFixed(1)}%)`);
       } else {

@@ -106,7 +106,7 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Import modular routes and services
-const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage } = require('./server/services/database');
+const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
@@ -13114,6 +13114,216 @@ app.get('/sitemap.xml', (req, res) => {
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://magicalstory.ch/</loc><priority>1.0</priority></url>
 </urlset>`);
+  }
+});
+
+// ============================================
+// PUBLIC SHARED STORY ROUTES (No Authentication)
+// ============================================
+
+// Helper: Get shared story by token (validates is_shared = true)
+async function getSharedStory(shareToken) {
+  if (!shareToken || shareToken.length !== 64) {
+    return null;
+  }
+  const rows = await dbQuery(
+    'SELECT id, data FROM stories WHERE share_token = $1 AND is_shared = true',
+    [shareToken]
+  );
+  if (rows.length === 0) {
+    return null;
+  }
+  return { id: rows[0].id, data: rows[0].data };
+}
+
+// GET /api/shared/:shareToken - Get shared story data (public, no auth)
+app.get('/api/shared/:shareToken', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+    const story = await getSharedStory(shareToken);
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+
+    // Return only safe public data (no user info, no prompts)
+    const data = story.data;
+    res.json({
+      id: story.id,
+      title: data.title,
+      language: data.language,
+      pageCount: data.pageCount,
+      pages: data.pages?.map(p => ({
+        pageNumber: p.pageNumber,
+        text: p.text
+      })),
+      dedication: data.dedication,
+      // Image URLs (client will fetch separately)
+      hasImages: true
+    });
+  } catch (err) {
+    log.error('Error fetching shared story:', err);
+    res.status(500).json({ error: 'Failed to load story' });
+  }
+});
+
+// GET /api/shared/:shareToken/image/:pageNumber - Get shared story page image
+app.get('/api/shared/:shareToken/image/:pageNumber', async (req, res) => {
+  try {
+    const { shareToken, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    const story = await getSharedStory(shareToken);
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+
+    // Try separate images table first
+    const separateImage = await getStoryImage(story.id, 'scene', pageNum, 0);
+    if (separateImage) {
+      const imageBuffer = Buffer.from(separateImage, 'base64');
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.send(imageBuffer);
+    }
+
+    // Fallback to data blob
+    const page = story.data.pages?.find(p => p.pageNumber === pageNum);
+    if (!page || !page.image) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    const base64Data = page.image.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(imageBuffer);
+  } catch (err) {
+    log.error('Error fetching shared story image:', err);
+    res.status(500).json({ error: 'Failed to load image' });
+  }
+});
+
+// GET /api/shared/:shareToken/cover-image/:coverType - Get shared story cover image
+app.get('/api/shared/:shareToken/cover-image/:coverType', async (req, res) => {
+  try {
+    const { shareToken, coverType } = req.params;
+
+    const story = await getSharedStory(shareToken);
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+
+    // Try separate images table first
+    const separateImage = await getStoryImage(story.id, coverType, null, 0);
+    if (separateImage) {
+      const imageBuffer = Buffer.from(separateImage, 'base64');
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.send(imageBuffer);
+    }
+
+    // Fallback to data blob
+    const coverData = story.data.covers?.[coverType];
+    if (!coverData) {
+      return res.status(404).json({ error: 'Cover not found' });
+    }
+
+    const base64Data = coverData.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(imageBuffer);
+  } catch (err) {
+    log.error('Error fetching shared story cover:', err);
+    res.status(500).json({ error: 'Failed to load cover' });
+  }
+});
+
+// GET /api/shared/:shareToken/og-image - Generate Open Graph image (1200x630 for social)
+app.get('/api/shared/:shareToken/og-image', async (req, res) => {
+  try {
+    const { shareToken } = req.params;
+
+    const story = await getSharedStory(shareToken);
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+
+    // Try to get front cover from separate images table
+    let coverImage = await getStoryImage(story.id, 'frontCover', null, 0);
+
+    // Fallback to data blob
+    if (!coverImage && story.data.covers?.frontCover) {
+      coverImage = story.data.covers.frontCover.replace(/^data:image\/\w+;base64,/, '');
+    }
+
+    if (!coverImage) {
+      return res.status(404).json({ error: 'Cover image not found' });
+    }
+
+    // Return the cover image as-is for OG (WhatsApp will resize)
+    const imageBuffer = Buffer.from(coverImage, 'base64');
+    res.set('Content-Type', 'image/png');
+    res.set('Cache-Control', 'public, max-age=86400');
+    res.send(imageBuffer);
+  } catch (err) {
+    log.error('Error generating OG image:', err);
+    res.status(500).json({ error: 'Failed to generate preview image' });
+  }
+});
+
+// GET /s/:shareToken - Serve HTML with OG meta tags for WhatsApp/social previews
+app.get('/s/:shareToken', async (req, res) => {
+  const { shareToken } = req.params;
+
+  try {
+    const story = await getSharedStory(shareToken);
+
+    if (story) {
+      const title = story.data.title || 'Eine magische Geschichte';
+      const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
+      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image`;
+      const pageUrl = `https://magicalstory.ch/s/${shareToken}`;
+
+      // Return HTML with OG meta tags, then load React app
+      const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title} - MagicalStory</title>
+
+  <!-- Open Graph / Facebook / WhatsApp -->
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="${pageUrl}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:image" content="${ogImageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${ogImageUrl}">
+
+  <meta http-equiv="refresh" content="0;url=/shared/${shareToken}">
+</head>
+<body>
+  <p>Weiterleitung zu <a href="/shared/${shareToken}">${title}</a>...</p>
+</body>
+</html>`;
+
+      res.type('text/html').send(html);
+    } else {
+      // Story not found - redirect to home
+      res.redirect('/');
+    }
+  } catch (err) {
+    log.error('Error serving shared story OG page:', err);
+    res.redirect('/');
   }
 });
 

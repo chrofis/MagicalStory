@@ -1072,4 +1072,140 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
   }
 });
 
+// ============================================
+// STORY SHARING
+// ============================================
+
+const crypto = require('crypto');
+
+/**
+ * Generate a cryptographically secure share token
+ */
+function generateShareToken() {
+  return crypto.randomBytes(32).toString('hex'); // 64 char hex string
+}
+
+/**
+ * GET /api/stories/:id/share-status - Get sharing status for a story
+ */
+router.get('/:id/share-status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership
+    const rows = await dbQuery(
+      'SELECT share_token, is_shared FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const { share_token, is_shared } = rows[0];
+
+    res.json({
+      isShared: is_shared || false,
+      shareToken: is_shared ? share_token : null,
+      shareUrl: is_shared && share_token ? `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}/s/${share_token}` : null
+    });
+  } catch (err) {
+    console.error('Error getting share status:', err);
+    res.status(500).json({ error: 'Failed to get share status' });
+  }
+});
+
+/**
+ * POST /api/stories/:id/share - Enable sharing for a story
+ */
+router.post('/:id/share', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership and get current token
+    const rows = await dbQuery(
+      'SELECT share_token FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    let shareToken = rows[0].share_token;
+
+    // Generate new token if none exists
+    if (!shareToken) {
+      shareToken = generateShareToken();
+      await dbQuery(
+        'UPDATE stories SET share_token = $1, is_shared = true WHERE id = $2',
+        [shareToken, id]
+      );
+    } else {
+      // Just enable sharing
+      await dbQuery(
+        'UPDATE stories SET is_shared = true WHERE id = $1',
+        [id]
+      );
+    }
+
+    const shareUrl = `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}/s/${shareToken}`;
+
+    console.log(`✅ Sharing enabled for story ${id}, token: ${shareToken.substring(0, 8)}...`);
+
+    res.json({
+      success: true,
+      shareToken,
+      shareUrl
+    });
+  } catch (err) {
+    console.error('Error enabling sharing:', err);
+    res.status(500).json({ error: 'Failed to enable sharing' });
+  }
+});
+
+/**
+ * DELETE /api/stories/:id/share - Disable sharing for a story
+ */
+router.delete('/:id/share', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership
+    const rows = await dbQuery(
+      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Disable sharing (keep token for potential re-enable)
+    await dbQuery(
+      'UPDATE stories SET is_shared = false WHERE id = $1',
+      [id]
+    );
+
+    console.log(`🚫 Sharing disabled for story ${id}`);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error disabling sharing:', err);
+    res.status(500).json({ error: 'Failed to disable sharing' });
+  }
+});
+
 module.exports = router;

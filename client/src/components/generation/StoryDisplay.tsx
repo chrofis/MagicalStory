@@ -7,6 +7,7 @@ import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
 import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, GenerationSettingsPanel } from './story';
 import type { GenerationSettings } from './story';
+import { ShareButton } from '@/components/story/ShareButton';
 
 interface StoryTextPrompt {
   batch: number;
@@ -834,6 +835,11 @@ export function StoryDisplay({
           >
             <Plus size={16} /> {language === 'de' ? 'Neue Geschichte' : language === 'fr' ? 'Nouvelle histoire' : 'New Story'}
           </button>
+        )}
+
+        {/* Share Story */}
+        {hasImages && storyId && !isGenerating && (
+          <ShareButton storyId={storyId} />
         )}
       </div>
 

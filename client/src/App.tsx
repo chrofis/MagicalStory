@@ -20,6 +20,7 @@ const EmailVerified = lazy(() => import('./pages/EmailVerified'));
 const TermsOfService = lazy(() => import('./pages/TermsOfService'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const Impressum = lazy(() => import('./pages/Impressum'));
+const SharedStoryViewer = lazy(() => import('./pages/SharedStoryViewer'));
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/impressum" element={<Impressum />} />
+          <Route path="/shared/:shareToken" element={<SharedStoryViewer />} />
         </Routes>
       </Suspense>
     </GenerationProvider>
