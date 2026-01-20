@@ -162,10 +162,13 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    // Use fit to maintain aspect ratio, center images (white padding for non-square formats)
+    // Fill width completely, center vertically (for square images on portrait covers)
     const halfCoverWidth = coverWidth / 2;
-    doc.image(backCoverBuffer, 0, 0, { fit: [halfCoverWidth, coverHeight], align: 'center', valign: 'center' });
-    doc.image(frontCoverBuffer, halfCoverWidth, 0, { fit: [halfCoverWidth, coverHeight], align: 'center', valign: 'center' });
+    // Assuming square source images - they fill width, center vertically
+    const coverImageHeight = halfCoverWidth; // Square image height = width
+    const coverYOffset = (coverHeight - coverImageHeight) / 2;
+    doc.image(backCoverBuffer, 0, coverYOffset, { width: halfCoverWidth });
+    doc.image(frontCoverBuffer, halfCoverWidth, coverYOffset, { width: halfCoverWidth });
   }
 
   // Add initial page (dedication/intro page)
@@ -174,8 +177,10 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
     const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-    // Use fit to maintain aspect ratio, center the image (white padding for portrait pages)
-    doc.image(initialPageBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
+    // Fill width completely, center vertically (for square images on portrait pages)
+    const initialImageHeight = pageWidth; // Square image height = width
+    const initialYOffset = (pageHeight - initialImageHeight) / 2;
+    doc.image(initialPageBuffer, 0, initialYOffset, { width: pageWidth });
   }
 
   // Parse story pages
