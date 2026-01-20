@@ -115,6 +115,12 @@ OBJECT-CHARACTER RELATIONSHIP:
 1. Presence: Are all prompt-requested characters visible?
 2. Style Unity: Is the rendering style consistent across all figures?
 3. Narrative Match: Does the scene action reflect the USER_PROMPT?
+4. Directional Elements: Check if directional cues are visually clear:
+   - STAIRS: Can you tell if they go UP or DOWN? (descending = steps visible going down into darkness/lower level; ascending = steps visible going up)
+   - SLOPES/RAMPS: Is the incline direction clear?
+   - PATHS: Is the intended direction of travel visible?
+   - Flag if prompt says "descending stairs" but image shows ambiguous or ascending stairs
+   - Flag if prompt says "climbing up" but image shows going down
 
 ---
 
@@ -186,7 +192,8 @@ Output your COMPLETE analysis as JSON (no other text):
   "scene_check": {
     "characters_present": ["Lukas (yes)", "Eli elephant (yes)", "Manuel (missing)"],
     "style_unity": "Consistent 3D render style",
-    "narrative_match": "Scene shows pirate ship adventure, Manuel not visible as requested"
+    "narrative_match": "Scene shows pirate ship adventure, Manuel not visible as requested",
+    "directional_elements": "Stairs clearly descend (visible steps going down into darkness) OR 'N/A' if no directional elements OR 'ISSUE: stairs direction unclear'"
   },
   "score": 7,
   "verdict": "PASS",

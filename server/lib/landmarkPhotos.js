@@ -7,6 +7,7 @@
 
 const { log } = require('../utils/logger');
 const { compressImageToJPEG } = require('./images');
+const { getPool } = require('../services/database');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -1360,6 +1361,409 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   return validLandmarks;
 }
 
+// ============================================================================
+// SWISS LANDMARKS - PRE-INDEXED LANDMARK DATABASE
+// ============================================================================
+
+/**
+ * Get a landmark photo on-demand (lazy loading)
+ * Used when a pre-indexed landmark is actually needed for story generation
+ * @param {Object} landmark - Landmark object with name, wikipedia_page_id, lang
+ * @returns {Promise<{photoData: string, attribution: string}|null>}
+ */
+async function getLandmarkPhotoOnDemand(landmark) {
+  if (!landmark?.name) return null;
+
+  // Check in-memory cache first
+  const cacheKey = landmark.wikidata_qid || `${landmark.lang}:${landmark.wikipedia_page_id}` || landmark.name;
+  const cached = photoCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    log.debug(`[LANDMARK-LAZY] Cache hit for "${landmark.name}"`);
+    return { photoData: cached.data, attribution: cached.attribution };
+  }
+
+  log.info(`[LANDMARK-LAZY] Fetching photo on-demand for "${landmark.name}"`);
+
+  try {
+    // Use existing fetchLandmarkPhoto function
+    const result = await fetchLandmarkPhoto(
+      landmark.name,
+      landmark.wikipedia_page_id,
+      landmark.lang
+    );
+
+    if (result) {
+      // Cache the result
+      photoCache.set(cacheKey, {
+        data: result,
+        attribution: landmark.photo_attribution || 'Wikimedia Commons',
+        timestamp: Date.now()
+      });
+
+      return {
+        photoData: result,
+        attribution: landmark.photo_attribution || 'Wikimedia Commons'
+      };
+    }
+
+    return null;
+  } catch (err) {
+    log.warn(`[LANDMARK-LAZY] Failed to fetch "${landmark.name}": ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Get pre-indexed Swiss landmarks near a location
+ * @param {number} latitude
+ * @param {number} longitude
+ * @param {number} radiusKm - Search radius in kilometers (default 20km)
+ * @param {number} limit - Maximum results (default 30)
+ * @returns {Promise<Array>}
+ */
+async function getSwissLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30) {
+  const pool = getPool();
+  if (!pool) {
+    log.warn('[SWISS-LANDMARKS] Database not available');
+    return [];
+  }
+
+  try {
+    // Use Haversine formula approximation for distance
+    // 1 degree latitude ≈ 111km, 1 degree longitude ≈ 111km * cos(lat)
+    const latDelta = radiusKm / 111;
+    const lonDelta = radiusKm / (111 * Math.cos(latitude * Math.PI / 180));
+
+    const result = await pool.query(`
+      SELECT *,
+        (6371 * acos(
+          cos(radians($1)) * cos(radians(latitude)) *
+          cos(radians(longitude) - radians($2)) +
+          sin(radians($1)) * sin(radians(latitude))
+        )) AS distance_km
+      FROM swiss_landmarks
+      WHERE latitude BETWEEN $1 - $3 AND $1 + $3
+        AND longitude BETWEEN $2 - $4 AND $2 + $4
+      ORDER BY score DESC, distance_km ASC
+      LIMIT $5
+    `, [latitude, longitude, latDelta, lonDelta, limit]);
+
+    log.info(`[SWISS-LANDMARKS] Found ${result.rows.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
+    return result.rows;
+  } catch (err) {
+    log.error(`[SWISS-LANDMARKS] Query error: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Get pre-indexed Swiss landmarks by city name
+ * @param {string} city - City name
+ * @param {number} limit - Maximum results (default 30)
+ * @returns {Promise<Array>}
+ */
+async function getSwissLandmarksByCity(city, limit = 30) {
+  const pool = getPool();
+  if (!pool) {
+    log.warn('[SWISS-LANDMARKS] Database not available');
+    return [];
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT * FROM swiss_landmarks
+      WHERE LOWER(nearest_city) = LOWER($1)
+      ORDER BY score DESC
+      LIMIT $2
+    `, [city, limit]);
+
+    log.info(`[SWISS-LANDMARKS] Found ${result.rows.length} landmarks for city "${city}"`);
+    return result.rows;
+  } catch (err) {
+    log.error(`[SWISS-LANDMARKS] Query error: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Get all pre-indexed Swiss landmarks (for outline generation)
+ * Returns top landmarks across all of Switzerland
+ * @param {number} limit - Maximum results (default 100)
+ * @returns {Promise<Array>}
+ */
+async function getAllSwissLandmarks(limit = 100) {
+  const pool = getPool();
+  if (!pool) {
+    log.warn('[SWISS-LANDMARKS] Database not available');
+    return [];
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT * FROM swiss_landmarks
+      ORDER BY score DESC
+      LIMIT $1
+    `, [limit]);
+
+    log.info(`[SWISS-LANDMARKS] Retrieved ${result.rows.length} top landmarks from index`);
+    return result.rows;
+  } catch (err) {
+    log.error(`[SWISS-LANDMARKS] Query error: ${err.message}`);
+    return [];
+  }
+}
+
+/**
+ * Save a landmark to the swiss_landmarks table
+ * @param {Object} landmark - Landmark data
+ * @returns {Promise<boolean>} - Success status
+ */
+async function saveSwissLandmark(landmark) {
+  const pool = getPool();
+  if (!pool) return false;
+
+  try {
+    await pool.query(`
+      INSERT INTO swiss_landmarks (
+        name, wikipedia_page_id, wikidata_qid, lang,
+        latitude, longitude, nearest_city, canton,
+        type, boost_amount, categories,
+        photo_url, photo_attribution, photo_source,
+        photo_description, commons_photo_count, score
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+      ON CONFLICT (wikidata_qid) DO UPDATE SET
+        name = EXCLUDED.name,
+        photo_url = EXCLUDED.photo_url,
+        photo_attribution = EXCLUDED.photo_attribution,
+        photo_description = COALESCE(EXCLUDED.photo_description, swiss_landmarks.photo_description),
+        score = EXCLUDED.score,
+        updated_at = CURRENT_TIMESTAMP
+    `, [
+      landmark.name,
+      landmark.pageId || landmark.wikipedia_page_id,
+      landmark.qid || landmark.wikidata_qid,
+      landmark.lang,
+      landmark.lat || landmark.latitude,
+      landmark.lon || landmark.longitude,
+      landmark.nearestCity || landmark.nearest_city,
+      landmark.canton,
+      landmark.type,
+      landmark.boostAmount || landmark.boost_amount || 0,
+      landmark.categories || [],
+      landmark.photoUrl || landmark.photo_url,
+      landmark.attribution || landmark.photo_attribution,
+      landmark.source || landmark.photo_source,
+      landmark.photoDescription || landmark.photo_description,
+      landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
+      landmark.score || 0
+    ]);
+
+    return true;
+  } catch (err) {
+    log.error(`[SWISS-LANDMARKS] Save error for "${landmark.name}": ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Swiss cities to crawl for landmark discovery
+ * Covers all 26 cantons with major towns
+ */
+const SWISS_CITIES = [
+  // Major cities
+  { city: 'Zürich', canton: 'ZH' },
+  { city: 'Genf', canton: 'GE' },
+  { city: 'Basel', canton: 'BS' },
+  { city: 'Lausanne', canton: 'VD' },
+  { city: 'Bern', canton: 'BE' },
+  { city: 'Winterthur', canton: 'ZH' },
+  { city: 'Luzern', canton: 'LU' },
+  { city: 'St. Gallen', canton: 'SG' },
+  { city: 'Lugano', canton: 'TI' },
+  { city: 'Biel', canton: 'BE' },
+  // Medium cities
+  { city: 'Thun', canton: 'BE' },
+  { city: 'Fribourg', canton: 'FR' },
+  { city: 'Schaffhausen', canton: 'SH' },
+  { city: 'Chur', canton: 'GR' },
+  { city: 'Neuchâtel', canton: 'NE' },
+  { city: 'Sion', canton: 'VS' },
+  { city: 'Aarau', canton: 'AG' },
+  { city: 'Baden', canton: 'AG' },
+  { city: 'Zug', canton: 'ZG' },
+  { city: 'Solothurn', canton: 'SO' },
+  { city: 'Olten', canton: 'SO' },
+  { city: 'Bellinzona', canton: 'TI' },
+  { city: 'Locarno', canton: 'TI' },
+  // Smaller but landmark-rich towns
+  { city: 'Interlaken', canton: 'BE' },
+  { city: 'Montreux', canton: 'VD' },
+  { city: 'Zermatt', canton: 'VS' },
+  { city: 'Grindelwald', canton: 'BE' },
+  { city: 'Lauterbrunnen', canton: 'BE' },
+  { city: 'Rapperswil', canton: 'SG' },
+  { city: 'Stein am Rhein', canton: 'SH' },
+  { city: 'Murten', canton: 'FR' },
+  { city: 'Gruyères', canton: 'FR' },
+  { city: 'Appenzell', canton: 'AI' },
+  { city: 'Davos', canton: 'GR' },
+  { city: 'St. Moritz', canton: 'GR' },
+  { city: 'Ascona', canton: 'TI' },
+  { city: 'Bremgarten', canton: 'AG' },
+  { city: 'Rheinfelden', canton: 'AG' },
+  { city: 'Einsiedeln', canton: 'SZ' },
+  { city: 'Schwyz', canton: 'SZ' },
+  { city: 'Altdorf', canton: 'UR' },
+  { city: 'Stans', canton: 'NW' },
+  { city: 'Sarnen', canton: 'OW' },
+  { city: 'Glarus', canton: 'GL' },
+  { city: 'Liestal', canton: 'BL' },
+  { city: 'Delémont', canton: 'JU' },
+  { city: 'Herisau', canton: 'AR' },
+  // Additional landmark-rich locations
+  { city: 'Avenches', canton: 'VD' },
+  { city: 'Romainmôtier', canton: 'VD' },
+  { city: 'Grandson', canton: 'VD' },
+  { city: 'Payerne', canton: 'VD' },
+  { city: 'Aigle', canton: 'VD' },
+  { city: 'Yverdon', canton: 'VD' },
+  { city: 'Nyon', canton: 'VD' },
+  { city: 'Morges', canton: 'VD' },
+  { city: 'Vevey', canton: 'VD' },
+  { city: 'Spiez', canton: 'BE' },
+  { city: 'Brienz', canton: 'BE' },
+  { city: 'Meiringen', canton: 'BE' },
+  { city: 'Burgdorf', canton: 'BE' },
+  { city: 'Langnau', canton: 'BE' },
+  { city: 'Brig', canton: 'VS' },
+  { city: 'Visp', canton: 'VS' },
+  { city: 'Leuk', canton: 'VS' },
+  { city: 'Sierre', canton: 'VS' },
+  { city: 'Martigny', canton: 'VS' }
+];
+
+/**
+ * Discover and index all Swiss landmarks
+ * One-time crawl to populate swiss_landmarks table
+ * @param {Object} options - Options
+ * @param {boolean} options.analyzePhotos - Whether to analyze photos with AI (costs ~$0.15 total)
+ * @param {Function} options.onProgress - Progress callback (city, current, total)
+ * @returns {Promise<{total: number, saved: number, errors: number}>}
+ */
+async function discoverAllSwissLandmarks(options = {}) {
+  const { analyzePhotos = true, onProgress = null } = options;
+
+  log.info(`[SWISS-INDEX] Starting Swiss landmark discovery (${SWISS_CITIES.length} cities, analyzePhotos=${analyzePhotos})`);
+
+  const allLandmarks = new Map(); // qid -> landmark (for deduplication)
+  let savedCount = 0;
+  let errorCount = 0;
+
+  for (let i = 0; i < SWISS_CITIES.length; i++) {
+    const { city, canton } = SWISS_CITIES[i];
+
+    if (onProgress) {
+      onProgress(city, i + 1, SWISS_CITIES.length);
+    }
+
+    log.info(`[SWISS-INDEX] [${i + 1}/${SWISS_CITIES.length}] Discovering landmarks for ${city} (${canton})...`);
+
+    try {
+      // Get coordinates for city
+      const coords = await geocodeCity(city, 'Switzerland');
+      if (!coords) {
+        log.warn(`[SWISS-INDEX] Could not geocode "${city}", skipping`);
+        continue;
+      }
+
+      // Search Wikipedia for landmarks (10km radius)
+      const landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, null, 'Switzerland');
+
+      log.info(`[SWISS-INDEX] Found ${landmarks.length} landmarks near ${city}`);
+
+      for (const landmark of landmarks) {
+        // Skip if already found (deduplicate by QID)
+        if (landmark.qid && allLandmarks.has(landmark.qid)) {
+          continue;
+        }
+
+        // Add city/canton info
+        landmark.nearestCity = city;
+        landmark.canton = canton;
+
+        // Fetch and analyze photo if requested
+        if (analyzePhotos && !landmark.photoDescription) {
+          try {
+            const photoData = await fetchLandmarkPhoto(landmark.name, landmark.pageId, landmark.lang);
+            if (photoData) {
+              landmark.photoUrl = landmark.photoUrl || `https://${landmark.lang}.wikipedia.org/wiki/${encodeURIComponent(landmark.name)}`;
+              landmark.photoDescription = await analyzeLandmarkPhoto(photoData, landmark.name, landmark.type);
+              // Don't store the actual photo data, just the URL and description
+            }
+          } catch (err) {
+            log.debug(`[SWISS-INDEX] Photo fetch failed for "${landmark.name}": ${err.message}`);
+          }
+        }
+
+        // Save to database
+        const saved = await saveSwissLandmark(landmark);
+        if (saved) {
+          savedCount++;
+          if (landmark.qid) {
+            allLandmarks.set(landmark.qid, landmark);
+          }
+        } else {
+          errorCount++;
+        }
+
+        // Rate limiting
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      // Delay between cities
+      await new Promise(r => setTimeout(r, 500));
+
+    } catch (err) {
+      log.error(`[SWISS-INDEX] Error processing ${city}: ${err.message}`);
+      errorCount++;
+    }
+  }
+
+  const total = allLandmarks.size;
+  log.info(`[SWISS-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Errors: ${errorCount}`);
+
+  return { total, saved: savedCount, errors: errorCount };
+}
+
+/**
+ * Get stats about the swiss_landmarks table
+ * @returns {Promise<{count: number, withDescriptions: number, byType: Object}>}
+ */
+async function getSwissLandmarkStats() {
+  const pool = getPool();
+  if (!pool) return { count: 0, withDescriptions: 0, byType: {} };
+
+  try {
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM swiss_landmarks');
+    const descResult = await pool.query('SELECT COUNT(*) as count FROM swiss_landmarks WHERE photo_description IS NOT NULL');
+    const typeResult = await pool.query('SELECT type, COUNT(*) as count FROM swiss_landmarks GROUP BY type ORDER BY count DESC');
+
+    const byType = {};
+    for (const row of typeResult.rows) {
+      byType[row.type || 'Unknown'] = parseInt(row.count);
+    }
+
+    return {
+      count: parseInt(countResult.rows[0].count),
+      withDescriptions: parseInt(descResult.rows[0].count),
+      byType
+    };
+  } catch (err) {
+    log.error(`[SWISS-LANDMARKS] Stats error: ${err.message}`);
+    return { count: 0, withDescriptions: 0, byType: {} };
+  }
+}
+
 module.exports = {
   fetchLandmarkPhoto,
   prefetchLandmarkPhotos,
@@ -1368,5 +1772,15 @@ module.exports = {
   searchLandmarksByCoordinates,
   geocodeCity,
   clearCache,
-  getCacheStats
+  getCacheStats,
+
+  // Swiss pre-indexed landmarks
+  getLandmarkPhotoOnDemand,
+  getSwissLandmarksNearLocation,
+  getSwissLandmarksByCity,
+  getAllSwissLandmarks,
+  saveSwissLandmark,
+  discoverAllSwissLandmarks,
+  getSwissLandmarkStats,
+  SWISS_CITIES
 };

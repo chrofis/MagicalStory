@@ -182,7 +182,17 @@ const {
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations
 } = require('./server/lib/visualBible');
-const { prefetchLandmarkPhotos, discoverLandmarksForLocation } = require('./server/lib/landmarkPhotos');
+const {
+  prefetchLandmarkPhotos,
+  discoverLandmarksForLocation,
+  // Swiss pre-indexed landmarks
+  discoverAllSwissLandmarks,
+  getSwissLandmarksNearLocation,
+  getSwissLandmarksByCity,
+  getSwissLandmarkStats,
+  getLandmarkPhotoOnDemand,
+  SWISS_CITIES
+} = require('./server/lib/landmarkPhotos');
 
 // Landmark discovery cache - stores pre-discovered landmarks per user location
 // Key: `${city}_${country}` (normalized), Value: { landmarks: [], timestamp }
@@ -1367,6 +1377,60 @@ async function initializeDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `);
+
+    // Swiss landmarks - pre-indexed landmarks for all of Switzerland
+    // Stores metadata + AI description, photos fetched on-demand
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS swiss_landmarks (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        wikipedia_page_id INT,
+        wikidata_qid VARCHAR(20),
+        lang VARCHAR(10),
+
+        -- Location
+        latitude DECIMAL(10, 7),
+        longitude DECIMAL(10, 7),
+        nearest_city VARCHAR(100),
+        canton VARCHAR(50),
+
+        -- Classification
+        type VARCHAR(50),
+        boost_amount INT DEFAULT 0,
+        categories TEXT[],
+
+        -- Photo metadata (NOT the actual photo - fetched on demand)
+        photo_url TEXT,
+        photo_attribution TEXT,
+        photo_source VARCHAR(50),
+
+        -- AI-analyzed description (the valuable cached part)
+        photo_description TEXT,
+
+        -- Scoring
+        commons_photo_count INT DEFAULT 0,
+        score INT DEFAULT 0,
+
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+        UNIQUE(wikidata_qid)
+      )
+    `);
+
+    // Indexes for swiss_landmarks
+    await dbPool.query(`
+      CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_location
+      ON swiss_landmarks(latitude, longitude)
+    `);
+    await dbPool.query(`
+      CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_city
+      ON swiss_landmarks(LOWER(nearest_city))
+    `);
+    await dbPool.query(`
+      CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_type
+      ON swiss_landmarks(type)
     `);
 
     console.log('✓ Database tables initialized');
