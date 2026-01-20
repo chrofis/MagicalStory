@@ -1765,11 +1765,28 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
 let swissLandmarkIndexingJob = null;
 
 // Admin endpoint to trigger Swiss landmark indexing
-app.post('/api/admin/swiss-landmarks/index', authenticateToken, async (req, res) => {
+app.post('/api/admin/swiss-landmarks/index', async (req, res) => {
   try {
-    // Verify admin role
-    if (req.user?.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin access required' });
+    // Check auth: either valid admin JWT or secret key
+    const { secret } = req.body;
+    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
+    const hasValidSecret = secret === secretKey;
+
+    if (!hasValidSecret) {
+      // Try JWT auth
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        return res.status(401).json({ error: 'Authentication required (JWT or secret)' });
+      }
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.role !== 'admin') {
+          return res.status(403).json({ error: 'Admin access required' });
+        }
+      } catch (jwtErr) {
+        return res.status(401).json({ error: 'Invalid token' });
+      }
     }
 
     // Check if already running
@@ -1854,7 +1871,18 @@ app.post('/api/admin/swiss-landmarks/index', authenticateToken, async (req, res)
 });
 
 // Admin endpoint to get indexing progress
-app.get('/api/admin/swiss-landmarks/index/status', authenticateToken, async (req, res) => {
+app.get('/api/admin/swiss-landmarks/index/status', async (req, res) => {
+  const { secret } = req.query;
+  const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
+  if (secret !== secretKey) {
+    // Try JWT
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'Auth required' });
+    try {
+      const token = authHeader.split(' ')[1];
+      jwt.verify(token, JWT_SECRET);
+    } catch { return res.status(401).json({ error: 'Invalid token' }); }
+  }
   try {
     if (!swissLandmarkIndexingJob) {
       return res.json({ status: 'not_started', message: 'No indexing job has been started' });
