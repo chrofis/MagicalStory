@@ -37,6 +37,7 @@ export default function BookBuilder() {
   const [stories, setStories] = useState<SelectedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
+  const [bookFormat, setBookFormat] = useState<'square' | 'A4'>('square');
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isPrintingPdf, setIsPrintingPdf] = useState(false);
   const [pricingTiers, setPricingTiers] = useState<PricingTier[] | undefined>(undefined);
@@ -74,6 +75,11 @@ export default function BookBuilder() {
       hardcover: 'Hardcover',
       softcoverSize: '20 × 20 cm',
       hardcoverSize: '20 × 20 cm',
+      bookSize: 'Book Size',
+      squareFormat: 'Square',
+      squareSize: '20 × 20 cm',
+      portraitFormat: 'Portrait',
+      portraitSize: '21 × 28 cm',
       price: 'Price',
       includesShipping: 'Includes shipping & taxes (Switzerland)',
       shippingTime: 'Delivery in approx. 2 weeks',
@@ -105,6 +111,11 @@ export default function BookBuilder() {
       hardcover: 'Hardcover',
       softcoverSize: '20 × 20 cm',
       hardcoverSize: '20 × 20 cm',
+      bookSize: 'Buchgrösse',
+      squareFormat: 'Quadrat',
+      squareSize: '20 × 20 cm',
+      portraitFormat: 'Hochformat',
+      portraitSize: '21 × 28 cm',
       price: 'Preis',
       includesShipping: 'Inkl. Versand & Steuern (Schweiz)',
       shippingTime: 'Lieferung in ca. 2 Wochen',
@@ -136,6 +147,11 @@ export default function BookBuilder() {
       hardcover: 'Couverture rigide',
       softcoverSize: '20 × 20 cm',
       hardcoverSize: '20 × 20 cm',
+      bookSize: 'Taille du livre',
+      squareFormat: 'Carré',
+      squareSize: '20 × 20 cm',
+      portraitFormat: 'Portrait',
+      portraitSize: '21 × 28 cm',
       price: 'Prix',
       includesShipping: 'Livraison & taxes incluses (Suisse)',
       shippingTime: 'Livraison en env. 2 semaines',
@@ -202,9 +218,9 @@ export default function BookBuilder() {
     setIsCheckingOut(true);
     try {
       const storyIds = stories.map(s => s.id);
-      log.info('Creating combined book checkout:', { storyIds, coverType, totalPages });
+      log.info('Creating combined book checkout:', { storyIds, coverType, bookFormat, totalPages });
 
-      const { url } = await storyService.createCheckoutSession(storyIds, coverType);
+      const { url } = await storyService.createCheckoutSession(storyIds, coverType, bookFormat);
       window.location.href = url;
     } catch (error) {
       log.error('Checkout failed:', error);
@@ -229,7 +245,7 @@ export default function BookBuilder() {
     setIsPrintingPdf(true);
     try {
       const storyIds = stories.map(s => s.id);
-      log.info('Downloading print PDF for stories:', storyIds);
+      log.info('Downloading print PDF for stories:', { storyIds, bookFormat });
 
       const token = localStorage.getItem('auth_token');
       const response = await fetch('/api/generate-book-pdf', {
@@ -238,7 +254,7 @@ export default function BookBuilder() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ storyIds })
+        body: JSON.stringify({ storyIds, bookFormat })
       });
 
       if (!response.ok) {
@@ -480,6 +496,46 @@ export default function BookBuilder() {
                       CHF {getPriceForPages(totalPages, true, pricingTiers)}.-
                     </div>
                   )}
+                </div>
+              </button>
+            </div>
+
+            {/* Book size selection */}
+            <h2 className="text-xl font-bold text-gray-800 mb-3 mt-6">{t.bookSize}</h2>
+            <div className="space-y-3 mb-6">
+              {/* Square */}
+              <button
+                onClick={() => setBookFormat('square')}
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                  bookFormat === 'square'
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-8 h-8 border-2 rounded ${bookFormat === 'square' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-800">{t.squareFormat}</div>
+                    <div className="text-sm text-gray-500">{t.squareSize}</div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Portrait */}
+              <button
+                onClick={() => setBookFormat('A4')}
+                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                  bookFormat === 'A4'
+                    ? 'border-indigo-600 bg-indigo-50'
+                    : 'border-gray-200 hover:border-indigo-300'
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`w-6 h-8 border-2 rounded ${bookFormat === 'A4' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
+                  <div className="flex-1">
+                    <div className="font-semibold text-gray-800">{t.portraitFormat}</div>
+                    <div className="text-sm text-gray-500">{t.portraitSize}</div>
+                  </div>
                 </div>
               </button>
             </div>

@@ -5226,14 +5226,14 @@ app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
 // Page count starts from Story 1's first story page (covers/intro don't count)
 app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
   try {
-    const { storyIds } = req.body;
+    const { storyIds, bookFormat = 'square' } = req.body;
     const userId = req.user.id;
 
     if (!storyIds || !Array.isArray(storyIds) || storyIds.length === 0) {
       return res.status(400).json({ error: 'Missing or invalid storyIds array' });
     }
 
-    log.debug(`📚 [BOOK PDF] Generating multi-story book with ${storyIds.length} stories`);
+    log.debug(`📚 [BOOK PDF] Generating multi-story book with ${storyIds.length} stories, format: ${bookFormat}`);
 
     // Fetch all stories from database
     const stories = [];
@@ -5261,9 +5261,15 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     const getCoverImageData = (img) => typeof img === 'string' ? img : img?.imageData;
     const PDFDocument = require('pdfkit');
     const mmToPoints = (mm) => mm * 2.83465;
-    const coverWidth = mmToPoints(416);     // 20x20cm cover spread
-    const coverHeight = mmToPoints(206);    // 20x20cm cover height with bleed
-    const pageSize = mmToPoints(200);       // Interior pages: 200x200mm
+
+    // Dimensions based on book format
+    const isPortrait = bookFormat === 'A4';
+    const coverWidth = isPortrait ? mmToPoints(436) : mmToPoints(416);   // Cover spread width
+    const coverHeight = isPortrait ? mmToPoints(286) : mmToPoints(206);  // Cover height with bleed
+    const pageWidth = isPortrait ? mmToPoints(210) : mmToPoints(200);    // Interior page width
+    const pageHeight = isPortrait ? mmToPoints(280) : mmToPoints(200);   // Interior page height
+    // Note: For portrait format, use pageWidth and pageHeight separately
+    // pageSize is kept for backwards compatibility but equals pageWidth
 
     // Create PDF document
     const doc = new PDFDocument({
@@ -5296,9 +5302,9 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
 
       if (isPictureBook) {
         // Picture Book: combined image + text on same page
-        const imageHeight = pageSize * 0.85;
-        const textAreaHeight = pageSize * 0.15;
-        const textWidth = pageSize - (textMarginMm * 2);
+        const imageHeight = pageHeight * 0.85;
+        const textAreaHeight = pageHeight * 0.15;
+        const textWidth = pageWidth - (textMarginMm * 2);
         const availableTextHeight = textAreaHeight - textMarginMm;
         const lineGap = -2;
 
@@ -5307,7 +5313,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
           const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
 
           if (image && image.imageData) {
@@ -5315,7 +5321,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
               const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
               // Full-bleed image (no margin)
               doc.image(imageBuffer, 0, 0, {
-                fit: [pageSize, imageHeight],
+                fit: [pageWidth, imageHeight],
                 align: 'center',
                 valign: 'center'
               });
@@ -5340,8 +5346,8 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         });
       } else {
         // Standard: separate text and image pages
-        const availableWidth = pageSize - (textMargin * 2);
-        const availableHeight = pageSize - (textMargin * 2);
+        const availableWidth = pageWidth - (textMargin * 2);
+        const availableHeight = pageHeight - (textMargin * 2);
         const lineGap = -2;
 
         storyPages.forEach((pageText, index) => {
@@ -5350,7 +5356,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
           const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
           // Text page (has margin)
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
+          doc.addPage({ size: [pageWidth, pageHeight], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
           totalStoryPages++;
 
           let fontSize = 13;  // Scaled for 20x20cm (was 9pt for 14x14cm)
@@ -5368,12 +5374,12 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
 
           // Image page (full-bleed, no margin)
           if (image && image.imageData) {
-            doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+            doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
             totalStoryPages++;
             try {
               const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
               doc.image(imageBuffer, 0, 0, {
-                fit: [pageSize, pageSize],
+                fit: [pageWidth, pageHeight],
                 align: 'center',
                 valign: 'center'
               });
@@ -5410,9 +5416,9 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         // Introduction page (doesn't count towards page total)
         const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
         if (initialPageImageData) {
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+          doc.image(initialPageBuffer, 0, 0, { width: pageWidth, height: pageHeight });
         }
 
         // Story 1 content pages (page count starts here)
@@ -5423,19 +5429,19 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         // STORY 2+: Front cover (title page)
         const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
         if (frontCoverImageData) {
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
           const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          doc.image(frontCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+          doc.image(frontCoverBuffer, 0, 0, { width: pageWidth, height: pageHeight });
         }
 
         // Introduction page
         const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
         if (initialPageImageData) {
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
           const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          doc.image(initialPageBuffer, 0, 0, { width: pageSize, height: pageSize });
+          doc.image(initialPageBuffer, 0, 0, { width: pageWidth, height: pageHeight });
         }
 
         // Story content pages
@@ -5444,21 +5450,21 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         // Back cover for this story
         const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
         if (backCoverImageData) {
-          doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
           const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-          doc.image(backCoverBuffer, 0, 0, { width: pageSize, height: pageSize });
+          doc.image(backCoverBuffer, 0, 0, { width: pageWidth, height: pageHeight });
         }
 
         // Blank page between stories
-        doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
       }
     }
 
     // Add blank pages if needed to reach even page count for printing
     if (totalStoryPages % 2 !== 0) {
-      doc.addPage({ size: [pageSize, pageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       totalStoryPages++;
       log.debug(`📚 [BOOK PDF] Added final blank page for even page count`);
     }
