@@ -96,6 +96,8 @@ export default function StoryWizard() {
     devSkipCovers, setDevSkipCovers,
     enableAutoRepair, setEnableAutoRepair,
     enableFinalChecks, setEnableFinalChecks,
+    incrementalConsistency, setIncrementalConsistency,
+    incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
@@ -3014,6 +3016,12 @@ export default function StoryWizard() {
         // Developer feature options
         enableAutoRepair: enableAutoRepair,
         enableFinalChecks: enableFinalChecks,
+        // Incremental consistency check (check each image against previous images)
+        incrementalConsistency: incrementalConsistency ? {
+          enabled: true,
+          dryRun: incrementalConsistencyDryRun,
+          lookbackCount: 3,
+        } : undefined,
         // Developer model overrides (admin only)
         modelOverrides: (user?.role === 'admin' || isImpersonating) ? {
           outlineModel: modelSelections.outlineModel,
@@ -4281,6 +4289,36 @@ export default function StoryWizard() {
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Prüft Bilder und Text auf Konsistenz am Ende der Generierung' : language === 'fr' ? 'Vérifie la cohérence des images et du texte à la fin de la génération' : 'Checks images and text for consistency at end of generation'}
                       </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={incrementalConsistency}
+                          onChange={(e) => setIncrementalConsistency(e.target.checked)}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Inkrementelle Konsistenz' : language === 'fr' ? 'Cohérence incrémentielle' : 'Incremental consistency'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Prüft jedes Bild gegen vorherige Bilder während der Generierung' : language === 'fr' ? 'Vérifie chaque image par rapport aux images précédentes pendant la génération' : 'Checks each image against previous images during generation'}
+                      </p>
+
+                      {incrementalConsistency && (
+                        <label className="flex items-center gap-2 cursor-pointer mt-2 ml-6">
+                          <input
+                            type="checkbox"
+                            checked={incrementalConsistencyDryRun}
+                            onChange={(e) => setIncrementalConsistencyDryRun(e.target.checked)}
+                            className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="text-gray-700">{language === 'de' ? 'Nur Protokoll (Dry Run)' : language === 'fr' ? 'Journaliser seulement (Dry Run)' : 'Dry run (log only)'}</span>
+                        </label>
+                      )}
+                      {incrementalConsistency && (
+                        <p className="text-xs text-gray-500 ml-12">
+                          {language === 'de' ? 'Zeigt nur an, was repariert würde, ohne tatsächlich zu reparieren' : language === 'fr' ? 'Affiche uniquement ce qui serait réparé sans effectuer de réparations' : 'Shows what would be fixed without actually fixing'}
+                        </p>
+                      )}
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">
                         <input

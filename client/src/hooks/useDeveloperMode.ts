@@ -29,6 +29,11 @@ interface DeveloperModeState {
   // Final checks: run image and text consistency checks at end of generation (default: OFF)
   enableFinalChecks: boolean;
   setEnableFinalChecks: (enable: boolean) => void;
+  // Incremental consistency: check each image against previous images as they're generated
+  incrementalConsistency: boolean;
+  setIncrementalConsistency: (enable: boolean) => void;
+  incrementalConsistencyDryRun: boolean;
+  setIncrementalConsistencyDryRun: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -55,6 +60,8 @@ const MODEL_DEFAULTS: ModelSelections = {
 const FEATURE_DEFAULTS = {
   enableAutoRepair: false,    // Auto-repair: fix detected issues in generated images
   enableFinalChecks: true,    // Final checks: run consistency checks at end of generation
+  incrementalConsistency: false,  // Incremental consistency: check each image against previous
+  incrementalConsistencyDryRun: true, // Dry run: log what would be fixed without fixing
 };
 
 /**
@@ -91,6 +98,10 @@ export function useDeveloperMode(): DeveloperModeState {
 
   // Final checks: run image and text consistency checks at end of generation
   const [enableFinalChecks, setEnableFinalChecks] = useState(FEATURE_DEFAULTS.enableFinalChecks);
+
+  // Incremental consistency: check each image against previous images as they're generated
+  const [incrementalConsistency, setIncrementalConsistency] = useState(FEATURE_DEFAULTS.incrementalConsistency);
+  const [incrementalConsistencyDryRun, setIncrementalConsistencyDryRun] = useState(FEATURE_DEFAULTS.incrementalConsistencyDryRun);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -142,6 +153,10 @@ export function useDeveloperMode(): DeveloperModeState {
     setEnableAutoRepair,
     enableFinalChecks,
     setEnableFinalChecks,
+    incrementalConsistency,
+    setIncrementalConsistency,
+    incrementalConsistencyDryRun,
+    setIncrementalConsistencyDryRun,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

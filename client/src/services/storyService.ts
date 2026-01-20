@@ -983,6 +983,12 @@ export const storyService = {
     // Developer feature options
     enableAutoRepair?: boolean;
     enableFinalChecks?: boolean;
+    // Incremental consistency check (check each image against previous images)
+    incrementalConsistency?: {
+      enabled: boolean;
+      dryRun: boolean;
+      lookbackCount: number;
+    };
     // Developer model overrides (admin only)
     modelOverrides?: {
       outlineModel?: string | null;
@@ -1029,6 +1035,8 @@ export const storyService = {
       // Developer feature options
       enableAutoRepair: data.enableAutoRepair,
       enableFinalChecks: data.enableFinalChecks,
+      // Incremental consistency check
+      incrementalConsistency: data.incrementalConsistency,
       // Developer model overrides
       modelOverrides: data.modelOverrides,
       // User location for landmark discovery
