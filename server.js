@@ -1777,43 +1777,62 @@ app.post('/api/admin/swiss-landmarks/index', authenticateToken, async (req, res)
       return res.json({
         status: 'already_running',
         progress: swissLandmarkIndexingJob.progress,
-        message: `Indexing already in progress: ${swissLandmarkIndexingJob.currentCity} (${swissLandmarkIndexingJob.citiesProcessed}/${swissLandmarkIndexingJob.totalCities})`
+        landmarksSaved: swissLandmarkIndexingJob.landmarksSaved,
+        maxLandmarks: swissLandmarkIndexingJob.maxLandmarks,
+        message: `Indexing already in progress: ${swissLandmarkIndexingJob.currentCity} (${swissLandmarkIndexingJob.citiesProcessed}/${swissLandmarkIndexingJob.totalCities} cities, ${swissLandmarkIndexingJob.landmarksSaved}/${swissLandmarkIndexingJob.maxLandmarks} landmarks)`
       });
     }
 
-    const { analyzePhotos = true, dryRun = false } = req.body;
+    // Safety limits with defaults
+    const {
+      analyzePhotos = true,
+      dryRun = false,
+      maxLandmarks = 500,   // Default safety limit
+      maxCities = null      // Process all cities by default (but stop at maxLandmarks)
+    } = req.body;
+
+    const effectiveMaxCities = maxCities || SWISS_CITIES.length;
 
     // Start indexing in background
     swissLandmarkIndexingJob = {
       status: 'running',
       startedAt: new Date(),
       citiesProcessed: 0,
-      totalCities: SWISS_CITIES.length,
+      totalCities: Math.min(effectiveMaxCities, SWISS_CITIES.length),
       currentCity: '',
       progress: 0,
       landmarksFound: 0,
       landmarksSaved: 0,
+      landmarksAnalyzed: 0,
+      maxLandmarks,
+      analyzePhotos,
+      dryRun,
       errors: []
     };
 
-    log.info(`[ADMIN] Starting Swiss landmark indexing (analyzePhotos=${analyzePhotos}, dryRun=${dryRun})`);
+    log.info(`[ADMIN] Starting Swiss landmark indexing (maxLandmarks=${maxLandmarks}, maxCities=${effectiveMaxCities}, analyzePhotos=${analyzePhotos}, dryRun=${dryRun})`);
 
     // Run in background (don't await)
     discoverAllSwissLandmarks({
       analyzePhotos,
       dryRun,
-      onProgress: (city, current, total) => {
+      maxLandmarks,
+      maxCities: effectiveMaxCities,
+      onProgress: (city, current, total, saved, max) => {
         swissLandmarkIndexingJob.currentCity = city;
         swissLandmarkIndexingJob.citiesProcessed = current;
+        swissLandmarkIndexingJob.landmarksSaved = saved || 0;
         swissLandmarkIndexingJob.progress = Math.round((current / total) * 100);
       }
     }).then(result => {
-      swissLandmarkIndexingJob.status = 'completed';
+      swissLandmarkIndexingJob.status = result.hitLimit ? 'completed_at_limit' : 'completed';
       swissLandmarkIndexingJob.completedAt = new Date();
       swissLandmarkIndexingJob.landmarksFound = result.totalDiscovered;
       swissLandmarkIndexingJob.landmarksSaved = result.totalSaved;
-      swissLandmarkIndexingJob.errors = result.errors || [];
-      log.info(`[ADMIN] Swiss landmark indexing completed: ${result.totalSaved} saved`);
+      swissLandmarkIndexingJob.landmarksAnalyzed = result.totalAnalyzed;
+      swissLandmarkIndexingJob.hitLimit = result.hitLimit;
+      swissLandmarkIndexingJob.errorCount = result.errors || 0;
+      log.info(`[ADMIN] Swiss landmark indexing completed: ${result.totalSaved} saved, ${result.totalAnalyzed} analyzed, hitLimit=${result.hitLimit}`);
     }).catch(err => {
       swissLandmarkIndexingJob.status = 'failed';
       swissLandmarkIndexingJob.error = err.message;
@@ -1822,7 +1841,9 @@ app.post('/api/admin/swiss-landmarks/index', authenticateToken, async (req, res)
 
     res.json({
       status: 'started',
-      message: `Started indexing ${SWISS_CITIES.length} Swiss cities`,
+      message: `Started indexing up to ${maxLandmarks} landmarks from ${effectiveMaxCities} Swiss cities`,
+      maxLandmarks,
+      maxCities: effectiveMaxCities,
       analyzePhotos,
       dryRun
     });
@@ -2113,63 +2134,89 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
 
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
-      // Check database first (persists across restarts)
-      try {
-        const dbResult = await dbPool.query(
-          'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
-          [cacheKey]
-        );
-        if (dbResult.rows.length > 0) {
-          const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-          if (age < LANDMARK_CACHE_TTL) {
-            const rawLandmarks = dbResult.rows[0].landmarks;
-            availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
-            log.info(`[LANDMARK] 📍 Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
+      // Check if Swiss location - use pre-indexed swiss_landmarks table
+      const isSwiss = /switzerland|schweiz|suisse|svizzera|svizra/i.test(userLocation.country || '');
+
+      if (isSwiss) {
+        try {
+          const swissLandmarks = await getSwissLandmarksByCity(userLocation.city, 20);
+          if (swissLandmarks.length > 0) {
+            // For story ideas, we just need landmark names (no photos needed)
+            availableLandmarks = swissLandmarks.map(l => ({
+              name: l.name,
+              query: l.name,
+              type: l.type,
+              score: l.score,
+              photoDescription: l.photo_description,
+              isSwissPreIndexed: true
+            }));
+            log.info(`[LANDMARK] 🇨🇭 Using ${availableLandmarks.length} Swiss pre-indexed landmarks for ${userLocation.city}`);
           }
+        } catch (swissErr) {
+          log.debug(`[LANDMARK] Swiss landmarks lookup failed: ${swissErr.message}`);
         }
-      } catch (dbErr) {
-        log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
       }
 
-      // If not cached, discover now (await with timeout)
+      // For non-Swiss locations or if Swiss lookup found nothing
       if (!availableLandmarks || availableLandmarks.length === 0) {
-        log.info(`[LANDMARK] 🔍 Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
-
+        // Check database first (persists across restarts)
         try {
-          // Use Promise.race to timeout after 15 seconds
-          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
+          const dbResult = await dbPool.query(
+            'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
+            [cacheKey]
           );
-
-          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
-
-          // Save to database (upsert) for future requests
-          if (availableLandmarks && availableLandmarks.length > 0) {
-            try {
-              await dbPool.query(`
-                INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
-                VALUES ($1, $2, $3, $4, $5, NOW())
-                ON CONFLICT (location_key) DO UPDATE SET
-                  landmarks = $4,
-                  landmark_count = $5,
-                  updated_at = NOW()
-              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
-              log.info(`[LANDMARK] ✅ Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
-            } catch (dbErr) {
-              log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+          if (dbResult.rows.length > 0) {
+            const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+            if (age < LANDMARK_CACHE_TTL) {
+              const rawLandmarks = dbResult.rows[0].landmarks;
+              availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
+              log.info(`[LANDMARK] 📍 Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
             }
-            // Also update in-memory cache
-            userLandmarkCache.set(cacheKey, {
-              landmarks: availableLandmarks,
-              city: userLocation.city,
-              country: userLocation.country || '',
-              timestamp: Date.now()
-            });
           }
-        } catch (err) {
-          log.warn(`[LANDMARK] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
-          availableLandmarks = [];
+        } catch (dbErr) {
+          log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
+        }
+
+        // If not cached, discover now (await with timeout)
+        if (!availableLandmarks || availableLandmarks.length === 0) {
+          log.info(`[LANDMARK] 🔍 Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
+
+          try {
+            // Use Promise.race to timeout after 15 seconds
+            const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
+            );
+
+            availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
+
+            // Save to database (upsert) for future requests
+            if (availableLandmarks && availableLandmarks.length > 0) {
+              try {
+                await dbPool.query(`
+                  INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
+                  VALUES ($1, $2, $3, $4, $5, NOW())
+                  ON CONFLICT (location_key) DO UPDATE SET
+                    landmarks = $4,
+                    landmark_count = $5,
+                    updated_at = NOW()
+                `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
+                log.info(`[LANDMARK] ✅ Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
+              } catch (dbErr) {
+                log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+              }
+              // Also update in-memory cache
+              userLandmarkCache.set(cacheKey, {
+                landmarks: availableLandmarks,
+                city: userLocation.city,
+                country: userLocation.country || '',
+                timestamp: Date.now()
+              });
+            }
+          } catch (err) {
+            log.warn(`[LANDMARK] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+            availableLandmarks = [];
+          }
         }
       }
 
@@ -2428,66 +2475,92 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
 
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
-      // Check database first (persists across restarts)
-      try {
-        const dbResult = await dbPool.query(
-          'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
-          [cacheKey]
-        );
-        if (dbResult.rows.length > 0) {
-          const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-          if (age < LANDMARK_CACHE_TTL) {
-            const rawLandmarks = dbResult.rows[0].landmarks;
-            availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
-            log.info(`[LANDMARK] 📍 [STREAM] Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
+      // Check if Swiss location - use pre-indexed swiss_landmarks table
+      const isSwiss = /switzerland|schweiz|suisse|svizzera|svizra/i.test(userLocation.country || '');
+
+      if (isSwiss) {
+        try {
+          const swissLandmarks = await getSwissLandmarksByCity(userLocation.city, 20);
+          if (swissLandmarks.length > 0) {
+            // For story ideas, we just need landmark names (no photos needed)
+            availableLandmarks = swissLandmarks.map(l => ({
+              name: l.name,
+              query: l.name,
+              type: l.type,
+              score: l.score,
+              photoDescription: l.photo_description,
+              isSwissPreIndexed: true
+            }));
+            log.info(`[LANDMARK] 🇨🇭 [STREAM] Using ${availableLandmarks.length} Swiss pre-indexed landmarks for ${userLocation.city}`);
           }
+        } catch (swissErr) {
+          log.debug(`[LANDMARK] Swiss landmarks lookup failed: ${swissErr.message}`);
         }
-      } catch (dbErr) {
-        log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
       }
 
-      // If not cached, discover now (await with timeout)
+      // For non-Swiss locations or if Swiss lookup found nothing
       if (!availableLandmarks || availableLandmarks.length === 0) {
-        log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
-
-        // Send SSE event to inform user about landmark discovery
-        res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
-
+        // Check database first (persists across restarts)
         try {
-          // Use Promise.race to timeout after 15 seconds
-          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
-          const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
+          const dbResult = await dbPool.query(
+            'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
+            [cacheKey]
           );
-
-          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
-
-          // Save to database (upsert) for future requests
-          if (availableLandmarks && availableLandmarks.length > 0) {
-            try {
-              await dbPool.query(`
-                INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
-                VALUES ($1, $2, $3, $4, $5, NOW())
-                ON CONFLICT (location_key) DO UPDATE SET
-                  landmarks = $4,
-                  landmark_count = $5,
-                  updated_at = NOW()
-              `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
-              log.info(`[LANDMARK] ✅ [STREAM] Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
-            } catch (dbErr) {
-              log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+          if (dbResult.rows.length > 0) {
+            const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
+            if (age < LANDMARK_CACHE_TTL) {
+              const rawLandmarks = dbResult.rows[0].landmarks;
+              availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
+              log.info(`[LANDMARK] 📍 [STREAM] Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
             }
-            // Also update in-memory cache
-            userLandmarkCache.set(cacheKey, {
-              landmarks: availableLandmarks,
-              city: userLocation.city,
-              country: userLocation.country || '',
-              timestamp: Date.now()
-            });
           }
-        } catch (err) {
-          log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
-          availableLandmarks = [];
+        } catch (dbErr) {
+          log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
+        }
+
+        // If not cached, discover now (await with timeout)
+        if (!availableLandmarks || availableLandmarks.length === 0) {
+          log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
+
+          // Send SSE event to inform user about landmark discovery
+          res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
+
+          try {
+            // Use Promise.race to timeout after 15 seconds
+            const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
+            );
+
+            availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
+
+            // Save to database (upsert) for future requests
+            if (availableLandmarks && availableLandmarks.length > 0) {
+              try {
+                await dbPool.query(`
+                  INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
+                  VALUES ($1, $2, $3, $4, $5, NOW())
+                  ON CONFLICT (location_key) DO UPDATE SET
+                    landmarks = $4,
+                    landmark_count = $5,
+                    updated_at = NOW()
+                `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
+                log.info(`[LANDMARK] ✅ [STREAM] Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
+              } catch (dbErr) {
+                log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
+              }
+              // Also update in-memory cache
+              userLandmarkCache.set(cacheKey, {
+                landmarks: availableLandmarks,
+                city: userLocation.city,
+                country: userLocation.country || '',
+                timestamp: Date.now()
+              });
+            }
+          } catch (err) {
+            log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+            availableLandmarks = [];
+          }
         }
       }
 

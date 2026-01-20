@@ -1714,22 +1714,33 @@ const SWISS_CITIES = [
  * @returns {Promise<{total: number, saved: number, errors: number}>}
  */
 async function discoverAllSwissLandmarks(options = {}) {
-  const { analyzePhotos = true, onProgress = null } = options;
+  const {
+    analyzePhotos = true,
+    onProgress = null,
+    maxLandmarks = 500,  // Safety limit - default 500 landmarks max
+    maxCities = null,    // Optional limit on cities to process
+    dryRun = false       // If true, don't save to DB, just count
+  } = options;
 
-  log.info(`[SWISS-INDEX] Starting Swiss landmark discovery (${SWISS_CITIES.length} cities, analyzePhotos=${analyzePhotos})`);
+  const citiesToProcess = maxCities ? Math.min(maxCities, SWISS_CITIES.length) : SWISS_CITIES.length;
+
+  log.info(`[SWISS-INDEX] Starting Swiss landmark discovery`);
+  log.info(`[SWISS-INDEX]   Cities: ${citiesToProcess}/${SWISS_CITIES.length}, maxLandmarks: ${maxLandmarks}, analyzePhotos: ${analyzePhotos}, dryRun: ${dryRun}`);
 
   const allLandmarks = new Map(); // qid -> landmark (for deduplication)
   let savedCount = 0;
+  let analyzedCount = 0;
   let errorCount = 0;
+  let hitLimit = false;
 
-  for (let i = 0; i < SWISS_CITIES.length; i++) {
+  for (let i = 0; i < citiesToProcess && !hitLimit; i++) {
     const { city, canton } = SWISS_CITIES[i];
 
     if (onProgress) {
-      onProgress(city, i + 1, SWISS_CITIES.length);
+      onProgress(city, i + 1, citiesToProcess, savedCount, maxLandmarks);
     }
 
-    log.info(`[SWISS-INDEX] [${i + 1}/${SWISS_CITIES.length}] Discovering landmarks for ${city} (${canton})...`);
+    log.info(`[SWISS-INDEX] [${i + 1}/${citiesToProcess}] Discovering landmarks for ${city} (${canton})... (saved: ${savedCount}/${maxLandmarks})`);
 
     try {
       // Get coordinates for city
@@ -1745,6 +1756,13 @@ async function discoverAllSwissLandmarks(options = {}) {
       log.info(`[SWISS-INDEX] Found ${landmarks.length} landmarks near ${city}`);
 
       for (const landmark of landmarks) {
+        // Check if we hit the limit
+        if (savedCount >= maxLandmarks) {
+          log.warn(`[SWISS-INDEX] ⚠️ Reached maxLandmarks limit (${maxLandmarks}), stopping`);
+          hitLimit = true;
+          break;
+        }
+
         // Skip if already found (deduplicate by QID)
         if (landmark.qid && allLandmarks.has(landmark.qid)) {
           continue;
@@ -1761,6 +1779,7 @@ async function discoverAllSwissLandmarks(options = {}) {
             if (photoData) {
               landmark.photoUrl = landmark.photoUrl || `https://${landmark.lang}.wikipedia.org/wiki/${encodeURIComponent(landmark.name)}`;
               landmark.photoDescription = await analyzeLandmarkPhoto(photoData, landmark.name, landmark.type);
+              analyzedCount++;
               // Don't store the actual photo data, just the URL and description
             }
           } catch (err) {
@@ -1768,15 +1787,23 @@ async function discoverAllSwissLandmarks(options = {}) {
           }
         }
 
-        // Save to database
-        const saved = await saveSwissLandmark(landmark);
-        if (saved) {
+        // Save to database (unless dry run)
+        if (dryRun) {
           savedCount++;
           if (landmark.qid) {
             allLandmarks.set(landmark.qid, landmark);
           }
+          log.debug(`[SWISS-INDEX] [DRY RUN] Would save: "${landmark.name}" (${landmark.type})`);
         } else {
-          errorCount++;
+          const saved = await saveSwissLandmark(landmark);
+          if (saved) {
+            savedCount++;
+            if (landmark.qid) {
+              allLandmarks.set(landmark.qid, landmark);
+            }
+          } else {
+            errorCount++;
+          }
         }
 
         // Rate limiting
@@ -1793,9 +1820,16 @@ async function discoverAllSwissLandmarks(options = {}) {
   }
 
   const total = allLandmarks.size;
-  log.info(`[SWISS-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Errors: ${errorCount}`);
+  log.info(`[SWISS-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Analyzed: ${analyzedCount}, Errors: ${errorCount}, HitLimit: ${hitLimit}`);
 
-  return { total, saved: savedCount, errors: errorCount };
+  return {
+    totalDiscovered: total,
+    totalSaved: savedCount,
+    totalAnalyzed: analyzedCount,
+    errors: errorCount,
+    hitLimit,
+    dryRun
+  };
 }
 
 /**
