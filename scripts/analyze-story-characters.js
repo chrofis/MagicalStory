@@ -20,6 +20,7 @@ const path = require('path');
 const { Pool } = require('pg');
 const fetch = require('node-fetch');
 const sharp = require('sharp');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 // ============================================================================
 // CONFIG
@@ -27,6 +28,10 @@ const sharp = require('sharp');
 
 const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://localhost:5000';
 const OUTPUT_DIR = path.join(__dirname, '..', 'output');
+
+// Gemini setup for face detection
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const GEMINI_MODEL = 'gemini-2.0-flash-exp';
 
 // ============================================================================
 // DATABASE

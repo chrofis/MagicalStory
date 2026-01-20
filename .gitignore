@@ -79,8 +79,28 @@ test-gemini*.js
 
 # Inpainting test outputs
 test-*.png
+test-*.jpg
+test_*.png
 test-scene*.jpg
+
+# Temp photos (debug/testing)
+temp_photos/
+
+# Test fixtures (large test data)
+tests/fixtures/
+
+# Baden landmarks cache (local testing)
+baden-landmarks/
+
+# Output folder (story extractions, etc.)
+output/
 
 # Historical location images (local editing)
 historical-location-images/
 historical-location-images-uploaded/
+
+# Miscellaneous temp/debug files
+availableLandmarks
+userLocation
+C:*
+*.tflite

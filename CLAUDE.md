@@ -7,6 +7,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Do not automatically deploy.** Always ask before deploying.
 - **Ask if unclear.** If there are different implementation options, ask rather than assuming.
 
+## Folder Organization Rules
+
+**Do NOT create files in the project root** unless they are core config files. Use the organized folder structure:
+
+| Content Type | Location | Examples |
+|--------------|----------|----------|
+| Admin/utility scripts | `scripts/admin/` | check-users.js, setup-admin.js |
+| Analysis scripts | `scripts/analysis/` | compare-faces.js |
+| Other scripts | `scripts/` | download-photos.js |
+| Manual test scripts | `tests/manual/` | test-*.js, test_*.py |
+| E2E tests | `tests/e2e/` | Playwright tests |
+| Test fixtures/images | `tests/fixtures/` | (gitignored) |
+| Documentation | `docs/` | *.md files (except README.md, CLAUDE.md) |
+| AI prompts | `prompts/` | *.txt prompt templates |
+
+**NEVER commit to git:**
+- Test output images (test-*.png, test-*.jpg)
+- Temp files (tmpclaude-*, temp_photos/)
+- Large data files (*.tflite, baden-landmarks/)
+
+**Core files that stay in root:** server.js, email.js, photo_analyzer.py, package.json, README.md, CLAUDE.md
+
 ## Build & Development Commands
 
 ```bash
