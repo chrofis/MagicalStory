@@ -10,10 +10,34 @@ const { log } = require('../utils/logger');
 // Convert millimeters to PDF points
 const mmToPoints = (mm) => mm * 2.83465;
 
-// PDF dimensions
-const COVER_WIDTH = mmToPoints(416);    // 20x20cm cover spread (back + front)
-const COVER_HEIGHT = mmToPoints(206);   // 20x20cm cover height with bleed
-const PAGE_SIZE = mmToPoints(200);      // 20x20cm interior pages
+// PDF dimensions for different book formats
+const BOOK_FORMATS = {
+  // 20x20cm square format (original)
+  'square': {
+    pageWidth: mmToPoints(200),
+    pageHeight: mmToPoints(200),
+    coverWidth: mmToPoints(416),   // back + spine + front with bleed
+    coverHeight: mmToPoints(206),
+  },
+  // 21x28cm portrait format (more text space)
+  'portrait': {
+    pageWidth: mmToPoints(210),
+    pageHeight: mmToPoints(280),
+    coverWidth: mmToPoints(436),   // back + spine + front with bleed (210*2 + spine + bleed)
+    coverHeight: mmToPoints(286),
+  }
+};
+
+// Default to square format for backwards compatibility
+const DEFAULT_FORMAT = 'square';
+
+// Legacy constants (for backwards compatibility)
+const COVER_WIDTH = BOOK_FORMATS.square.coverWidth;
+const COVER_HEIGHT = BOOK_FORMATS.square.coverHeight;
+const PAGE_SIZE = BOOK_FORMATS.square.pageWidth;
+
+// Minimum font size before warning
+const MIN_FONT_SIZE_WARNING = 10;
 
 /**
  * Extract image data from cover images (handles both string and object formats)
@@ -31,15 +55,86 @@ function parseStoryPages(storyData) {
 }
 
 /**
+ * Calculate consistent font size that fits ALL pages
+ * Returns the minimum font size needed across all pages
+ *
+ * @param {PDFDocument} doc - PDFKit document (for text measurement)
+ * @param {Array<string>} pageTexts - Array of page texts
+ * @param {number} availableWidth - Available text width
+ * @param {number} availableHeight - Available text height
+ * @param {number} startFontSize - Starting font size
+ * @param {number} minFontSize - Minimum allowed font size
+ * @param {string} align - Text alignment ('left' or 'center')
+ * @returns {{fontSize: number, warning: string|null}}
+ */
+function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHeight, startFontSize = 14, minFontSize = 6, align = 'left') {
+  const lineGap = -2;
+  let minNeededFontSize = startFontSize;
+
+  // Calculate minimum font size needed for each page
+  for (let i = 0; i < pageTexts.length; i++) {
+    const cleanText = pageTexts[i].trim().replace(/^-+|-+$/g, '').trim();
+    let fontSize = startFontSize;
+
+    doc.fontSize(fontSize).font('Helvetica');
+    let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap });
+
+    // Reduce font size until text fits
+    while (textHeight > availableHeight && fontSize > minFontSize) {
+      fontSize -= 0.5;
+      doc.fontSize(fontSize);
+      textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap });
+    }
+
+    // Track the smallest font size needed
+    if (fontSize < minNeededFontSize) {
+      minNeededFontSize = fontSize;
+    }
+  }
+
+  // Generate warning if font size is below threshold
+  let warning = null;
+  if (minNeededFontSize < MIN_FONT_SIZE_WARNING) {
+    warning = `Font size reduced to ${minNeededFontSize}pt to fit all text. Consider shortening some pages.`;
+    log.warn(`⚠️  [PDF] ${warning}`);
+  }
+
+  // Check if text still doesn't fit at minimum size
+  if (minNeededFontSize <= minFontSize) {
+    // Verify all pages fit at this size
+    doc.fontSize(minNeededFontSize).font('Helvetica');
+    for (let i = 0; i < pageTexts.length; i++) {
+      const cleanText = pageTexts[i].trim().replace(/^-+|-+$/g, '').trim();
+      const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align, lineGap });
+      if (textHeight > availableHeight) {
+        const errorMsg = `Page ${i + 1} text too long even at minimum font size (${minFontSize}pt). Please shorten the text.`;
+        log.error(`❌ [PDF] ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+    }
+  }
+
+  log.debug(`📄 [PDF] Consistent font size: ${minNeededFontSize}pt for ${pageTexts.length} pages`);
+  return { fontSize: minNeededFontSize, warning };
+}
+
+/**
  * Generate print-ready PDF for a single story
  * Layout: Back+Front cover spread → Initial page → Story pages
  *
  * @param {Object} storyData - Story data with coverImages, sceneImages, storyText, etc.
- * @returns {Promise<{pdfBuffer: Buffer, pageCount: number}>}
+ * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'portrait' (210x280mm)
+ * @returns {Promise<{pdfBuffer: Buffer, pageCount: number, fontSizeWarning: string|null}>}
  */
-async function generatePrintPdf(storyData) {
+async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
+  // Get dimensions for the selected format
+  const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
+  const { pageWidth, pageHeight, coverWidth, coverHeight } = format;
+
+  log.debug(`📄 [PRINT PDF] Using format: ${bookFormat} (${Math.round(pageWidth / 2.83465)}x${Math.round(pageHeight / 2.83465)}mm)`);
+
   const doc = new PDFDocument({
-    size: [COVER_WIDTH, COVER_HEIGHT],
+    size: [coverWidth, coverHeight],
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
     autoFirstPage: false
   });
@@ -53,7 +148,7 @@ async function generatePrintPdf(storyData) {
   });
 
   // Add cover page (back cover on left + front cover on right - for print binding)
-  doc.addPage({ size: [COVER_WIDTH, COVER_HEIGHT], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
   const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
   const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
@@ -62,17 +157,17 @@ async function generatePrintPdf(storyData) {
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    doc.image(backCoverBuffer, 0, 0, { width: COVER_WIDTH / 2, height: COVER_HEIGHT });
-    doc.image(frontCoverBuffer, COVER_WIDTH / 2, 0, { width: COVER_WIDTH / 2, height: COVER_HEIGHT });
+    doc.image(backCoverBuffer, 0, 0, { width: coverWidth / 2, height: coverHeight });
+    doc.image(frontCoverBuffer, coverWidth / 2, 0, { width: coverWidth / 2, height: coverHeight });
   }
 
   // Add initial page (dedication/intro page)
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
   if (initialPageImageData) {
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
     const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-    doc.image(initialPageBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+    doc.image(initialPageBuffer, 0, 0, { width: pageWidth, height: pageHeight });
   }
 
   // Parse story pages
@@ -87,13 +182,36 @@ async function generatePrintPdf(storyData) {
   const isPictureBook = storyData.languageLevel === '1st-grade';
   log.debug(`📄 [PRINT PDF] Layout: ${isPictureBook ? 'Picture Book (combined)' : 'Standard (separate pages)'}`);
 
-  // Add content pages based on layout type
+  // Calculate consistent font size for all pages BEFORE rendering
+  let fontSizeWarning = null;
+  let consistentFontSize;
+
   if (isPictureBook) {
-    // PICTURE BOOK LAYOUT: Combined image on top (~85%), text below (~15%)
-    addPictureBookPages(doc, storyData, storyPages);
+    // Picture book: 85% image, 15% text
+    const textMargin = mmToPoints(3);
+    const textWidth = pageWidth - (textMargin * 2);
+    const textAreaHeight = pageHeight * 0.15;
+    const availableTextHeight = textAreaHeight - textMargin;
+
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, 14, 6, 'center');
+    consistentFontSize = fontResult.fontSize;
+    fontSizeWarning = fontResult.warning;
   } else {
-    // STANDARD/ADVANCED LAYOUT: Separate pages for text and image
-    addStandardPages(doc, storyData, storyPages);
+    // Standard: full page for text
+    const margin = 28;
+    const availableWidth = pageWidth - (margin * 2);
+    const availableHeight = (pageHeight - (margin * 2)) * 0.9;
+
+    const fontResult = calculateConsistentFontSize(doc, storyPages, availableWidth, availableHeight, 13, 6, 'left');
+    consistentFontSize = fontResult.fontSize;
+    fontSizeWarning = fontResult.warning;
+  }
+
+  // Add content pages based on layout type (with consistent font size)
+  if (isPictureBook) {
+    addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
+  } else {
+    addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
   }
 
   // Calculate page count and add blank pages if needed (must be even for print)
@@ -106,25 +224,31 @@ async function generatePrintPdf(storyData) {
   }
 
   for (let i = 0; i < blankPagesToAdd; i++) {
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   }
 
   doc.end();
   const pdfBuffer = await pdfPromise;
 
-  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${targetPageCount} interior pages`);
+  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${targetPageCount} interior pages, font: ${consistentFontSize}pt`);
 
-  return { pdfBuffer, pageCount: targetPageCount };
+  return { pdfBuffer, pageCount: targetPageCount, fontSizeWarning };
 }
 
 /**
  * Add picture book pages (combined image + text on same page)
+ * @param {PDFDocument} doc - PDFKit document
+ * @param {Object} storyData - Story data
+ * @param {Array<string>} storyPages - Parsed page texts
+ * @param {number} pageWidth - Page width in points
+ * @param {number} pageHeight - Page height in points
+ * @param {number} fontSize - Consistent font size for all pages
  */
-function addPictureBookPages(doc, storyData, storyPages) {
-  const imageHeight = PAGE_SIZE * 0.85;
-  const textAreaHeight = PAGE_SIZE * 0.15;
+function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14) {
+  const imageHeight = pageHeight * 0.85;
+  const textAreaHeight = pageHeight * 0.15;
   const textMargin = mmToPoints(3);
-  const textWidth = PAGE_SIZE - (textMargin * 2);
+  const textWidth = pageWidth - (textMargin * 2);
   const availableTextHeight = textAreaHeight - textMargin;
   const lineGap = -2;
 
@@ -133,13 +257,13 @@ function addPictureBookPages(doc, storyData, storyPages) {
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
     if (image && image.imageData) {
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(imageBuffer, 0, 0, {
-          fit: [PAGE_SIZE, imageHeight],
+          fit: [pageWidth, imageHeight],
           align: 'center',
           valign: 'center'
         });
@@ -148,23 +272,9 @@ function addPictureBookPages(doc, storyData, storyPages) {
       }
     }
 
-    // Add text in bottom portion with vertical centering
-    let fontSize = 14;
+    // Add text in bottom portion with consistent font size and vertical centering
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-    let textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
-
-    while (textHeight > availableTextHeight && fontSize > 6) {
-      fontSize -= 0.5;
-      doc.fontSize(fontSize);
-      textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
-    }
-
-    if (textHeight > availableTextHeight) {
-      const errorMsg = `Text too long on page ${pageNumber}. Please shorten the story text for this page.`;
-      log.error(`❌ [PRINT PDF] ${errorMsg}`);
-      throw new Error(errorMsg);
-    }
-
+    const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
     const textY = imageHeight + (availableTextHeight - textHeight) / 2;
     doc.text(cleanText, textMargin, textY, { width: textWidth, align: 'center', lineGap });
   });
@@ -172,11 +282,17 @@ function addPictureBookPages(doc, storyData, storyPages) {
 
 /**
  * Add standard pages (separate text and image pages)
+ * @param {PDFDocument} doc - PDFKit document
+ * @param {Object} storyData - Story data
+ * @param {Array<string>} storyPages - Parsed page texts
+ * @param {number} pageWidth - Page width in points
+ * @param {number} pageHeight - Page height in points
+ * @param {number} fontSize - Consistent font size for all pages
  */
-function addStandardPages(doc, storyData, storyPages) {
+function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13) {
   const margin = 28;
-  const availableWidth = PAGE_SIZE - (margin * 2);
-  const availableHeight = PAGE_SIZE - (margin * 2);
+  const availableWidth = pageWidth - (margin * 2);
+  const availableHeight = pageHeight - (margin * 2);
   const lineGap = -2;
 
   storyPages.forEach((pageText, index) => {
@@ -184,40 +300,21 @@ function addStandardPages(doc, storyData, storyPages) {
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-    // Add text page
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+    // Add text page with consistent font size
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: margin, bottom: margin, left: margin, right: margin } });
 
-    let fontSize = 13;
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
-    const safeAvailableHeight = availableHeight * 0.9;
-    let textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
-
-    while (textHeight > safeAvailableHeight && fontSize > 6) {
-      fontSize -= 0.5;
-      doc.fontSize(fontSize);
-      textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
-    }
-
-    if (fontSize < 13) {
-      log.debug(`📄 [PRINT PDF] Page ${pageNumber}: Font reduced 13pt → ${fontSize}pt`);
-    }
-
-    if (textHeight > safeAvailableHeight) {
-      const errorMsg = `Text too long on page ${pageNumber}. Please shorten the story text for this page.`;
-      log.error(`❌ [PRINT PDF] ${errorMsg}`);
-      throw new Error(errorMsg);
-    }
-
+    const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
     const yPosition = margin + (availableHeight - textHeight) / 2;
     doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
     // Add image page if available (full-bleed, no margin)
     if (image && image.imageData) {
-      doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(imageBuffer, 0, 0, {
-          fit: [PAGE_SIZE, PAGE_SIZE],
+          fit: [pageWidth, pageHeight],
           align: 'center',
           valign: 'center'
         });
@@ -510,5 +607,7 @@ module.exports = {
   mmToPoints,
   COVER_WIDTH,
   COVER_HEIGHT,
-  PAGE_SIZE
+  PAGE_SIZE,
+  BOOK_FORMATS,
+  DEFAULT_FORMAT
 };
