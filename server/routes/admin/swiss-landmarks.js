@@ -69,18 +69,28 @@ router.post('/index', async (req, res) => {
 
     const {
       analyzePhotos = true,
+      useMultiImageAnalysis = true,  // Use new multi-image quality analysis
       dryRun = false,
       maxLandmarks = 500,
-      maxCities = null
+      maxCities = null,
+      filterCities = null  // Array of city names to filter to (for testing)
     } = req.body;
 
-    const effectiveMaxCities = maxCities || SWISS_CITIES.length;
+    // Calculate effective city count based on filter
+    let effectiveCityCount;
+    if (filterCities && filterCities.length > 0) {
+      effectiveCityCount = SWISS_CITIES.filter(c =>
+        filterCities.some(f => c.city.toLowerCase().includes(f.toLowerCase()))
+      ).length;
+    } else {
+      effectiveCityCount = maxCities || SWISS_CITIES.length;
+    }
 
     swissLandmarkIndexingJob = {
       status: 'running',
       startedAt: new Date(),
       citiesProcessed: 0,
-      totalCities: Math.min(effectiveMaxCities, SWISS_CITIES.length),
+      totalCities: effectiveCityCount,
       currentCity: '',
       progress: 0,
       landmarksFound: 0,
@@ -88,18 +98,22 @@ router.post('/index', async (req, res) => {
       landmarksAnalyzed: 0,
       maxLandmarks,
       analyzePhotos,
+      useMultiImageAnalysis,
+      filterCities,
       dryRun,
       errors: []
     };
 
-    log.info(`[ADMIN] Starting Swiss landmark indexing (maxLandmarks=${maxLandmarks}, maxCities=${effectiveMaxCities}, analyzePhotos=${analyzePhotos}, dryRun=${dryRun})`);
+    log.info(`[ADMIN] Starting Swiss landmark indexing (maxLandmarks=${maxLandmarks}, cities=${effectiveCityCount}, multiImage=${useMultiImageAnalysis}, filter=${filterCities || 'none'}, dryRun=${dryRun})`);
 
     // Run in background
     discoverAllSwissLandmarks({
       analyzePhotos,
+      useMultiImageAnalysis,
       dryRun,
       maxLandmarks,
-      maxCities: effectiveMaxCities,
+      maxCities: maxCities || null,
+      filterCities,
       onProgress: (city, current, total, saved) => {
         swissLandmarkIndexingJob.currentCity = city;
         swissLandmarkIndexingJob.citiesProcessed = current;
@@ -123,10 +137,12 @@ router.post('/index', async (req, res) => {
 
     res.json({
       status: 'started',
-      message: `Started indexing up to ${maxLandmarks} landmarks from ${effectiveMaxCities} Swiss cities`,
+      message: `Started indexing up to ${maxLandmarks} landmarks from ${effectiveCityCount} Swiss cities${filterCities ? ` (filter: ${filterCities.join(', ')})` : ''}`,
       maxLandmarks,
-      maxCities: effectiveMaxCities,
+      cities: effectiveCityCount,
+      filterCities,
       analyzePhotos,
+      useMultiImageAnalysis,
       dryRun
     });
   } catch (err) {

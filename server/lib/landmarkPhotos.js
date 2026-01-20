@@ -632,6 +632,250 @@ Write 2-3 sentences. Be specific and visual. Do NOT mention the photo itself or 
   }
 }
 
+// ============================================================================
+// MULTI-IMAGE QUALITY ANALYSIS
+// ============================================================================
+
+/**
+ * Fetch multiple images from Wikimedia Commons for a landmark
+ * @param {string} landmarkName - Name of landmark to search for
+ * @param {number} maxImages - Maximum images to fetch (default 4)
+ * @returns {Promise<Array<{url, fileName, attribution, width, height}>>}
+ */
+async function fetchMultipleImages(landmarkName, maxImages = 4) {
+  const images = [];
+
+  try {
+    // Search Wikimedia Commons for images
+    const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search` +
+      `&srsearch=${encodeURIComponent(landmarkName + ' filetype:jpg|jpeg|png')}` +
+      `&srnamespace=6&srlimit=${maxImages * 2}&format=json&origin=*`;
+
+    const searchRes = await fetch(searchUrl, { headers: WIKI_HEADERS });
+    const searchData = await searchRes.json();
+
+    if (!searchData.query?.search?.length) {
+      log.debug(`[MULTI-IMG] No images found for "${landmarkName}"`);
+      return images;
+    }
+
+    // Get details for each image
+    for (const result of searchData.query.search) {
+      if (images.length >= maxImages) break;
+
+      const fileName = result.title;
+      const lowerName = fileName.toLowerCase();
+
+      // Skip non-photos
+      if (lowerName.endsWith('.svg') || lowerName.endsWith('.pdf') ||
+          lowerName.endsWith('.webm') || lowerName.endsWith('.ogv') ||
+          lowerName.includes('map') || lowerName.includes('logo') ||
+          lowerName.includes('wappen') || lowerName.includes('flag') ||
+          lowerName.includes('coat of arms') || lowerName.includes('plan')) {
+        continue;
+      }
+
+      // Get image info
+      const infoUrl = `https://commons.wikimedia.org/w/api.php?action=query` +
+        `&titles=${encodeURIComponent(fileName)}` +
+        `&prop=imageinfo&iiprop=url|user|size|mime&format=json&origin=*`;
+
+      const infoRes = await fetch(infoUrl, { headers: WIKI_HEADERS });
+      const infoData = await infoRes.json();
+
+      const pages = infoData.query?.pages;
+      const page = pages ? Object.values(pages)[0] : null;
+      const info = page?.imageinfo?.[0];
+
+      if (!info?.url || !info.mime?.startsWith('image/')) continue;
+
+      // Skip tiny images
+      if (info.width < 400 || info.height < 300) {
+        log.debug(`[MULTI-IMG] Skipping small image: ${info.width}x${info.height}`);
+        continue;
+      }
+
+      images.push({
+        url: info.url,
+        fileName: fileName.replace('File:', ''),
+        attribution: `Photo by ${info.user || 'Unknown'}, Wikimedia Commons`,
+        width: info.width,
+        height: info.height
+      });
+    }
+
+    log.debug(`[MULTI-IMG] Found ${images.length} images for "${landmarkName}"`);
+    return images;
+
+  } catch (err) {
+    log.error(`[MULTI-IMG] Error fetching images for "${landmarkName}": ${err.message}`);
+    return images;
+  }
+}
+
+/**
+ * Analyze an image for quality and suitability as a landmark reference
+ * @param {string} imageUrl - URL of image to analyze
+ * @param {string} landmarkName - Name of the landmark
+ * @returns {Promise<{score, isPhoto, isExterior, description, issues}|null>}
+ */
+async function analyzeImageQuality(imageUrl, landmarkName) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    // Download image
+    const imgRes = await fetch(imageUrl, {
+      headers: { 'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch)' },
+      signal: AbortSignal.timeout(10000)
+    });
+
+    if (!imgRes.ok) return null;
+
+    const buffer = await imgRes.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+    const mimeType = contentType.split(';')[0].trim();
+
+    // Analyze with Gemini
+    const prompt = `Analyze this image of "${landmarkName}" for use as a reference in children's book illustration.
+
+Rate each criterion 1-10:
+1. PHOTO_QUALITY: Is it a clear, well-lit photograph? (not blurry, not too dark)
+2. IS_LANDMARK_PHOTO: Does it show a building, monument, or natural landmark? (not a map, diagram, logo, portrait, or text)
+3. VISUAL_INTEREST: Would it be interesting/recognizable in a children's book?
+4. COMPOSITION: Is the main subject clearly visible and well-framed?
+
+Respond in this exact JSON format:
+{
+  "photoQuality": <1-10>,
+  "isLandmarkPhoto": <1-10>,
+  "visualInterest": <1-10>,
+  "composition": <1-10>,
+  "isExterior": <true/false>,
+  "issues": ["list any problems"],
+  "description": "One sentence describing what's in the photo"
+}`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: base64 } }
+          ]
+        }],
+        generationConfig: {
+          maxOutputTokens: 300,
+          temperature: 0.1
+        }
+      }),
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!response.ok) {
+      log.debug(`[IMG-QUALITY] Gemini error: ${response.status}`);
+      return null;
+    }
+
+    const data = await response.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+
+    if (!text) return null;
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      log.debug(`[IMG-QUALITY] Could not parse JSON from: ${text.substring(0, 100)}`);
+      return null;
+    }
+
+    const analysis = JSON.parse(jsonMatch[0]);
+
+    // Calculate overall score (weighted average)
+    const score = Math.round(
+      (analysis.photoQuality * 0.2) +
+      (analysis.isLandmarkPhoto * 0.4) +  // Most important: is it actually a landmark photo?
+      (analysis.visualInterest * 0.25) +
+      (analysis.composition * 0.15)
+    );
+
+    return {
+      score,
+      isPhoto: analysis.isLandmarkPhoto >= 5,
+      isExterior: analysis.isExterior,
+      description: analysis.description,
+      issues: analysis.issues || [],
+      raw: analysis
+    };
+
+  } catch (err) {
+    log.debug(`[IMG-QUALITY] Error analyzing ${imageUrl.substring(0, 50)}: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Fetch and analyze multiple images, return the best one(s)
+ * @param {string} landmarkName - Name of landmark
+ * @param {string} landmarkType - Type of landmark (Castle, Church, etc.)
+ * @param {number} maxImages - Max images to analyze
+ * @returns {Promise<{bestImage, allAnalyzed}|null>}
+ */
+async function findBestLandmarkImage(landmarkName, landmarkType, maxImages = 4) {
+  log.info(`[BEST-IMG] Finding best image for "${landmarkName}" (${landmarkType || 'unknown type'})`);
+
+  // Fetch multiple candidate images
+  const candidates = await fetchMultipleImages(landmarkName, maxImages);
+
+  if (candidates.length === 0) {
+    log.debug(`[BEST-IMG] No candidate images found for "${landmarkName}"`);
+    return null;
+  }
+
+  log.debug(`[BEST-IMG] Analyzing ${candidates.length} candidate images...`);
+
+  // Analyze each image
+  const analyzed = [];
+  for (const img of candidates) {
+    const analysis = await analyzeImageQuality(img.url, landmarkName);
+    if (analysis) {
+      analyzed.push({
+        ...img,
+        ...analysis
+      });
+    }
+    // Small delay between API calls
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  if (analyzed.length === 0) {
+    log.debug(`[BEST-IMG] No images could be analyzed for "${landmarkName}"`);
+    return null;
+  }
+
+  // Sort by score (highest first)
+  analyzed.sort((a, b) => b.score - a.score);
+
+  const best = analyzed[0];
+  log.info(`[BEST-IMG] ✅ Best image for "${landmarkName}": score=${best.score}, exterior=${best.isExterior}, "${best.description?.substring(0, 50)}..."`);
+
+  // Only accept if it's actually a landmark photo (score >= 5)
+  if (best.score < 5 || !best.isPhoto) {
+    log.warn(`[BEST-IMG] Best image rejected (score=${best.score}, isPhoto=${best.isPhoto})`);
+    return null;
+  }
+
+  return {
+    bestImage: best,
+    allAnalyzed: analyzed
+  };
+}
+
 /**
  * Pre-fetch photos for all landmarks in a Visual Bible
  * Designed to run in background as soon as landmarks are detected
@@ -934,6 +1178,8 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
           query: name,
           source: `wikipedia-${lang}`,
           distance: item.dist,
+          lat: item.lat,    // Capture coordinates from geosearch
+          lon: item.lon,
           pageId: item.pageid,
           lang
         });
@@ -1585,6 +1831,9 @@ async function saveSwissLandmark(landmark) {
   const pool = getPool();
   if (!pool) return false;
 
+  // Normalize values - ensure we don't save "undefined" strings
+  const normalize = (val) => (val === undefined || val === 'undefined' || val === '') ? null : val;
+
   try {
     await pool.query(`
       INSERT INTO swiss_landmarks (
@@ -1596,27 +1845,30 @@ async function saveSwissLandmark(landmark) {
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       ON CONFLICT (wikidata_qid) DO UPDATE SET
         name = EXCLUDED.name,
-        photo_url = EXCLUDED.photo_url,
-        photo_attribution = EXCLUDED.photo_attribution,
+        latitude = COALESCE(EXCLUDED.latitude, swiss_landmarks.latitude),
+        longitude = COALESCE(EXCLUDED.longitude, swiss_landmarks.longitude),
+        type = COALESCE(EXCLUDED.type, swiss_landmarks.type),
+        photo_url = COALESCE(EXCLUDED.photo_url, swiss_landmarks.photo_url),
+        photo_attribution = COALESCE(EXCLUDED.photo_attribution, swiss_landmarks.photo_attribution),
         photo_description = COALESCE(EXCLUDED.photo_description, swiss_landmarks.photo_description),
-        score = EXCLUDED.score,
+        score = GREATEST(EXCLUDED.score, swiss_landmarks.score),
         updated_at = CURRENT_TIMESTAMP
     `, [
       landmark.name,
-      landmark.pageId || landmark.wikipedia_page_id,
+      landmark.pageId || landmark.wikipedia_page_id || null,
       landmark.qid || landmark.wikidata_qid,
-      landmark.lang,
-      landmark.lat || landmark.latitude,
-      landmark.lon || landmark.longitude,
-      landmark.nearestCity || landmark.nearest_city,
-      landmark.canton,
-      landmark.type,
+      landmark.lang || null,
+      landmark.lat || landmark.latitude || null,
+      landmark.lon || landmark.longitude || null,
+      landmark.nearestCity || landmark.nearest_city || null,
+      landmark.canton || null,
+      normalize(landmark.type),
       landmark.boostAmount || landmark.boost_amount || 0,
       landmark.categories || [],
-      landmark.photoUrl || landmark.photo_url,
-      landmark.attribution || landmark.photo_attribution,
-      landmark.source || landmark.photo_source,
-      landmark.photoDescription || landmark.photo_description,
+      normalize(landmark.photoUrl || landmark.photo_url),
+      normalize(landmark.attribution || landmark.photo_attribution),
+      normalize(landmark.source || landmark.photo_source) || 'wikimedia',
+      normalize(landmark.photoDescription || landmark.photo_description),
       landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
       landmark.score || 0
     ]);
@@ -1716,16 +1968,27 @@ const SWISS_CITIES = [
 async function discoverAllSwissLandmarks(options = {}) {
   const {
     analyzePhotos = true,
+    useMultiImageAnalysis = true,  // Use new multi-image quality analysis
     onProgress = null,
     maxLandmarks = 500,  // Safety limit - default 500 landmarks max
     maxCities = null,    // Optional limit on cities to process
+    filterCities = null, // Array of city names to process (for testing)
     dryRun = false       // If true, don't save to DB, just count
   } = options;
 
-  const citiesToProcess = maxCities ? Math.min(maxCities, SWISS_CITIES.length) : SWISS_CITIES.length;
+  // Filter to specific cities if provided, otherwise use all
+  let cities = SWISS_CITIES;
+  if (filterCities && filterCities.length > 0) {
+    cities = SWISS_CITIES.filter(c => filterCities.some(f =>
+      c.city.toLowerCase().includes(f.toLowerCase())
+    ));
+    log.info(`[SWISS-INDEX] Filtering to cities: ${cities.map(c => c.city).join(', ')}`);
+  }
+
+  const citiesToProcess = maxCities ? Math.min(maxCities, cities.length) : cities.length;
 
   log.info(`[SWISS-INDEX] Starting Swiss landmark discovery`);
-  log.info(`[SWISS-INDEX]   Cities: ${citiesToProcess}/${SWISS_CITIES.length}, maxLandmarks: ${maxLandmarks}, analyzePhotos: ${analyzePhotos}, dryRun: ${dryRun}`);
+  log.info(`[SWISS-INDEX]   Cities: ${citiesToProcess}/${cities.length}, maxLandmarks: ${maxLandmarks}, analyzePhotos: ${analyzePhotos}, multiImage: ${useMultiImageAnalysis}, dryRun: ${dryRun}`);
 
   const allLandmarks = new Map(); // qid -> landmark (for deduplication)
   let savedCount = 0;
@@ -1734,7 +1997,7 @@ async function discoverAllSwissLandmarks(options = {}) {
   let hitLimit = false;
 
   for (let i = 0; i < citiesToProcess && !hitLimit; i++) {
-    const { city, canton } = SWISS_CITIES[i];
+    const { city, canton } = cities[i];
 
     if (onProgress) {
       onProgress(city, i + 1, citiesToProcess, savedCount, maxLandmarks);
@@ -1772,15 +2035,48 @@ async function discoverAllSwissLandmarks(options = {}) {
         landmark.nearestCity = city;
         landmark.canton = canton;
 
+        // Calculate score based on type and boost
+        // Higher score = more visually interesting landmark
+        let score = 0;
+        if (landmark.boostAmount === 100) score += 100;  // Tourist attractions, castles, churches
+        else if (landmark.boostAmount === 50) score += 50;  // Parks, monuments, historic
+        if (landmark.type && !['Unknown', 'Building', 'Station'].includes(landmark.type)) {
+          score += 25;  // Has a specific type (not generic)
+        }
+        landmark.score = score;
+
         // Fetch and analyze photo if requested
         if (analyzePhotos && !landmark.photoDescription) {
           try {
-            const photoData = await fetchLandmarkPhoto(landmark.name, landmark.pageId, landmark.lang);
-            if (photoData) {
-              landmark.photoUrl = landmark.photoUrl || `https://${landmark.lang}.wikipedia.org/wiki/${encodeURIComponent(landmark.name)}`;
-              landmark.photoDescription = await analyzeLandmarkPhoto(photoData, landmark.name, landmark.type);
-              analyzedCount++;
-              // Don't store the actual photo data, just the URL and description
+            if (useMultiImageAnalysis) {
+              // NEW: Multi-image quality analysis - fetches up to 4 images and picks best
+              const bestResult = await findBestLandmarkImage(landmark.name, landmark.type, 4);
+              if (bestResult && bestResult.bestImage) {
+                const best = bestResult.bestImage;
+                landmark.photoUrl = best.url;
+                landmark.attribution = best.attribution;
+                landmark.photoDescription = best.description;
+                landmark.photoScore = best.score;
+                landmark.photoIsExterior = best.isExterior;
+                // Add to landmark score based on photo quality
+                landmark.score += Math.round(best.score / 2);  // +0 to +5 points
+                analyzedCount++;
+                log.debug(`[SWISS-INDEX] ✅ "${landmark.name}" best image: score=${best.score}, exterior=${best.isExterior}`);
+              } else {
+                log.debug(`[SWISS-INDEX] No suitable image found for "${landmark.name}"`);
+              }
+            } else {
+              // Old single-image approach (fallback)
+              const photoResult = await fetchLandmarkPhoto(landmark.name, landmark.pageId, landmark.lang);
+              if (photoResult && photoResult.photoData) {
+                landmark.photoUrl = photoResult.photoUrl || `https://${landmark.lang}.wikipedia.org/wiki/${encodeURIComponent(landmark.name)}`;
+                landmark.attribution = photoResult.attribution;
+                const description = await analyzeLandmarkPhoto(photoResult.photoData, landmark.name, landmark.type);
+                if (description && description !== 'undefined') {
+                  landmark.photoDescription = description;
+                  analyzedCount++;
+                }
+              }
             }
           } catch (err) {
             log.debug(`[SWISS-INDEX] Photo fetch failed for "${landmark.name}": ${err.message}`);
