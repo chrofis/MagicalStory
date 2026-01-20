@@ -1311,7 +1311,14 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
-  const { isAdmin = false, enableAutoRepair = false, landmarkPhotos = [], sceneCharacterCount = 0 } = options;
+  const {
+    isAdmin = false,
+    enableAutoRepair = false,
+    landmarkPhotos = [],
+    sceneCharacterCount = 0,
+    // Incremental consistency options
+    incrementalConsistency = null,  // { enabled, dryRun, lookbackCount, previousImages, ... }
+  } = options;
   // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
   const MAX_ATTEMPTS = 3;
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
@@ -1476,21 +1483,94 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       };
     }
 
-    // AUTO-REPAIR: Run if enabled AND score <= 90% AND there are fix targets
-    // This is OFF by default - can be enabled via developer mode
+    // INCREMENTAL CONSISTENCY CHECK: If enabled, compare with previous images
+    let consistencyResult = null;
+    let unifiedReport = null;
+    const incrConfig = incrementalConsistency || {};
+    const incrEnabled = incrConfig.enabled && evaluationType === 'scene' && incrConfig.previousImages?.length > 0;
+
+    if (incrEnabled) {
+      log.debug(`🔍 [QUALITY RETRY] ${pageLabel}Running incremental consistency check...`);
+      consistencyResult = await evaluateIncrementalConsistency(
+        result.imageData,
+        pageNumber || attempts,  // Use page number if available
+        incrConfig.previousImages,
+        incrConfig
+      );
+
+      // Track consistency check usage
+      if (usageTracker && consistencyResult?.usage) {
+        usageTracker(null, consistencyResult.usage, null, consistencyResult.usage.model);
+      }
+
+      // Merge quality and consistency issues
+      unifiedReport = mergeEvaluationIssues(result, consistencyResult, incrConfig);
+
+      // Log the unified report
+      if (incrConfig.dryRun) {
+        logDryRunReport(pageContext, unifiedReport);
+      } else {
+        const totalIssues = unifiedReport.allIssues.length;
+        const fixableCount = unifiedReport.fixPlan.estimatedFixCount;
+        if (totalIssues > 0) {
+          log.info(`📋 [QUALITY RETRY] ${pageLabel}Unified report: ${totalIssues} issue(s) found, ${fixableCount} will be fixed`);
+        }
+      }
+
+      // Record in retry history
+      retryHistory.push({
+        attempt: attempts,
+        type: 'incremental_consistency',
+        consistencyScore: consistencyResult?.score,
+        consistencyIssues: consistencyResult?.issues?.length || 0,
+        unifiedReport: {
+          qualityScore: unifiedReport.qualityScore,
+          consistencyScore: unifiedReport.consistencyScore,
+          totalIssues: unifiedReport.allIssues.length,
+          fixableIssues: unifiedReport.fixPlan.estimatedFixCount
+        },
+        dryRun: incrConfig.dryRun,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    // AUTO-REPAIR: Run if enabled AND there are issues to fix
+    // Now uses unified fix plan if incremental consistency is enabled
     const AUTO_REPAIR_THRESHOLD = 90;
-    const couldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0;
+
+    // Determine if we should repair based on unified report or just quality
+    let shouldRepair = false;
+    let fixTargetsToUse = [];
+
+    if (incrEnabled && unifiedReport && !incrConfig.dryRun) {
+      // Use unified fix plan
+      shouldRepair = unifiedReport.fixPlan.requiresFix;
+      fixTargetsToUse = unifiedReport.fixPlan.fixTargets.map(t => ({
+        element: t.type,
+        issue: t.instruction,
+        severity: t.severity,
+        bounds: t.region === 'full' ? null : t.region,
+        fix_instruction: t.instruction
+      }));
+    } else if (!incrEnabled) {
+      // Fall back to quality-only repair (original behavior)
+      shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0;
+      fixTargetsToUse = result.fixTargets || [];
+    }
+
+    const couldRepair = shouldRepair && fixTargetsToUse.length > 0;
     if (couldRepair && !enableAutoRepair) {
-      log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). Score ${score}%, ${result.fixTargets.length} fix targets available.`);
+      log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). ${fixTargetsToUse.length} fix targets available.`);
     }
     if (enableAutoRepair && couldRepair) {
-      log.info(`🔧 [QUALITY RETRY] ${pageLabel}Score ${score}% <= ${AUTO_REPAIR_THRESHOLD}%, attempting auto-repair on ${result.fixTargets.length} fix targets...`);
+      const repairSource = incrEnabled ? 'unified (quality + consistency)' : 'quality';
+      log.info(`🔧 [QUALITY RETRY] ${pageLabel}Attempting auto-repair on ${fixTargetsToUse.length} fix targets (${repairSource})...`);
       try {
         // Inpainting uses text-based coordinates instead of mask images
         // This avoids confusion when there are multiple similar elements
         const repairResult = await autoRepairWithTargets(
           result.imageData,
-          result.fixTargets,
+          fixTargetsToUse,
           0,  // No additional inspection attempts
           { includeDebugImages: isAdmin }  // Include before/after images for admin users
         );
@@ -3285,6 +3365,347 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
   return report;
 }
 
+// =============================================================================
+// INCREMENTAL CONSISTENCY CHECK
+// Real-time consistency checking during story generation
+// =============================================================================
+
+/**
+ * Default configuration for incremental consistency checks
+ */
+const INCREMENTAL_CONSISTENCY_DEFAULTS = {
+  enabled: true,
+  lookbackCount: 3,           // How many previous images to compare
+  fixThreshold: 7,            // Score below which to trigger fixes (0-10)
+  minSeverityToFix: 'major',  // 'critical' | 'major' | 'minor'
+  dryRun: false,              // If true, log what would be fixed but don't fix
+  checks: {
+    characterIdentity: true,
+    clothing: true,
+    artStyle: true
+  }
+};
+
+/**
+ * Evaluate a newly generated image for consistency with previous images
+ *
+ * @param {string} currentImage - Base64 image data of the new image
+ * @param {number} currentPageNumber - Page number of the new image
+ * @param {Array<object>} previousImages - Array of previous images with metadata
+ * @param {object} options - Evaluation options
+ * @returns {Promise<object>} Consistency evaluation result
+ */
+async function evaluateIncrementalConsistency(currentImage, currentPageNumber, previousImages, options = {}) {
+  const config = { ...INCREMENTAL_CONSISTENCY_DEFAULTS, ...options };
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    log.warn('⚠️  [INCR-CONSISTENCY] Gemini API key not configured, skipping');
+    return null;
+  }
+
+  if (!previousImages || previousImages.length === 0) {
+    log.verbose('[INCR-CONSISTENCY] No previous images to compare against');
+    return { consistent: true, score: 10, issues: [], summary: 'First image - no comparison needed' };
+  }
+
+  // Limit to lookback count
+  const imagesToCompare = previousImages.slice(-config.lookbackCount);
+  const prevPageNumbers = imagesToCompare.map(img => img.pageNumber).join(', ');
+
+  log.info(`🔍 [INCR-CONSISTENCY] Page ${currentPageNumber}: checking against pages ${prevPageNumbers}`);
+
+  // Load prompt template
+  const promptTemplate = PROMPT_TEMPLATES.incrementalConsistencyCheck;
+  if (!promptTemplate) {
+    log.error('❌ [INCR-CONSISTENCY] Missing prompt template: incremental-consistency-check.txt');
+    return null;
+  }
+
+  // Build clothing info string
+  const clothingLines = [];
+  const characterSet = new Set();
+  for (const img of imagesToCompare) {
+    if (img.characterClothing) {
+      for (const [charName, clothing] of Object.entries(img.characterClothing)) {
+        characterSet.add(charName);
+        clothingLines.push(`- ${charName} (Page ${img.pageNumber}): ${clothing}`);
+      }
+    } else if (img.characters && img.clothing) {
+      for (const char of img.characters) {
+        characterSet.add(char);
+      }
+      clothingLines.push(`- All characters (Page ${img.pageNumber}): ${img.clothing}`);
+    }
+  }
+
+  const characters = Array.from(characterSet).join(', ') || 'Unknown';
+  const clothingInfo = clothingLines.length > 0 ? clothingLines.join('\n') : 'No specific clothing information';
+
+  // Fill template
+  const prompt = fillTemplate(promptTemplate, {
+    PAGE_NUMBER: currentPageNumber,
+    IMAGE_COUNT: imagesToCompare.length + 1,
+    PREV_PAGES: prevPageNumbers,
+    CHARACTERS: characters,
+    CLOTHING_INFO: clothingInfo
+  });
+
+  // Build parts array
+  const parts = [];
+
+  // Add current image first (Image 1)
+  const currentBase64 = currentImage.replace(/^data:image\/\w+;base64,/, '');
+  parts.push({ text: `Image 1 (Page ${currentPageNumber} - CURRENT, to evaluate):` });
+  parts.push({
+    inline_data: {
+      mime_type: 'image/jpeg',
+      data: currentBase64
+    }
+  });
+
+  // Add previous images (Images 2, 3, ...)
+  for (let i = 0; i < imagesToCompare.length; i++) {
+    const img = imagesToCompare[i];
+    const imageData = img.imageData || img;
+
+    if (!imageData || !imageData.startsWith('data:image')) continue;
+
+    // Compress for efficiency
+    const compressed = await compressImageToJPEG(imageData, 80, 768);
+    const base64Data = compressed.replace(/^data:image\/\w+;base64,/, '');
+
+    parts.push({ text: `Image ${i + 2} (Page ${img.pageNumber} - reference):` });
+    parts.push({
+      inline_data: {
+        mime_type: 'image/jpeg',
+        data: base64Data
+      }
+    });
+  }
+
+  // Add the evaluation prompt
+  parts.push({ text: prompt });
+
+  // Call Gemini API
+  const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+  let data;
+  try {
+    data = await withRetry(async () => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            maxOutputTokens: 4000,
+            temperature: 0.2
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        log.error(`❌ [INCR-CONSISTENCY] API error: ${error.substring(0, 200)}`);
+        throw new Error(`API error (${response.status})`);
+      }
+
+      return response.json();
+    }, { maxRetries: 2, baseDelay: 2000 });
+  } catch (error) {
+    log.error(`❌ [INCR-CONSISTENCY] Request failed: ${error.message}`);
+    return null;
+  }
+
+  // Log token usage
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  log.verbose(`📊 [INCR-CONSISTENCY] Tokens - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+
+  // Extract response text
+  const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  // Parse JSON response
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const result = JSON.parse(jsonMatch[0]);
+
+      // Log result
+      if (result.consistent) {
+        log.info(`✅ [INCR-CONSISTENCY] Page ${currentPageNumber}: consistent (score: ${result.score})`);
+      } else {
+        log.warn(`⚠️  [INCR-CONSISTENCY] Page ${currentPageNumber}: ${result.issues?.length || 0} issue(s) found (score: ${result.score})`);
+        for (const issue of result.issues || []) {
+          log.debug(`   - [${issue.severity}] ${issue.type}: ${issue.description}`);
+        }
+      }
+
+      return {
+        ...result,
+        usage: { inputTokens, outputTokens, model: modelId },
+        pageNumber: currentPageNumber,
+        comparedTo: prevPageNumbers
+      };
+    }
+  } catch (parseError) {
+    log.error(`❌ [INCR-CONSISTENCY] Failed to parse response: ${parseError.message}`);
+    log.debug(`Response was: ${responseText.substring(0, 500)}`);
+  }
+
+  return null;
+}
+
+/**
+ * Merge issues from quality evaluation and consistency check
+ * Deduplicates similar issues and creates a unified fix plan
+ *
+ * @param {object} qualityResult - Result from evaluateImageQuality
+ * @param {object} consistencyResult - Result from evaluateIncrementalConsistency
+ * @param {object} options - Merge options
+ * @returns {object} Unified issue report with fix plan
+ */
+function mergeEvaluationIssues(qualityResult, consistencyResult, options = {}) {
+  const config = { ...INCREMENTAL_CONSISTENCY_DEFAULTS, ...options };
+
+  const report = {
+    qualityScore: qualityResult?.score ?? null,
+    consistencyScore: consistencyResult?.score ?? null,
+    qualityIssues: [],
+    consistencyIssues: [],
+    allIssues: [],
+    fixPlan: {
+      requiresFix: false,
+      fixTargets: [],
+      estimatedFixCount: 0
+    },
+    dryRunReport: null
+  };
+
+  // Collect quality issues (from fixTargets)
+  if (qualityResult?.fixTargets) {
+    for (const target of qualityResult.fixTargets) {
+      report.qualityIssues.push({
+        source: 'quality',
+        type: target.element || 'rendering',
+        severity: target.severity || 'major',
+        description: target.issue || target.description || 'Quality issue',
+        fixTarget: {
+          region: target.bounds || 'full',
+          instruction: target.fix_instruction || target.instruction || 'Fix the issue'
+        }
+      });
+    }
+  }
+
+  // Collect consistency issues
+  if (consistencyResult?.issues) {
+    for (const issue of consistencyResult.issues) {
+      report.consistencyIssues.push({
+        source: 'consistency',
+        type: issue.type || 'consistency',
+        severity: issue.severity || 'major',
+        description: issue.description,
+        affectedCharacter: issue.affectedCharacter,
+        comparedToPage: issue.comparedToPage,
+        fixTarget: issue.fixTarget
+      });
+    }
+  }
+
+  // Merge all issues
+  report.allIssues = [...report.qualityIssues, ...report.consistencyIssues];
+
+  // Determine severity threshold
+  const severityOrder = { critical: 0, major: 1, minor: 2 };
+  const minSeverityLevel = severityOrder[config.minSeverityToFix] || 1;
+
+  // Filter issues that meet severity threshold
+  const fixableIssues = report.allIssues.filter(issue => {
+    const issueSeverity = severityOrder[issue.severity] ?? 1;
+    return issueSeverity <= minSeverityLevel;
+  });
+
+  // Build fix plan
+  if (fixableIssues.length > 0) {
+    report.fixPlan.requiresFix = true;
+    report.fixPlan.estimatedFixCount = fixableIssues.length;
+
+    // Collect fix targets, merging overlapping regions
+    for (const issue of fixableIssues) {
+      if (issue.fixTarget) {
+        report.fixPlan.fixTargets.push({
+          source: issue.source,
+          type: issue.type,
+          severity: issue.severity,
+          region: issue.fixTarget.region,
+          instruction: issue.fixTarget.instruction
+        });
+      }
+    }
+  }
+
+  // Build dry-run report
+  if (config.dryRun) {
+    report.dryRunReport = {
+      wouldFix: fixableIssues.map(i => `[${i.severity}] ${i.type}: ${i.description}`),
+      wouldSkip: report.allIssues
+        .filter(i => !fixableIssues.includes(i))
+        .map(i => `[${i.severity}] ${i.type}: ${i.description} [SKIPPED - below threshold]`)
+    };
+  }
+
+  return report;
+}
+
+/**
+ * Log dry-run report showing what would be fixed
+ *
+ * @param {string} pageContext - Page context string (e.g., "PAGE 5")
+ * @param {object} report - Unified issue report from mergeEvaluationIssues
+ */
+function logDryRunReport(pageContext, report) {
+  const pageLabel = pageContext ? `[${pageContext}] ` : '';
+
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📋 ${pageLabel}DRY RUN REPORT - Incremental Consistency`);
+  console.log(`${'='.repeat(60)}`);
+  console.log(`Quality score: ${report.qualityScore ?? 'N/A'}`);
+  console.log(`Consistency score: ${report.consistencyScore ?? 'N/A'}`);
+  console.log(`Quality issues: ${report.qualityIssues.length}`);
+  console.log(`Consistency issues: ${report.consistencyIssues.length}`);
+  console.log(`Total issues: ${report.allIssues.length}`);
+  console.log('');
+
+  if (report.dryRunReport?.wouldFix?.length > 0) {
+    console.log('Would FIX:');
+    for (const fix of report.dryRunReport.wouldFix) {
+      console.log(`  ✓ ${fix}`);
+    }
+  } else {
+    console.log('Would FIX: (none)');
+  }
+
+  if (report.dryRunReport?.wouldSkip?.length > 0) {
+    console.log('');
+    console.log('Would SKIP:');
+    for (const skip of report.dryRunReport.wouldSkip) {
+      console.log(`  ✗ ${skip}`);
+    }
+  }
+
+  console.log(`${'='.repeat(60)}\n`);
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -3316,6 +3737,12 @@ module.exports = {
   // Final consistency checks
   evaluateConsistencyAcrossImages,
   runFinalConsistencyChecks,
+
+  // Incremental consistency checks
+  evaluateIncrementalConsistency,
+  mergeEvaluationIssues,
+  logDryRunReport,
+  INCREMENTAL_CONSISTENCY_DEFAULTS,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,

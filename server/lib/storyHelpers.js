@@ -1912,6 +1912,7 @@ ${historicalGuide}${locationsSection}
       STORY_TOPIC: storyTopic || 'None',
       CATEGORY_GUIDELINES: categoryGuidelines,
       STORY_DETAILS: inputData.storyDetails || 'None',
+      SEASON: inputData.season ? `${inputData.season.charAt(0).toUpperCase() + inputData.season.slice(1)} - include seasonal weather, activities, and atmosphere` : 'Not specified',
       DEDICATION: inputData.dedication || 'None',
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection
     });

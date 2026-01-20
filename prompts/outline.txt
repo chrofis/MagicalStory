@@ -28,6 +28,7 @@ Your task is to create a compelling, well-structured story outline that will gui
 - **Story Theme/Setting**: {STORY_TYPE}
 - **Story Topic**: {STORY_TOPIC}
 - **Story Details**: {STORY_DETAILS}
+- **Season**: {SEASON}
 - **Characters**: {CHARACTERS}
 - **Character Base Clothing**: {CHARACTER_CLOTHING}
 

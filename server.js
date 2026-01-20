@@ -10117,6 +10117,15 @@ async function processStoryJob(jobId) {
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
     const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
 
+    // Incremental consistency check options (check each image against previous N images)
+    const incrementalConsistencyOptions = inputData.incrementalConsistency || {};
+    const enableIncrementalConsistency = incrementalConsistencyOptions.enabled === true;
+    const incrementalConsistencyDryRun = incrementalConsistencyOptions.dryRun === true;
+    const incrementalConsistencyLookback = incrementalConsistencyOptions.lookbackCount || 3;
+    if (enableIncrementalConsistency) {
+      log.debug(`🔍 [PIPELINE] Incremental consistency check ENABLED (lookback: ${incrementalConsistencyLookback}, dryRun: ${incrementalConsistencyDryRun})`);
+    }
+
     // Check if user is admin (for including debug images in repair history)
     const userResult = await dbPool.query('SELECT role FROM users WHERE id = $1', [job.user_id]);
     const isAdmin = userResult.rows.length > 0 && userResult.rows[0].role === 'admin';
@@ -11219,6 +11228,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
         let previousImage = null;
         const pageTextsForContext = {}; // Track page texts for previous scenes context
         const pageClothingForContext = {}; // Track clothing for consistency
+        const previousImagesForConsistency = []; // Track images for incremental consistency checks
 
         // Scene description model override for sequential mode
         const seqSceneModelOverride = modelOverrides.sceneDescriptionModel || null;
@@ -11348,12 +11358,28 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
             }
 
+            // Build incrementalConsistency options with previous images
+            let incrementalConsistencyConfig = null;
+            if (enableIncrementalConsistency && previousImagesForConsistency.length > 0) {
+              // Get last N images for comparison
+              const lookbackImages = previousImagesForConsistency.slice(-incrementalConsistencyLookback);
+              incrementalConsistencyConfig = {
+                enabled: true,
+                dryRun: incrementalConsistencyDryRun,
+                lookbackCount: incrementalConsistencyLookback,
+                previousImages: lookbackImages
+              };
+            }
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
                 // Use quality retry to regenerate if score is below threshold
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
+                imageResult = await generateImageWithQualityRetry(
+                  imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`,
+                  { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrementalConsistencyConfig }
+                );
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -11368,6 +11394,24 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             // Store this image as the previous image for the next iteration
             previousImage = imageResult.imageData;
+
+            // Store image data for incremental consistency checks on future pages
+            if (enableIncrementalConsistency) {
+              // Build clothing info for each character in this scene
+              const clothingInfo = {};
+              for (const char of sceneCharacters) {
+                const charClothing = char.clothing?.current?.[clothingCategory] || char.clothing?.current?.standard || null;
+                clothingInfo[char.name] = charClothing
+                  ? `${charClothing.top || ''} ${charClothing.bottom || ''} ${charClothing.accessories || ''}`.trim()
+                  : clothingRaw;
+              }
+              previousImagesForConsistency.push({
+                imageData: imageResult.imageData,
+                pageNumber: pageNum,
+                characters: sceneCharacters.map(c => c.name),
+                clothing: clothingInfo
+              });
+            }
 
             const imageData = {
               pageNumber: pageNum,
