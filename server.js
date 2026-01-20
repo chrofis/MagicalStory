@@ -6308,7 +6308,7 @@ class ProgressiveStoryPageParser {
 
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false, incrementalConsistencyConfig = null) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // Generation logger for tracking API usage and debugging
@@ -7247,7 +7247,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }
 
       // Helper function to generate a single image (used for sequential mode)
-      const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null) => {
+      const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null, incrConfig = null) => {
         const pageNum = scene.pageNumber;
         try {
           // DEBUG: Log available characters before filtering
@@ -7325,7 +7325,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
               const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrConfig });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -7358,7 +7358,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalImage: imageResult.originalImage || null,
             originalScore: imageResult.originalScore || null,
             originalReasoning: imageResult.originalReasoning || null,
-            referencePhotos
+            referencePhotos,
+            sceneCharacters  // Include for incremental consistency tracking
           };
         } catch (error) {
           log.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
@@ -7368,29 +7369,69 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             description: scene.description,
             prompt: null,
             error: error.message,
-            referencePhotos: []
+            referencePhotos: [],
+            sceneCharacters: []
           };
         }
       };
 
-      if (imageGenMode === 'sequential') {
-        // SEQUENTIAL MODE: Generate images one at a time, passing previous for consistency
-        console.log(`🔗 [STORYBOOK] Starting SEQUENTIAL image generation for ${allSceneDescriptions.length} scenes...`);
+      // Use sequential mode for either explicit sequential setting or incremental consistency
+      const useSequentialMode = imageGenMode === 'sequential' || incrementalConsistencyConfig?.enabled;
+
+      if (useSequentialMode) {
+        // SEQUENTIAL MODE: Generate images one at a time
+        // Required for incremental consistency (comparing against previous images)
+        const modeReason = incrementalConsistencyConfig?.enabled
+          ? `incremental consistency (lookback: ${incrementalConsistencyConfig.lookbackCount})`
+          : 'sequential image mode';
+        console.log(`🔗 [STORYBOOK] Starting SEQUENTIAL image generation for ${allSceneDescriptions.length} scenes (${modeReason})...`);
         if (visualBible) {
           log.debug(`📖 [STORYBOOK] Using visual bible for image generation`);
         }
         let previousImage = null;
+        const previousImagesForConsistency = [];
 
         for (let i = 0; i < allSceneDescriptions.length; i++) {
           const scene = allSceneDescriptions[i];
-          log.debug(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${scene.pageNumber}...`);
+          const pageNum = scene.pageNumber;
+          log.debug(`🔗 [STORYBOOK SEQUENTIAL ${i + 1}/${allSceneDescriptions.length}] Processing page ${pageNum}...`);
 
-          const result = await generateImage(scene, i, previousImage, true, visualBible); // isSequential = true, with visual bible
+          // Build incremental consistency config with previous images
+          let incrConfig = null;
+          if (incrementalConsistencyConfig?.enabled && previousImagesForConsistency.length > 0) {
+            const lookbackImages = previousImagesForConsistency.slice(-incrementalConsistencyConfig.lookbackCount);
+            incrConfig = {
+              enabled: true,
+              dryRun: incrementalConsistencyConfig.dryRun,
+              lookbackCount: incrementalConsistencyConfig.lookbackCount,
+              previousImages: lookbackImages
+            };
+            log.debug(`🔍 [STORYBOOK] Page ${pageNum}: checking against ${lookbackImages.length} previous page(s)`);
+          }
+
+          const result = await generateImage(scene, i, previousImage, true, visualBible, incrConfig); // isSequential = true, with visual bible
           allImages.push(result);
 
           // Use this image as reference for next image
           if (result.imageData) {
             previousImage = result.imageData;
+
+            // Track for incremental consistency
+            if (incrementalConsistencyConfig?.enabled) {
+              const clothingInfo = {};
+              for (const char of (result.sceneCharacters || [])) {
+                const charClothing = char.clothing?.current?.standard || null;
+                clothingInfo[char.name] = charClothing
+                  ? `${charClothing.top || ''} ${charClothing.bottom || ''} ${charClothing.accessories || ''}`.trim()
+                  : '';
+              }
+              previousImagesForConsistency.push({
+                imageData: result.imageData,
+                pageNumber: pageNum,
+                characters: (result.sceneCharacters || []).map(c => c.name),
+                clothing: clothingInfo
+              });
+            }
           }
         }
 
@@ -8109,7 +8150,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false, incrementalConsistencyConfig = null) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -9153,7 +9194,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.info(`🌍 [UNIFIED] Landmark photos ready: ${successCount}/${landmarkCount} fetched successfully`);
     }
 
-    // PHASE 5: Generate page images (parallel with rate limiting)
+    // PHASE 5: Generate page images
+    // Sequential mode when incremental consistency is enabled, parallel otherwise
     genLog.setStage('images');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -9161,155 +9203,212 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
 
     timing.pagesStart = Date.now();
-    const imageLimit = pLimit(5);
-    const allImages = await Promise.all(
-      expandedScenes.map((scene, index) => imageLimit(async () => {
-        const pageNum = scene.pageNumber;
-        const progressPercent = 50 + Math.floor((index / expandedScenes.length) * 40);
+    let allImages;
 
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [progressPercent, `Generating illustration ${pageNum}/${expandedScenes.length}...`, jobId]
-        );
+    // Helper function to generate a single page image (shared between parallel and sequential modes)
+    const generatePageImage = async (scene, index, incrConfig = null) => {
+      const pageNum = scene.pageNumber;
+      const progressPercent = 50 + Math.floor((index / expandedScenes.length) * 40);
 
-        const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [progressPercent, `Generating illustration ${pageNum}/${expandedScenes.length}...`, jobId]
+      );
 
-        // Build per-character clothing lookup from scene.characterClothing
-        // scene.characterClothing = { "Lukas": "costumed:superhero", "Franziska": "standard" }
-        const perCharClothing = scene.characterClothing || {};
+      const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
 
-        // Get default clothing (fallback for characters not in the map)
-        const defaultClothing = Object.values(perCharClothing)[0] || 'standard';
-        let defaultCategory = defaultClothing;
-        let defaultCostumeType = null;
-        if (defaultClothing.startsWith('costumed:')) {
-          defaultCategory = 'costumed';
-          defaultCostumeType = defaultClothing.split(':')[1];
+      // Build per-character clothing lookup from scene.characterClothing
+      // scene.characterClothing = { "Lukas": "costumed:superhero", "Franziska": "standard" }
+      const perCharClothing = scene.characterClothing || {};
+
+      // Get default clothing (fallback for characters not in the map)
+      const defaultClothing = Object.values(perCharClothing)[0] || 'standard';
+      let defaultCategory = defaultClothing;
+      let defaultCostumeType = null;
+      if (defaultClothing.startsWith('costumed:')) {
+        defaultCategory = 'costumed';
+        defaultCostumeType = defaultClothing.split(':')[1];
+      }
+
+      // Pass per-character clothing requirements merged with story-level requirements
+      // Each character's clothing category from scene.characterClothing
+      const sceneClothingRequirements = { ...clothingRequirements };
+      for (const char of sceneCharacters) {
+        // Find clothing using trimmed name comparison (handles trailing whitespace)
+        const charNameTrimmed = char.name.trim().toLowerCase();
+        const charClothing = Object.entries(perCharClothing).find(
+          ([name]) => name.trim().toLowerCase() === charNameTrimmed
+        )?.[1] || defaultClothing;
+        if (!sceneClothingRequirements[char.name]) {
+          sceneClothingRequirements[char.name] = {};
         }
+        // Add the current scene's clothing selection
+        sceneClothingRequirements[char.name]._currentClothing = charClothing;
+      }
 
-        // Pass per-character clothing requirements merged with story-level requirements
-        // Each character's clothing category from scene.characterClothing
-        const sceneClothingRequirements = { ...clothingRequirements };
-        for (const char of sceneCharacters) {
-          // Find clothing using trimmed name comparison (handles trailing whitespace)
-          const charNameTrimmed = char.name.trim().toLowerCase();
-          const charClothing = Object.entries(perCharClothing).find(
-            ([name]) => name.trim().toLowerCase() === charNameTrimmed
-          )?.[1] || defaultClothing;
-          if (!sceneClothingRequirements[char.name]) {
-            sceneClothingRequirements[char.name] = {};
-          }
-          // Add the current scene's clothing selection
-          sceneClothingRequirements[char.name]._currentClothing = charClothing;
-        }
+      let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultCategory, defaultCostumeType, inputData.artStyle, sceneClothingRequirements);
+      // Apply styled avatars for non-costumed characters
+      if (defaultCategory !== 'costumed') {
+        pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+      }
 
-        let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultCategory, defaultCostumeType, inputData.artStyle, sceneClothingRequirements);
-        // Apply styled avatars for non-costumed characters
-        if (defaultCategory !== 'costumed') {
-          pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
-        }
-
-        // Log avatar selections for each character
-        for (const photo of pagePhotos) {
-          if (photo.photoType === 'none' || !photo.hasPhoto) {
-            genLog.avatarFallback(photo.name, `No avatar found for ${effectiveCategory}`, {
-              pageNumber: pageNum,
-              requestedCategory: effectiveCategory,
-              costumeType
-            });
-          } else {
-            genLog.avatarLookup(photo.name, `Using ${photo.photoType}${photo.isStyled ? ' (styled)' : ''}`, {
-              pageNumber: pageNum,
-              photoType: photo.photoType,
-              isStyled: photo.isStyled,
-              clothingCategory: photo.clothingCategory
-            });
-          }
-        }
-
-        // Get landmark photos for this scene from metadata objects like "Burgruine Stein [LOC002]"
-        const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
-        const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
-        if (pageLandmarkPhotos.length > 0) {
-          log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
-        }
-        const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
-
-        const imagePrompt = buildImagePrompt(
-          scene.sceneDescription,
-          inputData,
-          sceneCharacters,
-          false,
-          visualBible,
-          pageNum,
-          true,
-          allReferencePhotos
-        );
-
-        const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-
-        // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
-        const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
-          if (imgUsage) {
-            // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
-            const isRunware = imgModel && imgModel.startsWith('runware:');
-            const provider = isRunware ? 'runware' : 'gemini_image';
-            const funcName = isInpaint ? 'inpaint' : 'page_images';
-            addUsage(provider, imgUsage, funcName, imgModel);
-          }
-          if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
-        };
-
-        const imageResult = await generateImageWithQualityRetry(
-          imagePrompt,
-          allReferencePhotos,
-          null,
-          'scene',
-          null,
-          pageUsageTracker,
-          null,
-          pageModelOverrides,
-          `PAGE ${pageNum}`,
-          { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length }
-        );
-
-        if (imageResult?.imageData) {
-
-          // Save partial_page checkpoint for progressive display
-          await saveCheckpoint(jobId, 'partial_page', {
+      // Log avatar selections for each character
+      for (const photo of pagePhotos) {
+        if (photo.photoType === 'none' || !photo.hasPhoto) {
+          genLog.avatarFallback(photo.name, `No avatar found for ${defaultCategory}`, {
             pageNumber: pageNum,
-            text: scene.text,
-            sceneDescription: scene.sceneDescription,
-            imageData: imageResult.imageData,
-            qualityScore: imageResult.score,
-            modelId: imageResult.modelId
-          }, pageNum);
-          log.debug(`💾 [UNIFIED] Saved page ${pageNum} for progressive display`);
+            requestedCategory: defaultCategory,
+            costumeType: defaultCostumeType
+          });
+        } else {
+          genLog.avatarLookup(photo.name, `Using ${photo.photoType}${photo.isStyled ? ' (styled)' : ''}`, {
+            pageNumber: pageNum,
+            photoType: photo.photoType,
+            isStyled: photo.isStyled,
+            clothingCategory: photo.clothingCategory
+          });
         }
+      }
 
-        return {
+      // Get landmark photos for this scene from metadata objects like "Burgruine Stein [LOC002]"
+      const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+      const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
+      if (pageLandmarkPhotos.length > 0) {
+        log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+      }
+      const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
+
+      const imagePrompt = buildImagePrompt(
+        scene.sceneDescription,
+        inputData,
+        sceneCharacters,
+        false,
+        visualBible,
+        pageNum,
+        true,
+        allReferencePhotos
+      );
+
+      const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
+
+      // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
+      const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
+        if (imgUsage) {
+          // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+          const isRunware = imgModel && imgModel.startsWith('runware:');
+          const provider = isRunware ? 'runware' : 'gemini_image';
+          const funcName = isInpaint ? 'inpaint' : 'page_images';
+          addUsage(provider, imgUsage, funcName, imgModel);
+        }
+        if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
+      };
+
+      const imageResult = await generateImageWithQualityRetry(
+        imagePrompt,
+        allReferencePhotos,
+        null,
+        'scene',
+        null,
+        pageUsageTracker,
+        null,
+        pageModelOverrides,
+        `PAGE ${pageNum}`,
+        { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfig }
+      );
+
+      if (imageResult?.imageData) {
+
+        // Save partial_page checkpoint for progressive display
+        await saveCheckpoint(jobId, 'partial_page', {
           pageNumber: pageNum,
           text: scene.text,
-          description: scene.sceneDescription,
-          outlineExtract: scene.outlineExtract || scene.sceneHint || '',  // Short scene hint for re-expansion
-          imageData: imageResult?.imageData || null,
-          prompt: imagePrompt,
-          // Dev mode: Art Director prompt used to create scene description
-          sceneDescriptionPrompt: scene.sceneDescriptionPrompt,
-          sceneDescriptionModelId: scene.sceneDescriptionModelId,
-          // Include quality info if available
-          qualityScore: imageResult?.score,
-          qualityReasoning: imageResult?.reasoning,
-          wasRegenerated: imageResult?.wasRegenerated,
-          totalAttempts: imageResult?.totalAttempts,
-          retryHistory: imageResult?.retryHistory,
-          // Dev mode: which reference photos/avatars were used
-          referencePhotos: pagePhotos,
-          // Landmark photos (separate for frontend display)
-          landmarkPhotos: pageLandmarkPhotos
-        };
-      }))
-    );
+          sceneDescription: scene.sceneDescription,
+          imageData: imageResult.imageData,
+          qualityScore: imageResult.score,
+          modelId: imageResult.modelId
+        }, pageNum);
+        log.debug(`💾 [UNIFIED] Saved page ${pageNum} for progressive display`);
+      }
+
+      return {
+        pageNumber: pageNum,
+        text: scene.text,
+        description: scene.sceneDescription,
+        outlineExtract: scene.outlineExtract || scene.sceneHint || '',  // Short scene hint for re-expansion
+        imageData: imageResult?.imageData || null,
+        prompt: imagePrompt,
+        // Dev mode: Art Director prompt used to create scene description
+        sceneDescriptionPrompt: scene.sceneDescriptionPrompt,
+        sceneDescriptionModelId: scene.sceneDescriptionModelId,
+        // Include quality info if available
+        qualityScore: imageResult?.score,
+        qualityReasoning: imageResult?.reasoning,
+        wasRegenerated: imageResult?.wasRegenerated,
+        totalAttempts: imageResult?.totalAttempts,
+        retryHistory: imageResult?.retryHistory,
+        // Dev mode: which reference photos/avatars were used
+        referencePhotos: pagePhotos,
+        // Landmark photos (separate for frontend display)
+        landmarkPhotos: pageLandmarkPhotos,
+        // Include characters info for incremental consistency tracking
+        sceneCharacters
+      };
+    };
+
+    if (incrementalConsistencyConfig?.enabled) {
+      // SEQUENTIAL MODE for incremental consistency
+      // Generate images one at a time, comparing each against previous images
+      log.info(`🔍 [UNIFIED] Using SEQUENTIAL image generation for incremental consistency (lookback: ${incrementalConsistencyConfig.lookbackCount})`);
+      const previousImagesForConsistency = [];
+      allImages = [];
+
+      for (let index = 0; index < expandedScenes.length; index++) {
+        const scene = expandedScenes[index];
+        const pageNum = scene.pageNumber;
+
+        // Build incremental consistency config with previous images
+        let incrConfig = null;
+        if (previousImagesForConsistency.length > 0) {
+          const lookbackImages = previousImagesForConsistency.slice(-incrementalConsistencyConfig.lookbackCount);
+          incrConfig = {
+            enabled: true,
+            dryRun: incrementalConsistencyConfig.dryRun,
+            lookbackCount: incrementalConsistencyConfig.lookbackCount,
+            previousImages: lookbackImages
+          };
+          log.debug(`🔍 [UNIFIED] Page ${pageNum}: checking against ${lookbackImages.length} previous page(s)`);
+        }
+
+        // Generate image with incremental consistency
+        const pageResult = await generatePageImage(scene, index, incrConfig);
+        allImages.push(pageResult);
+
+        // Track this image for future consistency checks
+        if (pageResult.imageData) {
+          // Build clothing info for each character in this scene
+          const clothingInfo = {};
+          for (const char of (pageResult.sceneCharacters || [])) {
+            const charClothing = char.clothing?.current?.standard || null;
+            clothingInfo[char.name] = charClothing
+              ? `${charClothing.top || ''} ${charClothing.bottom || ''} ${charClothing.accessories || ''}`.trim()
+              : '';
+          }
+          previousImagesForConsistency.push({
+            imageData: pageResult.imageData,
+            pageNumber: pageNum,
+            characters: (pageResult.sceneCharacters || []).map(c => c.name),
+            clothing: clothingInfo
+          });
+        }
+      }
+    } else {
+      // PARALLEL MODE (default) - faster but no incremental consistency
+      log.debug(`🖼️ [UNIFIED] Using PARALLEL image generation (5 concurrent)`);
+      const imageLimit = pLimit(5);
+      allImages = await Promise.all(
+        expandedScenes.map((scene, index) => imageLimit(() => generatePageImage(scene, index, null)))
+      );
+    }
 
     timing.pagesEnd = Date.now();
     timing.end = Date.now();
@@ -10427,15 +10526,22 @@ async function processStoryJob(jobId) {
       ['processing', 5, 'Starting story generation...', jobId]
     );
 
+    // Build incremental consistency config for passing to processing functions
+    const incrementalConsistencyConfig = enableIncrementalConsistency ? {
+      enabled: true,
+      dryRun: incrementalConsistencyDryRun,
+      lookbackCount: incrementalConsistencyLookback
+    } : null;
+
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks, incrementalConsistencyConfig);
     }
 
     if (generationMode === 'pictureBook') {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks, incrementalConsistencyConfig);
     }
 
     // outlineAndText mode (legacy): Separate outline + text generation

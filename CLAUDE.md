@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Do not automatically deploy.** Always ask before deploying.
 - **Ask if unclear.** If there are different implementation options, ask rather than assuming.
+- **Unified mode is primary.** All new features and developer options must work in unified mode (the default story generation mode). Don't implement features only for legacy modes (pictureBook, outlineAndText) - unified mode is the mode the user wants to use.
 
 ## Folder Organization Rules
 
