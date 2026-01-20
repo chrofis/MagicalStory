@@ -137,18 +137,20 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       const allProductsResult = await dbPool.query(
         'SELECT product_uid, product_name, cover_type, min_pages, max_pages FROM gelato_products WHERE is_active = true'
       );
-      log.debug(`📦 [BACKGROUND] Active products: ${allProductsResult.rows.length}, looking for "${coverType}" with ${printPageCount} pages`);
+      log.debug(`📦 [BACKGROUND] Active products: ${allProductsResult.rows.length}, looking for "${coverType}" + "${bookFormat}" with ${printPageCount} pages`);
       allProductsResult.rows.forEach((p, i) => {
         log.debug(`   ${i+1}. "${p.product_name}" cover_type="${p.cover_type}" pages=${p.min_pages}-${p.max_pages}`);
       });
 
-      // Match by product_uid pattern since cover_type column may be null
+      // Match by product_uid pattern for both coverType AND bookFormat
+      // Book formats: 'square' = 200x200mm, 'A4' = 210x280mm (portrait)
+      const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
       const productsResult = await dbPool.query(
-        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1',
-        [`%${coverType.toLowerCase()}%`]
+        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
+        [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
       );
 
-      log.debug(`📦 [BACKGROUND] Products matching "${coverType}": ${productsResult.rows.length}`);
+      log.debug(`📦 [BACKGROUND] Products matching "${coverType}" + "${formatPattern}": ${productsResult.rows.length}`);
 
       if (productsResult.rows.length > 0) {
         // Find product matching the page count using min/max range
@@ -158,14 +160,14 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
         if (matchingProduct) {
           printProductUid = matchingProduct.product_uid;
-          console.log(`✅ [BACKGROUND] Found matching ${coverType} product: ${matchingProduct.product_name}`);
+          console.log(`✅ [BACKGROUND] Found matching ${coverType} ${bookFormat} product: ${matchingProduct.product_name}`);
         } else {
-          log.warn(`[BACKGROUND] No ${coverType} product matches page count ${printPageCount}`);
+          log.warn(`[BACKGROUND] No ${coverType} ${bookFormat} product matches page count ${printPageCount}`);
         }
       } else {
         // Log all products to help debug
         const availableTypes = allProductsResult.rows.map(p => `"${p.cover_type}"`).join(', ');
-        log.warn(`[BACKGROUND] No active ${coverType} products found. Available cover_types: ${availableTypes || 'none'}`);
+        log.warn(`[BACKGROUND] No active ${coverType} ${bookFormat} products found. Available cover_types: ${availableTypes || 'none'}`);
       }
     } catch (err) {
       log.error('❌ [BACKGROUND] Error fetching products:', err.message);
