@@ -80,18 +80,18 @@ const stripeLegacy = (!stripeTest && process.env.STRIPE_TEST_API_KEY)
   ? require('stripe')(process.env.STRIPE_TEST_API_KEY)
   : null;
 
-// Helper: Get appropriate Stripe client for user (admins get test mode)
+// Helper: Get appropriate Stripe client for user (admins and impersonating admins get test mode)
 function getStripeForUser(user) {
-  const isTestMode = user?.role === 'admin';
-  if (isTestMode) {
+  if (isUserTestMode(user)) {
     return stripeTest || stripeLegacy;
   }
   return stripeLive || stripeTest || stripeLegacy; // fallback chain for live users
 }
 
 // Helper: Check if user should use test mode
+// Admins AND impersonating admins use test mode (Gelato drafts, test Stripe)
 function isUserTestMode(user) {
-  return user?.role === 'admin';
+  return user?.role === 'admin' || user?.impersonating === true;
 }
 
 // Log Stripe configuration on startup
