@@ -1313,9 +1313,9 @@ export const storyService = {
   },
 
   // PDF generation
-  async generatePdf(storyId: string): Promise<Blob> {
+  async generatePdf(storyId: string, bookFormat: 'square' | 'A4' = 'square'): Promise<Blob> {
     const token = localStorage.getItem('auth_token');
-    const response = await fetch(`/api/stories/${storyId}/pdf`, {
+    const response = await fetch(`/api/stories/${storyId}/pdf?format=${bookFormat}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!response.ok) {
@@ -1325,11 +1325,12 @@ export const storyService = {
   },
 
   // Stripe checkout for book purchase (supports single story or multiple stories)
-  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover'): Promise<{ url: string }> {
+  async createCheckoutSession(storyIds: string | string[], coverType?: 'softcover' | 'hardcover', bookFormat?: 'square' | 'A4'): Promise<{ url: string }> {
     const ids = Array.isArray(storyIds) ? storyIds : [storyIds];
     const response = await api.post<{ url: string }>('/api/stripe/create-checkout-session', {
       storyIds: ids,
       coverType: coverType || 'softcover',
+      bookFormat: bookFormat || 'square',
     });
     return response;
   },

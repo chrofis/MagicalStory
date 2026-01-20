@@ -19,8 +19,8 @@ const BOOK_FORMATS = {
     coverWidth: mmToPoints(416),   // back + spine + front with bleed
     coverHeight: mmToPoints(206),
   },
-  // 21x28cm portrait format (more text space)
-  'portrait': {
+  // A4-based format: 21x28cm (more text space)
+  'A4': {
     pageWidth: mmToPoints(210),
     pageHeight: mmToPoints(280),
     coverWidth: mmToPoints(436),   // back + spine + front with bleed (210*2 + spine + bleed)
@@ -523,11 +523,18 @@ async function generateCombinedBookPdf(stories) {
  * Layout: Front cover → Initial page → Story pages → Back cover (all separate pages)
  *
  * @param {Object} storyData - Story data with coverImages, sceneImages, storyText, etc.
+ * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
  * @returns {Promise<Buffer>} PDF buffer
  */
-async function generateViewPdf(storyData) {
+async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
+  // Get dimensions for the selected format
+  const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
+  const { pageWidth, pageHeight } = format;
+
+  log.debug(`📄 [VIEW PDF] Using format: ${bookFormat} (${Math.round(pageWidth / 2.83465)}x${Math.round(pageHeight / 2.83465)}mm)`);
+
   const doc = new PDFDocument({
-    size: [PAGE_SIZE, PAGE_SIZE],
+    size: [pageWidth, pageHeight],
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
     autoFirstPage: false
   });
@@ -542,10 +549,10 @@ async function generateViewPdf(storyData) {
   // 1. FRONT COVER (first page - different from print which has back+front spread)
   const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
   if (frontCoverImageData) {
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      doc.image(frontCoverBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+      doc.image(frontCoverBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
     } catch (err) {
       log.error('Error adding front cover:', err.message);
     }
@@ -554,10 +561,10 @@ async function generateViewPdf(storyData) {
   // 2. INITIAL PAGE (dedication/intro)
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
   if (initialPageImageData) {
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      doc.image(initialPageBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+      doc.image(initialPageBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
     } catch (err) {
       log.error('Error adding initial page:', err.message);
     }
@@ -572,19 +579,36 @@ async function generateViewPdf(storyData) {
   const isPictureBook = storyData.languageLevel === '1st-grade';
   log.debug(`📄 [VIEW PDF] Generating with ${storyPages.length} pages, layout: ${isPictureBook ? 'Picture Book' : 'Standard'}`);
 
+  // Calculate consistent font size for all pages
+  let consistentFontSize;
   if (isPictureBook) {
-    addPictureBookPages(doc, storyData, storyPages);
+    const textMargin = mmToPoints(3);
+    const textWidth = pageWidth - (textMargin * 2);
+    const textAreaHeight = pageHeight * 0.15;
+    const availableTextHeight = textAreaHeight - textMargin;
+    const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, 14, 6, 'center');
+    consistentFontSize = fontResult.fontSize;
   } else {
-    addStandardPages(doc, storyData, storyPages);
+    const margin = 28;
+    const availableWidth = pageWidth - (margin * 2);
+    const availableHeight = (pageHeight - (margin * 2)) * 0.9;
+    const fontResult = calculateConsistentFontSize(doc, storyPages, availableWidth, availableHeight, 13, 6, 'left');
+    consistentFontSize = fontResult.fontSize;
+  }
+
+  if (isPictureBook) {
+    addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
+  } else {
+    addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
   }
 
   // 4. BACK COVER (last page)
   const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
   if (backCoverImageData) {
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     try {
       const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-      doc.image(backCoverBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+      doc.image(backCoverBuffer, 0, 0, { fit: [pageWidth, pageHeight], align: 'center', valign: 'center' });
     } catch (err) {
       log.error('Error adding back cover:', err.message);
     }

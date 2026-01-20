@@ -19,15 +19,16 @@ const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
  * @param {Object} shippingAddress - Shipping address
  * @param {boolean} isTestPayment - Whether this is a test payment (creates draft order)
  * @param {string} coverType - Cover type: 'softcover' or 'hardcover'
+ * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'A4' (210x280mm)
  */
-async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover') {
+async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInfo, shippingAddress, isTestPayment = false, coverType = 'softcover', bookFormat = 'square') {
   // Normalize storyIds to array (backwards compatible with single storyId)
   const allStoryIds = Array.isArray(storyIds) ? storyIds : [storyIds];
 
   console.log(`📚 [BACKGROUND] Starting book order processing for session ${sessionId}`);
   log.debug(`   Stories: ${allStoryIds.length} (${allStoryIds.join(', ')})`);
   log.debug(`   Payment mode: ${isTestPayment ? 'TEST (Gelato draft)' : 'LIVE (real Gelato order)'}`);
-  log.debug(`   Cover type: ${coverType}`);
+  log.debug(`   Cover type: ${coverType}, Book format: ${bookFormat}`);
 
   // Determine Gelato order type based on payment mode
   const gelatoOrderType = isTestPayment ? 'draft' : 'order';
@@ -72,13 +73,13 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     let pdfBuffer, targetPageCount;
 
     if (stories.length === 1) {
-      // Single story - use existing generatePrintPdf
-      log.debug('📄 [BACKGROUND] Generating single-story PDF...');
-      const result = await generatePrintPdf(stories[0].data);
+      // Single story - use existing generatePrintPdf with format
+      log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
+      const result = await generatePrintPdf(stories[0].data, bookFormat);
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     } else {
-      // Multiple stories - generate combined book PDF
+      // Multiple stories - generate combined book PDF (format not yet supported for multi-story)
       log.debug('📄 [BACKGROUND] Generating combined multi-story PDF...');
       const result = await generateCombinedBookPdf(stories);
       pdfBuffer = result.pdfBuffer;

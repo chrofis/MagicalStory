@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2 } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
@@ -86,7 +86,7 @@ interface StoryDisplayProps {
   languageLevel?: LanguageLevel;
   storyLanguage?: StoryLanguageCode;  // Language of the story content (for correct labels)
   isGenerating?: boolean;
-  onDownloadPdf?: () => void;
+  onDownloadPdf?: (bookFormat: 'square' | 'A4') => void;
   onAddToBook?: () => void;
   onPrintBook?: () => void;
   onCreateAnother?: () => void;
@@ -233,6 +233,10 @@ export function StoryDisplay({
 
   // Enlarged image modal for repair before/after comparison
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
+
+  // PDF format selection dropdown
+  const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('square');
+  const [showPdfFormatDropdown, setShowPdfFormatDropdown] = useState(false);
 
   // Update edited story when story prop changes (e.g., after save)
   useEffect(() => {
@@ -798,17 +802,56 @@ export function StoryDisplay({
           </button>
         )}
 
-        {/* PDF Download */}
+        {/* PDF Download with Format Selector */}
         {hasImages && onDownloadPdf && (
-          <button
-            onClick={onDownloadPdf}
-            disabled={isGenerating}
-            className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-            }`}
-          >
-            <FileText size={16} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => setShowPdfFormatDropdown(!showPdfFormatDropdown)}
+              disabled={isGenerating}
+              className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full ${
+                isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+              }`}
+            >
+              <FileText size={16} />
+              {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
+              <ChevronDown size={14} className={`transition-transform ${showPdfFormatDropdown ? 'rotate-180' : ''}`} />
+            </button>
+            {showPdfFormatDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+                <div className="p-2 space-y-1">
+                  <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pdfFormat"
+                      checked={pdfFormat === 'square'}
+                      onChange={() => setPdfFormat('square')}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm text-gray-700">Square (20×20cm)</span>
+                  </label>
+                  <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pdfFormat"
+                      checked={pdfFormat === 'A4'}
+                      onChange={() => setPdfFormat('A4')}
+                      className="text-indigo-600"
+                    />
+                    <span className="text-sm text-gray-700">A4 (21×28cm)</span>
+                  </label>
+                </div>
+                <button
+                  onClick={() => {
+                    onDownloadPdf(pdfFormat);
+                    setShowPdfFormatDropdown(false);
+                  }}
+                  className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
+                >
+                  {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Edit Story */}
@@ -3374,17 +3417,56 @@ export function StoryDisplay({
               </button>
             )}
 
-            {/* PDF Download */}
+            {/* PDF Download with Format Selector */}
             {onDownloadPdf && (
-              <button
-                onClick={onDownloadPdf}
-                disabled={isGenerating}
-                className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                }`}
-              >
-                <FileText size={16} /> {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowPdfFormatDropdown(!showPdfFormatDropdown)}
+                  disabled={isGenerating}
+                  className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full ${
+                    isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                  }`}
+                >
+                  <FileText size={16} />
+                  {language === 'de' ? 'PDF herunterladen' : language === 'fr' ? 'Télécharger PDF' : 'Download PDF'}
+                  <ChevronDown size={14} className={`transition-transform ${showPdfFormatDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showPdfFormatDropdown && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 z-50 overflow-hidden">
+                    <div className="p-2 space-y-1">
+                      <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pdfFormat2"
+                          checked={pdfFormat === 'square'}
+                          onChange={() => setPdfFormat('square')}
+                          className="text-indigo-600"
+                        />
+                        <span className="text-sm text-gray-700">Square (20×20cm)</span>
+                      </label>
+                      <label className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="radio"
+                          name="pdfFormat2"
+                          checked={pdfFormat === 'A4'}
+                          onChange={() => setPdfFormat('A4')}
+                          className="text-indigo-600"
+                        />
+                        <span className="text-sm text-gray-700">A4 (21×28cm)</span>
+                      </label>
+                    </div>
+                    <button
+                      onClick={() => {
+                        onDownloadPdf(pdfFormat);
+                        setShowPdfFormatDropdown(false);
+                      }}
+                      className="w-full py-2 bg-indigo-500 text-white text-sm font-semibold hover:bg-indigo-600"
+                    >
+                      {language === 'de' ? 'Herunterladen' : language === 'fr' ? 'Télécharger' : 'Download'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Edit Story */}

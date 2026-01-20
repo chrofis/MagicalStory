@@ -3637,9 +3637,9 @@ export default function StoryWizard() {
                 a.click();
                 URL.revokeObjectURL(url);
               }}
-              onDownloadPdf={storyId ? async () => {
+              onDownloadPdf={storyId ? async (bookFormat: 'square' | 'A4') => {
                 try {
-                  const blob = await storyService.generatePdf(storyId);
+                  const blob = await storyService.generatePdf(storyId, bookFormat);
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;

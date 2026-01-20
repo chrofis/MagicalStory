@@ -246,6 +246,39 @@ const photosRoutes = require('./server/routes/photos');
 const avatarsRoutes = require('./server/routes/avatars');
 const aiProxyRoutes = require('./server/routes/ai-proxy');
 
+/**
+ * Convert clothingRequirements to _currentClothing format for getCharacterPhotoDetails
+ * This ensures characters use the story's costumes (not 'standard' fallback) for covers
+ *
+ * @param {Object} clothingRequirements - Raw clothing requirements from story/streaming
+ * @returns {Object} - Converted requirements with _currentClothing set for each character
+ */
+function convertClothingToCurrentFormat(clothingRequirements) {
+  const converted = {};
+  for (const [charName, charData] of Object.entries(clothingRequirements || {})) {
+    if (typeof charData === 'string') {
+      // Flat format: "costumed:1889 belle epoque"
+      converted[charName] = { _currentClothing: charData };
+    } else if (charData && typeof charData === 'object') {
+      if (charData._currentClothing) {
+        // Already has _currentClothing, copy as-is
+        converted[charName] = { ...charData };
+      } else if (charData.costumed && charData.costumed.costume) {
+        // Nested format: { costumed: { costume: "1889 belle epoque", used: true } }
+        const costume = charData.costumed.costume;
+        converted[charName] = {
+          ...charData,
+          _currentClothing: `costumed:${costume}`
+        };
+      } else {
+        // No costume found, copy as-is
+        converted[charName] = { ...charData };
+      }
+    }
+  }
+  return converted;
+}
+
 // Initialize Firebase Admin SDK
 // Supports: FIREBASE_SERVICE_ACCOUNT_BASE64 (base64), FIREBASE_SERVICE_ACCOUNT (JSON string), or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
 let firebaseInitialized = false;
@@ -615,6 +648,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           const userId = parseInt(fullSession.metadata?.userId);
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
           const orderCoverType = fullSession.metadata?.coverType || 'softcover';
+          const orderBookFormat = fullSession.metadata?.bookFormat || 'square';
 
           // Validate required metadata
           if (!userId || isNaN(userId)) {
@@ -745,7 +779,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // Trigger background PDF generation and print provider order (don't await - fire and forget)
           // Pass isTestPayment so Gelato knows whether to create draft or real order
           // Now passing array of storyIds for combined book generation
-          processBookOrder(dbPool, fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType).catch(async (err) => {
+          processBookOrder(dbPool, fullSession.id, userId, validatedStoryIds, customerInfo, address, isTestPayment, orderCoverType, orderBookFormat).catch(async (err) => {
             log.error('❌ [BACKGROUND] Error processing book order:', err);
             log.error('   Error stack:', err.stack);
             log.error('   Session ID:', fullSession.id);
@@ -3303,7 +3337,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       coverCostumeType = coverClothing.split(':')[1];
       effectiveCoverClothing = 'costumed';
     }
-    const clothingRequirements = storyData.clothingRequirements || null;
+    // Convert clothingRequirements to _currentClothing format for proper avatar lookup
+    // This ensures regenerated covers use the story's costumes (not 'standard' fallback)
+    const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
 
     // Fetch fresh avatar data from characters table (fallback for missing avatars)
     const freshCharResult = await dbPool.query(
@@ -4172,9 +4208,10 @@ function updatePageText(storyText, pageNumber, newText) {
 }
 
 // Print Provider API - Create photobook order
+// Accepts bookFormat: 'square' (default) or 'A4'
 app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
   try {
-    let { storyId, pdfUrl, shippingAddress, orderReference, productUid, pageCount } = req.body;
+    let { storyId, pdfUrl, shippingAddress, orderReference, productUid, pageCount, bookFormat = 'square' } = req.body;
 
     // If storyId provided, look up story to get pdfUrl and pageCount
     if (storyId && !pdfUrl) {
@@ -4196,9 +4233,9 @@ app.post('/api/print-provider/order', authenticateToken, async (req, res) => {
       }
 
       // Generate fresh PDF using the shared print function (same as Buy Book)
-      log.debug(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}`);
+      log.debug(`🖨️ [PRINT] Generating fresh print PDF for story: ${storyId}, format: ${bookFormat}`);
       try {
-        const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData);
+        const { pdfBuffer, pageCount: generatedPageCount } = await generatePrintPdf(storyData, bookFormat);
         pageCount = generatedPageCount;
 
         // Save PDF temporarily to database for Gelato to fetch
@@ -4738,12 +4775,14 @@ app.get('/api/print-provider/products', async (req, res) => {
 
 // GET PDF for a story - for DOWNLOAD/VIEWING (different sequence than print)
 // Uses generateViewPdf from pdf.js library - no code duplication
+// Query params: format=square|A4 (default: square)
 app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
   try {
     const storyId = req.params.id;
     const userId = req.user.id;
+    const bookFormat = req.query.format === 'A4' ? 'A4' : 'square'; // Validate format
 
-    log.debug(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}`);
+    log.debug(`📄 [PDF DOWNLOAD] Generating viewable PDF for story: ${storyId}, format: ${bookFormat}`);
 
     // Fetch story from database
     const storyResult = await dbPool.query(
@@ -4762,7 +4801,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
     log.debug(`📄 [PDF DOWNLOAD] Story found: ${storyData.title}`);
 
     // Generate PDF using shared library function
-    const pdfBuffer = await generateViewPdf(storyData);
+    const pdfBuffer = await generateViewPdf(storyData, bookFormat);
 
     log.debug(`📄 [PDF DOWNLOAD] PDF generated successfully (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
@@ -4785,6 +4824,7 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
 
 // GET PRINT PDF for a story - ADMIN ONLY - uses same format as Buy Book/Print Book
 // This allows admins to preview the exact PDF that would be sent to Gelato for printing
+// Query params: format=square|A4 (default: square)
 app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
   try {
     // Admin only
@@ -4794,7 +4834,8 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     }
 
     const storyId = req.params.id;
-    log.debug(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}`);
+    const bookFormat = req.query.format === 'A4' ? 'A4' : 'square'; // Validate format
+    log.debug(`🖨️ [ADMIN PRINT PDF] Admin ${req.user.username} requesting print PDF for story: ${storyId}, format: ${bookFormat}`);
     console.log(`🖨️ [ADMIN PRINT PDF] Storage mode: ${STORAGE_MODE}, dbPool exists: ${!!dbPool}`);
 
     // Fetch story from database (admin can access any story)
@@ -4827,7 +4868,7 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
     log.debug(`🖨️ [ADMIN PRINT PDF] Story has: coverImages=${!!storyData.coverImages}, sceneImages=${storyData.sceneImages?.length || 0}, storyText=${!!storyData.storyText || !!storyData.generatedStory}`);
 
     // Generate print PDF using the shared function (same as Buy Book / Print Book)
-    const { pdfBuffer, pageCount } = await generatePrintPdf(storyData);
+    const { pdfBuffer, pageCount } = await generatePrintPdf(storyData, bookFormat);
 
     log.info(`🖨️ [ADMIN PRINT PDF] PDF generated: ${pageCount} pages, ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
@@ -5662,7 +5703,7 @@ async function getPriceForPages(pageCount, isHardcover) {
 app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, res) => {
   try {
     // Support both single storyId and array of storyIds
-    const { storyId, storyIds, coverType = 'softcover' } = req.body;
+    const { storyId, storyIds, coverType = 'softcover', bookFormat = 'square' } = req.body;
     const userId = req.user.id;
 
     // Normalize to array
@@ -5737,7 +5778,8 @@ app.post('/api/stripe/create-checkout-session', authenticateToken, async (req, r
         storyIds: JSON.stringify(allStoryIds),
         storyCount: stories.length.toString(),
         totalPages: totalPages.toString(),
-        coverType: coverType
+        coverType: coverType,
+        bookFormat: bookFormat
       },
       shipping_address_collection: {
         allowed_countries: ['DE', 'AT', 'CH', 'FR', 'IT', 'NL', 'BE', 'LU']
@@ -6634,6 +6676,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Get art style for avatar lookup
         const artStyleId = inputData.artStyle || 'pixar';
 
+        // Convert streamingClothingRequirements to _currentClothing format
+        // This ensures all characters use the story's costume (not 'standard' fallback)
+        const convertedClothingRequirements = convertClothingToCurrentFormat(streamingClothingRequirements);
+
         // Determine character selection based on cover type
         let referencePhotos;
         if (coverType === 'titlePage') {
@@ -6642,11 +6688,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
           // Fallback to all characters if no main characters defined
           const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
-          referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, costumeType, artStyleId, streamingClothingRequirements);
+          referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, costumeType, artStyleId, convertedClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         } else {
           // Initial page and back cover: ALL characters
-          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, streamingClothingRequirements);
+          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, convertedClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         }
         // Apply styled avatars for non-costumed characters
@@ -8380,7 +8426,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
 
         // Merge with streamingClothingRequirements (cover-specific takes precedence)
-        const mergedClothingRequirements = { ...streamingClothingRequirements };
+        // IMPORTANT: Convert streamingClothingRequirements to _currentClothing format for characters
+        // not explicitly mentioned in cover hint, so they use the story's costume (not 'standard')
+        const mergedClothingRequirements = convertClothingToCurrentFormat(streamingClothingRequirements);
+
+        // Then overlay cover-specific clothing (takes precedence)
         for (const [charName, data] of Object.entries(coverClothingRequirements)) {
           if (!mergedClothingRequirements[charName]) {
             mergedClothingRequirements[charName] = data;
