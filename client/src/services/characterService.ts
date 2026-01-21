@@ -104,6 +104,8 @@ interface CharacterApiResponse {
   // Generated outfits per page
   generated_outfits?: Record<number, unknown>;
   generatedOutfits?: Record<number, unknown>;
+  // Story role (persisted across sessions)
+  storyRole?: 'main' | 'in' | 'out';
 }
 
 // Convert API response to frontend Character
@@ -168,6 +170,8 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
       : undefined,
 
     generatedOutfits: (api.generated_outfits || api.generatedOutfits) as Record<number, GeneratedOutfit> | undefined,
+
+    storyRole: api.storyRole,
   };
 }
 
