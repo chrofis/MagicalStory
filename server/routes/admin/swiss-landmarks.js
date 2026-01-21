@@ -203,20 +203,25 @@ router.get('/', async (req, res) => {
     const showFull = full === 'true' || full === true;
     res.json({
       count: landmarks.length,
-      landmarks: landmarks.map(l => ({
-        id: l.id,
-        name: l.name,
-        type: l.type,
-        city: l.nearest_city,
-        canton: l.canton,
-        score: l.score,
-        photoUrl: l.photo_url,
-        photoDescription: showFull
-          ? l.photo_description
-          : (l.photo_description?.substring(0, 100) + (l.photo_description?.length > 100 ? '...' : '')),
-        latitude: l.latitude,
-        longitude: l.longitude
-      }))
+      landmarks: landmarks.map(l => {
+        const truncate = (text) => showFull ? text : (text?.substring(0, 100) + (text?.length > 100 ? '...' : ''));
+        return {
+          id: l.id,
+          name: l.name,
+          type: l.type,
+          city: l.nearest_city,
+          canton: l.canton,
+          score: l.score,
+          // Primary photo
+          photoUrl: l.photo_url,
+          photoDescription: truncate(l.photo_description),
+          // Second photo (if available)
+          photoUrl2: l.photo_url_2 || null,
+          photoDescription2: truncate(l.photo_description_2),
+          latitude: l.latitude,
+          longitude: l.longitude
+        };
+      })
     });
   } catch (err) {
     log.error('[ADMIN] Swiss landmarks list error:', err);
