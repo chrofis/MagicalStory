@@ -508,9 +508,23 @@ async function extractFaceThumbnail(imageBase64, box, padding = 0.6) {
     const imgWidth = metadata.width;
     const imgHeight = metadata.height;
 
-    // Add padding to bounding box
-    const padX = box.width * padding;
-    const padY = box.height * padding;
+    // For small face detections, use more aggressive padding
+    // Minimum crop should be at least 10% of image dimension
+    const minCropRatio = 0.10;
+    const minCropWidth = imgWidth * minCropRatio;
+    const minCropHeight = imgHeight * minCropRatio;
+
+    // Calculate padding - use more for small faces
+    let effectivePadding = padding;
+    if (box.width < minCropWidth || box.height < minCropHeight) {
+      // Small detection: calculate padding to reach minimum size
+      const neededPadX = Math.max(0, (minCropWidth - box.width) / 2);
+      const neededPadY = Math.max(0, (minCropHeight - box.height) / 2);
+      effectivePadding = Math.max(padding, neededPadX / box.width, neededPadY / box.height);
+    }
+
+    const padX = box.width * effectivePadding;
+    const padY = box.height * effectivePadding;
 
     const left = Math.max(0, Math.round(box.x - padX));
     const top = Math.max(0, Math.round(box.y - padY));

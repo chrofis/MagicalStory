@@ -43,7 +43,7 @@ async function getArcFaceEmbedding(imagePath) {
   const base64 = imageData.toString('base64');
 
   try {
-    const response = await fetch(`${PHOTO_ANALYZER_URL}/arcface-embedding`, {
+    const response = await fetch(`${PHOTO_ANALYZER_URL}/face-embedding`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image: base64 }),

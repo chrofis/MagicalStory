@@ -2362,13 +2362,20 @@ async function discoverAllSwissLandmarks(options = {}) {
         landmark.nearestCity = city;
         landmark.canton = canton;
 
-        // Calculate score based on type and boost
+        // Calculate score based on type
         // Higher score = more visually interesting landmark
+        const HIGH_BOOST_TYPES = ['Castle', 'Church', 'Cathedral', 'Bridge', 'Tower', 'Abbey', 'Monastery', 'Chapel'];
+        const MEDIUM_BOOST_TYPES = ['Park', 'Garden', 'Monument', 'Museum', 'Theatre', 'Historic site', 'Statue', 'Fountain', 'Square', 'Library'];
+
         let score = 0;
-        if (landmark.boostAmount === 100) score += 100;  // Tourist attractions, castles, churches
-        else if (landmark.boostAmount === 50) score += 50;  // Parks, monuments, historic
-        if (landmark.type && !['Unknown', 'Building', 'Station'].includes(landmark.type)) {
-          score += 25;  // Has a specific type (not generic)
+        if (HIGH_BOOST_TYPES.includes(landmark.type)) {
+          score = 130;  // Iconic landmarks: castles, churches, bridges
+        } else if (MEDIUM_BOOST_TYPES.includes(landmark.type)) {
+          score = 80;   // Good landmarks: parks, museums, monuments
+        } else if (landmark.type && !['Unknown', 'Building', 'Station'].includes(landmark.type)) {
+          score = 30;   // Other specific types
+        } else {
+          score = 5;    // Generic or unknown
         }
         landmark.score = score;
 
