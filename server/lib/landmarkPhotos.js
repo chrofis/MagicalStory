@@ -430,6 +430,91 @@ async function fetchWikipediaArticleImage(lang, pageId) {
 }
 
 /**
+ * Get Commons category name from Wikidata QID
+ * @param {string} qid - Wikidata QID (e.g., "Q1625435")
+ * @returns {Promise<string|null>} - Commons category name or null
+ */
+async function getCommonsCategoryFromWikidata(qid) {
+  if (!qid) return null;
+
+  try {
+    const url = `https://www.wikidata.org/w/api.php?action=wbgetentities&ids=${qid}&props=claims&format=json&origin=*`;
+    const res = await fetch(url, { headers: WIKI_HEADERS });
+    const data = await res.json();
+
+    // P373 is the "Commons category" property
+    const p373 = data.entities?.[qid]?.claims?.P373?.[0]?.mainsnak?.datavalue?.value;
+    if (p373) {
+      log.debug(`[WIKI] Found Commons category for ${qid}: "${p373}"`);
+      return p373;
+    }
+    return null;
+  } catch (err) {
+    log.debug(`[WIKI] Error getting Commons category: ${err.message}`);
+    return null;
+  }
+}
+
+/**
+ * Fetch images from a Wikimedia Commons category
+ * @param {string} categoryName - Category name (without "Category:" prefix)
+ * @param {number} maxImages - Maximum images to return
+ * @returns {Promise<Array<{url, fileName, attribution}>>}
+ */
+async function fetchImagesFromCommonsCategory(categoryName, maxImages = 10) {
+  const images = [];
+
+  try {
+    const url = `https://commons.wikimedia.org/w/api.php?action=query&list=categorymembers` +
+      `&cmtitle=Category:${encodeURIComponent(categoryName)}` +
+      `&cmtype=file&cmlimit=${maxImages * 2}&format=json&origin=*`;
+
+    log.debug(`[COMMONS-CAT] Fetching images from category: "${categoryName}"`);
+    const res = await fetch(url, { headers: WIKI_HEADERS });
+    const data = await res.json();
+
+    const files = data.query?.categorymembers || [];
+    log.debug(`[COMMONS-CAT] Found ${files.length} files in category`);
+
+    // Filter to photos and get URLs
+    for (const file of files) {
+      if (images.length >= maxImages) break;
+
+      const name = file.title.toLowerCase();
+      if (!name.endsWith('.jpg') && !name.endsWith('.jpeg') && !name.endsWith('.png')) continue;
+      if (name.includes('logo') || name.includes('map') || name.includes('icon')) continue;
+
+      // Get image info
+      const infoUrl = `https://commons.wikimedia.org/w/api.php?action=query` +
+        `&titles=${encodeURIComponent(file.title)}` +
+        `&prop=imageinfo&iiprop=url|user|size&format=json&origin=*`;
+
+      const infoRes = await fetch(infoUrl, { headers: WIKI_HEADERS });
+      const infoData = await infoRes.json();
+      const pages = infoData.query?.pages;
+      const page = pages ? Object.values(pages)[0] : null;
+      const info = page?.imageinfo?.[0];
+
+      if (info?.url && info.width >= 400 && info.height >= 300) {
+        images.push({
+          url: info.url,
+          fileName: file.title.replace('File:', ''),
+          attribution: `Photo by ${info.user || 'Unknown'}, Wikimedia Commons`,
+          width: info.width,
+          height: info.height
+        });
+      }
+    }
+
+    log.debug(`[COMMONS-CAT] Retrieved ${images.length} valid images`);
+    return images;
+  } catch (err) {
+    log.error(`[COMMONS-CAT] Error: ${err.message}`);
+    return images;
+  }
+}
+
+/**
  * Fetch ALL images from a Wikipedia article - these are guaranteed to be correct location
  * @param {string} lang - Wikipedia language code
  * @param {number} pageId - Wikipedia page ID
@@ -471,8 +556,16 @@ async function fetchWikipediaArticleImages(lang, pageId, maxImages = 6) {
     // Get URLs for each image
     for (const img of photoFiles.slice(0, maxImages)) {
       try {
+        // Normalize title: German Wikipedia uses "Datei:", French uses "Fichier:", etc.
+        // Commons always uses "File:"
+        const commonsTitle = img.title
+          .replace(/^Datei:/i, 'File:')
+          .replace(/^Fichier:/i, 'File:')
+          .replace(/^Archivo:/i, 'File:')
+          .replace(/^Immagine:/i, 'File:');
+
         const infoUrl = `https://commons.wikimedia.org/w/api.php?` +
-          `action=query&titles=${encodeURIComponent(img.title)}` +
+          `action=query&titles=${encodeURIComponent(commonsTitle)}` +
           `&prop=imageinfo&iiprop=url|user|size` +
           `&format=json&origin=*`;
 
@@ -486,7 +579,7 @@ async function fetchWikipediaArticleImages(lang, pageId, maxImages = 6) {
         if (info?.url && info.width >= 400 && info.height >= 300) {
           images.push({
             url: info.url,
-            fileName: img.title.replace('File:', ''),
+            fileName: commonsTitle.replace('File:', ''),
             attribution: `Photo by ${info.user || 'Unknown'}, Wikimedia Commons`,
             width: info.width,
             height: info.height
@@ -928,71 +1021,89 @@ Respond in this exact JSON format:
 /**
  * Find best images for a landmark
  * Strategy:
- * 1. First try Wikipedia article images (guaranteed correct location)
- * 2. AI rates each image for quality
- * 3. If 1-2 good photos found, done
- * 4. If no good photos, fallback to Wikimedia Commons with canton+country in search
+ * 1. Try Commons category (via Wikidata QID) - many images, guaranteed correct
+ * 2. If not enough good ones, try Wikipedia article images
+ * 3. If still not enough, fallback to Commons search with canton+Switzerland
  *
  * @param {string} landmarkName - Name of landmark
  * @param {string} landmarkType - Type of landmark (Castle, Church, etc.)
  * @param {string} lang - Wikipedia language code
  * @param {number} pageId - Wikipedia page ID (for article images)
+ * @param {string} qid - Wikidata QID (for Commons category lookup)
  * @param {string} canton - Swiss canton code (e.g., "AG")
  * @param {number} topN - Number of best images to return (default 2)
  * @returns {Promise<{bestImages: Array, source: string}|null>}
  */
-async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, canton = null, topN = 2) {
+async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, qid = null, canton = null, topN = 2) {
   log.info(`[BEST-IMG] Finding images for "${landmarkName}" (${landmarkType || 'unknown'})`);
 
   let candidates = [];
-  let source = 'unknown';
+  let goodImages = [];
 
-  // STEP 1: Try Wikipedia article images first (guaranteed correct location)
-  if (lang && pageId) {
+  // STEP 1: Try Commons category via Wikidata (best source - many correct images)
+  if (qid) {
+    const commonsCategory = await getCommonsCategoryFromWikidata(qid);
+    if (commonsCategory) {
+      log.debug(`[BEST-IMG] Trying Commons category: "${commonsCategory}"`);
+      candidates = await fetchImagesFromCommonsCategory(commonsCategory, 10);
+
+      if (candidates.length > 0) {
+        goodImages = await analyzeAndFilterImages(candidates, landmarkName, null);  // No location check - category is correct
+
+        if (goodImages.length >= topN) {
+          const bestImages = goodImages.slice(0, topN);
+          log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} from Commons category, scores=[${bestImages.map(i => i.score).join(', ')}]`);
+          return { bestImages, source: 'commons-category' };
+        }
+        log.debug(`[BEST-IMG] Commons category: ${goodImages.length} good images (need ${topN})`);
+      }
+    }
+  }
+
+  // STEP 2: Try Wikipedia article images (if we need more)
+  if (goodImages.length < topN && lang && pageId) {
     log.debug(`[BEST-IMG] Trying Wikipedia article (${lang}:${pageId})...`);
     candidates = await fetchWikipediaArticleImages(lang, pageId, 6);
-    source = 'wikipedia-article';
 
     if (candidates.length > 0) {
-      log.debug(`[BEST-IMG] Found ${candidates.length} images from Wikipedia article`);
-    } else {
-      log.debug(`[BEST-IMG] No images in Wikipedia article`);
+      const articleImages = await analyzeAndFilterImages(candidates, landmarkName, null);
+      // Merge with existing good images, avoiding duplicates
+      for (const img of articleImages) {
+        if (!goodImages.some(g => g.url === img.url)) {
+          goodImages.push(img);
+        }
+      }
+      goodImages.sort((a, b) => b.score - a.score);  // Re-sort by score
+
+      if (goodImages.length >= topN) {
+        const bestImages = goodImages.slice(0, topN);
+        log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} from article+category, scores=[${bestImages.map(i => i.score).join(', ')}]`);
+        return { bestImages, source: 'wikipedia-article' };
+      }
     }
   }
 
-  // STEP 2: Analyze Wikipedia images (no location check needed - article is correct)
-  let goodImages = [];
-  if (candidates.length > 0) {
-    goodImages = await analyzeAndFilterImages(candidates, landmarkName, null);
+  // STEP 3: Fallback to Commons search with location (if still need more)
+  if (goodImages.length < 1) {
+    log.debug(`[BEST-IMG] Trying Commons search with location...`);
 
-    if (goodImages.length >= 1) {
-      const bestImages = goodImages.slice(0, topN);
-      log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} good from Wikipedia, scores=[${bestImages.map(i => i.score).join(', ')}]`);
-      return { bestImages, source: 'wikipedia-article' };
+    const locationSuffix = canton ? `${canton} Switzerland` : 'Switzerland';
+    const searchQuery = `${landmarkName} ${locationSuffix}`;
+    candidates = await fetchMultipleImages(searchQuery, 6, null);
+
+    if (candidates.length > 0) {
+      // Verify location since search can return wrong places
+      const locationContext = canton ? `${canton}, Switzerland` : 'Switzerland';
+      const searchImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext);
+
+      for (const img of searchImages) {
+        if (!goodImages.some(g => g.url === img.url)) {
+          goodImages.push(img);
+        }
+      }
+      goodImages.sort((a, b) => b.score - a.score);
     }
-    log.debug(`[BEST-IMG] Wikipedia images not good enough (${goodImages.length} passed quality check)`);
   }
-
-  // STEP 3: Fallback to Wikimedia Commons with location in search query
-  log.debug(`[BEST-IMG] Trying Wikimedia Commons with location...`);
-
-  // Add canton and country to search for accuracy (e.g., "Ruine Stein AG Switzerland")
-  const locationSuffix = canton ? `${canton} Switzerland` : 'Switzerland';
-  const searchQuery = `${landmarkName} ${locationSuffix}`;
-
-  candidates = await fetchMultipleImages(searchQuery, 6, null);
-  source = 'wikimedia-commons';
-
-  if (candidates.length === 0) {
-    log.debug(`[BEST-IMG] No images found in Wikimedia Commons for "${searchQuery}"`);
-    return null;
-  }
-
-  log.debug(`[BEST-IMG] Found ${candidates.length} images from Wikimedia Commons`);
-
-  // Analyze WITH location verification since Commons can have wrong locations
-  const locationContext = canton ? `${canton}, Switzerland` : 'Switzerland';
-  goodImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext);
 
   if (goodImages.length === 0) {
     log.warn(`[BEST-IMG] No good images found for "${landmarkName}" from any source`);
@@ -1000,8 +1111,8 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   }
 
   const bestImages = goodImages.slice(0, topN);
-  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} good from Commons, scores=[${bestImages.map(i => i.score).join(', ')}]`);
-  return { bestImages, source: 'wikimedia-commons' };
+  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} images, scores=[${bestImages.map(i => i.score).join(', ')}]`);
+  return { bestImages, source: goodImages.length > 0 ? 'combined' : 'commons-search' };
 }
 
 /**
@@ -2224,6 +2335,7 @@ async function discoverAllSwissLandmarks(options = {}) {
                 landmark.type,
                 landmark.lang,      // Wikipedia language
                 landmark.pageId,    // Wikipedia page ID for article images
+                landmark.qid,       // Wikidata QID for Commons category lookup
                 canton,             // Swiss canton for location context
                 2                   // Get top 2 images
               );

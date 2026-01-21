@@ -156,23 +156,9 @@ export default function StoryWizard() {
   const relationshipsDirty = useRef(false); // Track if relationships were modified
   const [initialCharacterLoadDone, setInitialCharacterLoadDone] = useState(false); // Track if initial API load completed
 
-  // Story Settings state (step 4) - load from localStorage
-  const [mainCharacters, setMainCharacters] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem('story_main_characters');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-  const [excludedCharacters, setExcludedCharacters] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem('story_excluded_characters');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Story Settings state - character roles loaded from database (not localStorage)
+  const [mainCharacters, setMainCharacters] = useState<number[]>([]);
+  const [excludedCharacters, setExcludedCharacters] = useState<number[]>([]);
   const [languageLevel, setLanguageLevel] = useState<LanguageLevel>(() => {
     try {
       const saved = localStorage.getItem('story_language_level');
@@ -1033,14 +1019,8 @@ export default function StoryWizard() {
 
   // Note: Relationships are now saved with characters to the API, not localStorage
 
-  // Persist Story Settings (step 4) to localStorage
-  useEffect(() => {
-    localStorage.setItem('story_main_characters', JSON.stringify(mainCharacters));
-  }, [mainCharacters]);
-
-  useEffect(() => {
-    localStorage.setItem('story_excluded_characters', JSON.stringify(excludedCharacters));
-  }, [excludedCharacters]);
+  // Note: mainCharacters and excludedCharacters are persisted to database via saveCharacterRoles()
+  // when user navigates away from step 1 (see safeSetStep function)
 
   // Clear generated ideas when character roles change (excluded/main)
   // Ideas may reference characters that are no longer in the story
