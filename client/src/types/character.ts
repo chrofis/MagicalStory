@@ -227,6 +227,9 @@ export interface Character {
 
   // Generated outfits per page (during story generation)
   generatedOutfits?: Record<number, GeneratedOutfit>;
+
+  // Story role preference (persisted across sessions)
+  storyRole?: 'main' | 'in' | 'out';
 }
 
 // Relationship types

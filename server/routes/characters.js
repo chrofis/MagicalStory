@@ -82,6 +82,73 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// PUT /api/characters/roles - Update story roles for characters
+// IMPORTANT: This must be BEFORE /:characterId routes to avoid "roles" being matched as an ID
+// Body: { roles: { [characterId]: 'main' | 'in' | 'out' } }
+router.put('/roles', authenticateToken, async (req, res) => {
+  try {
+    const { roles } = req.body;
+
+    if (!roles || typeof roles !== 'object') {
+      return res.status(400).json({ error: 'roles object is required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const rowId = `characters_${req.user.id}`;
+
+    // Get current data
+    const rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [rowId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No characters found' });
+    }
+
+    const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const characters = Array.isArray(data) ? data : (data.characters || []);
+
+    // Update storyRole for each character
+    let updatedCount = 0;
+    for (const char of characters) {
+      const role = roles[char.id];
+      if (role && ['main', 'in', 'out'].includes(role)) {
+        char.storyRole = role;
+        updatedCount++;
+      }
+    }
+
+    // Prepare updated data
+    const updatedData = Array.isArray(data) ? characters : { ...data, characters };
+
+    // Create metadata (stripped version for fast loading)
+    const metadataCharacters = characters.map(char => {
+      const { avatars, photos, generatedOutfits, ...rest } = char;
+      return {
+        ...rest,
+        avatars: avatars ? {
+          standard: avatars.standard ? [avatars.standard[0]] : [],
+          status: avatars.status,
+          faceThumbnails: avatars.faceThumbnails
+        } : undefined
+      };
+    });
+    const metadata = Array.isArray(data) ? metadataCharacters : { ...data, characters: metadataCharacters };
+
+    // Save both data and metadata
+    await dbQuery(
+      'UPDATE characters SET data = $1, metadata = $2, updated_at = NOW() WHERE id = $3',
+      [JSON.stringify(updatedData), JSON.stringify(metadata), rowId]
+    );
+
+    console.log(`[Characters] PUT /roles - Updated ${updatedCount} character roles for user ${req.user.id}`);
+    res.json({ success: true, updatedCount });
+  } catch (err) {
+    console.error('Error updating character roles:', err);
+    res.status(500).json({ error: 'Failed to update character roles' });
+  }
+});
+
 // GET /api/characters/:characterId/avatars - Get full avatars for a specific character
 // Used for on-demand loading when editing a character (avoids loading all avatars upfront)
 router.get('/:characterId/avatars', authenticateToken, async (req, res) => {

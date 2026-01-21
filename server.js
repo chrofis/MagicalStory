@@ -1453,6 +1453,14 @@ async function initializeDatabase() {
       )
     `);
 
+    // Add second photo columns (for storing top 2 images)
+    await dbPool.query(`
+      ALTER TABLE swiss_landmarks
+      ADD COLUMN IF NOT EXISTS photo_url_2 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_attribution_2 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_description_2 TEXT
+    `).catch(() => {});  // Ignore if columns already exist
+
     // Indexes for swiss_landmarks
     await dbPool.query(`
       CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_location

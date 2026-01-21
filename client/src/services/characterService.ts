@@ -380,6 +380,21 @@ export const characterService = {
   },
 
   /**
+   * Save character story roles (main/in/out)
+   * Called when user navigates away from character selection step
+   */
+  async saveCharacterRoles(roles: Record<number, 'main' | 'in' | 'out'>): Promise<{ success: boolean; error?: string }> {
+    try {
+      await api.put<{ success: boolean; updatedCount: number }>('/api/characters/roles', { roles });
+      log.success(`Saved character roles: ${Object.keys(roles).length} characters`);
+      return { success: true };
+    } catch (error) {
+      log.error('Failed to save character roles:', error);
+      return { success: false, error: String(error) };
+    }
+  },
+
+  /**
    * Load full avatars for a specific character (on-demand)
    * Used when editing a character to avoid loading all avatars upfront
    */

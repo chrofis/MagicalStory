@@ -167,22 +167,14 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     // Step 3b: Get cover dimensions from Gelato API for actual spine width
     let actualSpineWidth = 10; // Default 10mm
-    let spineText = null;
     if (printProductUid) {
       const coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
       if (coverDims && coverDims.spineWidth) {
         actualSpineWidth = coverDims.spineWidth;
         log.debug(`📏 [BACKGROUND] Gelato spine width: ${actualSpineWidth}mm`);
-
-        // Add spine text if spine is wide enough (>= 10mm)
-        if (actualSpineWidth >= 10) {
-          spineText = 'MagicalStory.ch';
-          log.debug(`📝 [BACKGROUND] Spine wide enough for text: "${spineText}"`);
-        } else {
-          log.debug(`📝 [BACKGROUND] Spine too narrow for text (${actualSpineWidth}mm < 10mm)`);
-        }
       }
     }
+    // PDF generation will add title + "MagicalStory.ch" to spine if wide enough (>= 10mm)
 
     // Step 3c: Generate PDF with actual spine width
     let pdfBuffer, targetPageCount;
@@ -191,8 +183,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       // Single story - use existing generatePrintPdf with format and spine options
       log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat}, spine: ${actualSpineWidth}mm)...`);
       const result = await generatePrintPdf(stories[0].data, bookFormat, {
-        actualSpineWidth,
-        spineText
+        actualSpineWidth
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;

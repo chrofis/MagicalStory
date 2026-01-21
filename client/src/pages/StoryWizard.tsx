@@ -965,8 +965,22 @@ export default function StoryWizard() {
           setCustomRelationships(data.customRelationships);
         }
 
-        // Auto-select main characters after loading
-        if (data.characters.length > 0) {
+        // Load character roles from database (storyRole field)
+        // If any character has a stored role, use database roles instead of auto-select
+        const hasStoredRoles = data.characters.some((c: Character) => c.storyRole);
+        if (hasStoredRoles) {
+          const mainIds: number[] = [];
+          const excludedIds: number[] = [];
+          for (const char of data.characters) {
+            if (char.storyRole === 'main') mainIds.push(char.id);
+            else if (char.storyRole === 'out') excludedIds.push(char.id);
+            // 'in' is default, no action needed
+          }
+          setMainCharacters(mainIds);
+          setExcludedCharacters(excludedIds);
+          log.info(`Loaded character roles from database: ${mainIds.length} main, ${excludedIds.length} excluded`);
+        } else if (data.characters.length > 0) {
+          // No stored roles - auto-select main characters (first time or migrated data)
           autoSelectMainCharacters(data.characters);
         }
       } catch (error) {
@@ -2576,6 +2590,28 @@ export default function StoryWizard() {
     }
   };
 
+  // Save character roles to database
+  const saveCharacterRoles = async () => {
+    if (characters.length === 0) return;
+
+    // Build roles object from current state
+    const roles: Record<number, 'main' | 'in' | 'out'> = {};
+    for (const char of characters) {
+      if (mainCharacters.includes(char.id)) {
+        roles[char.id] = 'main';
+      } else if (excludedCharacters.includes(char.id)) {
+        roles[char.id] = 'out';
+      } else {
+        roles[char.id] = 'in';
+      }
+    }
+
+    // Save to database (fire and forget)
+    characterService.saveCharacterRoles(roles).catch(err => {
+      log.error('Failed to save character roles:', err);
+    });
+  };
+
   // Navigation
   // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType, 5=ArtStyle, 6=Summary, 7=StoryDisplay
   const safeSetStep = async (newStep: number) => {
@@ -2584,9 +2620,10 @@ export default function StoryWizard() {
       if (step === 1 && currentCharacter && newStep !== 1) {
         await saveCharacter();
       }
-      // Save relationships when leaving step 1 (fire and forget)
+      // Save relationships and character roles when leaving step 1 (fire and forget)
       if (step === 1 && newStep !== 1) {
         saveAllCharacterData(); // No await - runs in background
+        saveCharacterRoles(); // Save main/in/out roles to database
       }
       // Clear currentCharacter when entering step 1 to show character list
       if (newStep === 1 && step !== 1) {

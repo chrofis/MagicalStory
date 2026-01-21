@@ -134,7 +134,7 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
  *
  * @param {Object} storyData - Story data with coverImages, sceneImages, storyText, etc.
  * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'portrait' (210x280mm)
- * @param {Object} options - Optional settings { actualSpineWidth: number (mm), spineText: string }
+ * @param {Object} options - Optional settings { actualSpineWidth: number (mm) }
  * @returns {Promise<{pdfBuffer: Buffer, pageCount: number, fontSizeWarning: string|null}>}
  */
 async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options = {}) {
@@ -148,10 +148,9 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const bleed = format.bleed || mmToPoints(3);
   const actualSpineWidthMm = options.actualSpineWidth || 10;
   const spineWidth = mmToPoints(actualSpineWidthMm);
-  const spineText = options.spineText || null;
   const minSpineForText = 10; // Minimum spine width in mm to add text
 
-  log.debug(`📄 [PRINT PDF] Spine width: ${actualSpineWidthMm}mm, text: ${spineText ? 'yes' : 'no'}`);
+  log.debug(`📄 [PRINT PDF] Spine width: ${actualSpineWidthMm}mm`);
 
   // Recalculate cover width based on actual spine
   // Cover = bleed + back cover + spine + front cover + bleed
@@ -201,30 +200,55 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // Place front cover (right side)
     doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
 
-    // Add spine text if spine is wide enough (>= 10mm) and text is provided
-    if (spineText && actualSpineWidthMm >= minSpineForText) {
+    // Add spine text if spine is wide enough (>= 10mm)
+    if (actualSpineWidthMm >= minSpineForText) {
       const spineFontSize = Math.min(actualSpineWidthMm * 0.7, 10); // Max 10pt, scale with spine
       const spineTextColor = '#333333';
+      const spineMargin = mmToPoints(10); // 10mm margin from top/bottom edges
+      const spineTextHeight = coverHeight - (spineMargin * 2); // Available height for text
 
       doc.save();
-      // Move to spine center and rotate 90 degrees for vertical text
+
+      // Spine center position
       const spineCenterX = spineX + (spineWidth / 2);
-      const spineCenterY = coverHeight / 2;
 
-      doc.translate(spineCenterX, spineCenterY);
-      doc.rotate(-90); // Rotate so text reads bottom-to-top
+      // Get book title
+      const bookTitle = storyData.title || '';
+      const brandText = 'MagicalStory.ch';
 
+      // Measure text widths (which become heights when rotated)
+      doc.fontSize(spineFontSize).font('Helvetica');
+      const titleWidth = bookTitle ? doc.widthOfString(bookTitle) : 0;
+      const brandWidth = doc.widthOfString(brandText);
+      const minGap = mmToPoints(5); // Minimum 5mm gap between title and brand
+
+      // Check if both texts fit without overlapping
+      const totalNeededSpace = titleWidth + minGap + brandWidth;
+      const showTitle = bookTitle && totalNeededSpace <= spineTextHeight;
+
+      // Draw brand text at bottom (which is left side when rotated -90)
+      doc.translate(spineCenterX, coverHeight - spineMargin);
+      doc.rotate(-90);
       doc.fontSize(spineFontSize)
          .fillColor(spineTextColor)
          .font('Helvetica')
-         .text(spineText, 0, 0, {
-           width: coverHeight - mmToPoints(20), // Leave margin at top/bottom
-           align: 'center',
-           baseline: 'middle'
-         });
-
+         .text(brandText, 0, -spineFontSize / 2, { lineBreak: false });
       doc.restore();
-      log.debug(`📄 [PRINT PDF] Added spine text: "${spineText}" at ${spineFontSize}pt`);
+
+      // Draw title at top (which is right side when rotated -90) if it fits
+      if (showTitle) {
+        doc.save();
+        doc.translate(spineCenterX, spineMargin + titleWidth);
+        doc.rotate(-90);
+        doc.fontSize(spineFontSize)
+           .fillColor(spineTextColor)
+           .font('Helvetica')
+           .text(bookTitle, 0, -spineFontSize / 2, { lineBreak: false });
+        doc.restore();
+        log.debug(`📄 [PRINT PDF] Added spine: title="${bookTitle}" + brand="${brandText}" at ${spineFontSize}pt`);
+      } else {
+        log.debug(`📄 [PRINT PDF] Added spine: brand="${brandText}" only (title too long or missing) at ${spineFontSize}pt`);
+      }
     }
   }
 
