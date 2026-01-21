@@ -37,6 +37,7 @@ Compare Step 1 findings to the Reference Images:
 - Reference Match: Identify by name (if in prompt) or index (reference 1, 2, 3...)
 - Validation: Compare facial structure and hair
 - Attire Audit: Check garment color and type against reference
+- Face Bounding Box: Provide approximate bounding box around the character's FACE (not full body)
 - If no match: state "no matching reference" or "extra character"
 
 **PERSPECTIVE LOGIC FOR ATTIRE:**
@@ -167,6 +168,7 @@ Output your COMPLETE analysis as JSON (no other text):
       "figure": 1,
       "matched_reference": "Lukas",
       "confidence": 0.85,
+      "face_bbox": [0.15, 0.3, 0.35, 0.5],
       "facial_match": "Good match - round face, blue eyes",
       "hair_match": "Correct blonde color and length",
       "age_match": "Child proportions correct",
@@ -215,6 +217,7 @@ Output your COMPLETE analysis as JSON (no other text):
   - 0.5-0.69: Uncertain match, noticeable differences
   - Below 0.5: Poor match, likely wrong character
 - `issue_severities`: Array matching issues array, with severity level for each (CRITICAL, MAJOR, MODERATE, MINOR)
+- `face_bbox`: Approximate bounding box around the character's FACE, format [ymin, xmin, ymax, xmax] normalized 0-1. This helps locate the character for face extraction.
 - **CRITICAL for `fix` field**: Write as a SELF-CONTAINED VISUAL DESCRIPTION. The image editor does NOT know character names - describe by appearance and position only.
   - BAD: "Add black gloves to Lukas"
   - GOOD: "Add black knitted gloves to the hands of the boy with short brown hair and blue striped hoodie on the right side"

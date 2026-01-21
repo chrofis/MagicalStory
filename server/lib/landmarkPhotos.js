@@ -972,9 +972,12 @@ Respond in this exact JSON format:
   "visualInterest": <1-10>,
   "composition": <1-10>,${locationField}
   "isExterior": <true/false>,
+  "isActualPhoto": <true/false>,
   "issues": ["list any problems"],
   "description": "One sentence describing what's in the photo"
-}`;
+}
+
+IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illustration, engraving, historical artwork, or any non-photographic image. Only set TRUE for actual photographs.`;
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -1038,6 +1041,7 @@ Respond in this exact JSON format:
       score,
       isPhoto: analysis.isLandmarkPhoto >= 5,
       isExterior: analysis.isExterior,
+      isActualPhoto: analysis.isActualPhoto !== false,  // Default to true if not specified
       locationMatch,
       detectedLocation: analysis.detectedLocation,
       description: analysis.description,
@@ -1133,7 +1137,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     .slice(0, 2);
 
   const interiorImages = allGoodImages
-    .filter(img => img.isExterior === false)  // Only definite interiors
+    .filter(img => img.isExterior === false && img.isActualPhoto !== false)  // Only actual photos of interiors (not paintings/artwork)
     .sort((a, b) => b.score - a.score)
     .slice(0, 2);
 

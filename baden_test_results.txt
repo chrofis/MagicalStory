@@ -1,0 +1,89 @@
+Baden Landmarks - Full Test Results
+Generated: 2026-01-21
+Strategy: Wikipedia extract + Commons category (via Wikidata) + AI analysis
+Photos: Up to 2 exterior + 2 interior per landmark
+
+================================================================================
+Ruine Stein
+================================================================================
+   Wikipedia: Die Ruine Stein ist die Ruine einer Höhenburg auf 445 m ü. M. in Baden im Schweizer Kanton Aargau. Sie überragt die  Altstadt und sicherte einst zusammen mit dem Landvogteischloss am Ufer der Limmat die enge Klus zwischen Schlossberg und Lägern.
+
+   EXTERIOR PHOTOS:
+   1. [Score 8] This image shows the Ruine Stein, a castle ruin on a hill, with a flag waving from the tower and a small building nearby, surrounded by trees.
+      URL: https://upload.wikimedia.org/wikipedia/commons/1/15/2012-11-02_15.29.59_Schloss_Stein.jpg
+   2. [Score 7] This image shows the Ruine Stein castle perched on a hill overlooking a river, framed by lush green trees, offering a glimpse into a historical landscape.
+      URL: https://upload.wikimedia.org/wikipedia/commons/a/a9/Baden_-_Ruine_Stein_-_Limmat_-_Wettingen_2010-06-22_16-03-06.JPG
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Holzbrücke Baden
+================================================================================
+   Wikipedia: Die Holzbrücke ist eine Brücke in Baden in der Schweiz und überquert die Limmat an der engsten Stelle der Klus zwischen Schlossberg und Lägern. Sie ist 39 Meter lang und führt von der linksufrigen Altstadt zum Landvogteischloss am rechten Ufer. Die heute bestehende, gedeckte Holzbrücke hatte seit dem Mittelalter mindestens fünf Vorgängerbauten an derselben Stelle.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Stadtturm Baden
+================================================================================
+   Wikipedia: Der Stadtturm (ursprünglich Bruggerturm oder Baderturm genannt) ist ein Torturm in der Altstadt von Baden in der Schweiz. Er entstand in der Mitte des 15. Jahrhunderts und diente als nördliches Stadttor.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Kurpark Baden
+================================================================================
+   Wikipedia: Der Kurpark ist ein Park in Baden im Kanton Aargau, der im Stil eines englischen Landschaftsgartens angelegt ist. Er entstand in den 1870er Jahren, um den Tourismus in den Badener Thermalbädern zu fördern.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Historisches Museum Baden
+================================================================================
+   Wikipedia: Das Historische Museum Baden ist ein Geschichtsmuseum in der Schweizer Stadt Baden im Kanton Aargau. Es beherbergt Relikte aus der über 2000-jährigen Geschichte von Stadt und Region und ist im Landvogteischloss und dessen Erweiterungsbau untergebracht. Der Erweiterungsbau entstand 1992/1993 nach Plänen von Wilfrid und Katharina Steib und wird im Volksmund aufgrund seiner geschwungenen Form als «Melonenschnitz» bezeichnet.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Landvogteischloss Baden
+================================================================================
+   Wikipedia: Das Landvogteischloss ist ein kleines Schloss in der Stadt Baden im Schweizer Kanton Aargau. Es befindet sich am rechten Ufer der Limmat gegenüber der Altstadt und bewachte einst die Engstelle zwischen dem Schlossberg im Westen (mit der Burg Stein) und der Lägern im Osten. Bis 1798 war es die Residenz des Landvogts der Grafschaft Baden, heute beherbergt es das Historische Museum Baden und das Archiv der Stadt Baden.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Reformierte Kirche Baden
+================================================================================
+   Wikipedia: Die Reformierte Kirche Baden ist heute die zentrale Kirche der reformierten Kirchgemeinde Baden in der Schweiz, die mit ihren Teilkirchgemeinden Baden-Ennetbaden, Ehrendingen-Freienwil, Obersiggenthal und Untersiggenthal die grösste Gemeinde der Reformierten Landeskirche Aargau bildet. Als die barocke Kirche zu Beginn des 18. Jahrhunderts erbaut wurde, gab es jedoch in der Stadt Baden keine reformierte Gemeinde.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+Stadtpfarrkirche Maria Himmelfahrt
+================================================================================
+   Wikipedia: Die Stadtpfarrkirche Maria Himmelfahrt ist die römisch-katholische Pfarrkirche in Baden in der Schweiz. Sie gehört zur Katholischen Kirchgemeinde Baden-Ennetbaden (Pastoralraum Aargauer Limmattal) im Bistum Basel. 
+Die Kirche befindet sich im Zentrum der Altstadt am Rande einer Geländeterrasse, die zur Limmat hin abfällt.
+
+   EXTERIOR PHOTOS: None found
+
+   INTERIOR PHOTOS: None found
+
+================================================================================
+SUMMARY
+================================================================================
+Total landmarks tested: 8
+With Wikipedia extract: 8
+With exterior photos: 1
+With interior photos: 0

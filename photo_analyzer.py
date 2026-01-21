@@ -106,6 +106,79 @@ except Exception as e:
 TEMP_DIR = os.path.join(os.path.dirname(__file__), 'temp_photos')
 os.makedirs(TEMP_DIR, exist_ok=True)
 
+# Load anime face cascade (for illustrated/cartoon faces)
+ANIME_CASCADE_AVAILABLE = False
+anime_face_cascade = None
+try:
+    cascade_path = os.path.join(os.path.dirname(__file__), 'lbpcascade_animeface.xml')
+    if os.path.exists(cascade_path):
+        anime_face_cascade = cv2.CascadeClassifier(cascade_path)
+        if not anime_face_cascade.empty():
+            ANIME_CASCADE_AVAILABLE = True
+            print("[OK] Anime face cascade available (lbpcascade_animeface)")
+        else:
+            print("[WARN] Anime face cascade failed to load")
+    else:
+        print("[INFO] Anime face cascade not found at:", cascade_path)
+except Exception as e:
+    print(f"[WARN] Anime face cascade error: {e}")
+
+
+def detect_all_faces_anime(image, min_size=30, scale_factor=1.1, min_neighbors=2):
+    """
+    Detect faces in illustrated/anime images using lbpcascade_animeface.
+    Returns list of faces with bounding boxes.
+    """
+    if not ANIME_CASCADE_AVAILABLE or anime_face_cascade is None:
+        print("[WARN] Anime face cascade not available")
+        return []
+
+    try:
+        # Convert to grayscale for detection
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+
+        # Equalize histogram for better detection
+        gray = cv2.equalizeHist(gray)
+
+        height, width = gray.shape[:2]
+
+        # Detect faces - anime cascade works better with smaller scale factor
+        faces_detected = anime_face_cascade.detectMultiScale(
+            gray,
+            scaleFactor=scale_factor,
+            minNeighbors=min_neighbors,
+            minSize=(min_size, min_size)
+        )
+
+        faces = []
+        for idx, (x, y, w, h) in enumerate(faces_detected):
+            # Filter out detections in bottom 25% of image (usually shoes/feet)
+            if y + h/2 > height * 0.75:
+                print(f"[ANIME] Skipping detection at y={y} (bottom of image, likely shoes)")
+                continue
+
+            faces.append({
+                'index': len(faces),
+                'box': {
+                    'x': int(x),
+                    'y': int(y),
+                    'width': int(w),
+                    'height': int(h)
+                },
+                'confidence': 0.8,  # Cascade doesn't give confidence, assume reasonable
+                'detector': 'anime_cascade'
+            })
+
+        print(f"[ANIME] Detected {len(faces)} faces (filtered)")
+        return faces
+
+    except Exception as e:
+        print(f"[ANIME] Error: {e}")
+        return []
+
 
 def detect_all_faces_mtcnn(image, min_confidence=0.9):
     """
@@ -2321,10 +2394,92 @@ def detect_all_faces():
         }), 500
 
 
+@app.route('/detect-anime-faces', methods=['POST'])
+def detect_anime_faces():
+    """
+    Detect faces in illustrated/anime images using lbpcascade_animeface.
+    Better for cartoon/storybook illustrations than real-photo detectors.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "min_size": 30,          # Optional: minimum face size in pixels
+        "scale_factor": 1.1,     # Optional: detection scale factor
+        "min_neighbors": 5       # Optional: minimum neighbors for detection
+    }
+
+    Returns:
+    {
+        "success": true,
+        "faces": [
+            {
+                "index": 0,
+                "box": {"x": 100, "y": 50, "width": 80, "height": 100},
+                "confidence": 0.8
+            }
+        ],
+        "total_faces": 2,
+        "image_size": {"width": 1024, "height": 1024}
+    }
+    """
+    try:
+        data = request.get_json()
+        image_data = data.get('image')
+
+        if not image_data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+
+        # Decode image
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        height, width = image.shape[:2]
+        print(f"[DETECT-ANIME] Image size: {width}x{height}")
+
+        # Get optional parameters
+        min_size = data.get('min_size', 30)
+        scale_factor = data.get('scale_factor', 1.1)
+        min_neighbors = data.get('min_neighbors', 5)
+
+        # Detect anime faces
+        faces = detect_all_faces_anime(
+            image,
+            min_size=min_size,
+            scale_factor=scale_factor,
+            min_neighbors=min_neighbors
+        )
+
+        print(f"[DETECT-ANIME] Returning {len(faces)} faces")
+
+        return jsonify({
+            "success": True,
+            "faces": faces,
+            "total_faces": len(faces),
+            "image_size": {"width": width, "height": height},
+            "detector": "lbpcascade_animeface"
+        }), 200
+
+    except Exception as e:
+        print(f"[DETECT-ANIME] Error: {e}")
+        import traceback
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PHOTO_ANALYZER_PORT', 5000))
     print(f"[START] Photo Analyzer API starting on port {port}")
     print(f"   MediaPipe available: {MEDIAPIPE_AVAILABLE}")
+    print(f"   Anime cascade available: {ANIME_CASCADE_AVAILABLE}")
     print("   LPIPS: checking on first request")
     print("   Face embeddings: ArcFace via DeepFace (512-D, style-invariant)")
     app.run(host='0.0.0.0', port=port, debug=False)
