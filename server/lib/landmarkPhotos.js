@@ -926,67 +926,114 @@ Respond in this exact JSON format:
 }
 
 /**
- * Fetch and analyze multiple images, return the best ones
+ * Find best images for a landmark
+ * Strategy:
+ * 1. First try Wikipedia article images (guaranteed correct location)
+ * 2. AI rates each image for quality
+ * 3. If 1-2 good photos found, done
+ * 4. If no good photos, fallback to Wikimedia Commons with canton+country in search
+ *
  * @param {string} landmarkName - Name of landmark
  * @param {string} landmarkType - Type of landmark (Castle, Church, etc.)
- * @param {number} maxImages - Max images to analyze
- * @param {string} locationContext - Expected location for verification (e.g., "Baden, Switzerland")
+ * @param {string} lang - Wikipedia language code
+ * @param {number} pageId - Wikipedia page ID (for article images)
+ * @param {string} canton - Swiss canton code (e.g., "AG")
  * @param {number} topN - Number of best images to return (default 2)
- * @returns {Promise<{bestImages: Array, allAnalyzed: Array}|null>}
+ * @returns {Promise<{bestImages: Array, source: string}|null>}
  */
-async function findBestLandmarkImage(landmarkName, landmarkType, maxImages = 6, locationContext = null, topN = 2) {
-  log.info(`[BEST-IMG] Finding best ${topN} images for "${landmarkName}" (${landmarkType || 'unknown type'})${locationContext ? ` in ${locationContext}` : ''}`);
+async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, canton = null, topN = 2) {
+  log.info(`[BEST-IMG] Finding images for "${landmarkName}" (${landmarkType || 'unknown'})`);
 
-  // Fetch multiple candidate images
-  const candidates = await fetchMultipleImages(landmarkName, maxImages, null);  // Don't add location to search query
+  let candidates = [];
+  let source = 'unknown';
+
+  // STEP 1: Try Wikipedia article images first (guaranteed correct location)
+  if (lang && pageId) {
+    log.debug(`[BEST-IMG] Trying Wikipedia article (${lang}:${pageId})...`);
+    candidates = await fetchWikipediaArticleImages(lang, pageId, 6);
+    source = 'wikipedia-article';
+
+    if (candidates.length > 0) {
+      log.debug(`[BEST-IMG] Found ${candidates.length} images from Wikipedia article`);
+    } else {
+      log.debug(`[BEST-IMG] No images in Wikipedia article`);
+    }
+  }
+
+  // STEP 2: Analyze Wikipedia images (no location check needed - article is correct)
+  let goodImages = [];
+  if (candidates.length > 0) {
+    goodImages = await analyzeAndFilterImages(candidates, landmarkName, null);
+
+    if (goodImages.length >= 1) {
+      const bestImages = goodImages.slice(0, topN);
+      log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} good from Wikipedia, scores=[${bestImages.map(i => i.score).join(', ')}]`);
+      return { bestImages, source: 'wikipedia-article' };
+    }
+    log.debug(`[BEST-IMG] Wikipedia images not good enough (${goodImages.length} passed quality check)`);
+  }
+
+  // STEP 3: Fallback to Wikimedia Commons with location in search query
+  log.debug(`[BEST-IMG] Trying Wikimedia Commons with location...`);
+
+  // Add canton and country to search for accuracy (e.g., "Ruine Stein AG Switzerland")
+  const locationSuffix = canton ? `${canton} Switzerland` : 'Switzerland';
+  const searchQuery = `${landmarkName} ${locationSuffix}`;
+
+  candidates = await fetchMultipleImages(searchQuery, 6, null);
+  source = 'wikimedia-commons';
 
   if (candidates.length === 0) {
-    log.debug(`[BEST-IMG] No candidate images found for "${landmarkName}"`);
+    log.debug(`[BEST-IMG] No images found in Wikimedia Commons for "${searchQuery}"`);
     return null;
   }
 
-  log.debug(`[BEST-IMG] Analyzing ${candidates.length} candidate images...`);
+  log.debug(`[BEST-IMG] Found ${candidates.length} images from Wikimedia Commons`);
 
-  // Analyze each image WITH location verification
+  // Analyze WITH location verification since Commons can have wrong locations
+  const locationContext = canton ? `${canton}, Switzerland` : 'Switzerland';
+  goodImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext);
+
+  if (goodImages.length === 0) {
+    log.warn(`[BEST-IMG] No good images found for "${landmarkName}" from any source`);
+    return null;
+  }
+
+  const bestImages = goodImages.slice(0, topN);
+  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} good from Commons, scores=[${bestImages.map(i => i.score).join(', ')}]`);
+  return { bestImages, source: 'wikimedia-commons' };
+}
+
+/**
+ * Analyze images and filter to good quality ones
+ * @param {Array} candidates - Array of image candidates
+ * @param {string} landmarkName - Name of landmark
+ * @param {string} locationContext - Expected location (null to skip location check)
+ * @returns {Promise<Array>} - Filtered and sorted good images
+ */
+async function analyzeAndFilterImages(candidates, landmarkName, locationContext) {
   const analyzed = [];
+
   for (const img of candidates) {
     const analysis = await analyzeImageQuality(img.url, landmarkName, locationContext);
     if (analysis) {
-      analyzed.push({
-        ...img,
-        ...analysis
-      });
+      analyzed.push({ ...img, ...analysis });
     }
-    // Small delay between API calls
-    await new Promise(r => setTimeout(r, 200));
+    await new Promise(r => setTimeout(r, 200));  // Rate limiting
   }
 
-  if (analyzed.length === 0) {
-    log.debug(`[BEST-IMG] No images could be analyzed for "${landmarkName}"`);
-    return null;
-  }
-
-  // Sort by score (highest first) - location mismatches already penalized in score
+  // Sort by score (highest first)
   analyzed.sort((a, b) => b.score - a.score);
 
-  // Filter to only valid landmark photos with correct location
-  const validImages = analyzed.filter(img => img.score >= 5 && img.isPhoto && (img.locationMatch || 10) >= 5);
+  // Filter to valid images (score >= 5, is a landmark photo, correct location if checked)
+  const minLocationScore = locationContext ? 5 : 0;
+  const goodImages = analyzed.filter(img =>
+    img.score >= 5 &&
+    img.isPhoto &&
+    (img.locationMatch || 10) >= minLocationScore
+  );
 
-  if (validImages.length === 0) {
-    log.warn(`[BEST-IMG] All images rejected for "${landmarkName}" (wrong location or not landmark photos)`);
-    return null;
-  }
-
-  // Get top N images
-  const bestImages = validImages.slice(0, topN);
-
-  log.info(`[BEST-IMG] ✅ Found ${bestImages.length} good images for "${landmarkName}": scores=[${bestImages.map(i => i.score).join(', ')}]`);
-
-  return {
-    bestImages,  // Array of top N images
-    bestImage: bestImages[0],  // Backwards compatibility
-    allAnalyzed: analyzed
-  };
+  return goodImages;
 }
 
 /**
@@ -2169,10 +2216,18 @@ async function discoverAllSwissLandmarks(options = {}) {
         if (analyzePhotos && !landmark.photoDescription) {
           try {
             if (useMultiImageAnalysis) {
-              // Multi-image quality analysis with location verification
-              // Fetches up to 6 images, analyzes each, verifies location, returns top 2
-              const locationContext = `${city}, Switzerland`;
-              const bestResult = await findBestLandmarkImage(landmark.name, landmark.type, 6, locationContext, 2);
+              // Strategy:
+              // 1. Try Wikipedia article images first (correct location guaranteed)
+              // 2. If not enough good ones, fallback to Wikimedia Commons with canton+Switzerland in search
+              const bestResult = await findBestLandmarkImage(
+                landmark.name,
+                landmark.type,
+                landmark.lang,      // Wikipedia language
+                landmark.pageId,    // Wikipedia page ID for article images
+                canton,             // Swiss canton for location context
+                2                   // Get top 2 images
+              );
+
               if (bestResult && bestResult.bestImages && bestResult.bestImages.length > 0) {
                 // Save first (best) image
                 const best = bestResult.bestImages[0];
@@ -2181,6 +2236,7 @@ async function discoverAllSwissLandmarks(options = {}) {
                 landmark.photoDescription = best.description;
                 landmark.photoScore = best.score;
                 landmark.photoIsExterior = best.isExterior;
+                landmark.photoSource = bestResult.source;
 
                 // Save second image if available
                 if (bestResult.bestImages.length > 1) {
@@ -2193,7 +2249,7 @@ async function discoverAllSwissLandmarks(options = {}) {
                 // Add to landmark score based on photo quality
                 landmark.score += Math.round(best.score / 2);  // +0 to +5 points
                 analyzedCount++;
-                log.debug(`[SWISS-INDEX] ✅ "${landmark.name}": ${bestResult.bestImages.length} images, scores=[${bestResult.bestImages.map(i => i.score).join(', ')}]`);
+                log.debug(`[SWISS-INDEX] ✅ "${landmark.name}": ${bestResult.bestImages.length} images from ${bestResult.source}, scores=[${bestResult.bestImages.map(i => i.score).join(', ')}]`);
               } else {
                 log.debug(`[SWISS-INDEX] No suitable image found for "${landmark.name}"`);
               }
