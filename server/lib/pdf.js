@@ -11,6 +11,7 @@ const { log } = require('../utils/logger');
 const mmToPoints = (mm) => mm * 2.83465;
 
 // PDF dimensions for different book formats
+// Gelato cover spread layout: Back Cover (left) + Spine (center) + Front Cover (right)
 const BOOK_FORMATS = {
   // 20x20cm square format (original)
   'square': {
@@ -18,6 +19,8 @@ const BOOK_FORMATS = {
     pageHeight: mmToPoints(200),
     coverWidth: mmToPoints(416),   // back + spine + front with bleed
     coverHeight: mmToPoints(206),
+    bleed: mmToPoints(3),          // 3mm bleed
+    spineWidth: mmToPoints(10),    // 10mm spine (adjusts based on page count in practice)
   },
   // A4-based format: 21x28cm (more text space)
   'A4': {
@@ -25,6 +28,8 @@ const BOOK_FORMATS = {
     pageHeight: mmToPoints(280),
     coverWidth: mmToPoints(436),   // back + spine + front with bleed (210*2 + spine + bleed)
     coverHeight: mmToPoints(286),
+    bleed: mmToPoints(3),          // 3mm bleed
+    spineWidth: mmToPoints(10),    // 10mm spine
   }
 };
 
@@ -152,26 +157,43 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     doc.on('error', reject);
   });
 
-  // Add cover page (back cover on left + front cover on right - for print binding)
+  // PAGE 1: Cover spread (Back Cover + Spine + Front Cover) - Gelato requirement
+  // Layout: Back Cover (left) | Spine (center) | Front Cover (right)
   doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
   const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
   const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
+  const bleed = format.bleed || mmToPoints(3);
+  const spineWidth = format.spineWidth || mmToPoints(10);
 
   if (backCoverImageData && frontCoverImageData) {
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    // Fill width completely, center vertically (for square images on portrait covers)
-    const halfCoverWidth = coverWidth / 2;
-    // Assuming square source images - they fill width, center vertically
-    const coverImageHeight = halfCoverWidth; // Square image height = width
+    // Calculate cover positions with spine in the middle
+    // Back cover: from 0, width = pageWidth + bleed (image extends into left bleed)
+    // Spine: white space in the middle
+    // Front cover: starts after back cover + spine, width = pageWidth + bleed
+    const backCoverWidth = pageWidth + bleed;
+    const frontCoverX = backCoverWidth + spineWidth;
+    const frontCoverWidth = pageWidth + bleed;
+
+    // For square source images, center vertically on cover
+    const coverImageHeight = backCoverWidth; // Square image: height = width
     const coverYOffset = (coverHeight - coverImageHeight) / 2;
-    doc.image(backCoverBuffer, 0, coverYOffset, { width: halfCoverWidth });
-    doc.image(frontCoverBuffer, halfCoverWidth, coverYOffset, { width: halfCoverWidth });
+
+    // Place back cover (left side)
+    doc.image(backCoverBuffer, 0, coverYOffset, { width: backCoverWidth });
+    // Spine area stays white (no image)
+    // Place front cover (right side)
+    doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
   }
 
-  // Add initial page (dedication/intro page)
+  // PAGE 2: Blank endpaper (required by Gelato - non-printable inside of front cover)
+  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  // Leave blank - Gelato requirement
+
+  // PAGE 3: Initial page (dedication/intro page)
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
   if (initialPageImageData) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -239,6 +261,10 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
   for (let i = 0; i < blankPagesToAdd; i++) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   }
+
+  // LAST PAGE: Blank endpaper (required by Gelato - non-printable inside of back cover)
+  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  // Leave blank - Gelato requirement
 
   doc.end();
   const pdfBuffer = await pdfPromise;
