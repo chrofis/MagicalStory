@@ -642,13 +642,20 @@ Write 2-3 sentences. Be specific and visual. Do NOT mention the photo itself or 
  * @param {number} maxImages - Maximum images to fetch (default 4)
  * @returns {Promise<Array<{url, fileName, attribution, width, height}>>}
  */
-async function fetchMultipleImages(landmarkName, maxImages = 4) {
+async function fetchMultipleImages(landmarkName, maxImages = 4, locationContext = null) {
   const images = [];
 
   try {
+    // Build search query with location context to avoid wrong matches
+    // e.g., "Ruine Stein" alone might find Austrian castle, but "Ruine Stein Baden Switzerland" finds the right one
+    let searchQuery = landmarkName;
+    if (locationContext) {
+      searchQuery = `${landmarkName} ${locationContext}`;
+    }
+
     // Search Wikimedia Commons for images
     const searchUrl = `https://commons.wikimedia.org/w/api.php?action=query&list=search` +
-      `&srsearch=${encodeURIComponent(landmarkName + ' filetype:jpg|jpeg|png')}` +
+      `&srsearch=${encodeURIComponent(searchQuery + ' filetype:jpg|jpeg|png')}` +
       `&srnamespace=6&srlimit=${maxImages * 2}&format=json&origin=*`;
 
     const searchRes = await fetch(searchUrl, { headers: WIKI_HEADERS });
@@ -826,11 +833,12 @@ Respond in this exact JSON format:
  * @param {number} maxImages - Max images to analyze
  * @returns {Promise<{bestImage, allAnalyzed}|null>}
  */
-async function findBestLandmarkImage(landmarkName, landmarkType, maxImages = 4) {
-  log.info(`[BEST-IMG] Finding best image for "${landmarkName}" (${landmarkType || 'unknown type'})`);
+async function findBestLandmarkImage(landmarkName, landmarkType, maxImages = 4, locationContext = null) {
+  log.info(`[BEST-IMG] Finding best image for "${landmarkName}" (${landmarkType || 'unknown type'})${locationContext ? ` in ${locationContext}` : ''}`);
 
-  // Fetch multiple candidate images
-  const candidates = await fetchMultipleImages(landmarkName, maxImages);
+  // Fetch multiple candidate images with location context to avoid wrong matches
+  // e.g., "Ruine Stein Switzerland" instead of just "Ruine Stein" (which finds Austrian castle)
+  const candidates = await fetchMultipleImages(landmarkName, maxImages, locationContext);
 
   if (candidates.length === 0) {
     log.debug(`[BEST-IMG] No candidate images found for "${landmarkName}"`);
@@ -2050,7 +2058,9 @@ async function discoverAllSwissLandmarks(options = {}) {
           try {
             if (useMultiImageAnalysis) {
               // NEW: Multi-image quality analysis - fetches up to 4 images and picks best
-              const bestResult = await findBestLandmarkImage(landmark.name, landmark.type, 4);
+              // Pass location context to avoid wrong matches (e.g., "Ruine Stein" finding Austrian castle)
+              const locationContext = `${city} Switzerland`;
+              const bestResult = await findBestLandmarkImage(landmark.name, landmark.type, 4, locationContext);
               if (bestResult && bestResult.bestImage) {
                 const best = bestResult.bestImage;
                 landmark.photoUrl = best.url;

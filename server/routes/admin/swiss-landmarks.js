@@ -179,7 +179,7 @@ router.get('/', async (req, res) => {
   if (!checkAuth(req, res, false)) return;
 
   try {
-    const { city, lat, lon, radius = 20, limit = 50 } = req.query;
+    const { city, lat, lon, radius = 20, limit = 50, full = false } = req.query;
     const pool = getPool();
 
     let landmarks;
@@ -200,6 +200,7 @@ router.get('/', async (req, res) => {
       landmarks = result.rows;
     }
 
+    const showFull = full === 'true' || full === true;
     res.json({
       count: landmarks.length,
       landmarks: landmarks.map(l => ({
@@ -210,7 +211,9 @@ router.get('/', async (req, res) => {
         canton: l.canton,
         score: l.score,
         photoUrl: l.photo_url,
-        photoDescription: l.photo_description?.substring(0, 100) + (l.photo_description?.length > 100 ? '...' : ''),
+        photoDescription: showFull
+          ? l.photo_description
+          : (l.photo_description?.substring(0, 100) + (l.photo_description?.length > 100 ? '...' : '')),
         latitude: l.latitude,
         longitude: l.longitude
       }))
