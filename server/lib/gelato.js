@@ -188,9 +188,9 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     } else {
-      // Multiple stories - generate combined book PDF (spine text not yet supported for multi-story)
-      log.debug('📄 [BACKGROUND] Generating combined multi-story PDF...');
-      const result = await generateCombinedBookPdf(stories);
+      // Multiple stories - generate combined book PDF with spine text
+      log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF (spine: ${actualSpineWidth}mm)...`);
+      const result = await generateCombinedBookPdf(stories, { actualSpineWidth });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     }

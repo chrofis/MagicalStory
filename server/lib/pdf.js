@@ -148,7 +148,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const bleed = format.bleed || mmToPoints(3);
   const actualSpineWidthMm = options.actualSpineWidth || 10;
   const spineWidth = mmToPoints(actualSpineWidthMm);
-  const minSpineForText = 10; // Minimum spine width in mm to add text
+  const minSpineForText = 6; // Minimum spine width in mm to add text
 
   log.debug(`📄 [PRINT PDF] Spine width: ${actualSpineWidthMm}mm`);
 
@@ -427,13 +427,25 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
  * Used for ordering books with multiple stories
  *
  * @param {Array<{id: string, data: Object}>} stories - Array of story objects
+ * @param {Object} options - Optional settings { actualSpineWidth: number (mm) }
  * @returns {Promise<{pdfBuffer: Buffer, pageCount: number}>}
  */
-async function generateCombinedBookPdf(stories) {
+async function generateCombinedBookPdf(stories, options = {}) {
   log.debug(`📚 [COMBINED PDF] Generating book with ${stories.length} stories`);
 
+  // Get spine width from options or use default
+  const actualSpineWidthMm = options.actualSpineWidth || 10;
+  const spineWidth = mmToPoints(actualSpineWidthMm);
+  const bleed = mmToPoints(3);
+  const minSpineForText = 6;
+
+  // Calculate actual cover width with spine
+  const actualCoverWidth = bleed + PAGE_SIZE + spineWidth + PAGE_SIZE + bleed;
+
+  log.debug(`📚 [COMBINED PDF] Spine width: ${actualSpineWidthMm}mm, cover width: ${Math.round(actualCoverWidth / 2.83465)}mm`);
+
   const doc = new PDFDocument({
-    size: [COVER_WIDTH, COVER_HEIGHT],
+    size: [actualCoverWidth, COVER_HEIGHT],
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
     autoFirstPage: false
   });
@@ -539,8 +551,8 @@ async function generateCombinedBookPdf(stories) {
     log.debug(`📚 [COMBINED PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
 
     if (isFirstStory) {
-      // STORY 1: Back cover + Front cover (combined spread for book binding)
-      doc.addPage({ size: [COVER_WIDTH, COVER_HEIGHT], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      // STORY 1: Back cover + Spine + Front cover (combined spread for book binding)
+      doc.addPage({ size: [actualCoverWidth, COVER_HEIGHT], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
       const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
@@ -548,8 +560,62 @@ async function generateCombinedBookPdf(stories) {
       if (backCoverImageData && frontCoverImageData) {
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(backCoverBuffer, 0, 0, { width: COVER_WIDTH / 2, height: COVER_HEIGHT });
-        doc.image(frontCoverBuffer, COVER_WIDTH / 2, 0, { width: COVER_WIDTH / 2, height: COVER_HEIGHT });
+
+        // Calculate cover positions with spine in the middle
+        const backCoverWidth = bleed + PAGE_SIZE;
+        const spineX = backCoverWidth;
+        const frontCoverX = backCoverWidth + spineWidth;
+        const frontCoverWidth = PAGE_SIZE + bleed;
+
+        // For square source images, center vertically on cover
+        const coverImageHeight = backCoverWidth;
+        const coverYOffset = (COVER_HEIGHT - coverImageHeight) / 2;
+
+        // Place back cover (left side)
+        doc.image(backCoverBuffer, 0, coverYOffset, { width: backCoverWidth });
+        // Spine area stays white
+        // Place front cover (right side)
+        doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
+
+        // Add spine text if spine is wide enough
+        if (actualSpineWidthMm >= minSpineForText) {
+          const spineFontSize = Math.min(actualSpineWidthMm * 0.7, 10);
+          const spineTextColor = '#333333';
+          const spineMargin = mmToPoints(10);
+
+          // Get combined book title (use first story's title)
+          const bookTitle = storyData.title || '';
+          const brandText = 'MagicalStory.ch';
+
+          doc.fontSize(spineFontSize).font('Helvetica');
+          const titleWidth = bookTitle ? doc.widthOfString(bookTitle) : 0;
+          const brandWidth = doc.widthOfString(brandText);
+          const spineTextHeight = COVER_HEIGHT - (spineMargin * 2);
+          const minGap = mmToPoints(5);
+          const showTitle = bookTitle && (titleWidth + minGap + brandWidth) <= spineTextHeight;
+
+          const spineCenterX = spineX + (spineWidth / 2);
+
+          // Draw brand text at bottom
+          doc.save();
+          doc.translate(spineCenterX, COVER_HEIGHT - spineMargin);
+          doc.rotate(-90);
+          doc.fontSize(spineFontSize).fillColor(spineTextColor).font('Helvetica')
+             .text(brandText, 0, -spineFontSize / 2, { lineBreak: false });
+          doc.restore();
+
+          // Draw title at top if it fits
+          if (showTitle) {
+            doc.save();
+            doc.translate(spineCenterX, spineMargin + titleWidth);
+            doc.rotate(-90);
+            doc.fontSize(spineFontSize).fillColor(spineTextColor).font('Helvetica')
+               .text(bookTitle, 0, -spineFontSize / 2, { lineBreak: false });
+            doc.restore();
+          }
+
+          log.debug(`📚 [COMBINED PDF] Added spine text: ${showTitle ? `"${bookTitle}" + ` : ''}"${brandText}"`);
+        }
       }
 
       // Introduction page
