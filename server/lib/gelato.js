@@ -8,6 +8,60 @@ const { log } = require('../utils/logger');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
 
 /**
+ * Get cover dimensions from Gelato API including spine width
+ *
+ * @param {string} productUid - Gelato product UID
+ * @param {number} pageCount - Number of interior pages
+ * @returns {Promise<{spineWidth: number, coverWidth: number, coverHeight: number} | null>}
+ */
+async function getCoverDimensions(productUid, pageCount) {
+  const printApiKey = process.env.GELATO_API_KEY;
+  if (!printApiKey) {
+    log.warn('[GELATO] No API key configured, cannot fetch cover dimensions');
+    return null;
+  }
+
+  try {
+    const url = `https://product.gelatoapis.com/v3/products/${productUid}/cover-dimensions?pagesCount=${pageCount}&measureUnit=mm`;
+    log.debug(`[GELATO] Fetching cover dimensions: ${url}`);
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-API-KEY': printApiKey
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.warn(`[GELATO] Cover dimensions API error: ${response.status} - ${errorText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    log.debug(`[GELATO] Cover dimensions response:`, JSON.stringify(data, null, 2));
+
+    // Extract spine width from response
+    const spineSize = data.spineSize || data.spine;
+    if (spineSize) {
+      const spineWidth = spineSize.width || spineSize;
+      log.debug(`[GELATO] Spine width for ${pageCount} pages: ${spineWidth}mm`);
+      return {
+        spineWidth: spineWidth,
+        coverWidth: data.wraparoundEdgeSize?.width || data.coverWidth,
+        coverHeight: data.wraparoundEdgeSize?.height || data.coverHeight,
+        raw: data
+      };
+    }
+
+    return null;
+  } catch (error) {
+    log.error('[GELATO] Error fetching cover dimensions:', error.message);
+    return null;
+  }
+}
+
+/**
  * Process a book order after successful Stripe payment
  * Creates print order with Gelato and updates order status
  *
@@ -69,17 +123,81 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     console.log(`✅ [BACKGROUND] Fetched ${stories.length} stories`);
     log.debug('📊 [BACKGROUND] Titles:', stories.map(s => s.data.title).join(', '));
 
-    // Step 3: Generate PDF (single story uses generatePrintPdf, multiple uses combined book)
+    // Step 3: Estimate page count and get product/spine info BEFORE generating PDF
+    // This allows us to use actual spine width in PDF generation
+    const printApiKey = process.env.GELATO_API_KEY;
+    if (!printApiKey) {
+      throw new Error('GELATO_API_KEY not configured');
+    }
+
+    // Estimate page count from story data
+    const { parseStoryPages } = require('./pdf');
+    let estimatedPageCount = 0;
+    for (const story of stories) {
+      const storyPages = parseStoryPages(story.data);
+      const isPictureBook = story.data.languageLevel === '1st-grade';
+      estimatedPageCount += isPictureBook ? storyPages.length : storyPages.length * 2;
+    }
+    // Add padding for covers, initial pages, endpapers, etc.
+    estimatedPageCount += stories.length * 4; // Rough estimate for cover pages
+    // Round up to even number
+    if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
+    log.debug(`📊 [BACKGROUND] Estimated page count: ${estimatedPageCount}`);
+
+    // Step 3a: Select product based on estimated page count
+    const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
+    let printProductUid = null;
+    const productsResult = await dbPool.query(
+      'SELECT product_uid, product_name, min_pages, max_pages FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
+      [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
+    );
+    if (productsResult.rows.length > 0) {
+      const matchingProduct = productsResult.rows.find(p =>
+        estimatedPageCount >= (p.min_pages || 0) && estimatedPageCount <= (p.max_pages || 999)
+      );
+      if (matchingProduct) {
+        printProductUid = matchingProduct.product_uid;
+        log.debug(`📦 [BACKGROUND] Selected product: ${matchingProduct.product_name}`);
+      }
+    }
+    if (!printProductUid) {
+      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
+      log.warn(`[BACKGROUND] Using fallback product UID`);
+    }
+
+    // Step 3b: Get cover dimensions from Gelato API for actual spine width
+    let actualSpineWidth = 10; // Default 10mm
+    let spineText = null;
+    if (printProductUid) {
+      const coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
+      if (coverDims && coverDims.spineWidth) {
+        actualSpineWidth = coverDims.spineWidth;
+        log.debug(`📏 [BACKGROUND] Gelato spine width: ${actualSpineWidth}mm`);
+
+        // Add spine text if spine is wide enough (>= 10mm)
+        if (actualSpineWidth >= 10) {
+          spineText = 'MagicalStory.ch';
+          log.debug(`📝 [BACKGROUND] Spine wide enough for text: "${spineText}"`);
+        } else {
+          log.debug(`📝 [BACKGROUND] Spine too narrow for text (${actualSpineWidth}mm < 10mm)`);
+        }
+      }
+    }
+
+    // Step 3c: Generate PDF with actual spine width
     let pdfBuffer, targetPageCount;
 
     if (stories.length === 1) {
-      // Single story - use existing generatePrintPdf with format
-      log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
-      const result = await generatePrintPdf(stories[0].data, bookFormat);
+      // Single story - use existing generatePrintPdf with format and spine options
+      log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat}, spine: ${actualSpineWidth}mm)...`);
+      const result = await generatePrintPdf(stories[0].data, bookFormat, {
+        actualSpineWidth,
+        spineText
+      });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     } else {
-      // Multiple stories - generate combined book PDF (format not yet supported for multi-story)
+      // Multiple stories - generate combined book PDF (spine text not yet supported for multi-story)
       log.debug('📄 [BACKGROUND] Generating combined multi-story PDF...');
       const result = await generateCombinedBookPdf(stories);
       pdfBuffer = result.pdfBuffer;
@@ -121,83 +239,15 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     // Step 4: Create print order
     log.debug('📦 [BACKGROUND] Creating print order...');
 
-    const printApiKey = process.env.GELATO_API_KEY;
-    if (!printApiKey) {
-      throw new Error('GELATO_API_KEY not configured');
-    }
-
-    // Use the same targetPageCount calculated during PDF generation (already added blank pages)
+    // Use the same targetPageCount calculated during PDF generation
     const printPageCount = targetPageCount;
-    log.debug(`📊 [BACKGROUND] Using PDF page count for Gelato: ${printPageCount}`);
+    log.debug(`📊 [BACKGROUND] Final PDF page count: ${printPageCount} (estimated: ${estimatedPageCount})`);
 
-    // Fetch product UID from database based on page count and cover type
-    let printProductUid = null;
-    try {
-      // Debug: log all active products
-      const allProductsResult = await dbPool.query(
-        'SELECT product_uid, product_name, cover_type, min_pages, max_pages FROM gelato_products WHERE is_active = true'
-      );
-      log.debug(`📦 [BACKGROUND] Active products: ${allProductsResult.rows.length}, looking for "${coverType}" + "${bookFormat}" with ${printPageCount} pages`);
-      allProductsResult.rows.forEach((p, i) => {
-        log.debug(`   ${i+1}. "${p.product_name}" cover_type="${p.cover_type}" pages=${p.min_pages}-${p.max_pages}`);
-      });
-
-      // Match by product_uid pattern for both coverType AND bookFormat
-      // Book formats: 'square' = 200x200mm, 'A4' = 210x280mm (portrait)
-      const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
-      const productsResult = await dbPool.query(
-        'SELECT product_uid, product_name, min_pages, max_pages, available_page_counts, cover_type FROM gelato_products WHERE is_active = true AND LOWER(product_uid) LIKE $1 AND LOWER(product_uid) LIKE $2',
-        [`%${coverType.toLowerCase()}%`, `%${formatPattern}%`]
-      );
-
-      log.debug(`📦 [BACKGROUND] Products matching "${coverType}" + "${formatPattern}": ${productsResult.rows.length}`);
-
-      if (productsResult.rows.length > 0) {
-        // Find product matching the page count using min/max range
-        const matchingProduct = productsResult.rows.find(p => {
-          return printPageCount >= (p.min_pages || 0) && printPageCount <= (p.max_pages || 999);
-        });
-
-        if (matchingProduct) {
-          printProductUid = matchingProduct.product_uid;
-          console.log(`✅ [BACKGROUND] Found matching ${coverType} ${bookFormat} product: ${matchingProduct.product_name}`);
-        } else {
-          log.warn(`[BACKGROUND] No ${coverType} ${bookFormat} product matches page count ${printPageCount}`);
-        }
-      } else {
-        // Log all products to help debug
-        const availableTypes = allProductsResult.rows.map(p => `"${p.cover_type}"`).join(', ');
-        log.warn(`[BACKGROUND] No active ${coverType} ${bookFormat} products found. Available cover_types: ${availableTypes || 'none'}`);
-      }
-    } catch (err) {
-      log.error('❌ [BACKGROUND] Error fetching products:', err.message);
-    }
-
-    // Fallback to environment variable or first active product of any type
+    // Verify product is still valid for actual page count (should match estimate)
     if (!printProductUid) {
-      // Try to get any active product as fallback
-      try {
-        const fallbackResult = await dbPool.query(
-          'SELECT product_uid, product_name FROM gelato_products WHERE is_active = true LIMIT 1'
-        );
-        if (fallbackResult.rows.length > 0) {
-          printProductUid = fallbackResult.rows[0].product_uid;
-          log.warn(`[BACKGROUND] Using fallback product: ${fallbackResult.rows[0].product_name}`);
-        }
-      } catch (err) {
-        log.error('❌ [BACKGROUND] Error fetching fallback product:', err.message);
-      }
+      throw new Error('No active products configured. Please add products in admin dashboard.');
     }
-
-    // Final fallback to environment variable
-    if (!printProductUid) {
-      printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      if (printProductUid) {
-        log.warn(`[BACKGROUND] Using environment fallback product UID`);
-      } else {
-        throw new Error('No active products configured. Please add products in admin dashboard.');
-      }
-    }
+    console.log(`✅ [BACKGROUND] Using product: ${printProductUid} for ${printPageCount} pages`);
 
     // Use gelatoOrderType determined from isTestPayment parameter
     log.debug(`📦 [BACKGROUND] Creating Gelato ${gelatoOrderType} order`);
@@ -326,5 +376,6 @@ The MagicalStory Team`,
 }
 
 module.exports = {
-  processBookOrder
+  processBookOrder,
+  getCoverDimensions
 };

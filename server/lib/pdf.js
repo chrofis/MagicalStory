@@ -134,17 +134,31 @@ function calculateConsistentFontSize(doc, pageTexts, availableWidth, availableHe
  *
  * @param {Object} storyData - Story data with coverImages, sceneImages, storyText, etc.
  * @param {string} bookFormat - Book format: 'square' (200x200mm) or 'portrait' (210x280mm)
+ * @param {Object} options - Optional settings { actualSpineWidth: number (mm), spineText: string }
  * @returns {Promise<{pdfBuffer: Buffer, pageCount: number, fontSizeWarning: string|null}>}
  */
-async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
+async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options = {}) {
   // Get dimensions for the selected format
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
   const { pageWidth, pageHeight, coverWidth, coverHeight } = format;
 
   log.debug(`📄 [PRINT PDF] Using format: ${bookFormat} (${Math.round(pageWidth / 2.83465)}x${Math.round(pageHeight / 2.83465)}mm)`);
 
+  // Use actual spine width from Gelato API if provided, otherwise use default
+  const bleed = format.bleed || mmToPoints(3);
+  const actualSpineWidthMm = options.actualSpineWidth || 10;
+  const spineWidth = mmToPoints(actualSpineWidthMm);
+  const spineText = options.spineText || null;
+  const minSpineForText = 10; // Minimum spine width in mm to add text
+
+  log.debug(`📄 [PRINT PDF] Spine width: ${actualSpineWidthMm}mm, text: ${spineText ? 'yes' : 'no'}`);
+
+  // Recalculate cover width based on actual spine
+  // Cover = bleed + back cover + spine + front cover + bleed
+  const actualCoverWidth = bleed + pageWidth + spineWidth + pageWidth + bleed;
+
   const doc = new PDFDocument({
-    size: [coverWidth, coverHeight],
+    size: [actualCoverWidth, coverHeight],
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
     autoFirstPage: false
   });
@@ -159,22 +173,21 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
 
   // PAGE 1: Cover spread (Back Cover + Spine + Front Cover) - Gelato requirement
   // Layout: Back Cover (left) | Spine (center) | Front Cover (right)
-  doc.addPage({ size: [coverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  doc.addPage({ size: [actualCoverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
   const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
   const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
-  const bleed = format.bleed || mmToPoints(3);
-  const spineWidth = format.spineWidth || mmToPoints(10);
 
   if (backCoverImageData && frontCoverImageData) {
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
     // Calculate cover positions with spine in the middle
-    // Back cover: from 0, width = pageWidth + bleed (image extends into left bleed)
-    // Spine: white space in the middle
+    // Back cover: from 0, width = bleed + pageWidth (image extends into left bleed)
+    // Spine: in the middle
     // Front cover: starts after back cover + spine, width = pageWidth + bleed
-    const backCoverWidth = pageWidth + bleed;
+    const backCoverWidth = bleed + pageWidth;
+    const spineX = backCoverWidth;
     const frontCoverX = backCoverWidth + spineWidth;
     const frontCoverWidth = pageWidth + bleed;
 
@@ -187,6 +200,32 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     // Spine area stays white (no image)
     // Place front cover (right side)
     doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
+
+    // Add spine text if spine is wide enough (>= 10mm) and text is provided
+    if (spineText && actualSpineWidthMm >= minSpineForText) {
+      const spineFontSize = Math.min(actualSpineWidthMm * 0.7, 10); // Max 10pt, scale with spine
+      const spineTextColor = '#333333';
+
+      doc.save();
+      // Move to spine center and rotate 90 degrees for vertical text
+      const spineCenterX = spineX + (spineWidth / 2);
+      const spineCenterY = coverHeight / 2;
+
+      doc.translate(spineCenterX, spineCenterY);
+      doc.rotate(-90); // Rotate so text reads bottom-to-top
+
+      doc.fontSize(spineFontSize)
+         .fillColor(spineTextColor)
+         .font('Helvetica')
+         .text(spineText, 0, 0, {
+           width: coverHeight - mmToPoints(20), // Leave margin at top/bottom
+           align: 'center',
+           baseline: 'middle'
+         });
+
+      doc.restore();
+      log.debug(`📄 [PRINT PDF] Added spine text: "${spineText}" at ${spineFontSize}pt`);
+    }
   }
 
   // PAGE 2: Blank endpaper (required by Gelato - non-printable inside of front cover)
