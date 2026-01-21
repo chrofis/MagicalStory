@@ -216,12 +216,18 @@ router.get('/', async (req, res) => {
           city: l.nearest_city,
           canton: l.canton,
           score: l.score,
-          // Primary photo
+          // Wikipedia description
+          wikipediaExtract: truncate(l.wikipedia_extract),
+          // Exterior photos (1-2)
           photoUrl: l.photo_url,
           photoDescription: truncate(l.photo_description),
-          // Second photo (if available)
           photoUrl2: l.photo_url_2 || null,
           photoDescription2: truncate(l.photo_description_2),
+          // Interior photos (3-4)
+          photoUrl3: l.photo_url_3 || null,
+          photoDescription3: truncate(l.photo_description_3),
+          photoUrl4: l.photo_url_4 || null,
+          photoDescription4: truncate(l.photo_description_4),
           latitude: l.latitude,
           longitude: l.longitude
         };

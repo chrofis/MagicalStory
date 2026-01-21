@@ -1453,12 +1453,24 @@ async function initializeDatabase() {
       )
     `);
 
-    // Add second photo columns (for storing top 2 images)
+    // Add photo columns (2 exterior + 2 interior)
     await dbPool.query(`
       ALTER TABLE swiss_landmarks
       ADD COLUMN IF NOT EXISTS photo_url_2 TEXT,
       ADD COLUMN IF NOT EXISTS photo_attribution_2 TEXT,
       ADD COLUMN IF NOT EXISTS photo_description_2 TEXT
+    `).catch(() => {});  // Ignore if columns already exist
+
+    // Add interior photo columns + Wikipedia extract
+    await dbPool.query(`
+      ALTER TABLE swiss_landmarks
+      ADD COLUMN IF NOT EXISTS photo_url_3 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_attribution_3 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_description_3 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_url_4 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_attribution_4 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_description_4 TEXT,
+      ADD COLUMN IF NOT EXISTS wikipedia_extract TEXT
     `).catch(() => {});  // Ignore if columns already exist
 
     // Indexes for swiss_landmarks

@@ -430,6 +430,39 @@ async function fetchWikipediaArticleImage(lang, pageId) {
 }
 
 /**
+ * Fetch Wikipedia article extract (summary text)
+ * @param {string} lang - Wikipedia language code (e.g., 'de', 'en')
+ * @param {number} pageId - Wikipedia page ID
+ * @param {number} maxSentences - Maximum sentences to return (default 3)
+ * @returns {Promise<string|null>} - Article extract or null
+ */
+async function fetchWikipediaExtract(lang, pageId, maxSentences = 3) {
+  if (!lang || !pageId) return null;
+
+  try {
+    const url = `https://${lang}.wikipedia.org/w/api.php?action=query&pageids=${pageId}` +
+      `&prop=extracts&exintro=1&explaintext=1&exsentences=${maxSentences}` +
+      `&format=json&origin=*`;
+
+    log.debug(`[WIKI] Fetching extract for ${lang}:${pageId}`);
+    const res = await fetch(url, { headers: WIKI_HEADERS });
+    const data = await res.json();
+
+    const page = data.query?.pages?.[pageId];
+    const extract = page?.extract?.trim();
+
+    if (extract && extract.length > 20) {
+      log.debug(`[WIKI] Got extract (${extract.length} chars): "${extract.substring(0, 80)}..."`);
+      return extract;
+    }
+    return null;
+  } catch (err) {
+    log.debug(`[WIKI] Extract error: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Get Commons category name from Wikidata QID
  * @param {string} qid - Wikidata QID (e.g., "Q1625435")
  * @returns {Promise<string|null>} - Commons category name or null
@@ -1019,10 +1052,10 @@ Respond in this exact JSON format:
 }
 
 /**
- * Find best images for a landmark
+ * Find best images for a landmark - returns up to 2 exterior + 2 interior photos
  * Strategy:
  * 1. Try Commons category (via Wikidata QID) - many images, guaranteed correct
- * 2. If not enough good ones, try Wikipedia article images
+ * 2. If not enough, try Wikipedia article images
  * 3. If still not enough, fallback to Commons search with canton+Switzerland
  *
  * @param {string} landmarkName - Name of landmark
@@ -1031,88 +1064,82 @@ Respond in this exact JSON format:
  * @param {number} pageId - Wikipedia page ID (for article images)
  * @param {string} qid - Wikidata QID (for Commons category lookup)
  * @param {string} canton - Swiss canton code (e.g., "AG")
- * @param {number} topN - Number of best images to return (default 2)
- * @returns {Promise<{bestImages: Array, source: string}|null>}
+ * @returns {Promise<{exteriorImages: Array, interiorImages: Array, source: string}|null>}
  */
-async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, qid = null, canton = null, topN = 2) {
+async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, qid = null, canton = null) {
   log.info(`[BEST-IMG] Finding images for "${landmarkName}" (${landmarkType || 'unknown'})`);
 
   let candidates = [];
-  let goodImages = [];
+  let allGoodImages = [];
 
   // STEP 1: Try Commons category via Wikidata (best source - many correct images)
   if (qid) {
     const commonsCategory = await getCommonsCategoryFromWikidata(qid);
     if (commonsCategory) {
       log.debug(`[BEST-IMG] Trying Commons category: "${commonsCategory}"`);
-      candidates = await fetchImagesFromCommonsCategory(commonsCategory, 10);
+      candidates = await fetchImagesFromCommonsCategory(commonsCategory, 15);  // Get more to find interior too
 
       if (candidates.length > 0) {
-        goodImages = await analyzeAndFilterImages(candidates, landmarkName, null);  // No location check - category is correct
-
-        if (goodImages.length >= topN) {
-          const bestImages = goodImages.slice(0, topN);
-          log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} from Commons category, scores=[${bestImages.map(i => i.score).join(', ')}]`);
-          return { bestImages, source: 'commons-category' };
-        }
-        log.debug(`[BEST-IMG] Commons category: ${goodImages.length} good images (need ${topN})`);
+        allGoodImages = await analyzeAndFilterImages(candidates, landmarkName, null);
+        log.debug(`[BEST-IMG] Commons category: ${allGoodImages.length} good images`);
       }
     }
   }
 
-  // STEP 2: Try Wikipedia article images (if we need more)
-  if (goodImages.length < topN && lang && pageId) {
+  // STEP 2: Try Wikipedia article images (if we need more variety)
+  if (allGoodImages.length < 6 && lang && pageId) {
     log.debug(`[BEST-IMG] Trying Wikipedia article (${lang}:${pageId})...`);
-    candidates = await fetchWikipediaArticleImages(lang, pageId, 6);
+    candidates = await fetchWikipediaArticleImages(lang, pageId, 8);
 
     if (candidates.length > 0) {
       const articleImages = await analyzeAndFilterImages(candidates, landmarkName, null);
-      // Merge with existing good images, avoiding duplicates
       for (const img of articleImages) {
-        if (!goodImages.some(g => g.url === img.url)) {
-          goodImages.push(img);
+        if (!allGoodImages.some(g => g.url === img.url)) {
+          allGoodImages.push(img);
         }
-      }
-      goodImages.sort((a, b) => b.score - a.score);  // Re-sort by score
-
-      if (goodImages.length >= topN) {
-        const bestImages = goodImages.slice(0, topN);
-        log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} from article+category, scores=[${bestImages.map(i => i.score).join(', ')}]`);
-        return { bestImages, source: 'wikipedia-article' };
       }
     }
   }
 
-  // STEP 3: Fallback to Commons search with location (if still need more)
-  if (goodImages.length < 1) {
+  // STEP 3: Fallback to Commons search with location (if we have very few)
+  if (allGoodImages.length < 2) {
     log.debug(`[BEST-IMG] Trying Commons search with location...`);
 
     const locationSuffix = canton ? `${canton} Switzerland` : 'Switzerland';
     const searchQuery = `${landmarkName} ${locationSuffix}`;
-    candidates = await fetchMultipleImages(searchQuery, 6, null);
+    candidates = await fetchMultipleImages(searchQuery, 8, null);
 
     if (candidates.length > 0) {
-      // Verify location since search can return wrong places
       const locationContext = canton ? `${canton}, Switzerland` : 'Switzerland';
       const searchImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext);
 
       for (const img of searchImages) {
-        if (!goodImages.some(g => g.url === img.url)) {
-          goodImages.push(img);
+        if (!allGoodImages.some(g => g.url === img.url)) {
+          allGoodImages.push(img);
         }
       }
-      goodImages.sort((a, b) => b.score - a.score);
     }
   }
 
-  if (goodImages.length === 0) {
+  if (allGoodImages.length === 0) {
     log.warn(`[BEST-IMG] No good images found for "${landmarkName}" from any source`);
     return null;
   }
 
-  const bestImages = goodImages.slice(0, topN);
-  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${bestImages.length} images, scores=[${bestImages.map(i => i.score).join(', ')}]`);
-  return { bestImages, source: goodImages.length > 0 ? 'combined' : 'commons-search' };
+  // Separate exterior and interior images, sort by score
+  const exteriorImages = allGoodImages
+    .filter(img => img.isExterior !== false)  // Include if exterior or unknown
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+
+  const interiorImages = allGoodImages
+    .filter(img => img.isExterior === false)  // Only definite interiors
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2);
+
+  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${exteriorImages.length} exterior + ${interiorImages.length} interior`);
+
+  return { exteriorImages, interiorImages, source: 'combined' };
 }
 
 /**
@@ -2113,8 +2140,11 @@ async function saveSwissLandmark(landmark) {
         type, boost_amount, categories,
         photo_url, photo_attribution, photo_source, photo_description,
         photo_url_2, photo_attribution_2, photo_description_2,
+        photo_url_3, photo_attribution_3, photo_description_3,
+        photo_url_4, photo_attribution_4, photo_description_4,
+        wikipedia_extract,
         commons_photo_count, score
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
       ON CONFLICT (wikidata_qid) DO UPDATE SET
         name = EXCLUDED.name,
         latitude = COALESCE(EXCLUDED.latitude, swiss_landmarks.latitude),
@@ -2126,6 +2156,13 @@ async function saveSwissLandmark(landmark) {
         photo_url_2 = COALESCE(EXCLUDED.photo_url_2, swiss_landmarks.photo_url_2),
         photo_attribution_2 = COALESCE(EXCLUDED.photo_attribution_2, swiss_landmarks.photo_attribution_2),
         photo_description_2 = COALESCE(EXCLUDED.photo_description_2, swiss_landmarks.photo_description_2),
+        photo_url_3 = COALESCE(EXCLUDED.photo_url_3, swiss_landmarks.photo_url_3),
+        photo_attribution_3 = COALESCE(EXCLUDED.photo_attribution_3, swiss_landmarks.photo_attribution_3),
+        photo_description_3 = COALESCE(EXCLUDED.photo_description_3, swiss_landmarks.photo_description_3),
+        photo_url_4 = COALESCE(EXCLUDED.photo_url_4, swiss_landmarks.photo_url_4),
+        photo_attribution_4 = COALESCE(EXCLUDED.photo_attribution_4, swiss_landmarks.photo_attribution_4),
+        photo_description_4 = COALESCE(EXCLUDED.photo_description_4, swiss_landmarks.photo_description_4),
+        wikipedia_extract = COALESCE(EXCLUDED.wikipedia_extract, swiss_landmarks.wikipedia_extract),
         score = GREATEST(EXCLUDED.score, swiss_landmarks.score),
         updated_at = CURRENT_TIMESTAMP
     `, [
@@ -2147,6 +2184,13 @@ async function saveSwissLandmark(landmark) {
       normalize(landmark.photoUrl2 || landmark.photo_url_2),
       normalize(landmark.attribution2 || landmark.photo_attribution_2),
       normalize(landmark.photoDescription2 || landmark.photo_description_2),
+      normalize(landmark.photoUrl3 || landmark.photo_url_3),
+      normalize(landmark.attribution3 || landmark.photo_attribution_3),
+      normalize(landmark.photoDescription3 || landmark.photo_description_3),
+      normalize(landmark.photoUrl4 || landmark.photo_url_4),
+      normalize(landmark.attribution4 || landmark.photo_attribution_4),
+      normalize(landmark.photoDescription4 || landmark.photo_description_4),
+      normalize(landmark.wikipediaExtract || landmark.wikipedia_extract),
       landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
       landmark.score || 0
     ]);
@@ -2330,41 +2374,63 @@ async function discoverAllSwissLandmarks(options = {}) {
             if (useMultiImageAnalysis) {
               // Strategy:
               // 1. Try Wikipedia article images first (correct location guaranteed)
-              // 2. If not enough good ones, fallback to Wikimedia Commons with canton+Switzerland in search
+              // Returns up to 2 exterior + 2 interior photos
               const bestResult = await findBestLandmarkImage(
                 landmark.name,
                 landmark.type,
                 landmark.lang,      // Wikipedia language
                 landmark.pageId,    // Wikipedia page ID for article images
                 landmark.qid,       // Wikidata QID for Commons category lookup
-                canton,             // Swiss canton for location context
-                2                   // Get top 2 images
+                canton              // Swiss canton for location context
               );
 
-              if (bestResult && bestResult.bestImages && bestResult.bestImages.length > 0) {
-                // Save first (best) image
-                const best = bestResult.bestImages[0];
-                landmark.photoUrl = best.url;
-                landmark.attribution = best.attribution;
-                landmark.photoDescription = best.description;
-                landmark.photoScore = best.score;
-                landmark.photoIsExterior = best.isExterior;
-                landmark.photoSource = bestResult.source;
+              if (bestResult) {
+                const { exteriorImages, interiorImages } = bestResult;
 
-                // Save second image if available
-                if (bestResult.bestImages.length > 1) {
-                  const second = bestResult.bestImages[1];
-                  landmark.photoUrl2 = second.url;
-                  landmark.attribution2 = second.attribution;
-                  landmark.photoDescription2 = second.description;
+                // Save exterior images (photo_url, photo_url_2)
+                if (exteriorImages.length > 0) {
+                  landmark.photoUrl = exteriorImages[0].url;
+                  landmark.attribution = exteriorImages[0].attribution;
+                  landmark.photoDescription = exteriorImages[0].description;
+                  landmark.photoScore = exteriorImages[0].score;
+                  landmark.photoSource = bestResult.source;
+                }
+                if (exteriorImages.length > 1) {
+                  landmark.photoUrl2 = exteriorImages[1].url;
+                  landmark.attribution2 = exteriorImages[1].attribution;
+                  landmark.photoDescription2 = exteriorImages[1].description;
+                }
+
+                // Save interior images (photo_url_3, photo_url_4)
+                if (interiorImages.length > 0) {
+                  landmark.photoUrl3 = interiorImages[0].url;
+                  landmark.attribution3 = interiorImages[0].attribution;
+                  landmark.photoDescription3 = interiorImages[0].description;
+                }
+                if (interiorImages.length > 1) {
+                  landmark.photoUrl4 = interiorImages[1].url;
+                  landmark.attribution4 = interiorImages[1].attribution;
+                  landmark.photoDescription4 = interiorImages[1].description;
                 }
 
                 // Add to landmark score based on photo quality
-                landmark.score += Math.round(best.score / 2);  // +0 to +5 points
+                if (exteriorImages.length > 0) {
+                  landmark.score += Math.round(exteriorImages[0].score / 2);
+                }
                 analyzedCount++;
-                log.debug(`[SWISS-INDEX] ✅ "${landmark.name}": ${bestResult.bestImages.length} images from ${bestResult.source}, scores=[${bestResult.bestImages.map(i => i.score).join(', ')}]`);
+
+                const totalImages = exteriorImages.length + interiorImages.length;
+                log.debug(`[SWISS-INDEX] ✅ "${landmark.name}": ${exteriorImages.length} ext + ${interiorImages.length} int`);
               } else {
                 log.debug(`[SWISS-INDEX] No suitable image found for "${landmark.name}"`);
+              }
+
+              // Fetch Wikipedia extract for landmark description
+              if (landmark.lang && landmark.pageId) {
+                const extract = await fetchWikipediaExtract(landmark.lang, landmark.pageId, 3);
+                if (extract) {
+                  landmark.wikipediaExtract = extract;
+                }
               }
             } else {
               // Old single-image approach (fallback)

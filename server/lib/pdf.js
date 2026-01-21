@@ -190,15 +190,19 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const frontCoverX = backCoverWidth + spineWidth;
     const frontCoverWidth = pageWidth + bleed;
 
-    // For square source images, center vertically on cover
-    const coverImageHeight = backCoverWidth; // Square image: height = width
-    const coverYOffset = (coverHeight - coverImageHeight) / 2;
-
-    // Place back cover (left side)
-    doc.image(backCoverBuffer, 0, coverYOffset, { width: backCoverWidth });
+    // Place back cover (left side) - align to LEFT edge, margin toward spine (right)
+    doc.image(backCoverBuffer, 0, 0, {
+      fit: [backCoverWidth, coverHeight],
+      align: 'left',   // Image on left, margin on right (toward spine)
+      valign: 'center'
+    });
     // Spine area stays white (no image)
-    // Place front cover (right side)
-    doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
+    // Place front cover (right side) - align to RIGHT edge, margin toward spine (left)
+    doc.image(frontCoverBuffer, frontCoverX, 0, {
+      fit: [frontCoverWidth, coverHeight],
+      align: 'right',  // Image on right, margin on left (toward spine)
+      valign: 'center'
+    });
 
     // Add spine text if spine is wide enough (>= 10mm)
     if (actualSpineWidthMm >= minSpineForText) {
@@ -567,15 +571,19 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const frontCoverX = backCoverWidth + spineWidth;
         const frontCoverWidth = PAGE_SIZE + bleed;
 
-        // For square source images, center vertically on cover
-        const coverImageHeight = backCoverWidth;
-        const coverYOffset = (COVER_HEIGHT - coverImageHeight) / 2;
-
-        // Place back cover (left side)
-        doc.image(backCoverBuffer, 0, coverYOffset, { width: backCoverWidth });
+        // Place back cover (left side) - align to LEFT edge, margin toward spine (right)
+        doc.image(backCoverBuffer, 0, 0, {
+          fit: [backCoverWidth, COVER_HEIGHT],
+          align: 'left',   // Image on left, margin on right (toward spine)
+          valign: 'center'
+        });
         // Spine area stays white
-        // Place front cover (right side)
-        doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
+        // Place front cover (right side) - align to RIGHT edge, margin toward spine (left)
+        doc.image(frontCoverBuffer, frontCoverX, 0, {
+          fit: [frontCoverWidth, COVER_HEIGHT],
+          align: 'right',  // Image on right, margin on left (toward spine)
+          valign: 'center'
+        });
 
         // Add spine text if spine is wide enough
         if (actualSpineWidthMm >= minSpineForText) {
