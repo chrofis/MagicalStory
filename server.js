@@ -7343,6 +7343,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             [progressPercent, `Generated image ${idx + 1}/${sceneCount}...`, jobId]
           );
 
+          // Build per-character clothing map (in storybook, all chars share same scene clothing)
+          const perCharClothing = {};
+          for (const char of sceneCharacters) {
+            perCharClothing[char.name] = clothingRaw;  // e.g., "costumed:pirate" or "standard"
+          }
+
           return {
             pageNumber: pageNum,
             imageData: imageResult.imageData,
@@ -7359,7 +7365,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalScore: imageResult.originalScore || null,
             originalReasoning: imageResult.originalReasoning || null,
             referencePhotos,
-            sceneCharacters  // Include for incremental consistency tracking
+            sceneCharacters,  // Include for incremental consistency tracking
+            sceneCharacterClothing: perCharClothing  // Per-character clothing for this scene
           };
         } catch (error) {
           log.error(`❌ [STORYBOOK] Failed to generate image for page ${pageNum}:`, error.message);
@@ -7370,7 +7377,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             prompt: null,
             error: error.message,
             referencePhotos: [],
-            sceneCharacters: []
+            sceneCharacters: [],
+            sceneCharacterClothing: {}
           };
         }
       };
@@ -7418,18 +7426,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
             // Track for incremental consistency
             if (incrementalConsistencyConfig?.enabled) {
-              const clothingInfo = {};
-              for (const char of (result.sceneCharacters || [])) {
-                const charClothing = char.clothing?.current?.standard || null;
-                clothingInfo[char.name] = charClothing
-                  ? `${charClothing.top || ''} ${charClothing.bottom || ''} ${charClothing.accessories || ''}`.trim()
-                  : '';
-              }
               previousImagesForConsistency.push({
                 imageData: result.imageData,
                 pageNumber: pageNum,
                 characters: (result.sceneCharacters || []).map(c => c.name),
-                clothing: clothingInfo
+                characterClothing: result.sceneCharacterClothing || {}
               });
             }
           }
@@ -9351,7 +9352,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Landmark photos (separate for frontend display)
         landmarkPhotos: pageLandmarkPhotos,
         // Include characters info for incremental consistency tracking
-        sceneCharacters
+        sceneCharacters,
+        // Per-character clothing selections for this scene (e.g., {"Lukas": "costumed:pirate", "Franziska": "standard"})
+        sceneCharacterClothing: perCharClothing
       };
     };
 
@@ -9385,19 +9388,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Track this image for future consistency checks
         if (pageResult.imageData) {
-          // Build clothing info for each character in this scene
-          const clothingInfo = {};
-          for (const char of (pageResult.sceneCharacters || [])) {
-            const charClothing = char.clothing?.current?.standard || null;
-            clothingInfo[char.name] = charClothing
-              ? `${charClothing.top || ''} ${charClothing.bottom || ''} ${charClothing.accessories || ''}`.trim()
-              : '';
-          }
+          // Use per-character clothing from the scene (e.g., {"Lukas": "costumed:pirate", "Franziska": "standard"})
+          // This is the actual clothing category selected for each character in this specific scene
           previousImagesForConsistency.push({
             imageData: pageResult.imageData,
             pageNumber: pageNum,
             characters: (pageResult.sceneCharacters || []).map(c => c.name),
-            clothing: clothingInfo
+            characterClothing: pageResult.sceneCharacterClothing || {}
           });
         }
       }

@@ -56,6 +56,8 @@ async function loadPromptTemplates() {
     // Final consistency check prompts
     PROMPT_TEMPLATES.finalConsistencyCheck = await fs.readFile(path.join(promptsDir, 'final-consistency-check.txt'), 'utf-8');
     PROMPT_TEMPLATES.textConsistencyCheck = await fs.readFile(path.join(promptsDir, 'text-consistency-check.txt'), 'utf-8');
+    // Incremental consistency check (compare new image against previous images)
+    PROMPT_TEMPLATES.incrementalConsistencyCheck = await fs.readFile(path.join(promptsDir, 'incremental-consistency-check.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {

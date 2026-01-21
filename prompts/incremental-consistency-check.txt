@@ -1,11 +1,11 @@
 You are evaluating a newly generated storybook illustration for consistency with previous pages in the same story.
 
-**CURRENT IMAGE**: Image 1 (Page {{PAGE_NUMBER}})
-**PREVIOUS IMAGES**: Images 2-{{IMAGE_COUNT}} ({{PREV_PAGES}})
+**CURRENT IMAGE**: Image 1 (Page {PAGE_NUMBER})
+**PREVIOUS IMAGES**: Images 2-{IMAGE_COUNT} (Pages {PREV_PAGES})
 
-**CHARACTERS EXPECTED**: {{CHARACTERS}}
-**CLOTHING BY CHARACTER**:
-{{CLOTHING_INFO}}
+**CHARACTERS EXPECTED**: {CHARACTERS}
+**CLOTHING BY CHARACTER & PAGE**:
+{CLOTHING_INFO}
 
 **TASK**: Check if the current image (Image 1) is visually consistent with the previous images.
 
