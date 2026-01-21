@@ -496,6 +496,13 @@ router.post('/', authenticateToken, async (req, res) => {
           hasChanges = true;
         }
 
+        // Preserve storyRole if not in new data (set via PUT /roles endpoint)
+        if (existingChar.storyRole && !newChar.storyRole) {
+          mergedChar.storyRole = existingChar.storyRole;
+          preservedFields.push('storyRole');
+          hasChanges = true;
+        }
+
         if (preservedFields.length > 0) {
           console.log(`[Characters] POST - Preserving fields for ${newChar.name}: ${preservedFields.join(', ')}`);
         }
