@@ -455,8 +455,8 @@ export default function StoryWizard() {
       setPages(30);
       setDedication('');
       setStoryDetails('');
-      setMainCharacters([]);
-      setExcludedCharacters([]);
+      // NOTE: mainCharacters and excludedCharacters are USER data, not story data
+      // They persist across stories - don't reset them here
       setStoryCharacters(null);
 
       // Clear localStorage for story settings
@@ -470,8 +470,6 @@ export default function StoryWizard() {
       localStorage.removeItem('story_pages');
       localStorage.removeItem('story_dedication');
       localStorage.removeItem('story_details');
-      localStorage.removeItem('story_main_characters');
-      localStorage.removeItem('story_excluded_characters');
       localStorage.removeItem('wizard_step');
 
       // Remove the 'new' param from URL to avoid resetting on refresh
