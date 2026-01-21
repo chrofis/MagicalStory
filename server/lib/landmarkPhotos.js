@@ -2167,7 +2167,7 @@ async function saveSwissLandmark(landmark) {
         photo_attribution_4 = COALESCE(EXCLUDED.photo_attribution_4, swiss_landmarks.photo_attribution_4),
         photo_description_4 = COALESCE(EXCLUDED.photo_description_4, swiss_landmarks.photo_description_4),
         wikipedia_extract = COALESCE(EXCLUDED.wikipedia_extract, swiss_landmarks.wikipedia_extract),
-        score = GREATEST(EXCLUDED.score, swiss_landmarks.score),
+        score = EXCLUDED.score,
         updated_at = CURRENT_TIMESTAMP
     `, [
       landmark.name,

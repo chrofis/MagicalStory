@@ -203,6 +203,7 @@ REJECT (isFace: false) if:
 - A framed picture/photo hanging on a wall (not an actual character in the scene)
 - Too blurry or small to identify facial features
 - Shows body/clothing but face is out of frame
+- Person is facing away / showing back of head (face not visible from front)
 
 ACCEPT (isFace: true) only if:
 - The face is the main subject and clearly visible
