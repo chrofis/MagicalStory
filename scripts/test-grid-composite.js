@@ -158,30 +158,38 @@ async function analyzeGridImage(gridBuffer, characterName, faceCount) {
   const model = genAI.getGenerativeModel({ model: MODEL });
 
   const prompt = `You are analyzing a grid of ${faceCount} face images from different pages of a children's storybook.
-All faces should be the same character: "${characterName}".
+All faces should be the SAME character.
 
-Each cell is labeled with its page number. Look at all the faces and determine:
-1. Overall consistency score (0-100)
-2. Which page numbers show inconsistent faces
-3. What specific issues you see
+Each cell is labeled with its page number. Analyze EACH face carefully for these specific features:
+
+1. HAIR COLOR - Is it consistent across all pages? Note any that are lighter/darker/different shade.
+2. HAIR STYLE - Is the cut, length, and styling consistent? Note any differences in parting, volume, or shape.
+3. FACE SHAPE - Is the face shape (round, oval, etc.) consistent? Note any that look different.
+4. EYES - Are eye color, size, and shape consistent? Note any differences.
+
+Compare each face against the majority. Identify ALL pages that don't match.
 
 Respond in JSON format:
 {
-  "characterName": "${characterName}",
   "totalFaces": ${faceCount},
   "overallConsistency": 85,
-  "consistentFeatures": ["brown hair", "blue eyes"],
+  "majorityFeatures": {
+    "hairColor": "medium brown",
+    "hairStyle": "short, parted to the side",
+    "faceShape": "round",
+    "eyes": "blue, medium size"
+  },
   "inconsistentPages": [
     {
       "pageNumber": 3,
-      "issues": ["hair color appears different", "face shape doesn't match"],
+      "issues": ["hair color is blonde instead of brown", "face shape is more oval"],
       "severity": "high"
     }
   ],
   "summary": "Brief overall assessment"
 }
 
-Be specific about which page numbers have issues. Focus on clear inconsistencies, not minor lighting variations.`;
+Be thorough - check EVERY page against the majority features.`;
 
   try {
     const result = await model.generateContent([

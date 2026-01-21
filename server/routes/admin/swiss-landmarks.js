@@ -165,6 +165,31 @@ router.get('/index/status', async (req, res) => {
   res.json(swissLandmarkIndexingJob);
 });
 
+// POST /api/admin/swiss-landmarks/recalculate-scores - Recalculate all scores based on type
+router.post('/recalculate-scores', async (req, res) => {
+  if (!checkAuth(req, res, true)) return;
+
+  try {
+    const pool = getPool();
+
+    // Update scores based on type
+    const result = await pool.query(`
+      UPDATE swiss_landmarks SET score = CASE
+        WHEN type IN ('Castle', 'Church', 'Cathedral', 'Bridge', 'Tower', 'Abbey', 'Monastery', 'Chapel') THEN 130
+        WHEN type IN ('Park', 'Garden', 'Monument', 'Museum', 'Theatre', 'Historic site', 'Statue', 'Fountain', 'Square', 'Library') THEN 80
+        WHEN type IS NOT NULL AND type NOT IN ('Unknown', 'Building', 'Station') THEN 30
+        ELSE 5
+      END
+    `);
+
+    log.info(`[ADMIN] Recalculated scores for ${result.rowCount} landmarks`);
+    res.json({ success: true, updated: result.rowCount });
+  } catch (err) {
+    log.error('[ADMIN] Score recalculation error:', err);
+    res.status(500).json({ error: 'Failed to recalculate scores' });
+  }
+});
+
 // GET /api/admin/swiss-landmarks/stats - Get statistics
 router.get('/stats', async (req, res) => {
   if (!checkAuth(req, res, false)) return;
