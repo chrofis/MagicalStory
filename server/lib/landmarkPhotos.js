@@ -2247,6 +2247,7 @@ async function discoverAllSwissLandmarks(options = {}) {
   const {
     analyzePhotos = true,
     useMultiImageAnalysis = true,  // Use new multi-image quality analysis
+    forceReanalyze = false,        // If true, re-analyze photos even if already have description
     onProgress = null,
     maxLandmarks = 500,  // Safety limit - default 500 landmarks max
     maxCities = null,    // Optional limit on cities to process
@@ -2324,7 +2325,7 @@ async function discoverAllSwissLandmarks(options = {}) {
         landmark.score = score;
 
         // Fetch and analyze photo if requested
-        if (analyzePhotos && !landmark.photoDescription) {
+        if (analyzePhotos && (forceReanalyze || !landmark.photoDescription)) {
           try {
             if (useMultiImageAnalysis) {
               // Strategy:

@@ -70,6 +70,7 @@ router.post('/index', async (req, res) => {
     const {
       analyzePhotos = true,
       useMultiImageAnalysis = true,  // Use new multi-image quality analysis
+      forceReanalyze = false,        // Re-analyze photos even if already have description
       dryRun = false,
       maxLandmarks = 500,
       maxCities = null,
@@ -99,17 +100,19 @@ router.post('/index', async (req, res) => {
       maxLandmarks,
       analyzePhotos,
       useMultiImageAnalysis,
+      forceReanalyze,
       filterCities,
       dryRun,
       errors: []
     };
 
-    log.info(`[ADMIN] Starting Swiss landmark indexing (maxLandmarks=${maxLandmarks}, cities=${effectiveCityCount}, multiImage=${useMultiImageAnalysis}, filter=${filterCities || 'none'}, dryRun=${dryRun})`);
+    log.info(`[ADMIN] Starting Swiss landmark indexing (maxLandmarks=${maxLandmarks}, cities=${effectiveCityCount}, multiImage=${useMultiImageAnalysis}, forceReanalyze=${forceReanalyze}, filter=${filterCities || 'none'}, dryRun=${dryRun})`);
 
     // Run in background
     discoverAllSwissLandmarks({
       analyzePhotos,
       useMultiImageAnalysis,
+      forceReanalyze,
       dryRun,
       maxLandmarks,
       maxCities: maxCities || null,
@@ -137,12 +140,13 @@ router.post('/index', async (req, res) => {
 
     res.json({
       status: 'started',
-      message: `Started indexing up to ${maxLandmarks} landmarks from ${effectiveCityCount} Swiss cities${filterCities ? ` (filter: ${filterCities.join(', ')})` : ''}`,
+      message: `Started indexing up to ${maxLandmarks} landmarks from ${effectiveCityCount} Swiss cities${filterCities ? ` (filter: ${filterCities.join(', ')})` : ''}${forceReanalyze ? ' (FORCE REANALYZE)' : ''}`,
       maxLandmarks,
       cities: effectiveCityCount,
       filterCities,
       analyzePhotos,
       useMultiImageAnalysis,
+      forceReanalyze,
       dryRun
     });
   } catch (err) {
