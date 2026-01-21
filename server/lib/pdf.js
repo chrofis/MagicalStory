@@ -252,11 +252,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     }
   }
 
-  // PAGE 2: Blank endpaper (required by Gelato - non-printable inside of front cover)
-  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-  // Leave blank - Gelato requirement
-
-  // PAGE 3: Initial page (dedication/intro page)
+  // Initial page (dedication/intro page)
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
   if (initialPageImageData) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -324,10 +320,6 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   for (let i = 0; i < blankPagesToAdd; i++) {
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   }
-
-  // LAST PAGE: Blank endpaper (required by Gelato - non-printable inside of back cover)
-  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-  // Leave blank - Gelato requirement
 
   doc.end();
   const pdfBuffer = await pdfPromise;
