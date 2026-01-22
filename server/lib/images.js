@@ -100,7 +100,7 @@ const MAX_MASK_COVERAGE_PERCENT = 25;
  * @returns {string} Short hash (8 characters)
  */
 function hashImageData(imageData) {
-  if (!imageData) return null;
+  if (!imageData || typeof imageData !== 'string') return null;
   const data = imageData.replace(/^data:image\/\w+;base64,/, '');
   return crypto.createHash('sha256').update(data).digest('hex').substring(0, 8);
 }
