@@ -1266,7 +1266,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Fall back to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
-        photoUrl = avatars[effectiveClothingCategory];
+        // Handle object format {imageData, clothing} from dynamic avatar generation
+        const avatarData = avatars[effectiveClothingCategory];
+        photoUrl = (typeof avatarData === 'object' && avatarData.imageData) ? avatarData.imageData : avatarData;
         usedClothingCategory = effectiveClothingCategory;
         // Get extracted clothing description for this avatar
         if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
@@ -1280,7 +1282,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       if (!photoUrl && effectiveClothingCategory === 'costumed' && avatars?.formal) {
         log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
         photoType = 'clothing-formal';
-        photoUrl = avatars.formal;
+        // Handle object format {imageData, clothing}
+        const formalData = avatars.formal;
+        photoUrl = (typeof formalData === 'object' && formalData.imageData) ? formalData.imageData : formalData;
         usedClothingCategory = 'formal';
         if (avatars.clothing?.formal) {
           const clothingData = avatars.clothing.formal;
@@ -1298,7 +1302,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             photoType = `clothing-${fallbackCategory}`;
-            photoUrl = avatars[fallbackCategory];
+            // Handle object format {imageData, clothing}
+            const fallbackData = avatars[fallbackCategory];
+            photoUrl = (typeof fallbackData === 'object' && fallbackData.imageData) ? fallbackData.imageData : fallbackData;
             usedClothingCategory = fallbackCategory;
             if (avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
