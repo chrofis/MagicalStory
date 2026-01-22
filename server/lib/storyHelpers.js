@@ -1218,9 +1218,10 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
                   ? avatarData.clothing
                   : formatClothingObject(avatarData.clothing);
               }
-            } else {
+            } else if (typeof avatarData === 'string') {
               photoUrl = avatarData;
             }
+            // If avatarData is object without imageData, skip - fallback will handle it
             photoType = `costumed-${foundKey}`;
             usedClothingCategory = `costumed:${foundKey}`;
             log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${foundKey}"`);
@@ -1247,9 +1248,10 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
               ? avatarData.clothing
               : formatClothingObject(avatarData.clothing);
           }
-        } else {
+        } else if (typeof avatarData === 'string') {
           photoUrl = avatarData;
         }
+        // If avatarData is object without imageData, skip - fallback will handle it
         photoType = `styled-${effectiveClothingCategory}`;
         usedClothingCategory = effectiveClothingCategory;
         log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${effectiveClothingCategory} for ${artStyle}`);
