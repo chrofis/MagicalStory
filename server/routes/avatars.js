@@ -908,14 +908,27 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
   log.debug(`[STYLED COSTUME] ${character.name} data check: avatars=${hasAvatars}, standard=${hasStandard}, photos=${hasPhotos}, face=${hasFace}, original=${hasOriginal}, photoUrl=${hasPhotoUrl}`);
 
   let standardAvatar = character.avatars?.standard;
-  if (!standardAvatar) {
-    // Fallback: use face photo if standard avatar doesn't exist
-    const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
-    if (facePhoto) {
-      log.warn(`[STYLED COSTUME] ${character.name}: No standard avatar found, using face photo as fallback`);
+
+  // Handle case where avatar is stored as object {data: '...', mimeType: '...'}
+  if (standardAvatar && typeof standardAvatar === 'object' && standardAvatar.data) {
+    standardAvatar = standardAvatar.data;
+  }
+
+  // Check if it's a valid string
+  if (!standardAvatar || typeof standardAvatar !== 'string') {
+    // Fallback: use face photo if standard avatar doesn't exist or isn't a string
+    let facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
+
+    // Handle object format for photos too
+    if (facePhoto && typeof facePhoto === 'object' && facePhoto.data) {
+      facePhoto = facePhoto.data;
+    }
+
+    if (facePhoto && typeof facePhoto === 'string') {
+      log.warn(`[STYLED COSTUME] ${character.name}: No valid standard avatar found, using face photo as fallback`);
       standardAvatar = facePhoto;
     } else {
-      log.error(`[STYLED COSTUME] No standard avatar or face photo for ${character.name}`);
+      log.error(`[STYLED COSTUME] No valid standard avatar or face photo for ${character.name} (got ${typeof standardAvatar})`);
       return { success: false, error: 'No reference image available - generate clothing avatars or upload photo first' };
     }
   } else {

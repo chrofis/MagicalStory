@@ -265,8 +265,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     // Use 'avatar' evaluation type (lightweight, no quality retry)
     const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar');
 
-    if (!result || !result.imageData) {
-      throw new Error('No image returned from API');
+    if (!result || !result.imageData || typeof result.imageData !== 'string') {
+      throw new Error(`No valid image returned from API (got ${typeof result?.imageData})`);
     }
 
     // Track usage if callback provided

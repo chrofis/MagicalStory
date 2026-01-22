@@ -190,6 +190,12 @@ async function cropImageForSequential(imageBase64) {
  */
 async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null) {
   try {
+    // Validate input is a string
+    if (!pngBase64 || typeof pngBase64 !== 'string') {
+      log.error(`❌ [COMPRESSION] Invalid input: expected string, got ${typeof pngBase64}`);
+      throw new Error(`compressImageToJPEG requires a string, got ${typeof pngBase64}`);
+    }
+
     // Remove data URI prefix if present and detect original mime type
     const mimeMatch = pngBase64.match(/^data:(image\/\w+);base64,/);
     const originalMimeType = mimeMatch ? mimeMatch[1] : 'image/png';

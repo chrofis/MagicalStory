@@ -1995,7 +1995,8 @@ async function getLandmarkPhotoOnDemand(landmark) {
           const mimeType = contentType.split(';')[0].trim();
 
           // Compress to JPEG if needed (keeping consistent with fetchLandmarkPhoto)
-          photoData = await compressImageToJPEG(`data:${mimeType};base64,${base64}`, 800, 85);
+          // Parameters: (imageData, quality, maxDimension)
+          photoData = await compressImageToJPEG(`data:${mimeType};base64,${base64}`, 85, 800);
           log.debug(`[LANDMARK-LAZY] Fetched from stored URL: ${Math.round(photoData.length / 1024)}KB`);
         }
       } catch (urlErr) {
