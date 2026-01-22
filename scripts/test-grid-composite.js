@@ -32,9 +32,10 @@ const MODEL = 'gemini-2.0-flash-exp';
 
 // Grid settings
 const CELL_SIZE = 200;  // Each face cell
-const MAX_COLS = 5;
+const MAX_COLS = 3;     // Smaller grid for better analysis
 const PADDING = 10;
 const LABEL_HEIGHT = 30;
+const MAX_FACES_PER_GRID = 6;  // Split into batches of 6
 
 // ============================================================================
 // GRID CREATION
@@ -96,12 +97,13 @@ async function createFaceGrid(facePaths, pageNumbers, characterName) {
       top: y,
     });
 
-    // Add page number label (as simple text overlay)
+    // Add letter label (A, B, C...) - simpler for AI to read
+    const letter = String.fromCharCode(65 + i); // A=65 in ASCII
     const labelSvg = Buffer.from(`
       <svg width="${CELL_SIZE - PADDING * 2}" height="${LABEL_HEIGHT}">
         <rect width="100%" height="100%" fill="white"/>
-        <text x="50%" y="70%" text-anchor="middle" font-size="16" font-family="Arial" fill="black">
-          Page ${face.pageNumber}
+        <text x="50%" y="70%" text-anchor="middle" font-size="20" font-family="Arial" font-weight="bold" fill="black">
+          ${letter}
         </text>
       </svg>
     `);
@@ -118,7 +120,7 @@ async function createFaceGrid(facePaths, pageNumbers, characterName) {
     <svg width="${gridWidth}" height="50">
       <rect width="100%" height="100%" fill="white"/>
       <text x="50%" y="70%" text-anchor="middle" font-size="24" font-family="Arial" fill="black">
-        ${characterName} - Face Consistency Grid
+        Face Consistency Grid
       </text>
     </svg>
   `);
@@ -157,17 +159,18 @@ async function createFaceGrid(facePaths, pageNumbers, characterName) {
 async function analyzeGridImage(gridBuffer, characterName, faceCount) {
   const model = genAI.getGenerativeModel({ model: MODEL });
 
-  const prompt = `You are analyzing a grid of ${faceCount} face images from different pages of a children's storybook.
+  const prompt = `You are analyzing a grid of ${faceCount} face images from a children's storybook.
 All faces should be the SAME character.
 
-Each cell is labeled with its page number. Analyze EACH face carefully for these specific features:
+Each cell is labeled with a letter (A, B, C, etc.). Analyze EACH face carefully for these specific features:
 
-1. HAIR COLOR - Is it consistent across all pages? Note any that are lighter/darker/different shade.
-2. HAIR STYLE - Is the cut, length, and styling consistent? Note any differences in parting, volume, or shape.
-3. FACE SHAPE - Is the face shape (round, oval, etc.) consistent? Note any that look different.
-4. EYES - Are eye color, size, and shape consistent? Note any differences.
+1. HAIR COLOR - Is it consistent? Note any that are lighter/darker/different shade.
+2. HAIR STYLE - Is the cut and length consistent? Note any differences.
+3. HAIR PARTING - Which direction is the hair parted (left, right, center, forward)? Note any that differ from the majority.
+4. FACE SHAPE - Is the face shape (round, oval, etc.) consistent?
+5. EYES - Are eye color, size, and shape consistent?
 
-Compare each face against the majority. Identify ALL pages that don't match.
+Compare each face against the majority. Identify ALL letters that don't match.
 
 Respond in JSON format:
 {
@@ -175,13 +178,14 @@ Respond in JSON format:
   "overallConsistency": 85,
   "majorityFeatures": {
     "hairColor": "medium brown",
-    "hairStyle": "short, parted to the side",
+    "hairStyle": "short",
+    "hairParting": "parted to the right",
     "faceShape": "round",
     "eyes": "blue, medium size"
   },
-  "inconsistentPages": [
+  "inconsistentFaces": [
     {
-      "pageNumber": 3,
+      "letter": "C",
       "issues": ["hair color is blonde instead of brown", "face shape is more oval"],
       "severity": "high"
     }
@@ -189,7 +193,7 @@ Respond in JSON format:
   "summary": "Brief overall assessment"
 }
 
-Be thorough - check EVERY page against the majority features.`;
+Be thorough - check EVERY face (A through ${String.fromCharCode(64 + faceCount)}) against the majority features.`;
 
   try {
     const result = await model.generateContent([
@@ -262,69 +266,82 @@ async function analyzeConsistency(storyDir) {
 
     console.log(`\n   ${charName}: ${appearances.length} appearances`);
 
-    // Create grid image
     const facePaths = appearances.map(a => path.join(storyDir, a.faceThumbnailPath));
     const pageNumbers = appearances.map(a => a.pageNumber);
 
-    console.log(`      Creating grid image...`);
-    const grid = await createFaceGrid(facePaths, pageNumbers, charName);
+    // Split into batches for better analysis
+    const numBatches = Math.ceil(appearances.length / MAX_FACES_PER_GRID);
+    console.log(`      Splitting into ${numBatches} batch(es) of up to ${MAX_FACES_PER_GRID} faces`);
 
-    if (!grid) {
-      console.log(`      ❌ Could not create grid`);
-      analysis.characters[charName] = {
-        appearances: appearances.length,
-        error: 'Could not create grid image',
-      };
-      continue;
-    }
+    const allIssues = [];
+    const gridPaths = [];
+    let totalConsistency = 0;
 
-    // Save grid image
-    const gridPath = path.join(storyDir, `grid-${charName.replace(/\s+/g, '_')}.jpg`);
-    fs.writeFileSync(gridPath, grid.buffer);
-    console.log(`      Saved grid: ${path.basename(gridPath)}`);
+    for (let batchIdx = 0; batchIdx < numBatches; batchIdx++) {
+      const startIdx = batchIdx * MAX_FACES_PER_GRID;
+      const endIdx = Math.min(startIdx + MAX_FACES_PER_GRID, appearances.length);
+      const batchFacePaths = facePaths.slice(startIdx, endIdx);
+      const batchPageNumbers = pageNumbers.slice(startIdx, endIdx);
 
-    // Analyze with Gemini
-    console.log(`      Calling Gemini API (1 call for all faces)...`);
-    const result = await analyzeGridImage(grid.buffer, charName, grid.faces.length);
-    totalCalls++;
+      console.log(`      Batch ${batchIdx + 1}: faces ${startIdx + 1}-${endIdx} (pages ${batchPageNumbers.join(', ')})`);
 
-    if (result.error) {
-      console.log(`      ❌ Error: ${result.error}`);
-      analysis.characters[charName] = {
-        appearances: appearances.length,
-        gridPath: path.basename(gridPath),
-        error: result.error,
-      };
-      continue;
-    }
+      const grid = await createFaceGrid(batchFacePaths, batchPageNumbers, charName);
+      if (!grid) {
+        console.log(`         ❌ Could not create grid`);
+        continue;
+      }
 
-    console.log(`      Overall consistency: ${result.overallConsistency}%`);
-    if (result.inconsistentPages?.length > 0) {
-      console.log(`      Issues found: ${result.inconsistentPages.length}`);
-      for (const issue of result.inconsistentPages) {
-        console.log(`         - Page ${issue.pageNumber}: ${issue.issues.join(', ')}`);
+      // Save grid image
+      const gridPath = path.join(storyDir, `grid-${charName.replace(/\s+/g, '_')}-batch${batchIdx + 1}.jpg`);
+      fs.writeFileSync(gridPath, grid.buffer);
+      gridPaths.push(path.basename(gridPath));
+
+      // Analyze with Gemini
+      const result = await analyzeGridImage(grid.buffer, charName, grid.faces.length);
+      totalCalls++;
+
+      if (result.error) {
+        console.log(`         ❌ Error: ${result.error}`);
+        continue;
+      }
+
+      totalConsistency += result.overallConsistency || 0;
+
+      if (result.inconsistentFaces?.length > 0) {
+        console.log(`         Issues: ${result.inconsistentFaces.length}`);
+        for (const issue of result.inconsistentFaces) {
+          // Map letter back to actual index in this batch, then to global page number
+          const batchIndex = issue.letter.charCodeAt(0) - 65;
+          const globalIndex = startIdx + batchIndex;
+          const pageNum = pageNumbers[globalIndex] || '?';
+          console.log(`            - ${issue.letter} (Page ${pageNum}): ${issue.issues.join(', ')}`);
+
+          allIssues.push({
+            letter: issue.letter,
+            batchIndex: batchIdx + 1,
+            pageNumber: pageNum,
+            faceId: appearances[globalIndex]?.faceId,
+            issues: issue.issues,
+            severity: issue.severity,
+          });
+        }
+      } else {
+        console.log(`         No issues found`);
       }
     }
 
-    // Map results
-    const mappedIssues = (result.inconsistentPages || []).map(issue => {
-      const appearance = appearances.find(a => a.pageNumber === issue.pageNumber);
-      return {
-        pageNumber: issue.pageNumber,
-        faceId: appearance?.faceId,
-        issues: issue.issues,
-        severity: issue.severity,
-      };
-    });
+    const avgConsistency = numBatches > 0 ? totalConsistency / numBatches : 0;
+    console.log(`      Overall consistency: ${avgConsistency.toFixed(0)}%`);
+    console.log(`      Total issues: ${allIssues.length}`);
+
+    const mappedIssues = allIssues;
 
     analysis.characters[charName] = {
       appearances: appearances.length,
       pageNumbers,
-      gridPath: path.basename(gridPath),
-      overallConsistency: result.overallConsistency / 100,
-      consistentFeatures: result.consistentFeatures,
+      gridPaths,
+      overallConsistency: avgConsistency / 100,
       inconsistentPages: mappedIssues,
-      summary: result.summary,
     };
   }
 

@@ -303,6 +303,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       for (const refImg of referenceImages) {
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
+        const charName = typeof refImg === 'object' ? refImg?.name : null;
         if (photoUrl && photoUrl.startsWith('data:image')) {
           // Check cache first using hash of original image
           const imageHash = hashImageData(photoUrl);
@@ -317,6 +318,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             compressedRefCache.set(imageHash, compressedBase64);
           }
 
+          // Add label with character name so Gemini can identify by name (not just "Reference 1")
+          if (charName) {
+            parts.push({ text: `Reference: ${charName}` });
+          }
           parts.push({
             inline_data: {
               mime_type: 'image/jpeg',

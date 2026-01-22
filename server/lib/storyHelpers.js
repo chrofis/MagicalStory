@@ -2956,6 +2956,7 @@ module.exports = {
   buildCharacterPhysicalDescription,
   buildRelativeHeightDescription,
   buildCharacterReferenceList,
+  buildHairDescription,
 
   // Parsers
   parseStoryPages,

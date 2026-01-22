@@ -211,16 +211,28 @@ function parseLandmarkCategories(categories) {
   const boostAmount = hasHighBoost ? 100 : (hasMediumBoost ? 50 : 0);
 
   // Find landmark type from categories
-  let type = null;
+  // Collect all matching types and prefer specific ones over generic (Building, Station)
+  const GENERIC_TYPES = ['Building', 'Station', 'Landmark', 'Historic site'];
+  let specificType = null;
+  let genericType = null;
+
   for (const cat of categories) {
     for (const { pattern, type: matchType } of CATEGORY_TO_TYPE) {
       if (pattern.test(cat)) {
-        type = matchType;
-        break;
+        if (GENERIC_TYPES.includes(matchType)) {
+          // Store generic type but keep looking for specific
+          if (!genericType) genericType = matchType;
+        } else {
+          // Found a specific type - use it
+          specificType = matchType;
+          break;
+        }
       }
     }
-    if (type) break;
+    if (specificType) break;
   }
+
+  const type = specificType || genericType;
 
   return { type, boostAmount };
 }

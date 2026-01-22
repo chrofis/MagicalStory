@@ -16,6 +16,7 @@ const path = require('path');
 const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { buildHairDescription } = require('./storyHelpers');
 
 // Art style ID to sample image file mapping
 const ART_STYLE_SAMPLES = {
@@ -139,6 +140,31 @@ function loadArtStylePrompts() {
 const ART_STYLE_PROMPTS = loadArtStylePrompts();
 
 /**
+ * Build physical traits string for avatar prompt
+ * Uses detailed hair analysis from storyHelpers for accurate hair description
+ * @param {Object} character - Character object with physical traits
+ * @returns {string} Physical traits description or default message
+ */
+function buildPhysicalTraitsString(character) {
+  const traits = character?.physical || {};
+  const parts = [];
+
+  // Use detailed hair description from storyHelpers (handles detailedHairAnalysis)
+  const hairDesc = buildHairDescription(traits, character?.physicalTraitsSource);
+  if (hairDesc) parts.push(`Hair: ${hairDesc}`);
+
+  if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
+  if (traits.facialHair && traits.facialHair !== 'none' && traits.facialHair !== 'clean-shaven') {
+    parts.push(`Facial hair: ${traits.facialHair}`);
+  }
+  if (traits.other && traits.other !== 'none') {
+    parts.push(`Other features: ${traits.other}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n') : 'Match reference photo exactly';
+}
+
+/**
  * Generate cache key for styled avatar
  * @param {string} characterName
  * @param {string} clothingCategory
@@ -157,9 +183,11 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {string} facePhoto - High-resolution face photo for identity (optional)
  * @param {string} clothingDescription - Text description of clothing to wear (optional)
  * @param {string} clothingCategory - Clothing category (standard, winter, summer) for logging
+ * @param {Function} addUsage - Usage tracking callback (optional)
+ * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null) {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   const hasClothing = !!clothingDescription;
@@ -188,15 +216,18 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     let fullPrompt;
 
     if (template) {
+      const physicalTraits = buildPhysicalTraitsString(character);
+      log.debug(`🎨 [STYLED AVATAR] ${characterName} physical traits: ${physicalTraits.substring(0, 100)}${physicalTraits.length > 100 ? '...' : ''}`);
       fullPrompt = fillTemplate(template, {
         'ART_STYLE_PROMPT': artStylePrompt,
         'COSTUME_DESCRIPTION': clothingText,
         'COSTUME_TYPE': 'standard outfit',
-        'PHYSICAL_TRAITS': ''
+        'PHYSICAL_TRAITS': physicalTraits
       });
     } else {
       // Fallback if template not loaded
-      fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features. Wearing: ${clothingText}`;
+      const physicalTraits = buildPhysicalTraitsString(character);
+      fullPrompt = `Convert this person into the following art style: ${artStylePrompt}\n\nThis is ${characterName}. Preserve their identity and all distinguishing features. Wearing: ${clothingText}\n\nPHYSICAL TRAITS TO PRESERVE:\n${physicalTraits}`;
     }
 
     // Build reference photos array
@@ -327,9 +358,11 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {string} originalAvatar - Base64 image data URL (body/clothing reference)
  * @param {string} facePhoto - High-resolution face photo for identity (optional)
  * @param {string} clothingDescription - Text description of clothing (optional)
+ * @param {Function} addUsage - Usage tracking callback (optional)
+ * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -349,7 +382,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character);
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -539,7 +572,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           clothingCategory,
           originalAvatar,
           facePhoto,
-          clothingDescription
+          clothingDescription,
+          character: char  // Pass full character object for physical traits
         });
       } else {
         // Log why we can't convert this avatar - helps debug cache misses later
@@ -561,9 +595,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
   // Convert all needed avatars in parallel
   const conversionPromises = [];
-  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription }] of neededAvatars) {
+  for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, character }] of neededAvatars) {
     conversionPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage)
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character)
         .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
         .catch(error => {
           // Bug #14 fix: Include stack trace for better debugging
