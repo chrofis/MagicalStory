@@ -656,4 +656,125 @@ router.post('/convert-characters-jsonb', authenticateToken, requireAdmin, async 
   }
 });
 
+// POST /api/admin/strip-migrated-image-data
+// Strip imageData from stories that have images in story_images table
+// This makes the data column much smaller and queries faster
+router.post('/strip-migrated-image-data', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(400).json({ error: 'This operation is only available in database mode' });
+    }
+
+    const pool = getPool();
+    const { limit = 10, dryRun = true } = req.body;
+
+    // Find stories that have images in story_images table
+    const storyRows = await pool.query(`
+      SELECT DISTINCT s.id,
+             pg_column_size(s.data) as data_size_bytes
+      FROM stories s
+      INNER JOIN story_images si ON si.story_id = s.id
+      ORDER BY data_size_bytes DESC
+      LIMIT $1
+    `, [limit]);
+
+    const results = [];
+    let totalBytesFreed = 0;
+
+    for (const row of storyRows.rows) {
+      const storyId = row.id;
+      const originalSize = row.data_size_bytes;
+
+      try {
+        // Load story data
+        const dataRows = await pool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
+        const story = typeof dataRows.rows[0].data === 'string'
+          ? JSON.parse(dataRows.rows[0].data)
+          : dataRows.rows[0].data;
+
+        let imagesStripped = 0;
+
+        // Strip imageData from scene images (keep metadata)
+        if (story.sceneImages) {
+          for (const img of story.sceneImages) {
+            if (img.imageData) {
+              delete img.imageData;
+              imagesStripped++;
+            }
+            // Also strip from image versions
+            if (img.imageVersions) {
+              for (const version of img.imageVersions) {
+                if (version.imageData) {
+                  delete version.imageData;
+                  imagesStripped++;
+                }
+              }
+            }
+          }
+        }
+
+        // Strip imageData from cover images (keep metadata)
+        const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+        for (const coverType of coverTypes) {
+          const coverData = story.coverImages?.[coverType];
+          if (coverData && typeof coverData === 'object' && coverData.imageData) {
+            delete coverData.imageData;
+            imagesStripped++;
+          } else if (coverData && typeof coverData === 'string') {
+            // Old format: coverImages.frontCover is just the image string
+            story.coverImages[coverType] = { stripped: true };
+            imagesStripped++;
+          }
+        }
+
+        if (imagesStripped > 0) {
+          const newDataJson = JSON.stringify(story);
+          const newSize = Buffer.byteLength(newDataJson, 'utf8');
+          const bytesFreed = originalSize - newSize;
+
+          if (!dryRun) {
+            await pool.query('UPDATE stories SET data = $1 WHERE id = $2', [newDataJson, storyId]);
+          }
+
+          results.push({
+            storyId,
+            imagesStripped,
+            originalSize,
+            newSize,
+            bytesFreed,
+            status: dryRun ? 'dry-run' : 'stripped'
+          });
+          totalBytesFreed += bytesFreed;
+        } else {
+          results.push({
+            storyId,
+            imagesStripped: 0,
+            originalSize,
+            status: 'already-clean'
+          });
+        }
+      } catch (err) {
+        results.push({
+          storyId,
+          status: 'error',
+          error: err.message
+        });
+      }
+    }
+
+    log.info(`[STRIP] ${dryRun ? 'DRY RUN: ' : ''}Processed ${results.length} stories, freed ${(totalBytesFreed / 1024 / 1024).toFixed(2)} MB`);
+    res.json({
+      success: true,
+      dryRun,
+      storiesProcessed: results.length,
+      totalBytesFreed,
+      totalMBFreed: (totalBytesFreed / 1024 / 1024).toFixed(2),
+      results
+    });
+  } catch (err) {
+    log.error('[STRIP] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

@@ -224,14 +224,42 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
 
     if (hasSeparateImages) {
       // FAST PATH: Load metadata without image data, get image info from story_images table
-      // Use JSONB to extract non-image fields (PostgreSQL won't load the huge imageData strings)
+      // IMPORTANT: Extract only specific JSONB fields - do NOT use (data::jsonb) - 'field'
+      // because that still loads the entire blob before removing fields!
       // Characters are extracted separately with only id/name (not full 7MB+ photo data)
       const metaQuery = `
         SELECT
-          (data::jsonb) - 'sceneImages' - 'coverImages' - 'characters' as base_data,
-          COALESCE(jsonb_array_length((data::jsonb)->'sceneImages'), 0) as scene_count,
+          jsonb_build_object(
+            'id', data::jsonb->'id',
+            'title', data::jsonb->'title',
+            'createdAt', data::jsonb->'createdAt',
+            'updatedAt', data::jsonb->'updatedAt',
+            'language', data::jsonb->'language',
+            'languageLevel', data::jsonb->'languageLevel',
+            'outline', data::jsonb->'outline',
+            'storyText', data::jsonb->'storyText',
+            'sceneDescriptions', data::jsonb->'sceneDescriptions',
+            'storyCategory', data::jsonb->'storyCategory',
+            'storyTopic', data::jsonb->'storyTopic',
+            'storyTheme', data::jsonb->'storyTheme',
+            'mainCharacters', data::jsonb->'mainCharacters',
+            'generatedPages', data::jsonb->'generatedPages',
+            'totalPages', data::jsonb->'totalPages',
+            'pages', data::jsonb->'pages',
+            'visualBible', data::jsonb->'visualBible',
+            'clothingRequirements', data::jsonb->'clothingRequirements',
+            'artStyle', data::jsonb->'artStyle',
+            'imageGenerationMode', data::jsonb->'imageGenerationMode',
+            'isPartial', data::jsonb->'isPartial',
+            'historicalEvent', data::jsonb->'historicalEvent',
+            'location', data::jsonb->'location',
+            'generationLog', data::jsonb->'generationLog',
+            'styledAvatarGeneration', data::jsonb->'styledAvatarGeneration',
+            'costumedAvatarGeneration', data::jsonb->'costumedAvatarGeneration'
+          ) as base_data,
+          COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as scene_count,
           (SELECT jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name'))
-           FROM jsonb_array_elements((data::jsonb)->'characters') c) as characters_mini
+           FROM jsonb_array_elements(data::jsonb->'characters') c) as characters_mini
         FROM stories WHERE id = $1
       `;
       const metaRows = await dbQuery(metaQuery, [id]);
