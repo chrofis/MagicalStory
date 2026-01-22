@@ -2572,14 +2572,27 @@ export default function StoryWizard() {
 
   // Save character roles to database
   const saveCharacterRoles = async () => {
-    if (characters.length === 0) return;
+    // Get LATEST state values to avoid stale closure issues
+    const [latestCharacters, latestMain, latestExcluded] = await Promise.all([
+      new Promise<Character[]>(resolve => {
+        setCharacters(prev => { resolve(prev); return prev; });
+      }),
+      new Promise<number[]>(resolve => {
+        setMainCharacters(prev => { resolve(prev); return prev; });
+      }),
+      new Promise<number[]>(resolve => {
+        setExcludedCharacters(prev => { resolve(prev); return prev; });
+      }),
+    ]);
 
-    // Build roles object from current state
+    if (latestCharacters.length === 0) return;
+
+    // Build roles object from latest state
     const roles: Record<number, 'main' | 'in' | 'out'> = {};
-    for (const char of characters) {
-      if (mainCharacters.includes(char.id)) {
+    for (const char of latestCharacters) {
+      if (latestMain.includes(char.id)) {
         roles[char.id] = 'main';
-      } else if (excludedCharacters.includes(char.id)) {
+      } else if (latestExcluded.includes(char.id)) {
         roles[char.id] = 'out';
       } else {
         roles[char.id] = 'in';
