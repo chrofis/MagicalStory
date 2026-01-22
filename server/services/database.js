@@ -434,33 +434,153 @@ function buildStoryMetadata(story) {
 /**
  * Save story data with metadata column for fast list queries.
  * Use this instead of raw UPDATE to ensure metadata stays in sync.
+ * OPTIMIZED: Extracts images to story_images table for faster queries.
  */
 async function saveStoryData(storyId, storyData) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
   }
 
+  // Deep clone to avoid modifying original
+  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  let imagesSaved = 0;
+
+  // Extract and save scene images to story_images table
+  if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
+    for (const img of dataForStorage.sceneImages) {
+      if (img.imageData) {
+        await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
+          qualityScore: img.qualityScore || img.score,
+          generatedAt: img.generatedAt,
+          versionIndex: 0
+        });
+        imagesSaved++;
+        delete img.imageData;
+      }
+      if (img.imageVersions && Array.isArray(img.imageVersions)) {
+        for (let i = 0; i < img.imageVersions.length; i++) {
+          const version = img.imageVersions[i];
+          if (version.imageData) {
+            await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
+              qualityScore: version.qualityScore || version.score,
+              generatedAt: version.generatedAt,
+              versionIndex: i + 1
+            });
+            imagesSaved++;
+            delete version.imageData;
+          }
+        }
+      }
+    }
+  }
+
+  // Extract and save cover images
+  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+  for (const coverType of coverTypes) {
+    const coverData = dataForStorage.coverImages?.[coverType];
+    if (coverData) {
+      const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+      if (imageData) {
+        await saveStoryImage(storyId, coverType, null, imageData, {
+          qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null,
+          generatedAt: typeof coverData === 'object' ? coverData.generatedAt : null,
+          versionIndex: 0
+        });
+        imagesSaved++;
+        if (typeof coverData === 'object') {
+          delete coverData.imageData;
+        } else {
+          dataForStorage.coverImages[coverType] = { stripped: true };
+        }
+      }
+    }
+  }
+
   const metadata = buildStoryMetadata(storyData);
+  if (imagesSaved > 0) {
+    console.log(`💾 [SAVE] Extracted ${imagesSaved} images to story_images for ${storyId}`);
+  }
   await dbQuery(
     'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
-    [JSON.stringify(storyData), JSON.stringify(metadata), storyId]
+    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
   );
 }
 
 /**
  * Insert or update story data with metadata.
+ * OPTIMIZED: Extracts images to story_images table for faster queries.
  */
 async function upsertStory(storyId, userId, storyData) {
   if (!isDatabaseMode()) {
     throw new Error('Database mode required');
   }
 
-  const metadata = buildStoryMetadata(storyData);
-  console.log(`💾 [UPSERT] Saving story ${storyId} for user ${userId}, title: "${metadata.title}"`);
+  // Deep clone to avoid modifying original
+  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+  let imagesSaved = 0;
+
+  // Extract and save scene images to story_images table
+  if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
+    for (const img of dataForStorage.sceneImages) {
+      if (img.imageData) {
+        // Save to story_images table
+        await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
+          qualityScore: img.qualityScore || img.score,
+          generatedAt: img.generatedAt,
+          versionIndex: 0
+        });
+        imagesSaved++;
+        // Remove imageData from storage (keep metadata)
+        delete img.imageData;
+      }
+      // Also save image versions
+      if (img.imageVersions && Array.isArray(img.imageVersions)) {
+        for (let i = 0; i < img.imageVersions.length; i++) {
+          const version = img.imageVersions[i];
+          if (version.imageData) {
+            await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
+              qualityScore: version.qualityScore || version.score,
+              generatedAt: version.generatedAt,
+              versionIndex: i + 1
+            });
+            imagesSaved++;
+            delete version.imageData;
+          }
+        }
+      }
+    }
+  }
+
+  // Extract and save cover images to story_images table
+  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+  for (const coverType of coverTypes) {
+    const coverData = dataForStorage.coverImages?.[coverType];
+    if (coverData) {
+      const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+      if (imageData) {
+        await saveStoryImage(storyId, coverType, null, imageData, {
+          qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null,
+          generatedAt: typeof coverData === 'object' ? coverData.generatedAt : null,
+          versionIndex: 0
+        });
+        imagesSaved++;
+        // Remove imageData from storage (keep metadata for object type)
+        if (typeof coverData === 'object') {
+          delete coverData.imageData;
+        } else {
+          // For string-only cover data, replace with placeholder
+          dataForStorage.coverImages[coverType] = { stripped: true };
+        }
+      }
+    }
+  }
+
+  const metadata = buildStoryMetadata(storyData); // Use original for metadata (includes image counts)
+  console.log(`💾 [UPSERT] Saving story ${storyId} for user ${userId}, title: "${metadata.title}" (${imagesSaved} images to story_images)`);
 
   const result = await dbQuery(
     'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, metadata = EXCLUDED.metadata RETURNING id, user_id',
-    [storyId, userId, JSON.stringify(storyData), JSON.stringify(metadata)]
+    [storyId, userId, JSON.stringify(dataForStorage), JSON.stringify(metadata)]
   );
 
   if (result && result.length > 0) {

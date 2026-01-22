@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, hasStorySeparateImages } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, hasStorySeparateImages, saveStoryData } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -704,20 +704,10 @@ router.post('/', authenticateToken, async (req, res) => {
       const existing = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [story.id, req.user.id]);
       isNewStory = existing.length === 0;
 
-      // Build metadata for fast list queries
-      const metadata = buildStoryMetadata(story);
-
-      if (isNewStory) {
-        await dbQuery(
-          'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4)',
-          [story.id, req.user.id, JSON.stringify(story), JSON.stringify(metadata)]
-        );
-      } else {
-        await dbQuery(
-          'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3 AND user_id = $4',
-          [JSON.stringify(story), JSON.stringify(metadata), story.id, req.user.id]
-        );
-      }
+      // Save story (automatically extracts images to story_images table)
+      // Use upsertStory which handles both insert and update
+      const { upsertStory } = require('../services/database');
+      await upsertStory(story.id, req.user.id, story);
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
@@ -828,9 +818,8 @@ router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
       storyData.sceneDescriptions = sceneDescriptions;
     }
 
-    // Save updated story with metadata
-    const metadata = buildStoryMetadata(storyData);
-    await pool.query('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
+    // Save updated story with metadata (extracts images to story_images table)
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Page ${pageNumber} updated for story ${id}`);
 
@@ -877,8 +866,7 @@ router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
     storyData.updatedAt = new Date().toISOString();
 
     // Note: visualBible doesn't affect metadata, but update for consistency
-    const metadata = buildStoryMetadata(storyData);
-    await pool.query('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Visual Bible updated for story ${id}`);
 
@@ -949,8 +937,7 @@ router.put('/:id/text', authenticateToken, async (req, res) => {
     storyData.storyText = newStoryText; // Also update storyText for compatibility
     storyData.updatedAt = new Date().toISOString();
 
-    const metadata = buildStoryMetadata(storyData);
-    await dbQuery('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Story text updated for ${id}`);
     await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id });
@@ -1011,8 +998,7 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
     storyData.updatedAt = new Date().toISOString();
 
     // Title is in metadata, so we need to update it
-    const metadata = buildStoryMetadata(storyData);
-    await dbQuery('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Story title updated for ${id}: "${title.trim()}"`);
     await logActivity(req.user.id, req.user.username, 'STORY_TITLE_EDITED', { storyId: id, newTitle: title.trim() });
@@ -1083,8 +1069,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     storyData.sceneImages = sceneImages;
     storyData.updatedAt = new Date().toISOString();
 
-    const metadata = buildStoryMetadata(storyData);
-    await pool.query('UPDATE stories SET data = $1, metadata = $2 WHERE id = $3', [JSON.stringify(storyData), JSON.stringify(metadata), id]);
+    await saveStoryData(id, storyData);
 
     console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum}`);
 
