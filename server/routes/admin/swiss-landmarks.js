@@ -190,16 +190,15 @@ router.post('/recalculate-scores', async (req, res) => {
   }
 });
 
-// PATCH /api/admin/swiss-landmarks/:id - Update a landmark's type
-router.patch('/:id', async (req, res) => {
+// POST /api/admin/swiss-landmarks/update-type - Update a landmark's type
+router.post('/update-type', async (req, res) => {
   if (!checkAuth(req, res, true)) return;
 
   try {
-    const { id } = req.params;
-    const { type } = req.body;
+    const { id, type } = req.body;
 
-    if (!type) {
-      return res.status(400).json({ error: 'type is required' });
+    if (!id || !type) {
+      return res.status(400).json({ error: 'id and type are required' });
     }
 
     const pool = getPool();
