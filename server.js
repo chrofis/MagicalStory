@@ -12888,8 +12888,8 @@ app.get('/api/jobs/:jobId/status', jobStatusLimiter, authenticateToken, async (r
       let partialPages = [];
       let partialCovers = {};
       let storyText = null;
-      if (job.status === 'processing') {
-        // Fetch partial pages
+      if (job.status === 'processing' || job.status === 'failed') {
+        // Fetch partial pages (also for failed jobs to allow data recovery)
         const partialPagesResult = await dbPool.query(
           `SELECT step_index, step_data
            FROM story_job_checkpoints
