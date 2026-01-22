@@ -190,6 +190,36 @@ router.post('/recalculate-scores', async (req, res) => {
   }
 });
 
+// PATCH /api/admin/swiss-landmarks/:id - Update a landmark's type
+router.patch('/:id', async (req, res) => {
+  if (!checkAuth(req, res, true)) return;
+
+  try {
+    const { id } = req.params;
+    const { type } = req.body;
+
+    if (!type) {
+      return res.status(400).json({ error: 'type is required' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'UPDATE swiss_landmarks SET type = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, type',
+      [type, id]
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: 'Landmark not found' });
+    }
+
+    log.info(`[ADMIN] Updated landmark ${id} type to "${type}"`);
+    res.json({ success: true, landmark: result.rows[0] });
+  } catch (err) {
+    log.error('[ADMIN] Update landmark error:', err);
+    res.status(500).json({ error: 'Failed to update landmark' });
+  }
+});
+
 // GET /api/admin/swiss-landmarks/stats - Get statistics
 router.get('/stats', async (req, res) => {
   if (!checkAuth(req, res, false)) return;
