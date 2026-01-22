@@ -118,7 +118,7 @@ function generateImageCacheKey(prompt, characterPhotos = [], sequentialMarker = 
   // Supports both: array of URLs (legacy) or array of {name, photoUrl} objects (new)
   const photoHashes = characterPhotos
     .map(p => typeof p === 'string' ? p : p?.photoUrl)
-    .filter(url => url && url.startsWith('data:image'))
+    .filter(url => url && typeof url === 'string' && url.startsWith('data:image'))
     .map(photoUrl => {
       const base64Data = photoUrl.replace(/^data:image\/\w+;base64,/, '');
       return crypto.createHash('sha256').update(base64Data).digest('hex').substring(0, 16);
