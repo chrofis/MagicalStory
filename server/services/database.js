@@ -519,6 +519,16 @@ async function upsertStory(storyId, userId, storyData) {
   const dataForStorage = JSON.parse(JSON.stringify(storyData));
   let imagesSaved = 0;
 
+  // IMPORTANT: Insert story record FIRST to satisfy foreign key constraint
+  // story_images references stories.id, so story must exist before saving images
+  const metadata = buildStoryMetadata(storyData);
+  console.log(`💾 [UPSERT] Creating/updating story ${storyId} for user ${userId}, title: "${metadata.title}"`);
+
+  await dbQuery(
+    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id',
+    [storyId, userId, JSON.stringify({}), JSON.stringify(metadata)]
+  );
+
   // Extract and save scene images to story_images table
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
     for (const img of dataForStorage.sceneImages) {
@@ -575,19 +585,16 @@ async function upsertStory(storyId, userId, storyData) {
     }
   }
 
-  const metadata = buildStoryMetadata(storyData); // Use original for metadata (includes image counts)
-  console.log(`💾 [UPSERT] Saving story ${storyId} for user ${userId}, title: "${metadata.title}" (${imagesSaved} images to story_images)`);
+  // Now update the story with full data and final metadata
+  const finalMetadata = buildStoryMetadata(storyData); // Use original for metadata (includes image counts)
+  console.log(`💾 [UPSERT] Updating story ${storyId} with full data (${imagesSaved} images saved to story_images)`);
 
-  const result = await dbQuery(
-    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data, metadata = EXCLUDED.metadata RETURNING id, user_id',
-    [storyId, userId, JSON.stringify(dataForStorage), JSON.stringify(metadata)]
+  await dbQuery(
+    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
+    [JSON.stringify(dataForStorage), JSON.stringify(finalMetadata), storyId]
   );
 
-  if (result && result.length > 0) {
-    console.log(`✅ [UPSERT] Story saved successfully: id=${result[0].id}, user_id=${result[0].user_id}`);
-  } else {
-    console.error(`❌ [UPSERT] Story save returned no result for ${storyId}`);
-  }
+  console.log(`✅ [UPSERT] Story ${storyId} saved successfully`);
 }
 
 /**
