@@ -12295,6 +12295,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           let storyTextPrompts = [];
           let visualBible = null;
           let coverImages = {};
+          let pageClothingData = null;
 
           for (const cp of checkpoints) {
             const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
@@ -12304,6 +12305,14 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               outlinePrompt = data.outlinePrompt || '';
               outlineModelId = data.outlineModelId || null;
               outlineUsage = data.outlineUsage || null;
+              // Extract clothing data from outline
+              if (outline) {
+                try {
+                  pageClothingData = extractPageClothing(outline, inputData?.pages || 15);
+                } catch (e) {
+                  log.debug(`[PARTIAL SAVE] Could not extract clothing: ${e.message}`);
+                }
+              }
             } else if (cp.step_name === 'scene_hints' && data.visualBible) {
               visualBible = data.visualBible;
             } else if (cp.step_name === 'story_batch') {
