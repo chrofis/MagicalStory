@@ -2566,6 +2566,8 @@ export default function StoryWizard() {
       setExcludedCharacters(prev => prev.filter(id => id !== charId));
       setMainCharacters(prev => prev.includes(charId) ? prev : [...prev, charId]);
     }
+    // Also update storyRole on the character object so it's sent with saveAllCharacterData
+    setCharacters(prev => prev.map(c => c.id === charId ? { ...c, storyRole: role } : c));
   };
 
   // Save character roles to database

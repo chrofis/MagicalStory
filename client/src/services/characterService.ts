@@ -222,6 +222,8 @@ function mapCharacterToApi(char: Partial<Character>): Record<string, unknown> {
     // NOTE: avatars/clothing_avatars NOT sent - backend is source of truth
     // Generated outfits per page
     generated_outfits: char.generatedOutfits,
+    // Story role (main/in/out) - sent to avoid race conditions with PUT /roles
+    storyRole: char.storyRole,
   };
 }
 
