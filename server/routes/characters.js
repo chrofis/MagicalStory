@@ -137,7 +137,7 @@ router.put('/roles', authenticateToken, async (req, res) => {
 
     // Save both data and metadata
     await dbQuery(
-      'UPDATE characters SET data = $1, metadata = $2, updated_at = NOW() WHERE id = $3',
+      'UPDATE characters SET data = $1, metadata = $2 WHERE id = $3',
       [JSON.stringify(updatedData), JSON.stringify(metadata), rowId]
     );
 
