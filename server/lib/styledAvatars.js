@@ -453,9 +453,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           );
           if (matchingKey && existingStyledCostumed[matchingKey]) {
             // Ensure cache is populated even if setStyledAvatar was missed
-            // Styled avatars are always strings (clothing stored separately)
+            // Extract imageData if legacy object format {imageData, clothing}
             if (!styledAvatarCache.has(cacheKey)) {
-              styledAvatarCache.set(cacheKey, existingStyledCostumed[matchingKey]);
+              const avatarValue = existingStyledCostumed[matchingKey];
+              const avatarString = (typeof avatarValue === 'object' && avatarValue.imageData) ? avatarValue.imageData : avatarValue;
+              styledAvatarCache.set(cacheKey, avatarString);
               log.debug(`📥 [STYLED AVATARS] ${charName}:${clothingCategory} - populated cache from character data (costumed)`);
             }
             log.debug(`⏭️ [STYLED AVATARS] Skipping ${charName}:${clothingCategory} - already has styled costumed avatar`);
@@ -478,9 +480,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         const existingStyled = avatars?.styledAvatars?.[artStyle]?.costumed?.[costumeType];
         if (existingStyled) {
           // Ensure cache is populated even if setStyledAvatar was missed
-          // Styled avatars are always strings (clothing stored separately)
+          // Extract imageData if legacy object format {imageData, clothing}
           if (!styledAvatarCache.has(cacheKey)) {
-            styledAvatarCache.set(cacheKey, existingStyled);
+            const avatarString = (typeof existingStyled === 'object' && existingStyled.imageData) ? existingStyled.imageData : existingStyled;
+            styledAvatarCache.set(cacheKey, avatarString);
             log.debug(`📥 [STYLED AVATARS] ${charName}: costumed:${costumeType} - populated cache from character data`);
           }
           log.debug(`⏭️ [STYLED AVATARS] ${charName}: costumed:${costumeType} already styled, skipping`);
@@ -498,9 +501,10 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           const existingStyled = avatars?.styledAvatars?.[artStyle]?.[clothingCategory];
           if (existingStyled) {
             // Ensure cache is populated even if setStyledAvatar was missed
-            // Styled avatars are always strings (clothing stored separately)
+            // Extract imageData if legacy object format {imageData, clothing}
             if (!styledAvatarCache.has(cacheKey)) {
-              styledAvatarCache.set(cacheKey, existingStyled);
+              const avatarString = (typeof existingStyled === 'object' && existingStyled.imageData) ? existingStyled.imageData : existingStyled;
+              styledAvatarCache.set(cacheKey, avatarString);
               log.debug(`📥 [STYLED AVATARS] ${charName}:${clothingCategory} - populated cache from character data (signature avatar)`);
             }
             log.debug(`⏭️ [STYLED AVATARS] ${charName}:${clothingCategory} already styled with signature, skipping`);
