@@ -363,10 +363,17 @@ function extractSceneMetadata(sceneDescription) {
       }
     }
 
-    // Extract object IDs
-    const objectIds = (parsed.output.objects || []).map(obj =>
-      obj.id ? `${obj.name} [${obj.id}]` : obj.name
-    );
+    // Extract object IDs - handle both string format ("LOC001") and object format ({id, name})
+    const objectIds = (parsed.output.objects || []).map(obj => {
+      if (typeof obj === 'string') {
+        // String format: "LOC001" or "Stadtturm [LOC001]"
+        return obj;
+      } else if (obj && typeof obj === 'object') {
+        // Object format: {id: "LOC001", name: "Stadtturm"}
+        return obj.id ? `${obj.name} [${obj.id}]` : obj.name;
+      }
+      return null;
+    }).filter(Boolean);
 
     // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
     // This ensures landmark photos are passed to image generation
@@ -1210,24 +1217,14 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           const foundKey = artStyle && findCostumeByPrefix(avatars?.styledAvatars?.[artStyle]?.costumed, costumeKey);
 
           if (foundKey) {
-            let avatarData = avatars.styledAvatars[artStyle].costumed[foundKey];
-            if (typeof avatarData === 'object' && avatarData.imageData) {
-              photoUrl = avatarData.imageData;
-              if (avatarData.clothing) {
-                clothingDescription = typeof avatarData.clothing === 'string'
-                  ? avatarData.clothing
-                  : formatClothingObject(avatarData.clothing);
-              }
-            } else if (typeof avatarData === 'string') {
-              photoUrl = avatarData;
-            }
-            // If avatarData is object without imageData, skip - fallback will handle it
+            // Styled avatars are always strings (image data stored separately from clothing)
+            photoUrl = avatars.styledAvatars[artStyle].costumed[foundKey];
             photoType = `costumed-${foundKey}`;
             usedClothingCategory = `costumed:${foundKey}`;
             log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${foundKey}"`);
 
-            // Get clothing description from separate clothing object if not already set
-            if (!clothingDescription && avatars?.clothing?.costumed?.[foundKey]) {
+            // Get clothing description from separate clothing object
+            if (avatars?.clothing?.costumed?.[foundKey]) {
               const clothingData = avatars.clothing.costumed[foundKey];
               clothingDescription = typeof clothingData === 'string'
                 ? clothingData
@@ -1240,18 +1237,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Check styled avatars first (with signature items from this story)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' &&
                artStyle && avatars?.styledAvatars?.[artStyle]?.[effectiveClothingCategory]) {
-        let avatarData = avatars.styledAvatars[artStyle][effectiveClothingCategory];
-        if (typeof avatarData === 'object' && avatarData.imageData) {
-          photoUrl = avatarData.imageData;
-          if (avatarData.clothing) {
-            clothingDescription = typeof avatarData.clothing === 'string'
-              ? avatarData.clothing
-              : formatClothingObject(avatarData.clothing);
-          }
-        } else if (typeof avatarData === 'string') {
-          photoUrl = avatarData;
-        }
-        // If avatarData is object without imageData, skip - fallback will handle it
+        // Styled avatars are always strings (clothing stored separately)
+        photoUrl = avatars.styledAvatars[artStyle][effectiveClothingCategory];
         photoType = `styled-${effectiveClothingCategory}`;
         usedClothingCategory = effectiveClothingCategory;
         log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${effectiveClothingCategory} for ${artStyle}`);
@@ -1268,9 +1255,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Fall back to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
-        // Handle object format {imageData, clothing} from dynamic avatar generation
-        const avatarData = avatars[effectiveClothingCategory];
-        photoUrl = (typeof avatarData === 'object' && avatarData.imageData) ? avatarData.imageData : avatarData;
+        // Avatars are always strings (clothing stored separately)
+        photoUrl = avatars[effectiveClothingCategory];
         usedClothingCategory = effectiveClothingCategory;
         // Get extracted clothing description for this avatar
         if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
@@ -1284,9 +1270,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       if (!photoUrl && effectiveClothingCategory === 'costumed' && avatars?.formal) {
         log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
         photoType = 'clothing-formal';
-        // Handle object format {imageData, clothing}
-        const formalData = avatars.formal;
-        photoUrl = (typeof formalData === 'object' && formalData.imageData) ? formalData.imageData : formalData;
+        // Avatars are always strings
+        photoUrl = avatars.formal;
         usedClothingCategory = 'formal';
         if (avatars.clothing?.formal) {
           const clothingData = avatars.clothing.formal;
@@ -1304,9 +1289,8 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             photoType = `clothing-${fallbackCategory}`;
-            // Handle object format {imageData, clothing}
-            const fallbackData = avatars[fallbackCategory];
-            photoUrl = (typeof fallbackData === 'object' && fallbackData.imageData) ? fallbackData.imageData : fallbackData;
+            // Avatars are always strings
+            photoUrl = avatars[fallbackCategory];
             usedClothingCategory = fallbackCategory;
             if (avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
