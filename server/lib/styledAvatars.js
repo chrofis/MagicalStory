@@ -746,9 +746,13 @@ function applyStyledAvatars(characterPhotos, artStyle) {
     const styledAvatar = getStyledAvatar(photo.name, photo.clothingCategory, artStyle);
     if (styledAvatar) {
       appliedCount++;
+      // Handle legacy object format {imageData, clothing} if present in cache
+      const styledPhotoUrl = (typeof styledAvatar === 'object' && styledAvatar.imageData)
+        ? styledAvatar.imageData
+        : styledAvatar;
       return {
         ...photo,
-        photoUrl: styledAvatar,
+        photoUrl: styledPhotoUrl,
         isStyled: true,
         originalPhotoUrl: photo.photoUrl // Keep original for debugging
       };
