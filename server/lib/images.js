@@ -889,11 +889,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     for (const photoData of characterPhotos) {
       // Handle both formats: string URL or {name, photoUrl} object
-      const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+      let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+      // Handle object format {data: '...', mimeType: '...'}
+      if (photoUrl && typeof photoUrl === 'object' && photoUrl.data) {
+        photoUrl = photoUrl.data;
+      }
       const characterName = typeof photoData === 'object' ? photoData?.name : null;
       const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
 
-      if (photoUrl && photoUrl.startsWith('data:image')) {
+      if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
         // Check cache first using hash of original image
         const imageHash = hashImageData(photoUrl);
         let compressedBase64 = compressedRefCache.get(imageHash);
