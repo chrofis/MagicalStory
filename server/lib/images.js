@@ -894,6 +894,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       if (photoUrl && typeof photoUrl === 'object' && photoUrl.data) {
         photoUrl = photoUrl.data;
       }
+      // Handle legacy object format {imageData: '...', clothing: '...'}
+      if (photoUrl && typeof photoUrl === 'object' && photoUrl.imageData) {
+        photoUrl = photoUrl.imageData;
+      }
       const characterName = typeof photoData === 'object' ? photoData?.name : null;
       const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
 
