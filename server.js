@@ -12810,7 +12810,7 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
       await dbPool.query(
         `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved, idempotency_key)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', userCredits === -1 ? 0 : creditsNeeded, idempotencyKey]
+        [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', (userCredits === -1 || req.user.role === 'admin') ? 0 : creditsNeeded, idempotencyKey]
       );
 
       // Clean up old completed/failed jobs in background (don't await)
