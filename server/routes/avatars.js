@@ -1159,26 +1159,17 @@ async function generateStyledAvatarWithSignature(character, category, config, ar
   log.debug(`[STYLED SIGNATURE] ${character.name} data check: avatars=${hasAvatars}, ${category}=${hasCategory}, standard=${hasStandard}, photos=${hasPhotos}, face=${hasFace}`);
 
   // Priority: category avatar > standard avatar > face photo
-  // Handle object format {imageData, clothing} - extract imageData
+  // Avatars are always strings (clothing stored separately)
   let baseAvatar = character.avatars?.[category];
-  if (baseAvatar && typeof baseAvatar === 'object' && baseAvatar.imageData) {
-    baseAvatar = baseAvatar.imageData;
-  }
-  if (!baseAvatar || typeof baseAvatar !== 'string') {
+  if (!baseAvatar) {
     baseAvatar = character.avatars?.standard;
-    if (baseAvatar && typeof baseAvatar === 'object' && baseAvatar.imageData) {
-      baseAvatar = baseAvatar.imageData;
-    }
-    if (baseAvatar && typeof baseAvatar === 'string') {
+    if (baseAvatar) {
       log.warn(`[STYLED SIGNATURE] ${character.name}: No ${category} avatar found, using standard avatar as fallback`);
     }
   }
-  if (!baseAvatar || typeof baseAvatar !== 'string') {
-    let facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
-    if (facePhoto && typeof facePhoto === 'object' && facePhoto.imageData) {
-      facePhoto = facePhoto.imageData;
-    }
-    if (facePhoto && typeof facePhoto === 'string') {
+  if (!baseAvatar) {
+    const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
+    if (facePhoto) {
       log.warn(`[STYLED SIGNATURE] ${character.name}: No ${category} or standard avatar found, using face photo as fallback`);
       baseAvatar = facePhoto;
     } else {

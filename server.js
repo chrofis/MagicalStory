@@ -10315,30 +10315,46 @@ async function processStoryJob(jobId) {
             : charResult.rows[0].data;
           const dbCharacters = dbData.characters || [];
 
-          // Merge DB avatar data into inputData characters
+          // Merge DB character data into inputData characters
+          // (frontend strips heavy data to reduce payload, restore from DB)
           let mergedCount = 0;
           for (const char of inputData.characters) {
             const dbChar = dbCharacters.find(c =>
               c.name.trim().toLowerCase() === char.name.trim().toLowerCase()
             );
 
-            if (dbChar?.avatars) {
-              // Merge avatar data: DB as fallback, request data wins (later spread overwrites)
-              // NOTE: styledAvatars intentionally NOT merged - regenerate fresh per story
-              // This ensures consistency between covers and pages (see styledAvatars.js line 385-389)
-              char.avatars = {
-                ...dbChar.avatars,      // DB data first (fallback)
-                ...char.avatars,        // Request data wins (new avatars override stale DB)
-                styledAvatars: {},      // Clear - always regenerate fresh for each story
-                costumed: {
-                  ...dbChar.avatars?.costumed,
-                  ...char.avatars?.costumed
-                },
-                clothing: {
-                  ...dbChar.avatars?.clothing,
-                  ...char.avatars?.clothing
-                }
-              };
+            if (dbChar) {
+              // Merge physical traits (needed for styled avatar prompts)
+              if (dbChar.physical && !char.physical) {
+                char.physical = dbChar.physical;
+              }
+              // Merge photos (face, body references)
+              if (dbChar.photos && !char.photos) {
+                char.photos = dbChar.photos;
+              }
+              // Merge physicalTraitsSource
+              if (dbChar.physicalTraitsSource && !char.physicalTraitsSource) {
+                char.physicalTraitsSource = dbChar.physicalTraitsSource;
+              }
+
+              if (dbChar.avatars) {
+                // Merge avatar data: DB as fallback, request data wins (later spread overwrites)
+                // NOTE: styledAvatars intentionally NOT merged - regenerate fresh per story
+                // This ensures consistency between covers and pages (see styledAvatars.js line 385-389)
+                char.avatars = {
+                  ...dbChar.avatars,      // DB data first (fallback)
+                  ...char.avatars,        // Request data wins (new avatars override stale DB)
+                  styledAvatars: {},      // Clear - always regenerate fresh for each story
+                  costumed: {
+                    ...dbChar.avatars?.costumed,
+                    ...char.avatars?.costumed
+                  },
+                  clothing: {
+                    ...dbChar.avatars?.clothing,
+                    ...char.avatars?.clothing
+                  }
+                };
+              }
               mergedCount++;
             }
           }

@@ -20,11 +20,5 @@ REQUIREMENTS:
 - FACE MUST BE VISIBLE in all quadrants
 - Background: Light grey studio
 
-PHYSICAL TRAITS TO PRESERVE:
+PHYSICAL TRAITS TO PRESERVE (must match reference exactly):
 {PHYSICAL_TRAITS}
-
-These traits MUST match the reference exactly - do NOT change them:
-- Hair color and style must stay the same
-- Eye color must stay the same
-- Facial hair (if present) must stay the same
-- Glasses (if worn) must be included
