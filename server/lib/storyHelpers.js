@@ -1255,8 +1255,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Fall back to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
-        // Avatars are always strings (clothing stored separately)
-        photoUrl = avatars[effectiveClothingCategory];
+        // Handle legacy object format {imageData, clothing} if present in old data
+        const avatarData = avatars[effectiveClothingCategory];
+        photoUrl = (typeof avatarData === 'object' && avatarData.imageData) ? avatarData.imageData : avatarData;
         usedClothingCategory = effectiveClothingCategory;
         // Get extracted clothing description for this avatar
         if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
@@ -1270,8 +1271,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       if (!photoUrl && effectiveClothingCategory === 'costumed' && avatars?.formal) {
         log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
         photoType = 'clothing-formal';
-        // Avatars are always strings
-        photoUrl = avatars.formal;
+        // Handle legacy object format {imageData, clothing} if present in old data
+        const formalData = avatars.formal;
+        photoUrl = (typeof formalData === 'object' && formalData.imageData) ? formalData.imageData : formalData;
         usedClothingCategory = 'formal';
         if (avatars.clothing?.formal) {
           const clothingData = avatars.clothing.formal;
@@ -1289,8 +1291,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             photoType = `clothing-${fallbackCategory}`;
-            // Avatars are always strings
-            photoUrl = avatars[fallbackCategory];
+            // Handle legacy object format {imageData, clothing} if present in old data
+            const fallbackData = avatars[fallbackCategory];
+            photoUrl = (typeof fallbackData === 'object' && fallbackData.imageData) ? fallbackData.imageData : fallbackData;
             usedClothingCategory = fallbackCategory;
             if (avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
