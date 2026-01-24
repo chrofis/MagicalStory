@@ -17,6 +17,7 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription } = require('./storyHelpers');
+const { generateStyledCostumedAvatar } = require('../routes/avatars');
 
 // Art style ID to sample image file mapping
 const ART_STYLE_SAMPLES = {
@@ -490,8 +491,50 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           continue;
         }
         if (!originalAvatar) {
-          // Costumed avatar doesn't exist - it needs to be GENERATED, not converted from standard
-          log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} not found - must be generated via generateStyledCostumedAvatar, skipping conversion`);
+          // Costumed avatar doesn't exist - GENERATE it on-demand
+          // Look up costume config from clothingRequirements
+          let charReqs = clothingRequirements?.[charName];
+          if (!charReqs && clothingRequirements) {
+            // Fallback: case-insensitive lookup
+            const charNameLower = charName.toLowerCase();
+            const matchingKey = Object.keys(clothingRequirements).find(k => k.toLowerCase() === charNameLower);
+            if (matchingKey) charReqs = clothingRequirements[matchingKey];
+          }
+          const costumeConfig = charReqs?.costumed;
+
+          if (costumeConfig?.used && costumeConfig?.description) {
+            log.debug(`🎭 [STYLED AVATARS] ${charName}: generating costumed:${costumeType} on-demand...`);
+            try {
+              const result = await generateStyledCostumedAvatar(char, {
+                costume: costumeConfig.costume || costumeType,
+                description: costumeConfig.description
+              }, artStyle);
+
+              if (result.success && result.imageData) {
+                // Store in cache
+                setStyledAvatar(charName, clothingCategory, artStyle, result.imageData);
+                // Store on character object for persistence
+                if (!char.avatars) char.avatars = {};
+                if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+                if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+                char.avatars.styledAvatars[artStyle].costumed[costumeType] = result.imageData;
+                // Store clothing description if available
+                if (result.clothing) {
+                  if (!char.avatars.clothing) char.avatars.clothing = {};
+                  if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+                  char.avatars.clothing.costumed[costumeType] = result.clothing;
+                }
+                log.debug(`✅ [STYLED AVATARS] ${charName}: costumed:${costumeType}@${artStyle} generated successfully`);
+              } else {
+                log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation failed: ${result.error || 'unknown'}`);
+              }
+            } catch (err) {
+              log.error(`❌ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation error: ${err.message}`);
+            }
+          } else {
+            log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} not found and no costume config in clothingRequirements`);
+          }
           continue;
         }
       } else {
