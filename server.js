@@ -6826,9 +6826,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     // Set up cover parser to start cover image generation during streaming
     const shouldStreamCovers = !skipImages;
 
-    // Track clothing requirements and avatar generation
+    // Track clothing requirements
     let streamingClothingRequirements = null;
-    const avatarGenerationPromises = [];
 
     const coverParser = new ProgressiveCoverParser(
       // onVisualBibleComplete
@@ -6851,12 +6850,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         streamingClothingRequirements = clothingRequirements;
         if (skipImages) return;
 
-        // Generate missing avatars based on clothing requirements
-        const { generateDynamicAvatar, generateStyledCostumedAvatar, generateStyledAvatarWithSignature } = require('./server/routes/avatars');
-        const characters = inputData.characters || [];
-        const artStyle = inputData.artStyle || 'pixar';
+        // NOTE: Avatar generation removed from story processing.
+        // Base avatars should already exist from character creation.
+        // For costumed/signature avatars, use server/lib/storyAvatarGeneration.js if needed.
 
-        // Bug #13 fix: Log completeness check for clothing requirements
+        const characters = inputData.characters || [];
         const reqCharCount = Object.keys(clothingRequirements).length;
         const expectedCharCount = characters.length;
         if (reqCharCount < expectedCharCount) {
@@ -6864,125 +6862,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         } else {
           log.debug(`✅ [STORYBOOK] Clothing requirements complete: ${reqCharCount}/${expectedCharCount} characters`);
         }
-
-        log.debug(`👕 [STORYBOOK] Processing clothing requirements for ${reqCharCount} characters`);
-
-        for (const [charName, requirements] of Object.entries(clothingRequirements)) {
-          const char = characters.find(c =>
-            c.name.trim().toLowerCase() === charName.trim().toLowerCase() ||
-            c.name.trim().toLowerCase().includes(charName.trim().toLowerCase()) ||
-            charName.trim().toLowerCase().includes(c.name.trim().toLowerCase())
-          );
-
-          if (!char) {
-            log.debug(`👕 [STORYBOOK] Character "${charName}" not found in input characters, skipping`);
-            continue;
-          }
-
-          // Ensure avatars object exists
-          if (!char.avatars) char.avatars = {};
-          if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-          if (!char.avatars.clothing) char.avatars.clothing = {};
-          if (!char.avatars.signatures) char.avatars.signatures = {};
-
-          for (const [category, config] of Object.entries(requirements)) {
-            if (!config.used) continue;
-
-            // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
-            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-            if (category === 'costumed') {
-              if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-            }
-
-            const logCategory = config.costume ? `costumed:${config.costume}` : category;
-            log.debug(`👕 [STORYBOOK] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
-            const avatarPromise = (async () => {
-              try {
-                let result;
-                let isCostumed = false;
-
-                if (category === 'costumed' && config.costume) {
-                  // For costumed: generate styled version directly (costume + art style in one call)
-                  result = await generateStyledCostumedAvatar(char, config, artStyle);
-                  isCostumed = true;
-
-                  if (result.success && result.imageData) {
-                    const costumeKey = result.costumeType;
-                    char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
-                    // Add to cache so applyStyledAvatars can find it
-                    setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, result.imageData);
-                    if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                    if (result.clothing) {
-                      char.avatars.clothing.costumed[costumeKey] = result.clothing;
-                    }
-                    log.debug(`✅ [STORYBOOK] Generated styled costumed:${costumeKey}@${artStyle} avatar for ${char.name}`);
-                  }
-                } else if (config.signature) {
-                  // For categories with signature: generate styled avatar directly (1 API call)
-                  result = await generateStyledAvatarWithSignature(char, category, config, artStyle);
-
-                  if (result.success && result.imageData) {
-                    if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-                    char.avatars.styledAvatars[artStyle][category] = result.imageData;
-                    // Add to cache so applyStyledAvatars can find it
-                    setStyledAvatar(char.name, category, artStyle, result.imageData);
-                    if (result.clothing) {
-                      char.avatars.clothing[category] = result.clothing;
-                    }
-                    if (result.signature) {
-                      char.avatars.signatures[category] = result.signature;
-                    }
-                    log.debug(`✅ [STORYBOOK] Generated styled ${category}+sig@${artStyle} avatar for ${char.name}`);
-                  }
-                } else {
-                  // For standard/winter/summer without signature: generate base avatar
-                  result = await generateDynamicAvatar(char, category, config);
-
-                  if (result.success && result.imageData) {
-                    char.avatars[category] = result.imageData;
-                    invalidateStyledAvatarForCategory(char.name, category, char);
-                    if (result.clothing) {
-                      char.avatars.clothing[category] = result.clothing;
-                    }
-                    log.debug(`✅ [STORYBOOK] Generated ${category} avatar for ${char.name}`);
-                  }
-                }
-
-                // Return token usage for tracking
-                return { tokenUsage: result?.tokenUsage, isCostumed };
-              } catch (e) {
-                log.error(`❌ [STORYBOOK] Failed to generate ${logCategory} avatar for ${char.name}: ${e.message}`);
-                return { tokenUsage: null, isCostumed: false };
-              }
-            })();
-            avatarGenerationPromises.push(avatarPromise);
-          }
-        }
       }
     );
-
-    // Bug #7 fix: Prepare styled avatars BEFORE streaming starts
-    // This ensures images generated during streaming have access to styled avatar cache
-    if (artStyle !== 'realistic' && avatarGenerationPromises.length > 0) {
-      log.debug(`🎨 [STORYBOOK] Waiting for ${avatarGenerationPromises.length} avatar generations before preparing styles...`);
-      const avatarResults = await Promise.all(avatarGenerationPromises);
-
-      // Aggregate avatar token usage
-      for (const avatarResult of avatarResults) {
-        if (avatarResult?.tokenUsage?.byModel) {
-          for (const [modelId, usage] of Object.entries(avatarResult.tokenUsage.byModel)) {
-            const functionName = avatarResult.isCostumed ? 'avatar_costumed' : 'avatar_styled';
-            addUsage('gemini_image', {
-              input_tokens: usage.input_tokens || 0,
-              output_tokens: usage.output_tokens || 0
-            }, functionName, modelId);
-          }
-        }
-      }
-
-      avatarGenerationPromises.length = 0; // Clear to avoid double-await later
-      log.debug(`✅ [STORYBOOK] Avatar generations complete, preparing styled avatars...`);
-    }
 
     // Prepare styled avatars for basic clothing categories (standard, winter, summer)
     // This populates the cache so streaming images can use styled avatars
@@ -7045,13 +6926,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     } catch (apiError) {
       log.error(`[STORYBOOK] Claude API streaming call failed:`, apiError.message);
       throw apiError;
-    }
-
-    // Wait for avatar generation to complete before generating images
-    if (avatarGenerationPromises.length > 0) {
-      log.debug(`👕 [STORYBOOK] Waiting for ${avatarGenerationPromises.length} avatar generations to complete...`);
-      await Promise.all(avatarGenerationPromises);
-      log.debug(`✅ [STORYBOOK] All avatar generations complete`);
     }
 
     // Wait for any cover images started during streaming
@@ -8299,99 +8173,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let lastProgressUpdate = Date.now();
 
     // Track parallel tasks started during streaming
-    const streamingAvatarPromises = [];
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
     const streamingCoverPromises = new Map(); // coverType -> promise
     const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
-    let avatarsStartedDuringStreaming = false;
     let coversStartedDuringStreaming = false;
 
     // Rate limiters for streaming tasks (aggressive parallelism)
-    const streamAvatarLimit = pLimit(10);  // Avatars are fast, run many in parallel
     const streamSceneLimit = pLimit(10);   // Scene expansions are text-only, can parallelize heavily
     const streamCoverLimit = pLimit(3);    // Only 3 covers total anyway
 
-    // Import avatar generators
-    const { generateDynamicAvatar, generateStyledCostumedAvatar } = require('./server/routes/avatars');
-
-    // Helper: Start avatar generation for a character's clothing requirement
-    const startAvatarGeneration = async (charName, requirements) => {
-      if (skipImages) return;
-
-      const char = inputData.characters?.find(c =>
-        c.name.trim().toLowerCase() === charName.trim().toLowerCase()
-      );
-      if (!char) {
-        log.debug(`⚠️ [STREAM-AVATAR] Character "${charName}" not found in input characters`);
-        return;
-      }
-
-      // Initialize avatars structure
-      if (!char.avatars) char.avatars = {};
-      if (!char.avatars.clothing) char.avatars.clothing = {};
-      if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-
-      log.debug(`⚡ [STREAM-AVATAR] Processing ${char.name} with ${Object.keys(requirements).length} categories: ${Object.keys(requirements).join(', ')}`);
-      for (const [category, config] of Object.entries(requirements)) {
-        log.debug(`⚡ [STREAM-AVATAR] ${char.name} category=${category}, config.used=${config?.used}, config.costume=${config?.costume}`);
-        if (!config || !config.used) continue;
-
-        // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
-        if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-        if (category === 'costumed') {
-          if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-        }
-
-        // Queue avatar generation
-        const avatarPromise = streamAvatarLimit(async () => {
-          try {
-            let result;
-            let isCostumed = false;
-
-            if (category === 'costumed' && config.costume) {
-              log.debug(`⚡ [STREAM-AVATAR] Generating costumed avatar for ${char.name}: ${config.costume}`);
-              result = await generateStyledCostumedAvatar(char, config, artStyle);
-              isCostumed = true;
-              if (result?.success && result?.imageData) {
-                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-                if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-                char.avatars.styledAvatars[artStyle].costumed[config.costume.toLowerCase()] = result.imageData;
-                // Add to cache so applyStyledAvatars can find it
-                setStyledAvatar(char.name, `costumed:${config.costume.toLowerCase()}`, artStyle, result.imageData);
-                // Store clothing description for image prompt
-                if (result.clothing) {
-                  if (!char.avatars.clothing) char.avatars.clothing = {};
-                  if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                  char.avatars.clothing.costumed[config.costume.toLowerCase()] = result.clothing;
-                }
-                log.debug(`✅ [STREAM-AVATAR] ${char.name} costumed:${config.costume} complete`);
-                genLog.costumeGenerated(char.name, config.costume, true, { artStyle });
-              } else {
-                genLog.costumeGenerated(char.name, config.costume, false, { artStyle, error: result?.error });
-              }
-            } else if (['winter', 'summer', 'standard'].includes(category)) {
-              log.debug(`⚡ [STREAM-AVATAR] Generating ${category} avatar for ${char.name}`);
-              result = await generateDynamicAvatar(char, category, config);
-              if (result?.success && result?.imageData) {
-                char.avatars[category] = result.imageData;
-                // Invalidate any cached styled versions since source avatar changed
-                invalidateStyledAvatarForCategory(char.name, category, char);
-                log.debug(`✅ [STREAM-AVATAR] ${char.name} ${category} complete`);
-              }
-            }
-
-            // Return token usage for tracking
-            return { tokenUsage: result?.tokenUsage, isCostumed };
-          } catch (err) {
-            // Bug #14 fix: Include more context for avatar generation failures
-            log.error(`❌ [STREAM-AVATAR] Failed for ${char.name} ${category}: ${err.message}`);
-            log.debug(`   Stack: ${err.stack?.split('\n').slice(0, 3).join(' -> ')}`);
-            return { tokenUsage: null, isCostumed: false };
-          }
-        });
-        streamingAvatarPromises.push(avatarPromise);
-      }
-    };
+    // NOTE: Avatar generation removed from streaming. Avatars should exist before story starts.
 
     // Helper: Start scene expansion for a page
     const startSceneExpansion = (page) => {
@@ -8466,11 +8257,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Wait for visual bible if not yet available
         while (!streamingVisualBible) {
           await new Promise(r => setTimeout(r, 100));
-        }
-
-        // Wait for avatars to complete (needed for reference photos)
-        if (streamingAvatarPromises.length > 0) {
-          await Promise.all(streamingAvatarPromises);
         }
 
         // Build per-character clothing requirements from hint.characterClothing
@@ -8642,14 +8428,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         } else {
           log.debug(`✅ [STREAM] Clothing requirements complete: ${reqCharCount}/${expectedCharCount} characters`);
         }
-        // Start avatar generation immediately
-        if (!avatarsStartedDuringStreaming && !skipImages) {
-          avatarsStartedDuringStreaming = true;
-          log.debug(`⚡ [STREAM] Starting avatar generation for ${reqCharCount} characters`);
-          for (const [charName, charReqs] of Object.entries(requirements)) {
-            startAvatarGeneration(charName, charReqs);
-          }
-        }
+        // NOTE: Avatar generation removed from streaming. Avatars should exist before story starts.
       },
       onVisualBible: (vb) => {
         streamingVisualBible = vb;
@@ -8690,13 +8469,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Enhance message to show parallel work
         let enhancedMessage = message;
-        const avatarCount = streamingAvatarPromises.length;
         const scenesInProgress = streamingSceneExpansionPromises.size;
-        if (avatarCount > 0 || scenesInProgress > 0) {
-          const parts = [];
-          if (avatarCount > 0) parts.push(`${avatarCount} avatars`);
-          if (scenesInProgress > 0) parts.push(`${scenesInProgress} scenes`);
-          enhancedMessage = `${message} (${parts.join(', ')} in progress)`;
+        if (scenesInProgress > 0) {
+          enhancedMessage = `${message} (${scenesInProgress} scenes in progress)`;
         }
 
         try {
@@ -8835,20 +8610,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`💾 [UNIFIED] Saved story text for progressive display (${storyPages.length} scenes = ${printPageCount} print pages)`);
 
     // Update progress: Story text complete
-    const avatarsStarted = streamingAvatarPromises.length;
     const scenesStarted = streamingSceneExpansionPromises.size;
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [18, `Story complete: "${title}" (${avatarsStarted} avatars, ${scenesStarted} scenes in parallel)`, jobId]
+      [18, `Story complete: "${title}" (${scenesStarted} scenes in parallel)`, jobId]
     );
 
-    // Bug #8 fix: Prepare styled avatars BEFORE covers start
+    // Prepare styled avatars BEFORE covers start
     // Covers call applyStyledAvatars which needs the cache populated by prepareStyledAvatars
-    // Without this, covers would get raw avatars instead of styled ones
-    if (!skipImages && artStyle !== 'realistic' && streamingAvatarPromises.length > 0) {
-      log.debug(`🎨 [UNIFIED] Waiting for ${streamingAvatarPromises.length} avatar generations before preparing styles for covers...`);
-      await Promise.all(streamingAvatarPromises);
-      log.debug(`✅ [UNIFIED] Avatar generations complete, preparing styled avatars for covers...`);
+    if (!skipImages && artStyle !== 'realistic') {
+      log.debug(`🎨 [UNIFIED] Preparing styled avatars for covers...`);
 
       // Prepare styled avatars for basic clothing categories used in covers
       try {
@@ -8868,33 +8639,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
     }
 
-    // NOTE: Cover generation moved to AFTER avatar generation (covers need avatars as reference photos)
+    // NOTE: Avatar generation removed. Avatars should already exist from character creation.
 
-    // PHASE 2: Wait for avatar generation to complete
+    // PHASE 2: Prepare styled avatars
     genLog.setStage('avatars');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [20, `Waiting for ${streamingAvatarPromises.length} avatars...`, jobId]
+      [20, `Preparing styled avatars...`, jobId]
     );
-
-    if (streamingAvatarPromises.length > 0) {
-      log.debug(`⏳ [UNIFIED] Waiting for ${streamingAvatarPromises.length} avatar generations started during streaming...`);
-      const streamAvatarResults = await Promise.all(streamingAvatarPromises);
-      log.debug(`✅ [UNIFIED] All streaming avatar generations complete`);
-
-      // Aggregate streaming avatar token usage
-      for (const avatarResult of streamAvatarResults) {
-        if (avatarResult?.tokenUsage?.byModel) {
-          for (const [modelId, usage] of Object.entries(avatarResult.tokenUsage.byModel)) {
-            const functionName = avatarResult.isCostumed ? 'avatar_costumed' : 'avatar_styled';
-            addUsage('gemini_image', {
-              input_tokens: usage.input_tokens || 0,
-              output_tokens: usage.output_tokens || 0
-            }, functionName, modelId);
-          }
-        }
-      }
-    }
 
     // Collect avatar requirements and prepare styled avatars
     const sceneDescriptions = storyPages.map(page => ({
@@ -8923,6 +8675,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Prepare styled avatars (convert existing avatars to target art style)
     if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
+      // Validate that characters have base avatars
+      const charactersWithoutAvatars = (inputData.characters || []).filter(c =>
+        !c.avatars?.standard && !c.photoUrl && !c.bodyNoBgUrl
+      );
+      if (charactersWithoutAvatars.length > 0) {
+        log.warn(`⚠️ [UNIFIED] Characters missing base avatars: ${charactersWithoutAvatars.map(c => c.name).join(', ')}`);
+      }
+
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
       await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage);
     }
@@ -10558,147 +10318,15 @@ async function processStoryJob(jobId) {
       inputData.title = storyTitle;
     }
 
-    // ===== DYNAMIC AVATAR GENERATION BASED ON OUTLINE =====
-    // Generate only the avatar variations needed for this story
-    // For costumed avatars: generate styled version directly (costume + art style in one call)
+    // ===== CLOTHING REQUIREMENTS =====
+    // NOTE: Avatar generation removed from story processing.
+    // Base avatars should already exist from character creation.
+    // For costumed/signature avatars, use server/lib/storyAvatarGeneration.js if needed.
     const clothingRequirements = outlineParser.extractClothingRequirements();
     const artStyle = inputData.artStyle || 'pixar';
 
-    if (clothingRequirements && Object.keys(clothingRequirements).length > 0 && !skipImages) {
+    if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
       log.debug(`👔 [PIPELINE] Clothing requirements found for ${Object.keys(clothingRequirements).length} characters`);
-
-      // Import avatar generators
-      const { generateDynamicAvatar, generateStyledCostumedAvatar, generateStyledAvatarWithSignature } = require('./server/routes/avatars');
-
-      // Track which avatars we generate
-      const avatarsGenerated = [];
-      const avatarsFailed = [];
-
-      for (const [charName, requirements] of Object.entries(clothingRequirements)) {
-        const char = inputData.characters?.find(c =>
-          c.name.trim().toLowerCase() === charName.trim().toLowerCase()
-        );
-        if (!char) {
-          log.debug(`[AVATAR] Character "${charName}" not found in input, skipping`);
-          continue;
-        }
-
-        // Initialize avatars structure if needed
-        if (!char.avatars) char.avatars = {};
-        if (!char.avatars.clothing) char.avatars.clothing = {};
-        if (!char.avatars.signatures) char.avatars.signatures = {};
-        if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-
-        for (const [category, config] of Object.entries(requirements)) {
-          if (!config || !config.used) continue;
-
-          // Always generate - no existence checks (avatars are story-specific with signatures/costumes)
-          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-          if (category === 'costumed') {
-            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-          }
-
-          const logCategory = config.costume ? `costumed:${config.costume}` : category;
-          log.debug(`🎭 [AVATAR] Generating ${logCategory}${config.signature ? '+sig' : ''} avatar for ${char.name}...`);
-
-          await dbPool.query(
-            'UPDATE story_jobs SET progress_message = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-            [`Generating ${logCategory} avatar for ${char.name}...`, jobId]
-          );
-
-          try {
-            let result;
-            let isCostumed = false;
-
-            if (category === 'costumed' && config.costume) {
-              // For costumed: generate styled version directly (costume + art style in one call)
-              result = await generateStyledCostumedAvatar(char, config, artStyle);
-              isCostumed = true;
-
-              if (result.success && result.imageData) {
-                const costumeKey = result.costumeType;
-                // Store in styledAvatars structure
-                char.avatars.styledAvatars[artStyle].costumed[costumeKey] = result.imageData;
-                // Add to cache so applyStyledAvatars can find it
-                setStyledAvatar(char.name, `costumed:${costumeKey}`, artStyle, result.imageData);
-                // Store clothing description
-                if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                if (result.clothing) {
-                  char.avatars.clothing.costumed[costumeKey] = result.clothing;
-                }
-                avatarsGenerated.push(`${char.name}:${logCategory}@${artStyle}`);
-                log.debug(`✅ [AVATAR] Generated styled ${logCategory}@${artStyle} avatar for ${char.name}`);
-              } else {
-                avatarsFailed.push(`${char.name}:${logCategory}`);
-                log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
-              }
-            } else if (config.signature) {
-              // For categories with signature: generate styled avatar directly (1 API call)
-              // Uses base avatar + adds signature items + applies art style
-              result = await generateStyledAvatarWithSignature(char, category, config, artStyle);
-
-              if (result.success && result.imageData) {
-                // Store in styledAvatars structure (not base avatar)
-                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-                char.avatars.styledAvatars[artStyle][category] = result.imageData;
-                // Add to cache so applyStyledAvatars can find it
-                setStyledAvatar(char.name, category, artStyle, result.imageData);
-                // Store clothing + signature info
-                if (result.clothing) {
-                  char.avatars.clothing[category] = result.clothing;
-                }
-                if (result.signature) {
-                  char.avatars.signatures[category] = result.signature;
-                }
-                avatarsGenerated.push(`${char.name}:${logCategory}+sig@${artStyle}`);
-                log.debug(`✅ [AVATAR] Generated styled ${logCategory} with signature @${artStyle} for ${char.name}`);
-              } else {
-                avatarsFailed.push(`${char.name}:${logCategory}`);
-                log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
-              }
-            } else {
-              // For standard/winter/summer without signature: generate base avatar
-              // Style conversion will happen later in prepareStyledAvatars()
-              result = await generateDynamicAvatar(char, category, config);
-
-              if (result.success && result.imageData) {
-                char.avatars[category] = result.imageData;
-                // Invalidate any cached styled versions since source avatar changed
-                invalidateStyledAvatarForCategory(char.name, category, char);
-                if (result.clothing) {
-                  char.avatars.clothing[category] = result.clothing;
-                }
-                avatarsGenerated.push(`${char.name}:${logCategory}`);
-                log.debug(`✅ [AVATAR] Generated ${logCategory} avatar for ${char.name}`);
-              } else {
-                avatarsFailed.push(`${char.name}:${logCategory}`);
-                log.warn(`⚠️ [AVATAR] Failed to generate ${logCategory} for ${char.name}: ${result.error}`);
-              }
-            }
-
-            // Track avatar token usage
-            if (result?.tokenUsage?.byModel) {
-              for (const [modelId, usage] of Object.entries(result.tokenUsage.byModel)) {
-                const functionName = isCostumed ? 'avatar_costumed' : 'avatar_styled';
-                addUsage('gemini_image', {
-                  input_tokens: usage.input_tokens || 0,
-                  output_tokens: usage.output_tokens || 0
-                }, functionName, modelId);
-              }
-            }
-          } catch (err) {
-            avatarsFailed.push(`${char.name}:${logCategory}`);
-            log.error(`❌ [AVATAR] Error generating ${logCategory} for ${char.name}:`, err.message);
-          }
-        }
-      }
-
-      if (avatarsGenerated.length > 0) {
-        log.debug(`✅ [PIPELINE] Generated ${avatarsGenerated.length} dynamic avatars: ${avatarsGenerated.join(', ')}`);
-      }
-      if (avatarsFailed.length > 0) {
-        log.warn(`⚠️ [PIPELINE] Failed to generate ${avatarsFailed.length} avatars: ${avatarsFailed.join(', ')}`);
-      }
     }
 
     // START COVER GENERATION IN PARALLEL (optimization: don't wait for page images)
