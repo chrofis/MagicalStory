@@ -939,7 +939,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         skippedCount++;
         // Bug #10 fix: Log character name for skipped photos to help diagnose issues
         const charLabel = characterName ? `"${characterName}"` : `#${addedCount + skippedCount}`;
-        const preview = photoUrl ? photoUrl.substring(0, 30) : 'null/undefined';
+        const preview = photoUrl
+          ? (typeof photoUrl === 'string' ? photoUrl.substring(0, 30) : `[object: ${Object.keys(photoUrl).join(',')}]`)
+          : 'null/undefined';
         log.warn(`[IMAGE GEN] Skipping character ${charLabel}: invalid photoUrl (${preview}...)`);
       }
     }

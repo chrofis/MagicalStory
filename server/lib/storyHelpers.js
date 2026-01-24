@@ -1217,8 +1217,11 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
           const foundKey = artStyle && findCostumeByPrefix(avatars?.styledAvatars?.[artStyle]?.costumed, costumeKey);
 
           if (foundKey) {
-            // Styled avatars are always strings (image data stored separately from clothing)
-            photoUrl = avatars.styledAvatars[artStyle].costumed[foundKey];
+            // Handle legacy object format {imageData, clothing} if present
+            const styledCostumedData = avatars.styledAvatars[artStyle].costumed[foundKey];
+            photoUrl = (typeof styledCostumedData === 'object' && styledCostumedData.imageData)
+              ? styledCostumedData.imageData
+              : styledCostumedData;
             photoType = `costumed-${foundKey}`;
             usedClothingCategory = `costumed:${foundKey}`;
             log.debug(`[AVATAR LOOKUP] ${char.name}: using styled costumed "${foundKey}"`);
@@ -1237,8 +1240,11 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Check styled avatars first (with signature items from this story)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' &&
                artStyle && avatars?.styledAvatars?.[artStyle]?.[effectiveClothingCategory]) {
-        // Styled avatars are always strings (clothing stored separately)
-        photoUrl = avatars.styledAvatars[artStyle][effectiveClothingCategory];
+        // Handle legacy object format {imageData, clothing} if present
+        const styledData = avatars.styledAvatars[artStyle][effectiveClothingCategory];
+        photoUrl = (typeof styledData === 'object' && styledData.imageData)
+          ? styledData.imageData
+          : styledData;
         photoType = `styled-${effectiveClothingCategory}`;
         usedClothingCategory = effectiveClothingCategory;
         log.debug(`[AVATAR LOOKUP] ${char.name}: using styled ${effectiveClothingCategory} for ${artStyle}`);
