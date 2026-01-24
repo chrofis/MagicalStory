@@ -14,6 +14,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
+const { buildHairDescription } = require('../lib/storyHelpers');
 
 // ============================================================================
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
@@ -881,6 +882,7 @@ const ART_STYLE_PROMPTS = loadArtStylePrompts();
 
 /**
  * Build physical traits string for avatar prompts
+ * Uses detailed hair analysis from storyHelpers for accurate hair description
  * @param {Object} character - Character object with physical traits
  * @returns {string} Physical traits description
  */
@@ -888,12 +890,9 @@ function buildPhysicalTraitsForAvatar(character) {
   const traits = character?.physical || {};
   const parts = [];
 
-  // Hair description
-  const hairParts = [];
-  if (traits.hairColor) hairParts.push(traits.hairColor);
-  if (traits.hairLength) hairParts.push(traits.hairLength);
-  if (traits.hairStyle && traits.hairStyle !== 'straight') hairParts.push(traits.hairStyle);
-  if (hairParts.length > 0) parts.push(`Hair: ${hairParts.join(', ')}`);
+  // Use detailed hair description from storyHelpers (handles detailedHairAnalysis)
+  const hairDesc = buildHairDescription(traits, character?.physicalTraitsSource);
+  if (hairDesc) parts.push(`Hair: ${hairDesc}`);
 
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
   if (traits.facialHair && traits.facialHair !== 'none' && traits.facialHair !== 'clean-shaven') {
