@@ -3463,24 +3463,29 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
     return null;
   }
 
-  // Build clothing info string
+  // Build clothing info string from previous pages
   const clothingLines = [];
-  const characterSet = new Set();
+  const previousCharacterSet = new Set();
   for (const img of imagesToCompare) {
     if (img.characterClothing) {
       for (const [charName, clothing] of Object.entries(img.characterClothing)) {
-        characterSet.add(charName);
+        previousCharacterSet.add(charName);
         clothingLines.push(`- ${charName} (Page ${img.pageNumber}): ${clothing}`);
       }
     } else if (img.characters && img.clothing) {
       for (const char of img.characters) {
-        characterSet.add(char);
+        previousCharacterSet.add(char);
       }
       clothingLines.push(`- All characters (Page ${img.pageNumber}): ${img.clothing}`);
     }
   }
 
-  const characters = Array.from(characterSet).join(', ') || 'Unknown';
+  // Current page characters (from config) - these are who should actually be in this scene
+  const currentCharacters = config.currentCharacters || [];
+  const currentCharactersStr = currentCharacters.length > 0 ? currentCharacters.join(', ') : 'Unknown';
+
+  // Previous pages characters (for reference only)
+  const previousCharactersStr = Array.from(previousCharacterSet).join(', ') || 'Unknown';
   const clothingInfo = clothingLines.length > 0 ? clothingLines.join('\n') : 'No specific clothing information';
 
   // Fill template
@@ -3488,7 +3493,8 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
     PAGE_NUMBER: currentPageNumber,
     IMAGE_COUNT: imagesToCompare.length + 1,
     PREV_PAGES: prevPageNumbers,
-    CHARACTERS: characters,
+    CURRENT_CHARACTERS: currentCharactersStr,
+    PREVIOUS_CHARACTERS: previousCharactersStr,
     CLOTHING_INFO: clothingInfo
   });
 

@@ -7252,7 +7252,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
               const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrConfig });
+              // Add current page's characters to incremental consistency config
+              const incrConfigWithCurrentChars = incrConfig ? {
+                ...incrConfig,
+                currentCharacters: sceneCharacters.map(c => c.name)
+              } : null;
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrConfigWithCurrentChars });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -9046,6 +9051,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
       };
 
+      // Add current page's characters to incremental consistency config
+      // This tells the model which characters should actually be in this scene
+      const incrConfigWithCurrentChars = incrConfig ? {
+        ...incrConfig,
+        currentCharacters: sceneCharacters.map(c => c.name)
+      } : null;
+
       const imageResult = await generateImageWithQualityRetry(
         imagePrompt,
         allReferencePhotos,
@@ -9056,7 +9068,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfig }
+        { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
       if (imageResult?.imageData) {
@@ -11344,7 +11356,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 enabled: true,
                 dryRun: incrementalConsistencyDryRun,
                 lookbackCount: incrementalConsistencyLookback,
-                previousImages: lookbackImages
+                previousImages: lookbackImages,
+                currentCharacters: sceneCharacters.map(c => c.name)  // Tell model which characters are in THIS scene
               };
             }
 

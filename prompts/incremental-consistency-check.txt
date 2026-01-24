@@ -3,11 +3,16 @@ You are evaluating a newly generated storybook illustration for consistency with
 **CURRENT IMAGE**: Image 1 (Page {PAGE_NUMBER})
 **PREVIOUS IMAGES**: Images 2-{IMAGE_COUNT} (Pages {PREV_PAGES})
 
-**CHARACTERS EXPECTED**: {CHARACTERS}
+**CHARACTERS IN THIS SCENE**: {CURRENT_CHARACTERS}
+(Only check consistency for these characters - they are the ones who should appear in Image 1)
+
+**CHARACTERS FROM PREVIOUS PAGES** (for reference): {PREVIOUS_CHARACTERS}
 **CLOTHING BY CHARACTER & PAGE**:
 {CLOTHING_INFO}
 
 **TASK**: Check if the current image (Image 1) is visually consistent with the previous images.
+
+**IMPORTANT**: Only report issues for characters listed in "CHARACTERS IN THIS SCENE". Do NOT report issues for characters who appeared in previous pages but are not in this scene.
 
 **CHECK FOR**:
 
