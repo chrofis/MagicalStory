@@ -58,6 +58,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.textConsistencyCheck = await fs.readFile(path.join(promptsDir, 'text-consistency-check.txt'), 'utf-8');
     // Incremental consistency check (compare new image against previous images)
     PROMPT_TEMPLATES.incrementalConsistencyCheck = await fs.readFile(path.join(promptsDir, 'incremental-consistency-check.txt'), 'utf-8');
+    // Dedicated bounding box detection (two-stage detection for auto-repair)
+    PROMPT_TEMPLATES.boundingBoxDetection = await fs.readFile(path.join(promptsDir, 'bounding-box-detection.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {

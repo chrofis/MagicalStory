@@ -109,6 +109,25 @@ export interface EvaluationData {
     issue: string;
     fixPrompt: string;
   }>;
+  fixableIssues?: Array<{
+    description: string;
+    severity: string;
+    type: string;
+    fix: string;
+  }>;
+}
+
+// Two-stage bounding box detection result
+export interface BboxDetectionResult {
+  issue: string;
+  severity: string;
+  type: string;
+  success: boolean;
+  faceBox?: number[] | null;  // [ymin, xmin, ymax, xmax] normalized 0-1
+  bodyBox?: number[] | null;  // [ymin, xmin, ymax, xmax] normalized 0-1
+  label?: string;
+  usage?: { input_tokens: number; output_tokens: number };
+  timestamp: string;
 }
 
 export interface RetryAttempt {
@@ -128,6 +147,8 @@ export interface RetryAttempt {
   fixTargetsCount?: number;
   preRepairEval?: EvaluationData;
   postRepairEval?: EvaluationData;
+  // Two-stage bounding box detection results
+  bboxDetection?: BboxDetectionResult[] | null;
   repairDetails?: RepairAttempt[];
 }
 

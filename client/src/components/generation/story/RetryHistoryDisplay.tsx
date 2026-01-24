@@ -422,6 +422,68 @@ export function RetryHistoryDisplay({
                   </div>
                 )}
 
+                {/* Two-Stage Bounding Box Detection (new) */}
+                {attempt.bboxDetection && attempt.bboxDetection.length > 0 && (
+                  <details className="text-sm mb-2">
+                    <summary className="cursor-pointer text-blue-700 font-medium hover:text-blue-900">
+                      📦 {language === 'de' ? 'Bounding Box Erkennung' : 'Bounding Box Detection'} ({attempt.bboxDetection.length})
+                    </summary>
+                    <div className="mt-3 space-y-2">
+                      {attempt.bboxDetection.map((detection, dIdx) => (
+                        <div key={dIdx} className={`p-3 rounded-lg border ${detection.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className={`font-medium text-sm ${detection.success ? 'text-green-800' : 'text-red-800'}`}>
+                              {detection.success ? '✓' : '✗'} {detection.issue.substring(0, 60)}{detection.issue.length > 60 ? '...' : ''}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded ${
+                              detection.severity === 'CRITICAL' ? 'bg-red-200 text-red-800' :
+                              detection.severity === 'MAJOR' ? 'bg-orange-200 text-orange-800' :
+                              detection.severity === 'MODERATE' ? 'bg-yellow-200 text-yellow-800' :
+                              'bg-gray-200 text-gray-800'
+                            }`}>
+                              {detection.severity} • {detection.type}
+                            </span>
+                          </div>
+                          {detection.success && (
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                              <div className={`p-2 rounded ${detection.faceBox ? 'bg-purple-100' : 'bg-gray-100'}`}>
+                                <span className="font-medium text-purple-800">Face Box:</span>
+                                {detection.faceBox ? (
+                                  <span className="ml-1 font-mono text-purple-600">
+                                    [{detection.faceBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
+                                  </span>
+                                ) : (
+                                  <span className="ml-1 text-gray-500 italic">not detected</span>
+                                )}
+                              </div>
+                              <div className={`p-2 rounded ${detection.bodyBox ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                <span className="font-medium text-blue-800">Body Box:</span>
+                                {detection.bodyBox ? (
+                                  <span className="ml-1 font-mono text-blue-600">
+                                    [{detection.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
+                                  </span>
+                                ) : (
+                                  <span className="ml-1 text-gray-500 italic">not detected</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          {detection.label && detection.label !== detection.issue && (
+                            <div className="mt-2 text-xs text-gray-600">
+                              <span className="font-medium">Detected as:</span> {detection.label}
+                            </div>
+                          )}
+                          {detection.usage && (
+                            <div className="mt-1 text-xs text-gray-400">
+                              Tokens: {detection.usage.input_tokens} in / {detection.usage.output_tokens} out
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+
                 {/* Before/After Evaluations */}
                 <details className="text-sm">
                   <summary className="cursor-pointer text-amber-700 font-medium hover:text-amber-900">

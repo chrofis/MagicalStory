@@ -8,6 +8,8 @@
 const { log } = require('../utils/logger');
 const { compressImageToJPEG } = require('./images');
 const { getPool } = require('../services/database');
+const { callAnthropicAPI } = require('./textModels');
+const { TEXT_MODELS } = require('../config/models');
 
 // Simple in-memory cache (24-hour TTL)
 const photoCache = new Map();
@@ -96,6 +98,49 @@ const CATEGORY_TO_TYPE = [
   { pattern: /landmark|sehenswürdigkeit|monument/i, type: 'Landmark' },
   { pattern: /building|gebäude|bâtiment/i, type: 'Building' }
 ];
+
+// ============================================================================
+// AI-BASED DIVERSITY CHECK (uses cheap Haiku model)
+// ============================================================================
+
+/**
+ * Check if two photo descriptions describe the same or very similar photos
+ * Uses Claude Haiku for quick semantic comparison
+ * @param {string} desc1 - First photo description
+ * @param {string} desc2 - Second photo description
+ * @returns {Promise<boolean>} - true if photos are too similar (should skip)
+ */
+async function checkPhotoSimilarityWithAI(desc1, desc2) {
+  // Skip if either description is missing/too short
+  if (!desc1 || !desc2 || desc1.length < 20 || desc2.length < 20) {
+    return false;  // Can't determine - allow both
+  }
+
+  const prompt = `Compare these two photo descriptions of a landmark. Are they showing the SAME viewpoint/angle of the building, or are they meaningfully different photos?
+
+Photo 1: "${desc1}"
+
+Photo 2: "${desc2}"
+
+Reply with ONLY "SAME" or "DIFFERENT" - nothing else.
+- SAME = same angle, same view, duplicate or near-duplicate photo
+- DIFFERENT = different angle, different features shown, or different time/season`;
+
+  try {
+    const haikuModel = TEXT_MODELS['claude-haiku'];
+    const result = await callAnthropicAPI(prompt, 10, haikuModel.modelId);
+    const response = result.text.trim().toUpperCase();
+
+    if (response.includes('SAME')) {
+      log.debug(`[AI-DIVERSITY] Photos are SAME: "${desc1.substring(0, 40)}..." vs "${desc2.substring(0, 40)}..."`);
+      return true;  // Too similar
+    }
+    return false;  // Different enough
+  } catch (err) {
+    log.warn(`[AI-DIVERSITY] AI check failed, allowing photo: ${err.message}`);
+    return false;  // On error, allow the photo
+  }
+}
 
 /**
  * Fetch Wikidata Q-IDs for a batch of Wikipedia page IDs
@@ -1079,10 +1124,11 @@ IMPORTANT for isActualPhoto: Set to FALSE if this is a painting, drawing, illust
  * @param {string} lang - Wikipedia language code
  * @param {number} pageId - Wikipedia page ID (for article images)
  * @param {string} qid - Wikidata QID (for Commons category lookup)
- * @param {string} canton - Swiss canton code (e.g., "AG")
+ * @param {string} region - Region code (e.g., "AG" for Swiss canton, "Bavaria" for German state)
+ * @param {string} country - Country name (e.g., "Switzerland", "Germany")
  * @returns {Promise<{exteriorImages: Array, interiorImages: Array, source: string}|null>}
  */
-async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, qid = null, canton = null) {
+async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pageId = null, qid = null, region = null, country = 'Switzerland') {
   log.info(`[BEST-IMG] Finding images for "${landmarkName}" (${landmarkType || 'unknown'})`);
 
   let candidates = [];
@@ -1093,7 +1139,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     const commonsCategory = await getCommonsCategoryFromWikidata(qid);
     if (commonsCategory) {
       log.debug(`[BEST-IMG] Trying Commons category: "${commonsCategory}"`);
-      candidates = await fetchImagesFromCommonsCategory(commonsCategory, 15);  // Get more to find interior too
+      candidates = await fetchImagesFromCommonsCategory(commonsCategory, 20);  // Get more to find 3 exterior + 3 interior with diversity
 
       if (candidates.length > 0) {
         allGoodImages = await analyzeAndFilterImages(candidates, landmarkName, null);
@@ -1105,7 +1151,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   // STEP 2: Try Wikipedia article images (if we need more variety)
   if (allGoodImages.length < 6 && lang && pageId) {
     log.debug(`[BEST-IMG] Trying Wikipedia article (${lang}:${pageId})...`);
-    candidates = await fetchWikipediaArticleImages(lang, pageId, 8);
+    candidates = await fetchWikipediaArticleImages(lang, pageId, 12);  // More candidates for diversity
 
     if (candidates.length > 0) {
       const articleImages = await analyzeAndFilterImages(candidates, landmarkName, null);
@@ -1121,12 +1167,12 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   if (allGoodImages.length < 2) {
     log.debug(`[BEST-IMG] Trying Commons search with location...`);
 
-    const locationSuffix = canton ? `${canton} Switzerland` : 'Switzerland';
+    const locationSuffix = region ? `${region} ${country}` : country;
     const searchQuery = `${landmarkName} ${locationSuffix}`;
     candidates = await fetchMultipleImages(searchQuery, 8, null);
 
     if (candidates.length > 0) {
-      const locationContext = canton ? `${canton}, Switzerland` : 'Switzerland';
+      const locationContext = region ? `${region}, ${country}` : country;
       const searchImages = await analyzeAndFilterImages(candidates, landmarkName, locationContext);
 
       for (const img of searchImages) {
@@ -1142,18 +1188,127 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     return null;
   }
 
-  // Separate exterior and interior images, sort by score
-  const exteriorImages = allGoodImages
+  // Helper function to extract key terms from a description for similarity comparison
+  function extractKeyTerms(description) {
+    if (!description) return new Set();
+    // Extract significant words (nouns, adjectives) - lowercase, remove common words
+    const stopWords = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'and', 'or', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'this', 'that', 'these', 'those', 'it', 'its', 'from', 'by', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'over', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'also', 'now', 'photo', 'image', 'picture', 'view', 'showing', 'shows', 'seen', 'visible']);
+    const words = description.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 3 && !stopWords.has(w));
+    return new Set(words);
+  }
+
+  // Calculate similarity between two sets of key terms (Jaccard index)
+  function calculateSimilarity(terms1, terms2) {
+    if (terms1.size === 0 || terms2.size === 0) return 0;
+    const intersection = new Set([...terms1].filter(x => terms2.has(x)));
+    const union = new Set([...terms1, ...terms2]);
+    return intersection.size / union.size;
+  }
+
+  // Helper function to filter for diversity (avoid duplicate/similar photos)
+  // Uses rule-based checks first, then AI for borderline cases
+  async function selectDiverseImages(images, maxCount) {
+    if (images.length <= maxCount) return images;
+
+    const selected = [];
+    const usedUrls = new Set();
+    const usedDescriptionTerms = [];  // Array of {terms, description} for similarity checking
+
+    // Sort by score first
+    const sorted = [...images].sort((a, b) => b.score - a.score);
+
+    for (const img of sorted) {
+      if (selected.length >= maxCount) break;
+
+      // Check 1: URL-based duplicate detection (same base filename)
+      const baseUrl = img.url.split('/').pop().split('?')[0].toLowerCase();
+      const isUrlDuplicate = usedUrls.has(baseUrl) ||
+        Array.from(usedUrls).some(url => url.includes(baseUrl.slice(0, 20)) || baseUrl.includes(url.slice(0, 20)));
+
+      if (isUrlDuplicate) {
+        log.debug(`[BEST-IMG] Skipping URL duplicate: ${baseUrl}`);
+        continue;
+      }
+
+      // Check 2: Description-based similarity detection (Jaccard index)
+      const imgTerms = extractKeyTerms(img.description);
+      let isDescriptionSimilar = false;
+      let similarTo = null;
+      let maxSimilarity = 0;
+      let borderlineMatch = null;  // For AI check if borderline
+
+      for (const used of usedDescriptionTerms) {
+        const similarity = calculateSimilarity(imgTerms, used.terms);
+        if (similarity > maxSimilarity) maxSimilarity = similarity;
+
+        if (similarity > 0.6) {  // 60% = clearly similar
+          isDescriptionSimilar = true;
+          similarTo = used.description?.substring(0, 50);
+          break;
+        } else if (similarity > 0.35 && !borderlineMatch) {
+          // 35-60% = borderline, need AI check
+          borderlineMatch = used;
+        }
+      }
+
+      if (isDescriptionSimilar) {
+        log.debug(`[BEST-IMG] Skipping similar content (${Math.round(maxSimilarity * 100)}%): "${img.description?.substring(0, 40)}..." similar to "${similarTo}..."`);
+        continue;
+      }
+
+      // Check 3: Angle/perspective keywords - avoid same viewpoint
+      const angleKeywords = ['front', 'back', 'side', 'aerial', 'above', 'below', 'left', 'right', 'north', 'south', 'east', 'west', 'entrance', 'facade', 'tower', 'spire', 'roof', 'courtyard', 'garden'];
+      const imgAngles = angleKeywords.filter(kw => img.description?.toLowerCase().includes(kw));
+
+      if (imgAngles.length > 0) {
+        const hasSameAngle = selected.some(sel => {
+          const selAngles = angleKeywords.filter(kw => sel.description?.toLowerCase().includes(kw));
+          // If both have angle keywords and they overlap significantly
+          const overlap = imgAngles.filter(a => selAngles.includes(a));
+          return overlap.length > 0 && overlap.length >= Math.min(imgAngles.length, selAngles.length) * 0.5;
+        });
+
+        if (hasSameAngle) {
+          log.debug(`[BEST-IMG] Skipping same angle/viewpoint: ${imgAngles.join(', ')}`);
+          continue;
+        }
+      }
+
+      // Check 4: AI check for borderline cases (35-60% Jaccard similarity)
+      if (borderlineMatch && img.description && borderlineMatch.description) {
+        const isSimilarByAI = await checkPhotoSimilarityWithAI(img.description, borderlineMatch.description);
+        if (isSimilarByAI) {
+          log.debug(`[BEST-IMG] AI detected similar photos (${Math.round(maxSimilarity * 100)}% Jaccard): "${img.description?.substring(0, 40)}..."`);
+          continue;
+        }
+      }
+
+      // Passed all diversity checks - add to selection
+      selected.push(img);
+      usedUrls.add(baseUrl);
+      usedDescriptionTerms.push({ terms: imgTerms, description: img.description });
+    }
+
+    return selected;
+  }
+
+  // Separate exterior and interior images, sort by score, ensure diversity
+  const exteriorCandidates = allGoodImages
     .filter(img => img.isExterior !== false)  // Include if exterior or unknown
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2);
+    .sort((a, b) => b.score - a.score);
 
-  const interiorImages = allGoodImages
+  const interiorCandidates = allGoodImages
     .filter(img => img.isExterior === false && img.isActualPhoto !== false)  // Only actual photos of interiors (not paintings/artwork)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 2);
+    .sort((a, b) => b.score - a.score);
 
-  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${exteriorImages.length} exterior + ${interiorImages.length} interior`);
+  // Select up to 3 diverse images for each type (async for AI checks)
+  const exteriorImages = await selectDiverseImages(exteriorCandidates, 3);
+  const interiorImages = await selectDiverseImages(interiorCandidates, 3);
+
+  log.info(`[BEST-IMG] ✅ "${landmarkName}": ${exteriorImages.length} exterior + ${interiorImages.length} interior (from ${exteriorCandidates.length}/${interiorCandidates.length} candidates)`);
 
   return { exteriorImages, interiorImages, source: 'combined' };
 }
@@ -2038,17 +2193,17 @@ async function getLandmarkPhotoOnDemand(landmark) {
 }
 
 /**
- * Get pre-indexed Swiss landmarks near a location
+ * Get indexed landmarks near a location (works for any city worldwide)
  * @param {number} latitude
  * @param {number} longitude
  * @param {number} radiusKm - Search radius in kilometers (default 20km)
  * @param {number} limit - Maximum results (default 30)
  * @returns {Promise<Array>}
  */
-async function getSwissLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30) {
+async function getIndexedLandmarksNearLocation(latitude, longitude, radiusKm = 20, limit = 30) {
   const pool = getPool();
   if (!pool) {
-    log.warn('[SWISS-LANDMARKS] Database not available');
+    log.warn('[LANDMARK-INDEX] Database not available');
     return [];
   }
 
@@ -2065,84 +2220,84 @@ async function getSwissLandmarksNearLocation(latitude, longitude, radiusKm = 20,
           cos(radians(longitude) - radians($2)) +
           sin(radians($1)) * sin(radians(latitude))
         )) AS distance_km
-      FROM swiss_landmarks
+      FROM landmark_index
       WHERE latitude BETWEEN $1 - $3 AND $1 + $3
         AND longitude BETWEEN $2 - $4 AND $2 + $4
       ORDER BY score DESC, distance_km ASC
       LIMIT $5
     `, [latitude, longitude, latDelta, lonDelta, limit]);
 
-    log.info(`[SWISS-LANDMARKS] Found ${result.rows.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
+    log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks within ${radiusKm}km of (${latitude}, ${longitude})`);
     return result.rows;
   } catch (err) {
-    log.error(`[SWISS-LANDMARKS] Query error: ${err.message}`);
+    log.error(`[LANDMARK-INDEX] Query error: ${err.message}`);
     return [];
   }
 }
 
 /**
- * Get pre-indexed Swiss landmarks by city name
+ * Get indexed landmarks by city name (works for any city worldwide)
  * @param {string} city - City name
  * @param {number} limit - Maximum results (default 30)
  * @returns {Promise<Array>}
  */
-async function getSwissLandmarksByCity(city, limit = 30) {
+async function getIndexedLandmarks(city, limit = 30) {
   const pool = getPool();
   if (!pool) {
-    log.warn('[SWISS-LANDMARKS] Database not available');
+    log.warn('[LANDMARK-INDEX] Database not available');
     return [];
   }
 
   try {
     const result = await pool.query(`
-      SELECT * FROM swiss_landmarks
+      SELECT * FROM landmark_index
       WHERE LOWER(nearest_city) = LOWER($1)
       ORDER BY score DESC
       LIMIT $2
     `, [city, limit]);
 
-    log.info(`[SWISS-LANDMARKS] Found ${result.rows.length} landmarks for city "${city}"`);
+    log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks for city "${city}"`);
     return result.rows;
   } catch (err) {
-    log.error(`[SWISS-LANDMARKS] Query error: ${err.message}`);
+    log.error(`[LANDMARK-INDEX] Query error: ${err.message}`);
     return [];
   }
 }
 
 /**
- * Get all pre-indexed Swiss landmarks (for outline generation)
- * Returns top landmarks across all of Switzerland
+ * Get all indexed landmarks (for outline generation)
+ * Returns top landmarks across all indexed cities
  * @param {number} limit - Maximum results (default 100)
  * @returns {Promise<Array>}
  */
-async function getAllSwissLandmarks(limit = 100) {
+async function getAllIndexedLandmarks(limit = 100) {
   const pool = getPool();
   if (!pool) {
-    log.warn('[SWISS-LANDMARKS] Database not available');
+    log.warn('[LANDMARK-INDEX] Database not available');
     return [];
   }
 
   try {
     const result = await pool.query(`
-      SELECT * FROM swiss_landmarks
+      SELECT * FROM landmark_index
       ORDER BY score DESC
       LIMIT $1
     `, [limit]);
 
-    log.info(`[SWISS-LANDMARKS] Retrieved ${result.rows.length} top landmarks from index`);
+    log.info(`[LANDMARK-INDEX] Retrieved ${result.rows.length} top landmarks from index`);
     return result.rows;
   } catch (err) {
-    log.error(`[SWISS-LANDMARKS] Query error: ${err.message}`);
+    log.error(`[LANDMARK-INDEX] Query error: ${err.message}`);
     return [];
   }
 }
 
 /**
- * Save a landmark to the swiss_landmarks table
+ * Save a landmark to the landmark_index table (works for any city worldwide)
  * @param {Object} landmark - Landmark data
  * @returns {Promise<boolean>} - Success status
  */
-async function saveSwissLandmark(landmark) {
+async function saveLandmarkToIndex(landmark) {
   const pool = getPool();
   if (!pool) return false;
 
@@ -2151,35 +2306,45 @@ async function saveSwissLandmark(landmark) {
 
   try {
     await pool.query(`
-      INSERT INTO swiss_landmarks (
+      INSERT INTO landmark_index (
         name, wikipedia_page_id, wikidata_qid, lang,
-        latitude, longitude, nearest_city, canton,
+        latitude, longitude, nearest_city, country, region,
         type, boost_amount, categories,
         photo_url, photo_attribution, photo_source, photo_description,
         photo_url_2, photo_attribution_2, photo_description_2,
         photo_url_3, photo_attribution_3, photo_description_3,
         photo_url_4, photo_attribution_4, photo_description_4,
+        photo_url_5, photo_attribution_5, photo_description_5,
+        photo_url_6, photo_attribution_6, photo_description_6,
         wikipedia_extract,
         commons_photo_count, score
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33, $34)
       ON CONFLICT (wikidata_qid) DO UPDATE SET
         name = EXCLUDED.name,
-        latitude = COALESCE(EXCLUDED.latitude, swiss_landmarks.latitude),
-        longitude = COALESCE(EXCLUDED.longitude, swiss_landmarks.longitude),
-        type = COALESCE(EXCLUDED.type, swiss_landmarks.type),
-        photo_url = COALESCE(EXCLUDED.photo_url, swiss_landmarks.photo_url),
-        photo_attribution = COALESCE(EXCLUDED.photo_attribution, swiss_landmarks.photo_attribution),
-        photo_description = COALESCE(EXCLUDED.photo_description, swiss_landmarks.photo_description),
-        photo_url_2 = COALESCE(EXCLUDED.photo_url_2, swiss_landmarks.photo_url_2),
-        photo_attribution_2 = COALESCE(EXCLUDED.photo_attribution_2, swiss_landmarks.photo_attribution_2),
-        photo_description_2 = COALESCE(EXCLUDED.photo_description_2, swiss_landmarks.photo_description_2),
-        photo_url_3 = COALESCE(EXCLUDED.photo_url_3, swiss_landmarks.photo_url_3),
-        photo_attribution_3 = COALESCE(EXCLUDED.photo_attribution_3, swiss_landmarks.photo_attribution_3),
-        photo_description_3 = COALESCE(EXCLUDED.photo_description_3, swiss_landmarks.photo_description_3),
-        photo_url_4 = COALESCE(EXCLUDED.photo_url_4, swiss_landmarks.photo_url_4),
-        photo_attribution_4 = COALESCE(EXCLUDED.photo_attribution_4, swiss_landmarks.photo_attribution_4),
-        photo_description_4 = COALESCE(EXCLUDED.photo_description_4, swiss_landmarks.photo_description_4),
-        wikipedia_extract = COALESCE(EXCLUDED.wikipedia_extract, swiss_landmarks.wikipedia_extract),
+        latitude = COALESCE(EXCLUDED.latitude, landmark_index.latitude),
+        longitude = COALESCE(EXCLUDED.longitude, landmark_index.longitude),
+        country = COALESCE(EXCLUDED.country, landmark_index.country),
+        region = COALESCE(EXCLUDED.region, landmark_index.region),
+        type = COALESCE(EXCLUDED.type, landmark_index.type),
+        photo_url = COALESCE(EXCLUDED.photo_url, landmark_index.photo_url),
+        photo_attribution = COALESCE(EXCLUDED.photo_attribution, landmark_index.photo_attribution),
+        photo_description = COALESCE(EXCLUDED.photo_description, landmark_index.photo_description),
+        photo_url_2 = COALESCE(EXCLUDED.photo_url_2, landmark_index.photo_url_2),
+        photo_attribution_2 = COALESCE(EXCLUDED.photo_attribution_2, landmark_index.photo_attribution_2),
+        photo_description_2 = COALESCE(EXCLUDED.photo_description_2, landmark_index.photo_description_2),
+        photo_url_3 = COALESCE(EXCLUDED.photo_url_3, landmark_index.photo_url_3),
+        photo_attribution_3 = COALESCE(EXCLUDED.photo_attribution_3, landmark_index.photo_attribution_3),
+        photo_description_3 = COALESCE(EXCLUDED.photo_description_3, landmark_index.photo_description_3),
+        photo_url_4 = COALESCE(EXCLUDED.photo_url_4, landmark_index.photo_url_4),
+        photo_attribution_4 = COALESCE(EXCLUDED.photo_attribution_4, landmark_index.photo_attribution_4),
+        photo_description_4 = COALESCE(EXCLUDED.photo_description_4, landmark_index.photo_description_4),
+        photo_url_5 = COALESCE(EXCLUDED.photo_url_5, landmark_index.photo_url_5),
+        photo_attribution_5 = COALESCE(EXCLUDED.photo_attribution_5, landmark_index.photo_attribution_5),
+        photo_description_5 = COALESCE(EXCLUDED.photo_description_5, landmark_index.photo_description_5),
+        photo_url_6 = COALESCE(EXCLUDED.photo_url_6, landmark_index.photo_url_6),
+        photo_attribution_6 = COALESCE(EXCLUDED.photo_attribution_6, landmark_index.photo_attribution_6),
+        photo_description_6 = COALESCE(EXCLUDED.photo_description_6, landmark_index.photo_description_6),
+        wikipedia_extract = COALESCE(EXCLUDED.wikipedia_extract, landmark_index.wikipedia_extract),
         score = EXCLUDED.score,
         updated_at = CURRENT_TIMESTAMP
     `, [
@@ -2190,7 +2355,8 @@ async function saveSwissLandmark(landmark) {
       landmark.lat || landmark.latitude || null,
       landmark.lon || landmark.longitude || null,
       landmark.nearestCity || landmark.nearest_city || null,
-      landmark.canton || null,
+      landmark.country || null,
+      landmark.region || landmark.canton || null,  // Support both new and old field names
       normalize(landmark.type),
       landmark.boostAmount || landmark.boost_amount || 0,
       landmark.categories || [],
@@ -2207,6 +2373,12 @@ async function saveSwissLandmark(landmark) {
       normalize(landmark.photoUrl4 || landmark.photo_url_4),
       normalize(landmark.attribution4 || landmark.photo_attribution_4),
       normalize(landmark.photoDescription4 || landmark.photo_description_4),
+      normalize(landmark.photoUrl5 || landmark.photo_url_5),
+      normalize(landmark.attribution5 || landmark.photo_attribution_5),
+      normalize(landmark.photoDescription5 || landmark.photo_description_5),
+      normalize(landmark.photoUrl6 || landmark.photo_url_6),
+      normalize(landmark.attribution6 || landmark.photo_attribution_6),
+      normalize(landmark.photoDescription6 || landmark.photo_description_6),
       normalize(landmark.wikipediaExtract || landmark.wikipedia_extract),
       landmark.commonsPhotoCount || landmark.commons_photo_count || 0,
       landmark.score || 0
@@ -2214,97 +2386,99 @@ async function saveSwissLandmark(landmark) {
 
     return true;
   } catch (err) {
-    log.error(`[SWISS-LANDMARKS] Save error for "${landmark.name}": ${err.message}`);
+    log.error(`[LANDMARK-INDEX] Save error for "${landmark.name}": ${err.message}`);
     return false;
   }
 }
 
 /**
- * Swiss cities to crawl for landmark discovery
- * Covers all 26 cantons with major towns
+ * Pre-configured Swiss cities for bulk indexing
+ * Each entry has city, country, and region (canton)
+ * These can be indexed via admin panel for fast landmark lookup
  */
 const SWISS_CITIES = [
   // Major cities
-  { city: 'Zürich', canton: 'ZH' },
-  { city: 'Genf', canton: 'GE' },
-  { city: 'Basel', canton: 'BS' },
-  { city: 'Lausanne', canton: 'VD' },
-  { city: 'Bern', canton: 'BE' },
-  { city: 'Winterthur', canton: 'ZH' },
-  { city: 'Luzern', canton: 'LU' },
-  { city: 'St. Gallen', canton: 'SG' },
-  { city: 'Lugano', canton: 'TI' },
-  { city: 'Biel', canton: 'BE' },
+  { city: 'Zürich', country: 'Switzerland', region: 'ZH' },
+  { city: 'Genf', country: 'Switzerland', region: 'GE' },
+  { city: 'Basel', country: 'Switzerland', region: 'BS' },
+  { city: 'Lausanne', country: 'Switzerland', region: 'VD' },
+  { city: 'Bern', country: 'Switzerland', region: 'BE' },
+  { city: 'Winterthur', country: 'Switzerland', region: 'ZH' },
+  { city: 'Luzern', country: 'Switzerland', region: 'LU' },
+  { city: 'St. Gallen', country: 'Switzerland', region: 'SG' },
+  { city: 'Lugano', country: 'Switzerland', region: 'TI' },
+  { city: 'Biel', country: 'Switzerland', region: 'BE' },
   // Medium cities
-  { city: 'Thun', canton: 'BE' },
-  { city: 'Fribourg', canton: 'FR' },
-  { city: 'Schaffhausen', canton: 'SH' },
-  { city: 'Chur', canton: 'GR' },
-  { city: 'Neuchâtel', canton: 'NE' },
-  { city: 'Sion', canton: 'VS' },
-  { city: 'Aarau', canton: 'AG' },
-  { city: 'Baden', canton: 'AG' },
-  { city: 'Zug', canton: 'ZG' },
-  { city: 'Solothurn', canton: 'SO' },
-  { city: 'Olten', canton: 'SO' },
-  { city: 'Bellinzona', canton: 'TI' },
-  { city: 'Locarno', canton: 'TI' },
+  { city: 'Thun', country: 'Switzerland', region: 'BE' },
+  { city: 'Fribourg', country: 'Switzerland', region: 'FR' },
+  { city: 'Schaffhausen', country: 'Switzerland', region: 'SH' },
+  { city: 'Chur', country: 'Switzerland', region: 'GR' },
+  { city: 'Neuchâtel', country: 'Switzerland', region: 'NE' },
+  { city: 'Sion', country: 'Switzerland', region: 'VS' },
+  { city: 'Aarau', country: 'Switzerland', region: 'AG' },
+  { city: 'Baden', country: 'Switzerland', region: 'AG' },
+  { city: 'Zug', country: 'Switzerland', region: 'ZG' },
+  { city: 'Solothurn', country: 'Switzerland', region: 'SO' },
+  { city: 'Olten', country: 'Switzerland', region: 'SO' },
+  { city: 'Bellinzona', country: 'Switzerland', region: 'TI' },
+  { city: 'Locarno', country: 'Switzerland', region: 'TI' },
   // Smaller but landmark-rich towns
-  { city: 'Interlaken', canton: 'BE' },
-  { city: 'Montreux', canton: 'VD' },
-  { city: 'Zermatt', canton: 'VS' },
-  { city: 'Grindelwald', canton: 'BE' },
-  { city: 'Lauterbrunnen', canton: 'BE' },
-  { city: 'Rapperswil', canton: 'SG' },
-  { city: 'Stein am Rhein', canton: 'SH' },
-  { city: 'Murten', canton: 'FR' },
-  { city: 'Gruyères', canton: 'FR' },
-  { city: 'Appenzell', canton: 'AI' },
-  { city: 'Davos', canton: 'GR' },
-  { city: 'St. Moritz', canton: 'GR' },
-  { city: 'Ascona', canton: 'TI' },
-  { city: 'Bremgarten', canton: 'AG' },
-  { city: 'Rheinfelden', canton: 'AG' },
-  { city: 'Einsiedeln', canton: 'SZ' },
-  { city: 'Schwyz', canton: 'SZ' },
-  { city: 'Altdorf', canton: 'UR' },
-  { city: 'Stans', canton: 'NW' },
-  { city: 'Sarnen', canton: 'OW' },
-  { city: 'Glarus', canton: 'GL' },
-  { city: 'Liestal', canton: 'BL' },
-  { city: 'Delémont', canton: 'JU' },
-  { city: 'Herisau', canton: 'AR' },
+  { city: 'Interlaken', country: 'Switzerland', region: 'BE' },
+  { city: 'Montreux', country: 'Switzerland', region: 'VD' },
+  { city: 'Zermatt', country: 'Switzerland', region: 'VS' },
+  { city: 'Grindelwald', country: 'Switzerland', region: 'BE' },
+  { city: 'Lauterbrunnen', country: 'Switzerland', region: 'BE' },
+  { city: 'Rapperswil', country: 'Switzerland', region: 'SG' },
+  { city: 'Stein am Rhein', country: 'Switzerland', region: 'SH' },
+  { city: 'Murten', country: 'Switzerland', region: 'FR' },
+  { city: 'Gruyères', country: 'Switzerland', region: 'FR' },
+  { city: 'Appenzell', country: 'Switzerland', region: 'AI' },
+  { city: 'Davos', country: 'Switzerland', region: 'GR' },
+  { city: 'St. Moritz', country: 'Switzerland', region: 'GR' },
+  { city: 'Ascona', country: 'Switzerland', region: 'TI' },
+  { city: 'Bremgarten', country: 'Switzerland', region: 'AG' },
+  { city: 'Rheinfelden', country: 'Switzerland', region: 'AG' },
+  { city: 'Einsiedeln', country: 'Switzerland', region: 'SZ' },
+  { city: 'Schwyz', country: 'Switzerland', region: 'SZ' },
+  { city: 'Altdorf', country: 'Switzerland', region: 'UR' },
+  { city: 'Stans', country: 'Switzerland', region: 'NW' },
+  { city: 'Sarnen', country: 'Switzerland', region: 'OW' },
+  { city: 'Glarus', country: 'Switzerland', region: 'GL' },
+  { city: 'Liestal', country: 'Switzerland', region: 'BL' },
+  { city: 'Delémont', country: 'Switzerland', region: 'JU' },
+  { city: 'Herisau', country: 'Switzerland', region: 'AR' },
   // Additional landmark-rich locations
-  { city: 'Avenches', canton: 'VD' },
-  { city: 'Romainmôtier', canton: 'VD' },
-  { city: 'Grandson', canton: 'VD' },
-  { city: 'Payerne', canton: 'VD' },
-  { city: 'Aigle', canton: 'VD' },
-  { city: 'Yverdon', canton: 'VD' },
-  { city: 'Nyon', canton: 'VD' },
-  { city: 'Morges', canton: 'VD' },
-  { city: 'Vevey', canton: 'VD' },
-  { city: 'Spiez', canton: 'BE' },
-  { city: 'Brienz', canton: 'BE' },
-  { city: 'Meiringen', canton: 'BE' },
-  { city: 'Burgdorf', canton: 'BE' },
-  { city: 'Langnau', canton: 'BE' },
-  { city: 'Brig', canton: 'VS' },
-  { city: 'Visp', canton: 'VS' },
-  { city: 'Leuk', canton: 'VS' },
-  { city: 'Sierre', canton: 'VS' },
-  { city: 'Martigny', canton: 'VS' }
+  { city: 'Avenches', country: 'Switzerland', region: 'VD' },
+  { city: 'Romainmôtier', country: 'Switzerland', region: 'VD' },
+  { city: 'Grandson', country: 'Switzerland', region: 'VD' },
+  { city: 'Payerne', country: 'Switzerland', region: 'VD' },
+  { city: 'Aigle', country: 'Switzerland', region: 'VD' },
+  { city: 'Yverdon', country: 'Switzerland', region: 'VD' },
+  { city: 'Nyon', country: 'Switzerland', region: 'VD' },
+  { city: 'Morges', country: 'Switzerland', region: 'VD' },
+  { city: 'Vevey', country: 'Switzerland', region: 'VD' },
+  { city: 'Spiez', country: 'Switzerland', region: 'BE' },
+  { city: 'Brienz', country: 'Switzerland', region: 'BE' },
+  { city: 'Meiringen', country: 'Switzerland', region: 'BE' },
+  { city: 'Burgdorf', country: 'Switzerland', region: 'BE' },
+  { city: 'Langnau', country: 'Switzerland', region: 'BE' },
+  { city: 'Brig', country: 'Switzerland', region: 'VS' },
+  { city: 'Visp', country: 'Switzerland', region: 'VS' },
+  { city: 'Leuk', country: 'Switzerland', region: 'VS' },
+  { city: 'Sierre', country: 'Switzerland', region: 'VS' },
+  { city: 'Martigny', country: 'Switzerland', region: 'VS' }
 ];
 
 /**
- * Discover and index all Swiss landmarks
- * One-time crawl to populate swiss_landmarks table
+ * Index landmarks for a list of cities (works for any city worldwide)
+ * Can be used to bulk-index Swiss cities or any other cities
  * @param {Object} options - Options
+ * @param {Array} options.cities - Array of {city, country, region} objects (defaults to SWISS_CITIES)
  * @param {boolean} options.analyzePhotos - Whether to analyze photos with AI (costs ~$0.15 total)
  * @param {Function} options.onProgress - Progress callback (city, current, total)
  * @returns {Promise<{total: number, saved: number, errors: number}>}
  */
-async function discoverAllSwissLandmarks(options = {}) {
+async function indexLandmarksForCities(options = {}) {
   const {
     analyzePhotos = true,
     useMultiImageAnalysis = true,  // Use new multi-image quality analysis
@@ -2316,19 +2490,19 @@ async function discoverAllSwissLandmarks(options = {}) {
     dryRun = false       // If true, don't save to DB, just count
   } = options;
 
-  // Filter to specific cities if provided, otherwise use all
-  let cities = SWISS_CITIES;
+  // Use provided cities or default to SWISS_CITIES
+  let cities = options.cities || SWISS_CITIES;
   if (filterCities && filterCities.length > 0) {
-    cities = SWISS_CITIES.filter(c => filterCities.some(f =>
+    cities = cities.filter(c => filterCities.some(f =>
       c.city.toLowerCase().includes(f.toLowerCase())
     ));
-    log.info(`[SWISS-INDEX] Filtering to cities: ${cities.map(c => c.city).join(', ')}`);
+    log.info(`[LANDMARK-INDEX] Filtering to cities: ${cities.map(c => c.city).join(', ')}`);
   }
 
   const citiesToProcess = maxCities ? Math.min(maxCities, cities.length) : cities.length;
 
-  log.info(`[SWISS-INDEX] Starting Swiss landmark discovery`);
-  log.info(`[SWISS-INDEX]   Cities: ${citiesToProcess}/${cities.length}, maxLandmarks: ${maxLandmarks}, analyzePhotos: ${analyzePhotos}, multiImage: ${useMultiImageAnalysis}, dryRun: ${dryRun}`);
+  log.info(`[LANDMARK-INDEX] Starting landmark indexing`);
+  log.info(`[LANDMARK-INDEX]   Cities: ${citiesToProcess}/${cities.length}, maxLandmarks: ${maxLandmarks}, analyzePhotos: ${analyzePhotos}, multiImage: ${useMultiImageAnalysis}, dryRun: ${dryRun}`);
 
   const allLandmarks = new Map(); // qid -> landmark (for deduplication)
   let savedCount = 0;
@@ -2337,31 +2511,31 @@ async function discoverAllSwissLandmarks(options = {}) {
   let hitLimit = false;
 
   for (let i = 0; i < citiesToProcess && !hitLimit; i++) {
-    const { city, canton } = cities[i];
+    const { city, country = 'Switzerland', region } = cities[i];
 
     if (onProgress) {
       onProgress(city, i + 1, citiesToProcess, savedCount, maxLandmarks);
     }
 
-    log.info(`[SWISS-INDEX] [${i + 1}/${citiesToProcess}] Discovering landmarks for ${city} (${canton})... (saved: ${savedCount}/${maxLandmarks})`);
+    log.info(`[LANDMARK-INDEX] [${i + 1}/${citiesToProcess}] Discovering landmarks for ${city}, ${country}${region ? ` (${region})` : ''}... (saved: ${savedCount}/${maxLandmarks})`);
 
     try {
       // Get coordinates for city
-      const coords = await geocodeCity(city, 'Switzerland');
+      const coords = await geocodeCity(city, country);
       if (!coords) {
-        log.warn(`[SWISS-INDEX] Could not geocode "${city}", skipping`);
+        log.warn(`[LANDMARK-INDEX] Could not geocode "${city}, ${country}", skipping`);
         continue;
       }
 
       // Search Wikipedia for landmarks (10km radius)
-      const landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, null, 'Switzerland');
+      const landmarks = await searchWikipediaLandmarks(coords.lat, coords.lon, 10000, null, country);
 
-      log.info(`[SWISS-INDEX] Found ${landmarks.length} landmarks near ${city}`);
+      log.info(`[LANDMARK-INDEX] Found ${landmarks.length} landmarks near ${city}`);
 
       for (const landmark of landmarks) {
         // Check if we hit the limit
         if (savedCount >= maxLandmarks) {
-          log.warn(`[SWISS-INDEX] ⚠️ Reached maxLandmarks limit (${maxLandmarks}), stopping`);
+          log.warn(`[LANDMARK-INDEX] ⚠️ Reached maxLandmarks limit (${maxLandmarks}), stopping`);
           hitLimit = true;
           break;
         }
@@ -2371,9 +2545,10 @@ async function discoverAllSwissLandmarks(options = {}) {
           continue;
         }
 
-        // Add city/canton info
+        // Add city/country/region info
         landmark.nearestCity = city;
-        landmark.canton = canton;
+        landmark.country = country;
+        landmark.region = region;
 
         // Calculate score based on type
         // Higher score = more visually interesting landmark
@@ -2405,13 +2580,15 @@ async function discoverAllSwissLandmarks(options = {}) {
                 landmark.lang,      // Wikipedia language
                 landmark.pageId,    // Wikipedia page ID for article images
                 landmark.qid,       // Wikidata QID for Commons category lookup
-                canton              // Swiss canton for location context
+                region,             // Region for location context
+                country             // Country for location context
               );
 
               if (bestResult) {
                 const { exteriorImages, interiorImages } = bestResult;
 
-                // Save exterior images (photo_url, photo_url_2)
+                // Save exterior images (photo_url, photo_url_2, photo_url_3) - 3 variants
+                // These should be diverse (different angles/perspectives)
                 if (exteriorImages.length > 0) {
                   landmark.photoUrl = exteriorImages[0].url;
                   landmark.attribution = exteriorImages[0].attribution;
@@ -2424,17 +2601,27 @@ async function discoverAllSwissLandmarks(options = {}) {
                   landmark.attribution2 = exteriorImages[1].attribution;
                   landmark.photoDescription2 = exteriorImages[1].description;
                 }
+                if (exteriorImages.length > 2) {
+                  landmark.photoUrl3 = exteriorImages[2].url;
+                  landmark.attribution3 = exteriorImages[2].attribution;
+                  landmark.photoDescription3 = exteriorImages[2].description;
+                }
 
-                // Save interior images (photo_url_3, photo_url_4)
+                // Save interior images (photo_url_4, photo_url_5, photo_url_6) - 3 variants
                 if (interiorImages.length > 0) {
-                  landmark.photoUrl3 = interiorImages[0].url;
-                  landmark.attribution3 = interiorImages[0].attribution;
-                  landmark.photoDescription3 = interiorImages[0].description;
+                  landmark.photoUrl4 = interiorImages[0].url;
+                  landmark.attribution4 = interiorImages[0].attribution;
+                  landmark.photoDescription4 = interiorImages[0].description;
                 }
                 if (interiorImages.length > 1) {
-                  landmark.photoUrl4 = interiorImages[1].url;
-                  landmark.attribution4 = interiorImages[1].attribution;
-                  landmark.photoDescription4 = interiorImages[1].description;
+                  landmark.photoUrl5 = interiorImages[1].url;
+                  landmark.attribution5 = interiorImages[1].attribution;
+                  landmark.photoDescription5 = interiorImages[1].description;
+                }
+                if (interiorImages.length > 2) {
+                  landmark.photoUrl6 = interiorImages[2].url;
+                  landmark.attribution6 = interiorImages[2].attribution;
+                  landmark.photoDescription6 = interiorImages[2].description;
                 }
 
                 // Add to landmark score based on photo quality
@@ -2444,9 +2631,9 @@ async function discoverAllSwissLandmarks(options = {}) {
                 analyzedCount++;
 
                 const totalImages = exteriorImages.length + interiorImages.length;
-                log.debug(`[SWISS-INDEX] ✅ "${landmark.name}": ${exteriorImages.length} ext + ${interiorImages.length} int`);
+                log.debug(`[LANDMARK-INDEX] ✅ "${landmark.name}": ${exteriorImages.length} ext + ${interiorImages.length} int`);
               } else {
-                log.debug(`[SWISS-INDEX] No suitable image found for "${landmark.name}"`);
+                log.debug(`[LANDMARK-INDEX] No suitable image found for "${landmark.name}"`);
               }
 
               // Fetch Wikipedia extract for landmark description
@@ -2470,7 +2657,7 @@ async function discoverAllSwissLandmarks(options = {}) {
               }
             }
           } catch (err) {
-            log.debug(`[SWISS-INDEX] Photo fetch failed for "${landmark.name}": ${err.message}`);
+            log.debug(`[LANDMARK-INDEX] Photo fetch failed for "${landmark.name}": ${err.message}`);
           }
         }
 
@@ -2480,9 +2667,9 @@ async function discoverAllSwissLandmarks(options = {}) {
           if (landmark.qid) {
             allLandmarks.set(landmark.qid, landmark);
           }
-          log.debug(`[SWISS-INDEX] [DRY RUN] Would save: "${landmark.name}" (${landmark.type})`);
+          log.debug(`[LANDMARK-INDEX] [DRY RUN] Would save: "${landmark.name}" (${landmark.type})`);
         } else {
-          const saved = await saveSwissLandmark(landmark);
+          const saved = await saveLandmarkToIndex(landmark);
           if (saved) {
             savedCount++;
             if (landmark.qid) {
@@ -2501,13 +2688,13 @@ async function discoverAllSwissLandmarks(options = {}) {
       await new Promise(r => setTimeout(r, 500));
 
     } catch (err) {
-      log.error(`[SWISS-INDEX] Error processing ${city}: ${err.message}`);
+      log.error(`[LANDMARK-INDEX] Error processing ${city}: ${err.message}`);
       errorCount++;
     }
   }
 
   const total = allLandmarks.size;
-  log.info(`[SWISS-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Analyzed: ${analyzedCount}, Errors: ${errorCount}, HitLimit: ${hitLimit}`);
+  log.info(`[LANDMARK-INDEX] ✅ Complete! Total unique: ${total}, Saved: ${savedCount}, Analyzed: ${analyzedCount}, Errors: ${errorCount}, HitLimit: ${hitLimit}`);
 
   return {
     totalDiscovered: total,
@@ -2519,12 +2706,30 @@ async function discoverAllSwissLandmarks(options = {}) {
   };
 }
 
+/**
+ * Index landmarks for a single city (on-demand when user from new city arrives)
+ * @param {string} city - City name
+ * @param {string} country - Country name
+ * @param {Object} options - Additional options (analyzePhotos, maxLandmarks, etc.)
+ * @returns {Promise<{totalDiscovered: number, totalSaved: number}>}
+ */
+async function indexLandmarksForCity(city, country, options = {}) {
+  log.info(`[LANDMARK-INDEX] Indexing landmarks for ${city}, ${country}...`);
+
+  return indexLandmarksForCities({
+    ...options,
+    cities: [{ city, country, region: null }],
+    maxLandmarks: options.maxLandmarks || 30,  // Lower limit for single city
+    analyzePhotos: options.analyzePhotos !== false
+  });
+}
+
 // ============================================================================
 // LAZY PHOTO VARIANT LOADING - Load descriptions first, photos on-demand
 // ============================================================================
 
 /**
- * Load photo variant descriptions for all Swiss landmarks in the Visual Bible
+ * Load photo variant descriptions for all indexed landmarks in the Visual Bible
  * This is called after linkPreDiscoveredLandmarks to populate descriptions
  * WITHOUT loading actual image data (lazy loading)
  * @param {Object} visualBible - Visual Bible with locations array
@@ -2533,17 +2738,17 @@ async function discoverAllSwissLandmarks(options = {}) {
 async function loadLandmarkPhotoDescriptions(visualBible) {
   if (!visualBible?.locations) return visualBible;
 
-  // Find Swiss pre-indexed landmarks that have photo variants
-  const swissLandmarks = visualBible.locations.filter(
-    loc => loc.isRealLandmark && loc.isSwissPreIndexed && loc.swissLandmarkId
+  // Find indexed landmarks that have photo variants (supports both old isSwissPreIndexed and new isIndexed)
+  const indexedLandmarks = visualBible.locations.filter(
+    loc => loc.isRealLandmark && (loc.isSwissPreIndexed || loc.isIndexed) && (loc.swissLandmarkId || loc.landmarkIndexId)
   );
 
-  if (swissLandmarks.length === 0) {
-    log.debug('[LANDMARK-VARIANTS] No Swiss landmarks to load descriptions for');
+  if (indexedLandmarks.length === 0) {
+    log.debug('[LANDMARK-VARIANTS] No indexed landmarks to load descriptions for');
     return visualBible;
   }
 
-  log.info(`[LANDMARK-VARIANTS] Loading photo descriptions for ${swissLandmarks.length} Swiss landmark(s)`);
+  log.info(`[LANDMARK-VARIANTS] Loading photo descriptions for ${indexedLandmarks.length} indexed landmark(s)`);
 
   const pool = getPool();
   if (!pool) {
@@ -2552,17 +2757,19 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
   }
 
   try {
-    // Get landmark IDs
-    const ids = swissLandmarks.map(l => l.swissLandmarkId);
+    // Get landmark IDs (support both old and new field names)
+    const ids = indexedLandmarks.map(l => l.swissLandmarkId || l.landmarkIndexId);
 
-    // Query all photo descriptions for these landmarks
+    // Query all photo descriptions for these landmarks (6 variants)
     const result = await pool.query(`
       SELECT id, name,
         photo_url, photo_description, photo_attribution,
         photo_url_2, photo_description_2, photo_attribution_2,
         photo_url_3, photo_description_3, photo_attribution_3,
-        photo_url_4, photo_description_4, photo_attribution_4
-      FROM swiss_landmarks
+        photo_url_4, photo_description_4, photo_attribution_4,
+        photo_url_5, photo_description_5, photo_attribution_5,
+        photo_url_6, photo_description_6, photo_attribution_6
+      FROM landmark_index
       WHERE id = ANY($1)
     `, [ids]);
 
@@ -2571,60 +2778,42 @@ async function loadLandmarkPhotoDescriptions(visualBible) {
     for (const row of result.rows) {
       const variants = [];
 
-      // Add variant 1 (always exists)
-      if (row.photo_url) {
-        variants.push({
-          variantNumber: 1,
-          url: row.photo_url,
-          description: row.photo_description || null,
-          attribution: row.photo_attribution || null
-        });
-      }
+      // Add variants 1-6 if they exist
+      const variantConfigs = [
+        { num: 1, url: row.photo_url, desc: row.photo_description, attr: row.photo_attribution },
+        { num: 2, url: row.photo_url_2, desc: row.photo_description_2, attr: row.photo_attribution_2 },
+        { num: 3, url: row.photo_url_3, desc: row.photo_description_3, attr: row.photo_attribution_3 },
+        { num: 4, url: row.photo_url_4, desc: row.photo_description_4, attr: row.photo_attribution_4 },
+        { num: 5, url: row.photo_url_5, desc: row.photo_description_5, attr: row.photo_attribution_5 },
+        { num: 6, url: row.photo_url_6, desc: row.photo_description_6, attr: row.photo_attribution_6 }
+      ];
 
-      // Add variant 2 if exists
-      if (row.photo_url_2) {
-        variants.push({
-          variantNumber: 2,
-          url: row.photo_url_2,
-          description: row.photo_description_2 || null,
-          attribution: row.photo_attribution_2 || null
-        });
-      }
-
-      // Add variant 3 if exists
-      if (row.photo_url_3) {
-        variants.push({
-          variantNumber: 3,
-          url: row.photo_url_3,
-          description: row.photo_description_3 || null,
-          attribution: row.photo_attribution_3 || null
-        });
-      }
-
-      // Add variant 4 if exists
-      if (row.photo_url_4) {
-        variants.push({
-          variantNumber: 4,
-          url: row.photo_url_4,
-          description: row.photo_description_4 || null,
-          attribution: row.photo_attribution_4 || null
-        });
+      for (const cfg of variantConfigs) {
+        if (cfg.url) {
+          variants.push({
+            variantNumber: cfg.num,
+            url: cfg.url,
+            description: cfg.desc || null,
+            attribution: cfg.attr || null
+          });
+        }
       }
 
       descriptionMap.set(row.id, variants);
     }
 
     // Update Visual Bible locations with photo variants
-    for (const loc of swissLandmarks) {
-      const variants = descriptionMap.get(loc.swissLandmarkId);
+    for (const loc of indexedLandmarks) {
+      const landmarkId = loc.swissLandmarkId || loc.landmarkIndexId;
+      const variants = descriptionMap.get(landmarkId);
       if (variants && variants.length > 0) {
         loc.photoVariants = variants;
         log.debug(`[LANDMARK-VARIANTS] "${loc.name}" has ${variants.length} photo variant(s)`);
       }
     }
 
-    const withVariants = swissLandmarks.filter(l => l.photoVariants?.length > 0).length;
-    log.info(`[LANDMARK-VARIANTS] ✅ Loaded descriptions for ${withVariants}/${swissLandmarks.length} landmarks`);
+    const withVariants = indexedLandmarks.filter(l => l.photoVariants?.length > 0).length;
+    log.info(`[LANDMARK-VARIANTS] ✅ Loaded descriptions for ${withVariants}/${indexedLandmarks.length} landmarks`);
 
   } catch (err) {
     log.error(`[LANDMARK-VARIANTS] Error loading descriptions: ${err.message}`);
@@ -2730,17 +2919,17 @@ async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
 }
 
 /**
- * Get stats about the swiss_landmarks table
- * @returns {Promise<{count: number, withDescriptions: number, byType: Object}>}
+ * Get stats about the landmark_index table
+ * @returns {Promise<{count: number, withDescriptions: number, byType: Object, byCountry: Object}>}
  */
-async function getSwissLandmarkStats() {
+async function getLandmarkIndexStats() {
   const pool = getPool();
   if (!pool) return { count: 0, withDescriptions: 0, byType: {} };
 
   try {
-    const countResult = await pool.query('SELECT COUNT(*) as count FROM swiss_landmarks');
-    const descResult = await pool.query('SELECT COUNT(*) as count FROM swiss_landmarks WHERE photo_description IS NOT NULL');
-    const typeResult = await pool.query('SELECT type, COUNT(*) as count FROM swiss_landmarks GROUP BY type ORDER BY count DESC');
+    const countResult = await pool.query('SELECT COUNT(*) as count FROM landmark_index');
+    const descResult = await pool.query('SELECT COUNT(*) as count FROM landmark_index WHERE photo_description IS NOT NULL');
+    const typeResult = await pool.query('SELECT type, COUNT(*) as count FROM landmark_index GROUP BY type ORDER BY count DESC');
 
     const byType = {};
     for (const row of typeResult.rows) {
@@ -2753,7 +2942,7 @@ async function getSwissLandmarkStats() {
       byType
     };
   } catch (err) {
-    log.error(`[SWISS-LANDMARKS] Stats error: ${err.message}`);
+    log.error(`[LANDMARK-INDEX] Stats error: ${err.message}`);
     return { count: 0, withDescriptions: 0, byType: {} };
   }
 }
@@ -2768,15 +2957,16 @@ module.exports = {
   clearCache,
   getCacheStats,
 
-  // Swiss pre-indexed landmarks
+  // Indexed landmarks (works for any city worldwide)
   getLandmarkPhotoOnDemand,
-  getSwissLandmarksNearLocation,
-  getSwissLandmarksByCity,
-  getAllSwissLandmarks,
-  saveSwissLandmark,
-  discoverAllSwissLandmarks,
-  getSwissLandmarkStats,
-  SWISS_CITIES,
+  getIndexedLandmarksNearLocation,
+  getIndexedLandmarks,
+  getAllIndexedLandmarks,
+  saveLandmarkToIndex,
+  indexLandmarksForCities,
+  indexLandmarksForCity,  // Single city on-demand indexing
+  getLandmarkIndexStats,
+  SWISS_CITIES,  // Pre-configured Swiss cities list
 
   // Lazy photo variant loading
   loadLandmarkPhotoDescriptions,

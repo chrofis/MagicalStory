@@ -869,21 +869,36 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  *
  * @param {string} imageData - Base64 image data
  * @param {Array<{description: string, severity: string, type: string, fix: string}>} fixableIssues - Issues from quality eval
- * @returns {Promise<Array<{faceBox, bodyBox, issue, severity, type, fixPrompt}>>} - Enriched fix targets
+ * @returns {Promise<{targets: Array, detectionHistory: Array}>} - Enriched fix targets and detection history for display
  */
 async function enrichWithBoundingBoxes(imageData, fixableIssues) {
   if (!fixableIssues || fixableIssues.length === 0) {
-    return [];
+    return { targets: [], detectionHistory: [] };
   }
 
   log.info(`📦 [BBOX-ENRICH] Detecting bounding boxes for ${fixableIssues.length} fixable issue(s)`);
 
   const enrichedTargets = [];
+  const detectionHistory = [];  // Track each detection for dev mode display
 
   for (const issue of fixableIssues) {
     const detection = await detectBoundingBoxesForIssue(imageData, issue.description);
 
+    // Record detection attempt for display
+    const detectionRecord = {
+      issue: issue.description,
+      severity: issue.severity,
+      type: issue.type,
+      success: !!detection,
+      timestamp: new Date().toISOString()
+    };
+
     if (detection) {
+      detectionRecord.faceBox = detection.faceBox;
+      detectionRecord.bodyBox = detection.bodyBox;
+      detectionRecord.label = detection.label;
+      detectionRecord.usage = detection.usage;
+
       enrichedTargets.push({
         faceBox: detection.faceBox,
         bodyBox: detection.bodyBox,
@@ -899,11 +914,13 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
     } else {
       log.warn(`⚠️  [BBOX-ENRICH] Could not detect boxes for: ${issue.description.substring(0, 50)}...`);
     }
+
+    detectionHistory.push(detectionRecord);
   }
 
   log.info(`📦 [BBOX-ENRICH] Successfully enriched ${enrichedTargets.length}/${fixableIssues.length} issues with bounding boxes`);
 
-  return enrichedTargets;
+  return { targets: enrichedTargets, detectionHistory };
 }
 
 /**
@@ -1791,6 +1808,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Determine if we should repair based on unified report or just quality
     let shouldRepair = false;
     let fixTargetsToUse = [];
+    let bboxDetectionHistory = null;  // Track two-stage detection for dev mode display
 
     if (incrEnabled && unifiedReport && !incrConfig.dryRun) {
       // Use unified fix plan
@@ -1804,8 +1822,25 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       }));
     } else if (!incrEnabled) {
       // Fall back to quality-only repair (original behavior)
-      shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0;
-      fixTargetsToUse = result.fixTargets || [];
+      // Two-stage detection: if fixableIssues exists, enrich with bounding boxes
+      if (result.fixableIssues && result.fixableIssues.length > 0) {
+        log.info(`🔧 [QUALITY RETRY] ${pageLabel}Two-stage detection: enriching ${result.fixableIssues.length} fixable issues with bounding boxes...`);
+        const enrichResult = await enrichWithBoundingBoxes(result.imageData, result.fixableIssues);
+        bboxDetectionHistory = enrichResult.detectionHistory;
+        if (enrichResult.targets && enrichResult.targets.length > 0) {
+          shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD;
+          fixTargetsToUse = enrichResult.targets;
+          log.info(`✅ [QUALITY RETRY] ${pageLabel}Two-stage detection complete: ${enrichResult.targets.length} targets with bounding boxes`);
+        } else {
+          log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Two-stage detection failed to enrich any issues`);
+          shouldRepair = false;
+          fixTargetsToUse = [];
+        }
+      } else {
+        // Legacy format: fixTargets already has bounding boxes
+        shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0;
+        fixTargetsToUse = result.fixTargets || [];
+      }
     }
 
     const couldRepair = shouldRepair && fixTargetsToUse.length > 0;
@@ -1863,7 +1898,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               type: 'auto_repair',
               preRepairScore: score,
               postRepairScore: repairedScore,
-              fixTargetsCount: result.fixTargets.length,
+              fixTargetsCount: fixTargetsToUse.length,
               imageData: repairResult.imageData,
               repairUsage: repairResult.usage,
               reEvalUsage: reEvalResult.usage,
@@ -1871,13 +1906,17 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               preRepairEval: {
                 score: result.score,
                 reasoning: result.reasoning,
-                fixTargets: result.fixTargets
+                fixTargets: result.fixTargets,
+                fixableIssues: result.fixableIssues  // New format issues
               },
               postRepairEval: {
                 score: reEvalResult.score,
                 reasoning: reEvalResult.reasoning,
-                fixTargets: reEvalResult.fixTargets
+                fixTargets: reEvalResult.fixTargets,
+                fixableIssues: reEvalResult.fixableIssues
               },
+              // Two-stage bounding box detection results (new)
+              bboxDetection: bboxDetectionHistory,
               // Repair details from autoRepairWithTargets
               repairDetails: repairResult.repairHistory || [],
               timestamp: new Date().toISOString()
@@ -2478,7 +2517,13 @@ async function verifyInpaintResult(beforeImage, afterImage, targets) {
  * Group fix targets by issue type for smart inpainting
  * Research: Combining unrelated regions in one mask causes artifacts
  * Face issues need high-quality model + reference, objects can use cheaper model
- * @param {Array} fixTargets - Array of {boundingBox, issue, fixPrompt}
+ *
+ * Two-stage detection provides separate face_box and body_box:
+ * - Face issues use faceBox (precise face region for identity preservation)
+ * - Anatomy issues use bodyBox (full body context for hands/limbs)
+ * - Object issues use bodyBox (more context for coherent object repair)
+ *
+ * @param {Array} fixTargets - Array of {boundingBox, faceBox?, bodyBox?, issue, fixPrompt}
  * @returns {Object} Grouped targets: { faceTargets, anatomyTargets, objectTargets }
  */
 function groupFixTargetsForInpainting(fixTargets) {
@@ -2489,9 +2534,38 @@ function groupFixTargetsForInpainting(fixTargets) {
   for (const target of fixTargets) {
     const issueType = classifyIssueType(target.issue);
 
-    // Apply adaptive padding to bounding box
-    const paddedBbox = padBoundingBox(target.boundingBox, issueType);
-    const paddedTarget = { ...target, boundingBox: paddedBbox, issueType };
+    // Select the appropriate bounding box based on issue type
+    // Two-stage detection provides faceBox and bodyBox separately
+    let selectedBbox;
+    if (issueType === 'face' && target.faceBox) {
+      // Use precise face box for identity-related issues
+      selectedBbox = target.faceBox;
+      log.debug(`🔧 [GROUPING] Using faceBox for face issue: "${target.issue.substring(0, 40)}..."`);
+    } else if (target.bodyBox) {
+      // Use body box for anatomy/object issues (more context)
+      selectedBbox = target.bodyBox;
+      log.debug(`🔧 [GROUPING] Using bodyBox for ${issueType} issue: "${target.issue.substring(0, 40)}..."`);
+    } else {
+      // Fall back to generic boundingBox (legacy format or detection failed)
+      selectedBbox = target.boundingBox;
+      if (selectedBbox) {
+        log.debug(`🔧 [GROUPING] Using fallback boundingBox for ${issueType} issue`);
+      }
+    }
+
+    if (!selectedBbox) {
+      log.warn(`⚠️  [GROUPING] No bounding box available for issue: "${target.issue.substring(0, 40)}..."`);
+      continue;
+    }
+
+    // Apply adaptive padding to the selected bounding box
+    const paddedBbox = padBoundingBox(selectedBbox, issueType);
+    const paddedTarget = {
+      ...target,
+      boundingBox: paddedBbox,
+      originalBox: selectedBbox,  // Keep original for debugging
+      issueType
+    };
 
     switch (issueType) {
       case 'face':
@@ -3989,6 +4063,10 @@ module.exports = {
   inpaintWithMask,
   autoRepairImage,
   autoRepairWithTargets,
+
+  // Two-stage bounding box detection
+  detectBoundingBoxesForIssue,
+  enrichWithBoundingBoxes,
 
   // Final consistency checks
   evaluateConsistencyAcrossImages,

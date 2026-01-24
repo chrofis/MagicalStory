@@ -200,16 +200,25 @@ Output your COMPLETE analysis as JSON (no other text):
   "score": 7,
   "verdict": "PASS",
   "issues_summary": "Manuel missing from scene; Lukas pants missing green accents; Eli ear patch on wrong side",
-  "fix_targets": [
-    {"bbox": [0.6, 0.36, 0.85, 0.5], "center": [0.725, 0.43], "issue": "pants missing green accents", "fix": "Add neon green stripe accents to the dark blue pants of the boy standing in the center foreground"}
+  "fixable_issues": [
+    {
+      "description": "boy in center has dark blue pants missing neon green accents",
+      "severity": "MODERATE",
+      "type": "clothing",
+      "fix": "Add neon green stripe accents to the dark blue pants of the boy with short blonde hair standing in the center foreground"
+    }
   ]
 }
 ```
 
 **RULES:**
 - Output ONLY the JSON block - no preamble, no explanation
-- `fix_targets` array: include only if score < 9 and issues are fixable by re-rendering a region
-- `bbox` coordinates: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left
+- `fixable_issues` array: include only if score < 9 and issues can be fixed by inpainting a region
+  - `description`: Describe the issue with visual identifiers (position, appearance) - NOT character names
+  - `severity`: CRITICAL, MAJOR, MODERATE, or MINOR
+  - `type`: face, hand, anatomy, clothing, object, or environment
+  - `fix`: What should be rendered instead (self-contained visual description, no character names)
+- Do NOT include bounding box coordinates - those will be detected in a separate step
 - Include ALL analysis steps in the JSON structure
 - `confidence`: 0.0-1.0 score for how confident the reference match is
   - 0.9-1.0: Strong match, clearly the same character
