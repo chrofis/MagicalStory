@@ -988,6 +988,7 @@ export const storyService = {
     // Developer feature options
     enableAutoRepair?: boolean;
     enableFinalChecks?: boolean;
+    checkOnlyMode?: boolean;  // Skip all regeneration, only run checks
     // Incremental consistency check (check each image against previous images)
     incrementalConsistency?: {
       enabled: boolean;
