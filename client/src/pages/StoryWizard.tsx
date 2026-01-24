@@ -2599,10 +2599,12 @@ export default function StoryWizard() {
       }
     }
 
-    // Save to database (fire and forget)
-    characterService.saveCharacterRoles(roles).catch(err => {
+    // Save to database (must await to ensure save completes before page unload)
+    try {
+      await characterService.saveCharacterRoles(roles);
+    } catch (err) {
       log.error('Failed to save character roles:', err);
-    });
+    }
   };
 
   // Navigation
@@ -2842,13 +2844,31 @@ export default function StoryWizard() {
     // Skip this check if we just verified (skipEmailCheck=true) since React state may not have updated yet
     // Also skip if admin is impersonating - they should be able to generate without the user's email being verified
     if (!overrides?.skipEmailCheck && !isImpersonating && user && user.emailVerified !== true) {
-      console.log('[generateStory] Email not verified, showing modal');
-      // Store all story state so we can auto-generate after email verification
-      localStorage.setItem('pendingStoryGeneration', 'true');
-      localStorage.setItem('pending_story_type', storyType);
-      localStorage.setItem('pending_art_style', artStyle);
-      setShowEmailVerificationModal(true);
-      return;
+      // Refresh user state from server to avoid showing modal when email is already verified
+      // (React state may be stale from login cache)
+      await refreshUser();
+
+      // Check localStorage for the latest value since React state won't update synchronously
+      const cachedUser = localStorage.getItem('currentUser');
+      let latestEmailVerified = user.emailVerified;
+      if (cachedUser) {
+        try {
+          latestEmailVerified = JSON.parse(cachedUser).emailVerified;
+        } catch { /* use existing value */ }
+      }
+
+      if (latestEmailVerified === true) {
+        console.log('[generateStory] Email verified (confirmed after refresh), proceeding');
+        // Fall through to generation
+      } else {
+        console.log('[generateStory] Email not verified, showing modal');
+        // Store all story state so we can auto-generate after email verification
+        localStorage.setItem('pendingStoryGeneration', 'true');
+        localStorage.setItem('pending_story_type', storyType);
+        localStorage.setItem('pending_art_style', artStyle);
+        setShowEmailVerificationModal(true);
+        return;
+      }
     }
 
     console.log('[generateStory] Starting generation, setting step to 6');
