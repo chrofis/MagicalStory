@@ -293,4 +293,32 @@ router.get('/', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/swiss-landmarks/broken - Delete broken entries (Wikipedia article URLs instead of image URLs)
+router.delete('/broken', async (req, res) => {
+  if (!checkAuth(req, res, false)) return;
+
+  try {
+    const pool = getPool();
+
+    // Find broken entries: photo_url contains wikipedia.org/wiki/ (article URL, not image)
+    // Valid entries have photo_url starting with upload.wikimedia.org (actual images)
+    const result = await pool.query(`
+      DELETE FROM swiss_landmarks
+      WHERE photo_url LIKE '%wikipedia.org/wiki/%'
+      AND photo_url NOT LIKE '%upload.wikimedia.org%'
+      RETURNING id, name, nearest_city
+    `);
+
+    log.info(`[ADMIN] Deleted ${result.rowCount} broken landmark entries`);
+    res.json({
+      success: true,
+      deleted: result.rowCount,
+      entries: result.rows
+    });
+  } catch (err) {
+    log.error('[ADMIN] Delete broken landmarks error:', err);
+    res.status(500).json({ error: 'Failed to delete broken landmarks', details: err.message });
+  }
+});
+
 module.exports = router;
