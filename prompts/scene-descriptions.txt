@@ -323,6 +323,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "imageSummary": "2-3 sentences: positions, actions, setting. End with: Main characters: Name1, Name2.",
     "setting": {
       "location": "Location name with [ID] if from Visual Bible",
+      "landmarkPhotoVariant": 1,
       "indoorOutdoor": "indoor | outdoor | mixed (e.g., doorway, window view)",
       "description": "Location details, background",
       "lighting": "Time of day, lighting",
@@ -374,6 +375,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "imageSummary": "CORRECTED: 2-3 sentences with all issues fixed",
     "setting": {
       "location": "Location name with [ID] if from Visual Bible",
+      "landmarkPhotoVariant": 1,
       "indoorOutdoor": "CORRECTED: indoor | outdoor | mixed",
       "description": "CORRECTED location details",
       "lighting": "Time of day, lighting",
@@ -412,6 +414,16 @@ Output raw JSON (no markdown code fences, no explanation text).
 - `objects`: Only include `id` for items from RECURRING VISUAL ELEMENTS.
 - If `issues` array is empty, `output` can match `draft` exactly
 - If `issues` array has items, `output` MUST differ from `draft` with fixes applied
+
+**LANDMARK PHOTO SELECTION:**
+When a location in RECURRING VISUAL ELEMENTS shows "PHOTO OPTIONS", you MUST:
+1. Read all variant descriptions carefully
+2. Choose the variant that BEST matches your scene composition and camera angle
+3. Set `"landmarkPhotoVariant": <1|2|3|4>` in the setting object
+4. If no PHOTO OPTIONS shown, omit the landmarkPhotoVariant field
+
+Example: If your scene is inside a covered bridge, select the interior variant.
+If your scene shows the bridge from across the river, select the wide exterior variant.
 
 ---
 

@@ -191,7 +191,10 @@ const {
   getSwissLandmarksByCity,
   getSwissLandmarkStats,
   getLandmarkPhotoOnDemand,
-  SWISS_CITIES
+  SWISS_CITIES,
+  // Lazy photo variant loading
+  loadLandmarkPhotoDescriptions,
+  loadLandmarkPhotoVariant
 } = require('./server/lib/landmarkPhotos');
 
 // Landmark discovery cache - stores pre-discovered landmarks per user location
@@ -8563,11 +8566,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
     }
 
+    // Load photo variant descriptions for Swiss landmarks (descriptions only, no image data)
+    // This enables scene description AI to intelligently select which photo variant to use
+    await loadLandmarkPhotoDescriptions(visualBible);
+
     // Start background fetch for landmark reference photos (runs in parallel with avatar generation)
+    // NOTE: For Swiss landmarks with photo variants, we'll load photos on-demand during image generation
+    // This prefetch handles non-Swiss landmarks (historical events, Wikimedia search) that don't have variants
     let landmarkFetchPromise = null;
-    const landmarkCount = (visualBible.locations || []).filter(l => l.isRealLandmark).length;
-    if (landmarkCount > 0 && !skipImages) {
-      log.info(`🌍 [UNIFIED] Starting background fetch for ${landmarkCount} landmark photo(s)`);
+    const nonVariantLandmarks = (visualBible.locations || []).filter(
+      l => l.isRealLandmark && !l.photoVariants?.length && l.photoFetchStatus !== 'success'
+    );
+    if (nonVariantLandmarks.length > 0 && !skipImages) {
+      log.info(`🌍 [UNIFIED] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)`);
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
     }
 
@@ -8931,10 +8942,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       // Get landmark photos for this scene from metadata objects like "Burgruine Stein [LOC002]"
+      // This loads the selected photo variant on-demand for Swiss landmarks
       const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
-      const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
+      const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
       if (pageLandmarkPhotos.length > 0) {
-        log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+        log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => `${l.name}${l.variantNumber > 1 ? ` (v${l.variantNumber})` : ''}`).join(', ')}`);
       }
       const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
 
@@ -9380,9 +9392,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               let pagePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, inputData.artStyle, pageClothingReqs);
               pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
 
-              // Get landmark photos
+              // Get landmark photos (loads selected variant on-demand for Swiss landmarks)
               const sceneMetadata = extractSceneMetadata(expandedDescription);
-              const pageLandmarkPhotos = getLandmarkPhotosForScene(visualBible, sceneMetadata);
+              const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
               const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
 
               // Build new image prompt
@@ -10273,6 +10285,9 @@ async function processStoryJob(jobId) {
       linkPreDiscoveredLandmarks(visualBible, inputData.availableLandmarks);
     }
 
+    // Load photo variant descriptions for Swiss landmarks (descriptions only, no image data)
+    await loadLandmarkPhotoDescriptions(visualBible);
+
     const visualBibleEntryCount = visualBible.secondaryCharacters.length +
                                    visualBible.animals.length +
                                    visualBible.artifacts.length +
@@ -10300,11 +10315,13 @@ async function processStoryJob(jobId) {
     await saveCheckpoint(jobId, 'scene_hints', { shortSceneDescriptions, visualBible });
 
     // Start background fetch for landmark reference photos
-    // This runs in parallel while avatars are generated
+    // NOTE: For Swiss landmarks with photo variants, we'll load photos on-demand during image generation
     let landmarkFetchPromise = null;
-    const landmarkCount = (visualBible.locations || []).filter(l => l.isRealLandmark).length;
-    if (landmarkCount > 0 && !skipImages) {
-      log.info(`🌍 [PIPELINE] Starting background fetch for ${landmarkCount} landmark photo(s)`);
+    const nonVariantLandmarks = (visualBible.locations || []).filter(
+      l => l.isRealLandmark && !l.photoVariants?.length && l.photoFetchStatus !== 'success'
+    );
+    if (nonVariantLandmarks.length > 0 && !skipImages) {
+      log.info(`🌍 [PIPELINE] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)`);
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
     }
 

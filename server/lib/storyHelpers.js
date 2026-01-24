@@ -14,6 +14,7 @@ const { buildVisualBiblePrompt } = require('./visualBible');
 const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = require('./outlineParser');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
+const { loadLandmarkPhotoVariant } = require('./landmarkPhotos');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -384,6 +385,9 @@ function extractSceneMetadata(sceneDescription) {
       }
     }
 
+    // Extract landmark photo variant selection (1-4, default 1)
+    const landmarkVariant = parsed.output.setting?.landmarkPhotoVariant || 1;
+
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
@@ -396,6 +400,10 @@ function extractSceneMetadata(sceneDescription) {
       translatedSummary: parsed.output.translatedSummary || null,
       // Extract image summary (English) for reference
       imageSummary: parsed.output.imageSummary || null,
+      // Landmark photo variant selection (for Swiss landmarks with multiple photos)
+      landmarkVariant,
+      // Store setting for reference
+      setting: parsed.output.setting || null,
       isJsonFormat: true
     };
   }
@@ -2007,11 +2015,25 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
         recurringElements += `* **${sc.name}**${idLabel(sc)} (secondary character): ${description}\n`;
       }
     }
-    // Add ALL locations
+    // Add ALL locations - with photo variants for real landmarks
     if (visualBible.locations && visualBible.locations.length > 0) {
       for (const loc of visualBible.locations) {
         const description = loc.extractedDescription || loc.description;
-        recurringElements += `* **${loc.name}**${idLabel(loc)} (location): ${description}\n`;
+
+        // Check if this is a real landmark with photo variants
+        if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
+          // Show photo variant options for scene description to select from
+          recurringElements += `* **${loc.name}**${idLabel(loc)} (real landmark): ${description}\n`;
+          recurringElements += `  PHOTO OPTIONS (select ONE via landmarkPhotoVariant field):\n`;
+          for (const variant of loc.photoVariants) {
+            const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
+            recurringElements += `    - variant ${variant.variantNumber}: ${variantDesc}\n`;
+          }
+        } else {
+          // Regular location without photo variants
+          const locType = loc.isRealLandmark ? 'real landmark' : 'location';
+          recurringElements += `* **${loc.name}**${idLabel(loc)} (${locType}): ${description}\n`;
+        }
       }
     }
     // Add ALL vehicles
@@ -2839,11 +2861,12 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
  * Get landmark reference photos for a scene based on LOC IDs in scene metadata
  * Parses objects like "Burgruine Stein [LOC002]" to extract LOC IDs
  * Also checks setting.location for landmark references
+ * Supports on-demand loading of photo variants for Swiss landmarks
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {Object} sceneMetadata - Scene metadata with objects array and setting.location
- * @returns {Array<{name: string, photoData: string, attribution: string, source: string}>} Landmark photos
+ * @param {Object} sceneMetadata - Scene metadata with objects array, setting.location, and landmarkVariant
+ * @returns {Promise<Array<{name: string, photoData: string, attribution: string, source: string, variantNumber: number}>>} Landmark photos
  */
-function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
+async function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
   if (!visualBible?.locations) return [];
 
   // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001]"
@@ -2885,19 +2908,48 @@ function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
 
   if (locIds.length === 0 && locNames.length === 0) return [];
 
-  return visualBible.locations
-    .filter(loc =>
-      (locIds.includes(loc.id) || locNames.includes(loc.name?.toLowerCase())) &&
-      loc.isRealLandmark &&
-      loc.referencePhotoData &&
-      loc.photoFetchStatus === 'success'
-    )
-    .map(loc => ({
-      name: loc.name,
-      photoData: loc.referencePhotoData,
-      attribution: loc.photoAttribution,
-      source: loc.photoSource
-    }));
+  // Get requested variant number (default to 1)
+  const requestedVariant = sceneMetadata?.landmarkVariant || 1;
+
+  // Find matching locations
+  const matchingLocations = visualBible.locations.filter(loc =>
+    (locIds.includes(loc.id) || locNames.includes(loc.name?.toLowerCase())) &&
+    loc.isRealLandmark
+  );
+
+  if (matchingLocations.length === 0) return [];
+
+  // Load photos for each matching location
+  const results = [];
+  for (const loc of matchingLocations) {
+    // Check if this location has photo variants (Swiss pre-indexed)
+    if (loc.photoVariants && loc.photoVariants.length > 0) {
+      // Load the selected variant on-demand
+      const variant = await loadLandmarkPhotoVariant(visualBible, loc.id, requestedVariant);
+      if (variant) {
+        results.push({
+          name: loc.name,
+          photoData: variant.photoData,
+          attribution: variant.attribution,
+          source: 'swiss-variant',
+          variantNumber: variant.variantNumber
+        });
+        log.debug(`[LANDMARK-SCENE] Loaded "${loc.name}" variant ${variant.variantNumber} (requested: ${requestedVariant})`);
+      }
+    }
+    // Fall back to existing referencePhotoData (already fetched)
+    else if (loc.referencePhotoData && loc.photoFetchStatus === 'success') {
+      results.push({
+        name: loc.name,
+        photoData: loc.referencePhotoData,
+        attribution: loc.photoAttribution,
+        source: loc.photoSource,
+        variantNumber: 1
+      });
+    }
+  }
+
+  return results;
 }
 
 // ============================================================================

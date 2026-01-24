@@ -2519,6 +2519,216 @@ async function discoverAllSwissLandmarks(options = {}) {
   };
 }
 
+// ============================================================================
+// LAZY PHOTO VARIANT LOADING - Load descriptions first, photos on-demand
+// ============================================================================
+
+/**
+ * Load photo variant descriptions for all Swiss landmarks in the Visual Bible
+ * This is called after linkPreDiscoveredLandmarks to populate descriptions
+ * WITHOUT loading actual image data (lazy loading)
+ * @param {Object} visualBible - Visual Bible with locations array
+ * @returns {Promise<Object>} Updated Visual Bible
+ */
+async function loadLandmarkPhotoDescriptions(visualBible) {
+  if (!visualBible?.locations) return visualBible;
+
+  // Find Swiss pre-indexed landmarks that have photo variants
+  const swissLandmarks = visualBible.locations.filter(
+    loc => loc.isRealLandmark && loc.isSwissPreIndexed && loc.swissLandmarkId
+  );
+
+  if (swissLandmarks.length === 0) {
+    log.debug('[LANDMARK-VARIANTS] No Swiss landmarks to load descriptions for');
+    return visualBible;
+  }
+
+  log.info(`[LANDMARK-VARIANTS] Loading photo descriptions for ${swissLandmarks.length} Swiss landmark(s)`);
+
+  const pool = getPool();
+  if (!pool) {
+    log.warn('[LANDMARK-VARIANTS] No database pool available');
+    return visualBible;
+  }
+
+  try {
+    // Get landmark IDs
+    const ids = swissLandmarks.map(l => l.swissLandmarkId);
+
+    // Query all photo descriptions for these landmarks
+    const result = await pool.query(`
+      SELECT id, name,
+        photo_url, photo_description, photo_attribution,
+        photo_url_2, photo_description_2, photo_attribution_2,
+        photo_url_3, photo_description_3, photo_attribution_3,
+        photo_url_4, photo_description_4, photo_attribution_4
+      FROM swiss_landmarks
+      WHERE id = ANY($1)
+    `, [ids]);
+
+    // Build a lookup map
+    const descriptionMap = new Map();
+    for (const row of result.rows) {
+      const variants = [];
+
+      // Add variant 1 (always exists)
+      if (row.photo_url) {
+        variants.push({
+          variantNumber: 1,
+          url: row.photo_url,
+          description: row.photo_description || null,
+          attribution: row.photo_attribution || null
+        });
+      }
+
+      // Add variant 2 if exists
+      if (row.photo_url_2) {
+        variants.push({
+          variantNumber: 2,
+          url: row.photo_url_2,
+          description: row.photo_description_2 || null,
+          attribution: row.photo_attribution_2 || null
+        });
+      }
+
+      // Add variant 3 if exists
+      if (row.photo_url_3) {
+        variants.push({
+          variantNumber: 3,
+          url: row.photo_url_3,
+          description: row.photo_description_3 || null,
+          attribution: row.photo_attribution_3 || null
+        });
+      }
+
+      // Add variant 4 if exists
+      if (row.photo_url_4) {
+        variants.push({
+          variantNumber: 4,
+          url: row.photo_url_4,
+          description: row.photo_description_4 || null,
+          attribution: row.photo_attribution_4 || null
+        });
+      }
+
+      descriptionMap.set(row.id, variants);
+    }
+
+    // Update Visual Bible locations with photo variants
+    for (const loc of swissLandmarks) {
+      const variants = descriptionMap.get(loc.swissLandmarkId);
+      if (variants && variants.length > 0) {
+        loc.photoVariants = variants;
+        log.debug(`[LANDMARK-VARIANTS] "${loc.name}" has ${variants.length} photo variant(s)`);
+      }
+    }
+
+    const withVariants = swissLandmarks.filter(l => l.photoVariants?.length > 0).length;
+    log.info(`[LANDMARK-VARIANTS] ✅ Loaded descriptions for ${withVariants}/${swissLandmarks.length} landmarks`);
+
+  } catch (err) {
+    log.error(`[LANDMARK-VARIANTS] Error loading descriptions: ${err.message}`);
+  }
+
+  return visualBible;
+}
+
+/**
+ * Load a specific photo variant on-demand
+ * Fetches the image URL, compresses to JPEG, and caches the result
+ * @param {Object} visualBible - Visual Bible with locations array
+ * @param {string} locId - Location ID (e.g., "LOC001")
+ * @param {number} variantNumber - Which variant to load (1-4, default 1)
+ * @returns {Promise<{photoData: string, attribution: string, variantNumber: number}|null>}
+ */
+async function loadLandmarkPhotoVariant(visualBible, locId, variantNumber = 1) {
+  if (!visualBible?.locations) return null;
+
+  // Find the location
+  const location = visualBible.locations.find(loc => loc.id === locId);
+  if (!location) {
+    log.debug(`[LANDMARK-VARIANT] Location not found: ${locId}`);
+    return null;
+  }
+
+  // Check if we have variants loaded
+  if (!location.photoVariants || location.photoVariants.length === 0) {
+    // Fall back to existing referencePhotoData if available
+    if (location.referencePhotoData) {
+      return {
+        photoData: location.referencePhotoData,
+        attribution: location.photoAttribution || 'Unknown',
+        variantNumber: 1
+      };
+    }
+    log.debug(`[LANDMARK-VARIANT] No variants for "${location.name}"`);
+    return null;
+  }
+
+  // Clamp variant number to available range
+  const maxVariant = location.photoVariants.length;
+  const safeVariantNumber = Math.min(Math.max(1, variantNumber), maxVariant);
+
+  if (variantNumber !== safeVariantNumber) {
+    log.debug(`[LANDMARK-VARIANT] Requested variant ${variantNumber} but only ${maxVariant} available, using ${safeVariantNumber}`);
+  }
+
+  const variant = location.photoVariants[safeVariantNumber - 1];
+  if (!variant?.url) {
+    log.debug(`[LANDMARK-VARIANT] No URL for variant ${safeVariantNumber} of "${location.name}"`);
+    return null;
+  }
+
+  // Check if already cached on the variant object
+  if (variant.cachedPhotoData) {
+    log.debug(`[LANDMARK-VARIANT] Cache hit for "${location.name}" variant ${safeVariantNumber}`);
+    return {
+      photoData: variant.cachedPhotoData,
+      attribution: variant.attribution || 'Wikimedia Commons',
+      variantNumber: safeVariantNumber
+    };
+  }
+
+  // Fetch and compress the image
+  log.info(`[LANDMARK-VARIANT] Loading "${location.name}" variant ${safeVariantNumber}...`);
+
+  try {
+    const response = await fetch(variant.url, {
+      headers: WIKI_HEADERS,
+      signal: AbortSignal.timeout(15000)
+    });
+
+    if (!response.ok) {
+      log.warn(`[LANDMARK-VARIANT] Failed to fetch variant ${safeVariantNumber}: HTTP ${response.status}`);
+      return null;
+    }
+
+    const buffer = await response.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    const mimeType = contentType.split(';')[0].trim();
+
+    // Compress to JPEG
+    const photoData = await compressImageToJPEG(`data:${mimeType};base64,${base64}`, 85, 800);
+
+    // Cache on the variant object for reuse
+    variant.cachedPhotoData = photoData;
+
+    const sizeKB = Math.round(photoData.length * 0.75 / 1024);
+    log.info(`[LANDMARK-VARIANT] ✅ Loaded "${location.name}" variant ${safeVariantNumber} (${sizeKB}KB)`);
+
+    return {
+      photoData,
+      attribution: variant.attribution || 'Wikimedia Commons',
+      variantNumber: safeVariantNumber
+    };
+
+  } catch (err) {
+    log.error(`[LANDMARK-VARIANT] Error loading variant ${safeVariantNumber} for "${location.name}": ${err.message}`);
+    return null;
+  }
+}
+
 /**
  * Get stats about the swiss_landmarks table
  * @returns {Promise<{count: number, withDescriptions: number, byType: Object}>}
@@ -2566,5 +2776,9 @@ module.exports = {
   saveSwissLandmark,
   discoverAllSwissLandmarks,
   getSwissLandmarkStats,
-  SWISS_CITIES
+  SWISS_CITIES,
+
+  // Lazy photo variant loading
+  loadLandmarkPhotoDescriptions,
+  loadLandmarkPhotoVariant
 };
