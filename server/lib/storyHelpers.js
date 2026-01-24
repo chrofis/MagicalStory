@@ -1969,13 +1969,39 @@ ${historicalGuide}${locationsSection}
 /**
  * Build available avatars list for scene expansion prompt
  * @param {Array} characters - Character array with avatars
+ * @param {Object} clothingRequirements - Optional: only show categories with used=true
  * @returns {string} Formatted string showing available clothing per character
  */
-function buildAvailableAvatarsForPrompt(characters) {
+function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null) {
   if (!characters || characters.length === 0) return '(No characters)';
 
   return characters.map(char => {
     const avatars = char.avatars || {};
+    const charNameLower = char.name?.toLowerCase();
+
+    // If clothingRequirements provided, only show categories actually used in this story
+    if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
+      const charReqs = clothingRequirements[char.name] ||
+                       clothingRequirements[charNameLower] ||
+                       Object.entries(clothingRequirements)
+                         .find(([k]) => k.toLowerCase() === charNameLower)?.[1];
+
+      if (charReqs) {
+        const usedCategories = Object.entries(charReqs)
+          .filter(([cat, config]) => config?.used)
+          .map(([cat, config]) => cat === 'costumed' && config?.costume
+            ? `costumed:${config.costume}`
+            : cat);
+
+        if (usedCategories.length > 0) {
+          return `- ${char.name}: ${usedCategories.join(', ')}`;
+        }
+      }
+      // Fallback to standard if character not in requirements
+      return `- ${char.name}: standard`;
+    }
+
+    // Legacy behavior: show all available avatars
     const available = [];
 
     // Standard categories

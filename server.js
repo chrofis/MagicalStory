@@ -2769,6 +2769,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 
     // Get page clothing from outline (reliable source) or fall back to parsing scene descriptions
     const pageClothingData = storyData.pageClothing || null;
+    const clothingRequirements = storyData.clothingRequirements || null;
 
     // Build previous scenes context (last 2 pages)
     const sceneDescriptions = storyData.sceneDescriptions || [];
@@ -2797,8 +2798,8 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
     log.debug(`🔄 [REGEN SCENE ${pageNumber}] Expected clothing from outline: ${expectedClothing}`)
 
-    // Build available avatars for scene expansion
-    const availableAvatars = buildAvailableAvatarsForPrompt(characters);
+    // Build available avatars - only show clothing categories used in this story
+    const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
@@ -3004,8 +3005,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       const pageText = getPageText(storyData.storyText, pageNumber);
       const previousScenes = buildPreviousScenesContext(sceneDescriptions, pageNumber);
       const clothingData = storyData.clothingRequirements || {};
-      // Build available avatars for scene expansion (use full character list with avatar data)
-      const availableAvatars = buildAvailableAvatarsForPrompt(storyData.characters || []);
+      // Build available avatars - only show clothing categories used in this story
+      const availableAvatars = buildAvailableAvatarsForPrompt(storyData.characters || [], clothingData);
       const expansionPrompt = buildSceneDescriptionPrompt(
         pageNumber,
         pageText || inputDescription,  // Fallback to description if no page text
@@ -8255,8 +8256,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           : 'none';
         log.debug(`⚡ [STREAM-SCENE] Page ${page.pageNumber} starting expansion (clothing: ${clothingStr}, prev: ${previousScenes.length} pages)`);
 
-        // Build available avatars string so scene expansion knows what clothing exists
-        const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters);
+        // Build available avatars string - only show clothing categories used in this story
+        const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters, streamingClothingRequirements);
 
         const expansionPrompt = buildSceneDescriptionPrompt(
           page.pageNumber,
@@ -9387,8 +9388,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   summary: img.description?.substring(0, 200) || ''
                 }));
               const clothingDataForPrompt = clothingRequirements || {};
-              // Build available avatars for scene expansion
-              const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || []);
+              // Build available avatars - only show clothing categories used in this story
+              const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
               const expansionPrompt = buildSceneDescriptionPrompt(
                 pageNum,
                 pageText || sceneHint,  // Fallback to scene hint if no page text
@@ -10757,8 +10758,8 @@ Output Format:
         // Get current page's clothing from outline
         const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
 
-        // Build available avatars for scene expansion
-        const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || []);
+        // Build available avatars - only show clothing categories used in this story
+        const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
 
         // Generate scene description using Art Director prompt (in story language)
         const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing, '', availableAvatars);
@@ -11236,8 +11237,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Get current page's clothing from outline
           const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
 
-          // Build available avatars for scene expansion
-          const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || []);
+          // Build available avatars - only show clothing categories used in this story
+          const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
 
           try {
             // Generate scene description using Art Director prompt (in story language)
