@@ -896,19 +896,42 @@ function buildPhysicalTraitsForAvatar(character) {
     parts.push(`Age: ${apparentAge}`);
     // Add explicit head-to-body ratio guidance based on age
     const ageStr = String(apparentAge).toLowerCase();
+
+    // Try to extract numeric age first
+    const numericAge = parseInt(ageStr.match(/\d+/)?.[0] || '', 10);
     let ratio = '8 heads tall (adult proportions)';
-    if (ageStr.includes('infant') || ageStr.includes('baby') || ageStr.includes('0') || ageStr.includes('1')) {
-      ratio = '4 heads tall (infant proportions)';
-    } else if (ageStr.includes('toddler') || ageStr.includes('2') || ageStr.includes('3')) {
-      ratio = '5 heads tall (toddler proportions)';
-    } else if (ageStr.includes('preschool') || ageStr.includes('kindergart') || ageStr.includes('4') || ageStr.includes('5') || ageStr.includes('6')) {
-      ratio = '5.5 heads tall (young child proportions)';
-    } else if (ageStr.includes('school') || ageStr.includes('7') || ageStr.includes('8') || ageStr.includes('9') || ageStr.includes('10')) {
-      ratio = '6 heads tall (child proportions)';
-    } else if (ageStr.includes('preteen') || ageStr.includes('11') || ageStr.includes('12')) {
-      ratio = '6.5 heads tall (preteen proportions)';
-    } else if (ageStr.includes('teen') || ageStr.includes('13') || ageStr.includes('14') || ageStr.includes('15') || ageStr.includes('16') || ageStr.includes('17')) {
-      ratio = '7 heads tall (teen proportions)';
+
+    if (!isNaN(numericAge)) {
+      // Use numeric age for precise matching
+      if (numericAge <= 1) {
+        ratio = '4 heads tall (infant proportions)';
+      } else if (numericAge <= 3) {
+        ratio = '5 heads tall (toddler proportions)';
+      } else if (numericAge <= 6) {
+        ratio = '5.5 heads tall (young child proportions)';
+      } else if (numericAge <= 10) {
+        ratio = '6 heads tall (child proportions)';
+      } else if (numericAge <= 12) {
+        ratio = '6.5 heads tall (preteen proportions)';
+      } else if (numericAge <= 17) {
+        ratio = '7 heads tall (teen proportions)';
+      }
+      // 18+ defaults to adult (8 heads)
+    } else {
+      // Fallback to category name matching for non-numeric values
+      if (ageStr.includes('infant') || ageStr.includes('baby')) {
+        ratio = '4 heads tall (infant proportions)';
+      } else if (ageStr.includes('toddler')) {
+        ratio = '5 heads tall (toddler proportions)';
+      } else if (ageStr.includes('preschool') || ageStr.includes('kindergart')) {
+        ratio = '5.5 heads tall (young child proportions)';
+      } else if (ageStr.includes('school-age') || ageStr.includes('school age')) {
+        ratio = '6 heads tall (child proportions)';
+      } else if (ageStr.includes('preteen')) {
+        ratio = '6.5 heads tall (preteen proportions)';
+      } else if (ageStr.includes('teen') && !ageStr.includes('preteen')) {
+        ratio = '7 heads tall (teen proportions)';
+      }
     }
     parts.push(`Body proportions: ${ratio}`);
   }
