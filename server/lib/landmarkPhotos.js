@@ -2062,6 +2062,49 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
       const boostLabel = l.boostAmount === 100 ? '🏆' : (l.boostAmount === 50 ? '⭐' : '');
       return `${l.name} [${l.type || '?'}]${boostLabel} score=${l.score}`;
     }).join(', ')}`);
+
+    // Auto-index discovered landmarks in background (so next user gets instant results)
+    // Only landmarks with QID can be indexed (unique constraint)
+    const indexable = validLandmarks.filter(l => l.qid);
+    if (indexable.length > 0) {
+      log.info(`[LANDMARK] 💾 Auto-indexing ${indexable.length} landmarks for "${city}" in background...`);
+
+      // Run in background - don't await
+      (async () => {
+        let saved = 0;
+        for (const landmark of indexable) {
+          try {
+            // Map discovered landmark fields to index format
+            const indexData = {
+              name: landmark.name,
+              pageId: landmark.pageId,
+              qid: landmark.qid,
+              lang: landmark.lang,
+              lat: landmark.lat,
+              lon: landmark.lon,
+              nearestCity: city,
+              country: country,
+              type: landmark.type,
+              boostAmount: landmark.boostAmount,
+              categories: landmark.categories,
+              photoUrl: landmark.photoUrl,
+              attribution: landmark.attribution,
+              photoDescription: landmark.photoDescription,
+              commonsPhotoCount: landmark.commonsPhotoCount,
+              score: landmark.score
+            };
+
+            const success = await saveLandmarkToIndex(indexData);
+            if (success) saved++;
+          } catch (err) {
+            log.debug(`[LANDMARK] Auto-index failed for "${landmark.name}": ${err.message}`);
+          }
+        }
+        log.info(`[LANDMARK] 💾 Auto-indexed ${saved}/${indexable.length} landmarks for "${city}"`);
+      })().catch(err => {
+        log.error(`[LANDMARK] Auto-indexing error for "${city}":`, err);
+      });
+    }
   }
 
   return validLandmarks;
