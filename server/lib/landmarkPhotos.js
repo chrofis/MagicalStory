@@ -100,45 +100,63 @@ const CATEGORY_TO_TYPE = [
 ];
 
 // ============================================================================
-// AI-BASED DIVERSITY CHECK (uses cheap Haiku model)
+// AI-BASED DIVERSITY SELECTION (uses cheap Haiku model)
 // ============================================================================
 
 /**
- * Check if two photo descriptions describe the same or very similar photos
- * Uses Claude Haiku for quick semantic comparison
- * @param {string} desc1 - First photo description
- * @param {string} desc2 - Second photo description
- * @returns {Promise<boolean>} - true if photos are too similar (should skip)
+ * Select the most diverse photos from a list using AI
+ * Sends all descriptions in one call, asks AI to pick N diverse ones
+ * @param {Array<{description: string, ...}>} images - Array of image objects with descriptions
+ * @param {number} count - How many diverse images to select (default 3)
+ * @returns {Promise<number[]>} - Indices of the most diverse images (0-based)
  */
-async function checkPhotoSimilarityWithAI(desc1, desc2) {
-  // Skip if either description is missing/too short
-  if (!desc1 || !desc2 || desc1.length < 20 || desc2.length < 20) {
-    return false;  // Can't determine - allow both
+async function selectDiversePhotosWithAI(images, count = 3) {
+  // Filter to images with descriptions
+  const withDescriptions = images
+    .map((img, idx) => ({ idx, desc: img.description }))
+    .filter(item => item.desc && item.desc.length >= 20);
+
+  // If not enough images with descriptions, return first N indices
+  if (withDescriptions.length <= count) {
+    return withDescriptions.map(item => item.idx);
   }
 
-  const prompt = `Compare these two photo descriptions of a landmark. Are they showing the SAME viewpoint/angle of the building, or are they meaningfully different photos?
+  // Build numbered list of descriptions
+  const descList = withDescriptions
+    .map((item, i) => `${i + 1}. ${item.desc}`)
+    .join('\n');
 
-Photo 1: "${desc1}"
+  const prompt = `Here are ${withDescriptions.length} photo descriptions of a landmark:
 
-Photo 2: "${desc2}"
+${descList}
 
-Reply with ONLY "SAME" or "DIFFERENT" - nothing else.
-- SAME = same angle, same view, duplicate or near-duplicate photo
-- DIFFERENT = different angle, different features shown, or different time/season`;
+Select the ${count} most DIVERSE photos - different angles, viewpoints, or features shown.
+Reply with ONLY ${count} numbers separated by commas (e.g., "1,4,7"). Nothing else.`;
 
   try {
     const haikuModel = TEXT_MODELS['claude-haiku'];
-    const result = await callAnthropicAPI(prompt, 10, haikuModel.modelId);
-    const response = result.text.trim().toUpperCase();
+    const result = await callAnthropicAPI(prompt, 20, haikuModel.modelId);
+    const response = result.text.trim();
 
-    if (response.includes('SAME')) {
-      log.debug(`[AI-DIVERSITY] Photos are SAME: "${desc1.substring(0, 40)}..." vs "${desc2.substring(0, 40)}..."`);
-      return true;  // Too similar
+    // Parse comma-separated numbers
+    const numbers = response.match(/\d+/g);
+    if (!numbers || numbers.length === 0) {
+      log.warn(`[AI-DIVERSITY] Could not parse response: "${response}"`);
+      return withDescriptions.slice(0, count).map(item => item.idx);
     }
-    return false;  // Different enough
+
+    // Convert 1-based AI response to 0-based indices, map back to original indices
+    const selectedIndices = numbers
+      .slice(0, count)
+      .map(n => parseInt(n) - 1)
+      .filter(i => i >= 0 && i < withDescriptions.length)
+      .map(i => withDescriptions[i].idx);
+
+    log.debug(`[AI-DIVERSITY] Selected ${selectedIndices.length} diverse photos: ${selectedIndices.join(', ')}`);
+    return selectedIndices.length > 0 ? selectedIndices : withDescriptions.slice(0, count).map(item => item.idx);
   } catch (err) {
-    log.warn(`[AI-DIVERSITY] AI check failed, allowing photo: ${err.message}`);
-    return false;  // On error, allow the photo
+    log.warn(`[AI-DIVERSITY] AI selection failed, using first ${count}: ${err.message}`);
+    return withDescriptions.slice(0, count).map(item => item.idx);
   }
 }
 
@@ -1188,108 +1206,49 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     return null;
   }
 
-  // Helper function to extract key terms from a description for similarity comparison
-  function extractKeyTerms(description) {
-    if (!description) return new Set();
-    // Extract significant words (nouns, adjectives) - lowercase, remove common words
-    const stopWords = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'and', 'or', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'shall', 'can', 'this', 'that', 'these', 'those', 'it', 'its', 'from', 'by', 'as', 'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'over', 'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just', 'also', 'now', 'photo', 'image', 'picture', 'view', 'showing', 'shows', 'seen', 'visible']);
-    const words = description.toLowerCase()
-      .replace(/[^\w\s]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length > 3 && !stopWords.has(w));
-    return new Set(words);
-  }
-
-  // Calculate similarity between two sets of key terms (Jaccard index)
-  function calculateSimilarity(terms1, terms2) {
-    if (terms1.size === 0 || terms2.size === 0) return 0;
-    const intersection = new Set([...terms1].filter(x => terms2.has(x)));
-    const union = new Set([...terms1, ...terms2]);
-    return intersection.size / union.size;
-  }
-
   // Helper function to filter for diversity (avoid duplicate/similar photos)
-  // Uses rule-based checks first, then AI for borderline cases
+  // Step 1: Remove URL duplicates (fast, free)
+  // Step 2: Use AI to select most diverse from remaining (one API call)
   async function selectDiverseImages(images, maxCount) {
     if (images.length <= maxCount) return images;
-
-    const selected = [];
-    const usedUrls = new Set();
-    const usedDescriptionTerms = [];  // Array of {terms, description} for similarity checking
 
     // Sort by score first
     const sorted = [...images].sort((a, b) => b.score - a.score);
 
+    // Step 1: Remove URL duplicates (keep first occurrence = highest score)
+    const usedUrls = new Set();
+    const deduped = [];
     for (const img of sorted) {
-      if (selected.length >= maxCount) break;
-
-      // Check 1: URL-based duplicate detection (same base filename)
       const baseUrl = img.url.split('/').pop().split('?')[0].toLowerCase();
-      const isUrlDuplicate = usedUrls.has(baseUrl) ||
+      const isDuplicate = usedUrls.has(baseUrl) ||
         Array.from(usedUrls).some(url => url.includes(baseUrl.slice(0, 20)) || baseUrl.includes(url.slice(0, 20)));
 
-      if (isUrlDuplicate) {
+      if (!isDuplicate) {
+        deduped.push(img);
+        usedUrls.add(baseUrl);
+      } else {
         log.debug(`[BEST-IMG] Skipping URL duplicate: ${baseUrl}`);
-        continue;
       }
+    }
 
-      // Check 2: Description-based similarity detection (Jaccard index)
-      const imgTerms = extractKeyTerms(img.description);
-      let isDescriptionSimilar = false;
-      let similarTo = null;
-      let maxSimilarity = 0;
-      let borderlineMatch = null;  // For AI check if borderline
+    if (deduped.length <= maxCount) return deduped;
 
-      for (const used of usedDescriptionTerms) {
-        const similarity = calculateSimilarity(imgTerms, used.terms);
-        if (similarity > maxSimilarity) maxSimilarity = similarity;
+    // Step 2: Use AI to select most diverse photos (one call)
+    // Take top 10 candidates (by score) for AI to choose from
+    const candidates = deduped.slice(0, 10);
+    const selectedIndices = await selectDiversePhotosWithAI(candidates, maxCount);
 
-        if (similarity > 0.6) {  // 60% = clearly similar
-          isDescriptionSimilar = true;
-          similarTo = used.description?.substring(0, 50);
-          break;
-        } else if (similarity > 0.35 && !borderlineMatch) {
-          // 35-60% = borderline, need AI check
-          borderlineMatch = used;
+    // Map indices back to images
+    const selected = selectedIndices.map(i => candidates[i]).filter(Boolean);
+
+    // If AI didn't return enough, fill with top-scored remaining
+    if (selected.length < maxCount) {
+      for (const img of candidates) {
+        if (selected.length >= maxCount) break;
+        if (!selected.includes(img)) {
+          selected.push(img);
         }
       }
-
-      if (isDescriptionSimilar) {
-        log.debug(`[BEST-IMG] Skipping similar content (${Math.round(maxSimilarity * 100)}%): "${img.description?.substring(0, 40)}..." similar to "${similarTo}..."`);
-        continue;
-      }
-
-      // Check 3: Angle/perspective keywords - avoid same viewpoint
-      const angleKeywords = ['front', 'back', 'side', 'aerial', 'above', 'below', 'left', 'right', 'north', 'south', 'east', 'west', 'entrance', 'facade', 'tower', 'spire', 'roof', 'courtyard', 'garden'];
-      const imgAngles = angleKeywords.filter(kw => img.description?.toLowerCase().includes(kw));
-
-      if (imgAngles.length > 0) {
-        const hasSameAngle = selected.some(sel => {
-          const selAngles = angleKeywords.filter(kw => sel.description?.toLowerCase().includes(kw));
-          // If both have angle keywords and they overlap significantly
-          const overlap = imgAngles.filter(a => selAngles.includes(a));
-          return overlap.length > 0 && overlap.length >= Math.min(imgAngles.length, selAngles.length) * 0.5;
-        });
-
-        if (hasSameAngle) {
-          log.debug(`[BEST-IMG] Skipping same angle/viewpoint: ${imgAngles.join(', ')}`);
-          continue;
-        }
-      }
-
-      // Check 4: AI check for borderline cases (35-60% Jaccard similarity)
-      if (borderlineMatch && img.description && borderlineMatch.description) {
-        const isSimilarByAI = await checkPhotoSimilarityWithAI(img.description, borderlineMatch.description);
-        if (isSimilarByAI) {
-          log.debug(`[BEST-IMG] AI detected similar photos (${Math.round(maxSimilarity * 100)}% Jaccard): "${img.description?.substring(0, 40)}..."`);
-          continue;
-        }
-      }
-
-      // Passed all diversity checks - add to selection
-      selected.push(img);
-      usedUrls.add(baseUrl);
-      usedDescriptionTerms.push({ terms: imgTerms, description: img.description });
     }
 
     return selected;
