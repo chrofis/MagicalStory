@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, GenerationLogEntry, FinalChecksReport } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport } from '@/types/story';
 
 interface StoryDraft {
   storyType: string;
@@ -347,6 +347,7 @@ export const storyService = {
       totalAttempts: number | null;
       faceEvaluation: unknown | null;
       referencePhotos: ReferencePhoto[] | null;
+      landmarkPhotos?: LandmarkPhoto[] | null;
       consistencyRegen?: {
         originalImage: string;
         originalPrompt: string;
@@ -377,9 +378,9 @@ export const storyService = {
       } | null;
     }>;
     coverImages: {
-      frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
-      initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
-      backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null } | null;
+      frontCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null; landmarkPhotos?: LandmarkPhoto[] | null } | null;
+      initialPage: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null; landmarkPhotos?: LandmarkPhoto[] | null } | null;
+      backCover: { prompt: string | null; qualityReasoning: string | null; retryHistory: RetryAttempt[]; totalAttempts: number | null; referencePhotos: ReferencePhoto[] | null; landmarkPhotos?: LandmarkPhoto[] | null } | null;
     } | null;
     generationLog?: GenerationLogEntry[];
     styledAvatarGeneration?: Array<{
