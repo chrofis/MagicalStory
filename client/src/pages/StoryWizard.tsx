@@ -2615,18 +2615,26 @@ export default function StoryWizard() {
     }
   };
 
+  // Track pending save operations for awaiting before generation
+  const pendingSavePromise = useRef<Promise<void> | null>(null);
+
   // Navigation
   // NEW ORDER: 1=Characters, 2=Relationships, 3=BookSettings, 4=StoryType, 5=ArtStyle, 6=Summary, 7=StoryDisplay
   const safeSetStep = async (newStep: number) => {
     if (newStep >= 0 && newStep <= 7) {
-      // Auto-save character if leaving step 1 while editing
+      // Auto-save character if leaving step 1 while editing (must await to avoid data loss)
       if (step === 1 && currentCharacter && newStep !== 1) {
         await saveCharacter();
       }
-      // Save relationships and character roles when leaving step 1
+      // Save relationships and character roles when leaving step 1 (background, non-blocking)
       if (step === 1 && newStep !== 1) {
-        await saveAllCharacterData(); // Must complete before roles save to avoid race condition
-        await saveCharacterRoles(); // Then save roles
+        // Start saves in background - don't block navigation
+        pendingSavePromise.current = (async () => {
+          await saveAllCharacterData();
+          await saveCharacterRoles();
+        })();
+        // Fire and forget for UI responsiveness - will await before generation
+        pendingSavePromise.current.catch(err => log.error('Background save failed:', err));
       }
       // Clear currentCharacter when entering step 1 to show character list
       if (newStep === 1 && step !== 1) {
@@ -2847,6 +2855,12 @@ export default function StoryWizard() {
   const generateStory = async (overrides?: { skipImages?: boolean; skipEmailCheck?: boolean }) => {
     console.log('[generateStory] Called with overrides:', overrides);
     console.log('[generateStory] user:', user?.email, 'emailVerified:', user?.emailVerified, 'isImpersonating:', isImpersonating);
+
+    // Ensure any pending saves complete before generating
+    if (pendingSavePromise.current) {
+      await pendingSavePromise.current;
+      pendingSavePromise.current = null;
+    }
 
     // Check email verification before generating (emailVerified could be false or undefined)
     // Skip this check if we just verified (skipEmailCheck=true) since React state may not have updated yet
