@@ -212,6 +212,7 @@ Review your draft against EVERY check below. Be harsh - find ALL problems.
 **9. Physics Check:**
 - Ropes taut? Heavy = straining posture?
 - Distinct materials where objects touch?
+- Obstacles actually block? (spans width / wedged / too large to bypass)
 
 **10. Weather & Indoor/Outdoor Consistency:**
 - If INDOOR: Weather should NOT be directly visible (no rain/snow falling on characters)
@@ -293,6 +294,19 @@ Examples:
      Pfadi-Bub: "pushing the beam, weight forward"
      (Clear - one beam, two people, positions defined)
 
+**15. Obstacle Logic:**
+When an object is described as BLOCKING or PREVENTING passage, explain WHY it's impassable:
+- Spans full width (can't go around)
+- Wedged/jammed in place (can't push aside)
+- Too heavy AND too large to step over
+- Locked/sealed (for doors/gates)
+
+Examples:
+- ❌ "Beams scattered on bridge, blocking the path" (could walk around scattered items)
+- ✅ "Massive beam wedged between bridge railings, spanning full width of the walkway"
+- ❌ "Rocks piled in the cave entrance" (could climb over a pile)
+- ✅ "Boulder fills the cave mouth from floor to ceiling, no gaps visible"
+
 **After checking, list:**
 - `issues`: Every problem found (be specific)
 - `corrections`: How to fix each issue
@@ -346,12 +360,13 @@ Output raw JSON (no markdown code fences, no explanation text).
     "gazeGeometry": "Left/right pointing verified, depth layers verified",
     "cameraViewCheck": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
     "characterDifferentiation": "Each character has UNIQUE pose? YES/NO",
-    "physicsCheck": "Ropes taut? Heavy = straining? Materials distinct?",
+    "physicsCheck": "Ropes taut? Heavy = straining? Materials distinct? Obstacles actually block?",
     "weatherCheck": "Scene is INDOOR/OUTDOOR. Weather: X. Weather visibility: [how weather is shown - e.g., 'through window' or 'directly on characters']. Compatible: YES/NO",
     "distanceSeparation": "Are distant/adversary characters separated? Is the gap named? What fills the space between them? ADEQUATE/INADEQUATE",
     "locationContinuity": "Previous scene location: X. Current scene location: Y. Story mentions travel? YES/NO. Consistent: YES/NO",
     "linearSpaceConsistency": "Path: [type]. Orientation: [lengthwise/crosswise/diagonal]. Character positions match orientation? YES/NO",
     "sharedObjectInteractions": "Shared objects: [list or NONE]. Each in Objects section with grip points? YES/NO/N/A",
+    "obstacleLogic": "Obstacles blocking passage: [list or NONE]. Each explains WHY impassable (spans width/wedged/too large)? YES/NO/N/A",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
@@ -444,12 +459,13 @@ Output raw JSON (no markdown code fences, no explanation text).
     "gazeGeometry": "Both looking at door in center - valid.",
     "cameraViewCheck": "Elevated camera + characters looking DOWN at floor door = tops of heads visible, not faces. Sophie 'eyes wide, mouth open' INCOMPATIBLE with elevated camera seeing her from above/behind.",
     "characterDifferentiation": "Sophie kneeling/pushing, Manuel standing/pulling - UNIQUE poses.",
-    "physicsCheck": "Door pulling mechanics inconsistent with floor placement.",
+    "physicsCheck": "Door pulling mechanics inconsistent with floor placement. No blocking obstacles in scene.",
     "weatherCheck": "Scene is OUTDOOR (ruins). Weather: winter. Weather visibility: directly on scene. Compatible: YES",
     "distanceSeparation": "Characters are working together at same location (door) - no separation needed. N/A",
     "locationContinuity": "Previous scene: Ruine Stein. Current scene: Ruine Stein. No travel mentioned. Consistent: YES",
     "linearSpaceConsistency": "No linear path in scene - characters at door in room. N/A",
     "sharedObjectInteractions": "Shared objects: door (Manuel and Sophie). In Objects section with grip points? YES - door position and who does what defined.",
+    "obstacleLogic": "No obstacles blocking passage in this scene. N/A",
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
