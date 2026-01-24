@@ -880,6 +880,34 @@ function loadArtStylePrompts() {
 const ART_STYLE_PROMPTS = loadArtStylePrompts();
 
 /**
+ * Build physical traits string for avatar prompts
+ * @param {Object} character - Character object with physical traits
+ * @returns {string} Physical traits description
+ */
+function buildPhysicalTraitsForAvatar(character) {
+  const traits = character?.physical || {};
+  const parts = [];
+
+  // Hair description
+  const hairParts = [];
+  if (traits.hairColor) hairParts.push(traits.hairColor);
+  if (traits.hairLength) hairParts.push(traits.hairLength);
+  if (traits.hairStyle && traits.hairStyle !== 'straight') hairParts.push(traits.hairStyle);
+  if (hairParts.length > 0) parts.push(`Hair: ${hairParts.join(', ')}`);
+
+  if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
+  if (traits.facialHair && traits.facialHair !== 'none' && traits.facialHair !== 'clean-shaven') {
+    parts.push(`Facial hair: ${traits.facialHair}`);
+  }
+  if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
+  if (traits.other && traits.other !== 'none') {
+    parts.push(`Other features: ${traits.other}`);
+  }
+
+  return parts.length > 0 ? parts.join('\n') : 'Match reference photo exactly';
+}
+
+/**
  * Generate a styled costumed avatar in a single API call
  * Combines costume transformation + art style conversion
  *
@@ -951,7 +979,7 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
       'ART_STYLE_PROMPT': artStylePrompt,
       'COSTUME_DESCRIPTION': config.description || 'A creative costume appropriate for the story',
       'COSTUME_TYPE': config.costume || 'Costume',
-      'PHYSICAL_TRAITS': '' // Physical traits removed - input image is sufficient
+      'PHYSICAL_TRAITS': buildPhysicalTraitsForAvatar(character)
     });
 
     // Prepare standard avatar data as the only reference
@@ -1202,7 +1230,7 @@ async function generateStyledAvatarWithSignature(character, category, config, ar
       'ART_STYLE_PROMPT': artStylePrompt,
       'COSTUME_DESCRIPTION': clothingWithSignature,  // Clothing + signature items
       'COSTUME_TYPE': `${category} outfit`,  // e.g., "winter outfit" instead of "Cowboy"
-      'PHYSICAL_TRAITS': ''
+      'PHYSICAL_TRAITS': buildPhysicalTraitsForAvatar(character)
     });
 
     // Prepare base avatar data as the only reference

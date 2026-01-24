@@ -6,43 +6,14 @@ const path = require('path');
 const outputDir = 'output/story-job_1768859833557_x2dpb3fe2';
 
 function buildPrompt(faceCount, gridSize) {
-  const positions = [];
-  for (let i = 1; i <= faceCount; i++) {
-    positions.push(`Image ${i}: change hair to #65350F`);
-  }
+  return `This is a ${gridSize} grid with ${faceCount} child face images.
 
-  return `TASK: RECOLOR HAIR IN ALL ${faceCount} IMAGES.
+TASK: Change hair color to dark brown #65350F in all ${faceCount} images.
+GOAL: Every face in the grid must have #65350F brown hair.
+REQUIREMENT: All ${faceCount} images need the hair recolored, not just some.
 
-This is a ${gridSize} GRID containing exactly ${faceCount} separate face images.
-
-The grid layout:
-- Grid size: ${gridSize}
-- Total images in grid: ${faceCount}
-- Each cell contains one child's face
-
-YOUR TASK: Change the hair color in EACH AND EVERY one of the ${faceCount} images.
-
-${positions.join('\n')}
-
-Target hair color: dark brown #65350F
-
-CRITICAL: You must change the hair in ALL ${faceCount} images. Not 1, not 2, but ALL ${faceCount}.
-
-Count them:
-${Array.from({length: faceCount}, (_, i) => `${i + 1}. Change hair to #65350F ✓`).join('\n')}
-
-That's ${faceCount} images total. Every single one needs dark brown #65350F hair.
-
-DO NOT skip any image.
-DO NOT leave any hair blonde.
-DO NOT change anything except hair color.
-
-Keep faces, expressions, poses, backgrounds, clothing, art style IDENTICAL.
-
-ONLY change: hair color → dark brown #65350F
-Change it in: ALL ${faceCount} images in the ${gridSize} grid
-
-FINAL CHECK: Did you change the hair in all ${faceCount} images? Every single one?`;
+Keep everything else identical: faces, expressions, poses, clothes, backgrounds.
+Only the hair color changes from blonde to dark brown #65350F.`;
 }
 
 async function editWithGemini(imagePath, label, faceCount, gridSize) {
@@ -87,7 +58,7 @@ async function editWithGemini(imagePath, label, faceCount, gridSize) {
   for (const part of parts) {
     const inlineData = part.inlineData || part.inline_data;
     if (inlineData && inlineData.data) {
-      const outputPath = path.join(outputDir, 'luis-grid-' + label + '-v3.png');
+      const outputPath = path.join(outputDir, 'luis-grid-' + label + '-v4.png');
       fs.writeFileSync(outputPath, Buffer.from(inlineData.data, 'base64'));
       console.log('Saved:', outputPath);
       return outputPath;
