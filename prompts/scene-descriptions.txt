@@ -272,6 +272,27 @@ FOLLOWING:
 - ❌ "Forest trail leads from foreground into distant trees" + "guide on left, hikers on right"
 - ✅ "Forest trail starts bottom-left and goes to top-right" + "guide top-right (seen from behind), hikers bottom-left (seen from behind)"
 
+**14. Shared Object Interactions:**
+When 2+ characters physically interact with the SAME object (carrying, pushing, holding together):
+
+1. Object MUST appear in the Objects section with:
+   - Exact position in scene
+   - For EACH character: their grip point/side and action
+
+2. Character action entries reference object by name only (no re-describing)
+
+Examples:
+
+- ❌ Objects: "Wooden beams scattered on bridge"
+     Manuel: "lifts a large beam to waist height"
+     Pfadi-Bub: "pushes a beam from opposite side"
+     (Ambiguous - sounds like two separate beams)
+
+- ✅ Objects: "Large wooden beam: center of bridge spanning left to right. Manuel grips left end lifting to waist height, Pfadi-Bub pushes right end."
+     Manuel: "gripping the beam, straining with effort"
+     Pfadi-Bub: "pushing the beam, weight forward"
+     (Clear - one beam, two people, positions defined)
+
 **After checking, list:**
 - `issues`: Every problem found (be specific)
 - `corrections`: How to fix each issue
@@ -330,6 +351,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "distanceSeparation": "Are distant/adversary characters separated? Is the gap named? What fills the space between them? ADEQUATE/INADEQUATE",
     "locationContinuity": "Previous scene location: X. Current scene location: Y. Story mentions travel? YES/NO. Consistent: YES/NO",
     "linearSpaceConsistency": "Path: [type]. Orientation: [lengthwise/crosswise/diagonal]. Character positions match orientation? YES/NO",
+    "sharedObjectInteractions": "Shared objects: [list or NONE]. Each in Objects section with grip points? YES/NO/N/A",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
@@ -427,6 +449,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "distanceSeparation": "Characters are working together at same location (door) - no separation needed. N/A",
     "locationContinuity": "Previous scene: Ruine Stein. Current scene: Ruine Stein. No travel mentioned. Consistent: YES",
     "linearSpaceConsistency": "No linear path in scene - characters at door in room. N/A",
+    "sharedObjectInteractions": "Shared objects: door (Manuel and Sophie). In Objects section with grip points? YES - door position and who does what defined.",
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
