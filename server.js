@@ -10325,16 +10325,27 @@ async function processStoryJob(jobId) {
 
             if (dbChar) {
               // Merge physical traits (needed for styled avatar prompts)
-              if (dbChar.physical && !char.physical) {
-                char.physical = dbChar.physical;
+              // Use deep merge: DB values as fallback, request values take priority
+              // Note: metadata includes physical, so char.physical may exist but be incomplete
+              if (dbChar.physical) {
+                const hadPhysical = !!char.physical;
+                const dbKeys = Object.keys(dbChar.physical);
+                char.physical = {
+                  ...dbChar.physical,
+                  ...(char.physical || {})
+                };
+                log.debug(`📸 [JOB PROCESS] Merged physical traits for ${char.name}: DB had [${dbKeys.join(',')}], request ${hadPhysical ? 'had' : 'missing'} physical`);
               }
               // Merge photos (face, body references)
               if (dbChar.photos && !char.photos) {
                 char.photos = dbChar.photos;
               }
-              // Merge physicalTraitsSource
-              if (dbChar.physicalTraitsSource && !char.physicalTraitsSource) {
-                char.physicalTraitsSource = dbChar.physicalTraitsSource;
+              // Merge physicalTraitsSource (same deep merge pattern)
+              if (dbChar.physicalTraitsSource) {
+                char.physicalTraitsSource = {
+                  ...dbChar.physicalTraitsSource,
+                  ...(char.physicalTraitsSource || {})
+                };
               }
 
               if (dbChar.avatars) {
