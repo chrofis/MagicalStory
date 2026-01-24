@@ -316,20 +316,23 @@ Examples:
 - ✅ "Boulder fills the cave mouth from floor to ceiling, no gaps visible"
 
 **16. Holding Inventory:**
-For EACH character, list what they're holding and which hand(s):
+For EACH character, track what they're holding via the `holding` field:
 
-1. Count items being held
-2. Assign each item to specific hand(s): LEFT, RIGHT, or BOTH
-3. Verify no conflicts:
+1. Fill `leftHand` and `rightHand` for each character
+2. Verify no conflicts:
    - LEFT + RIGHT = OK (one item per hand)
-   - BOTH + anything else = CONFLICT (both hands occupied, can't hold more)
+   - BOTH hands on same item + anything else = CONFLICT
    - "tucked under arm" counts as using that arm
+3. SIGNATURE ITEMS: If secondary character has a "Signature:" item, it MUST be either:
+   - Held (in leftHand or rightHand)
+   - Placed in Objects section (leaning, on table, etc.)
 
 Examples:
-- ✅ "Left hand: shield. Right hand: sword." (one per hand)
-- ✅ "Both hands: heavy treasure chest." (both occupied, nothing else)
-- ❌ "Both hands: open book. Stuffed animal tucked under left arm." (left arm can't do both)
-- ❌ "Right hand: pointing. Both hands: gripping steering wheel." (right hand can't do both)
+- ✅ "leftHand": "shield", "rightHand": "sword" (one per hand)
+- ✅ "leftHand": "staff", "rightHand": "map edge" (wizard holds both)
+- ❌ "leftHand": "map edge", "rightHand": "map edge" + wizard's signature staff missing (where is staff?)
+- ✅ "leftHand": "map edge", "rightHand": "map edge" + Objects: "Wizard's staff leaning against pillar"
+- ❌ "Both hands: open book" + "Stuffed animal tucked under left arm" (left arm can't do both)
 
 **After checking, list:**
 - `issues`: Every problem found (be specific)
@@ -359,11 +362,13 @@ Output raw JSON (no markdown code fences, no explanation text).
     "characters": [
       // KEEP IT SIMPLE: natural poses that match the source description
       // Don't over-engineer - "searches for X" = looking around, NOT elaborate hand gestures
+      // SECONDARY CHARACTERS: Must include their signature items and clothing from visual bible
       {
         "name": "CharacterName",
         "position": "Frame region + depth layer",
         "pose": "Body position, facing direction (SIMPLE, NATURAL)",
         "action": "Physical action - keep it simple, match source description",
+        "holding": {"leftHand": "item or empty", "rightHand": "item or empty"},
         "expression": "Visible facial features (NOT emotions)",
         "clothing": "standard | winter | summer | costumed:type"
       }
@@ -415,6 +420,7 @@ Output raw JSON (no markdown code fences, no explanation text).
         "position": "CORRECTED frame region + depth layer",
         "pose": "CORRECTED body position, facing direction",
         "action": "CORRECTED physical action",
+        "holding": {"leftHand": "item or empty", "rightHand": "item or empty"},
         "expression": "CORRECTED visible features (compatible with camera view)",
         "clothing": "standard | winter | summer | costumed:type"
       }
@@ -471,6 +477,7 @@ If your scene shows the bridge from across the river, select the wide exterior v
         "position": "Left side, foreground, kneeling",
         "pose": "Kneeling, leaning forward over floor gap",
         "action": "Right hand pushing stone aside, left hand braced on floor",
+        "holding": {"leftHand": "braced on floor", "rightHand": "pushing stone"},
         "expression": "Eyes wide, mouth open",
         "clothing": "winter"
       },
@@ -479,6 +486,7 @@ If your scene shows the bridge from across the river, select the wide exterior v
         "position": "Center, middle ground, facing door",
         "pose": "Standing, leaning back with effort",
         "action": "Right hand gripping door handle pulling it open, left hand braced against wall",
+        "holding": {"leftHand": "braced on wall", "rightHand": "door handle"},
         "expression": "Focused gaze, jaw set",
         "clothing": "winter"
       }
@@ -530,6 +538,7 @@ If your scene shows the bridge from across the river, select the wide exterior v
         "position": "Left of door, middle ground, three-quarter view facing right",
         "pose": "Standing, body angled toward the wall",
         "action": "Right hand pushing a loose stone aside, left hand raised in surprise",
+        "holding": {"leftHand": "empty (raised)", "rightHand": "pushing stone"},
         "expression": "Eyes wide, mouth open, eyebrows raised",
         "clothing": "winter"
       },
@@ -538,6 +547,7 @@ If your scene shows the bridge from across the river, select the wide exterior v
         "position": "Center-right at door, middle ground, three-quarter view",
         "pose": "Standing, body leaning back with effort",
         "action": "Right hand gripping ornate door handle pulling toward him, left hand braced against door frame",
+        "holding": {"leftHand": "braced on frame", "rightHand": "door handle"},
         "expression": "Focused gaze on door, jaw set, brow furrowed",
         "clothing": "winter"
       }
