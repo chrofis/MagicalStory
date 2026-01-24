@@ -890,6 +890,33 @@ function buildPhysicalTraitsForAvatar(character) {
   const traits = character?.physical || {};
   const parts = [];
 
+  // Age and body proportions (CRITICAL for correct head-to-body ratio)
+  const apparentAge = traits.apparentAge || character?.ageCategory || character?.age;
+  if (apparentAge) {
+    parts.push(`Age: ${apparentAge}`);
+    // Add explicit head-to-body ratio guidance based on age
+    const ageStr = String(apparentAge).toLowerCase();
+    let ratio = '8 heads tall (adult proportions)';
+    if (ageStr.includes('infant') || ageStr.includes('baby') || ageStr.includes('0') || ageStr.includes('1')) {
+      ratio = '4 heads tall (infant proportions)';
+    } else if (ageStr.includes('toddler') || ageStr.includes('2') || ageStr.includes('3')) {
+      ratio = '5 heads tall (toddler proportions)';
+    } else if (ageStr.includes('preschool') || ageStr.includes('kindergart') || ageStr.includes('4') || ageStr.includes('5') || ageStr.includes('6')) {
+      ratio = '5.5 heads tall (young child proportions)';
+    } else if (ageStr.includes('school') || ageStr.includes('7') || ageStr.includes('8') || ageStr.includes('9') || ageStr.includes('10')) {
+      ratio = '6 heads tall (child proportions)';
+    } else if (ageStr.includes('preteen') || ageStr.includes('11') || ageStr.includes('12')) {
+      ratio = '6.5 heads tall (preteen proportions)';
+    } else if (ageStr.includes('teen') || ageStr.includes('13') || ageStr.includes('14') || ageStr.includes('15') || ageStr.includes('16') || ageStr.includes('17')) {
+      ratio = '7 heads tall (teen proportions)';
+    }
+    parts.push(`Body proportions: ${ratio}`);
+  }
+
+  // Build/height
+  if (traits.height) parts.push(`Height: ${traits.height}`);
+  if (traits.build) parts.push(`Build: ${traits.build}`);
+
   // Use detailed hair description from storyHelpers (handles detailedHairAnalysis)
   const hairDesc = buildHairDescription(traits, character?.physicalTraitsSource);
   if (hairDesc) parts.push(`Hair: ${hairDesc}`);
