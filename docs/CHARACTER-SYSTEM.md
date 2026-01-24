@@ -1,6 +1,6 @@
 # MagicalStory Character System
 
-**Last Updated:** January 2025
+**Last Updated:** January 2026
 
 ## Table of Contents
 
@@ -259,6 +259,102 @@ After generation, Gemini analyzes the avatar to extract:
   }
 }
 ```
+
+### Styled Avatar Conversion
+
+Convert base avatars to specific art styles while preserving identity.
+
+**Endpoint:** `POST /api/avatars/convert-style`
+
+**Flow:**
+```
+1. Get base avatar from character.avatars[category]
+2. Get physical traits from character.physical
+3. Build prompt with traits + target art style
+4. Call generateStyledCharacterAvatar() with reference image
+5. Store result in character.styledAvatars[artStyle][category]
+```
+
+**Key Function:** `convertAvatarToStyle()` in `server/routes/avatars.js:440`
+
+**Prompt Template:** `prompts/styled-avatar.txt`
+
+### Costumed Avatar Generation
+
+Generate styled avatars with story-specific costumes.
+
+**Endpoint:** `POST /api/avatars/styled-costumed`
+
+**Flow:**
+```
+1. Get base avatar from character.avatars.standard
+2. Get physical traits from character.physical
+3. Get costume description from request or theme
+4. Build prompt with: traits + costume + art style
+5. Call generateStyledCostumedAvatar()
+6. Store in character.styledAvatars[artStyle].costumed[costumeType]
+```
+
+**Key Function:** `generateStyledCostumedAvatar()` in `server/routes/avatars.js:580`
+
+**Prompt Template:** `prompts/styled-costumed-avatar.txt`
+- 2x2 character sheet format
+- Top row: face copies from reference (original style)
+- Bottom row: full body in new style with costume
+- Explicit instruction: NO HATS or HEAD COVERINGS (faces must be visible)
+
+### Avatar Data Flow
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    BASE CHARACTER                           │
+│  ┌─────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │ physical│  │  clothing   │  │        avatars          │ │
+│  │ traits  │  │ categories  │  │  standard/winter/summer │ │
+│  └────┬────┘  └──────┬──────┘  └───────────┬─────────────┘ │
+└───────┼──────────────┼─────────────────────┼───────────────┘
+        │              │                     │
+        │              │                     ▼
+        │              │         ┌───────────────────────┐
+        │              │         │  convertAvatarToStyle │
+        │              │         │  (with reference img) │
+        │              │         └───────────┬───────────┘
+        │              │                     │
+        │              │                     ▼
+        │              │         ┌───────────────────────────┐
+        │              │         │      styledAvatars        │
+        │              │         │  [artStyle][category]     │
+        │              │         └───────────┬───────────────┘
+        │              │                     │
+        │              ▼                     │
+        │    ┌─────────────────────┐         │
+        │    │ generateStyled      │         │
+        │    │ CostumedAvatar      │◄────────┘
+        │    │ (with costume desc) │
+        │    └─────────┬───────────┘
+        │              │
+        │              ▼
+        │    ┌─────────────────────────────┐
+        │    │  styledAvatars[style]       │
+        │    │  .costumed[costumeType]     │
+        │    └─────────────────────────────┘
+        │
+        └──────────────────┐
+                           ▼
+              ┌────────────────────────┐
+              │  SCENE GENERATION      │
+              │  - Reference images    │
+              │  - Physical traits     │
+              │  - Clothing from avatar│
+              └────────────────────────┘
+```
+
+**Key Design Points:**
+1. **Hair is in `physical` object** - preserved across ALL avatar types
+2. **Clothing categories** (standard/winter/summer) have separate base avatars
+3. **Costumed avatars** use special `costumed:TYPE` format
+4. **Styled avatars** are nested: `styledAvatars[artStyle][category]`
+5. **Scene generation** picks correct avatar based on story's art style + clothing/costume
 
 ---
 
