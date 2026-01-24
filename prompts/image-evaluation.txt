@@ -47,12 +47,10 @@ Compare Step 1 findings to the Reference Images:
 Do NOT penalize for missing prints/patterns when figure is seen from behind.
 If attire is DIFFERENT from reference, note it as an issue.
 
-**AGE & PROPORTION CHECK:**
-- Compare body proportions to reference (head-to-body ratio, limb length)
-- Children: larger head-to-body ratio (~1:5), shorter limbs, rounder face
-- Adults: smaller head-to-body ratio (~1:7), longer limbs, defined features
-- Flag if child appears adult-sized or vice versa
-- Flag if age appearance doesn't match reference photo
+**PROPORTION CHECK:**
+- Head-to-body ratio should match the figure's apparent height/stature
+- Limb length should be proportional to torso
+- Flag anatomically incorrect proportions (oversized head on tall figure, etc.)
 
 **DUPLICATE CHARACTER CHECK:**
 - If two figures match the SAME reference, flag as duplicate
@@ -155,6 +153,7 @@ Output your COMPLETE analysis as JSON (no other text):
     {
       "figure": 1,
       "position": "Foreground, Center",
+      "center": [0.5, 0.4],
       "role": "main character",
       "gender": "male",
       "hair": "blonde, short, slightly messy",
@@ -169,9 +168,10 @@ Output your COMPLETE analysis as JSON (no other text):
       "matched_reference": "Lukas",
       "confidence": 0.85,
       "face_bbox": [0.15, 0.3, 0.35, 0.5],
+      "face_center": [0.25, 0.4],
       "facial_match": "Good match - round face, blue eyes",
       "hair_match": "Correct blonde color and length",
-      "age_match": "Child proportions correct",
+      "proportion_check": "Proportions correct for figure's stature",
       "attire_audit": "Blue hoodie correct, pants missing neon green accents",
       "issues": ["pants missing neon green accents"],
       "issue_severities": ["MODERATE"]
@@ -187,7 +187,7 @@ Output your COMPLETE analysis as JSON (no other text):
   },
   "object_integrity": {
     "expected_from_prompt": ["stuffed elephant"],
-    "found_objects": [{"object": "stuffed elephant", "count": 1, "status": "OK"}],
+    "found_objects": [{"object": "stuffed elephant", "count": 1, "center": [0.55, 0.45], "status": "OK"}],
     "structural_issues": [],
     "relationship_issues": []
   },
@@ -201,7 +201,7 @@ Output your COMPLETE analysis as JSON (no other text):
   "verdict": "PASS",
   "issues_summary": "Manuel missing from scene; Lukas pants missing green accents; Eli ear patch on wrong side",
   "fix_targets": [
-    {"bbox": [0.6, 0.36, 0.85, 0.5], "issue": "pants missing green accents", "fix": "Add neon green stripe accents to the dark blue pants of the boy standing in the center foreground"}
+    {"bbox": [0.6, 0.36, 0.85, 0.5], "center": [0.725, 0.43], "issue": "pants missing green accents", "fix": "Add neon green stripe accents to the dark blue pants of the boy standing in the center foreground"}
   ]
 }
 ```
@@ -218,6 +218,10 @@ Output your COMPLETE analysis as JSON (no other text):
   - Below 0.5: Poor match, likely wrong character
 - `issue_severities`: Array matching issues array, with severity level for each (CRITICAL, MAJOR, MODERATE, MINOR)
 - `face_bbox`: Approximate bounding box around the character's FACE, format [ymin, xmin, ymax, xmax] normalized 0-1. This helps locate the character for face extraction.
+- `center` in subject_mapping: Center point of the figure's body, format [y, x] normalized 0-1.
+- `face_center`: Center point of the face, format [y, x] normalized 0-1. Calculated as midpoint of face_bbox.
+- `center` in found_objects: Center point of the object, format [y, x] normalized 0-1.
+- `center` in fix_targets: Center point of the fix target region, format [y, x] normalized 0-1.
 - **CRITICAL for `fix` field**: Write as a SELF-CONTAINED VISUAL DESCRIPTION. The image editor does NOT know character names - describe by appearance and position only.
   - BAD: "Add black gloves to Lukas"
   - GOOD: "Add black knitted gloves to the hands of the boy with short brown hair and blue striped hoodie on the right side"
