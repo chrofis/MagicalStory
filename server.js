@@ -8686,9 +8686,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const basicCoverRequirements = (inputData.characters || []).flatMap(char => {
           const charNameLower = char.name?.toLowerCase();
           // Find clothing requirements for this character (case-insensitive lookup)
-          const charReqs = streamingClothingRequirements?.[char.name] ||
-                           streamingClothingRequirements?.[charNameLower] ||
-                           (streamingClothingRequirements && Object.entries(streamingClothingRequirements)
+          // Use clothingRequirements (from parser) which is available at this point, not streamingClothingRequirements
+          const charReqs = clothingRequirements?.[char.name] ||
+                           clothingRequirements?.[charNameLower] ||
+                           (clothingRequirements && Object.entries(clothingRequirements)
                              .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
 
           // Get categories with used=true, default to ['standard'] if no requirements
