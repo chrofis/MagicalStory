@@ -75,6 +75,8 @@ interface StoryDetailsServer {
   languageLevel: LanguageLevel;
   pages: number;
   dedication?: string;
+  season?: string;  // Season when story takes place
+  userLocation?: { city: string | null; region: string | null; country: string | null } | null;
   characters: Character[];
   mainCharacters: number[];
   relationships: RelationshipMap;
@@ -287,6 +289,8 @@ export const storyService = {
       mainCharacters: s.mainCharacters,
       relationships: s.relationships,
       relationshipTexts: s.relationshipTexts,
+      season: s.season,
+      userLocation: s.userLocation,
       outline: s.outline,
       outlinePrompt: s.outlinePrompt,
       outlineModelId: s.outlineModelId,

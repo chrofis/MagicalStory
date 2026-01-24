@@ -257,6 +257,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'isPartial', data::jsonb->'isPartial',
             'historicalEvent', data::jsonb->'historicalEvent',
             'location', data::jsonb->'location',
+            'season', data::jsonb->'season',
+            'userLocation', data::jsonb->'userLocation',
             'generationLog', data::jsonb->'generationLog',
             'styledAvatarGeneration', data::jsonb->'styledAvatarGeneration',
             'costumedAvatarGeneration', data::jsonb->'costumedAvatarGeneration'
