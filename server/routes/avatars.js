@@ -14,7 +14,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
-const { buildHairDescription } = require('../lib/storyHelpers');
+const { buildHairDescription, getAgeCategory } = require('../lib/storyHelpers');
 
 // ============================================================================
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
@@ -891,7 +891,9 @@ function buildPhysicalTraitsForAvatar(character) {
   const parts = [];
 
   // Age and body proportions (CRITICAL for correct head-to-body ratio)
-  const apparentAge = traits.apparentAge || character?.ageCategory || character?.age;
+  // Priority: apparentAge from avatar analysis > computed from numeric age
+  const apparentAge = traits.apparentAge || (character?.age ? getAgeCategory(character.age) : null);
+  log.debug(`[AVATAR TRAITS] ${character?.name}: apparentAge=${apparentAge} (from ${traits.apparentAge ? 'physical.apparentAge' : 'computed from age ' + character?.age})`);
   if (apparentAge) {
     parts.push(`Age: ${apparentAge}`);
     // Add explicit head-to-body ratio guidance based on age
@@ -2240,72 +2242,77 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         }
 
         if (rows && rows.length > 0 && charIndex >= 0) {
-            log.debug(`💾 [AVATAR JOB ${jobId}] Found character at index ${charIndex} (rowId: ${rowId})`);
+            log.debug(`💾 [AVATAR JOB ${jobId}] Found character at index ${charIndex} (rowId: ${rowId}) - starting transaction for update`);
 
+          // Use transaction with row lock to prevent race condition with character save
+          // The charIndex from retry loop may be stale if user modified characters during avatar generation
+          await dbQuery('BEGIN');
 
-          if (characters[charIndex]) {
+          try {
+            // Lock row and get fresh data
+            const freshRows = await dbQuery(
+              `SELECT id, data FROM characters WHERE user_id = $1 FOR UPDATE`,
+              [user.id]
+            );
+
+            if (freshRows.length === 0) {
+              await dbQuery('ROLLBACK');
+              throw new Error('Character row disappeared during transaction');
+            }
+
+            const freshRowId = freshRows[0].id;
+            const freshData = freshRows[0].data || {};
+            const freshCharacters = freshData.characters || [];
+
+            // Find character with fresh index (may have changed if user reordered/deleted characters)
+            let freshCharIndex = freshCharacters.findIndex(c => c.id === characterId || c.id === parseInt(characterId));
+
+            // Fallback to name if ID not found
+            if (freshCharIndex < 0 && name) {
+              const nameMatches = freshCharacters.filter(c => c.name === name);
+              if (nameMatches.length === 1) {
+                freshCharIndex = freshCharacters.findIndex(c => c.name === name);
+                log.warn(`📍 [AVATAR JOB ${jobId}] Using name fallback in transaction: "${name}" at index ${freshCharIndex}`);
+              }
+            }
+
+            if (freshCharIndex < 0) {
+              await dbQuery('ROLLBACK');
+              const availableChars = freshCharacters.map(c => `${c.name}(${c.id})`).join(', ');
+              throw new Error(`Character ${characterId} (${name}) not found in fresh lookup - may have been deleted. Available: [${availableChars}]`);
+            }
+
+            // Log if index changed (indicates user modified characters during avatar generation)
+            if (freshCharIndex !== charIndex) {
+              log.warn(`🔄 [AVATAR JOB ${jobId}] Character index changed: ${charIndex} → ${freshCharIndex} (array was modified during generation)`);
+            }
+
+          if (freshCharacters[freshCharIndex]) {
+            // Note: In-memory updates below are for logging/debugging only
+            // The actual DB update uses freshCharIndex with atomic jsonb_set
+
             // Apply extracted traits as FLAT properties (not nested in physical)
             // This matches the format used by frontend save and photo analysis
             if (results.extractedTraits) {
               const t = results.extractedTraits;
-              if (t.apparentAge) characters[charIndex].apparent_age = t.apparentAge;
-              if (t.build) characters[charIndex].build = t.build;
-              if (t.eyeColor) characters[charIndex].eye_color = t.eyeColor;
-              if (t.hairColor) characters[charIndex].hair_color = t.hairColor;
-              if (t.hairLength) characters[charIndex].hair_length = t.hairLength;
-              if (t.hairStyle) characters[charIndex].hair_style = t.hairStyle;
-              if (t.skinTone) characters[charIndex].skin_tone = t.skinTone;
-              if (t.skinToneHex) characters[charIndex].skin_tone_hex = t.skinToneHex;
-              if (t.facialHair) characters[charIndex].facial_hair = t.facialHair;
-              if (t.face) characters[charIndex].other_features = t.face;
-              if (t.other) characters[charIndex].other = t.other;
-              if (t.detailedHairAnalysis) characters[charIndex].detailed_hair_analysis = t.detailedHairAnalysis;
-              log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted traits to character (flat): apparent_age=${t.apparentAge}`);
+              log.debug(`💾 [AVATAR JOB ${jobId}] Will apply extracted traits: apparent_age=${t.apparentAge}, build=${t.build}`);
             }
 
             // Apply extracted clothing
             if (results.structuredClothing?.standard) {
-              characters[charIndex].structured_clothing = results.structuredClothing.standard;
-              log.debug(`💾 [AVATAR JOB ${jobId}] Applied extracted clothing to character: ${JSON.stringify(results.structuredClothing.standard)}`);
+              log.debug(`💾 [AVATAR JOB ${jobId}] Will apply extracted clothing: ${JSON.stringify(results.structuredClothing.standard)}`);
             }
 
             // Save avatars data including faceThumbnails
             if (results.faceThumbnails || results.standard || results.winter || results.summer) {
-              characters[charIndex].avatars = {
-                ...(characters[charIndex].avatars || {}),
-                status: 'complete',
-                generatedAt: new Date().toISOString(),
-                ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
-                ...(results.standard && { standard: results.standard }),
-                ...(results.winter && { winter: results.winter }),
-                ...(results.summer && { summer: results.summer }),
-                ...(results.clothing && { clothing: results.clothing }),
-              };
-              log.debug(`💾 [AVATAR JOB ${jobId}] Applied avatar data including faceThumbnails`);
+              log.debug(`💾 [AVATAR JOB ${jobId}] Will apply avatar data including faceThumbnails`);
             }
 
             // Save token usage for cost tracking (ASYNC path)
             const hasTokenUsage = results.tokenUsage && Object.keys(results.tokenUsage.byModel || {}).length > 0;
             if (hasTokenUsage) {
-              const existingUsage = characters[charIndex].avatarTokenUsage || { byModel: {} };
-              if (!existingUsage.byModel) existingUsage.byModel = {};
-
-              for (const [modelId, usage] of Object.entries(results.tokenUsage.byModel)) {
-                if (!existingUsage.byModel[modelId]) {
-                  existingUsage.byModel[modelId] = { input_tokens: 0, output_tokens: 0, calls: 0 };
-                }
-                existingUsage.byModel[modelId].input_tokens += usage.input_tokens || 0;
-                existingUsage.byModel[modelId].output_tokens += usage.output_tokens || 0;
-                existingUsage.byModel[modelId].calls += usage.calls || 0;
-              }
-              existingUsage.lastUpdated = new Date().toISOString();
-              characters[charIndex].avatarTokenUsage = existingUsage;
-              log.info(`📊 [AVATAR JOB ${jobId}] Token usage saved: ${JSON.stringify(existingUsage.byModel)}`);
+              log.info(`📊 [AVATAR JOB ${jobId}] Will save token usage: ${JSON.stringify(results.tokenUsage.byModel)}`);
             }
-
-            // Use ATOMIC updates to prevent race conditions with concurrent saves
-            // Instead of read-modify-write on entire document, use jsonb_set for each field
-            const charPath = `{characters,${charIndex}}`;
 
             // Build avatar data for full data column
             // NOTE: We intentionally DON'T spread old avatars here - we use SQL-level merge below
@@ -2329,20 +2336,19 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               clothing: results.clothing,
             };
 
-            // Build atomic update SQL with all field updates
+            // Build atomic update SQL with all field updates using FRESH index
             // Each jsonb_set wraps the previous, creating nested atomic updates
             let dataUpdate = 'data';
             let metaUpdate = 'metadata';
-            const params = [rowId]; // $1 = rowId
+            const params = [freshRowId]; // $1 = rowId (use fresh rowId)
             let paramIndex = 2;
 
             // Avatar data (always update if we have results)
             // Use SQL-level merge: COALESCE(existing, '{}') || new_data to preserve other avatar fields
-            // This avoids race conditions from using stale in-memory data
             if (results.faceThumbnails || results.standard || results.winter || results.summer) {
               // Merge new avatars with existing DB avatars (references current DB value, not stale in-memory)
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatars}', COALESCE(data->'characters'->${charIndex}->'avatars', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},avatars}', $${paramIndex + 1}::jsonb, true)`;
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},avatars}', COALESCE(data->'characters'->${freshCharIndex}->'avatars', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},avatars}', $${paramIndex + 1}::jsonb, true)`;
               params.push(JSON.stringify(newAvatarData), JSON.stringify(lightAvatarData));
               paramIndex += 2;
             }
@@ -2367,8 +2373,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
               for (const [field, value] of traitFields) {
                 if (value) {
-                  dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
-                  metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
+                  dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},${field}}', $${paramIndex}::jsonb, true)`;
+                  metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},${field}}', $${paramIndex}::jsonb, true)`;
                   params.push(JSON.stringify(value));
                   paramIndex += 1;
                 }
@@ -2377,8 +2383,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
             // Structured clothing
             if (results.structuredClothing?.standard) {
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},structured_clothing}', $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(results.structuredClothing.standard));
               paramIndex += 1;
             }
@@ -2396,7 +2402,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               }
 
               // Use SQL-level merge for token usage (only in data column)
-              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},avatarTokenUsage}', COALESCE(data->'characters'->${charIndex}->'avatarTokenUsage', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},avatarTokenUsage}', COALESCE(data->'characters'->${freshCharIndex}->'avatarTokenUsage', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(newUsage));
               paramIndex += 1;
 
@@ -2407,8 +2413,19 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             const updateQuery = `UPDATE characters SET data = ${dataUpdate}, metadata = ${metaUpdate} WHERE id = $1`;
             await dbQuery(updateQuery, params);
 
-            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} in row ${rowId} (data + metadata)`);
+            // Commit transaction
+            await dbQuery('COMMIT');
+
+            log.info(`✅ [AVATAR JOB ${jobId}] Successfully updated character ${name || characterId} at index ${freshCharIndex} in row ${freshRowId} (data + metadata)`);
             results.dbSaveSuccessful = true;
+          } else {
+            await dbQuery('ROLLBACK');
+            throw new Error(`Character at fresh index ${freshCharIndex} is undefined`);
+          }
+          } catch (txErr) {
+            // Ensure rollback on any error
+            try { await dbQuery('ROLLBACK'); } catch (rollbackErr) { /* ignore rollback errors */ }
+            throw txErr;
           }
         } else {
           // Character still not found after all retries - fail the job
