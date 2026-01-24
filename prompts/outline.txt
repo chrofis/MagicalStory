@@ -171,7 +171,7 @@ List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensu
 **Animals & Creatures** - Any animal appearing in 2+ scenes:
 - name: What it's called (e.g., "Whiskers")
 - species: Type of animal
-- coloring: Exact colors and patterns
+- coloring: Exact colors and patterns. For breeds with distinctive patterns, always describe the FULL pattern, not just base color.
 - size: Relative size description
 - features: Collar, markings, accessories
 
