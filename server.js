@@ -8196,6 +8196,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let streamingCoverHints = null;
     let streamingPagesDetected = 0;
     let lastProgressUpdate = Date.now();
+    let landmarkDescriptionsPromise = null; // Promise for loading landmark photo descriptions
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -8218,6 +8219,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Wait for visual bible if not yet available
         while (!streamingVisualBible) {
           await new Promise(r => setTimeout(r, 100));
+        }
+
+        // Wait for landmark photo descriptions to be loaded (so variants are in the prompt)
+        if (landmarkDescriptionsPromise) {
+          await landmarkDescriptionsPromise;
         }
 
         const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
@@ -8461,6 +8467,15 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         filterMainCharactersFromVisualBible(streamingVisualBible, inputData.characters);
         // Initialize main characters from inputData.characters
         initializeVisualBibleMainCharacters(streamingVisualBible, inputData.characters);
+
+        // Link pre-discovered landmarks and load photo variant descriptions
+        // This must happen BEFORE scene expansion so variants are available in the prompt
+        if (inputData.availableLandmarks?.length > 0) {
+          linkPreDiscoveredLandmarks(streamingVisualBible, inputData.availableLandmarks);
+        }
+        // Start async loading of photo descriptions (scene expansion will wait for this)
+        landmarkDescriptionsPromise = loadLandmarkPhotoDescriptions(streamingVisualBible);
+
         log.debug(`⚡ [STREAM] Visual Bible ready - scene expansions can now proceed`);
       },
       onCoverHints: () => {
