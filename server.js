@@ -6868,17 +6868,39 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       }
     );
 
-    // Prepare styled avatars for basic clothing categories (standard, winter, summer)
+    // Prepare styled avatars ONLY for clothing categories actually used in the story
     // This populates the cache so streaming images can use styled avatars
     if (artStyle !== 'realistic') {
       try {
-        const basicRequirements = (inputData.characters || []).flatMap(char =>
-          ['standard', 'winter', 'summer'].map(cat => ({
+        const basicRequirements = (inputData.characters || []).flatMap(char => {
+          const charNameLower = char.name?.toLowerCase();
+          // Find clothing requirements for this character (case-insensitive lookup)
+          const charReqs = streamingClothingRequirements?.[char.name] ||
+                           streamingClothingRequirements?.[charNameLower] ||
+                           (streamingClothingRequirements && Object.entries(streamingClothingRequirements)
+                             .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
+
+          // Get categories with used=true, default to ['standard'] if no requirements
+          let usedCategories = charReqs
+            ? Object.entries(charReqs)
+                .filter(([cat, config]) => config?.used)
+                .map(([cat, config]) => cat === 'costumed' && config?.costume
+                  ? `costumed:${config.costume}`
+                  : cat)
+            : ['standard'];
+
+          // At minimum, always include 'standard' if no categories found
+          if (usedCategories.length === 0) {
+            usedCategories = ['standard'];
+          }
+
+          log.debug(`🔍 [STYLED AVATARS] ${char.name}: using categories [${usedCategories.join(', ')}]`);
+          return usedCategories.map(cat => ({
             pageNumber: 'pre-stream',
             clothingCategory: cat,
             characterNames: [char.name]
-          }))
-        );
+          }));
+        });
         await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, streamingClothingRequirements, addUsage);
         log.debug(`✅ [STORYBOOK] Pre-streaming styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
@@ -8632,15 +8654,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (!skipImages && artStyle !== 'realistic') {
       log.debug(`🎨 [UNIFIED] Preparing styled avatars for covers...`);
 
-      // Prepare styled avatars for basic clothing categories used in covers
+      // Prepare styled avatars ONLY for clothing categories actually used in the story
       try {
-        const basicCoverRequirements = (inputData.characters || []).flatMap(char =>
-          ['standard', 'winter', 'summer'].map(cat => ({
+        const basicCoverRequirements = (inputData.characters || []).flatMap(char => {
+          const charNameLower = char.name?.toLowerCase();
+          // Find clothing requirements for this character (case-insensitive lookup)
+          const charReqs = streamingClothingRequirements?.[char.name] ||
+                           streamingClothingRequirements?.[charNameLower] ||
+                           (streamingClothingRequirements && Object.entries(streamingClothingRequirements)
+                             .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
+
+          // Get categories with used=true, default to ['standard'] if no requirements
+          let usedCategories = charReqs
+            ? Object.entries(charReqs)
+                .filter(([cat, config]) => config?.used)
+                .map(([cat, config]) => cat === 'costumed' && config?.costume
+                  ? `costumed:${config.costume}`
+                  : cat)
+            : ['standard'];
+
+          // At minimum, always include 'standard' for covers if no categories found
+          if (usedCategories.length === 0) {
+            usedCategories = ['standard'];
+          }
+
+          log.debug(`🔍 [STYLED AVATARS] ${char.name}: using categories [${usedCategories.join(', ')}]`);
+          return usedCategories.map(cat => ({
             pageNumber: 'pre-cover',
             clothingCategory: cat,
             characterNames: [char.name]
-          }))
-        );
+          }));
+        });
         await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, streamingClothingRequirements, addUsage);
         log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
