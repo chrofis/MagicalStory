@@ -644,6 +644,7 @@ export default function StoryWizard() {
                           totalAttempts: devData.totalAttempts ?? img.totalAttempts,
                           faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
                           referencePhotos: devData.referencePhotos ?? img.referencePhotos,
+                          landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
                           consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
                         };
                       }
@@ -665,6 +666,7 @@ export default function StoryWizard() {
                             qualityReasoning: devCover.qualityReasoning ?? currentCover.qualityReasoning,
                             retryHistory: devCover.retryHistory ?? currentCover.retryHistory,
                             referencePhotos: devCover.referencePhotos ?? currentCover.referencePhotos,
+                            landmarkPhotos: devCover.landmarkPhotos ?? currentCover.landmarkPhotos,
                           };
                         }
                       }
