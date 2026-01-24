@@ -127,9 +127,14 @@ router.put('/roles', authenticateToken, async (req, res) => {
       return {
         ...rest,
         avatars: avatars ? {
-          standard: avatars.standard ? [avatars.standard[0]] : [],
+          // Don't include full avatars in metadata - use hasFullAvatars flag instead
+          // Full avatars are loaded on-demand via /api/characters/:id/avatars
+          hasFullAvatars: !!(avatars.standard || avatars.winter || avatars.summer || avatars.formal),
           status: avatars.status,
-          faceThumbnails: avatars.faceThumbnails
+          faceThumbnails: avatars.faceThumbnails,
+          // Include clothing descriptions (lightweight text, needed for story generation)
+          clothing: avatars.clothing,
+          signatures: avatars.signatures
         } : undefined
       };
     });
