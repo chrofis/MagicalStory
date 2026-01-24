@@ -2837,32 +2837,48 @@ function getLandmarkPhotosForPage(visualBible, pageNumber) {
 /**
  * Get landmark reference photos for a scene based on LOC IDs in scene metadata
  * Parses objects like "Burgruine Stein [LOC002]" to extract LOC IDs
+ * Also checks setting.location for landmark references
  * @param {Object} visualBible - Visual Bible object with locations
- * @param {Object} sceneMetadata - Scene metadata with objects array containing LOC IDs
+ * @param {Object} sceneMetadata - Scene metadata with objects array and setting.location
  * @returns {Array<{name: string, photoData: string, attribution: string, source: string}>} Landmark photos
  */
 function getLandmarkPhotosForScene(visualBible, sceneMetadata) {
-  if (!visualBible?.locations || !sceneMetadata?.objects) return [];
+  if (!visualBible?.locations) return [];
 
   // Extract LOC IDs and names from objects like "Burgruine Stein [LOC002]" or "Kennedy Space Center [LOC001]"
   const locIds = [];
   const locNames = [];
-  for (const obj of sceneMetadata.objects) {
-    // Match [LOC###] pattern in string like "Kennedy Space Center [LOC001]"
-    const bracketMatch = obj.match(/\[LOC(\d+)\]/i);
+
+  // Helper to extract LOC ID and name from a string like "Ruine Stein [LOC001]"
+  const extractLocFromString = (str) => {
+    if (!str || typeof str !== 'string') return;
+    // Match [LOC###] pattern
+    const bracketMatch = str.match(/\[LOC(\d+)\]/i);
     if (bracketMatch) {
       locIds.push(`LOC${bracketMatch[1].padStart(3, '0')}`);
       // Also extract the name before the bracket
-      const namePart = obj.replace(/\s*\[LOC\d+\]\s*/i, '').trim();
+      const namePart = str.replace(/\s*\[LOC\d+\]\s*/i, '').trim();
       if (namePart) locNames.push(namePart.toLowerCase());
     }
     // Also match plain "LOC002" format
-    else if (obj.match(/^LOC\d+$/i)) {
-      locIds.push(obj.toUpperCase());
+    else if (str.match(/^LOC\d+$/i)) {
+      locIds.push(str.toUpperCase());
     }
     // Fallback: treat as location name (for historical locations)
-    else if (obj.trim()) {
-      locNames.push(obj.trim().toLowerCase());
+    else if (str.trim()) {
+      locNames.push(str.trim().toLowerCase());
+    }
+  };
+
+  // Check setting.location first (e.g., "Ruine Stein [LOC001]")
+  if (sceneMetadata?.setting?.location) {
+    extractLocFromString(sceneMetadata.setting.location);
+  }
+
+  // Then check objects array
+  if (sceneMetadata?.objects) {
+    for (const obj of sceneMetadata.objects) {
+      extractLocFromString(obj);
     }
   }
 
