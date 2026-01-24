@@ -228,6 +228,7 @@ const {
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt,
   buildPreviousScenesContext,
+  buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
   extractSceneMetadata,
@@ -2796,8 +2797,11 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
     const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
     log.debug(`🔄 [REGEN SCENE ${pageNumber}] Expected clothing from outline: ${expectedClothing}`)
 
+    // Build available avatars for scene expansion
+    const availableAvatars = buildAvailableAvatarsForPrompt(characters);
+
     // Generate new scene description (includes Visual Bible recurring elements)
-    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing);
+    const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
     const sceneResult = await callClaudeAPI(scenePrompt, 6000);
     const newSceneDescription = sceneResult.text;
 
@@ -3000,6 +3004,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       const pageText = getPageText(storyData.storyText, pageNumber);
       const previousScenes = buildPreviousScenesContext(sceneDescriptions, pageNumber);
       const clothingData = storyData.clothingRequirements || {};
+      // Build available avatars for scene expansion (use full character list with avatar data)
+      const availableAvatars = buildAvailableAvatarsForPrompt(storyData.characters || []);
       const expansionPrompt = buildSceneDescriptionPrompt(
         pageNumber,
         pageText || inputDescription,  // Fallback to description if no page text
@@ -3009,7 +3015,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
         visualBible,
         previousScenes,
         clothingData,
-        correctionNotes
+        correctionNotes,
+        availableAvatars
       );
 
       try {
@@ -8248,6 +8255,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           : 'none';
         log.debug(`⚡ [STREAM-SCENE] Page ${page.pageNumber} starting expansion (clothing: ${clothingStr}, prev: ${previousScenes.length} pages)`);
 
+        // Build available avatars string so scene expansion knows what clothing exists
+        const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters);
+
         const expansionPrompt = buildSceneDescriptionPrompt(
           page.pageNumber,
           page.text,
@@ -8256,7 +8266,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           lang,
           streamingVisualBible,
           previousScenes,
-          pageClothing
+          pageClothing,
+          '',  // correctionNotes
+          availableAvatars
         );
 
         const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel);
@@ -8947,18 +8959,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
 
-      // Build per-character clothing lookup from scene.characterClothing
-      // scene.characterClothing = { "Lukas": "costumed:superhero", "Franziska": "standard" }
-      const perCharClothing = scene.characterClothing || {};
+      // Extract clothing from scene expansion's JSON output (not from outline)
+      // This ensures Claude's validated clothing selection is used, not the outline's suggestion
+      const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
+      const perCharClothing = sceneMetadataForClothing?.characterClothing || scene.characterClothing || {};
 
-      // Get default clothing (fallback for characters not in the map)
-      const defaultClothing = Object.values(perCharClothing)[0] || 'standard';
+      // Always default to 'standard' for unlisted characters (not first character's costume)
+      // This prevents inheriting costumes from other characters
+      const defaultClothing = 'standard';
       let defaultCategory = defaultClothing;
       let defaultCostumeType = null;
-      if (defaultClothing.startsWith('costumed:')) {
-        defaultCategory = 'costumed';
-        defaultCostumeType = defaultClothing.split(':')[1];
-      }
 
       // Pass per-character clothing requirements merged with story-level requirements
       // Each character's clothing category from scene.characterClothing
@@ -9376,6 +9386,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   summary: img.description?.substring(0, 200) || ''
                 }));
               const clothingDataForPrompt = clothingRequirements || {};
+              // Build available avatars for scene expansion
+              const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || []);
               const expansionPrompt = buildSceneDescriptionPrompt(
                 pageNum,
                 pageText || sceneHint,  // Fallback to scene hint if no page text
@@ -9385,7 +9397,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 visualBible,
                 previousScenes,
                 clothingDataForPrompt,
-                correctionNotes
+                correctionNotes,
+                availableAvatars
               );
 
               const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel);
@@ -10743,8 +10756,11 @@ Output Format:
         // Get current page's clothing from outline
         const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
 
+        // Build available avatars for scene expansion
+        const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || []);
+
         // Generate scene description using Art Director prompt (in story language)
-        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing);
+        const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing, '', availableAvatars);
 
         // Start scene description + image generation (don't await)
         const imagePromise = limit(async () => {
@@ -11219,10 +11235,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Get current page's clothing from outline
           const currentClothing = pageClothingData?.pageClothing?.[pageNum] || pageClothingData?.primaryClothing || 'standard';
 
+          // Build available avatars for scene expansion
+          const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || []);
+
           try {
             // Generate scene description using Art Director prompt (in story language)
             // Pass visualBible so recurring elements are included in scene description
-            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing);
+            const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing, '', availableAvatars);
 
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
             const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride);

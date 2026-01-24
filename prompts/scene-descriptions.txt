@@ -137,9 +137,17 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 **Story Text:**
 {PAGE_CONTENT}
 
-**Character Clothing:**
+**Character Clothing (recommendation from outline):**
 {CHARACTER_CLOTHING}
-(Valid categories: standard, winter, summer, costumed:type)
+
+**Available Avatars (YOU MUST SELECT FROM THESE):**
+{AVAILABLE_AVATARS}
+
+IMPORTANT CLOTHING RULES:
+- Select clothing for each character ONLY from their available avatars above
+- If recommended clothing doesn't exist for a character, use "standard" instead
+- Characters not mentioned in recommendation should use "standard"
+- Never assign a costume that isn't in the character's available list
 
 **Main Characters:**
 {CHARACTERS}
@@ -307,6 +315,22 @@ Examples:
 - ❌ "Rocks piled in the cave entrance" (could climb over a pile)
 - ✅ "Boulder fills the cave mouth from floor to ceiling, no gaps visible"
 
+**16. Holding Inventory:**
+For EACH character, list what they're holding and which hand(s):
+
+1. Count items being held
+2. Assign each item to specific hand(s): LEFT, RIGHT, or BOTH
+3. Verify no conflicts:
+   - LEFT + RIGHT = OK (one item per hand)
+   - BOTH + anything else = CONFLICT (both hands occupied, can't hold more)
+   - "tucked under arm" counts as using that arm
+
+Examples:
+- ✅ "Left hand: shield. Right hand: sword." (one per hand)
+- ✅ "Both hands: heavy treasure chest." (both occupied, nothing else)
+- ❌ "Both hands: open book. Stuffed animal tucked under left arm." (left arm can't do both)
+- ❌ "Right hand: pointing. Both hands: gripping steering wheel." (right hand can't do both)
+
 **After checking, list:**
 - `issues`: Every problem found (be specific)
 - `corrections`: How to fix each issue
@@ -368,6 +392,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "linearSpaceConsistency": "Path: [type]. Orientation: [lengthwise/crosswise/diagonal]. Character positions match orientation? YES/NO",
     "sharedObjectInteractions": "Shared objects: [list or NONE]. Each in Objects section with grip points? YES/NO/N/A",
     "obstacleLogic": "Obstacles blocking passage: [list or NONE]. Each explains WHY impassable (spans width/wedged/too large)? YES/NO/N/A",
+    "holdingInventory": "For EACH character: [Name] L:[item/empty] R:[item/empty] BOTH:[item/none]. Conflict? YES/NO",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },

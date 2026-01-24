@@ -1967,6 +1967,37 @@ ${historicalGuide}${locationsSection}
 }
 
 /**
+ * Build available avatars list for scene expansion prompt
+ * @param {Array} characters - Character array with avatars
+ * @returns {string} Formatted string showing available clothing per character
+ */
+function buildAvailableAvatarsForPrompt(characters) {
+  if (!characters || characters.length === 0) return '(No characters)';
+
+  return characters.map(char => {
+    const avatars = char.avatars || {};
+    const available = [];
+
+    // Standard categories
+    if (avatars.standard) available.push('standard');
+    if (avatars.winter) available.push('winter');
+    if (avatars.summer) available.push('summer');
+
+    // Costumed categories
+    if (avatars.costumed && typeof avatars.costumed === 'object') {
+      for (const costumeType of Object.keys(avatars.costumed)) {
+        available.push(`costumed:${costumeType}`);
+      }
+    }
+
+    // Fallback - always assume standard exists
+    if (available.length === 0) available.push('standard');
+
+    return `- ${char.name}: ${available.join(', ')}`;
+  }).join('\n');
+}
+
+/**
  * Build Art Director scene description prompt
  * @param {number} pageNumber - Current page number
  * @param {string} pageContent - Text content for current page
@@ -1977,8 +2008,9 @@ ${historicalGuide}${locationsSection}
  * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2)
  * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string
  * @param {string} correctionNotes - Notes from previous failed attempt (for regeneration)
+ * @param {string} availableAvatars - Pre-built string of available avatars per character
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '') {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '') {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -2160,6 +2192,7 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
       CHARACTER_CLOTHING: characterClothingText,
+      AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),
@@ -3070,6 +3103,7 @@ module.exports = {
   buildSceneExpansionPrompt,
   buildUnifiedStoryPrompt,
   buildPreviousScenesContext,
+  buildAvailableAvatarsForPrompt,
 
   // Teaching guides
   getTeachingGuide,
