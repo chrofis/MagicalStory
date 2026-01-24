@@ -62,13 +62,18 @@ function parseCharacterClothingBlock(content) {
   // Characters:
   // - Name1: standard
   // - Name2 (alias): costumed:type
+  // Also handles single-line comma-separated format:
+  // Characters: Name1: standard, Name2: costumed:wizard, Name3: winter
   const charactersBlockMatch = content.match(/Characters:\s*([\s\S]*?)(?=---\s*Page|$)/i);
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
-    // Match lines like "- Name: category" or "Name: category" (with or without leading hyphen)
-    // Also allows "* Name: category" bullet format
-    // costumed:[^\n]+ allows costume names with spaces like "mittelalterlicher Junge"
-    const linePattern = /^[-*]?\s*([^:\n]+):\s*(standard|winter|summer|costumed:[^\n]+)/gim;
+    // Match "Name: category" entries - supports both multi-line (with bullets) and single-line comma-separated
+    // (?:^|,\s*) - start of line OR after comma (for single-line format)
+    // [-*]?\s* - optional bullet point
+    // ([^:\n,]+) - name (no colon, newline, or comma)
+    // :\s* - colon separator
+    // (standard|winter|summer|costumed:[^\n,]+) - clothing category (stops at comma or newline)
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^:\n,]+):\s*(standard|winter|summer|costumed:[^\n,]+)/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();

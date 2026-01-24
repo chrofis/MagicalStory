@@ -1071,10 +1071,26 @@ function parseSceneHintMetadata(sceneHint) {
 
   const result = { characters: null, setting: null, time: null, weather: null };
 
-  // Try to match "Characters: Luis: knight, Noel: standard" format
-  const charsMatch = sceneHint.match(/Characters?:\s*([^\n]+)/i);
+  // Try to match Characters section - handles both formats:
+  // 1. Single line: "Characters: Luis: knight, Noel: standard"
+  // 2. Multi-line: "Characters:\n- Luis: knight\n- Noel: standard"
+  const charsMatch = sceneHint.match(/Characters?:\s*([\s\S]*?)(?=Setting:|$)/i);
   if (charsMatch) {
-    result.characters = charsMatch[1].trim();
+    const charBlock = charsMatch[1].trim();
+    // Check if it's multi-line format (has newlines with bullet points)
+    if (charBlock.includes('\n') && /^[-*]\s*\w/m.test(charBlock)) {
+      // Multi-line format: extract and join character entries
+      const charEntries = [];
+      const linePattern = /^[-*]\s*([^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n,]+))/gim;
+      let lineMatch;
+      while ((lineMatch = linePattern.exec(charBlock)) !== null) {
+        charEntries.push(lineMatch[1].trim());
+      }
+      result.characters = charEntries.length > 0 ? charEntries.join(', ') : charBlock;
+    } else {
+      // Single line format: use as-is
+      result.characters = charBlock;
+    }
   }
 
   // Try to match "Setting: X | Time: Y | Weather: Z" format
