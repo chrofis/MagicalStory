@@ -1261,9 +1261,15 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       // Fall back to unstyled clothing avatar (standard, winter, summer)
       else if (effectiveClothingCategory && effectiveClothingCategory !== 'costumed' && avatars && avatars[effectiveClothingCategory]) {
         photoType = `clothing-${effectiveClothingCategory}`;
-        // Handle legacy object format {imageData, clothing} if present in old data
+        // Handle various legacy formats: arrays, {imageData, clothing} objects
         const avatarData = avatars[effectiveClothingCategory];
-        photoUrl = (typeof avatarData === 'object' && avatarData.imageData) ? avatarData.imageData : avatarData;
+        if (Array.isArray(avatarData)) {
+          photoUrl = avatarData[0];
+        } else if (typeof avatarData === 'object' && avatarData.imageData) {
+          photoUrl = avatarData.imageData;
+        } else {
+          photoUrl = avatarData;
+        }
         usedClothingCategory = effectiveClothingCategory;
         // Get extracted clothing description for this avatar
         if (avatars.clothing && avatars.clothing[effectiveClothingCategory]) {
@@ -1277,9 +1283,15 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       if (!photoUrl && effectiveClothingCategory === 'costumed' && avatars?.formal) {
         log.debug(`[AVATAR COMPAT] ${char.name}: Using legacy 'formal' avatar for costumed request`);
         photoType = 'clothing-formal';
-        // Handle legacy object format {imageData, clothing} if present in old data
+        // Handle various legacy formats: arrays, {imageData, clothing} objects
         const formalData = avatars.formal;
-        photoUrl = (typeof formalData === 'object' && formalData.imageData) ? formalData.imageData : formalData;
+        if (Array.isArray(formalData)) {
+          photoUrl = formalData[0];
+        } else if (typeof formalData === 'object' && formalData.imageData) {
+          photoUrl = formalData.imageData;
+        } else {
+          photoUrl = formalData;
+        }
         usedClothingCategory = 'formal';
         if (avatars.clothing?.formal) {
           const clothingData = avatars.clothing.formal;
@@ -1297,9 +1309,15 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         for (const fallbackCategory of fallbacks) {
           if (avatars[fallbackCategory]) {
             photoType = `clothing-${fallbackCategory}`;
-            // Handle legacy object format {imageData, clothing} if present in old data
+            // Handle various legacy formats: arrays, {imageData, clothing} objects
             const fallbackData = avatars[fallbackCategory];
-            photoUrl = (typeof fallbackData === 'object' && fallbackData.imageData) ? fallbackData.imageData : fallbackData;
+            if (Array.isArray(fallbackData)) {
+              photoUrl = fallbackData[0];
+            } else if (typeof fallbackData === 'object' && fallbackData.imageData) {
+              photoUrl = fallbackData.imageData;
+            } else {
+              photoUrl = fallbackData;
+            }
             usedClothingCategory = fallbackCategory;
             if (avatars.clothing && avatars.clothing[fallbackCategory]) {
               const clothingData = avatars.clothing[fallbackCategory];
@@ -2483,43 +2501,49 @@ function buildSceneExpansionPrompt(sceneSummary, inputData, sceneCharacters, vis
     // Add secondary characters
     if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
       visualBible.secondaryCharacters.forEach(char => {
-        elements.push(`* **${char.name}**${idLabel(char)} (secondary character): ${char.description}`);
+        const description = char.extractedDescription || char.description;
+        elements.push(`* **${char.name}**${idLabel(char)} (secondary character): ${description}`);
       });
     }
 
     // Add locations
     if (visualBible.locations && visualBible.locations.length > 0) {
       visualBible.locations.forEach(location => {
-        elements.push(`* **${location.name}**${idLabel(location)} (location): ${location.description}`);
+        const description = location.extractedDescription || location.description;
+        elements.push(`* **${location.name}**${idLabel(location)} (location): ${description}`);
       });
     }
 
     // Add vehicles
     if (visualBible.vehicles && visualBible.vehicles.length > 0) {
       visualBible.vehicles.forEach(vehicle => {
-        elements.push(`* **${vehicle.name}**${idLabel(vehicle)} (vehicle): ${vehicle.description}`);
+        const description = vehicle.extractedDescription || vehicle.description;
+        elements.push(`* **${vehicle.name}**${idLabel(vehicle)} (vehicle): ${description}`);
       });
     }
 
     // Add animals
     if (visualBible.animals && visualBible.animals.length > 0) {
       visualBible.animals.forEach(animal => {
-        elements.push(`* **${animal.name}**${idLabel(animal)} (animal): ${animal.description}`);
+        const description = animal.extractedDescription || animal.description;
+        elements.push(`* **${animal.name}**${idLabel(animal)} (animal): ${description}`);
       });
     }
 
     // Add artifacts
     if (visualBible.artifacts && visualBible.artifacts.length > 0) {
       visualBible.artifacts.forEach(artifact => {
-        elements.push(`* **${artifact.name}**${idLabel(artifact)} (object): ${artifact.description}`);
+        const description = artifact.extractedDescription || artifact.description;
+        elements.push(`* **${artifact.name}**${idLabel(artifact)} (object): ${description}`);
       });
     }
 
     // Add clothing/costumes
     if (visualBible.clothing && visualBible.clothing.length > 0) {
       visualBible.clothing.forEach(item => {
+        const description = item.extractedDescription || item.description;
         const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
-        elements.push(`* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${item.description}`);
+        elements.push(`* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${description}`);
       });
     }
 
