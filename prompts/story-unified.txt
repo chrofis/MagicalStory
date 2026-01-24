@@ -108,7 +108,14 @@ Let the story be warm and entertaining without trying to be a comedian.
 You MUST output ALL sections below in this EXACT order. Do not skip any section.
 
 ---TITLE---
-TITLE: [Creative, age-appropriate title]
+Create a title that:
+- Is SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
+- References a unique element: a character name, location, object, or pivotal moment
+- Creates curiosity or intrigue
+- Avoids clichés like "The [Adjective] [Noun]" patterns
+- Works well in {LANGUAGE}
+
+TITLE: [Your creative, specific title]
 
 ---CHARACTER ARCS---
 
