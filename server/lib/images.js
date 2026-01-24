@@ -90,6 +90,103 @@ const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS);
 // Quality threshold from environment or default
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
 
+// =============================================================================
+// PROMPT ENHANCEMENT FOR CHARACTER CONSISTENCY
+// Builds numbered reference section and identity preservation instructions
+// Works for both Gemini 2.5 Flash and 3 Pro (3 Pro benefits more from this)
+// =============================================================================
+
+/**
+ * Build enhanced prompt with numbered image references and identity preservation instructions
+ * This structure works for both Gemini 2.5 Flash and 3 Pro Image models.
+ * 3 Pro has dedicated identity tracking that benefits from explicit numbering.
+ *
+ * @param {string} originalPrompt - The scene description prompt
+ * @param {Array} characterPhotos - Array of {name, photoUrl} objects
+ * @param {Array} landmarkPhotos - Array of {name, photoData} objects
+ * @param {boolean} hasSequentialImage - Whether a previous scene image is included
+ * @returns {string} Enhanced prompt with reference map and identity instructions
+ */
+function buildEnhancedPromptWithReferences(originalPrompt, characterPhotos = [], landmarkPhotos = [], hasSequentialImage = false) {
+  const parts = [];
+  let imageIndex = 1;
+
+  // Track which images map to which reference number
+  const referenceMap = [];
+
+  // If sequential mode, the previous scene is Image 1
+  if (hasSequentialImage) {
+    referenceMap.push({ index: imageIndex, type: 'previous_scene', name: 'Previous scene' });
+    imageIndex++;
+  }
+
+  // Map character photos
+  const validCharacters = (characterPhotos || []).filter(p => {
+    const url = typeof p === 'string' ? p : p?.photoUrl;
+    return url && url.startsWith('data:image');
+  });
+
+  for (const photoData of validCharacters) {
+    const name = typeof photoData === 'object' ? photoData?.name : `Character ${imageIndex}`;
+    referenceMap.push({ index: imageIndex, type: 'character', name });
+    imageIndex++;
+  }
+
+  // Map landmark photos
+  const validLandmarks = (landmarkPhotos || []).filter(l => l.photoData && l.photoData.startsWith('data:image'));
+
+  for (const landmark of validLandmarks) {
+    referenceMap.push({ index: imageIndex, type: 'landmark', name: landmark.name });
+    imageIndex++;
+  }
+
+  // Build reference map section (only if we have references)
+  if (referenceMap.length > 0) {
+    parts.push('**REFERENCE IMAGES (in order):**');
+
+    for (const ref of referenceMap) {
+      if (ref.type === 'previous_scene') {
+        parts.push(`${ref.index}. Previous scene - maintain visual continuity, style, lighting`);
+      } else if (ref.type === 'character') {
+        parts.push(`${ref.index}. ${ref.name} - character reference photo`);
+      } else if (ref.type === 'landmark') {
+        parts.push(`${ref.index}. ${ref.name} - real-world landmark reference`);
+      }
+    }
+    parts.push('');
+  }
+
+  // Add identity preservation instructions (only if we have character references)
+  const characterRefs = referenceMap.filter(r => r.type === 'character');
+  if (characterRefs.length > 0) {
+    parts.push('**IDENTITY PRESERVATION (CRITICAL):**');
+    parts.push('Each character MUST be the SAME PERSON as shown in their reference image.');
+    parts.push('Preserve exact: eye shape, nose, jawline, hair color/style, facial proportions.');
+    parts.push('Do not average or blend features - replicate the exact face from each reference.');
+
+    // List specific character mappings for clarity
+    for (const ref of characterRefs) {
+      parts.push(`- Image ${ref.index} defines ${ref.name}'s appearance - maintain exact likeness`);
+    }
+    parts.push('');
+  }
+
+  // Add landmark instructions if present
+  const landmarkRefs = referenceMap.filter(r => r.type === 'landmark');
+  if (landmarkRefs.length > 0) {
+    parts.push('**LANDMARK REFERENCE:**');
+    for (const ref of landmarkRefs) {
+      parts.push(`- Image ${ref.index} shows ${ref.name} - incorporate recognizable features from this reference`);
+    }
+    parts.push('');
+  }
+
+  // Add the original prompt
+  parts.push(originalPrompt);
+
+  return parts.join('\n');
+}
+
 // Maximum mask coverage for inpainting (percentage of image area)
 // Masks larger than this will skip repair - inpainting doesn't work well for large areas
 const MAX_MASK_COVERAGE_PERCENT = 25;
@@ -310,7 +407,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         // Handle both formats: string URL or {name, photoUrl} object
         const photoUrl = typeof refImg === 'string' ? refImg : refImg?.photoUrl;
         const charName = typeof refImg === 'object' ? refImg?.name : null;
-        if (photoUrl && photoUrl.startsWith('data:image')) {
+        if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
           // Check cache first using hash of original image
           const imageHash = hashImageData(photoUrl);
           let compressedBase64 = compressedRefCache.get(imageHash);
@@ -822,8 +919,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       // Evaluate quality using Gemini (still needed for consistency checking)
       const qualityResult = await evaluateImageQuality(
         result.imageData,
-        characterPhotos,
-        prompt,
+        prompt,              // originalPrompt (string)
+        characterPhotos,     // referenceImages (array)
         evaluationType,
         qualityModelOverride
       );
@@ -855,13 +952,29 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     throw new Error('Gemini API key not configured');
   }
 
-  // Build parts array with prompt + reference images
-  const parts = [{ text: prompt }];
+  // Determine if we have a previous scene image (for sequential mode)
+  const hasSequentialImage = previousImage && previousImage.startsWith('data:image');
+
+  // Build enhanced prompt with numbered image references and identity preservation
+  // This structure works for both Gemini 2.5 Flash and 3 Pro Image models
+  const enhancedPrompt = buildEnhancedPromptWithReferences(
+    prompt,
+    characterPhotos,
+    landmarkPhotos,
+    hasSequentialImage
+  );
+
+  // Build parts array: PROMPT FIRST, then images in order
+  // This is the optimal structure for Gemini 3 Pro's character consistency features
+  const parts = [{ text: enhancedPrompt }];
+
+  // Track image index for numbered labels (matches the reference map in the prompt)
+  let currentImageIndex = 1;
 
   // For sequential mode: Add PREVIOUS scene image FIRST (most important for continuity)
   // Crop the image slightly to change aspect ratio - this forces AI to regenerate
   // rather than copying too much from the reference image
-  if (previousImage && previousImage.startsWith('data:image')) {
+  if (hasSequentialImage) {
     // Crop 15% from top and bottom to change aspect ratio
     const croppedImage = await cropImageForSequential(previousImage);
 
@@ -869,12 +982,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
       croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
+    // Add numbered label for clarity
+    parts.push({ text: `[Image ${currentImageIndex} - Previous scene]:` });
     parts.push({
       inline_data: {
         mime_type: mimeType,
         data: base64Data
       }
     });
+    currentImageIndex++;
     log.debug(`🖼️  [IMAGE GEN] Added cropped previous scene image for visual continuity (SEQUENTIAL MODE)`);
   }
 
@@ -890,13 +1006,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     for (const photoData of characterPhotos) {
       // Handle both formats: string URL or {name, photoUrl} object
       let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-      // Handle object format {data: '...', mimeType: '...'}
-      if (photoUrl && typeof photoUrl === 'object' && photoUrl.data) {
-        photoUrl = photoUrl.data;
-      }
-      // Handle legacy object format {imageData: '...', clothing: '...'}
-      if (photoUrl && typeof photoUrl === 'object' && photoUrl.imageData) {
-        photoUrl = photoUrl.imageData;
+      // Handle various legacy formats
+      if (photoUrl && typeof photoUrl === 'object') {
+        if (Array.isArray(photoUrl)) {
+          photoUrl = photoUrl[0];
+        } else if (photoUrl.data) {
+          photoUrl = photoUrl.data;
+        } else if (photoUrl.imageData) {
+          photoUrl = photoUrl.imageData;
+        }
       }
       const characterName = typeof photoData === 'object' ? photoData?.name : null;
       const providedHash = typeof photoData === 'object' ? photoData?.photoHash : null;
@@ -922,9 +1040,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           matchesProvided: providedHash ? imageHash === providedHash : null
         });
 
-        // Option A: Add text label BEFORE the image if we have a name
+        // Add numbered label BEFORE the image (matches reference map in prompt)
+        const labelName = characterName || `Character ${addedCount + 1}`;
+        parts.push({ text: `[Image ${currentImageIndex} - ${labelName}]:` });
         if (characterName) {
-          parts.push({ text: `[Reference photo of ${characterName}]:` });
           characterNames.push(characterName);
         }
 
@@ -934,6 +1053,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
             data: compressedBase64
           }
         });
+        currentImageIndex++;
         addedCount++;
       } else {
         skippedCount++;
@@ -970,14 +1090,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const mimeType = landmark.photoData.match(/^data:(image\/\w+);base64,/) ?
           landmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-        // Add label before the image
-        parts.push({ text: `[Reference photo of ${landmark.name} (real-world landmark)]:` });
+        // Add numbered label before the image (matches reference map in prompt)
+        parts.push({ text: `[Image ${currentImageIndex} - ${landmark.name} (landmark)]:` });
         parts.push({
           inline_data: {
             mime_type: mimeType,
             data: base64Data
           }
         });
+        currentImageIndex++;
         landmarkAddedCount++;
         log.debug(`🌍 [IMAGE GEN] Added landmark reference: ${landmark.name}`);
       }
@@ -1001,10 +1122,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Truncate prompt if needed based on model's maxPromptLength
   const maxPromptLength = modelConfig?.maxPromptLength || 30000;
-  let effectivePrompt = prompt;
-  if (prompt.length > maxPromptLength) {
-    log.warn(`✂️ [IMAGE GEN] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength} for ${modelId}`);
-    effectivePrompt = prompt.substring(0, maxPromptLength - 3) + '...';
+  let effectivePrompt = enhancedPrompt;
+  if (enhancedPrompt.length > maxPromptLength) {
+    log.warn(`✂️ [IMAGE GEN] Prompt too long (${enhancedPrompt.length} chars), truncating to ${maxPromptLength} for ${modelId}`);
+    effectivePrompt = enhancedPrompt.substring(0, maxPromptLength - 3) + '...';
     // Update parts array with truncated prompt for Gemini path
     parts[0] = { text: effectivePrompt };
   }
@@ -1047,8 +1168,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       // Evaluate quality using Gemini
       const qualityResult = await evaluateImageQuality(
         result.imageData,
-        characterPhotos,
-        prompt,
+        prompt,              // originalPrompt (string)
+        characterPhotos,     // referenceImages (array)
         evaluationType,
         qualityModelOverride
       );
@@ -1084,7 +1205,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   };
 
-  log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt: ${prompt.substring(0, 100).replace(/\n/g, ' ')}...`);
+  log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with enhanced prompt (${enhancedPrompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
   log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
 
   const data = await withRetry(async () => {
