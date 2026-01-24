@@ -12,7 +12,9 @@ Extract the person's physical characteristics as shown in the GENERATED AVATAR.
 This captures user corrections (e.g., changed hair color) that were applied during generation.
 
 TASK 3: CLOTHING EXTRACTION (from IMAGE 2 - the generated avatar)
-Describe the EXACT clothing visible on the AI-generated avatar.
+Describe the clothing visible on the AI-generated avatar.
+NEVER include any text, logos, slogans, or graphic prints - only describe the garment type, color, fit, and style.
+Example: "black crew-neck sweatshirt with white graphic" → just "black crew-neck sweatshirt"
 IMPORTANT - Choose ONE of these two options:
   Option A: Dress/Jumpsuit → set "fullBody" with description, set "upperBody" and "lowerBody" to null
   Option B: Separate top + bottom → set "upperBody" and "lowerBody", set "fullBody" to null
