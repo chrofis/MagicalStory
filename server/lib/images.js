@@ -427,59 +427,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
 
       // Create a SANITIZED prompt that removes potentially triggering content:
       // - No detailed physical descriptions (age, body type, etc.)
-      // - No mention of "children" or ages
-      // - Focus purely on artistic/technical quality
-      // - KEEP full analysis structure for auto-repair functionality
-      const sanitizedPrompt = `You are a Technical QA Analyst evaluating an AI-generated illustration.
+      // Simplified prompt to avoid content filters
+      const sanitizedPrompt = `Illustration QA: Evaluate artwork against reference images.
 
-**TASK**: Audit for rendering errors and character consistency against reference photos.
+Check: rendering quality, character consistency, AI artifacts (hands, objects).
 
-**ANALYSIS STEPS**:
-
-1. **Subject Mapping**: For each figure, describe position, build, hair, attire, activity, perspective
-2. **Identity Sync**: Match each figure to reference photos, check hair/attire consistency
-3. **Rendering Integrity**:
-   - Count fingers on each visible hand (1,2,3,4,5)
-   - Check for structural issues (floating objects, missing limbs, clipping)
-   - Verify proportions and anatomy
-4. **Scene Check**: Are all expected characters present? Does action match prompt?
-
-**SCORING (0-10)**:
-- 10: Perfect, no issues
-- 8-9: Good, minor issues only
-- 5-7: Acceptable, some issues
-- 3-4: Poor, major issues
-- 0-2: Bad, multiple major issues
-
-**OUTPUT**: Return your COMPLETE analysis as JSON (no other text):
-\`\`\`json
+Return JSON only:
 {
-  "subject_mapping": [
-    {"figure": 1, "position": "...", "frame": "...", "hair": "...", "attire": "...", "activity": "...", "perspective": "..."}
-  ],
-  "identity_sync": [
-    {"figure": 1, "matched_reference": "...", "hair_match": "...", "attire_audit": "...", "issues": []}
-  ],
-  "rendering_integrity": {
-    "extremities": [{"figure": 1, "hand": "left", "digit_count": "1,2,3,4,5 = 5", "status": "OK"}],
-    "anatomy": ["..."],
-    "environment": ["..."]
-  },
-  "scene_check": {
-    "characters_present": ["Name (yes/missing)"],
-    "style_unity": "...",
-    "narrative_match": "..."
-  },
+  "figures": [{"id": 1, "position": "...", "hair": "...", "clothing": "..."}],
+  "matches": [{"figure": 1, "reference": "...", "confidence": 0.85, "face_bbox": [0.1,0.2,0.3,0.4], "issues": []}],
+  "rendering": {"hands": [{"figure": 1, "fingers": 5, "ok": true}], "issues": []},
+  "scene": {"all_present": true, "missing": []},
   "score": 7,
   "verdict": "PASS",
-  "issues_summary": "brief summary of issues",
-  "fixable_issues": [{"description": "visual description of issue", "severity": "MAJOR", "type": "hand", "fix": "what to render"}]
+  "issues_summary": "brief summary",
+  "fixable_issues": [{"description": "visual description", "severity": "MAJOR", "type": "hand", "fix": "what to render"}]
 }
-\`\`\`
 
-**RULES:**
-- fixable_issues: only if score < 8 and issues can be fixed by inpainting
-- Do NOT include bounding boxes - describe issues by visual appearance and position`;
+Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
 
       // Rebuild parts with sanitized prompt (keep images, replace text)
       const sanitizedParts = parts.slice(0, -1); // Remove original prompt
