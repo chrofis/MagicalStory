@@ -98,6 +98,7 @@ export default function StoryWizard() {
     enableFinalChecks, setEnableFinalChecks,
     incrementalConsistency, setIncrementalConsistency,
     incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
+    checkOnlyMode, setCheckOnlyMode,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
@@ -3090,6 +3091,7 @@ export default function StoryWizard() {
         // Developer feature options
         enableAutoRepair: enableAutoRepair,
         enableFinalChecks: enableFinalChecks,
+        checkOnlyMode: checkOnlyMode,  // Skip all regeneration, only run checks
         // Incremental consistency check (check each image against previous images)
         incrementalConsistency: incrementalConsistency ? {
           enabled: true,
@@ -4393,6 +4395,19 @@ export default function StoryWizard() {
                           {language === 'de' ? 'Zeigt nur an, was repariert würde, ohne tatsächlich zu reparieren' : language === 'fr' ? 'Affiche uniquement ce qui serait réparé sans effectuer de réparations' : 'Shows what would be fixed without actually fixing'}
                         </p>
                       )}
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-4">
+                        <input
+                          type="checkbox"
+                          checked={checkOnlyMode}
+                          onChange={(e) => setCheckOnlyMode(e.target.checked)}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Nur Prüfung (keine Regenerierung)' : language === 'fr' ? 'Vérification seule (pas de régénération)' : 'Check only (no regeneration)'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Führt alle Qualitätsprüfungen durch, überspringt aber Regenerierung/Reparatur' : language === 'fr' ? 'Exécute toutes les vérifications de qualité mais ignore la régénération/réparation' : 'Runs all quality checks but skips regeneration/repair'}
+                      </p>
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">
                         <input

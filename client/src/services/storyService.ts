@@ -1040,6 +1040,7 @@ export const storyService = {
       // Developer feature options
       enableAutoRepair: data.enableAutoRepair,
       enableFinalChecks: data.enableFinalChecks,
+      checkOnlyMode: data.checkOnlyMode,  // Skip all regeneration, only run checks
       // Incremental consistency check
       incrementalConsistency: data.incrementalConsistency,
       // Developer model overrides

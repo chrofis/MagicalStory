@@ -473,13 +473,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
   "score": 7,
   "verdict": "PASS",
   "issues_summary": "brief summary of issues",
-  "fix_targets": [{"bbox": [ymin, xmin, ymax, xmax], "issue": "brief", "fix": "what to render"}]
+  "fixable_issues": [{"description": "visual description of issue", "severity": "MAJOR", "type": "hand", "fix": "what to render"}]
 }
 \`\`\`
 
 **RULES:**
-- fix_targets: only if score < 8 and issues are fixable by re-rendering a region
-- bbox: normalized 0.0-1.0, format [ymin, xmin, ymax, xmax], origin top-left`;
+- fixable_issues: only if score < 8 and issues can be fixed by inpainting
+- Do NOT include bounding boxes - describe issues by visual appearance and position`;
 
       // Rebuild parts with sanitized prompt (keep images, replace text)
       const sanitizedParts = parts.slice(0, -1); // Remove original prompt
@@ -617,7 +617,24 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         log.info(`⭐ [QUALITY] Issues: ${issuesSummary}`);
       }
 
-      // Parse fix_targets from JSON if present (overrides text-based parsing)
+      // Parse fixable_issues from JSON (new two-stage format - no bboxes)
+      // These will be enriched with bounding boxes in a separate detection step
+      let fixableIssues = [];
+      if (parsedJson.fixable_issues && Array.isArray(parsedJson.fixable_issues)) {
+        fixableIssues = parsedJson.fixable_issues
+          .filter(i => i.description)
+          .map(i => ({
+            description: i.description,
+            severity: i.severity || 'MODERATE',
+            type: i.type || 'default',
+            fix: i.fix || `Fix: ${i.description}`
+          }));
+        if (fixableIssues.length > 0) {
+          log.info(`⭐ [QUALITY] Parsed ${fixableIssues.length} fixable issues (two-stage detection)`);
+        }
+      }
+
+      // Also parse legacy fix_targets for backwards compatibility
       let jsonFixTargets = fixTargets;
       if (parsedJson.fix_targets && Array.isArray(parsedJson.fix_targets)) {
         jsonFixTargets = parsedJson.fix_targets
@@ -628,7 +645,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             fixPrompt: t.fix || 'fix the issue'
           }));
         if (jsonFixTargets.length > 0) {
-          log.info(`⭐ [QUALITY] Parsed ${jsonFixTargets.length} fix targets from JSON`);
+          log.info(`⭐ [QUALITY] Parsed ${jsonFixTargets.length} fix targets from JSON (legacy format)`);
         }
       }
 
@@ -652,7 +669,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
         reasoning,
         issuesSummary, // Brief summary for quick display
         textIssue,
-        fixTargets: jsonFixTargets,
+        fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
+        fixableIssues: fixableIssues,     // New format without bboxes (for two-stage detection)
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -706,6 +724,186 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
     return null;
   }
+}
+
+/**
+ * Detect bounding boxes for a specific issue using Gemini's native detection
+ * This is stage 2 of the two-stage detection approach:
+ * Stage 1: Quality evaluation identifies issues (no bboxes needed)
+ * Stage 2: This function detects precise face_box and body_box for each fixable issue
+ *
+ * @param {string} imageData - Base64 image data
+ * @param {string} issueDescription - Description of the issue to locate
+ * @returns {Promise<{faceBox: number[]|null, bodyBox: number[]|null, label: string}|null>}
+ */
+async function detectBoundingBoxesForIssue(imageData, issueDescription) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      log.warn('⚠️  [BBOX-DETECT] Gemini API key not configured');
+      return null;
+    }
+
+    // Load prompt template
+    if (!PROMPT_TEMPLATES.boundingBoxDetection) {
+      log.warn('⚠️  [BBOX-DETECT] Bounding box detection prompt template not loaded');
+      return null;
+    }
+
+    const prompt = fillTemplate(PROMPT_TEMPLATES.boundingBoxDetection, {
+      ISSUE_DESCRIPTION: issueDescription
+    });
+
+    // Extract base64 and mime type
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = imageData.match(/^data:(image\/\w+);base64,/) ?
+      imageData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    const parts = [
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      },
+      { text: prompt }
+    ];
+
+    // Use gemini-2.0-flash for detection (good balance of speed and accuracy)
+    const modelId = 'gemini-2.0-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await withRetry(async () => {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            maxOutputTokens: 1000,
+            temperature: 0.1,  // Low temperature for precise detection
+            responseMimeType: 'application/json'
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+          ]
+        })
+      });
+    }, { maxRetries: 2, baseDelay: 1000 });
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error(`❌ [BBOX-DETECT] Gemini API error: ${error.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      log.warn('⚠️  [BBOX-DETECT] No response from Gemini');
+      return null;
+    }
+
+    const responseText = data.candidates[0].content.parts[0].text.trim();
+
+    // Parse JSON response
+    let parsedResult;
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0]);
+      }
+    } catch (e) {
+      log.warn(`⚠️  [BBOX-DETECT] Failed to parse response: ${e.message}`);
+      return null;
+    }
+
+    if (!parsedResult?.detections || !Array.isArray(parsedResult.detections) || parsedResult.detections.length === 0) {
+      log.warn('⚠️  [BBOX-DETECT] No detections in response');
+      return null;
+    }
+
+    // Get the first detection (most relevant)
+    const detection = parsedResult.detections[0];
+
+    // Normalize coordinates from 0-1000 to 0.0-1.0
+    const normalizeBox = (box) => {
+      if (!box || !Array.isArray(box) || box.length !== 4) return null;
+      const [ymin, xmin, ymax, xmax] = box;
+      // Handle both 0-1000 format (Gemini native) and 0-1 format (already normalized)
+      const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
+      return [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
+    };
+
+    const faceBox = normalizeBox(detection.face_box);
+    const bodyBox = normalizeBox(detection.body_box);
+
+    log.info(`📦 [BBOX-DETECT] Detected boxes for "${issueDescription.substring(0, 50)}...": ` +
+      `face=${faceBox ? 'yes' : 'no'}, body=${bodyBox ? 'yes' : 'no'}`);
+
+    return {
+      faceBox,
+      bodyBox,
+      label: detection.label || issueDescription,
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens }
+    };
+
+  } catch (error) {
+    log.error(`❌ [BBOX-DETECT] Error detecting bounding boxes: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Enrich fixable issues with bounding boxes using two-stage detection
+ * Calls detectBoundingBoxesForIssue for each fixable issue identified by quality evaluation
+ *
+ * @param {string} imageData - Base64 image data
+ * @param {Array<{description: string, severity: string, type: string, fix: string}>} fixableIssues - Issues from quality eval
+ * @returns {Promise<Array<{faceBox, bodyBox, issue, severity, type, fixPrompt}>>} - Enriched fix targets
+ */
+async function enrichWithBoundingBoxes(imageData, fixableIssues) {
+  if (!fixableIssues || fixableIssues.length === 0) {
+    return [];
+  }
+
+  log.info(`📦 [BBOX-ENRICH] Detecting bounding boxes for ${fixableIssues.length} fixable issue(s)`);
+
+  const enrichedTargets = [];
+
+  for (const issue of fixableIssues) {
+    const detection = await detectBoundingBoxesForIssue(imageData, issue.description);
+
+    if (detection) {
+      enrichedTargets.push({
+        faceBox: detection.faceBox,
+        bodyBox: detection.bodyBox,
+        // Use bodyBox as primary boundingBox for backwards compatibility
+        // groupFixTargetsForInpainting will choose the right box based on issue type
+        boundingBox: detection.bodyBox || detection.faceBox,
+        issue: issue.description,
+        severity: issue.severity,
+        type: issue.type,
+        fixPrompt: issue.fix || `Fix: ${issue.description}`,
+        label: detection.label
+      });
+    } else {
+      log.warn(`⚠️  [BBOX-ENRICH] Could not detect boxes for: ${issue.description.substring(0, 50)}...`);
+    }
+  }
+
+  log.info(`📦 [BBOX-ENRICH] Successfully enriched ${enrichedTargets.length}/${fixableIssues.length} issues with bounding boxes`);
+
+  return enrichedTargets;
 }
 
 /**
@@ -1354,14 +1552,25 @@ async function editImageWithPrompt(imageData, editInstruction) {
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
   const {
     isAdmin = false,
-    enableAutoRepair = false,
+    enableAutoRepair: enableAutoRepairInput = false,
     landmarkPhotos = [],
     sceneCharacterCount = 0,
     // Incremental consistency options
-    incrementalConsistency = null,  // { enabled, dryRun, lookbackCount, previousImages, ... }
+    incrementalConsistency: incrementalConsistencyInput = null,  // { enabled, dryRun, lookbackCount, previousImages, ... }
+    // Check-only mode: run all checks but skip regeneration/repair
+    checkOnlyMode = false,
   } = options;
-  // MAX ATTEMPTS: 3 for both covers and scenes (allows 2 retries after initial attempt)
-  const MAX_ATTEMPTS = 3;
+
+  // In check-only mode: only 1 attempt, no auto-repair, force dry-run for consistency
+  const MAX_ATTEMPTS = checkOnlyMode ? 1 : 3;
+  const enableAutoRepair = checkOnlyMode ? false : enableAutoRepairInput;
+  const incrementalConsistency = checkOnlyMode && incrementalConsistencyInput
+    ? { ...incrementalConsistencyInput, dryRun: true }
+    : incrementalConsistencyInput;
+
+  if (checkOnlyMode) {
+    log.debug(`🔍 [QUALITY RETRY] Check-only mode: MAX_ATTEMPTS=1, autoRepair=OFF, incrementalDryRun=ON`);
+  }
   const pageLabel = pageContext ? `[${pageContext}] ` : '';
 
   // Extract page number from pageContext for cache key uniqueness

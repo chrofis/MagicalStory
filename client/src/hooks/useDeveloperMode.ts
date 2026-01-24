@@ -34,6 +34,10 @@ interface DeveloperModeState {
   setIncrementalConsistency: (enable: boolean) => void;
   incrementalConsistencyDryRun: boolean;
   setIncrementalConsistencyDryRun: (enable: boolean) => void;
+  // Check-only mode: run all quality checks but skip all regeneration/repair
+  // Useful for analyzing issues before deciding on fixes
+  checkOnlyMode: boolean;
+  setCheckOnlyMode: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -62,6 +66,7 @@ const FEATURE_DEFAULTS = {
   enableFinalChecks: true,    // Final checks: run consistency checks at end of generation
   incrementalConsistency: false,  // Incremental consistency: check each image against previous
   incrementalConsistencyDryRun: true, // Dry run: log what would be fixed without fixing
+  checkOnlyMode: false,       // Check-only mode: run checks but skip all regeneration
 };
 
 /**
@@ -102,6 +107,9 @@ export function useDeveloperMode(): DeveloperModeState {
   // Incremental consistency: check each image against previous images as they're generated
   const [incrementalConsistency, setIncrementalConsistency] = useState(FEATURE_DEFAULTS.incrementalConsistency);
   const [incrementalConsistencyDryRun, setIncrementalConsistencyDryRun] = useState(FEATURE_DEFAULTS.incrementalConsistencyDryRun);
+
+  // Check-only mode: run all quality checks but skip all regeneration/repair
+  const [checkOnlyMode, setCheckOnlyMode] = useState(FEATURE_DEFAULTS.checkOnlyMode);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -157,6 +165,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setIncrementalConsistency,
     incrementalConsistencyDryRun,
     setIncrementalConsistencyDryRun,
+    checkOnlyMode,
+    setCheckOnlyMode,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

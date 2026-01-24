@@ -185,11 +185,12 @@ const {
 const {
   prefetchLandmarkPhotos,
   discoverLandmarksForLocation,
-  // Swiss pre-indexed landmarks
-  discoverAllSwissLandmarks,
-  getSwissLandmarksNearLocation,
-  getSwissLandmarksByCity,
-  getSwissLandmarkStats,
+  // Indexed landmarks (works for any city worldwide)
+  indexLandmarksForCities,
+  indexLandmarksForCity,
+  getIndexedLandmarksNearLocation,
+  getIndexedLandmarks,
+  getLandmarkIndexStats,
   getLandmarkPhotoOnDemand,
   SWISS_CITIES,
   // Lazy photo variant loading
@@ -1403,24 +1404,14 @@ async function initializeDatabase() {
       console.log('✓ Default pricing tiers seeded');
     }
 
-    // Discovered landmarks cache table - persists landmark discovery across restarts
-    await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS discovered_landmarks (
-        id SERIAL PRIMARY KEY,
-        location_key VARCHAR(200) NOT NULL UNIQUE,
-        city VARCHAR(100) NOT NULL,
-        country VARCHAR(100),
-        landmarks JSONB NOT NULL DEFAULT '[]',
-        landmark_count INT NOT NULL DEFAULT 0,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+    // Note: discovered_landmarks table is deprecated - all landmarks now in landmark_index
+    // The table will be dropped after migration (see below)
 
-    // Swiss landmarks - pre-indexed landmarks for all of Switzerland
+    // Landmark index - pre-indexed landmarks for ANY city worldwide
     // Stores metadata + AI description, photos fetched on-demand
+    // Renamed from swiss_landmarks to support global coverage
     await dbPool.query(`
-      CREATE TABLE IF NOT EXISTS swiss_landmarks (
+      CREATE TABLE IF NOT EXISTS landmark_index (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         wikipedia_page_id INT,
@@ -1431,7 +1422,8 @@ async function initializeDatabase() {
         latitude DECIMAL(10, 7),
         longitude DECIMAL(10, 7),
         nearest_city VARCHAR(100),
-        canton VARCHAR(50),
+        country VARCHAR(100),
+        region VARCHAR(50),
 
         -- Classification
         type VARCHAR(50),
@@ -1457,39 +1449,76 @@ async function initializeDatabase() {
       )
     `);
 
-    // Add photo columns (2 exterior + 2 interior)
+    // Migration: rename swiss_landmarks to landmark_index if exists
     await dbPool.query(`
-      ALTER TABLE swiss_landmarks
+      DO $$
+      BEGIN
+        IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'swiss_landmarks') THEN
+          -- Rename table
+          ALTER TABLE swiss_landmarks RENAME TO landmark_index;
+          -- Add country column if missing
+          ALTER TABLE landmark_index ADD COLUMN IF NOT EXISTS country VARCHAR(100);
+          -- Rename canton to region
+          IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'landmark_index' AND column_name = 'canton') THEN
+            ALTER TABLE landmark_index RENAME COLUMN canton TO region;
+          END IF;
+          -- Rename indexes
+          IF EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_swiss_landmarks_location') THEN
+            ALTER INDEX idx_swiss_landmarks_location RENAME TO idx_landmark_index_location;
+          END IF;
+          IF EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_swiss_landmarks_city') THEN
+            ALTER INDEX idx_swiss_landmarks_city RENAME TO idx_landmark_index_city;
+          END IF;
+          IF EXISTS (SELECT FROM pg_indexes WHERE indexname = 'idx_swiss_landmarks_type') THEN
+            ALTER INDEX idx_swiss_landmarks_type RENAME TO idx_landmark_index_type;
+          END IF;
+          -- Set country to Switzerland for existing records
+          UPDATE landmark_index SET country = 'Switzerland' WHERE country IS NULL;
+        END IF;
+      END $$;
+    `).catch(() => {}); // Ignore if already migrated
+
+    // Add photo columns (3 exterior + 3 interior = 6 variants total)
+    await dbPool.query(`
+      ALTER TABLE landmark_index
       ADD COLUMN IF NOT EXISTS photo_url_2 TEXT,
       ADD COLUMN IF NOT EXISTS photo_attribution_2 TEXT,
-      ADD COLUMN IF NOT EXISTS photo_description_2 TEXT
-    `).catch(() => {});  // Ignore if columns already exist
-
-    // Add interior photo columns + Wikipedia extract
-    await dbPool.query(`
-      ALTER TABLE swiss_landmarks
+      ADD COLUMN IF NOT EXISTS photo_description_2 TEXT,
       ADD COLUMN IF NOT EXISTS photo_url_3 TEXT,
       ADD COLUMN IF NOT EXISTS photo_attribution_3 TEXT,
       ADD COLUMN IF NOT EXISTS photo_description_3 TEXT,
       ADD COLUMN IF NOT EXISTS photo_url_4 TEXT,
       ADD COLUMN IF NOT EXISTS photo_attribution_4 TEXT,
       ADD COLUMN IF NOT EXISTS photo_description_4 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_url_5 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_attribution_5 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_description_5 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_url_6 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_attribution_6 TEXT,
+      ADD COLUMN IF NOT EXISTS photo_description_6 TEXT,
       ADD COLUMN IF NOT EXISTS wikipedia_extract TEXT
     `).catch(() => {});  // Ignore if columns already exist
 
-    // Indexes for swiss_landmarks
+    // Indexes for landmark_index
     await dbPool.query(`
-      CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_location
-      ON swiss_landmarks(latitude, longitude)
+      CREATE INDEX IF NOT EXISTS idx_landmark_index_location
+      ON landmark_index(latitude, longitude)
     `);
     await dbPool.query(`
-      CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_city
-      ON swiss_landmarks(LOWER(nearest_city))
+      CREATE INDEX IF NOT EXISTS idx_landmark_index_city
+      ON landmark_index(LOWER(nearest_city))
     `);
     await dbPool.query(`
-      CREATE INDEX IF NOT EXISTS idx_swiss_landmarks_type
-      ON swiss_landmarks(type)
+      CREATE INDEX IF NOT EXISTS idx_landmark_index_type
+      ON landmark_index(type)
     `);
+    await dbPool.query(`
+      CREATE INDEX IF NOT EXISTS idx_landmark_index_country
+      ON landmark_index(LOWER(country))
+    `);
+
+    // Drop obsolete discovered_landmarks table (now unified in landmark_index)
+    await dbPool.query(`DROP TABLE IF EXISTS discovered_landmarks`).catch(() => {});
 
     console.log('✓ Database tables initialized');
 
@@ -1741,10 +1770,10 @@ app.delete('/api/admin/landmarks-cache', async (req, res) => {
     let result;
 
     if (city) {
-      // Clear specific city
+      // Clear specific city from landmark_index
       const cacheKey = city.toLowerCase().replace(/\s+/g, '_');
       result = await dbPool.query(
-        'DELETE FROM discovered_landmarks WHERE location_key LIKE $1',
+        'DELETE FROM landmark_index WHERE LOWER(nearest_city) LIKE $1',
         [`%${cacheKey}%`]
       );
       // Also clear in-memory cache
@@ -1753,12 +1782,12 @@ app.delete('/api/admin/landmarks-cache', async (req, res) => {
           userLandmarkCache.delete(key);
         }
       }
-      log.info(`[ADMIN] Cleared landmarks cache for "${city}" (${result.rowCount} rows)`);
+      log.info(`[ADMIN] Cleared landmarks for "${city}" (${result.rowCount} rows from landmark_index)`);
     } else {
-      // Clear all
-      result = await dbPool.query('DELETE FROM discovered_landmarks');
+      // Clear all from landmark_index
+      result = await dbPool.query('DELETE FROM landmark_index');
       userLandmarkCache.clear();
-      log.info(`[ADMIN] Cleared all landmarks cache (${result.rowCount} rows)`);
+      log.info(`[ADMIN] Cleared all landmarks (${result.rowCount} rows from landmark_index)`);
     }
 
     res.json({
@@ -1783,32 +1812,37 @@ app.get('/api/admin/landmarks-photos', async (req, res) => {
       return res.status(400).json({ error: 'city parameter required' });
     }
 
+    // Query from landmark_index table
     const result = await dbPool.query(
-      "SELECT location_key, city, country, landmarks FROM discovered_landmarks WHERE LOWER(city) = LOWER($1)",
+      `SELECT id, name, type, nearest_city, country,
+              photo_url, photo_description, photo_attribution,
+              photo_url_2, photo_description_2,
+              photo_url_3, photo_description_3,
+              photo_url_4, photo_description_4,
+              photo_url_5, photo_description_5,
+              photo_url_6, photo_description_6
+       FROM landmark_index WHERE LOWER(nearest_city) = LOWER($1)
+       ORDER BY score DESC`,
       [city]
     );
 
-    const photos = [];
-    for (const row of result.rows) {
-      let landmarks = row.landmarks;
-      if (typeof landmarks === 'string') landmarks = JSON.parse(landmarks);
-      if (!Array.isArray(landmarks)) continue;
+    const landmarks = result.rows.map(l => ({
+      id: l.id,
+      name: l.name,
+      type: l.type,
+      city: l.nearest_city,
+      country: l.country,
+      photos: [
+        l.photo_url ? { url: l.photo_url, description: l.photo_description } : null,
+        l.photo_url_2 ? { url: l.photo_url_2, description: l.photo_description_2 } : null,
+        l.photo_url_3 ? { url: l.photo_url_3, description: l.photo_description_3 } : null,
+        l.photo_url_4 ? { url: l.photo_url_4, description: l.photo_description_4 } : null,
+        l.photo_url_5 ? { url: l.photo_url_5, description: l.photo_description_5 } : null,
+        l.photo_url_6 ? { url: l.photo_url_6, description: l.photo_description_6 } : null
+      ].filter(Boolean)
+    }));
 
-      for (const l of landmarks) {
-        if (l.photoData && l.photoData.startsWith('data:image')) {
-          photos.push({
-            name: l.name,
-            type: l.type,
-            locationKey: row.location_key,
-            photoData: l.photoData,
-            photoDescription: l.photoDescription || null,
-            sizeKB: Math.round(l.photoData.length * 0.75 / 1024)
-          });
-        }
-      }
-    }
-
-    res.json({ city, count: photos.length, photos });
+    res.json({ city, count: landmarks.length, landmarks });
   } catch (err) {
     log.error('Error getting landmark photos:', err);
     res.status(500).json({ error: 'Failed to get landmark photos', details: err.message, code: err.code });
@@ -1912,25 +1946,36 @@ app.post('/api/landmarks/discover', async (req, res) => {
 
     const cacheKey = `${city}_${country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
-    // Check if we already have fresh landmarks in database
+    // Check if we already have landmarks in landmark_index
     try {
-      const dbResult = await dbPool.query(
-        'SELECT landmark_count, updated_at FROM discovered_landmarks WHERE location_key = $1',
-        [cacheKey]
-      );
-      if (dbResult.rows.length > 0) {
-        const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-        if (age < LANDMARK_CACHE_TTL) {
-          log.debug(`[LANDMARK] Already have ${dbResult.rows[0].landmark_count} fresh landmarks for ${city}`);
-          return res.json({
-            status: 'cached',
-            landmarkCount: dbResult.rows[0].landmark_count,
-            ageMinutes: Math.round(age / 60000)
-          });
-        }
+      const indexedLandmarks = await getIndexedLandmarks(city, 1);  // Just check if any exist
+      if (indexedLandmarks.length > 0) {
+        // Count total landmarks for this city
+        const countResult = await dbPool.query(
+          'SELECT COUNT(*) as count FROM landmark_index WHERE LOWER(nearest_city) = LOWER($1)',
+          [city]
+        );
+        const landmarkCount = parseInt(countResult.rows[0].count);
+        log.debug(`[LANDMARK] Already have ${landmarkCount} indexed landmarks for ${city}`);
+        return res.json({
+          status: 'indexed',
+          landmarkCount,
+          source: 'landmark_index'
+        });
       }
     } catch (dbErr) {
-      log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
+      log.debug(`[LANDMARK] Index check failed: ${dbErr.message}`);
+    }
+
+    // Check in-memory cache
+    const cachedLandmarks = userLandmarkCache.get(cacheKey);
+    if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
+      log.debug(`[LANDMARK] Already have ${cachedLandmarks.landmarks.length} cached landmarks for ${city}`);
+      return res.json({
+        status: 'cached',
+        landmarkCount: cachedLandmarks.landmarks.length,
+        source: 'memory_cache'
+      });
     }
 
     // Trigger discovery in background (don't await)
@@ -1938,26 +1983,14 @@ app.post('/api/landmarks/discover', async (req, res) => {
 
     discoverLandmarksForLocation(city, country || '')
       .then(async landmarks => {
-        try {
-          await dbPool.query(`
-            INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
-            VALUES ($1, $2, $3, $4, $5, NOW())
-            ON CONFLICT (location_key) DO UPDATE SET
-              landmarks = $4,
-              landmark_count = $5,
-              updated_at = NOW()
-          `, [cacheKey, city, country || '', JSON.stringify(landmarks), landmarks.length]);
-          log.info(`[LANDMARK] ✅ Early discovery: saved ${landmarks.length} landmarks for ${city}`);
-        } catch (dbErr) {
-          log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
-        }
-        // Also update in-memory cache
+        // Update in-memory cache
         userLandmarkCache.set(cacheKey, {
           landmarks,
           city,
           country: country || '',
           timestamp: Date.now()
         });
+        log.info(`[LANDMARK] ✅ Early discovery: found ${landmarks.length} landmarks for ${city}`);
       })
       .catch(err => {
         log.error(`[LANDMARK] Early discovery failed for ${city}: ${err.message}`);
@@ -1987,89 +2020,52 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
 
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
-      // Check if Swiss location - use pre-indexed swiss_landmarks table
-      const isSwiss = /switzerland|schweiz|suisse|svizzera|svizra/i.test(userLocation.country || '');
-
-      if (isSwiss) {
-        try {
-          const swissLandmarks = await getSwissLandmarksByCity(userLocation.city, 20);
-          if (swissLandmarks.length > 0) {
-            // For story ideas, we just need landmark names (no photos needed)
-            availableLandmarks = swissLandmarks.map(l => ({
-              name: l.name,
-              query: l.name,
-              type: l.type,
-              score: l.score,
-              photoDescription: l.photo_description,
-              isSwissPreIndexed: true
-            }));
-            log.info(`[LANDMARK] 🇨🇭 Using ${availableLandmarks.length} Swiss pre-indexed landmarks for ${userLocation.city}`);
-          }
-        } catch (swissErr) {
-          log.debug(`[LANDMARK] Swiss landmarks lookup failed: ${swissErr.message}`);
+      // Check landmark_index table first (works for any city worldwide)
+      try {
+        const indexedLandmarks = await getIndexedLandmarks(userLocation.city, 20);
+        if (indexedLandmarks.length > 0) {
+          // For story ideas, we just need landmark names (no photos needed)
+          availableLandmarks = indexedLandmarks.map(l => ({
+            name: l.name,
+            query: l.name,
+            type: l.type,
+            score: l.score,
+            photoDescription: l.photo_description,
+            isIndexed: true,
+            landmarkIndexId: l.id
+          }));
+          log.info(`[LANDMARK] 📍 Using ${availableLandmarks.length} indexed landmarks for ${userLocation.city}`);
         }
+      } catch (indexErr) {
+        log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
       }
 
-      // For non-Swiss locations or if Swiss lookup found nothing
+      // If not in index, discover on-demand (with timeout)
       if (!availableLandmarks || availableLandmarks.length === 0) {
-        // Check database first (persists across restarts)
+        log.info(`[LANDMARK] 🔍 Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
+
         try {
-          const dbResult = await dbPool.query(
-            'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
-            [cacheKey]
+          // Use Promise.race to timeout after 15 seconds
+          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
           );
-          if (dbResult.rows.length > 0) {
-            const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-            if (age < LANDMARK_CACHE_TTL) {
-              const rawLandmarks = dbResult.rows[0].landmarks;
-              availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
-              log.info(`[LANDMARK] 📍 Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
-            }
+
+          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
+
+          // Also update in-memory cache
+          if (availableLandmarks && availableLandmarks.length > 0) {
+            userLandmarkCache.set(cacheKey, {
+              landmarks: availableLandmarks,
+              city: userLocation.city,
+              country: userLocation.country || '',
+              timestamp: Date.now()
+            });
+            log.info(`[LANDMARK] ✅ Discovered ${availableLandmarks.length} landmarks for ${userLocation.city}`);
           }
-        } catch (dbErr) {
-          log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
-        }
-
-        // If not cached, discover now (await with timeout)
-        if (!availableLandmarks || availableLandmarks.length === 0) {
-          log.info(`[LANDMARK] 🔍 Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
-
-          try {
-            // Use Promise.race to timeout after 15 seconds
-            const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
-            );
-
-            availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
-
-            // Save to database (upsert) for future requests
-            if (availableLandmarks && availableLandmarks.length > 0) {
-              try {
-                await dbPool.query(`
-                  INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
-                  VALUES ($1, $2, $3, $4, $5, NOW())
-                  ON CONFLICT (location_key) DO UPDATE SET
-                    landmarks = $4,
-                    landmark_count = $5,
-                    updated_at = NOW()
-                `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
-                log.info(`[LANDMARK] ✅ Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
-              } catch (dbErr) {
-                log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
-              }
-              // Also update in-memory cache
-              userLandmarkCache.set(cacheKey, {
-                landmarks: availableLandmarks,
-                city: userLocation.city,
-                country: userLocation.country || '',
-                timestamp: Date.now()
-              });
-            }
-          } catch (err) {
-            log.warn(`[LANDMARK] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
-            availableLandmarks = [];
-          }
+        } catch (err) {
+          log.warn(`[LANDMARK] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+          availableLandmarks = [];
         }
       }
 
@@ -2328,92 +2324,55 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
 
       const cacheKey = `${userLocation.city}_${userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
 
-      // Check if Swiss location - use pre-indexed swiss_landmarks table
-      const isSwiss = /switzerland|schweiz|suisse|svizzera|svizra/i.test(userLocation.country || '');
-
-      if (isSwiss) {
-        try {
-          const swissLandmarks = await getSwissLandmarksByCity(userLocation.city, 20);
-          if (swissLandmarks.length > 0) {
-            // For story ideas, we just need landmark names (no photos needed)
-            availableLandmarks = swissLandmarks.map(l => ({
-              name: l.name,
-              query: l.name,
-              type: l.type,
-              score: l.score,
-              photoDescription: l.photo_description,
-              isSwissPreIndexed: true
-            }));
-            log.info(`[LANDMARK] 🇨🇭 [STREAM] Using ${availableLandmarks.length} Swiss pre-indexed landmarks for ${userLocation.city}`);
-          }
-        } catch (swissErr) {
-          log.debug(`[LANDMARK] Swiss landmarks lookup failed: ${swissErr.message}`);
+      // Check landmark_index table first (works for any city worldwide)
+      try {
+        const indexedLandmarks = await getIndexedLandmarks(userLocation.city, 20);
+        if (indexedLandmarks.length > 0) {
+          // For story ideas, we just need landmark names (no photos needed)
+          availableLandmarks = indexedLandmarks.map(l => ({
+            name: l.name,
+            query: l.name,
+            type: l.type,
+            score: l.score,
+            photoDescription: l.photo_description,
+            isIndexed: true,
+            landmarkIndexId: l.id
+          }));
+          log.info(`[LANDMARK] 📍 [STREAM] Using ${availableLandmarks.length} indexed landmarks for ${userLocation.city}`);
         }
+      } catch (indexErr) {
+        log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
       }
 
-      // For non-Swiss locations or if Swiss lookup found nothing
+      // If not in index, discover on-demand (with timeout)
       if (!availableLandmarks || availableLandmarks.length === 0) {
-        // Check database first (persists across restarts)
+        log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
+
+        // Send SSE event to inform user about landmark discovery
+        res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
+
         try {
-          const dbResult = await dbPool.query(
-            'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
-            [cacheKey]
+          // Use Promise.race to timeout after 15 seconds
+          const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
           );
-          if (dbResult.rows.length > 0) {
-            const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-            if (age < LANDMARK_CACHE_TTL) {
-              const rawLandmarks = dbResult.rows[0].landmarks;
-              availableLandmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
-              log.info(`[LANDMARK] 📍 [STREAM] Using DB-cached ${availableLandmarks?.length || 0} landmarks for ${userLocation.city}`);
-            }
+
+          availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
+
+          // Also update in-memory cache
+          if (availableLandmarks && availableLandmarks.length > 0) {
+            userLandmarkCache.set(cacheKey, {
+              landmarks: availableLandmarks,
+              city: userLocation.city,
+              country: userLocation.country || '',
+              timestamp: Date.now()
+            });
+            log.info(`[LANDMARK] ✅ [STREAM] Discovered ${availableLandmarks.length} landmarks for ${userLocation.city}`);
           }
-        } catch (dbErr) {
-          log.debug(`[LANDMARK] DB check failed: ${dbErr.message}`);
-        }
-
-        // If not cached, discover now (await with timeout)
-        if (!availableLandmarks || availableLandmarks.length === 0) {
-          log.info(`[LANDMARK] 🔍 [STREAM] Discovering landmarks for ${userLocation.city}, ${userLocation.country || ''}...`);
-
-          // Send SSE event to inform user about landmark discovery
-          res.write(`data: ${JSON.stringify({ type: 'status', message: 'Discovering local landmarks...' })}\n\n`);
-
-          try {
-            // Use Promise.race to timeout after 15 seconds
-            const discoveryPromise = discoverLandmarksForLocation(userLocation.city, userLocation.country || '', 10);
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Landmark discovery timeout')), 15000)
-            );
-
-            availableLandmarks = await Promise.race([discoveryPromise, timeoutPromise]);
-
-            // Save to database (upsert) for future requests
-            if (availableLandmarks && availableLandmarks.length > 0) {
-              try {
-                await dbPool.query(`
-                  INSERT INTO discovered_landmarks (location_key, city, country, landmarks, landmark_count, updated_at)
-                  VALUES ($1, $2, $3, $4, $5, NOW())
-                  ON CONFLICT (location_key) DO UPDATE SET
-                    landmarks = $4,
-                    landmark_count = $5,
-                    updated_at = NOW()
-                `, [cacheKey, userLocation.city, userLocation.country || '', JSON.stringify(availableLandmarks), availableLandmarks.length]);
-                log.info(`[LANDMARK] ✅ [STREAM] Discovered and saved ${availableLandmarks.length} landmarks for ${userLocation.city}`);
-              } catch (dbErr) {
-                log.error(`[LANDMARK] Failed to save to DB: ${dbErr.message}`);
-              }
-              // Also update in-memory cache
-              userLandmarkCache.set(cacheKey, {
-                landmarks: availableLandmarks,
-                city: userLocation.city,
-                country: userLocation.country || '',
-                timestamp: Date.now()
-              });
-            }
-          } catch (err) {
-            log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
-            availableLandmarks = [];
-          }
+        } catch (err) {
+          log.warn(`[LANDMARK] [STREAM] Discovery failed or timed out for ${userLocation.city}: ${err.message}`);
+          availableLandmarks = [];
         }
       }
 
@@ -6339,7 +6298,7 @@ class ProgressiveStoryPageParser {
 
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false, incrementalConsistencyConfig = null) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // Generation logger for tracking API usage and debugging
@@ -6631,7 +6590,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -6796,7 +6755,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Generate the image (use coverImageModel for covers)
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
         const streamCoverLabel = coverType === 'front' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides, streamCoverLabel, { isAdmin, enableAutoRepair });
+        const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides, streamCoverLabel, { isAdmin, enableAutoRepair, checkOnlyMode });
 
         const coverData = {
           imageData: result.imageData,
@@ -7257,7 +7216,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                 ...incrConfig,
                 currentCharacters: sceneCharacters.map(c => c.name)
               } : null;
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrConfigWithCurrentChars });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrConfigWithCurrentChars });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -7473,7 +7432,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           });
           coverPrompts.frontCover = frontCoverPrompt;
           const frontCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, frontCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair });
+          const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, frontCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           log.debug(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.frontCover = {
             imageData: frontCoverResult.imageData,
@@ -7532,7 +7491,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               });
           coverPrompts.initialPage = initialPrompt;
           const initialPageModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, initialPageModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair });
+          const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, initialPageModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair, checkOnlyMode });
           log.debug(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.initialPage = {
             imageData: initialResult.imageData,
@@ -7582,7 +7541,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           });
           coverPrompts.backCover = backCoverPrompt;
           const backCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
-          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, backCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair });
+          const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, backCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           log.debug(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
           coverImages.backCover = {
             imageData: backCoverResult.imageData,
@@ -8083,7 +8042,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false, incrementalConsistencyConfig = null) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -8422,7 +8381,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, checkOnlyMode }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
 
@@ -9068,7 +9027,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
+        { isAdmin, enableAutoRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
       if (imageResult?.imageData) {
@@ -10117,71 +10076,46 @@ async function processStoryJob(jobId) {
     }
 
     // Inject pre-discovered landmarks if available for this user's location
-    // Check database first (persists across restarts), then fall back to in-memory cache
+    // Check landmark_index first (works for any city worldwide), then fall back to in-memory cache
     // Skip for historical stories - they use historically accurate locations, not local landmarks
     if (inputData.userLocation?.city && inputData.storyCategory !== 'historical') {
       const cacheKey = `${inputData.userLocation.city}_${inputData.userLocation.country || ''}`.toLowerCase().replace(/\s+/g, '_');
       let landmarks = null;
 
-      // Check if Swiss location - use pre-indexed swiss_landmarks table
-      const isSwiss = /switzerland|schweiz|suisse|svizzera|svizra/i.test(inputData.userLocation.country || '');
-
-      if (isSwiss) {
-        try {
-          // Query Swiss pre-indexed landmarks (no TTL - permanent database)
-          const swissLandmarks = await getSwissLandmarksByCity(inputData.userLocation.city, 30);
-          if (swissLandmarks.length > 0) {
-            // Convert Swiss landmarks to the format expected by linkPreDiscoveredLandmarks
-            landmarks = swissLandmarks.map(l => ({
-              name: l.name,
-              query: l.name,
-              type: l.type,
-              lat: parseFloat(l.latitude),
-              lon: parseFloat(l.longitude),
-              score: l.score,
-              // Swiss landmarks don't have photoData - they have photoUrl for lazy loading
-              photoUrl: l.photo_url,
-              photoDescription: l.photo_description,
-              attribution: l.photo_attribution,
-              // Flag for lazy photo loading
-              isSwissPreIndexed: true,
-              swissLandmarkId: l.id
-            }));
-            log.info(`[LANDMARK] 🇨🇭 Injecting ${landmarks.length} Swiss pre-indexed landmarks for ${inputData.userLocation.city}`);
-          }
-        } catch (swissErr) {
-          log.debug(`[LANDMARK] Swiss landmarks lookup failed: ${swissErr.message}`);
+      // Check landmark_index table first (works for any city worldwide)
+      try {
+        const indexedLandmarks = await getIndexedLandmarks(inputData.userLocation.city, 30);
+        if (indexedLandmarks.length > 0) {
+          // Convert indexed landmarks to the format expected by linkPreDiscoveredLandmarks
+          landmarks = indexedLandmarks.map(l => ({
+            name: l.name,
+            query: l.name,
+            type: l.type,
+            lat: parseFloat(l.latitude),
+            lon: parseFloat(l.longitude),
+            score: l.score,
+            // Indexed landmarks don't have photoData - they have photoUrl for lazy loading
+            photoUrl: l.photo_url,
+            photoDescription: l.photo_description,
+            attribution: l.photo_attribution,
+            // Flag for lazy photo loading (support both old and new field names)
+            isIndexed: true,
+            isSwissPreIndexed: true,  // For backward compatibility
+            landmarkIndexId: l.id,
+            swissLandmarkId: l.id  // For backward compatibility
+          }));
+          log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} indexed landmarks for ${inputData.userLocation.city}`);
         }
+      } catch (indexErr) {
+        log.debug(`[LANDMARK] Indexed landmarks lookup failed: ${indexErr.message}`);
       }
 
-      // For non-Swiss locations (or if Swiss lookup found nothing), use original discovery system
+      // Fall back to in-memory cache if index didn't have it
       if (!landmarks) {
-        // Try database first (persistent)
-        try {
-          const dbResult = await dbPool.query(
-            'SELECT landmarks, updated_at FROM discovered_landmarks WHERE location_key = $1',
-            [cacheKey]
-          );
-          if (dbResult.rows.length > 0) {
-            const age = Date.now() - new Date(dbResult.rows[0].updated_at).getTime();
-            if (age < LANDMARK_CACHE_TTL) {
-              // Parse JSON if stored as string (TEXT column) vs JSONB
-              const rawLandmarks = dbResult.rows[0].landmarks;
-              landmarks = typeof rawLandmarks === 'string' ? JSON.parse(rawLandmarks) : rawLandmarks;
-              log.info(`[LANDMARK] 📍 Injecting ${landmarks?.length || 0} DB-cached landmarks for ${inputData.userLocation.city}`);
-            }
-          }
-        } catch (dbErr) {
-          log.debug(`[LANDMARK] DB lookup failed: ${dbErr.message}`);
-        }
-
-        // Fall back to in-memory cache if database didn't have it
-        if (!landmarks) {
-          const cachedLandmarks = userLandmarkCache.get(cacheKey);
-          if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
-            landmarks = cachedLandmarks.landmarks;
-            log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} in-memory cached landmarks for ${inputData.userLocation.city}`);
-          }
+        const cachedLandmarks = userLandmarkCache.get(cacheKey);
+        if (cachedLandmarks && Date.now() - cachedLandmarks.timestamp < LANDMARK_CACHE_TTL) {
+          landmarks = cachedLandmarks.landmarks;
+          log.info(`[LANDMARK] 📍 Injecting ${landmarks.length} in-memory cached landmarks for ${inputData.userLocation.city}`);
         }
       }
 
@@ -10215,6 +10149,7 @@ async function processStoryJob(jobId) {
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
     const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
+    const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
 
     // Incremental consistency check options (check each image against previous N images)
     const incrementalConsistencyOptions = inputData.incrementalConsistency || {};
@@ -10223,6 +10158,9 @@ async function processStoryJob(jobId) {
     const incrementalConsistencyLookback = incrementalConsistencyOptions.lookbackCount || 3;
     if (enableIncrementalConsistency) {
       log.debug(`🔍 [PIPELINE] Incremental consistency check ENABLED (lookback: ${incrementalConsistencyLookback}, dryRun: ${incrementalConsistencyDryRun})`);
+    }
+    if (checkOnlyMode) {
+      log.debug(`🔍 [PIPELINE] Check-only mode ENABLED - all regeneration will be skipped`);
     }
 
     // Check if user is admin (for including debug images in repair history)
@@ -10317,12 +10255,12 @@ async function processStoryJob(jobId) {
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks, incrementalConsistencyConfig);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode);
     }
 
     if (generationMode === 'pictureBook') {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks, incrementalConsistencyConfig);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode);
     }
 
     // outlineAndText mode (legacy): Separate outline + text generation
@@ -10594,21 +10532,21 @@ async function processStoryJob(jobId) {
       coverGenerationPromise = Promise.all([
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
-          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair });
+          const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle, modelId: result.modelId || null }, 0);
           return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
-          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair });
+          const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair, checkOnlyMode });
           console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData, modelId: result.modelId || null }, 1);
           return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
-          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair });
+          const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData, modelId: result.modelId || null }, 2);
           return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
@@ -10872,7 +10810,7 @@ Output Format:
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -11368,7 +11306,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
                 imageResult = await generateImageWithQualityRetry(
                   imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`,
-                  { isAdmin, enableAutoRepair, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrementalConsistencyConfig }
+                  { isAdmin, enableAutoRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrementalConsistencyConfig }
                 );
               } catch (error) {
                 retries++;
