@@ -163,7 +163,13 @@ For EACH of the {PAGES} pages, output in this EXACT format:
 Analyze the draft above for logical issues. Be harsh and critical.
 1. List all logical inconsistencies (timeline errors, physical impossibilities, character motivation issues).
 2. List any reading level violations.
-3. For each issue, write a specific instruction on how you will fix it in the final version.
+3. **MAX 3 CHARACTERS PER SCENE** - Check each page: does the action focus on more than 3 characters?
+   - If 4+ characters do something together, REWRITE to focus on max 3 per page
+   - Split group actions across multiple pages (3 characters teleport on page 5, other 3 on page 6)
+   - Use close-up perspective: focus on the active character + 1-2 nearby characters
+   - Example: 6 people at dinner table → show close-up of speaker with person on left and right
+   - Background characters can be mentioned in text but scene hint focuses on 3 main actors
+4. For each issue, write a specific instruction on how you will fix it in the final version.
 
 
 ---CLOTHING REQUIREMENTS---
