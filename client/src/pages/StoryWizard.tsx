@@ -2850,7 +2850,7 @@ export default function StoryWizard() {
 
       // Check localStorage for the latest value since React state won't update synchronously
       const cachedUser = localStorage.getItem('currentUser');
-      let latestEmailVerified = user.emailVerified;
+      let latestEmailVerified: boolean | undefined = user.emailVerified;
       if (cachedUser) {
         try {
           latestEmailVerified = JSON.parse(cachedUser).emailVerified;
