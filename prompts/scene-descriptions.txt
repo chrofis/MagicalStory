@@ -503,6 +503,7 @@ If your scene shows the bridge from across the river, select the wide exterior v
     "linearSpaceConsistency": "No linear path in scene - characters at door in room. N/A",
     "sharedObjectInteractions": "Shared objects: door (Manuel and Sophie). In Objects section with grip points? YES - door position and who does what defined.",
     "obstacleLogic": "No obstacles blocking passage in this scene. N/A",
+    "holdingInventory": "Sophie: L:braced on floor R:pushing stone BOTH:none. No conflict. Manuel: L:braced on wall R:door handle BOTH:none. No conflict.",
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
