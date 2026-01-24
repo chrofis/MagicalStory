@@ -35,17 +35,15 @@ API key.txt
 /data/
 /data/uploads/
 /data/files.json
-
-# But include server/data for historical locations (needs deployment)
-!server/data/
-server/data/*
-!server/data/historical-locations.json
+server/data/
 
 # User content and uploads
 # Images/ - now included in git for Railway deployment
 # But keep originals and unused out (large files)
 images/originals/
 images/not used/
+images/*.mp4
+!images/Boy to pirat to book.mp4
 Magical-Story-images/
 Geschichten, Prompts, Inputs/
 MagicalStory/
@@ -88,6 +86,7 @@ temp_photos/
 
 # Test fixtures (large test data)
 tests/fixtures/
+test image inputs/
 
 # Baden landmarks cache (local testing)
 baden-landmarks/
