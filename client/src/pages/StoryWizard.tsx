@@ -159,6 +159,7 @@ export default function StoryWizard() {
   // Story Settings state - character roles loaded from database (not localStorage)
   const [mainCharacters, setMainCharacters] = useState<number[]>([]);
   const [excludedCharacters, setExcludedCharacters] = useState<number[]>([]);
+  const rolesDirty = useRef(false); // Track if character roles were modified
   const [languageLevel, setLanguageLevel] = useState<LanguageLevel>(() => {
     try {
       const saved = localStorage.getItem('story_language_level');
@@ -2504,6 +2505,7 @@ export default function StoryWizard() {
         });
 
         setMainCharacters(prev => prev.filter(cid => cid !== id));
+        rolesDirty.current = true; // Mark roles as modified (character was removed)
         log.success(`Character ${id} deleted`);
       } else {
         log.error('Failed to delete character:', result.error);
@@ -2566,6 +2568,7 @@ export default function StoryWizard() {
       setExcludedCharacters(prev => prev.filter(id => id !== charId));
       setMainCharacters(prev => prev.includes(charId) ? prev : [...prev, charId]);
     }
+    rolesDirty.current = true; // Mark as modified
     // Also update storyRole on the character object so it's sent with saveAllCharacterData
     setCharacters(prev => prev.map(c => c.id === charId ? { ...c, storyRole: role } : c));
   };
@@ -2586,6 +2589,10 @@ export default function StoryWizard() {
     ]);
 
     if (latestCharacters.length === 0) return;
+    if (!rolesDirty.current) {
+      log.debug('Roles not modified, skipping save');
+      return;
+    }
 
     // Build roles object from latest state
     const roles: Record<number, 'main' | 'in' | 'out'> = {};
@@ -2602,6 +2609,7 @@ export default function StoryWizard() {
     // Save to database (must await to ensure save completes before page unload)
     try {
       await characterService.saveCharacterRoles(roles);
+      rolesDirty.current = false; // Reset dirty flag after save
     } catch (err) {
       log.error('Failed to save character roles:', err);
     }
