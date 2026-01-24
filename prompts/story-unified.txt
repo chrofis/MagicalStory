@@ -385,7 +385,7 @@ TEXT:
 
 SCENE HINT:
 [1-2 sentences describing the KEY VISUAL MOMENT - MUST include left/right positions for each character, e.g., "Luna (left) waves at Max (right) across the playground"]
-Characters:
+Characters (MAX 3 per scene - pick the most important for THIS visual moment):
 - [CharacterName]: [standard | winter | summer | costumed:type]
 - [CharacterName]: [standard | winter | summer | costumed:type]
 Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/overcast/rainy/snowy]
@@ -409,7 +409,7 @@ Setting: [indoor/outdoor] | Time: [time of day] | Weather: [weather - use SAME a
 - This prevents jarring visual inconsistencies between scene illustrations
 
 **IMPORTANT - Character Clothing Format:**
-- List EVERY character appearing in the scene on a separate line
+- List up to 3 characters per scene (pick the most important for the visual moment)
 - Each line MUST follow format: `- [Name]: [category]`
 - Valid categories: `standard`, `winter`, `summer`, `costumed:type` (e.g., `costumed:superhero`)
 - NEVER use "same" - always specify the explicit clothing category for each character
