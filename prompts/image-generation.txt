@@ -24,9 +24,11 @@ Safe, family-friendly content only.
 {CHARACTER_REFERENCE_LIST}
 
 **IDENTITY PRESERVATION (CRITICAL):**
-Each character MUST be the SAME PERSON as shown in their reference image.
-Preserve exact: eye shape, nose, jawline, and facial proportions from reference.
-Do not average or blend features - replicate the exact face.
+Each [Image N - Name] label above corresponds to the reference photo that follows it.
+- COPY THE EXACT FACE from each labeled reference image
+- Preserve: eye shape, nose, jawline, facial proportions, hair color/style
+- Each character must look like the SAME PERSON as their reference - not similar, IDENTICAL
+- Do NOT average or blend features between different characters
 
 **SCENE:** {SCENE_DESCRIPTION}
 

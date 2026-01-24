@@ -1571,11 +1571,12 @@ function buildCharacterReferenceList(photos, characters = null) {
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
     ].filter(Boolean);
     const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-    const brief = [photo.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
-    return `${index + 1}. ${brief}`;
+    // Format: [Image N - Name] to match exactly the label we put before each image in parts array
+    const description = [visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
+    return `[Image ${index + 1} - ${photo.name}]: ${description}`;
   });
 
-  let result = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+  let result = `\n**CHARACTER REFERENCE PHOTOS (match each label to the image below it):**\n${charDescriptions.join('\n')}\n`;
 
   // Add relative height description if characters data is available
   if (characters && characters.length >= 2) {
