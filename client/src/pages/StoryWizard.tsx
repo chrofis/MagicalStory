@@ -2615,8 +2615,8 @@ export default function StoryWizard() {
       }
       // Save relationships and character roles when leaving step 1
       if (step === 1 && newStep !== 1) {
-        saveAllCharacterData(); // No await - runs in background
-        await saveCharacterRoles(); // Must await to ensure DB has new roles before user can refresh
+        await saveAllCharacterData(); // Must complete before roles save to avoid race condition
+        await saveCharacterRoles(); // Then save roles
       }
       // Clear currentCharacter when entering step 1 to show character list
       if (newStep === 1 && step !== 1) {
