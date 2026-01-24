@@ -964,6 +964,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     hasSequentialImage
   );
 
+  // Log the reference structure for debugging
+  const numCharRefs = (characterPhotos || []).filter(p => {
+    const url = typeof p === 'string' ? p : p?.photoUrl;
+    return url && typeof url === 'string' && url.startsWith('data:image');
+  }).length;
+  const numLandmarkRefs = (landmarkPhotos || []).filter(l => l.photoData && l.photoData.startsWith('data:image')).length;
+  log.info(`📋 [ENHANCED PROMPT] ${numCharRefs} character ref(s), ${numLandmarkRefs} landmark ref(s), sequential=${hasSequentialImage}, prompt=${enhancedPrompt.length} chars`);
+
   // Build parts array: PROMPT FIRST, then images in order
   // This is the optimal structure for Gemini 3 Pro's character consistency features
   const parts = [{ text: enhancedPrompt }];
