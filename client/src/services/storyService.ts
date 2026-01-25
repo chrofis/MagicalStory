@@ -1009,6 +1009,25 @@ export const storyService = {
     userLocation?: { city: string | null; region: string | null; country: string | null };
     // Season for story setting
     season?: string;
+    // Idea generation data (for analysis)
+    ideaGeneration?: {
+      input: {
+        storyType: string;
+        storyCategory: string;
+        storyTopic: string;
+        storyTheme: string;
+        characters: Array<{ id: number; name: string }>;
+        language: string;
+        languageLevel: string;
+        pages: number;
+        userLocation?: { city: string | null; region: string | null; country: string | null };
+        season?: string;
+      };
+      output: string[];  // Both generated ideas
+      prompt: string;
+      model: string;
+      selectedIndex: number | null;  // 0, 1, or null if custom/edited
+    };
   }): Promise<{ jobId: string; creditsRemaining?: number }> {
     // Generate idempotency key to prevent duplicate job creation on retries
     const idempotencyKey = `idem_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1050,6 +1069,8 @@ export const storyService = {
       userLocation: data.userLocation,
       // Season for story setting
       season: data.season,
+      // Idea generation data (for analysis)
+      ideaGeneration: data.ideaGeneration,
     });
     return { jobId: response.jobId, creditsRemaining: response.creditsRemaining };
   },

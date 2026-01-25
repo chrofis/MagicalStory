@@ -1774,6 +1774,21 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     let shouldRepair = false;
     let fixTargetsToUse = [];
     let bboxDetectionHistory = null;  // Track two-stage detection for dev mode display
+    let enrichedFixTargets = null;
+
+    // ALWAYS run two-stage detection when fixable issues exist (for dev mode visibility)
+    // This runs regardless of incrEnabled or autoRepair settings
+    if (result.fixableIssues && result.fixableIssues.length > 0) {
+      log.info(`📦 [QUALITY RETRY] ${pageLabel}Two-stage detection: enriching ${result.fixableIssues.length} fixable issues with bounding boxes...`);
+      const enrichResult = await enrichWithBoundingBoxes(result.imageData, result.fixableIssues);
+      bboxDetectionHistory = enrichResult.detectionHistory;
+      enrichedFixTargets = enrichResult.targets;
+      if (enrichResult.targets && enrichResult.targets.length > 0) {
+        log.info(`✅ [QUALITY RETRY] ${pageLabel}Two-stage detection complete: ${enrichResult.targets.length} targets with bounding boxes`);
+      } else {
+        log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Two-stage detection found no targets with bounding boxes`);
+      }
+    }
 
     if (incrEnabled && unifiedReport && !incrConfig.dryRun) {
       // Use unified fix plan
@@ -1787,30 +1802,34 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       }));
     } else if (!incrEnabled) {
       // Fall back to quality-only repair (original behavior)
-      // Two-stage detection: if fixableIssues exists, enrich with bounding boxes
-      if (result.fixableIssues && result.fixableIssues.length > 0) {
-        log.info(`🔧 [QUALITY RETRY] ${pageLabel}Two-stage detection: enriching ${result.fixableIssues.length} fixable issues with bounding boxes...`);
-        const enrichResult = await enrichWithBoundingBoxes(result.imageData, result.fixableIssues);
-        bboxDetectionHistory = enrichResult.detectionHistory;
-        if (enrichResult.targets && enrichResult.targets.length > 0) {
-          shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD;
-          fixTargetsToUse = enrichResult.targets;
-          log.info(`✅ [QUALITY RETRY] ${pageLabel}Two-stage detection complete: ${enrichResult.targets.length} targets with bounding boxes`);
-        } else {
-          log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Two-stage detection failed to enrich any issues`);
-          shouldRepair = false;
-          fixTargetsToUse = [];
-        }
-      } else {
+      if (enrichedFixTargets && enrichedFixTargets.length > 0) {
+        // Use results from two-stage detection above
+        shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD;
+        fixTargetsToUse = enrichedFixTargets;
+      } else if (result.fixTargets && result.fixTargets.length > 0) {
         // Legacy format: fixTargets already has bounding boxes
-        shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD && result.fixTargets && result.fixTargets.length > 0;
-        fixTargetsToUse = result.fixTargets || [];
+        shouldRepair = !hasTextError && score <= AUTO_REPAIR_THRESHOLD;
+        fixTargetsToUse = result.fixTargets;
       }
     }
 
     const couldRepair = shouldRepair && fixTargetsToUse.length > 0;
     if (couldRepair && !enableAutoRepair) {
       log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). ${fixTargetsToUse.length} fix targets available.`);
+    }
+
+    // Record bbox detection in retryHistory even when auto-repair is disabled (for dev mode)
+    if (bboxDetectionHistory && !enableAutoRepair) {
+      retryHistory.push({
+        attempt: attempts,
+        type: 'bbox_detection_only',
+        score: score,
+        fixableIssuesCount: result.fixableIssues?.length || 0,
+        enrichedTargetsCount: enrichedFixTargets?.length || 0,
+        bboxDetection: bboxDetectionHistory,
+        autoRepairEnabled: false,
+        timestamp: new Date().toISOString()
+      });
     }
     if (enableAutoRepair && couldRepair) {
       const repairSource = incrEnabled ? 'unified (quality + consistency)' : 'quality';

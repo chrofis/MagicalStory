@@ -88,7 +88,7 @@ interface WizardStep6Props {
   ideaPrompt: { prompt: string; model: string } | null;
   ideaFullResponse?: string;
   generatedIdeas: string[];
-  onSelectIdea: (idea: string) => void;
+  onSelectIdea: (idea: string, index?: number) => void;  // index: 0 or 1 for generated ideas, undefined for custom
   onUseDirectly?: () => void;  // Called when "Use my theme directly" is clicked to start generation
   // Navigation
   onEditStep: (step: number) => void;
@@ -163,7 +163,7 @@ export function WizardStep6Summary({
   // Handle option selection
   const handleSelectOption = (index: number) => {
     setSelectedOption(index);
-    onSelectIdea(editableIdeas[index]);
+    onSelectIdea(editableIdeas[index], index);
   };
 
   // Helper functions

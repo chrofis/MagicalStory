@@ -211,6 +211,20 @@ export default function StoryWizard() {
   const [lastIdeaPrompt, setLastIdeaPrompt] = useState<{ prompt: string; model: string } | null>(null);
   const [lastIdeaFullResponse, setLastIdeaFullResponse] = useState<string>('');
   const [generatedIdeas, setGeneratedIdeas] = useState<string[]>([]);
+  const [selectedIdeaIndex, setSelectedIdeaIndex] = useState<number | null>(null); // Track which idea was selected (0, 1, or null for custom)
+  // Store the input parameters used for idea generation (for later analysis)
+  const [ideaGenerationInput, setIdeaGenerationInput] = useState<{
+    storyType: string;
+    storyCategory: string;
+    storyTopic: string;
+    storyTheme: string;
+    characters: Array<{ id: number; name: string }>;
+    language: string;
+    languageLevel: string;
+    pages: number;
+    userLocation?: { city: string | null; region: string | null; country: string | null };
+    season?: string;
+  } | null>(null);
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
   // User's location from IP (for story setting personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
@@ -2743,8 +2757,10 @@ export default function StoryWizard() {
 
   // Generate story ideas using AI
   // Handler when user selects one of the generated ideas
-  const handleSelectIdea = (idea: string) => {
+  // index: 0 or 1 for generated ideas, undefined for custom/edited
+  const handleSelectIdea = (idea: string, index?: number) => {
     setStoryDetails(idea);
+    setSelectedIdeaIndex(index ?? null);
     // Don't clear generatedIdeas - let user switch between options
   };
 
@@ -2761,9 +2777,24 @@ export default function StoryWizard() {
     setGeneratedIdeas([]);
     setLastIdeaPrompt(null);
     setLastIdeaFullResponse('');
+    setSelectedIdeaIndex(null);  // Reset selection when regenerating
 
     // Get characters in story (not excluded)
     const charactersInStory = characters.filter(c => !excludedCharacters.includes(c.id));
+
+    // Store the input parameters for later analysis
+    setIdeaGenerationInput({
+      storyType,
+      storyCategory: storyCategory || '',
+      storyTopic: storyTopic || '',
+      storyTheme: storyTheme || '',
+      characters: charactersInStory.map(c => ({ id: c.id, name: c.name })),
+      language: storyLanguage,
+      languageLevel,
+      pages,
+      userLocation: userLocation || undefined,
+      season: season || undefined,
+    });
 
     // Use streaming API
     streamAbortRef.current = storyService.generateStoryIdeasStream(
@@ -3111,6 +3142,14 @@ export default function StoryWizard() {
         userLocation: userLocation || undefined,
         // Season for story setting
         season: season || undefined,
+        // Idea generation data (for analysis)
+        ideaGeneration: ideaGenerationInput && lastIdeaPrompt && generatedIdeas.length > 0 ? {
+          input: ideaGenerationInput,
+          output: generatedIdeas,
+          prompt: lastIdeaPrompt.prompt,
+          model: lastIdeaPrompt.model,
+          selectedIndex: selectedIdeaIndex,
+        } : undefined,
       });
 
       setJobId(newJobId);
