@@ -3218,50 +3218,11 @@ export function StoryDisplay({
             );
           })}
 
-          {/* Progressive mode: Show loading indicator for remaining scenes */}
-          {/* Hide when all expected images are received, even if job isn't complete yet */}
-          {/* Use totalScenes (image count) not totalPages (print pages) for comparison */}
-          {progressiveMode && Object.keys(completedPageImages).length < totalScenes && (
-            <div className="p-6 text-center">
-              <div className="inline-flex flex-col items-center bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 shadow-sm">
-                <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
-                <p className="text-indigo-700 font-semibold">
-                  {storyLang === 'de'
-                    ? `Bild ${Object.keys(completedPageImages).length} von ${totalScenes}`
-                    : storyLang === 'fr'
-                    ? `Image ${Object.keys(completedPageImages).length} sur ${totalScenes}`
-                    : `Image ${Object.keys(completedPageImages).length} of ${totalScenes}`}
-                </p>
-                <p className="text-indigo-500 text-sm mt-1">
-                  {storyLang === 'de'
-                    ? 'Weitere Bilder werden geladen...'
-                    : storyLang === 'fr'
-                    ? 'Chargement des images suivantes...'
-                    : 'Loading more images...'}
-                </p>
-              </div>
-            </div>
-          )}
+          {/* Progressive mode loading indicator removed - each image placeholder already shows its own loading state */}
         </div>
       )}
 
-      {/* Placeholder for remaining pages during generation - only show if not all images are complete */}
-      {isGenerating && story && sceneImages.filter(img => img.imageData).length < storyPages.length && (
-        <div className="mt-8 max-w-2xl mx-auto">
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 border-dashed rounded-xl p-8">
-            <div className="flex flex-col items-center text-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
-              <p className="text-indigo-700 font-semibold">
-                {storyLang === 'de'
-                  ? 'Weitere Seiten werden erstellt...'
-                  : storyLang === 'fr'
-                  ? 'Création des pages suivantes...'
-                  : 'Creating more pages...'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Removed "Weitere Seiten werden erstellt" - each page's image placeholder already shows loading state */}
 
       {/* Back Cover Display - show as soon as available */}
       {coverImages && getCoverImageData(coverImages.backCover) && (() => {
