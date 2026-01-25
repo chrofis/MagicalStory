@@ -2063,48 +2063,20 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
       return `${l.name} [${l.type || '?'}]${boostLabel} score=${l.score}`;
     }).join(', ')}`);
 
-    // Auto-index discovered landmarks in background (so next user gets instant results)
-    // Only landmarks with QID can be indexed (unique constraint)
-    const indexable = validLandmarks.filter(l => l.qid);
-    if (indexable.length > 0) {
-      log.info(`[LANDMARK] 💾 Auto-indexing ${indexable.length} landmarks for "${city}" in background...`);
+    // Run FULL indexing in background (multi-photo with AI diversity selection)
+    // This is identical to running /api/admin/landmark-index/index-city
+    log.info(`[LANDMARK] 💾 Running full indexing for "${city}, ${country}" in background...`);
 
-      // Run in background - don't await
-      (async () => {
-        let saved = 0;
-        for (const landmark of indexable) {
-          try {
-            // Map discovered landmark fields to index format
-            const indexData = {
-              name: landmark.name,
-              pageId: landmark.pageId,
-              qid: landmark.qid,
-              lang: landmark.lang,
-              lat: landmark.lat,
-              lon: landmark.lon,
-              nearestCity: city,
-              country: country,
-              type: landmark.type,
-              boostAmount: landmark.boostAmount,
-              categories: landmark.categories,
-              photoUrl: landmark.photoUrl,
-              attribution: landmark.attribution,
-              photoDescription: landmark.photoDescription,
-              commonsPhotoCount: landmark.commonsPhotoCount,
-              score: landmark.score
-            };
-
-            const success = await saveLandmarkToIndex(indexData);
-            if (success) saved++;
-          } catch (err) {
-            log.debug(`[LANDMARK] Auto-index failed for "${landmark.name}": ${err.message}`);
-          }
-        }
-        log.info(`[LANDMARK] 💾 Auto-indexed ${saved}/${indexable.length} landmarks for "${city}"`);
-      })().catch(err => {
-        log.error(`[LANDMARK] Auto-indexing error for "${city}":`, err);
-      });
-    }
+    // Run in background - don't await
+    indexLandmarksForCity(city, country, {
+      analyzePhotos: true,           // AI-analyze photos for descriptions
+      useMultiImageAnalysis: true,   // Use multi-image quality analysis
+      maxLandmarks: 30               // Index top 30 landmarks
+    }).then(result => {
+      log.info(`[LANDMARK] 💾 Full indexing complete for "${city}": ${result.totalSaved} landmarks saved with ${result.totalAnalyzed || 0} photos analyzed`);
+    }).catch(err => {
+      log.error(`[LANDMARK] Full indexing error for "${city}":`, err);
+    });
   }
 
   return validLandmarks;
