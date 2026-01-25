@@ -2403,7 +2403,6 @@ async function saveLandmarkToIndex(landmark) {
 const SWISS_CITIES = [
   // Major cities
   { city: 'Zürich', country: 'Switzerland', region: 'ZH' },
-  { city: 'Zurich', country: 'Switzerland', region: 'ZH' },  // ASCII alias
   { city: 'Genf', country: 'Switzerland', region: 'GE' },
   { city: 'Basel', country: 'Switzerland', region: 'BS' },
   { city: 'Lausanne', country: 'Switzerland', region: 'VD' },
