@@ -376,6 +376,22 @@ Examples:
 
 **Decision rule:** If a background element can't be shown accurately without distorting the setting's architecture, omit it from the visual description.
 
+**17. Character Count Limit:**
+Maximum 3 MAIN characters with visible faces in the scene.
+
+1. **Count characters in output:** How many have `position` in foreground/midground with faces visible?
+2. **If MORE than 3 main characters:**
+   - Keep the 3 most important (actively involved in this scene's action)
+   - EXTRA characters MUST be either:
+     - **From behind** (back view, no face visible), OR
+     - **Far background** (distant, small, no detail)
+   - These extras go in Objects section as "background figures"
+
+Examples:
+- ❌ 5 family members all in foreground with visible faces
+- ✅ 3 children in foreground (main), parents as "two adult figures seen from behind at table edge"
+- ✅ 3 heroes approaching, "distant crowd of villagers in background"
+
 **After checking, list:**
 - `issues`: Every problem found (be specific)
 - `corrections`: How to fix each issue
@@ -439,6 +455,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "check14_obstacleLogic": "Obstacles blocking passage: [list or NONE]. Each explains WHY impassable (spans width/wedged/too large)? YES/NO/N/A",
     "check15_holdingInventory": "For EACH character: [Name] L:[item/empty] R:[item/empty] BOTH:[item/none]. Conflict? YES/NO",
     "check16_backgroundFeasibility": "Background elements: [list]. All visible from this viewpoint? Opening sizes respected? If too many elements for openings, which to DROP? FEASIBLE/SIMPLIFY",
+    "check17_characterCount": "Main characters with visible faces: [count]. If >3: which to show from behind or move to background? PASS/FIX",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
@@ -543,7 +560,7 @@ If your scene shows the bridge from across the river, select the wide exterior v
     "check5_cameraView": "Elevated camera + characters looking DOWN at floor door = tops of heads visible, not faces. Sophie 'eyes wide, mouth open' INCOMPATIBLE with elevated camera seeing her from above/behind.",
     "check8_weather": "Scene is OUTDOOR (ruins). Weather: winter. Weather visibility: directly on scene. Compatible: YES",
     "check12_linearSpace": "No linear path in scene - characters at door in room. N/A",
-    "...": "(other checks omitted for brevity - include ALL 16 in actual output)",
+    "...": "(other checks omitted for brevity - include ALL 17 in actual output)",
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
