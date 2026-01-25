@@ -1356,16 +1356,17 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       }
 
       // If still no avatar, fall back to body photos
+      // Support both camelCase (photos object) and snake_case (char fields from DB)
       if (!photoUrl) {
-        if (photos.bodyNoBg || char.bodyNoBgUrl) {
+        if (photos.bodyNoBg || char.bodyNoBgUrl || char.body_no_bg_url) {
           photoType = 'bodyNoBg';
-          photoUrl = photos.bodyNoBg || char.bodyNoBgUrl;
-        } else if (photos.body || char.bodyPhotoUrl) {
+          photoUrl = photos.bodyNoBg || char.bodyNoBgUrl || char.body_no_bg_url;
+        } else if (photos.body || char.bodyPhotoUrl || char.body_photo_url) {
           photoType = 'body';
-          photoUrl = photos.body || char.bodyPhotoUrl;
-        } else if (photos.face || photos.original || char.photoUrl) {
+          photoUrl = photos.body || char.bodyPhotoUrl || char.body_photo_url;
+        } else if (photos.face || photos.original || char.photoUrl || char.photo_url) {
           photoType = 'face';
-          photoUrl = photos.face || photos.original || char.photoUrl;
+          photoUrl = photos.face || photos.original || char.photoUrl || char.photo_url;
         }
       }
 
