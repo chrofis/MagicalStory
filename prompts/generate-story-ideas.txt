@@ -38,36 +38,43 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 OUTPUT LANGUAGE:
 {LANGUAGE_INSTRUCTION}
 
-Generate a story idea that includes:
-1. LOCATION and TIME: Where and when does the story take place?
-2. ACTIONS: What happens? Who does what? Focus on the plot events.
-3. OUTLINE: The main conflict and how it gets resolved.
-
 STORY LENGTH: {STORY_LENGTH_CATEGORY}
 
-MAXIMUM LENGTH PER STORY IDEA:
-- Short stories (1-10 pages): 4 sentences maximum
-- Medium stories (11-20 pages): 6 sentences maximum
-- Long stories (21+ pages): 8 sentences maximum
+OUTPUT FORMAT:
+Write the story idea as PLAIN TEXT PARAGRAPHS.
+- First paragraph: Setting (location and time)
+- Second paragraph: What happens (the plot events)
+- Third paragraph: The conflict and resolution
 
-Each sentence should describe ONE key event or plot point. Be concise.
-DO NOT exceed these limits - quality over quantity.
+CRITICAL FORMAT RULES:
+- NO bold text (**text**) - never use asterisks
+- NO headers or labels like "LOCATION:", "HANDLUNG:", "KONFLIKT:" etc.
+- NO bullet points or numbered lists
+- Just plain flowing paragraphs of text
 
-IMPORTANT RULES:
-- NO adjectives allowed! Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
+LENGTH LIMITS:
+- Short stories (1-10 pages): 3-4 sentences total
+- Medium stories (11-20 pages): 5-6 sentences total
+- Long stories (21+ pages): 7-8 sentences total
+
+CONTENT RULES:
+- NO adjectives! Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
 - Focus ONLY on actions and events: who goes where, what they do, what happens next.
 - Be specific about locations and time periods.
-- The outline should focus on the main characters
-- All the characters must be mentioned
-- Follow the SCENE COMPLEXITY guide above - match story complexity to the number of scenes
+- All characters must be mentioned
+- Follow the SCENE COMPLEXITY guide above
 
-EXAMPLES of good story ideas:
+EXAMPLES of good story ideas (note: plain text, no headers):
 
-Example 1: "Pirates sail from the North Pole through icy waters to reach Africa. On the way, they discover a map hidden in a bottle. The crew follows the map to an underwater cave where they find a chest. They must solve three riddles to open it."
+Example 1:
+The story takes place on the high seas, traveling from the North Pole to Africa during summer.
 
-Example 2: "In a castle during winter in medieval times, the kitchen runs out of firewood. The cook sends her daughter to the forest to gather wood. The daughter meets a wolf who offers to help carry the wood in exchange for a bowl of soup."
+Pirates discover a map hidden in a bottle floating in icy waters. The crew follows the map to an underwater cave where they find a locked chest. They must solve three riddles carved into the cave walls to open the chest and claim the treasure inside.
 
-Example 3: "In a forest where animals can talk, a rabbit loses her way home. She asks an owl for directions, but the owl speaks in riddles. A fox offers to guide her, but leads her in circles. The rabbit must figure out the owl's riddle to find the path."
+Example 2:
+The story is set in a medieval castle during a cold winter when snow covers the land.
+
+The kitchen runs out of firewood and the cook sends her daughter to the forest to gather more. In the forest, the daughter meets a wolf who offers to help carry the heavy wood in exchange for a bowl of hot soup. She must decide whether to trust the wolf or find another way to bring the wood home.
 
 ---
 
