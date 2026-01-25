@@ -426,7 +426,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   const neededAvatars = new Map(); // key -> { characterName, clothingCategory, originalAvatar, facePhoto }
 
   for (const requirement of pageRequirements) {
-    const { clothingCategory, characterNames } = requirement;
+    let { clothingCategory, characterNames } = requirement;
 
     for (const charName of characterNames || []) {
       // Case-insensitive character lookup with exact match fallback
