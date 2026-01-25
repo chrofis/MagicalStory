@@ -1046,8 +1046,11 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     }
 
     const pool = getPool();
+
+    // OPTIMIZED: Only fetch sceneImages array, not entire 5MB+ data blob
     const result = await pool.query(
-      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      `SELECT data->'sceneImages' as scene_images
+       FROM stories WHERE id = $1 AND user_id = $2`,
       [id, req.user.id]
     );
 
@@ -1055,8 +1058,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = typeof result.rows[0].data === 'string' ? JSON.parse(result.rows[0].data) : result.rows[0].data;
-    const sceneImages = storyData.sceneImages || [];
+    const sceneImages = result.rows[0].scene_images || [];
     const sceneIndex = sceneImages.findIndex(s => s.pageNumber === pageNum);
 
     if (sceneIndex === -1) {
@@ -1074,16 +1076,16 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     versions.forEach((v, i) => {
       v.isActive = (i === versionIndex);
     });
-
-    // Also update the main imageData to the selected version
-    scene.imageData = versions[versionIndex].imageData;
     scene.imageVersions = versions;
 
-    storyData.sceneImages = sceneImages;
-    storyData.updatedAt = new Date().toISOString();
-
-    // Use lightweight update - don't re-save all images to story_images table
-    await updateStoryDataOnly(id, storyData);
+    // OPTIMIZED: Use jsonb_set to update only sceneImages, not entire data blob
+    await pool.query(
+      `UPDATE stories
+       SET data = jsonb_set(data::jsonb, '{sceneImages}', $1::jsonb),
+           metadata = jsonb_set(COALESCE(metadata::jsonb, '{}'), '{updatedAt}', $2::jsonb)
+       WHERE id = $3`,
+      [JSON.stringify(sceneImages), JSON.stringify(new Date().toISOString()), id]
+    );
 
     console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum}`);
 
