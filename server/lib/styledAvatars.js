@@ -778,17 +778,6 @@ function invalidateStyledAvatarForCategory(characterName, clothingCategory, char
 }
 
 /**
- * Get cache statistics
- * @returns {{size: number, inProgress: number}}
- */
-function getStyledAvatarCacheStats() {
-  return {
-    size: styledAvatarCache.size,
-    inProgress: conversionInProgress.size
-  };
-}
-
-/**
  * Apply styled avatars to character photo details array
  * Replaces photoUrl with styled version from cache if available
  *
@@ -1151,7 +1140,6 @@ module.exports = {
   hasStyledAvatar,
   clearStyledAvatarCache,
   invalidateStyledAvatarForCategory,
-  getStyledAvatarCacheStats,
 
   // Persistence
   getStyledAvatarsForCharacter,
