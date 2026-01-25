@@ -3914,6 +3914,7 @@ export default function StoryWizard() {
                 setDedication('');
                 setStoryDetails('');
                 setExcludedCharacters([]);
+                setMainCharacters([]);
 
                 // Clear localStorage for story settings
                 localStorage.removeItem('story_type');
