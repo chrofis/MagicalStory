@@ -12,10 +12,10 @@ const { getPool } = require('../../services/database');
 const { JWT_SECRET } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const {
-  discoverAllSwissLandmarks,
-  getSwissLandmarksNearLocation,
-  getSwissLandmarksByCity,
-  getSwissLandmarkStats,
+  indexLandmarksForCities,
+  getIndexedLandmarksNearLocation,
+  getIndexedLandmarks,
+  getLandmarkIndexStats,
   SWISS_CITIES
 } = require('../../lib/landmarkPhotos');
 
@@ -109,7 +109,7 @@ router.post('/index', async (req, res) => {
     log.info(`[ADMIN] Starting Swiss landmark indexing (maxLandmarks=${maxLandmarks}, cities=${effectiveCityCount}, multiImage=${useMultiImageAnalysis}, forceReanalyze=${forceReanalyze}, filter=${filterCities || 'none'}, dryRun=${dryRun})`);
 
     // Run in background
-    discoverAllSwissLandmarks({
+    indexLandmarksForCities({
       analyzePhotos,
       useMultiImageAnalysis,
       forceReanalyze,
@@ -174,7 +174,7 @@ router.post('/recalculate-scores', async (req, res) => {
 
     // Update scores based on type
     const result = await pool.query(`
-      UPDATE swiss_landmarks SET score = CASE
+      UPDATE landmark_index SET score = CASE
         WHEN type IN ('Castle', 'Church', 'Cathedral', 'Bridge', 'Tower', 'Abbey', 'Monastery', 'Chapel') THEN 130
         WHEN type IN ('Park', 'Garden', 'Monument', 'Museum', 'Theatre', 'Historic site', 'Statue', 'Fountain', 'Square', 'Library') THEN 80
         WHEN type IS NOT NULL AND type NOT IN ('Unknown', 'Building', 'Station') THEN 30
@@ -203,7 +203,7 @@ router.post('/update-type', async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'UPDATE swiss_landmarks SET type = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, type',
+      'UPDATE landmark_index SET type = $1, updated_at = NOW() WHERE id = $2 RETURNING id, name, type',
       [type, id]
     );
 
@@ -224,7 +224,7 @@ router.get('/stats', async (req, res) => {
   if (!checkAuth(req, res, false)) return;
 
   try {
-    const stats = await getSwissLandmarkStats();
+    const stats = await getLandmarkIndexStats();
     res.json(stats);
   } catch (err) {
     log.error('[ADMIN] Swiss landmark stats error:', err);
@@ -242,9 +242,9 @@ router.get('/', async (req, res) => {
 
     let landmarks;
     if (city) {
-      landmarks = await getSwissLandmarksByCity(city, parseInt(limit));
+      landmarks = await getIndexedLandmarks(city, parseInt(limit));
     } else if (lat && lon) {
-      landmarks = await getSwissLandmarksNearLocation(
+      landmarks = await getIndexedLandmarksNearLocation(
         parseFloat(lat),
         parseFloat(lon),
         parseFloat(radius),
@@ -252,7 +252,7 @@ router.get('/', async (req, res) => {
       );
     } else {
       const result = await pool.query(
-        `SELECT * FROM swiss_landmarks ORDER BY score DESC LIMIT $1`,
+        `SELECT * FROM landmark_index ORDER BY score DESC LIMIT $1`,
         [parseInt(limit)]
       );
       landmarks = result.rows;
@@ -303,7 +303,7 @@ router.delete('/broken', async (req, res) => {
     // Find broken entries: photo_url contains wikipedia.org/wiki/ (article URL, not image)
     // Valid entries have photo_url starting with upload.wikimedia.org (actual images)
     const result = await pool.query(`
-      DELETE FROM swiss_landmarks
+      DELETE FROM landmark_index
       WHERE photo_url LIKE '%wikipedia.org/wiki/%'
       AND photo_url NOT LIKE '%upload.wikimedia.org%'
       RETURNING id, name, nearest_city
