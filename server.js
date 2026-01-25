@@ -2030,7 +2030,8 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
             query: l.name,
             type: l.type,
             score: l.score,
-            photoDescription: l.photo_description,
+            wikipediaExtract: l.wikipedia_extract,  // For outline prompt (what landmark IS)
+            photoDescription: l.photo_description,   // For image generation (what photo looks like)
             isIndexed: true,
             landmarkIndexId: l.id
           }));
@@ -2334,7 +2335,8 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
             query: l.name,
             type: l.type,
             score: l.score,
-            photoDescription: l.photo_description,
+            wikipediaExtract: l.wikipedia_extract,  // For outline prompt (what landmark IS)
+            photoDescription: l.photo_description,   // For image generation (what photo looks like)
             isIndexed: true,
             landmarkIndexId: l.id
           }));

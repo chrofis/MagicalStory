@@ -2052,6 +2052,30 @@ async function discoverLandmarksForLocation(city, country, limit = 30) {
   const analyzedCount = validLandmarks.filter(l => l.photoDescription).length;
   log.info(`[LANDMARK] 🔍 Photo analysis: ${analyzedCount}/${validLandmarks.length} descriptions generated`);
 
+  // Step 8: Fetch Wikipedia extracts (what the landmark IS, for outline prompt)
+  log.info(`[LANDMARK] 📚 Fetching Wikipedia extracts for ${validLandmarks.length} landmarks...`);
+  const EXTRACT_BATCH_SIZE = 10;
+  const EXTRACT_BATCH_DELAY_MS = 50;
+
+  for (let i = 0; i < validLandmarks.length; i += EXTRACT_BATCH_SIZE) {
+    const batch = validLandmarks.slice(i, i + EXTRACT_BATCH_SIZE);
+    await Promise.allSettled(batch.map(async (landmark) => {
+      if (landmark.pageId && landmark.lang) {
+        const extract = await fetchWikipediaExtract(landmark.lang, landmark.pageId, 3);
+        if (extract) {
+          landmark.wikipediaExtract = extract;
+        }
+      }
+    }));
+    // Small delay between batches
+    if (i + EXTRACT_BATCH_SIZE < validLandmarks.length) {
+      await new Promise(resolve => setTimeout(resolve, EXTRACT_BATCH_DELAY_MS));
+    }
+  }
+
+  const extractCount = validLandmarks.filter(l => l.wikipediaExtract).length;
+  log.info(`[LANDMARK] 📚 Wikipedia extracts: ${extractCount}/${validLandmarks.length} fetched`);
+
   const elapsed = Date.now() - startTime;
   log.info(`[LANDMARK] ✅ Discovered ${validLandmarks.length} landmarks for "${location}" in ${elapsed}ms`);
   log.info(`[LANDMARK] 📊 Stats: ${landmarks.length} from Wikipedia → ${withPhotos.length} with photos → ${validLandmarks.length} returned (${analyzedCount} analyzed)`);

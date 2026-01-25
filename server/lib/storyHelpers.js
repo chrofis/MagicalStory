@@ -3053,18 +3053,21 @@ function buildAvailableLandmarksSection(landmarks) {
     return '';
   }
 
-  // Format with photo descriptions if available:
-  // "- Kurpark (Baden) [Park]: A beautiful public park with manicured lawns..."
+  // Format with Wikipedia descriptions (what the landmark IS, not what photos look like)
+  // "- Kurpark (Baden) [Park]: A historic spa park in the town center..."
   const landmarkList = landmarks
     .map(l => {
       let entry = `- ${l.name}`;
       if (l.type) entry += ` [${l.type}]`;
-      if (l.photoDescription) entry += `\n  PHOTO DESCRIPTION: ${l.photoDescription}`;
+      // Use Wikipedia extract for outline (describes what landmark IS)
+      // NOT photo description (describes what a photo looks like)
+      const description = l.wikipediaExtract || l.wikipedia_extract;
+      if (description) entry += `\n  DESCRIPTION: ${description}`;
       return entry;
     })
     .join('\n');
 
-  const hasDescriptions = landmarks.some(l => l.photoDescription);
+  const hasDescriptions = landmarks.some(l => l.wikipediaExtract || l.wikipedia_extract);
 
   return `**REAL LANDMARKS - You must use at least 2 landmarks from below list:**
 
@@ -3073,14 +3076,14 @@ ${landmarkList}
 When you use a landmark from the list (even if you rename it in your story):
 - Set "isRealLandmark": true
 - Set "landmarkQuery": copy-paste the EXACT name from the list above (WITHOUT the [type])
-${hasDescriptions ? `- IMPORTANT: If the landmark has a PHOTO DESCRIPTION above, copy it EXACTLY to "description" - do NOT invent your own!` : ''}
+${hasDescriptions ? `- Use the DESCRIPTION above to understand what the landmark is and incorporate it authentically into your story` : ''}
 
 EXAMPLE - Using "Ruine Stein [Ruins]" as "The Enchanted Castle" in your story:
 {
   "name": "The Enchanted Castle",
   "isRealLandmark": true,
   "landmarkQuery": "Ruine Stein",
-  "description": "<copy the PHOTO DESCRIPTION if provided, otherwise write your own>"
+  "description": "<write a scene description appropriate for your story>"
 }
 
 Your "name" can be creative, but "landmarkQuery" MUST match the original name exactly (without the [type] suffix)!
