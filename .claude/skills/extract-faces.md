@@ -178,6 +178,72 @@ node scripts/count-expected-faces.js <storyId>
 node scripts/compare-faces.js <storyId> <characterName>
 ```
 
+## Alternative: Bbox Detection from Retry History
+
+For debugging or when qualityReasoning is unavailable, use the raw bboxDetection data stored in retryHistory.
+
+### Find Pages with Bbox Data
+
+```javascript
+const result = await pool.query(`
+  SELECT result_data->'sceneImages' as images
+  FROM story_jobs WHERE id = $1
+`, [jobId]);
+
+const images = result.rows[0]?.images || [];
+images.forEach((img) => {
+  const bbox = img.retryHistory?.find(h => h.bboxDetection)?.bboxDetection;
+  if (bbox) {
+    console.log(`Page ${img.pageNumber}: ${bbox.figures?.length} figures, ${bbox.objects?.length} objects`);
+  }
+});
+```
+
+### Extract Bbox Data for a Page
+
+```javascript
+// Page index = pageNumber - 1
+const result = await pool.query(`
+  SELECT result_data->'sceneImages'->${pageIndex}->'retryHistory' as history
+  FROM story_jobs WHERE id = $1
+`, [jobId]);
+
+const bbox = result.rows[0]?.history?.find(h => h.bboxDetection)?.bboxDetection;
+// bbox.figures: [{label, bodyBox, faceBox, position}]
+// bbox.objects: [{label, bodyBox, position}]
+```
+
+### Crop Regions Using Sharp
+
+```javascript
+const sharp = require('sharp');
+const metadata = await sharp(imageBuffer).metadata();
+
+// Bbox format: [ymin, xmin, ymax, xmax] normalized 0-1
+const [ymin, xmin, ymax, xmax] = bbox.figures[0].bodyBox;
+
+await sharp(imageBuffer).extract({
+  left: Math.round(xmin * metadata.width),
+  top: Math.round(ymin * metadata.height),
+  width: Math.round((xmax - xmin) * metadata.width),
+  height: Math.round((ymax - ymin) * metadata.height)
+}).png().toFile('output.png');
+```
+
+### Quick Script
+
+```bash
+node scripts/extract-bbox-crops.js <jobId> <pageNumber>
+```
+
+Output directory: `tests/fixtures/bbox-crops/`
+
+### Known Issue: Face Detection Often Wrong
+
+The `faceBox` from bboxDetection is unreliable - often points to background elements instead of faces. **Prefer using `face_bbox` from qualityReasoning matches instead.**
+
+Body detection (`bodyBox`) works correctly.
+
 ## Troubleshooting
 
 **"From evaluation: 0"** - Story has no qualityReasoning data, or uses unknown format. Check with:
@@ -188,3 +254,5 @@ node scripts/check-evaluation-fields.js <storyId>
 **Missing characters** - Either not in scene, or evaluation didn't detect them. Falls back to cascade which may miss some.
 
 **Duplicate filenames** - Multiple faces per page overwrite each other. TODO: Add index suffix.
+
+**Face crops show wrong area** - bboxDetection faceBox is unreliable. Use qualityReasoning face_bbox instead.

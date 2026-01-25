@@ -315,6 +315,9 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       evaluationTemplate = null;
     }
 
+    // Determine model to use (parameter override > config default > fallback)
+    const modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+
     // Sanitize prompt for Gemini 2.5 to avoid content filter triggers
     // Remove age references and detailed physical descriptions while keeping scene context
     const sanitizePromptFor25 = (prompt) => {
@@ -390,8 +393,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });
 
-    // Use centralized default for quality evaluation (or override if provided)
-    let modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval;
+    // Log if using model override (modelId already defined at top of function)
     if (qualityModelOverride) {
       log.debug(`🔧 [QUALITY] Using model override: ${modelId}`);
     }
@@ -790,7 +792,7 @@ async function detectAllBoundingBoxes(imageData) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 2000,  // More tokens for full scene detection
+            maxOutputTokens: 4000,  // More tokens for full scene detection with many objects
             temperature: 0.1,  // Low temperature for precise detection
             responseMimeType: 'application/json'
           },
@@ -830,10 +832,27 @@ async function detectAllBoundingBoxes(imageData) {
     try {
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        parsedResult = JSON.parse(jsonMatch[0]);
+        // Try to fix common JSON issues from LLM output
+        let jsonText = jsonMatch[0];
+        // Remove trailing commas before ] or }
+        jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
+        // Remove any markdown code fence artifacts
+        jsonText = jsonText.replace(/```json?\s*/g, '').replace(/```\s*/g, '');
+        parsedResult = JSON.parse(jsonText);
       }
     } catch (e) {
       log.warn(`⚠️  [BBOX-DETECT] Failed to parse response: ${e.message}`);
+      // Log more context around the error position
+      const errorMatch = e.message.match(/position (\d+)/);
+      if (errorMatch) {
+        const pos = parseInt(errorMatch[1]);
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const context = jsonMatch[0].substring(Math.max(0, pos - 50), pos + 50);
+          log.warn(`⚠️  [BBOX-DETECT] JSON context around error: ...${context}...`);
+        }
+      }
+      log.debug(`⚠️  [BBOX-DETECT] Raw response (first 1000 chars): ${responseText.substring(0, 1000)}`);
       return null;
     }
 
@@ -2085,7 +2104,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             repaired: gridResult.repaired,
             repairHistory: gridResult.history?.steps || [],
             usage: null,  // Grid repair usage tracked in history
-            modelId: 'grid-repair'
+            modelId: 'grid-repair',
+            // Store grid data for UI display
+            grids: gridResult.grids,
+            gridFixedCount: gridResult.fixedCount,
+            gridFailedCount: gridResult.failedCount,
+            gridTotalIssues: gridResult.totalIssues
           };
 
           if (gridResult.repaired) {
@@ -2137,7 +2161,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             // Record repair attempt in history with full evaluation data
             retryHistory.push({
               attempt: attempts,
-              type: 'auto_repair',
+              type: repairResult.modelId === 'grid-repair' ? 'grid_repair' : 'auto_repair',
               preRepairScore: score,
               postRepairScore: repairedScore,
               fixTargetsCount: fixTargetsToUse.length,
@@ -2161,6 +2185,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               bboxDetection: bboxDetectionHistory,
               // Repair details from autoRepairWithTargets
               repairDetails: repairResult.repairHistory || [],
+              // Grid repair data for UI display (only present for grid repairs)
+              grids: repairResult.grids,
+              gridFixedCount: repairResult.gridFixedCount,
+              gridFailedCount: repairResult.gridFailedCount,
+              gridTotalIssues: repairResult.gridTotalIssues,
               timestamp: new Date().toISOString()
             });
 
@@ -2173,7 +2202,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
                 reasoning: reEvalResult.reasoning,
                 wasRepaired: true,
                 fixTargets: reEvalResult.fixTargets || [],  // Use new fix targets from re-eval
-                repairHistory: repairResult.repairHistory || []  // Include repair details
+                repairHistory: repairResult.repairHistory || [],  // Include repair details
+                // Include grid data for UI display
+                grids: repairResult.grids
               };
               score = repairedScore;  // Update score for threshold check
               log.info(`✅ [QUALITY RETRY] Using repaired image (score improved from ${retryHistory[retryHistory.length - 1].preRepairScore}% to ${score}%)`);
