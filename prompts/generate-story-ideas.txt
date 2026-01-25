@@ -44,7 +44,6 @@ OUTPUT FORMAT:
 Write the story idea as PLAIN TEXT PARAGRAPHS.
 - First paragraph: Setting (location and time)
 - Second paragraph: What happens (the plot events)
-- Third paragraph: The conflict and resolution
 
 CRITICAL FORMAT RULES:
 - NO bold text (**text**) - never use asterisks
