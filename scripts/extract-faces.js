@@ -53,11 +53,25 @@ function extractFromEvaluation(qualityReasoning, imgWidth, imgHeight) {
       : qualityReasoning;
 
     const faces = [];
-    for (const match of (reasoning.identity_sync || [])) {
-      if (!match.face_bbox || !match.matched_reference) continue;
+
+    // Try OLD format: identity_sync
+    let matchData = reasoning.identity_sync || [];
+
+    // Try NEW format: matches
+    if (matchData.length === 0 && reasoning.matches) {
+      matchData = reasoning.matches;
+    }
+
+    for (const match of matchData) {
+      if (!match.face_bbox) continue;
+
+      // Get character name from either format
+      let charName = match.matched_reference || match.reference;
+      if (!charName) continue;
+
       // Skip non-matches
-      if (match.matched_reference.toLowerCase().includes('no matching')) continue;
-      if (match.matched_reference.toLowerCase().includes('extra character')) continue;
+      if (charName.toLowerCase().includes('no matching')) continue;
+      if (charName.toLowerCase().includes('extra character')) continue;
 
       // Convert normalized [ymin, xmin, ymax, xmax] to pixel box
       const [ymin, xmin, ymax, xmax] = match.face_bbox;
@@ -69,7 +83,6 @@ function extractFromEvaluation(qualityReasoning, imgWidth, imgHeight) {
       };
 
       // Extract character name (remove "(Reference X)" suffix if present)
-      let charName = match.matched_reference;
       if (charName.includes('(')) {
         charName = charName.split('(')[0].trim();
       }

@@ -4939,9 +4939,9 @@ app.post('/api/stories/:id/share', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    // Generate share token if not exists
+    // Generate share token if not exists (32 bytes = 64 hex chars)
     const crypto = require('crypto');
-    const shareToken = crypto.randomBytes(16).toString('hex');
+    const shareToken = crypto.randomBytes(32).toString('hex');
 
     await dbQuery(
       'UPDATE stories SET is_shared = true, share_token = COALESCE(share_token, $1) WHERE id = $2',

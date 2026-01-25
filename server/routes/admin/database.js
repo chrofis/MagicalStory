@@ -20,6 +20,45 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// POST /api/admin/fix-sharing-columns
+// Adds is_shared and share_token columns for story sharing feature
+router.post('/fix-sharing-columns', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const pool = getPool();
+    const results = [];
+
+    // Add is_shared column
+    try {
+      await pool.query('ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT FALSE');
+      results.push({ column: 'is_shared', status: 'OK' });
+    } catch (err) {
+      results.push({ column: 'is_shared', status: 'ERROR', error: err.message });
+    }
+
+    // Add share_token column
+    try {
+      await pool.query('ALTER TABLE stories ADD COLUMN IF NOT EXISTS share_token VARCHAR(64) UNIQUE');
+      results.push({ column: 'share_token', status: 'OK' });
+    } catch (err) {
+      results.push({ column: 'share_token', status: 'ERROR', error: err.message });
+    }
+
+    // Create index for fast lookups
+    try {
+      await pool.query('CREATE INDEX IF NOT EXISTS idx_stories_share_token ON stories(share_token) WHERE share_token IS NOT NULL');
+      results.push({ index: 'idx_stories_share_token', status: 'OK' });
+    } catch (err) {
+      results.push({ index: 'idx_stories_share_token', status: 'ERROR', error: err.message });
+    }
+
+    log.info('[FIX-SHARING] Added sharing columns to stories table');
+    res.json({ success: true, results });
+  } catch (err) {
+    log.error('[FIX-SHARING] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/admin/fix-shipping-columns
 router.post('/fix-shipping-columns', authenticateToken, requireAdmin, async (req, res) => {
   try {
