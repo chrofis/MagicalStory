@@ -1582,7 +1582,8 @@ class ProgressiveUnifiedParser {
           this.callbacks.onProgress('clothing', `Clothing for ${Object.keys(requirements).length} characters`);
         }
       } catch (e) {
-        // JSON not valid yet, wait for more data
+        // JSON parse error - log it for debugging
+        log.debug(`[STREAM-UNIFIED] Clothing requirements JSON parse error (may be incomplete): ${e.message}`);
       }
     }
   }
@@ -1731,7 +1732,8 @@ class ProgressiveUnifiedParser {
           this.callbacks.onProgress('visualBible', `Visual Bible: ${entryCount} elements`);
         }
       } catch (e) {
-        // JSON not valid yet
+        // JSON parse error - log it for debugging
+        log.debug(`[STREAM-UNIFIED] Visual Bible JSON parse error (may be incomplete): ${e.message}`);
       }
     }
   }
@@ -1832,11 +1834,25 @@ class ProgressiveUnifiedParser {
   }
 
   /**
-   * Finalize parsing - emit any remaining pages
+   * Finalize parsing - emit any remaining pages and warn about missing sections
    */
   finalize() {
     // Re-check pages one more time to catch the last page
     this._checkPages();
+
+    // Warn about required sections that weren't detected during streaming
+    const missingSections = [];
+    if (!this.emitted.title) missingSections.push('TITLE');
+    if (!this.emitted.clothingRequirements) missingSections.push('CLOTHING REQUIREMENTS');
+    if (!this.emitted.visualBible) missingSections.push('VISUAL BIBLE');
+    if (!this.emitted.coverHints) missingSections.push('COVER SCENE HINTS');
+
+    if (missingSections.length > 0) {
+      log.warn(`⚠️ [STREAM-UNIFIED] Missing sections not detected during streaming: ${missingSections.join(', ')}`);
+      // Log which markers were found to help debug
+      const foundMarkers = this.sectionMarkers.filter(m => this.fullText.includes(m));
+      log.debug(`[STREAM-UNIFIED] Markers found in response: ${foundMarkers.join(', ') || 'none'}`);
+    }
 
     log.debug(`🌊 [STREAM-UNIFIED] Finalized: ${this.emitted.pages.size} pages emitted`);
     return {
