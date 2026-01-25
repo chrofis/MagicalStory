@@ -8330,6 +8330,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let streamingPagesDetected = 0;
     let lastProgressUpdate = Date.now();
     let landmarkDescriptionsPromise = null; // Promise for loading landmark photo descriptions
+    let streamingAvatarStylingPromise = null; // Promise for early avatar styling (started when clothing requirements ready)
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -8601,7 +8602,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         } else {
           log.debug(`✅ [STREAM] Clothing requirements complete: ${reqCharCount}/${expectedCharCount} characters`);
         }
-        // NOTE: Avatar generation removed from streaming. Avatars should exist before story starts.
+
+        // START AVATAR STYLING EARLY - we have everything we need now
+        // This saves ~3min by running in parallel with story text generation
+        if (!skipImages && artStyle !== 'realistic' && !streamingAvatarStylingPromise) {
+          log.debug(`🎨 [STREAM] Starting early avatar styling (${reqCharCount} characters, ${artStyle} style)...`);
+          streamingAvatarStylingPromise = (async () => {
+            try {
+              const basicRequirements = (inputData.characters || []).flatMap(char => {
+                const charNameLower = char.name?.toLowerCase();
+                const charReqs = requirements?.[char.name] ||
+                                 requirements?.[charNameLower] ||
+                                 (requirements && Object.entries(requirements)
+                                   .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
+
+                let usedCategories = charReqs
+                  ? Object.entries(charReqs)
+                      .filter(([cat, config]) => config?.used)
+                      .map(([cat, config]) => cat === 'costumed' && config?.costume
+                        ? `costumed:${config.costume}`
+                        : cat)
+                  : ['standard'];
+
+                if (usedCategories.length === 0) {
+                  usedCategories = ['standard'];
+                }
+
+                return usedCategories.map(cat => ({
+                  pageNumber: 'pre-cover',
+                  clothingCategory: cat,
+                  characterNames: [char.name]
+                }));
+              });
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage);
+              log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
+            } catch (error) {
+              log.warn(`⚠️ [STREAM] Early avatar styling failed: ${error.message}`);
+            }
+          })();
+        }
       },
       onVisualBible: (vb) => {
         streamingVisualBible = vb;
@@ -8808,49 +8847,47 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [18, `Story complete: "${title}" (${scenesStarted} scenes in parallel)`, jobId]
     );
 
-    // Prepare styled avatars BEFORE covers start
-    // Covers call applyStyledAvatars which needs the cache populated by prepareStyledAvatars
+    // Wait for early avatar styling (started during streaming when clothing requirements detected)
+    // This runs in parallel with story text generation, saving ~3min
     if (!skipImages && artStyle !== 'realistic') {
-      log.debug(`🎨 [UNIFIED] Preparing styled avatars for covers...`);
-
-      // Prepare styled avatars ONLY for clothing categories actually used in the story
-      try {
-        const basicCoverRequirements = (inputData.characters || []).flatMap(char => {
-          const charNameLower = char.name?.toLowerCase();
-          // Find clothing requirements for this character (case-insensitive lookup)
-          // Use clothingRequirements (from parser) which is available at this point, not streamingClothingRequirements
-          const charReqs = clothingRequirements?.[char.name] ||
-                           clothingRequirements?.[charNameLower] ||
-                           (clothingRequirements && Object.entries(clothingRequirements)
-                             .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
-
-          // Get categories with used=true, default to ['standard'] if no requirements
-          let usedCategories = charReqs
-            ? Object.entries(charReqs)
-                .filter(([cat, config]) => config?.used)
-                .map(([cat, config]) => cat === 'costumed' && config?.costume
-                  ? `costumed:${config.costume}`
-                  : cat)
-            : ['standard'];
-
-          // At minimum, always include 'standard' for covers if no categories found
-          if (usedCategories.length === 0) {
-            usedCategories = ['standard'];
-          }
-
-          log.debug(`🔍 [STYLED AVATARS] ${char.name}: using categories [${usedCategories.join(', ')}]`);
-          return usedCategories.map(cat => ({
-            pageNumber: 'pre-cover',
-            clothingCategory: cat,
-            characterNames: [char.name]
-          }));
-        });
-        await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage);
+      if (streamingAvatarStylingPromise) {
+        log.debug(`🎨 [UNIFIED] Waiting for early avatar styling to complete...`);
+        await streamingAvatarStylingPromise;
         log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
-      } catch (error) {
-        // Bug #14 fix: Include stack trace for better debugging
-        log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
-        log.debug(`   Stack: ${error.stack?.split('\n').slice(0, 3).join(' -> ')}`);
+      } else {
+        // Fallback: style avatars now if early styling didn't start
+        log.debug(`🎨 [UNIFIED] Preparing styled avatars for covers (fallback)...`);
+        try {
+          const basicCoverRequirements = (inputData.characters || []).flatMap(char => {
+            const charNameLower = char.name?.toLowerCase();
+            const charReqs = clothingRequirements?.[char.name] ||
+                             clothingRequirements?.[charNameLower] ||
+                             (clothingRequirements && Object.entries(clothingRequirements)
+                               .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
+
+            let usedCategories = charReqs
+              ? Object.entries(charReqs)
+                  .filter(([cat, config]) => config?.used)
+                  .map(([cat, config]) => cat === 'costumed' && config?.costume
+                    ? `costumed:${config.costume}`
+                    : cat)
+              : ['standard'];
+
+            if (usedCategories.length === 0) {
+              usedCategories = ['standard'];
+            }
+
+            return usedCategories.map(cat => ({
+              pageNumber: 'pre-cover',
+              clothingCategory: cat,
+              characterNames: [char.name]
+            }));
+          });
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage);
+          log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
+        } catch (error) {
+          log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
+        }
       }
     }
 
