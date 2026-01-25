@@ -12,6 +12,15 @@ const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 
+// Grid-based repair (lazy-loaded to avoid circular dependencies)
+let gridBasedRepairModule = null;
+function getGridBasedRepair() {
+  if (!gridBasedRepairModule) {
+    gridBasedRepairModule = require('./gridBasedRepair');
+  }
+  return gridBasedRepairModule;
+}
+
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
@@ -1715,6 +1724,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     incrementalConsistency: incrementalConsistencyInput = null,  // { enabled, dryRun, lookbackCount, previousImages, ... }
     // Check-only mode: run all checks but skip regeneration/repair
     checkOnlyMode = false,
+    // Grid-based repair: extracts issues, creates grids, repairs with Gemini, verifies
+    useGridRepair = false,
+    // Output directory for grid-based repair (required if useGridRepair=true)
+    gridRepairOutputDir = null,
+    // Story ID for grid-based repair manifest
+    storyId = null,
   } = options;
 
   // In check-only mode: only 1 attempt, no auto-repair, force dry-run for consistency
@@ -2013,14 +2028,60 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const repairSource = incrEnabled ? 'unified (quality + consistency)' : 'quality';
       log.info(`🔧 [QUALITY RETRY] ${pageLabel}Attempting auto-repair on ${fixTargetsToUse.length} fix targets (${repairSource})...`);
       try {
-        // Inpainting uses text-based coordinates instead of mask images
-        // This avoids confusion when there are multiple similar elements
-        const repairResult = await autoRepairWithTargets(
-          result.imageData,
-          fixTargetsToUse,
-          0,  // No additional inspection attempts
-          { includeDebugImages: isAdmin }  // Include before/after images for admin users
-        );
+        let repairResult;
+
+        // Choose repair method: grid-based (new) or direct inpainting (legacy)
+        if (useGridRepair && gridRepairOutputDir) {
+          // Grid-based repair: extract regions, create grid, repair with Gemini, verify
+          log.info(`🔧 [QUALITY RETRY] ${pageLabel}Using grid-based repair method`);
+          const { gridBasedRepair } = getGridBasedRepair();
+
+          // Build evaluation results from current state
+          const evalResults = {
+            quality: {
+              score: result.score,
+              fixTargets: fixTargetsToUse,
+              reasoning: result.reasoning
+            },
+            incremental: incrEnabled ? consistencyResult : null,
+            final: null  // Final consistency handled separately
+          };
+
+          const gridResult = await gridBasedRepair(
+            result.imageData,
+            pageNumber || 1,
+            evalResults,
+            {
+              outputDir: gridRepairOutputDir,
+              storyId: storyId,
+              skipVerification: false,
+              saveIntermediates: isAdmin,
+              onProgress: (step, msg) => log.debug(`  [GRID] ${step}: ${msg}`)
+            }
+          );
+
+          // Convert grid result to match autoRepairWithTargets format
+          repairResult = {
+            imageData: gridResult.imageData,
+            repaired: gridResult.repaired,
+            repairHistory: gridResult.history?.steps || [],
+            usage: null,  // Grid repair usage tracked in history
+            modelId: 'grid-repair'
+          };
+
+          if (gridResult.repaired) {
+            log.info(`✅ [QUALITY RETRY] ${pageLabel}Grid repair: ${gridResult.fixedCount}/${gridResult.totalIssues} issues fixed`);
+          }
+        } else {
+          // Legacy: Inpainting uses text-based coordinates instead of mask images
+          // This avoids confusion when there are multiple similar elements
+          repairResult = await autoRepairWithTargets(
+            result.imageData,
+            fixTargetsToUse,
+            0,  // No additional inspection attempts
+            { includeDebugImages: isAdmin }  // Include before/after images for admin users
+          );
+        }
 
         if (repairResult.repaired && repairResult.imageData !== result.imageData) {
           // Verify images are actually different by comparing hashes
@@ -4266,6 +4327,7 @@ module.exports = {
   inpaintWithMask,
   autoRepairImage,
   autoRepairWithTargets,
+  getGridBasedRepair,  // Lazy-loaded grid-based repair module
 
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
