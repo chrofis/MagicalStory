@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -300,6 +300,8 @@ export default function StoryWizard() {
   const [savedGenerationSettings, setSavedGenerationSettings] = useState<GenerationSettings | null>(null);
   // Flag to skip server reload when we just finished generating (data is already in state)
   const justFinishedGenerating = useRef(false);
+  // Flag to track if dev metadata has been loaded (prevents duplicate fetches)
+  const devMetadataLoadedRef = useRef(false);
 
   // Progressive story display state (show story while images are generating)
   const [progressiveStoryData, setProgressiveStoryData] = useState<{
@@ -337,6 +339,100 @@ export default function StoryWizard() {
       navigate(`/?login=true&redirect=${redirectParam}`);
     }
   }, [isAuthenticated, isAuthLoading, navigate]);
+
+  // Helper to merge dev metadata into state (used by initial load and dev mode toggle)
+  const mergeDevMetadata = useCallback((devMetadata: Awaited<ReturnType<typeof storyService.getStoryDevMetadata>>) => {
+    if (!devMetadata) return;
+
+    // Merge dev metadata into sceneImages
+    if (devMetadata.sceneImages?.length) {
+      setSceneImages(prev => prev.map(img => {
+        const devData = devMetadata.sceneImages.find(d => d.pageNumber === img.pageNumber);
+        if (devData) {
+          return {
+            ...img,
+            prompt: devData.prompt ?? img.prompt,
+            qualityReasoning: devData.qualityReasoning ?? img.qualityReasoning,
+            retryHistory: devData.retryHistory ?? img.retryHistory,
+            repairHistory: devData.repairHistory ?? img.repairHistory,
+            wasRegenerated: devData.wasRegenerated ?? img.wasRegenerated,
+            originalScore: devData.originalScore ?? img.originalScore,
+            originalReasoning: devData.originalReasoning ?? img.originalReasoning,
+            totalAttempts: devData.totalAttempts ?? img.totalAttempts,
+            faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
+            referencePhotos: devData.referencePhotos ?? img.referencePhotos,
+            landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
+            consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
+          };
+        }
+        return img;
+      }));
+    }
+
+    // Merge dev metadata into coverImages
+    if (devMetadata.coverImages) {
+      setCoverImages(prev => {
+        const updated = { ...prev };
+        const coverTypes = ['frontCover', 'initialPage', 'backCover'] as const;
+        for (const coverType of coverTypes) {
+          const devCover = devMetadata.coverImages?.[coverType];
+          const currentCover = prev[coverType];
+          if (devCover && typeof currentCover === 'object' && currentCover !== null) {
+            updated[coverType] = {
+              ...currentCover,
+              prompt: devCover.prompt ?? currentCover.prompt,
+              qualityReasoning: devCover.qualityReasoning ?? currentCover.qualityReasoning,
+              retryHistory: devCover.retryHistory ?? currentCover.retryHistory,
+              referencePhotos: devCover.referencePhotos ?? currentCover.referencePhotos,
+              landmarkPhotos: devCover.landmarkPhotos ?? currentCover.landmarkPhotos,
+            };
+          }
+        }
+        return updated;
+      });
+    }
+
+    // Load generation log from dev metadata
+    console.log('[StoryWizard] Dev metadata generationLog:', devMetadata.generationLog?.length || 0, 'entries');
+    if (devMetadata.generationLog?.length) {
+      setGenerationLog(devMetadata.generationLog);
+    }
+
+    // Load styled avatar generation log from dev metadata
+    if (devMetadata.styledAvatarGeneration?.length) {
+      console.log('[StoryWizard] Dev metadata styledAvatarGeneration:', devMetadata.styledAvatarGeneration.length, 'entries');
+      setStyledAvatarGeneration(devMetadata.styledAvatarGeneration);
+    }
+
+    // Load costumed avatar generation log from dev metadata
+    if (devMetadata.costumedAvatarGeneration?.length) {
+      console.log('[StoryWizard] Dev metadata costumedAvatarGeneration:', devMetadata.costumedAvatarGeneration.length, 'entries');
+      setCostumedAvatarGeneration(devMetadata.costumedAvatarGeneration);
+    }
+
+    // Load final checks report from dev metadata
+    if (devMetadata.finalChecksReport) {
+      console.log('[StoryWizard] Dev metadata finalChecksReport:', devMetadata.finalChecksReport.totalIssues, 'issues');
+      setFinalChecksReport(devMetadata.finalChecksReport);
+    }
+
+    // Load scene descriptions from dev metadata (outline extract, scene prompt, etc.)
+    // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
+    if (devMetadata.sceneDescriptions?.length) {
+      // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
+      console.log('[StoryWizard] Dev metadata sceneDescriptions:', devMetadata.sceneDescriptions.length, 'entries');
+      // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
+      setSceneDescriptions(devMetadata.sceneDescriptions);
+    }
+
+    // Load visual bible from dev metadata
+    // @ts-expect-error - visualBible is returned by API but missing from type definition
+    if (devMetadata.visualBible) {
+      console.log('[StoryWizard] Dev metadata visualBible loaded');
+      // @ts-expect-error - visualBible is returned by API but missing from type definition
+      setVisualBible(devMetadata.visualBible);
+    }
+  }, []);
 
   // Fetch user's location from IP for story personalization
   // Also trigger early landmark discovery so landmarks are ready when needed
@@ -641,88 +737,13 @@ export default function StoryWizard() {
             // Use ?storyId=X&dev=true to load dev metadata, or toggle dev mode on while viewing
             const loadDevData = searchParams.get('dev') === 'true' || isImpersonating;
             if (loadDevData) {
+              devMetadataLoadedRef.current = true; // Prevent duplicate fetch on dev mode toggle
               storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
-                if (devMetadata) {
-                  // Merge dev metadata into sceneImages
-                  if (devMetadata.sceneImages?.length) {
-                    setSceneImages(prev => prev.map(img => {
-                      const devData = devMetadata.sceneImages.find(d => d.pageNumber === img.pageNumber);
-                      if (devData) {
-                        return {
-                          ...img,
-                          prompt: devData.prompt ?? img.prompt,
-                          qualityReasoning: devData.qualityReasoning ?? img.qualityReasoning,
-                          retryHistory: devData.retryHistory ?? img.retryHistory,
-                          repairHistory: devData.repairHistory ?? img.repairHistory,
-                          wasRegenerated: devData.wasRegenerated ?? img.wasRegenerated,
-                          originalScore: devData.originalScore ?? img.originalScore,
-                          originalReasoning: devData.originalReasoning ?? img.originalReasoning,
-                          totalAttempts: devData.totalAttempts ?? img.totalAttempts,
-                          faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
-                          referencePhotos: devData.referencePhotos ?? img.referencePhotos,
-                          landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
-                          consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
-                        };
-                      }
-                      return img;
-                    }));
-                  }
-                  // Merge dev metadata into coverImages
-                  if (devMetadata.coverImages) {
-                    setCoverImages(prev => {
-                      const updated = { ...prev };
-                      const coverTypes = ['frontCover', 'initialPage', 'backCover'] as const;
-                      for (const coverType of coverTypes) {
-                        const devCover = devMetadata.coverImages?.[coverType];
-                        const currentCover = prev[coverType];
-                        if (devCover && typeof currentCover === 'object' && currentCover !== null) {
-                          updated[coverType] = {
-                            ...currentCover,
-                            prompt: devCover.prompt ?? currentCover.prompt,
-                            qualityReasoning: devCover.qualityReasoning ?? currentCover.qualityReasoning,
-                            retryHistory: devCover.retryHistory ?? currentCover.retryHistory,
-                            referencePhotos: devCover.referencePhotos ?? currentCover.referencePhotos,
-                            landmarkPhotos: devCover.landmarkPhotos ?? currentCover.landmarkPhotos,
-                          };
-                        }
-                      }
-                      return updated;
-                    });
-                  }
-                  // Load generation log from dev metadata
-                  console.log('[StoryWizard] Dev metadata generationLog:', devMetadata.generationLog?.length || 0, 'entries');
-                  if (devMetadata.generationLog?.length) {
-                    setGenerationLog(devMetadata.generationLog);
-                  }
-                  // Load styled avatar generation log from dev metadata
-                  if (devMetadata.styledAvatarGeneration?.length) {
-                    console.log('[StoryWizard] Dev metadata styledAvatarGeneration:', devMetadata.styledAvatarGeneration.length, 'entries');
-                    setStyledAvatarGeneration(devMetadata.styledAvatarGeneration);
-                  }
-                  // Load costumed avatar generation log from dev metadata
-                  if (devMetadata.costumedAvatarGeneration?.length) {
-                    console.log('[StoryWizard] Dev metadata costumedAvatarGeneration:', devMetadata.costumedAvatarGeneration.length, 'entries');
-                    setCostumedAvatarGeneration(devMetadata.costumedAvatarGeneration);
-                  }
-                  // Load final checks report from dev metadata
-                  if (devMetadata.finalChecksReport) {
-                    console.log('[StoryWizard] Dev metadata finalChecksReport:', devMetadata.finalChecksReport.totalIssues, 'issues');
-                    setFinalChecksReport(devMetadata.finalChecksReport);
-                  }
-                  // Load scene descriptions from dev metadata (outline extract, scene prompt, etc.)
-                  if (devMetadata.sceneDescriptions?.length) {
-                    console.log('[StoryWizard] Dev metadata sceneDescriptions:', devMetadata.sceneDescriptions.length, 'entries');
-                    setSceneDescriptions(devMetadata.sceneDescriptions);
-                  }
-                  // Load visual bible from dev metadata
-                  if (devMetadata.visualBible) {
-                    console.log('[StoryWizard] Dev metadata visualBible loaded');
-                    setVisualBible(devMetadata.visualBible);
-                  }
-                  log.debug('Dev metadata merged into story');
-                }
+                mergeDevMetadata(devMetadata);
+                log.debug('Dev metadata merged into story');
               }).catch(err => {
                 log.warn('Failed to load dev metadata:', err);
+                devMetadataLoadedRef.current = false; // Allow retry on error
               });
             }
           },
@@ -1017,6 +1038,29 @@ export default function StoryWizard() {
     // A separate effect below handles reloading when dev mode is enabled
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
+
+  // Auto-fetch dev metadata when developer mode is toggled ON while viewing an existing story
+  useEffect(() => {
+    // Only fetch if:
+    // - Developer mode just turned ON
+    // - We have a storyId (viewing existing story)
+    // - Dev metadata hasn't been loaded yet
+    if (developerMode && storyId && !devMetadataLoadedRef.current) {
+      devMetadataLoadedRef.current = true;
+      log.info('Developer mode enabled, fetching dev metadata for story:', storyId);
+      storyService.getStoryDevMetadata(storyId).then(devMetadata => {
+        mergeDevMetadata(devMetadata);
+        log.debug('Dev metadata merged (triggered by dev mode toggle)');
+      }).catch(err => {
+        log.warn('Failed to load dev metadata on toggle:', err);
+        devMetadataLoadedRef.current = false; // Allow retry
+      });
+    }
+    // Reset flag when viewing different story or dev mode turned off
+    if (!developerMode || !storyId) {
+      devMetadataLoadedRef.current = false;
+    }
+  }, [developerMode, storyId, mergeDevMetadata]);
 
   // Reload character data when loadAllAvatars is toggled ON (dev mode feature)
   // This allows developers to load full 30MB+ avatar data for debugging
