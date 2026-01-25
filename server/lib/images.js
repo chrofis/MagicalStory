@@ -794,7 +794,7 @@ async function detectAllBoundingBoxes(imageData) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 4000,  // More tokens for full scene detection with many objects
+            maxOutputTokens: 8000,  // Increased for complex scenes with many figures/objects
             temperature: 0.1,  // Low temperature for precise detection
             responseMimeType: 'application/json'
           },
@@ -899,6 +899,98 @@ async function detectAllBoundingBoxes(imageData) {
     log.error(`❌ [BBOX-DETECT] Error detecting bounding boxes: ${error.message}`);
     return null;
   }
+}
+
+/**
+ * Create an overlay image with bounding boxes drawn on it
+ * @param {string} imageData - Base64 image data
+ * @param {Object} bboxDetection - Result from detectAllBoundingBoxes
+ * @returns {Promise<string|null>} Base64 image with boxes drawn, or null on error
+ */
+async function createBboxOverlayImage(imageData, bboxDetection) {
+  if (!bboxDetection || (!bboxDetection.figures?.length && !bboxDetection.objects?.length)) {
+    return null;
+  }
+
+  try {
+    // Extract base64 data
+    const base64Match = imageData.match(/^data:image\/\w+;base64,(.+)$/);
+    const base64Data = base64Match ? base64Match[1] : imageData;
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    // Get image dimensions
+    const metadata = await sharp(imageBuffer).metadata();
+    const { width, height } = metadata;
+
+    // Build SVG overlay with boxes
+    const svgParts = [`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`];
+
+    // Draw figure boxes (green for body, blue for face)
+    for (let i = 0; i < (bboxDetection.figures || []).length; i++) {
+      const fig = bboxDetection.figures[i];
+
+      // Body box - green
+      if (fig.bodyBox) {
+        const [ymin, xmin, ymax, xmax] = fig.bodyBox;
+        const x = Math.round(xmin * width);
+        const y = Math.round(ymin * height);
+        const w = Math.round((xmax - xmin) * width);
+        const h = Math.round((ymax - ymin) * height);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#00ff00" stroke-width="3"/>`);
+        // Label
+        const label = fig.label ? fig.label.substring(0, 30) : `Figure ${i + 1}`;
+        svgParts.push(`<rect x="${x}" y="${Math.max(0, y - 20)}" width="${Math.min(label.length * 8 + 10, w)}" height="20" fill="#00ff00" opacity="0.8"/>`);
+        svgParts.push(`<text x="${x + 5}" y="${Math.max(15, y - 5)}" font-family="Arial" font-size="12" fill="black">${escapeXml(label)}</text>`);
+      }
+
+      // Face box - blue
+      if (fig.faceBox) {
+        const [ymin, xmin, ymax, xmax] = fig.faceBox;
+        const x = Math.round(xmin * width);
+        const y = Math.round(ymin * height);
+        const w = Math.round((xmax - xmin) * width);
+        const h = Math.round((ymax - ymin) * height);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#0088ff" stroke-width="2" stroke-dasharray="5,3"/>`);
+      }
+    }
+
+    // Draw object boxes (orange)
+    for (let i = 0; i < (bboxDetection.objects || []).length; i++) {
+      const obj = bboxDetection.objects[i];
+      if (obj.bodyBox) {
+        const [ymin, xmin, ymax, xmax] = obj.bodyBox;
+        const x = Math.round(xmin * width);
+        const y = Math.round(ymin * height);
+        const w = Math.round((xmax - xmin) * width);
+        const h = Math.round((ymax - ymin) * height);
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ff8800" stroke-width="2"/>`);
+        // Label
+        const label = obj.label ? obj.label.substring(0, 25) : `Object ${i + 1}`;
+        svgParts.push(`<rect x="${x}" y="${y + h}" width="${Math.min(label.length * 7 + 10, w)}" height="18" fill="#ff8800" opacity="0.8"/>`);
+        svgParts.push(`<text x="${x + 5}" y="${y + h + 13}" font-family="Arial" font-size="11" fill="black">${escapeXml(label)}</text>`);
+      }
+    }
+
+    svgParts.push('</svg>');
+    const svgBuffer = Buffer.from(svgParts.join(''));
+
+    // Composite SVG over image
+    const resultBuffer = await sharp(imageBuffer)
+      .composite([{ input: svgBuffer, top: 0, left: 0 }])
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    return 'data:image/jpeg;base64,' + resultBuffer.toString('base64');
+
+  } catch (error) {
+    log.error(`❌ [BBOX-OVERLAY] Error creating overlay: ${error.message}`);
+    return null;
+  }
+}
+
+// Helper to escape XML special characters
+function escapeXml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
@@ -2016,6 +2108,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     let shouldRepair = false;
     let fixTargetsToUse = [];
     let bboxDetectionHistory = null;  // Track two-stage detection for dev mode display
+    let bboxOverlayImage = null;  // Image with boxes drawn for dev mode
     let enrichedFixTargets = null;
 
     // ALWAYS run bbox detection for every image (figure locations needed for other features)
@@ -2029,6 +2122,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const figCount = bboxDetectionHistory.figures?.length || 0;
       const objCount = bboxDetectionHistory.objects?.length || 0;
       log.info(`✅ [QUALITY RETRY] ${pageLabel}Bbox detection complete: ${figCount} figures, ${objCount} objects${enrichedFixTargets.length > 0 ? `, ${enrichedFixTargets.length} fix targets` : ''}`);
+      // Create overlay image with boxes drawn for dev mode display
+      bboxOverlayImage = await createBboxOverlayImage(result.imageData, bboxDetectionHistory);
     } else {
       log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Bbox detection failed`);
     }
@@ -2070,6 +2165,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         fixableIssuesCount: result.fixableIssues?.length || 0,
         enrichedTargetsCount: enrichedFixTargets?.length || 0,
         bboxDetection: bboxDetectionHistory,
+        bboxOverlayImage: bboxOverlayImage,  // Image with boxes drawn for dev mode
         autoRepairEnabled: false,
         timestamp: new Date().toISOString()
       });
@@ -2195,6 +2291,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               },
               // Two-stage bounding box detection results (new)
               bboxDetection: bboxDetectionHistory,
+              bboxOverlayImage: bboxOverlayImage,  // Image with boxes drawn for dev mode
               // Repair details from autoRepairWithTargets
               repairDetails: repairResult.repairHistory || [],
               // Grid repair data for UI display (only present for grid repairs)
@@ -4393,6 +4490,7 @@ module.exports = {
 
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
+  createBboxOverlayImage,  // Create overlay image with boxes drawn
   detectBoundingBoxesForIssue,  // deprecated, use detectAllBoundingBoxes
   enrichWithBoundingBoxes,
 

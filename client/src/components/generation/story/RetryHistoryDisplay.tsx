@@ -791,6 +791,91 @@ export function RetryHistoryDisplay({
               </div>
             )}
 
+            {/* Bbox Detection Display (for all types including bbox_detection_only) */}
+            {attempt.bboxDetection && typeof attempt.bboxDetection === 'object' && 'figures' in attempt.bboxDetection && (
+              <details className="text-sm mb-2">
+                <summary className="cursor-pointer text-blue-700 font-medium hover:text-blue-900 flex items-center gap-2">
+                  📦 {language === 'de' ? 'Objekterkennung' : 'Object Detection'}
+                  <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                    {(attempt.bboxDetection as { figures?: unknown[]; objects?: unknown[] }).figures?.length || 0} {language === 'de' ? 'Figuren' : 'figures'},
+                    {' '}{(attempt.bboxDetection as { figures?: unknown[]; objects?: unknown[] }).objects?.length || 0} {language === 'de' ? 'Objekte' : 'objects'}
+                  </span>
+                </summary>
+                <div className="mt-3 space-y-3">
+                  {/* Bbox Overlay Image */}
+                  {attempt.bboxOverlayImage && (
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1 font-medium">
+                        {language === 'de' ? 'Erkannte Regionen' : 'Detected Regions'}
+                        <span className="ml-2 text-gray-400">(🟢 Body, 🔵 Face, 🟠 Object)</span>
+                      </div>
+                      <img
+                        src={attempt.bboxOverlayImage}
+                        alt="Bbox overlay"
+                        className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
+                        onClick={() => setEnlargedImg({ src: attempt.bboxOverlayImage!, title: language === 'de' ? 'Erkannte Regionen' : 'Detected Regions' })}
+                      />
+                    </div>
+                  )}
+
+                  {/* Figures list */}
+                  {(attempt.bboxDetection as { figures?: Array<{ label?: string; bodyBox?: number[]; faceBox?: number[]; position?: string }> }).figures && (attempt.bboxDetection as { figures: Array<{ label?: string; bodyBox?: number[]; faceBox?: number[]; position?: string }> }).figures.length > 0 && (
+                    <div className="bg-green-50 p-3 rounded border border-green-200">
+                      <div className="font-medium text-green-800 mb-2">
+                        {language === 'de' ? 'Figuren' : 'Figures'} ({(attempt.bboxDetection as { figures: unknown[] }).figures.length})
+                      </div>
+                      <div className="space-y-2">
+                        {(attempt.bboxDetection as { figures: Array<{ label?: string; bodyBox?: number[]; faceBox?: number[]; position?: string }> }).figures.map((fig, fIdx) => (
+                          <div key={fIdx} className="text-sm bg-white p-2 rounded border">
+                            <div className="font-medium text-green-700">{fig.label || `Figure ${fIdx + 1}`}</div>
+                            <div className="text-xs text-gray-500 mt-1 grid grid-cols-2 gap-2">
+                              {fig.bodyBox && (
+                                <span>Body: [{fig.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                              )}
+                              {fig.faceBox && (
+                                <span>Face: [{fig.faceBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                              )}
+                              {fig.position && <span>Pos: {fig.position}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Objects list */}
+                  {(attempt.bboxDetection as { objects?: Array<{ label?: string; bodyBox?: number[]; position?: string }> }).objects && (attempt.bboxDetection as { objects: Array<{ label?: string; bodyBox?: number[]; position?: string }> }).objects.length > 0 && (
+                    <div className="bg-orange-50 p-3 rounded border border-orange-200">
+                      <div className="font-medium text-orange-800 mb-2">
+                        {language === 'de' ? 'Objekte' : 'Objects'} ({(attempt.bboxDetection as { objects: unknown[] }).objects.length})
+                      </div>
+                      <div className="space-y-2">
+                        {(attempt.bboxDetection as { objects: Array<{ label?: string; bodyBox?: number[]; position?: string }> }).objects.map((obj, oIdx) => (
+                          <div key={oIdx} className="text-sm bg-white p-2 rounded border">
+                            <div className="font-medium text-orange-700">{obj.label || `Object ${oIdx + 1}`}</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {obj.bodyBox && (
+                                <span>Box: [{obj.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                              )}
+                              {obj.position && <span className="ml-2">Pos: {obj.position}</span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Raw JSON download */}
+                  <button
+                    onClick={() => downloadAsText(JSON.stringify(attempt.bboxDetection, null, 2), `bbox-detection-attempt-${idx}.json`)}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded hover:bg-blue-100"
+                  >
+                    <Download size={12} /> {language === 'de' ? 'JSON herunterladen' : 'Download JSON'}
+                  </button>
+                </div>
+              </details>
+            )}
+
             {/* Regular attempt feedback */}
             {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.reasoning ? (
               <details className="text-sm text-gray-600 mb-2">

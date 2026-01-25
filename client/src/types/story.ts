@@ -130,6 +130,23 @@ export interface BboxDetectionResult {
   timestamp: string;
 }
 
+// Full scene bbox detection result (figures + objects)
+export interface BboxSceneDetection {
+  figures: Array<{
+    label: string;
+    bodyBox?: number[] | null;  // [ymin, xmin, ymax, xmax] normalized 0-1
+    faceBox?: number[] | null;
+    position?: string;
+  }>;
+  objects: Array<{
+    label: string;
+    bodyBox?: number[] | null;
+    position?: string;
+  }>;
+  usage?: { input_tokens: number; output_tokens: number };
+  timestamp?: string;
+}
+
 // Grid repair manifest issue
 export interface GridManifestIssue {
   letter: string;
@@ -160,7 +177,7 @@ export interface GridRepairData {
 
 export interface RetryAttempt {
   attempt: number;
-  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed' | 'grid_repair';
+  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed' | 'grid_repair' | 'bbox_detection_only';
   imageData?: string;
   score?: number;
   reasoning?: string;
@@ -175,14 +192,19 @@ export interface RetryAttempt {
   fixTargetsCount?: number;
   preRepairEval?: EvaluationData;
   postRepairEval?: EvaluationData;
-  // Two-stage bounding box detection results
-  bboxDetection?: BboxDetectionResult[] | null;
+  // Two-stage bounding box detection results (old format: per-issue, new format: full scene)
+  bboxDetection?: BboxDetectionResult[] | BboxSceneDetection | null;
+  bboxOverlayImage?: string;  // Image with bbox rectangles drawn for visualization
   repairDetails?: RepairAttempt[];
   // Grid repair specific fields
   grids?: GridRepairData[];
   gridFixedCount?: number;
   gridFailedCount?: number;
   gridTotalIssues?: number;
+  // Bbox detection only fields
+  fixableIssuesCount?: number;
+  enrichedTargetsCount?: number;
+  autoRepairEnabled?: boolean;
 }
 
 // Inpaint verification result (LPIPS + LLM)
