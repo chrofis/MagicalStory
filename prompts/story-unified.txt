@@ -398,30 +398,40 @@ For famous buildings, monuments, or locations that exist in reality:
 ---COVER SCENE HINTS---
 
 **COVER RULES (CRITICAL):**
-- **LOCATIONS**: Use ONLY generic settings (forest, beach, garden) OR locations from the Visual Bible above
-- **DO NOT** reference specific buildings/landmarks by name unless they have a Visual Bible entry with [LOC###] ID
-- **CHARACTERS**: List characters by NAME - never use "the family", "everyone", "the group"
-- **MAIN CHARACTERS**: The protagonist(s) with isMainCharacter=true, NOT all family members
+- **LOCATIONS**: Use ONLY generic settings (forest, beach, garden, room) OR Visual Bible locations with [LOC###] ID
+- **NO LANDMARKS** by name unless they have a Visual Bible entry
+- **LIST BY NAME**: NEVER write "the family", "everyone", "the group" - list each character by name
+- **NO GROUP REFERENCES**: "his family behind him" is WRONG → list: "Sophie (left), Manuel (right)"
 
 **Title Page** (Front Cover)
-Hint: [1-2 sentences - ALL main character(s), simple generic setting, mood. NO specific building names.]
+ONLY main characters: {MAIN_CHARACTER_NAMES}
+NO primary characters on title page - keep focus on protagonist(s).
+
+Hint: [1-2 sentences - ONLY main character(s), generic setting, mood]
 Characters:
-- [MainCharacter1]: [clothing category - use costumed:type if costumes are defined]
-- [MainCharacter2]: [clothing category]
-- [MainCharacter3]: [clothing category]
-(List ALL protagonists marked as main character - if story has 3 main characters, list all 3)
+- [MainChar1] (position): [clothing]
+- [MainChar2] (position): [clothing]
+(List EVERY main character by name with position and clothing)
 
 **Initial Page**
-Hint: [1-2 sentences - main characters, welcoming atmosphere, generic setting]
+ALL main characters ({MAIN_CHARACTER_NAMES}) + ALL primary characters ({PRIMARY_CHARACTER_NAMES})
+
+Hint: [1-2 sentences - welcoming scene, all characters, generic setting]
 Characters:
-- [CharacterName]: [clothing category]
-- [CharacterName]: [clothing category]
+- [Name] (position): [clothing]
+- [Name] (position): [clothing]
+- [Name] (position): [clothing]
+(List EVERY main and primary character by name)
 
 **Back Cover**
-Hint: [1-2 sentences - happy conclusion, main characters, generic or Visual Bible setting]
+ALL main characters ({MAIN_CHARACTER_NAMES}) + ALL primary characters ({PRIMARY_CHARACTER_NAMES})
+
+Hint: [1-2 sentences - happy conclusion, all characters together]
 Characters:
-- [CharacterName]: [clothing category]
-- [CharacterName]: [clothing category]
+- [Name] (position): [clothing]
+- [Name] (position): [clothing]
+- [Name] (position): [clothing]
+(List EVERY main and primary character by name)
 
 ---STORY PAGES---
 Rewrite the story applying ALL FIXES from CRITICAL ANALYSIS. No word counts - clean text only.
