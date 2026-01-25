@@ -479,8 +479,9 @@ export function StoryDisplay({
     const image = sceneImages.find(img => img.pageNumber === pageNumber);
     const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
     const fullDescription = image?.description || sceneDesc?.description || '';
-    // Use pre-extracted summaries if available, otherwise try to extract from description
-    const summary = sceneDesc?.translatedSummary || sceneDesc?.imageSummary || extractImageSummary(fullDescription);
+    // Use pre-extracted translated summary first, then try to extract from description
+    // Note: imageSummary is always English, so we try extraction before falling back to it
+    const summary = sceneDesc?.translatedSummary || extractImageSummary(fullDescription) || sceneDesc?.imageSummary || '';
     // Detect characters mentioned in the scene
     const detectedCharacterIds = detectCharactersInScene(fullDescription);
     setSceneEditModal({ pageNumber, scene: summary, selectedCharacterIds: detectedCharacterIds });
