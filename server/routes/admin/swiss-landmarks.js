@@ -321,4 +321,33 @@ router.delete('/broken', async (req, res) => {
   }
 });
 
+// DELETE /api/admin/swiss-landmarks/by-ids - Delete landmarks by ID
+router.delete('/by-ids', async (req, res) => {
+  if (!checkAuth(req, res, false)) return;
+
+  try {
+    const ids = req.query.ids?.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+
+    if (!ids || ids.length === 0) {
+      return res.status(400).json({ error: 'ids query parameter required (comma-separated)' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      `DELETE FROM landmark_index WHERE id = ANY($1) RETURNING id, name`,
+      [ids]
+    );
+
+    log.info(`[ADMIN] Deleted ${result.rowCount} landmarks by ID: ${ids.join(', ')}`);
+    res.json({
+      success: true,
+      deleted: result.rowCount,
+      entries: result.rows
+    });
+  } catch (err) {
+    log.error('[ADMIN] Delete landmarks by ID error:', err);
+    res.status(500).json({ error: 'Failed to delete landmarks', details: err.message });
+  }
+});
+
 module.exports = router;
