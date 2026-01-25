@@ -728,7 +728,8 @@ function clearStyledAvatarCache() {
  */
 function getStyledAvatarCacheStats() {
   return {
-    size: styledAvatarCache.size
+    size: styledAvatarCache.size,
+    inProgress: 0 // No longer tracked, kept for backward compatibility with logging
   };
 }
 

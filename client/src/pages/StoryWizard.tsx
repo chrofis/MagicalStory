@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
@@ -10,13 +10,12 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
 import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
 import type { GenerationSettings } from '@/components/generation/story';
-import {
-  WizardStep2Characters,
-  WizardStep3BookSettings,
-  WizardStep4StoryType,
-  WizardStep5ArtStyle,
-  WizardStep6Summary,
-} from './wizard';
+// Lazy load wizard steps for faster initial load when viewing stories
+const WizardStep2Characters = lazy(() => import('./wizard/WizardStep2Characters').then(m => ({ default: m.WizardStep2Characters })));
+const WizardStep3BookSettings = lazy(() => import('./wizard/WizardStep3BookSettings').then(m => ({ default: m.WizardStep3BookSettings })));
+const WizardStep4StoryType = lazy(() => import('./wizard/WizardStep4StoryType').then(m => ({ default: m.WizardStep4StoryType })));
+const WizardStep5ArtStyle = lazy(() => import('./wizard/WizardStep5ArtStyle').then(m => ({ default: m.WizardStep5ArtStyle })));
+const WizardStep6Summary = lazy(() => import('./wizard/WizardStep6Summary').then(m => ({ default: m.WizardStep6Summary })));
 import { getCurrentSeason } from './wizard/WizardStep3BookSettings';
 import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal';
 import { FaceSelectionModal } from '@/components/character';
@@ -4238,7 +4237,9 @@ export default function StoryWizard() {
                   text={(wizardHelperTexts[language] || wizardHelperTexts.en)[step]}
                 />
               )}
-              {renderStep()}
+              <Suspense fallback={<LoadingSpinner />}>
+                {renderStep()}
+              </Suspense>
             </>
           )}
 
