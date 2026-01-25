@@ -15,6 +15,20 @@ const { TEXT_MODELS } = require('../config/models');
 const photoCache = new Map();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// Normalize string for comparison: lowercase + convert umlauts/accents to ASCII
+function normalizeForCompare(str) {
+  return str
+    .toLowerCase()
+    .replace(/[üù]/g, 'u')
+    .replace(/[äàâ]/g, 'a')
+    .replace(/[öô]/g, 'o')
+    .replace(/[éèêë]/g, 'e')
+    .replace(/[îï]/g, 'i')
+    .replace(/ç/g, 'c')
+    .replace(/ñ/g, 'n')
+    .replace(/ß/g, 'ss');
+}
+
 // Wikipedia/Wikimedia API headers - REQUIRED or they return HTML error pages
 const WIKI_HEADERS = {
   'User-Agent': 'MagicalStory/1.0 (https://magicalstory.ch; contact@magicalstory.ch) Node.js',
@@ -2500,7 +2514,7 @@ async function indexLandmarksForCities(options = {}) {
   let cities = options.cities || SWISS_CITIES;
   if (filterCities && filterCities.length > 0) {
     cities = cities.filter(c => filterCities.some(f =>
-      c.city.toLowerCase().includes(f.toLowerCase())
+      normalizeForCompare(c.city).includes(normalizeForCompare(f))
     ));
     log.info(`[LANDMARK-INDEX] Filtering to cities: ${cities.map(c => c.city).join(', ')}`);
   }
