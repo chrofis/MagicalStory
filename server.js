@@ -12899,7 +12899,9 @@ async function getSharedStory(shareToken) {
   if (rows.length === 0) {
     return null;
   }
-  return { id: rows[0].id, data: rows[0].data };
+  // Parse data if it's a JSON string
+  const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+  return { id: rows[0].id, data };
 }
 
 // GET /api/shared/:shareToken - Get shared story data (public, no auth)
