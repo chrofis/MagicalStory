@@ -242,7 +242,6 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'outlineUsage', data::jsonb->'outlineUsage',
             'storyTextPrompts', data::jsonb->'storyTextPrompts',
             'storyText', data::jsonb->'storyText',
-            'sceneDescriptions', data::jsonb->'sceneDescriptions',
             'storyCategory', data::jsonb->'storyCategory',
             'storyTopic', data::jsonb->'storyTopic',
             'storyTheme', data::jsonb->'storyTheme',
@@ -250,7 +249,6 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'generatedPages', data::jsonb->'generatedPages',
             'totalPages', data::jsonb->'totalPages',
             'pages', data::jsonb->'pages',
-            'visualBible', data::jsonb->'visualBible',
             'clothingRequirements', data::jsonb->'clothingRequirements',
             'artStyle', data::jsonb->'artStyle',
             'imageGenerationMode', data::jsonb->'imageGenerationMode',
@@ -258,10 +256,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'historicalEvent', data::jsonb->'historicalEvent',
             'location', data::jsonb->'location',
             'season', data::jsonb->'season',
-            'userLocation', data::jsonb->'userLocation',
-            'generationLog', data::jsonb->'generationLog',
-            'styledAvatarGeneration', data::jsonb->'styledAvatarGeneration',
-            'costumedAvatarGeneration', data::jsonb->'costumedAvatarGeneration'
+            'userLocation', data::jsonb->'userLocation'
           ) as base_data,
           COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as scene_count,
           (SELECT jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name'))
