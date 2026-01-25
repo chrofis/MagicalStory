@@ -354,8 +354,8 @@ Scan the draft and extract all elements that need to be consistent for visualiza
       "id": "ANI001",
       "name": "[Name]",
       "pages": [X, Y, Z],
-      "species": "[type]",
-      "coloring": "[exact colors and patterns]",
+      "species": "[type and breed, e.g., 'Golden Retriever' not just 'dog']",
+      "coloring": "[exact colors and patterns - for breeds with distinctive patterns like Siamese cats, tabbies, dalmatians, describe the FULL pattern, not just base color]",
       "size": "[relative size]",
       "features": "[collar, markings, accessories]"
     }
