@@ -8235,11 +8235,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await new Promise(r => setTimeout(r, 100));
         }
 
-        // Wait for clothing requirements if not yet available (comes after pages in outline)
-        while (!streamingClothingRequirements) {
-          await new Promise(r => setTimeout(r, 100));
-        }
-
         // Wait for landmark photo descriptions to be loaded (so variants are in the prompt)
         if (landmarkDescriptionsPromise) {
           await landmarkDescriptionsPromise;

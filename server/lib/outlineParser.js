@@ -64,7 +64,8 @@ function parseCharacterClothingBlock(content) {
   // - Name2 (alias): costumed:type
   // Also handles single-line comma-separated format:
   // Characters: Name1: standard, Name2: costumed:wizard, Name3: winter
-  const charactersBlockMatch = content.match(/Characters:\s*([\s\S]*?)(?=---\s*Page|$)/i);
+  // Match "Characters:" with optional suffix like "(MAX 3)", "(max 2-3)", etc.
+  const charactersBlockMatch = content.match(/Characters(?:\s*\([^)]*\))?:\s*([\s\S]*?)(?=---\s*Page|$)/i);
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
     // Match "Name: category" entries - supports both multi-line (with bullets) and single-line comma-separated
@@ -1497,12 +1498,10 @@ class ProgressiveUnifiedParser {
       pages: new Set()
     };
 
-    // Section markers in order
+    // Section markers in order (must match actual output format from story-unified.txt)
     this.sectionMarkers = [
       '---TITLE---',
       '---CLOTHING REQUIREMENTS---',
-      '---CHARACTER ARCS---',
-      '---PLOT STRUCTURE---',
       '---VISUAL BIBLE---',
       '---COVER SCENE HINTS---',
       '---STORY PAGES---'
@@ -1558,11 +1557,11 @@ class ProgressiveUnifiedParser {
   _checkClothingRequirements() {
     if (this.emitted.clothingRequirements) return;
 
-    // Complete when we see CHARACTER ARCS marker
+    // Complete when we see VISUAL BIBLE marker (next section in output)
     if (!this.fullText.includes('---CLOTHING REQUIREMENTS---')) return;
-    if (!this.fullText.includes('---CHARACTER ARCS---')) return;
+    if (!this.fullText.includes('---VISUAL BIBLE---')) return;
 
-    const sectionMatch = this.fullText.match(/---CLOTHING REQUIREMENTS---\s*([\s\S]*?)(?=---CHARACTER ARCS---)/i);
+    const sectionMatch = this.fullText.match(/---CLOTHING REQUIREMENTS---\s*([\s\S]*?)(?=---VISUAL BIBLE---)/i);
     if (!sectionMatch) return;
 
     const section = sectionMatch[1];
