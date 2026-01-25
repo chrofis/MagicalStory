@@ -334,6 +334,30 @@ Examples:
 - ✅ "leftHand": "map edge", "rightHand": "map edge" + Objects: "Wizard's staff leaning against pillar"
 - ❌ "Both hands: open book" + "Stuffed animal tucked under left arm" (left arm can't do both)
 
+**17. Background Feasibility:**
+When describing background elements visible through openings (windows, doors, archways):
+
+1. Can all listed background elements realistically be seen from this viewpoint?
+   - Same landmark can't be visible from OPPOSITE directions (left window AND right window)
+   - Small openings (portholes, narrow windows) = ONE limited glimpse, not panoramic views
+
+2. If showing multiple landmarks would require distorting architecture → **DROP the less important ones**
+   - Priority: **Focus > Completeness**
+   - The story text already mentions these elements - they don't ALL need to be in the image
+
+3. Match opening size to what's visible:
+   - Small round window → "glimpse of tower through window"
+   - Large picture window → wider view acceptable
+   - No window described → background element shouldn't be visible from interior
+
+Examples:
+- ❌ "Through the small round windows, the tower, the river, and the ice floes are all visible" (too much for small openings)
+- ❌ "Sophie looks left through window at the tower, Manuel looks right through window at the tower" (same landmark from opposite directions)
+- ✅ "Through one small window, a glimpse of the tower's blue clock face" (focused, realistic)
+- ✅ Interior scene focusing on characters and setting; background landmarks omitted (implied by story text)
+
+**Decision rule:** If a background element can't be shown accurately without distorting the setting's architecture, omit it from the visual description.
+
 **After checking, list:**
 - `issues`: Every problem found (be specific)
 - `corrections`: How to fix each issue
@@ -398,6 +422,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "sharedObjectInteractions": "Shared objects: [list or NONE]. Each in Objects section with grip points? YES/NO/N/A",
     "obstacleLogic": "Obstacles blocking passage: [list or NONE]. Each explains WHY impassable (spans width/wedged/too large)? YES/NO/N/A",
     "holdingInventory": "For EACH character: [Name] L:[item/empty] R:[item/empty] BOTH:[item/none]. Conflict? YES/NO",
+    "backgroundFeasibility": "Background elements: [list]. All visible from this viewpoint? Opening sizes respected? If too many elements for openings, which to DROP? FEASIBLE/SIMPLIFY",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
