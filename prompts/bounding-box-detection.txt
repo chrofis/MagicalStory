@@ -1,64 +1,72 @@
-Detect bounding boxes for the following issue in this storybook illustration:
+Detect ALL figures, faces, and notable objects in this storybook illustration.
 
-ISSUE: {ISSUE_DESCRIPTION}
-
-For each affected element, return BOTH:
-- face_box: bounding box around the character's FACE only [y_min, x_min, y_max, x_max]
-- body_box: bounding box around the character's FULL BODY [y_min, x_min, y_max, x_max]
+Return bounding boxes for EVERY element in the image:
 
 COORDINATE SYSTEM:
 - Values are 0-1000 (Gemini native format)
 - Origin is top-left corner
 - Format: [y_min, x_min, y_max, x_max]
 
-DETECTION GUIDELINES:
-1. face_box should tightly enclose the face (forehead to chin, ear to ear)
-2. body_box should enclose the entire visible body (head to feet, or as much as visible)
-3. If the issue affects an OBJECT (not a character), return only body_box around the object
-4. If a face is not visible (back view), set face_box to null
+FOR EACH FIGURE (character/person):
+- face_box: bounding box around the FACE only (forehead to chin, ear to ear)
+- body_box: bounding box around the FULL BODY (head to feet, or as much as visible)
+- If face is not visible (back view), set face_box to null
+
+FOR EACH NOTABLE OBJECT:
+- body_box: bounding box around the object
+- face_box: null
+- Include: held items, vehicles, animals, furniture, magical elements
 
 Return ONLY valid JSON with no other text:
 {
-  "detections": [
+  "figures": [
     {
-      "label": "description of affected element (e.g., 'boy in blue hoodie on the left')",
+      "label": "visual description (e.g., 'boy in blue hoodie on left')",
+      "position": "left|center|right",
       "face_box": [y_min, x_min, y_max, x_max],
+      "body_box": [y_min, x_min, y_max, x_max]
+    }
+  ],
+  "objects": [
+    {
+      "label": "visual description (e.g., 'red bicycle in foreground')",
+      "position": "left|center|right",
       "body_box": [y_min, x_min, y_max, x_max]
     }
   ]
 }
 
-EXAMPLES:
-
-For a hand issue on a character:
+EXAMPLE - Scene with two children and a dog:
 {
-  "detections": [
+  "figures": [
     {
-      "label": "girl with red dress holding sword",
-      "face_box": [120, 340, 220, 440],
-      "body_box": [100, 280, 650, 520]
+      "label": "girl with blonde hair in pink dress",
+      "position": "left",
+      "face_box": [120, 100, 220, 200],
+      "body_box": [100, 50, 650, 300]
+    },
+    {
+      "label": "boy with brown hair in blue hoodie",
+      "position": "right",
+      "face_box": [150, 700, 250, 800],
+      "body_box": [130, 600, 680, 900]
+    }
+  ],
+  "objects": [
+    {
+      "label": "golden retriever dog",
+      "position": "center",
+      "body_box": [500, 400, 700, 600]
+    },
+    {
+      "label": "red ball on grass",
+      "position": "center",
+      "body_box": [650, 450, 720, 520]
     }
   ]
 }
 
-For an object issue (no face):
-{
-  "detections": [
-    {
-      "label": "broken sword in foreground",
-      "face_box": null,
-      "body_box": [400, 200, 600, 400]
-    }
-  ]
-}
-
-For a face identity issue:
-{
-  "detections": [
-    {
-      "label": "boy with wrong hair color in center",
-      "face_box": [150, 420, 280, 580],
-      "body_box": [130, 350, 700, 650]
-    }
-  ]
-}
+IMPORTANT:
+- Detect ALL visible figures, even if partially visible
+- Detect ALL notable objects that could be relevant to story issues
+- Be precise with bounding boxes - they will be used for inpainting

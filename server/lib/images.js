@@ -695,13 +695,12 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
  * Detect bounding boxes for a specific issue using Gemini's native detection
  * This is stage 2 of the two-stage detection approach:
  * Stage 1: Quality evaluation identifies issues (no bboxes needed)
- * Stage 2: This function detects precise face_box and body_box for each fixable issue
+ * Stage 2: This function detects ALL figures, faces, and objects in one call
  *
  * @param {string} imageData - Base64 image data
- * @param {string} issueDescription - Description of the issue to locate
- * @returns {Promise<{faceBox: number[]|null, bodyBox: number[]|null, label: string}|null>}
+ * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
-async function detectBoundingBoxesForIssue(imageData, issueDescription) {
+async function detectAllBoundingBoxes(imageData) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -715,9 +714,8 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
       return null;
     }
 
-    const prompt = fillTemplate(PROMPT_TEMPLATES.boundingBoxDetection, {
-      ISSUE_DESCRIPTION: issueDescription
-    });
+    // New prompt detects everything - no issue substitution needed
+    const prompt = PROMPT_TEMPLATES.boundingBoxDetection;
 
     // Extract base64 and mime type
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -745,7 +743,7 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 1000,
+            maxOutputTokens: 2000,  // More tokens for full scene detection
             temperature: 0.1,  // Low temperature for precise detection
             responseMimeType: 'application/json'
           },
@@ -792,14 +790,6 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
       return null;
     }
 
-    if (!parsedResult?.detections || !Array.isArray(parsedResult.detections) || parsedResult.detections.length === 0) {
-      log.warn('⚠️  [BBOX-DETECT] No detections in response');
-      return null;
-    }
-
-    // Get the first detection (most relevant)
-    const detection = parsedResult.detections[0];
-
     // Normalize coordinates from 0-1000 to 0.0-1.0
     const normalizeBox = (box) => {
       if (!box || !Array.isArray(box) || box.length !== 4) return null;
@@ -809,16 +799,26 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
       return [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
     };
 
-    const faceBox = normalizeBox(detection.face_box);
-    const bodyBox = normalizeBox(detection.body_box);
+    // Normalize all figures
+    const figures = (parsedResult.figures || []).map(fig => ({
+      label: fig.label,
+      position: fig.position,
+      faceBox: normalizeBox(fig.face_box),
+      bodyBox: normalizeBox(fig.body_box)
+    }));
 
-    log.info(`📦 [BBOX-DETECT] Detected boxes for "${issueDescription.substring(0, 50)}...": ` +
-      `face=${faceBox ? 'yes' : 'no'}, body=${bodyBox ? 'yes' : 'no'}`);
+    // Normalize all objects
+    const objects = (parsedResult.objects || []).map(obj => ({
+      label: obj.label,
+      position: obj.position,
+      bodyBox: normalizeBox(obj.body_box)
+    }));
+
+    log.info(`📦 [BBOX-DETECT] Detected ${figures.length} figures, ${objects.length} objects`);
 
     return {
-      faceBox,
-      bodyBox,
-      label: detection.label || issueDescription,
+      figures,
+      objects,
       usage: { input_tokens: inputTokens, output_tokens: outputTokens }
     };
 
@@ -829,61 +829,116 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
 }
 
 /**
- * Enrich fixable issues with bounding boxes using two-stage detection
- * Calls detectBoundingBoxesForIssue for each fixable issue identified by quality evaluation
+ * Legacy wrapper for backwards compatibility
+ * @deprecated Use detectAllBoundingBoxes instead
+ */
+async function detectBoundingBoxesForIssue(imageData, issueDescription) {
+  log.warn('⚠️  [BBOX-DETECT] detectBoundingBoxesForIssue is deprecated, use detectAllBoundingBoxes');
+  const result = await detectAllBoundingBoxes(imageData);
+  if (!result || result.figures.length === 0) return null;
+  // Return first figure for backwards compatibility
+  const fig = result.figures[0];
+  return {
+    faceBox: fig.faceBox,
+    bodyBox: fig.bodyBox,
+    label: fig.label,
+    usage: result.usage
+  };
+}
+
+/**
+ * Detect all bounding boxes in image and match to fixable issues
+ * Single API call detects ALL figures, faces, and objects for dev mode display
  *
  * @param {string} imageData - Base64 image data
  * @param {Array<{description: string, severity: string, type: string, fix: string}>} fixableIssues - Issues from quality eval
- * @returns {Promise<{targets: Array, detectionHistory: Array}>} - Enriched fix targets and detection history for display
+ * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
 async function enrichWithBoundingBoxes(imageData, fixableIssues) {
-  if (!fixableIssues || fixableIssues.length === 0) {
-    return { targets: [], detectionHistory: [] };
+  // Always detect all elements for dev mode display
+  log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
+
+  const allDetections = await detectAllBoundingBoxes(imageData);
+
+  if (!allDetections) {
+    log.warn(`⚠️  [BBOX-ENRICH] Detection failed, no bounding boxes available`);
+    return { targets: [], detectionHistory: null };
   }
 
-  log.info(`📦 [BBOX-ENRICH] Detecting bounding boxes for ${fixableIssues.length} fixable issue(s)`);
+  // Build detection history for dev mode display (full scene inventory)
+  const detectionHistory = {
+    figures: allDetections.figures,
+    objects: allDetections.objects,
+    usage: allDetections.usage,
+    timestamp: new Date().toISOString()
+  };
 
+  log.info(`📦 [BBOX-ENRICH] Found ${allDetections.figures.length} figures, ${allDetections.objects.length} objects`);
+
+  // If no issues to fix, just return the detections
+  if (!fixableIssues || fixableIssues.length === 0) {
+    return { targets: [], detectionHistory };
+  }
+
+  // Match issues to detected elements for repair targets
   const enrichedTargets = [];
-  const detectionHistory = [];  // Track each detection for dev mode display
+  const allElements = [
+    ...allDetections.figures.map(f => ({ ...f, elementType: 'figure' })),
+    ...allDetections.objects.map(o => ({ ...o, elementType: 'object', faceBox: null }))
+  ];
 
   for (const issue of fixableIssues) {
-    const detection = await detectBoundingBoxesForIssue(imageData, issue.description);
+    // Try to find matching element by position/description keywords
+    const issueDesc = issue.description.toLowerCase();
+    let matchedElement = null;
 
-    // Record detection attempt for display
-    const detectionRecord = {
-      issue: issue.description,
-      severity: issue.severity,
-      type: issue.type,
-      success: !!detection,
-      timestamp: new Date().toISOString()
-    };
+    // Simple matching by position keywords
+    for (const element of allElements) {
+      const label = (element.label || '').toLowerCase();
+      const position = (element.position || '').toLowerCase();
 
-    if (detection) {
-      detectionRecord.faceBox = detection.faceBox;
-      detectionRecord.bodyBox = detection.bodyBox;
-      detectionRecord.label = detection.label;
-      detectionRecord.usage = detection.usage;
+      // Check if issue mentions this element's position or description
+      const positionMatch = position && issueDesc.includes(position);
+      const labelMatch = label.split(' ').some(word =>
+        word.length > 3 && issueDesc.includes(word)
+      );
 
+      if (positionMatch || labelMatch) {
+        matchedElement = element;
+        break;
+      }
+    }
+
+    // Fallback: use first figure for character issues, first object for object issues
+    if (!matchedElement) {
+      if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
+        matchedElement = allDetections.figures[0];
+      } else if (issue.type === 'object') {
+        matchedElement = allDetections.objects[0] || allDetections.figures[0];
+      } else {
+        matchedElement = allDetections.figures[0] || allDetections.objects[0];
+      }
+    }
+
+    if (matchedElement) {
       enrichedTargets.push({
-        faceBox: detection.faceBox,
-        bodyBox: detection.bodyBox,
-        // Use bodyBox as primary boundingBox for backwards compatibility
-        // groupFixTargetsForInpainting will choose the right box based on issue type
-        boundingBox: detection.bodyBox || detection.faceBox,
+        faceBox: matchedElement.faceBox,
+        bodyBox: matchedElement.bodyBox,
+        boundingBox: matchedElement.bodyBox || matchedElement.faceBox,
         issue: issue.description,
         severity: issue.severity,
         type: issue.type,
         fixPrompt: issue.fix || `Fix: ${issue.description}`,
-        label: detection.label
+        label: matchedElement.label,
+        matchedPosition: matchedElement.position
       });
+      log.debug(`📦 [BBOX-ENRICH] Matched issue "${issue.description.substring(0, 30)}..." to "${matchedElement.label}"`);
     } else {
-      log.warn(`⚠️  [BBOX-ENRICH] Could not detect boxes for: ${issue.description.substring(0, 50)}...`);
+      log.warn(`⚠️  [BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
     }
-
-    detectionHistory.push(detectionRecord);
   }
 
-  log.info(`📦 [BBOX-ENRICH] Successfully enriched ${enrichedTargets.length}/${fixableIssues.length} issues with bounding boxes`);
+  log.info(`📦 [BBOX-ENRICH] Matched ${enrichedTargets.length}/${fixableIssues.length} issues to detected elements`);
 
   return { targets: enrichedTargets, detectionHistory };
 }
@@ -4049,7 +4104,8 @@ module.exports = {
   autoRepairWithTargets,
 
   // Two-stage bounding box detection
-  detectBoundingBoxesForIssue,
+  detectAllBoundingBoxes,
+  detectBoundingBoxesForIssue,  // deprecated, use detectAllBoundingBoxes
   enrichWithBoundingBoxes,
 
   // Final consistency checks
