@@ -421,7 +421,11 @@ export default function StoryWizard() {
     // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
     if (devMetadata.sceneDescriptions?.length) {
       // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
-      console.log('[StoryWizard] Dev metadata sceneDescriptions:', devMetadata.sceneDescriptions.length, 'entries');
+      const scenes = devMetadata.sceneDescriptions;
+      console.log('[StoryWizard] Dev metadata sceneDescriptions:', scenes.length, 'entries');
+      console.log('[StoryWizard] First scene keys:', Object.keys(scenes[0] || {}));
+      console.log('[StoryWizard] First scene has outlineExtract:', !!scenes[0]?.outlineExtract);
+      console.log('[StoryWizard] First scene has scenePrompt:', !!scenes[0]?.scenePrompt);
       // @ts-expect-error - sceneDescriptions is returned by API but missing from type definition
       setSceneDescriptions(devMetadata.sceneDescriptions);
     }

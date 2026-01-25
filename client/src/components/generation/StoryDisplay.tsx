@@ -686,7 +686,13 @@ export function StoryDisplay({
 
   // Helper to get outline extract for a page
   const getOutlineExtract = (pageNumber: number): string | undefined => {
-    return sceneDescriptions.find(s => s.pageNumber === pageNumber)?.outlineExtract;
+    const scene = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+    if (pageNumber === 1 && scene) {
+      console.log('[StoryDisplay] Page 1 scene keys:', Object.keys(scene));
+      console.log('[StoryDisplay] Page 1 has outlineExtract:', !!scene.outlineExtract);
+      console.log('[StoryDisplay] Page 1 has scenePrompt:', !!scene.scenePrompt);
+    }
+    return scene?.outlineExtract;
   };
 
   // Helper to get scene prompt (Art Director prompt) for a page
