@@ -51,8 +51,9 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     setLoading(true);
     setError(null);
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`/api/stories/${storyId}/share-status`, {
-        credentials: 'include'
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!response.ok) throw new Error('Failed to fetch status');
       const data = await response.json();
@@ -70,10 +71,11 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     try {
       const isCurrentlyShared = shareStatus?.isShared;
       const method = isCurrentlyShared ? 'DELETE' : 'POST';
+      const token = localStorage.getItem('auth_token');
 
       const response = await fetch(`/api/stories/${storyId}/share`, {
         method,
-        credentials: 'include'
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       if (!response.ok) throw new Error('Failed to toggle sharing');
