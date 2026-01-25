@@ -201,7 +201,7 @@ function EvaluationDisplay({ data, language, title }: { data: unknown; language:
   };
 
   return (
-    <div className="text-sm space-y-1 max-h-96 overflow-auto">
+    <div className="text-sm space-y-1 max-h-[500px] overflow-auto">
       <div className="flex justify-end mb-2">
         <button
           onClick={handleDownload}
@@ -550,7 +550,7 @@ export function RetryHistoryDisplay({
                                 <Download size={10} /> Download
                               </button>
                             </summary>
-                            <div className="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-wrap font-mono max-h-96 overflow-auto">{repair.fullPrompt || repair.fixPrompt}</div>
+                            <div className="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-wrap font-mono max-h-[500px] overflow-auto">{repair.fullPrompt || repair.fixPrompt}</div>
                           </details>
                           <div className="flex gap-4 items-start">
                             {/* Before with Mask Overlay */}
@@ -742,7 +742,7 @@ export function RetryHistoryDisplay({
                                   <Download size={10} /> Download
                                 </button>
                               </summary>
-                              <div className="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-wrap font-mono max-h-48 overflow-auto">
+                              <div className="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-wrap font-mono max-h-[500px] overflow-auto">
                                 {grid.prompt}
                               </div>
                             </details>
@@ -876,11 +876,30 @@ export function RetryHistoryDisplay({
               </details>
             )}
 
+            {/* Input Prompt (for regular attempts) */}
+            {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.prompt && (
+              <details className="text-sm mb-2">
+                <summary className="cursor-pointer text-blue-700 font-medium hover:text-blue-900 flex items-center gap-2">
+                  📤 {language === 'de' ? 'Eingabe-Prompt' : 'Input Prompt'}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadAsText(attempt.prompt || '', `prompt-attempt-${attempt.attempt}.txt`);
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-0.5 bg-blue-50 rounded"
+                  >
+                    <Download size={10} /> Download
+                  </button>
+                </summary>
+                <pre className="mt-2 whitespace-pre-wrap bg-blue-50 p-3 rounded text-sm overflow-auto max-h-[500px] font-mono border border-blue-200">{attempt.prompt}</pre>
+              </details>
+            )}
+
             {/* Regular attempt feedback */}
             {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.reasoning ? (
               <details className="text-sm text-gray-600 mb-2">
-                <summary className="cursor-pointer">{language === 'de' ? 'Feedback' : 'Feedback'}</summary>
-                <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded text-sm overflow-auto max-h-60 font-mono">{attempt.reasoning}</pre>
+                <summary className="cursor-pointer font-medium">📥 {language === 'de' ? 'Bewertungs-Feedback' : 'Evaluation Feedback'}</summary>
+                <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded text-sm overflow-auto max-h-[500px] font-mono">{attempt.reasoning}</pre>
               </details>
             ) : attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.score === 0 && (
               <div className="text-sm text-gray-500 italic mb-2">
@@ -888,17 +907,19 @@ export function RetryHistoryDisplay({
               </div>
             )}
 
+            {/* Image - show directly for regular attempts, not hidden */}
             {attempt.imageData && attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && (
-              <details>
-                <summary className="cursor-pointer text-sm text-blue-600">
-                  {language === 'de' ? 'Bild anzeigen' : language === 'fr' ? 'Voir image' : 'View image'}
-                </summary>
+              <div className="mt-2">
+                <div className="text-xs text-gray-500 mb-1 font-medium">
+                  {language === 'de' ? 'Generiertes Bild' : 'Generated Image'}
+                </div>
                 <img
                   src={attempt.imageData}
                   alt={`Attempt ${attempt.attempt}`}
-                  className={`mt-2 w-full rounded border ${idx === retryHistory.length - 1 ? 'border-green-300' : 'border-gray-200 opacity-75'}`}
+                  className={`w-48 h-48 object-contain rounded border cursor-pointer hover:ring-2 ${idx === retryHistory.length - 1 ? 'border-green-300 hover:ring-green-400' : 'border-gray-200 opacity-75 hover:ring-gray-400'}`}
+                  onClick={() => setEnlargedImg({ src: attempt.imageData!, title: `${language === 'de' ? 'Versuch' : 'Attempt'} ${attempt.attempt}` })}
                 />
-              </details>
+              </div>
             )}
 
             <div className="text-xs text-gray-400 mt-1">

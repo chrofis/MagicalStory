@@ -1414,7 +1414,7 @@ export function StoryDisplay({
                         {visualBible.changeLog.length}
                       </span>
                     </summary>
-                    <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
+                    <div className="mt-2 space-y-1 max-h-[500px] overflow-y-auto">
                       {visualBible.changeLog.slice().reverse().map((entry, idx) => (
                         <div key={idx} className="bg-amber-50 p-2 rounded text-xs border-l-2 border-amber-400">
                           <div className="flex items-center gap-2">
@@ -1610,7 +1610,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer font-semibold text-purple-700 hover:text-purple-800">
                             Prompt ({entry.prompt.length} chars)
                           </summary>
-                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-48 overflow-y-auto">
+                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-[500px] overflow-y-auto">
                             {entry.prompt}
                           </pre>
                         </details>
@@ -1726,7 +1726,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer font-semibold text-purple-700 hover:text-purple-800">
                             Prompt ({entry.prompt.length} chars)
                           </summary>
-                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-48 overflow-y-auto">
+                          <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-[500px] overflow-y-auto">
                             {entry.prompt}
                           </pre>
                         </details>
@@ -1949,7 +1949,7 @@ export function StoryDisplay({
                                   {(check.evaluationPrompts?.length ?? 0) > 1 && (
                                     <div className="text-xs font-semibold text-blue-700 mb-1">Batch {promptIdx + 1}:</div>
                                   )}
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto bg-white p-2 rounded border">
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
                                     {prompt}
                                   </pre>
                                 </div>
@@ -1985,7 +1985,7 @@ export function StoryDisplay({
                                   {(check.rawResponses?.length ?? 0) > 1 && (
                                     <div className="text-xs font-semibold text-purple-700 mb-1">Batch {respIdx + 1}:</div>
                                   )}
-                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto bg-white p-2 rounded border">
+                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
                                     {response}
                                   </pre>
                                 </div>
@@ -2077,7 +2077,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-gray-700">
                             📄 View Original Text
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-600 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.fullOriginalText}
                           </pre>
                         </details>
@@ -2088,7 +2088,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-green-800">
                             📋 View Full Corrected Text
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.fullCorrectedText}
                           </pre>
                         </details>
@@ -2099,7 +2099,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-purple-800">
                             📝 View Raw Response
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.rawResponse}
                           </pre>
                         </details>
@@ -2110,7 +2110,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-indigo-800">
                             🔧 View Parsed Result
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
                             {JSON.stringify({
                               quality: finalChecksReport.textCheck.quality,
                               overallScore: finalChecksReport.textCheck.overallScore,
@@ -2127,7 +2127,7 @@ export function StoryDisplay({
                           <summary className="cursor-pointer text-xs font-medium text-blue-800">
                             🔍 View Evaluation Prompt
                           </summary>
-                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-64 overflow-y-auto">
+                          <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
                             {finalChecksReport.textCheck.evaluationPrompt}
                           </pre>
                         </details>
@@ -2273,7 +2273,7 @@ export function StoryDisplay({
                       {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                       {frontCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({frontCoverObj.modelId})</span>}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                       {frontCoverObj.prompt}
                     </pre>
                   </details>
@@ -2407,7 +2407,7 @@ export function StoryDisplay({
                       {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                       {initialPageObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({initialPageObj.modelId})</span>}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                       {initialPageObj.prompt}
                     </pre>
                   </details>
@@ -2714,7 +2714,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900">
                                   {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-64 overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {getScenePrompt(pageNumber)}
                                 </pre>
                               </details>
@@ -2740,7 +2740,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                                   {image?.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {image?.prompt}
                                 </pre>
                               </details>
@@ -3059,7 +3059,7 @@ export function StoryDisplay({
                                 <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900">
                                   {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-64 overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {getScenePrompt(pageNumber)}
                                 </pre>
                               </details>
@@ -3085,7 +3085,7 @@ export function StoryDisplay({
                                   {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                                   {image.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({image.modelId})</span>}
                                 </summary>
-                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                                <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                                   {image.prompt}
                                 </pre>
                               </details>
@@ -3300,7 +3300,7 @@ export function StoryDisplay({
                       {language === 'de' ? 'API-Prompt' : language === 'fr' ? 'Prompt API' : 'API Prompt'}
                       {backCoverObj.modelId && <span className="ml-2 text-xs font-normal text-blue-600">({backCoverObj.modelId})</span>}
                     </summary>
-                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-48 overflow-y-auto">
+                    <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
                       {backCoverObj.prompt}
                     </pre>
                   </details>
