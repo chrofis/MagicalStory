@@ -1211,6 +1211,11 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_user_id ON stories(user_id)`);
 
+    // Story sharing columns (migration for existing tables)
+    await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS is_shared BOOLEAN DEFAULT FALSE`);
+    await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS share_token VARCHAR(255)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_share_token ON stories(share_token) WHERE share_token IS NOT NULL`);
+
     // Story drafts table - stores unsaved story settings (step 1 & 4 data)
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS story_drafts (
@@ -9058,43 +9063,42 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       return result;
     }
 
-    // PHASE 4: Wait for cover images (started during/after streaming)
-    genLog.setStage('covers');
+    // PHASE 4: Start cover images await (runs PARALLEL with page images)
+    // Covers and page images don't depend on each other - both need story/avatars but not each other
     const coverImages = {};
+    let coverAwaitPromise = null;
+
     if (streamingCoverPromises.size > 0) {
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [40, `Waiting for ${streamingCoverPromises.size} cover images...`, jobId]
-      );
-
       timing.coversStart = timing.coversStart || Date.now(); // May have started during streaming
-      log.debug(`⏳ [UNIFIED] Waiting for ${streamingCoverPromises.size} cover generations...`);
-      const coverResults = await Promise.all(
-        Array.from(streamingCoverPromises.values())
-      );
-      timing.coversEnd = Date.now();
+      log.debug(`⏳ [UNIFIED] Cover generations in progress (${streamingCoverPromises.size} covers, running parallel with page images)...`);
 
-      // Map results to coverImages object
-      for (const result of coverResults) {
-        if (result?.imageData) {
-          // Map coverType to frontend expected keys
-          const storageKey = result.type === 'titlePage' ? 'frontCover' : result.type;
-          coverImages[storageKey] = {
-            imageData: result.imageData,
-            description: result.description,
-            prompt: result.prompt,
-            qualityScore: result.qualityScore,
-            qualityReasoning: result.qualityReasoning,
-            wasRegenerated: result.wasRegenerated,
-            totalAttempts: result.totalAttempts,
-            retryHistory: result.retryHistory,
-            referencePhotos: result.referencePhotos,
-            modelId: result.modelId
-          };
+      // Create promise but don't await yet - covers run parallel with page images
+      coverAwaitPromise = Promise.all(
+        Array.from(streamingCoverPromises.values())
+      ).then(coverResults => {
+        timing.coversEnd = Date.now();
+        // Map results to coverImages object
+        for (const result of coverResults) {
+          if (result?.imageData) {
+            // Map coverType to frontend expected keys
+            const storageKey = result.type === 'titlePage' ? 'frontCover' : result.type;
+            coverImages[storageKey] = {
+              imageData: result.imageData,
+              description: result.description,
+              prompt: result.prompt,
+              qualityScore: result.qualityScore,
+              qualityReasoning: result.qualityReasoning,
+              wasRegenerated: result.wasRegenerated,
+              totalAttempts: result.totalAttempts,
+              retryHistory: result.retryHistory,
+              referencePhotos: result.referencePhotos,
+              modelId: result.modelId
+            };
+          }
         }
-      }
-      log.debug(`✅ [UNIFIED] All ${Object.keys(coverImages).length} cover images complete`);
-      log.debug(`⏱️ [UNIFIED] Cover images: ${((timing.coversEnd - (timing.coversStart || timing.storyGenEnd)) / 1000).toFixed(1)}s`);
+        log.debug(`✅ [UNIFIED] All ${Object.keys(coverImages).length} cover images complete`);
+        log.debug(`⏱️ [UNIFIED] Cover images: ${((timing.coversEnd - (timing.coversStart || timing.storyGenEnd)) / 1000).toFixed(1)}s`);
+      });
     } else {
       log.debug(`📖 [UNIFIED] No cover images to generate (skipCovers=${skipCovers})`);
     }
@@ -9330,9 +9334,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     timing.pagesEnd = Date.now();
-    timing.end = Date.now();
     log.debug(`📖 [UNIFIED] Generated ${allImages.filter(p => p.imageData).length}/${allImages.length} page images`);
     log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
+
+    // Wait for cover images if still running (they ran parallel with page images)
+    if (coverAwaitPromise) {
+      if (!timing.coversEnd) {
+        genLog.setStage('covers');
+        log.debug(`⏳ [UNIFIED] Waiting for cover images to finish (page images done first)...`);
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [95, 'Finishing cover images...', jobId]
+        );
+      }
+      await coverAwaitPromise;
+    }
+
+    timing.end = Date.now();
 
     // Log timing summary
     log.debug(`⏱️ [UNIFIED] Timing summary:`);
