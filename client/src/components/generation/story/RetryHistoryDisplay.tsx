@@ -427,14 +427,14 @@ export function RetryHistoryDisplay({
                   </div>
                 )}
 
-                {/* Two-Stage Bounding Box Detection (new) */}
-                {attempt.bboxDetection && attempt.bboxDetection.length > 0 && (
+                {/* Two-Stage Bounding Box Detection (old per-issue format) */}
+                {attempt.bboxDetection && Array.isArray(attempt.bboxDetection) && attempt.bboxDetection.length > 0 && (
                   <details className="text-sm mb-2">
                     <summary className="cursor-pointer text-blue-700 font-medium hover:text-blue-900">
                       📦 {language === 'de' ? 'Bounding Box Erkennung' : 'Bounding Box Detection'} ({attempt.bboxDetection.length})
                     </summary>
                     <div className="mt-3 space-y-2">
-                      {attempt.bboxDetection.map((detection, dIdx) => (
+                      {(attempt.bboxDetection as Array<{success: boolean; issue: string; severity: string; type: string; faceBox?: number[]; bodyBox?: number[]; label?: string; usage?: {input_tokens: number; output_tokens: number}}>).map((detection, dIdx) => (
                         <div key={dIdx} className={`p-3 rounded-lg border ${detection.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                           <div className="flex items-center justify-between mb-2">
                             <span className={`font-medium text-sm ${detection.success ? 'text-green-800' : 'text-red-800'}`}>
