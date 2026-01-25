@@ -322,9 +322,11 @@ For EACH of the {PAGES} story pages, provide:
 **Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
 
 **Scene**: One sentence describing the key visual moment for the illustrator.
-- **MAX 3 CHARACTERS per scene** - Pick the 1-3 most important characters for THIS visual moment
-- Other characters can be mentioned in the story text, but the illustration focuses on 3 or fewer
-- For group scenes: focus on the emotional center (e.g., "Sophie hugs Grandma while others watch" → illustrate Sophie + Grandma, not all 7 people)
+- **MAX 3 CHARACTERS per page** - Both the story TEXT and the illustration should focus on 1-3 characters
+- Do NOT write text that mentions 5-6 characters all doing things on the same page
+- If a group exists, the TEXT should describe what 2-3 key characters are doing, not catalog everyone's actions
+- Other characters can be PRESENT but not actively described (e.g., "while the others watched" is fine)
+- For group scenes: focus on the emotional center (e.g., "Sophie hugs Grandma" → don't describe what each of 5 other people is doing)
 
 **Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
 - Write **[same]** if clothing matches the previous page
@@ -506,9 +508,9 @@ Challenge: [One scene where this character shines]
 ## Page-by-Page Breakdown
 
 Page 1: [Key Action/Plot Point]
-Character Focus: [Which character(s) and what trait/development is shown]
+Character Focus: [1-3 characters MAX - describe what THESE characters do, not everyone in the story]
 Scene: [One sentence - the key visual moment, MAX 3 characters in the illustration]
-Scene Characters: [List only characters IN THIS SCENE with their clothing, e.g., "Luis: costumed:knight, Noel: standard"]
+Scene Characters: [List only 1-3 characters IN THIS SCENE with their clothing, e.g., "Luis: costumed:knight, Noel: standard"]
 Scene Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/etc]
 Clothing: [same] or [change to: X - reason]
 
