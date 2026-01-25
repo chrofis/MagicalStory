@@ -4,6 +4,8 @@
  * Extracted from server.js for maintainability
  */
 
+const path = require('path');
+const os = require('os');
 const sharp = require('sharp');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
@@ -1763,9 +1765,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Check-only mode: run all checks but skip regeneration/repair
     checkOnlyMode = false,
     // Grid-based repair: extracts issues, creates grids, repairs with Gemini, verifies
-    useGridRepair = false,
-    // Output directory for grid-based repair (required if useGridRepair=true)
-    gridRepairOutputDir = null,
+    // Defaults to true when enableAutoRepair is true (use grid repair instead of legacy inpainting)
+    useGridRepair: useGridRepairInput = null,
+    // Output directory for grid-based repair (auto-generated if not provided)
+    gridRepairOutputDir: gridRepairOutputDirInput = null,
     // Story ID for grid-based repair manifest
     storyId = null,
   } = options;
@@ -1776,6 +1779,15 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   const incrementalConsistency = checkOnlyMode && incrementalConsistencyInput
     ? { ...incrementalConsistencyInput, dryRun: true }
     : incrementalConsistencyInput;
+
+  // Grid repair: enabled by default when autoRepair is on (unless explicitly disabled)
+  const useGridRepair = useGridRepairInput !== null ? useGridRepairInput : enableAutoRepair;
+  // Auto-generate output directory for grid repair if not provided
+  const gridRepairOutputDir = gridRepairOutputDirInput || (useGridRepair ? path.join(os.tmpdir(), 'grid-repair', `job-${Date.now()}`) : null);
+
+  if (useGridRepair && enableAutoRepair) {
+    log.info(`🔲 [QUALITY RETRY] Grid-based repair enabled (output: ${gridRepairOutputDir})`);
+  }
 
   if (checkOnlyMode) {
     log.debug(`🔍 [QUALITY RETRY] Check-only mode: MAX_ATTEMPTS=1, autoRepair=OFF, incrementalDryRun=ON`);
