@@ -1,13 +1,28 @@
 ---
 name: story-outline-review
-description: "Compare draft vs final story text to analyze how self-critique (CRITICAL ANALYSIS) improved the story."
+description: "Analyze CRITICAL ANALYSIS findings and verify fixes were applied to the story."
 ---
 
 # Story Outline Review
 
 ## Overview
 
-Compares the draft story (before CRITICAL ANALYSIS) with the final story (after rewrite) to understand what changes the self-critique process made. This helps validate that the story generation pipeline is correctly identifying and fixing issues.
+Analyzes the CRITICAL ANALYSIS section from story generation to see:
+1. All issues identified (by category)
+2. Proposed fixes with before/after text
+3. Whether fixes were applied in the final story
+4. Banned gesture scan on final text
+
+## Quick Usage
+
+```bash
+node scripts/compare-story-draft.js
+```
+
+Or with explicit database URL:
+```bash
+DATABASE_PUBLIC_URL="postgresql://..." node scripts/compare-story-draft.js
+```
 
 ## Database Queries
 
