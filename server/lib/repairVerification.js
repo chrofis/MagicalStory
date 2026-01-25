@@ -1,133 +1,128 @@
 /**
  * Repair Verification Module
  *
- * Verifies repaired regions for correctness and checks for newly introduced artifacts.
- * Uses LPIPS for change detection and LLM for semantic verification.
+ * Verifies repaired regions for correctness using Gemini visual comparison.
+ * Simplified approach: per-repair verification without LPIPS dependency.
  */
 
 const sharp = require('sharp');
-const fetch = require('node-fetch');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const PHOTO_ANALYZER_URL = process.env.PHOTO_ANALYZER_URL || 'http://localhost:5000';
 
 // Verification thresholds
-const LPIPS_CHANGE_THRESHOLD = 0.02;  // Min LPIPS to consider changed
-const LPIPS_MAX_THRESHOLD = 0.5;      // Max LPIPS before considering too different
 const LLM_CONFIDENCE_THRESHOLD = 0.7; // Min confidence to accept
 
-// Gemini model for verification
-const VERIFY_MODEL = 'gemini-2.0-flash';
+// Gemini model for verification (same as quality eval for consistency)
+const VERIFY_MODEL = 'gemini-2.5-flash';
 
 /**
- * Calculate LPIPS score between two images using the photo analyzer service
+ * Create a side-by-side comparison image for verification
  *
- * @param {Buffer} original - Original image buffer
- * @param {Buffer} repaired - Repaired image buffer
- * @returns {Promise<{lpipsScore: number, changed: boolean}>}
+ * @param {Buffer} originalBuffer - Original region buffer
+ * @param {Buffer} repairedBuffer - Repaired region buffer
+ * @returns {Promise<Buffer>} Side-by-side comparison JPEG
  */
-async function calculateLPIPS(original, repaired) {
-  try {
-    const response = await fetch(`${PHOTO_ANALYZER_URL}/lpips`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image1: original.toString('base64'),
-        image2: repaired.toString('base64')
-      })
-    });
+async function createVerificationComparison(originalBuffer, repairedBuffer) {
+  const [origMeta, repairMeta] = await Promise.all([
+    sharp(originalBuffer).metadata(),
+    sharp(repairedBuffer).metadata()
+  ]);
 
-    if (!response.ok) {
-      throw new Error(`LPIPS service returned ${response.status}`);
+  const compWidth = Math.max(origMeta.width, repairMeta.width);
+  const compHeight = Math.max(origMeta.height, repairMeta.height);
+
+  const comparison = await sharp({
+    create: {
+      width: compWidth * 2 + 20,
+      height: compHeight + 40,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
     }
+  })
+    .composite([
+      {
+        input: await sharp(originalBuffer).resize(compWidth, compHeight, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } }).toBuffer(),
+        left: 0,
+        top: 30
+      },
+      {
+        input: await sharp(repairedBuffer).resize(compWidth, compHeight, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } }).toBuffer(),
+        left: compWidth + 20,
+        top: 30
+      },
+      {
+        input: Buffer.from(`
+          <svg width="${compWidth * 2 + 20}" height="30">
+            <text x="${compWidth / 2}" y="20" text-anchor="middle" font-size="16" font-family="Arial" fill="black">BEFORE</text>
+            <text x="${compWidth * 1.5 + 20}" y="20" text-anchor="middle" font-size="16" font-family="Arial" fill="black">AFTER</text>
+          </svg>
+        `),
+        left: 0,
+        top: 0
+      }
+    ])
+    .jpeg({ quality: 90 })
+    .toBuffer();
 
-    const result = await response.json();
-    const score = result.lpips_score || result.lpipsScore || 0;
-
-    return {
-      lpipsScore: score,
-      changed: score > LPIPS_CHANGE_THRESHOLD,
-      tooChanged: score > LPIPS_MAX_THRESHOLD
-    };
-  } catch (err) {
-    console.warn(`LPIPS calculation failed: ${err.message}`);
-    return { lpipsScore: null, changed: null, error: err.message };
-  }
+  return comparison;
 }
 
 /**
- * Use LLM to verify if a repair was successful
+ * Unified repair verification using Gemini
+ *
+ * Replaces the previous three-stage verification (LPIPS + LLM + artifacts)
+ * with a single Gemini call that checks:
+ * 1. Is the issue fixed?
+ * 2. Is there a visible change?
+ * 3. Are there any new problems?
  *
  * @param {Buffer} originalBuffer - Original region before repair
  * @param {Buffer} repairedBuffer - Region after repair
  * @param {Object} issue - Issue that was supposed to be fixed
- * @returns {Promise<{fixed: boolean, confidence: number, explanation: string}>}
+ * @returns {Promise<{fixed: boolean, changed: boolean, confidence: number, explanation: string, newProblems: string[]}>}
  */
-async function verifyWithLLM(originalBuffer, repairedBuffer, issue) {
+async function verifyRepairWithGemini(originalBuffer, repairedBuffer, issue) {
   const model = genAI.getGenerativeModel({ model: VERIFY_MODEL });
 
-  const prompt = `Compare these two images: BEFORE (left) and AFTER (right) repair.
+  // Type-specific artifact checks to include in prompt
+  const typeChecks = {
+    face: 'asymmetrical eyes, distorted features, merged faces, missing features',
+    hand: 'wrong finger count (not 5), merged fingers, floating fingers, backwards hands',
+    anatomy: 'floating limbs, detached body parts, impossible poses, missing joints',
+    clothing: 'patterns don\'t align, colors bleeding, floating fabric',
+    object: 'floating objects, objects merging with background, impossible physics'
+  };
 
-The repair was supposed to fix: "${issue.fixInstruction}"
+  const specificChecks = typeChecks[issue.type] || typeChecks.object;
+
+  const prompt = `Compare these two image regions: BEFORE (left) and AFTER (right).
+
+The original issue was: "${issue.description}"
+Fix instruction was: "${issue.fixInstruction}"
 Issue type: ${issue.type}
-Issue description: "${issue.description}"
 
-EVALUATE:
-1. Was the specific issue fixed?
-2. Does the repair look natural and consistent with the art style?
-3. Were any NEW problems introduced (extra fingers, distorted faces, floating objects)?
+EVALUATE carefully:
+1. Is the issue FIXED in the AFTER image? Look for the specific problem mentioned.
+2. Is there any VISIBLE CHANGE between BEFORE and AFTER? (Even subtle changes count)
+3. Are there any NEW PROBLEMS in the AFTER image? Check for:
+   - ${specificChecks}
+   - Blurry or smeared areas
+   - Unnatural color transitions
+   - Objects that don't connect properly
 
 Return JSON only:
 {
   "fixed": true/false,
+  "changed": true/false,
   "confidence": 0.0-1.0,
-  "explanation": "brief explanation",
-  "newProblems": ["list any new issues"] or []
+  "explanation": "brief explanation of what you see",
+  "newProblems": ["list any new issues found"] or []
 }`;
 
   try {
-    // Create side-by-side comparison image
-    const [origMeta, repairMeta] = await Promise.all([
-      sharp(originalBuffer).metadata(),
-      sharp(repairedBuffer).metadata()
-    ]);
-
-    const compWidth = Math.max(origMeta.width, repairMeta.width);
-    const compHeight = Math.max(origMeta.height, repairMeta.height);
-
-    const comparison = await sharp({
-      create: {
-        width: compWidth * 2 + 20,
-        height: compHeight + 40,
-        channels: 4,
-        background: { r: 255, g: 255, b: 255, alpha: 1 }
-      }
-    })
-      .composite([
-        {
-          input: await sharp(originalBuffer).resize(compWidth, compHeight, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } }).toBuffer(),
-          left: 0,
-          top: 30
-        },
-        {
-          input: await sharp(repairedBuffer).resize(compWidth, compHeight, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } }).toBuffer(),
-          left: compWidth + 20,
-          top: 30
-        },
-        {
-          input: Buffer.from(`
-            <svg width="${compWidth * 2 + 20}" height="30">
-              <text x="${compWidth / 2}" y="20" text-anchor="middle" font-size="16" font-family="Arial" fill="black">BEFORE</text>
-              <text x="${compWidth * 1.5 + 20}" y="20" text-anchor="middle" font-size="16" font-family="Arial" fill="black">AFTER</text>
-            </svg>
-          `),
-          left: 0,
-          top: 0
-        }
-      ])
-      .jpeg({ quality: 90 })
-      .toBuffer();
+    // Create side-by-side comparison
+    const comparison = await createVerificationComparison(originalBuffer, repairedBuffer);
 
     const result = await model.generateContent([
       prompt,
@@ -146,6 +141,7 @@ Return JSON only:
       const parsed = JSON.parse(jsonMatch[0]);
       return {
         fixed: parsed.fixed === true,
+        changed: parsed.changed === true,
         confidence: parsed.confidence || 0,
         explanation: parsed.explanation || '',
         newProblems: parsed.newProblems || [],
@@ -155,14 +151,16 @@ Return JSON only:
 
     return {
       fixed: false,
+      changed: false,
       confidence: 0,
-      explanation: 'Could not parse LLM response',
+      explanation: 'Could not parse verification response',
       newProblems: []
     };
   } catch (err) {
-    console.error(`LLM verification failed: ${err.message}`);
+    console.error(`Gemini verification failed: ${err.message}`);
     return {
       fixed: false,
+      changed: false,
       confidence: 0,
       explanation: `Verification error: ${err.message}`,
       newProblems: [],
@@ -240,6 +238,17 @@ Return JSON only:
 /**
  * Verify a single repaired region
  *
+ * Uses unified Gemini verification that checks in one call:
+ * - Is the issue fixed?
+ * - Is there a visible change?
+ * - Are there any new problems/artifacts?
+ *
+ * Acceptance criteria:
+ * - fixed: true (the issue was addressed)
+ * - changed: true (there's a visible difference, not identical)
+ * - newProblems: [] (no new artifacts introduced)
+ * - confidence >= threshold
+ *
  * @param {Buffer} originalBuffer - Original region buffer
  * @param {Buffer} repairedBuffer - Repaired region buffer
  * @param {Object} issue - Issue that was repaired
@@ -247,57 +256,39 @@ Return JSON only:
  */
 async function verifyRepairedRegion(originalBuffer, repairedBuffer, issue) {
   const results = {
-    lpips: null,
-    llm: null,
-    artifacts: null,
+    gemini: null,
     accepted: false,
     reason: ''
   };
 
-  // Step 1: LPIPS change detection
-  results.lpips = await calculateLPIPS(originalBuffer, repairedBuffer);
+  // Single unified verification call
+  results.gemini = await verifyRepairWithGemini(originalBuffer, repairedBuffer, issue);
 
-  if (results.lpips.lpipsScore !== null) {
-    if (!results.lpips.changed) {
-      results.accepted = false;
-      results.reason = 'No visible change detected (LPIPS too low)';
-      return results;
-    }
-
-    if (results.lpips.tooChanged) {
-      results.accepted = false;
-      results.reason = 'Region changed too much (LPIPS too high) - may have lost consistency';
-      return results;
-    }
-  }
-
-  // Step 2: LLM verification
-  results.llm = await verifyWithLLM(originalBuffer, repairedBuffer, issue);
-
-  if (!results.llm.fixed) {
+  // Check 1: Was the image actually changed?
+  if (!results.gemini.changed) {
     results.accepted = false;
-    results.reason = `Fix not applied: ${results.llm.explanation}`;
+    results.reason = 'No visible change detected - repair may have failed';
     return results;
   }
 
-  if (results.llm.confidence < LLM_CONFIDENCE_THRESHOLD) {
+  // Check 2: Was the issue fixed?
+  if (!results.gemini.fixed) {
     results.accepted = false;
-    results.reason = `Low confidence fix (${(results.llm.confidence * 100).toFixed(0)}%)`;
+    results.reason = `Issue not fixed: ${results.gemini.explanation}`;
     return results;
   }
 
-  if (results.llm.newProblems && results.llm.newProblems.length > 0) {
+  // Check 3: Sufficient confidence?
+  if (results.gemini.confidence < LLM_CONFIDENCE_THRESHOLD) {
     results.accepted = false;
-    results.reason = `New problems introduced: ${results.llm.newProblems.join(', ')}`;
+    results.reason = `Low confidence (${(results.gemini.confidence * 100).toFixed(0)}%)`;
     return results;
   }
 
-  // Step 3: Artifact check
-  results.artifacts = await checkForNewArtifacts(repairedBuffer, issue.type);
-
-  if (results.artifacts.hasArtifacts && results.artifacts.severity !== 'none' && results.artifacts.severity !== 'minor') {
+  // Check 4: No new problems introduced?
+  if (results.gemini.newProblems && results.gemini.newProblems.length > 0) {
     results.accepted = false;
-    results.reason = `Artifacts detected: ${results.artifacts.artifacts.join(', ')}`;
+    results.reason = `New problems: ${results.gemini.newProblems.join(', ')}`;
     return results;
   }
 
@@ -455,15 +446,15 @@ async function createComparisonImage(originalImage, repairedImage, repairs) {
 
 module.exports = {
   // Thresholds
-  LPIPS_CHANGE_THRESHOLD,
-  LPIPS_MAX_THRESHOLD,
   LLM_CONFIDENCE_THRESHOLD,
 
   // Core verification
-  calculateLPIPS,
-  verifyWithLLM,
+  verifyRepairWithGemini,
   checkForNewArtifacts,
   verifyRepairedRegion,
+
+  // Helpers
+  createVerificationComparison,
 
   // Repair application
   applyVerifiedRepairs,
