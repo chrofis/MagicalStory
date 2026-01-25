@@ -6343,11 +6343,21 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   };
 
   // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
+  // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_image: MODEL_PRICING['gemini-2.5-flash-image'] || { input: 0.30, output: 30.00 },
     gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
+  };
+
+  // Helper to calculate image generation cost (per-image pricing, not token-based)
+  const calculateImageCost = (modelId, imageCount) => {
+    const pricing = MODEL_PRICING[modelId];
+    if (pricing?.perImage) {
+      return pricing.perImage * imageCount;
+    }
+    // Fallback to default Gemini image pricing
+    return 0.04 * imageCount;
   };
 
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
@@ -7844,36 +7854,44 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0);
     const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
     const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
-    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens, tokenUsage.gemini_image.thinking_tokens);
     const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
-    const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
+    // Calculate image costs using per-image pricing (not token-based)
+    const byFunc = tokenUsage.byFunction;
+    const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
+    const imageCost = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed']
+      .reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
+    const totalCost = anthropicCost.total + imageCost + geminiQualityCost.total;
     log.debug(`📊 [STORYBOOK] Token usage & cost summary:`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY PROVIDER:`);
     const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` / ${tokenUsage.anthropic.thinking_tokens.toLocaleString().padStart(6)} think` : '';
-    const thinkingImageStr = tokenUsage.gemini_image.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_image.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr} (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out${thinkingImageStr} (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
     log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr} (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
-    const byFunc = tokenUsage.byFunction;
-    const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     // Use first model for cost calculation (model-specific pricing), fall back to provider
     const getCostModel = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models)[0] : funcData.provider;
 
     // Log API usage to generationLog for dev mode visibility
     genLog.setStage('finalize');
     log.debug(`📊 [STORYBOOK] Logging API usage to generationLog. Functions with calls:`);
+    // Image generation functions use per-image pricing, not token-based
+    const IMAGE_FUNCTIONS = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed'];
     for (const [funcName, funcData] of Object.entries(byFunc)) {
       log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out`);
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
-        const cost = directCost > 0
-          ? directCost
-          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        let cost;
+        if (directCost > 0) {
+          cost = directCost;
+        } else if (IMAGE_FUNCTIONS.includes(funcName)) {
+          cost = calculateImageCost(model, funcData.calls);
+        } else {
+          cost = calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        }
         genLog.apiUsage(funcName, model, {
           inputTokens: funcData.input_tokens,
           outputTokens: funcData.output_tokens,
@@ -7909,16 +7927,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       log.debug(`   Scene Desc:    ${byFunc.scene_descriptions.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_descriptions.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_descriptions.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_descriptions)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.cover_images), byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens, byFunc.cover_images.thinking_tokens);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
+      const model = getModels(byFunc.cover_images);
+      const cost = calculateImageCost(model, byFunc.cover_images.calls);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
       log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.page_images), byFunc.page_images.input_tokens, byFunc.page_images.output_tokens, byFunc.page_images.thinking_tokens);
-      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
+      const model = getModels(byFunc.page_images);
+      const cost = calculateImageCost(model, byFunc.page_images.calls);
+      log.debug(`   Page Images:   ${byFunc.page_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
@@ -8118,11 +8138,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
   };
 
   // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
+  // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_image: MODEL_PRICING['gemini-2.5-flash-image'] || { input: 0.30, output: 30.00 },
     gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
+  };
+
+  // Helper to calculate image generation cost (per-image pricing, not token-based)
+  const calculateImageCost = (modelId, imageCount) => {
+    const pricing = MODEL_PRICING[modelId];
+    if (pricing?.perImage) {
+      return pricing.perImage * imageCount;
+    }
+    // Fallback to default Gemini image pricing
+    return 0.04 * imageCount;
   };
 
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
@@ -8202,6 +8232,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const expansionPromise = streamSceneLimit(async () => {
         // Wait for visual bible if not yet available
         while (!streamingVisualBible) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+
+        // Wait for clothing requirements if not yet available (comes after pages in outline)
+        while (!streamingClothingRequirements) {
           await new Promise(r => setTimeout(r, 100));
         }
 
@@ -9161,26 +9196,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
     const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
     const geminiTextCost = calculateCost('gemini_text', tokenUsage.gemini_text.input_tokens, tokenUsage.gemini_text.output_tokens, tokenUsage.gemini_text.thinking_tokens);
-    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens, tokenUsage.gemini_image.thinking_tokens);
     const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
-    const totalCost = anthropicCost.total + geminiTextCost.total + geminiImageCost.total + geminiQualityCost.total;
+    // Calculate image costs using per-image pricing (not token-based)
+    const byFunc = tokenUsage.byFunction;
+    const getModels = (func) => Array.from(func.models).join(', ') || func.provider || 'unknown';
+    const imageCost = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed']
+      .reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
+    const totalCost = anthropicCost.total + geminiTextCost.total + imageCost + geminiQualityCost.total;
 
     log.debug(`📊 [UNIFIED] Token usage & cost summary:`);
     log.debug(`   BY PROVIDER:`);
     const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` + ${tokenUsage.anthropic.thinking_tokens.toLocaleString()} think` : '';
     const thinkingTextStr = tokenUsage.gemini_text.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_text.thinking_tokens.toLocaleString()} think` : '';
-    const thinkingImageStr = tokenUsage.gemini_image.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_image.thinking_tokens.toLocaleString()} think` : '';
     const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` + ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString()} think` : '';
     log.debug(`   Anthropic:      ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr}  $${anthropicCost.total.toFixed(4)}`);
     log.debug(`   Gemini Text:    ${tokenUsage.gemini_text.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_text.output_tokens.toLocaleString().padStart(8)} out${thinkingTextStr}  $${geminiTextCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:   ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out${thinkingImageStr}  $${geminiImageCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Image:   ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
     log.debug(`   Gemini Quality: ${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr}  $${geminiQualityCost.total.toFixed(4)}`);
 
     // Log by function
     log.debug(`   BY FUNCTION:`);
-    const byFunc = tokenUsage.byFunction;
     const getCostModel = (func) => func.provider || 'anthropic';
-    const getModels = (func) => Array.from(func.models).join(', ') || func.provider || 'unknown';
 
     if (byFunc.unified_story?.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.unified_story), byFunc.unified_story.input_tokens, byFunc.unified_story.output_tokens, byFunc.unified_story.thinking_tokens);
@@ -9192,16 +9228,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`   Scene Expand:  ${byFunc.scene_expansion.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.scene_expansion.output_tokens.toLocaleString().padStart(8)} out (${byFunc.scene_expansion.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.scene_expansion)}]`);
     }
     if (byFunc.cover_images?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.cover_images), byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens, byFunc.cover_images.thinking_tokens);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
+      const model = getModels(byFunc.cover_images);
+      const cost = calculateImageCost(model, byFunc.cover_images.calls);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.cover_quality?.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
       log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images?.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.page_images), byFunc.page_images.input_tokens, byFunc.page_images.output_tokens, byFunc.page_images.thinking_tokens);
-      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
+      const model = getModels(byFunc.page_images);
+      const cost = calculateImageCost(model, byFunc.page_images.calls);
+      log.debug(`   Page Images:   ${byFunc.page_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.page_quality?.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
@@ -9666,14 +9704,21 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Log API usage to generationLog BEFORE saving story (so it's included in the saved data)
     genLog.setStage('finalize');
     log.debug(`📊 [UNIFIED] Logging API usage to generationLog. Functions with calls:`);
+    // Image generation functions use per-image pricing, not token-based
+    const IMAGE_FUNCTIONS = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed'];
     for (const [funcName, funcData] of Object.entries(byFunc)) {
       log.debug(`   - ${funcName}: ${funcData.calls} calls, ${funcData.input_tokens} in, ${funcData.output_tokens} out, thinking: ${funcData.thinking_tokens || 0}`);
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
-        const cost = directCost > 0
-          ? directCost
-          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        let cost;
+        if (directCost > 0) {
+          cost = directCost;
+        } else if (IMAGE_FUNCTIONS.includes(funcName)) {
+          cost = calculateImageCost(model, funcData.calls);
+        } else {
+          cost = calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        }
         log.debug(`   >>> genLog.apiUsage('${funcName}', '${model}', {in: ${funcData.input_tokens}, out: ${funcData.output_tokens}}, cost: $${cost.toFixed(4)})`);
         genLog.apiUsage(funcName, model, {
           inputTokens: funcData.input_tokens,
@@ -9943,11 +9988,21 @@ async function processStoryJob(jobId) {
   };
 
   // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
+  // Note: gemini_image uses per-image pricing, not token pricing - see calculateImageCost
   const PROVIDER_PRICING = {
     anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
-    gemini_image: MODEL_PRICING['gemini-2.5-flash-image'] || { input: 0.30, output: 30.00 },
     gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
     gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
+  };
+
+  // Helper to calculate image generation cost (per-image pricing, not token-based)
+  const calculateImageCost = (modelId, imageCount) => {
+    const pricing = MODEL_PRICING[modelId];
+    if (pricing?.perImage) {
+      return pricing.perImage * imageCount;
+    }
+    // Fallback to default Gemini image pricing
+    return 0.04 * imageCount;
   };
 
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
@@ -11676,22 +11731,23 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     const totalOutputTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0);
     const totalThinkingTokens = Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + tokenUsage[k].thinking_tokens, 0);
     const anthropicCost = calculateCost('anthropic', tokenUsage.anthropic.input_tokens, tokenUsage.anthropic.output_tokens, tokenUsage.anthropic.thinking_tokens);
-    const geminiImageCost = calculateCost('gemini_image', tokenUsage.gemini_image.input_tokens, tokenUsage.gemini_image.output_tokens, tokenUsage.gemini_image.thinking_tokens);
     const geminiQualityCost = calculateCost('gemini_quality', tokenUsage.gemini_quality.input_tokens, tokenUsage.gemini_quality.output_tokens, tokenUsage.gemini_quality.thinking_tokens);
-    const totalCost = anthropicCost.total + geminiImageCost.total + geminiQualityCost.total;
+    // Calculate image costs using per-image pricing (not token-based)
+    const byFunc = tokenUsage.byFunction;
+    const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
+    const imageCost = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed']
+      .reduce((sum, fn) => sum + (byFunc[fn]?.calls > 0 ? calculateImageCost(getModels(byFunc[fn]), byFunc[fn].calls) : 0), 0);
+    const totalCost = anthropicCost.total + imageCost + geminiQualityCost.total;
     log.debug(`📊 [PIPELINE] Token usage & cost summary:`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY PROVIDER:`);
     const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` / ${tokenUsage.anthropic.thinking_tokens.toLocaleString().padStart(6)} think` : '';
-    const thinkingImageStr = tokenUsage.gemini_image.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_image.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr} (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out${thinkingImageStr} (${tokenUsage.gemini_image.calls} calls)  $${geminiImageCost.total.toFixed(4)}`);
+    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
     log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr} (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
-    const byFunc = tokenUsage.byFunction;
-    const getModels = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models).join(', ') : 'N/A';
     // Use first model for cost calculation (model-specific pricing), fall back to provider
     const getCostModel = (funcData) => funcData.models.size > 0 ? Array.from(funcData.models)[0] : funcData.provider;
     if (byFunc.outline.calls > 0) {
@@ -11707,16 +11763,18 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       log.debug(`   Story Text:    ${byFunc.story_text.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.story_text.output_tokens.toLocaleString().padStart(8)} out (${byFunc.story_text.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.story_text)}]`);
     }
     if (byFunc.cover_images.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.cover_images), byFunc.cover_images.input_tokens, byFunc.cover_images.output_tokens, byFunc.cover_images.thinking_tokens);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_images)}]`);
+      const model = getModels(byFunc.cover_images);
+      const cost = calculateImageCost(model, byFunc.cover_images.calls);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
       log.debug(`   Cover Quality: ${byFunc.cover_quality.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_quality.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_quality.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.cover_quality)}]`);
     }
     if (byFunc.page_images.calls > 0) {
-      const cost = calculateCost(getCostModel(byFunc.page_images), byFunc.page_images.input_tokens, byFunc.page_images.output_tokens, byFunc.page_images.thinking_tokens);
-      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.total.toFixed(4)}  [${getModels(byFunc.page_images)}]`);
+      const model = getModels(byFunc.page_images);
+      const cost = calculateImageCost(model, byFunc.page_images.calls);
+      log.debug(`   Page Images:   ${byFunc.page_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
@@ -11734,13 +11792,20 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
     // Log API usage to generationLog for dev mode visibility
     genLog.setStage('finalize');
+    // Image generation functions use per-image pricing, not token-based
+    const IMAGE_FUNCTIONS = ['cover_images', 'page_images', 'avatar_styled', 'avatar_costumed'];
     for (const [funcName, funcData] of Object.entries(byFunc)) {
       if (funcData.calls > 0) {
         const model = getModels(funcData);
         const directCost = funcData.direct_cost || 0;
-        const cost = directCost > 0
-          ? directCost
-          : calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        let cost;
+        if (directCost > 0) {
+          cost = directCost;
+        } else if (IMAGE_FUNCTIONS.includes(funcName)) {
+          cost = calculateImageCost(model, funcData.calls);
+        } else {
+          cost = calculateCost(getCostModel(funcData), funcData.input_tokens, funcData.output_tokens, funcData.thinking_tokens).total;
+        }
         genLog.apiUsage(funcName, model, {
           inputTokens: funcData.input_tokens,
           outputTokens: funcData.output_tokens,
