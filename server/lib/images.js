@@ -732,8 +732,8 @@ async function detectAllBoundingBoxes(imageData) {
       { text: prompt }
     ];
 
-    // Use gemini-2.0-flash for detection (good balance of speed and accuracy)
-    const modelId = 'gemini-2.0-flash';
+    // Use same model as quality evaluation for consistent spatial reasoning
+    const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await withRetry(async () => {
@@ -880,61 +880,154 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
     return { targets: [], detectionHistory };
   }
 
-  // Match issues to detected elements for repair targets
+  // Match issues to detected elements for repair targets using scored matching
   const enrichedTargets = [];
   const allElements = [
     ...allDetections.figures.map(f => ({ ...f, elementType: 'figure' })),
     ...allDetections.objects.map(o => ({ ...o, elementType: 'object', faceBox: null }))
   ];
 
-  for (const issue of fixableIssues) {
-    // Try to find matching element by position/description keywords
-    const issueDesc = issue.description.toLowerCase();
-    let matchedElement = null;
+  // Helper: extract meaningful keywords from text (4+ chars, not common words)
+  const commonWords = new Set(['with', 'that', 'this', 'from', 'have', 'been', 'were', 'being', 'their', 'there', 'which', 'would', 'could', 'should', 'about', 'figure', 'image', 'shown', 'visible']);
+  const extractKeywords = (text) => {
+    return (text || '').toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !commonWords.has(w));
+  };
 
-    // Simple matching by position keywords
+  // Helper: check for color matches
+  const colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white', 'brown', 'gray', 'grey', 'blonde', 'golden', 'silver'];
+  const extractColors = (text) => colors.filter(c => (text || '').toLowerCase().includes(c));
+
+  // Helper: check for position matches
+  const positions = ['left', 'right', 'center', 'middle', 'foreground', 'background'];
+  const extractPositions = (text) => positions.filter(p => (text || '').toLowerCase().includes(p));
+
+  for (const issue of fixableIssues) {
+    const issueDesc = (issue.description || '').toLowerCase();
+    const issueFix = (issue.fix || '').toLowerCase();
+    const issueKeywords = extractKeywords(issueDesc + ' ' + issueFix);
+    const issueColors = extractColors(issueDesc + ' ' + issueFix);
+    const issuePositions = extractPositions(issueDesc);
+
+    // Score each element for this issue
+    let bestMatch = null;
+    let bestScore = 0;
+
     for (const element of allElements) {
       const label = (element.label || '').toLowerCase();
       const position = (element.position || '').toLowerCase();
+      const elementKeywords = extractKeywords(label);
+      const elementColors = extractColors(label);
 
-      // Check if issue mentions this element's position or description
-      const positionMatch = position && issueDesc.includes(position);
-      const labelMatch = label.split(' ').some(word =>
-        word.length > 3 && issueDesc.includes(word)
-      );
+      let score = 0;
 
-      if (positionMatch || labelMatch) {
-        matchedElement = element;
-        break;
+      // Position match (strong signal): +30 points
+      if (position && issuePositions.includes(position)) {
+        score += 30;
       }
-    }
 
-    // Fallback: use first figure for character issues, first object for object issues
-    if (!matchedElement) {
+      // Keyword overlap: +10 per matching keyword
+      for (const keyword of issueKeywords) {
+        if (elementKeywords.includes(keyword) || label.includes(keyword)) {
+          score += 10;
+        }
+      }
+
+      // Color match: +15 per matching color
+      for (const color of issueColors) {
+        if (elementColors.includes(color)) {
+          score += 15;
+        }
+      }
+
+      // Issue type affinity: prefer figures for character issues, objects for object issues
       if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
-        matchedElement = allDetections.figures[0];
+        if (element.elementType === 'figure') score += 5;
       } else if (issue.type === 'object') {
-        matchedElement = allDetections.objects[0] || allDetections.figures[0];
-      } else {
-        matchedElement = allDetections.figures[0] || allDetections.objects[0];
+        if (element.elementType === 'object') score += 10;
+      }
+
+      // Character-related keywords in issue boost figure matches
+      const characterKeywords = ['character', 'person', 'boy', 'girl', 'man', 'woman', 'child', 'kid', 'face', 'hand', 'arm', 'leg', 'hair', 'clothes', 'wearing'];
+      if (characterKeywords.some(k => issueDesc.includes(k)) && element.elementType === 'figure') {
+        score += 8;
+      }
+
+      // Object-related keywords boost object matches
+      const objectKeywords = ['object', 'item', 'thing', 'toy', 'ball', 'sword', 'book', 'bag', 'bicycle', 'car', 'tree', 'flower', 'animal', 'dog', 'cat'];
+      if (objectKeywords.some(k => issueDesc.includes(k)) && element.elementType === 'object') {
+        score += 8;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = element;
       }
     }
 
-    if (matchedElement) {
+    // Fallback with smarter logic if no good match found
+    if (!bestMatch || bestScore < 5) {
+      log.debug(`📦 [BBOX-ENRICH] Low match score (${bestScore}), using fallback for: "${issue.description.substring(0, 40)}..."`);
+
+      // For character-related issues, prefer figures with visible faces
+      if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
+        // Prefer figure with face visible (for face issues) or largest body (for clothing/hand)
+        const figuresWithFace = allDetections.figures.filter(f => f.faceBox);
+        if (issue.type === 'face' && figuresWithFace.length > 0) {
+          bestMatch = figuresWithFace[0];
+        } else if (allDetections.figures.length > 0) {
+          // Use figure with largest body box (more prominent character)
+          bestMatch = allDetections.figures.reduce((largest, fig) => {
+            const getArea = (box) => box ? (box[2] - box[0]) * (box[3] - box[1]) : 0;
+            return getArea(fig.bodyBox) > getArea(largest?.bodyBox) ? fig : largest;
+          }, allDetections.figures[0]);
+        }
+      } else if (issue.type === 'object') {
+        // For object issues, use largest object or fall back to figure
+        if (allDetections.objects.length > 0) {
+          bestMatch = allDetections.objects.reduce((largest, obj) => {
+            const getArea = (box) => box ? (box[2] - box[0]) * (box[3] - box[1]) : 0;
+            return getArea(obj.bodyBox) > getArea(largest?.bodyBox) ? obj : largest;
+          }, allDetections.objects[0]);
+        } else {
+          bestMatch = allDetections.figures[0];
+        }
+      } else {
+        // Generic fallback: largest element in scene
+        const allWithArea = allElements.map(e => ({
+          element: e,
+          area: e.bodyBox ? (e.bodyBox[2] - e.bodyBox[0]) * (e.bodyBox[3] - e.bodyBox[1]) : 0
+        }));
+        allWithArea.sort((a, b) => b.area - a.area);
+        bestMatch = allWithArea[0]?.element;
+      }
+    }
+
+    if (bestMatch) {
+      // Choose appropriate box based on issue type
+      let boundingBox = bestMatch.bodyBox || bestMatch.faceBox;
+      if (issue.type === 'face' && bestMatch.faceBox) {
+        boundingBox = bestMatch.faceBox;  // Use face box for face issues
+      }
+
       enrichedTargets.push({
-        faceBox: matchedElement.faceBox,
-        bodyBox: matchedElement.bodyBox,
-        boundingBox: matchedElement.bodyBox || matchedElement.faceBox,
+        faceBox: bestMatch.faceBox,
+        bodyBox: bestMatch.bodyBox,
+        boundingBox: boundingBox,
         issue: issue.description,
         severity: issue.severity,
         type: issue.type,
         fixPrompt: issue.fix || `Fix: ${issue.description}`,
-        label: matchedElement.label,
-        matchedPosition: matchedElement.position
+        label: bestMatch.label,
+        matchedPosition: bestMatch.position,
+        matchScore: bestScore,
+        matchMethod: bestScore >= 5 ? 'scored' : 'fallback'
       });
-      log.debug(`📦 [BBOX-ENRICH] Matched issue "${issue.description.substring(0, 30)}..." to "${matchedElement.label}"`);
+      log.debug(`📦 [BBOX-ENRICH] Matched (score=${bestScore}, ${bestScore >= 5 ? 'scored' : 'fallback'}): "${issue.description.substring(0, 30)}..." → "${bestMatch.label}"`);
     } else {
-      log.warn(`⚠️  [BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
+      log.warn(`⚠️  [BBOX-ENRICH] Could not match issue (no elements detected): ${issue.description.substring(0, 50)}...`);
     }
   }
 
