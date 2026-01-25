@@ -209,18 +209,43 @@ For EACH of the {PAGES} pages:
 
 
 ---CRITICAL ANALYSIS---
-Analyze the draft above. Be harsh and critical.
+Analyze the draft above. Be harsh and critical - pretend you are editing someone else's work.
 
-**Check for:**
-1. **Logic errors** - Timeline issues, physical impossibilities, character motivation problems
-2. **Reading level** - Is word count appropriate? Too simple or complex?
-3. **Scene hints** - Max 3 characters? Positions specified? Weather consistent?
-4. **Banned gestures** - Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely"? REMOVE.
-5. **Repeated gestures** - Same gesture used twice? Vary them.
-6. **Clothing** - Categories match the scene (winter for cold outdoor, costumed for costume scenes)?
+**A. NARRATIVE & PLOT:**
+1. **Plot holes** - Are there any logical gaps? Events that don't make sense? Missing explanations?
+2. **Cause and effect** - Does each event follow naturally from the previous? Or do things happen "just because"?
+3. **Pacing** - Is Act 1 (setup) too long? Is the climax rushed? Is the ending earned or abrupt?
+4. **Stakes** - Is it clear what the characters stand to gain/lose? Does the reader care?
+5. **Resolution** - Is the ending satisfying? Does it feel complete, not just stopped?
 
-**Fixes:**
-For each issue, write how you will fix it in the final version.
+**B. CHARACTER & DIALOGUE:**
+6. **Character consistency** - Do characters act according to their established traits? Any out-of-character moments?
+7. **Character voice** - Does each character speak differently? Or do they all sound the same?
+8. **Show vs tell** - Are emotions SHOWN through actions/dialogue? Or just TOLD ("He felt sad")?
+9. **Motivation** - Is it clear WHY characters do what they do? Any unmotivated actions?
+10. **Growth** - Does the main character learn/change? Is the arc believable?
+
+**C. PROSE QUALITY:**
+11. **Reading level** - Is word count appropriate? Vocabulary too simple or complex for target?
+12. **Repetition** - Same words/phrases used too often? Same sentence structures?
+13. **Flow** - Do sentences read smoothly? Any awkward phrasing?
+14. **Passive voice** - Too much "was done" instead of "did"? Make it active.
+
+**D. SCENE HINTS REVIEW:**
+15. **MAX 3 CHARACTERS** - Check EACH page: more than 3 in scene hint? Pick the 3 most important.
+    - Background characters can be in text but scene hint focuses on max 3
+16. **Positions** - Does EACH scene hint specify left/right/center for all characters?
+17. **Clothing** - Categories match scene (winter for cold outdoor, costumed for costume scenes)?
+18. **Setting/Weather** - Is weather consistent across outdoor scenes? Time progresses logically?
+
+**E. CLICHÉ CHECK:**
+19. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". FORBIDDEN. Replace with: fist-bump, high-five, thumbs up, playful elbow nudge.
+20. **Repeated gestures** - Same gesture (hug, smile, wink) used twice? Vary them.
+21. **Cliché phrases** - Any "little did they know", "it was a dark and stormy night", "suddenly"? Remove.
+
+**FIXES REQUIRED:**
+For EACH issue found above, write the page number and exactly how you will fix it:
+- Page X: [specific issue] → [specific fix]
 
 
 ---TITLE---
