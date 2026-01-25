@@ -26,26 +26,45 @@ const CACHE_TTL_MS = parseInt(process.env.IMAGE_CACHE_TTL_MS) || 60 * 60 * 1000;
  * Evicts least recently used entries when max size is reached
  */
 class LRUCache {
-  constructor(maxSize, ttlMs = 0) {
+  constructor(maxSize, ttlMs = 0, name = 'cache') {
     this.maxSize = maxSize;
     this.ttlMs = ttlMs;
     this.cache = new Map();
+    this.name = name;
+    this.hits = 0;
+    this.misses = 0;
   }
 
   get(key) {
     const entry = this.cache.get(key);
-    if (!entry) return undefined;
+    if (!entry) {
+      this.misses++;
+      return undefined;
+    }
 
     // Check TTL expiration
     if (this.ttlMs > 0 && Date.now() - entry.timestamp > this.ttlMs) {
       this.cache.delete(key);
+      this.misses++;
       return undefined;
     }
 
     // Move to end (most recently used)
     this.cache.delete(key);
     this.cache.set(key, { value: entry.value, timestamp: entry.timestamp });
+    this.hits++;
     return entry.value;
+  }
+
+  getStats() {
+    const total = this.hits + this.misses;
+    const hitRate = total > 0 ? ((this.hits / total) * 100).toFixed(1) : 0;
+    return { hits: this.hits, misses: this.misses, total, hitRate, size: this.cache.size };
+  }
+
+  resetStats() {
+    this.hits = 0;
+    this.misses = 0;
   }
 
   set(key, value) {
@@ -82,10 +101,10 @@ class LRUCache {
 }
 
 // Image cache to avoid regenerating identical images (with LRU eviction)
-const imageCache = new LRUCache(IMAGE_CACHE_MAX_SIZE, CACHE_TTL_MS);
+const imageCache = new LRUCache(IMAGE_CACHE_MAX_SIZE, CACHE_TTL_MS, 'image');
 
 // Cache for compressed reference images (with LRU eviction)
-const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS);
+const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS, 'ref');
 
 // Quality threshold from environment or default
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
@@ -2146,6 +2165,38 @@ function getImageCacheSize() {
   return imageCache.size;
 }
 
+/**
+ * Get cache statistics for logging
+ * @returns {{image: Object, ref: Object}} Stats for both caches
+ */
+function getCacheStats() {
+  return {
+    image: imageCache.getStats(),
+    ref: compressedRefCache.getStats()
+  };
+}
+
+/**
+ * Log cache efficiency summary
+ */
+function logCacheSummary() {
+  const stats = getCacheStats();
+  if (stats.image.total > 0) {
+    log.info(`📊 [CACHE] Image cache: ${stats.image.hits} hits, ${stats.image.misses} misses (${stats.image.hitRate}% hit rate)`);
+  }
+  if (stats.ref.total > 0) {
+    log.info(`📊 [CACHE] Ref cache: ${stats.ref.hits} hits, ${stats.ref.misses} misses (${stats.ref.hitRate}% hit rate)`);
+  }
+}
+
+/**
+ * Reset cache statistics (call at start of story generation)
+ */
+function resetCacheStats() {
+  imageCache.resetStats();
+  compressedRefCache.resetStats();
+}
+
 // ============================================
 // AUTO-REPAIR (INPAINTING) FUNCTIONS
 // ============================================
@@ -4186,6 +4237,9 @@ module.exports = {
   clearImageCache,
   deleteFromImageCache,
   getImageCacheSize,
+  getCacheStats,
+  logCacheSummary,
+  resetCacheStats,
 
   // Auto-repair functions
   inspectImageForErrors,

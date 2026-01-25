@@ -318,19 +318,18 @@ async function enrichLandmarksWithCategories(landmarks) {
     byLang.get(landmark.lang).push(landmark);
   }
 
-  log.info(`[LANDMARK-CAT] Enriching ${landmarks.length} landmarks (${skippedCount} skipped, no pageId/lang)`);
-  log.debug(`[LANDMARK-CAT] Languages: ${Array.from(byLang.keys()).join(', ')}`);
+  log.debug(`[LANDMARK-CAT] Enriching ${landmarks.length} landmarks (${skippedCount} skipped, no pageId/lang)`);
 
-  // Log first few landmarks with their pageIds for debugging
-  const sampleLandmarks = landmarks.filter(l => l.pageId).slice(0, 5);
-  log.debug(`[LANDMARK-CAT] Sample landmarks: ${sampleLandmarks.map(l => `${l.name}(${l.pageId})`).join(', ')}`);
+  // Track enrichment results for summary
+  let typedCount = 0;
+  let highBoostCount = 0;
+  let medBoostCount = 0;
+  let noCategoriesCount = 0;
 
   // Fetch categories per language in parallel
   await Promise.all(Array.from(byLang.entries()).map(async ([lang, langLandmarks]) => {
     const pageIds = langLandmarks.map(l => l.pageId);
-    log.debug(`[LANDMARK-CAT] Fetching ${pageIds.length} categories from ${lang}.wikipedia (pageIds: ${pageIds.slice(0, 5).join(',')})`);
     const categoryMap = await fetchWikipediaCategories(lang, pageIds);
-    log.debug(`[LANDMARK-CAT] Got ${categoryMap.size} category results from ${lang}.wikipedia`);
 
     for (const landmark of langLandmarks) {
       const categories = categoryMap.get(landmark.pageId) || [];
@@ -339,20 +338,19 @@ async function enrichLandmarksWithCategories(landmarks) {
       landmark.type = type;
       landmark.boostAmount = boostAmount;
 
-      // Log ALL landmarks with their categories to debug why types aren't being extracted
-      if (categories.length > 0) {
-        log.debug(`[LANDMARK-CAT] "${landmark.name}" (pageId=${landmark.pageId}) categories: ${categories.slice(0, 5).join(', ')}${categories.length > 5 ? '...' : ''}`);
-        if (type) {
-          const boostLabel = boostAmount === 100 ? '🏆+100' : (boostAmount === 50 ? '⭐+50' : '');
-          log.info(`[LANDMARK-CAT] ✓ "${landmark.name}" → ${type} ${boostLabel}`);
-        } else {
-          log.debug(`[LANDMARK-CAT] ✗ "${landmark.name}" → NO TYPE MATCH`);
-        }
-      } else {
-        log.debug(`[LANDMARK-CAT] ✗ "${landmark.name}" (pageId=${landmark.pageId}) → NO CATEGORIES RETURNED`);
+      // Track stats for summary
+      if (categories.length === 0) {
+        noCategoriesCount++;
+      } else if (type) {
+        typedCount++;
+        if (boostAmount === 100) highBoostCount++;
+        else if (boostAmount === 50) medBoostCount++;
       }
     }
   }));
+
+  // Log summary instead of individual results
+  log.info(`[LANDMARK-CAT] Enriched ${landmarks.length} landmarks: ${typedCount} typed, ${highBoostCount} high-boost, ${medBoostCount} med-boost, ${noCategoriesCount} no-categories`);
 }
 
 /**
@@ -736,9 +734,6 @@ async function downloadAsBase64(imageUrl) {
     else if (contentType.includes('webp')) mimeType = 'image/webp';
     else if (contentType.includes('gif')) mimeType = 'image/gif';
 
-    const sizeKB = Math.round(base64.length * 0.75 / 1024);
-    log.debug(`[LANDMARK] Downloaded ${sizeKB}KB image`);
-
     return `data:${mimeType};base64,${base64}`;
   } catch (err) {
     log.error(`[LANDMARK] Download error:`, err.message);
@@ -804,7 +799,6 @@ async function fetchLandmarkPhoto(landmarkQuery, pageId = null, lang = null) {
     // Compress to reasonable size for API (768px max, 80% quality)
     const photoData = await compressImageToJPEG(rawPhotoData, 80, 768);
     const compressedSizeKB = Math.round(photoData.length * 0.75 / 1024);
-    log.debug(`[LANDMARK] Compressed to ${compressedSizeKB}KB`);
 
     const photoResult = {
       photoUrl: result.url,
@@ -1550,16 +1544,23 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
       const data = await res.json();
 
       const langCandidates = [];
+      let skippedCount = 0;  // Track filtered candidates for summary log
+      const totalItems = data.query?.geosearch?.length || 0;
+
       for (const item of data.query?.geosearch || []) {
         const name = item.title;
 
         // Skip if matches exclude pattern
         if (excludeRegex && excludeRegex.test(name)) {
+          skippedCount++;
           continue;
         }
 
         // Skip generic Wikipedia articles
-        if (/^(List of|Category:|Template:|Wikipedia:|Liste |Kategorie:)/i.test(name)) continue;
+        if (/^(List of|Category:|Template:|Wikipedia:|Liste |Kategorie:)/i.test(name)) {
+          skippedCount++;
+          continue;
+        }
 
         // Check if name contains landmark indicators (buildings, structures, natural features)
         // Use language-appropriate patterns
@@ -1573,31 +1574,33 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
 
         // Skip administrative divisions (not actual landmarks)
         if (/^(Canton of|County of|District of|Municipality of|Province of|Region of|Department of|Kanton |Bezirk |Gemeinde |Canton de|Département)/i.test(name)) {
+          skippedCount++;
           continue;
         }
 
         // Skip Swiss city articles (e.g., "Baden AG", "Zürich ZH")
         if (/^[A-ZÄÖÜ][a-zäöü]+\s+(AG|ZH|BE|LU|SG|BL|BS|SO|TG|GR|VS|NE|GE|VD|TI|FR|JU|SH|AR|AI|OW|NW|GL|ZG|SZ|UR)$/i.test(name)) {
-          log.debug(`[LANDMARK] Skipping Swiss city article: "${name}"`);
+          skippedCount++;
           continue;
         }
 
         // Skip entries that are just city/municipality names (end with ", Country/Region")
         // BUT keep them if they have landmark indicators (e.g., "Stein Castle, Aargau")
         if (!hasLandmarkIndicator && /,\s*(Switzerland|Germany|Austria|France|Italy|Aargau|Canton|Zurich|Bern|Basel|Schweiz|Deutschland|Österreich|Frankreich|Italien)$/i.test(name)) {
+          skippedCount++;
           continue;
         }
 
         // Skip pure municipality names - short names without descriptive words
         const wordCount = name.split(/[\s\-]+/).length;
         if (wordCount <= 2 && !hasLandmarkIndicator) {
-          log.debug(`[LANDMARK] Skipping short non-landmark: "${name}"`);
+          skippedCount++;
           continue;
         }
 
         // Skip single-word names that look like place names (capitalized, no indicator)
         if (wordCount === 1 && /^[A-ZÄÖÜ][a-zäöüß]+$/.test(name) && !hasLandmarkIndicator) {
-          log.debug(`[LANDMARK] Skipping single-word place name: "${name}"`);
+          skippedCount++;
           continue;
         }
 
@@ -1624,7 +1627,7 @@ async function searchWikipediaLandmarks(lat, lon, radiusMeters = 10000, excludeP
         }
       }
 
-      log.debug(`[LANDMARK] Wikipedia (${lang}) found ${langCandidates.length} candidates`);
+      log.debug(`[LANDMARK] Wikipedia (${lang}): ${langCandidates.length} candidates from ${totalItems} results (filtered ${skippedCount} non-landmarks)`);
     } catch (err) {
       log.error(`[LANDMARK] Wikipedia (${lang}) geosearch error:`, err.message);
     }
