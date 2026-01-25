@@ -1030,7 +1030,7 @@ async function analyzeImageQuality(imageUrl, landmarkName, expectedLocation = nu
 
 Rate each criterion 1-10:
 1. PHOTO_QUALITY: Is it a clear, well-lit photograph? (not blurry, not too dark)
-2. IS_LANDMARK_PHOTO: Does it show a building, monument, or natural landmark? (not a map, diagram, logo, portrait, or text)
+2. IS_LANDMARK_PHOTO: Does it show a building, monument, or natural landmark? (not a map, diagram, logo, portrait, text, information sign, plaque, or commemorative board)
 3. VISUAL_INTEREST: Would it be interesting/recognizable in a children's book?
 4. COMPOSITION: Is the main subject clearly visible and well-framed?${locationCheck}
 
@@ -1253,8 +1253,11 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     .filter(img => img.isExterior !== false)  // Include if exterior or unknown
     .sort((a, b) => b.score - a.score);
 
+  // Exclude information signs, plaques, maps from interior candidates
+  const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
+
   const interiorCandidates = allGoodImages
-    .filter(img => img.isExterior === false && img.isActualPhoto !== false)  // Only actual photos of interiors (not paintings/artwork)
+    .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description))
     .sort((a, b) => b.score - a.score);
 
   // Select up to 3 diverse images for each type (async for AI checks)
