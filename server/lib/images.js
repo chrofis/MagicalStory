@@ -1948,18 +1948,19 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     let bboxDetectionHistory = null;  // Track two-stage detection for dev mode display
     let enrichedFixTargets = null;
 
-    // ALWAYS run two-stage detection when fixable issues exist (for dev mode visibility)
-    // This runs regardless of incrEnabled or autoRepair settings
-    if (result.fixableIssues && result.fixableIssues.length > 0) {
-      log.info(`📦 [QUALITY RETRY] ${pageLabel}Two-stage detection: enriching ${result.fixableIssues.length} fixable issues with bounding boxes...`);
-      const enrichResult = await enrichWithBoundingBoxes(result.imageData, result.fixableIssues);
-      bboxDetectionHistory = enrichResult.detectionHistory;
-      enrichedFixTargets = enrichResult.targets;
-      if (enrichResult.targets && enrichResult.targets.length > 0) {
-        log.info(`✅ [QUALITY RETRY] ${pageLabel}Two-stage detection complete: ${enrichResult.targets.length} targets with bounding boxes`);
-      } else {
-        log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Two-stage detection found no targets with bounding boxes`);
-      }
+    // ALWAYS run bbox detection for every image (figure locations needed for other features)
+    // This runs regardless of whether issues were found, incrEnabled, or autoRepair settings
+    const fixableIssues = result.fixableIssues || [];
+    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}...`);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues);
+    bboxDetectionHistory = enrichResult.detectionHistory;
+    enrichedFixTargets = enrichResult.targets;
+    if (bboxDetectionHistory) {
+      const figCount = bboxDetectionHistory.figures?.length || 0;
+      const objCount = bboxDetectionHistory.objects?.length || 0;
+      log.info(`✅ [QUALITY RETRY] ${pageLabel}Bbox detection complete: ${figCount} figures, ${objCount} objects${enrichedFixTargets.length > 0 ? `, ${enrichedFixTargets.length} fix targets` : ''}`);
+    } else {
+      log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Bbox detection failed`);
     }
 
     if (incrEnabled && unifiedReport && !incrConfig.dryRun) {
