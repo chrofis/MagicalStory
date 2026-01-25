@@ -2203,13 +2203,15 @@ ${adventureGuideContent}`
         .map(l => {
           let entry = `- ${l.name}`;
           if (l.type) entry += ` (${l.type})`;
-          if (l.photoDescription) entry += `: ${l.photoDescription}`;
+          // Prefer Wikipedia extract (what landmark IS) over photo description (what photo shows)
+          const description = l.wikipediaExtract || l.photoDescription;
+          if (description) entry += `: ${description}`;
           return entry;
         })
         .join('\n');
       availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
 ${landmarkEntries}`;
-      const withDesc = availableLandmarks.filter(l => l.photoDescription).length;
+      const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
       log.info(`[LANDMARK] ⚠️ No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
@@ -2512,13 +2514,15 @@ ${adventureGuideContent}`
         .map(l => {
           let entry = `- ${l.name}`;
           if (l.type) entry += ` (${l.type})`;
-          if (l.photoDescription) entry += `: ${l.photoDescription}`;
+          // Prefer Wikipedia extract (what landmark IS) over photo description (what photo shows)
+          const description = l.wikipediaExtract || l.photoDescription;
+          if (description) entry += `: ${description}`;
           return entry;
         })
         .join('\n');
       availableLandmarksSection = `**AVAILABLE LOCAL LANDMARKS** (use 1-2 of these in Story 1 to make it feel personal):
 ${landmarkEntries}`;
-      const withDesc = availableLandmarks.filter(l => l.photoDescription).length;
+      const withDesc = availableLandmarks.filter(l => l.wikipediaExtract || l.photoDescription).length;
       log.info(`[LANDMARK] ✅ [STREAM] Including ${availableLandmarks.length} landmarks in ideas prompt (${withDesc} with descriptions): ${availableLandmarks.slice(0, 3).map(l => l.name).join(', ')}...`);
     } else {
       log.info(`[LANDMARK] ⚠️ [STREAM] No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
