@@ -2183,19 +2183,6 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     previousScenesText += '\n';
   }
 
-  // Format per-character clothing for prompt
-  let characterClothingText = '';
-  if (characterClothing && typeof characterClothing === 'object' && Object.keys(characterClothing).length > 0) {
-    characterClothingText = Object.entries(characterClothing)
-      .map(([name, category]) => `- ${name}: ${category}`)
-      .join('\n');
-  } else if (typeof characterClothing === 'string') {
-    // Legacy format: single clothing for all
-    characterClothingText = `All characters: ${characterClothing}`;
-  } else {
-    characterClothingText = 'All characters: standard';
-  }
-
   // Extract scene context (characters, setting, time, weather) from scene hint
   let sceneContextText = '';
   const sceneMetadata = parseSceneHintMetadata(shortSceneDesc);
@@ -2233,7 +2220,6 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       PAGE_CONTENT: pageContent,
       CHARACTERS: characterDetails,
       RECURRING_ELEMENTS: recurringElements,
-      CHARACTER_CLOTHING: characterClothingText,
       AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,

@@ -137,17 +137,13 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 **Story Text:**
 {PAGE_CONTENT}
 
-**Character Clothing (recommendation from outline):**
-{CHARACTER_CLOTHING}
-
 **Available Avatars (YOU MUST SELECT FROM THESE):**
 {AVAILABLE_AVATARS}
 
 IMPORTANT CLOTHING RULES:
-- Select clothing for each character ONLY from their available avatars above
-- If recommended clothing doesn't exist for a character, use "standard" instead
-- Characters not mentioned in recommendation should use "standard"
+- Select clothing for each character ONLY from their available avatars listed above
 - Never assign a costume that isn't in the character's available list
+- If in doubt, use "standard"
 
 **Main Characters:**
 {CHARACTERS}
