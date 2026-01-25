@@ -3913,7 +3913,7 @@ export default function StoryWizard() {
                 setPages(30);
                 setDedication('');
                 setStoryDetails('');
-                setExcludedCharacters([]);
+                // Reset main characters but keep excluded characters (user preference)
                 setMainCharacters([]);
 
                 // Clear localStorage for story settings
@@ -3927,7 +3927,7 @@ export default function StoryWizard() {
                 localStorage.removeItem('story_dedication');
                 localStorage.removeItem('story_details');
                 localStorage.removeItem('story_main_characters');
-                localStorage.removeItem('story_excluded_characters');
+                // Keep story_excluded_characters - user preference persists
                 localStorage.removeItem('wizard_step');
                 localStorage.removeItem('verificationGenerationStarted');
 
