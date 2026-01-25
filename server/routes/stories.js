@@ -408,8 +408,20 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
 
     const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
+    // Extract CRITICAL ANALYSIS from outline (if present)
+    let criticalAnalysis = null;
+    if (story.outline) {
+      const analysisMatch = story.outline.match(/---CRITICAL ANALYSIS---\s*\n([\s\S]*?)(?=\n---TITLE---|$)/);
+      if (analysisMatch) {
+        criticalAnalysis = analysisMatch[1].trim();
+      }
+    }
+
     // Extract only dev-relevant fields (no image data, no characters)
     const devMetadata = {
+      // Story outline review data
+      criticalAnalysis,
+      originalStory: story.originalStory || null,
       // Scene images dev data
       sceneImages: story.sceneImages?.map(img => ({
         pageNumber: img.pageNumber,

@@ -1,7 +1,50 @@
-const { Pool } = require('pg');
+#!/usr/bin/env node
+/**
+ * Story Outline Review - Analyze CRITICAL ANALYSIS findings
+ *
+ * Usage:
+ *   node scripts/compare-story-draft.js [storyId]
+ *
+ * If storyId is provided, fetches from API (requires server running)
+ * Otherwise, fetches latest story from database directly
+ */
 
-async function main() {
+const https = require('https');
+const http = require('http');
+
+// Parse command line args
+const storyId = process.argv[2];
+const apiBase = process.env.API_BASE || 'http://localhost:3000';
+
+async function fetchFromApi(storyId) {
+  return new Promise((resolve, reject) => {
+    const url = `${apiBase}/api/stories/${storyId}/dev-metadata`;
+    const client = url.startsWith('https') ? https : http;
+
+    // Note: This requires authentication in production
+    // For local dev, you may need to temporarily disable auth or use a token
+    const req = client.get(url, (res) => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        if (res.statusCode === 200) {
+          resolve(JSON.parse(data));
+        } else {
+          reject(new Error(`API returned ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+    req.on('error', reject);
+  });
+}
+
+async function fetchFromDatabase() {
+  const { Pool } = require('pg');
   const dbUrl = process.env.DATABASE_PUBLIC_URL || process.env.DATABASE_URL;
+
+  if (!dbUrl) {
+    throw new Error('No database URL. Set DATABASE_PUBLIC_URL or DATABASE_URL');
+  }
 
   const pool = new Pool({
     connectionString: dbUrl,
@@ -9,8 +52,6 @@ async function main() {
   });
 
   try {
-    console.log('Fetching latest story...\n');
-
     const result = await pool.query(`
       SELECT
         id,
@@ -21,177 +62,92 @@ async function main() {
       ORDER BY created_at DESC LIMIT 1
     `);
 
-    const { outline, story, title, id } = result.rows[0] || {};
+    const row = result.rows[0];
+    if (!row) return null;
 
-    if (!outline || !story) {
-      console.log('No story data found');
-      return;
-    }
-
-    console.log(`Story: ${title || 'Untitled'}`);
-    console.log(`ID: ${id}\n`);
-    console.log('='.repeat(80));
-
-    const outlineStr = typeof outline === 'string' ? outline : String(outline);
-    const storyStr = typeof story === 'string' ? story : String(story);
-
-    // =========================================================================
-    // SECTION 1: EXTRACT AND DISPLAY CRITICAL ANALYSIS
-    // =========================================================================
-
-    const analysisMatch = outlineStr.match(/---CRITICAL ANALYSIS---\s*\n([\s\S]*?)(?=\n---TITLE---|$)/);
-
-    if (!analysisMatch) {
-      console.log('\n❌ No CRITICAL ANALYSIS section found');
-    } else {
-      console.log('\n# CRITICAL ANALYSIS FINDINGS\n');
-
-      const analysisText = analysisMatch[1];
-
-      // Parse all issues mentioned with page numbers
-      const issues = [];
-
-      // Pattern 1: "Seite X: ..." or "Seite X hat ..." or "Page X: ..."
-      const pageIssuePattern = /(?:Seite|Page)\s*(\d+)(?:\s*hat|\s*:)?\s*["„]?([^""\n]+)[""]?/gi;
-      let match;
-      while ((match = pageIssuePattern.exec(analysisText)) !== null) {
-        issues.push({
-          page: parseInt(match[1]),
-          issue: match[2].trim(),
-          type: 'page-specific'
-        });
-      }
-
-      // Pattern 2: "Seiten X und Y" (multiple pages)
-      const multiPagePattern = /(?:Seiten|Pages)\s*(\d+)\s*(?:und|and|,)\s*(\d+)[^-\n]*[-–]\s*([^\n]+)/gi;
-      while ((match = multiPagePattern.exec(analysisText)) !== null) {
-        issues.push({
-          page: `${match[1]}, ${match[2]}`,
-          issue: match[3].trim(),
-          type: 'multi-page'
-        });
-      }
-
-      // Extract fixes section
-      const fixesMatch = analysisText.match(/\*\*Fixes:?\*\*:?\s*\n([\s\S]*?)$/i);
-      const fixes = [];
-      if (fixesMatch) {
-        // Parse numbered fixes: "1. Seite X: before → after"
-        const fixPattern = /\d+\.\s*(?:Seite|Page)\s*(\d+):\s*["„]?([^"„→\n]+)[""]?\s*→\s*(.+)/gi;
-        while ((match = fixPattern.exec(fixesMatch[1])) !== null) {
-          fixes.push({
-            page: parseInt(match[1]),
-            before: match[2].trim(),
-            after: match[3].trim()
-          });
-        }
-      }
-
-      // Display all issues found
-      console.log('## Issues Identified:\n');
-
-      // Group by category from analysis
-      const categories = {
-        'Logic': /logic|timeline|motivation|physik/i,
-        'Reading Level': /reading|wortzahl|vokabular/i,
-        'Scene Hints': /scene|szene|charaktere|position|wetter|weather/i,
-        'Banned Gestures': /banned|hand.*shoulder|schulter|ruffled|hair|patted|back/i,
-        'Repeated Gestures': /repeated|wiederh|umarmung|nicken/i,
-        'Clothing': /clothing|kleidung|standard|winter|costumed/i,
-        'Show vs Tell': /show.*tell|trait|zeigen/i
-      };
-
-      // Extract category sections
-      const sectionPattern = /\d+\.\s*\*\*([^*]+)\*\*\s*\n([\s\S]*?)(?=\n\d+\.\s*\*\*|\*\*Fixes|\n---|\n$)/gi;
-      while ((match = sectionPattern.exec(analysisText)) !== null) {
-        const category = match[1].trim();
-        const content = match[2].trim();
-
-        // Check if this section has issues (not all ✓)
-        const hasIssue = !content.split('\n').every(line =>
-          line.includes('✓') || line.includes('✔') || line.trim() === ''
-        );
-
-        const status = hasIssue ? '⚠️' : '✅';
-        console.log(`${status} **${category}**`);
-
-        // Show details for sections with issues
-        if (hasIssue) {
-          const lines = content.split('\n').filter(l => l.trim());
-          for (const line of lines) {
-            const isOk = line.includes('✓') || line.includes('✔');
-            if (!isOk) {
-              console.log(`   ${line.trim()}`);
-            }
-          }
-        }
-        console.log();
-      }
-
-      // =========================================================================
-      // SECTION 2: SHOW FIXES WITH BEFORE/AFTER
-      // =========================================================================
-
-      if (fixes.length > 0) {
-        console.log('\n## Fixes Applied:\n');
-
-        for (const fix of fixes) {
-          console.log(`### Page ${fix.page}`);
-          console.log();
-          console.log(`**Before:** "${fix.before}"`);
-          console.log(`**After:**  "${fix.after}"`);
-
-          // Check if fix was applied in final story
-          const pagePattern = new RegExp(`--- Page ${fix.page} ---\\s*\\n([\\s\\S]*?)(?=--- Page \\d+ ---|$)`, 'i');
-          const pageMatch = storyStr.match(pagePattern);
-          if (pageMatch) {
-            const pageText = pageMatch[1].toLowerCase();
-            // Check if the problematic phrase still exists
-            // Extract the key problematic words (exclude common words like "Sophie", "sagte")
-            const commonWords = ['sophie', 'lukas', 'manuel', 'franziska', 'roger', 'sagte', 'fragte', 'rief'];
-            const beforeLower = fix.before.toLowerCase();
-
-            // Check for specific banned patterns in the before text
-            const bannedInBefore = [
-              /hand.*schulter/, /arm.*um/, /umarmte/, /wuschelte.*haar/,
-              /klopfte.*rücken/, /nickte.*wissend/, /praktisch/
-            ].some(p => p.test(beforeLower));
-
-            let isFixed = true;
-            if (bannedInBefore) {
-              // Check if the banned pattern exists in final
-              isFixed = ![
-                /hand.*schulter/, /arm.*um.*schulter/, /umarmte.*kurz/,
-                /wuschelte.*haar/, /klopfte.*rücken/, /nickte.*wissend/,
-                /sagte.*praktisch/
-              ].some(p => p.test(pageText));
-            }
-
-            if (isFixed) {
-              console.log(`**Status:** ✅ Fixed in final`);
-            } else {
-              console.log(`**Status:** ❌ Not fixed - problematic phrase still exists`);
-            }
-
-            // Show relevant excerpt from final
-            console.log(`**Final text excerpt:**`);
-            // Try to find context around where the fix should be
-            const excerpt = pageText.substring(0, 300);
-            console.log(`   "${excerpt}${pageText.length > 300 ? '...' : ''}"`);
-          }
-          console.log();
-          console.log('-'.repeat(60));
-          console.log();
-        }
+    // Extract CRITICAL ANALYSIS from outline
+    let criticalAnalysis = null;
+    if (row.outline) {
+      const analysisMatch = row.outline.match(/---CRITICAL ANALYSIS---\s*\n([\s\S]*?)(?=\n---TITLE---|$)/);
+      if (analysisMatch) {
+        criticalAnalysis = analysisMatch[1].trim();
       }
     }
 
-    // =========================================================================
-    // SECTION 3: BANNED GESTURE SCAN ON FINAL STORY
-    // =========================================================================
+    return {
+      id: row.id,
+      title: row.title,
+      criticalAnalysis,
+      originalStory: row.story
+    };
+  } finally {
+    await pool.end();
+  }
+}
 
-    console.log('\n# BANNED GESTURE SCAN (Final Story)\n');
+function analyzeCriticalAnalysis(analysisText, storyText) {
+  const results = {
+    categories: [],
+    fixes: [],
+    bannedGestureScan: []
+  };
 
+  if (!analysisText) return results;
+
+  // Extract category sections
+  const sectionPattern = /\d+\.\s*\*\*([^*]+)\*\*\s*\n([\s\S]*?)(?=\n\d+\.\s*\*\*|\*\*Fixes|\n---|\n$)/gi;
+  let match;
+  while ((match = sectionPattern.exec(analysisText)) !== null) {
+    const category = match[1].trim();
+    const content = match[2].trim();
+    const lines = content.split('\n').filter(l => l.trim());
+
+    const hasIssue = !lines.every(line =>
+      line.includes('✓') || line.includes('✔') || line.trim() === ''
+    );
+
+    const issues = hasIssue
+      ? lines.filter(l => !l.includes('✓') && !l.includes('✔') && l.trim())
+      : [];
+
+    results.categories.push({
+      name: category,
+      passed: !hasIssue,
+      issues: issues.map(l => l.trim())
+    });
+  }
+
+  // Extract fixes
+  const fixesMatch = analysisText.match(/\*\*Fixes:?\*\*:?\s*\n([\s\S]*?)$/i);
+  if (fixesMatch) {
+    const fixPattern = /\d+\.\s*(?:Seite|Page)\s*(\d+):\s*["„]?([^"„→\n]+)[""]?\s*→\s*(.+)/gi;
+    while ((match = fixPattern.exec(fixesMatch[1])) !== null) {
+      const page = parseInt(match[1]);
+      const before = match[2].trim();
+      const after = match[3].trim();
+
+      // Check if fix was applied
+      let fixed = true;
+      if (storyText) {
+        const pagePattern = new RegExp(`--- Page ${page} ---\\s*\\n([\\s\\S]*?)(?=--- Page \\d+ ---|$)`, 'i');
+        const pageMatch = storyText.match(pagePattern);
+        if (pageMatch) {
+          const pageText = pageMatch[1].toLowerCase();
+          // Check for banned patterns
+          fixed = ![
+            /hand.*schulter/, /arm.*um.*schulter/, /umarmte.*kurz/,
+            /wuschelte.*haar/, /klopfte.*rücken/, /nickte.*wissend/,
+            /sagte.*praktisch/
+          ].some(p => p.test(pageText));
+        }
+      }
+
+      results.fixes.push({ page, before, after, fixed });
+    }
+  }
+
+  // Scan for banned gestures in final story
+  if (storyText) {
     const bannedPatterns = [
       { pattern: /hand.{0,15}schulter/gi, name: 'Hand on shoulder' },
       { pattern: /arm.{0,10}um.{0,15}schulter/gi, name: 'Arm around shoulders' },
@@ -201,39 +157,111 @@ async function main() {
       { pattern: /legte.{0,10}arm.{0,10}um/gi, name: 'Put arm around' }
     ];
 
-    let foundBanned = false;
     for (const { pattern, name } of bannedPatterns) {
-      const matches = storyStr.match(pattern);
-      if (matches) {
-        console.log(`❌ ${name}: FOUND "${matches.join('", "')}""`);
-        foundBanned = true;
-      } else {
-        console.log(`✅ ${name}: Clean`);
-      }
+      const matches = storyText.match(pattern);
+      results.bannedGestureScan.push({
+        name,
+        found: matches || [],
+        clean: !matches
+      });
     }
-
-    if (!foundBanned) {
-      console.log('\n✅ All banned gestures successfully removed!');
-    }
-
-    // =========================================================================
-    // SECTION 4: SUMMARY
-    // =========================================================================
-
-    console.log('\n' + '='.repeat(80));
-    console.log('# SUMMARY\n');
-
-    // Count pages
-    const pageMatches = storyStr.match(/--- Page \d+ ---/g);
-    console.log(`Total pages: ${pageMatches ? pageMatches.length : 0}`);
-    console.log(`Banned gestures remaining: ${foundBanned ? 'Some found' : '0 (all clean)'}`);
-
-  } catch (e) {
-    console.error('Error:', e.message);
-    console.error(e.stack);
   }
 
-  await pool.end();
+  return results;
 }
 
-main();
+function printResults(data, analysis) {
+  console.log(`Story: ${data.title || 'Untitled'}`);
+  console.log(`ID: ${data.id}\n`);
+  console.log('='.repeat(80));
+
+  // Categories
+  console.log('\n# CRITICAL ANALYSIS FINDINGS\n');
+  console.log('## Issues Identified:\n');
+
+  for (const cat of analysis.categories) {
+    const status = cat.passed ? '✅' : '⚠️';
+    console.log(`${status} **${cat.name}**`);
+    if (!cat.passed) {
+      for (const issue of cat.issues) {
+        console.log(`   ${issue}`);
+      }
+    }
+    console.log();
+  }
+
+  // Fixes
+  if (analysis.fixes.length > 0) {
+    console.log('\n## Fixes Applied:\n');
+    for (const fix of analysis.fixes) {
+      console.log(`### Page ${fix.page}`);
+      console.log();
+      console.log(`**Before:** "${fix.before}"`);
+      console.log(`**After:**  "${fix.after}"`);
+      console.log(`**Status:** ${fix.fixed ? '✅ Fixed in final' : '❌ Not fixed'}`);
+      console.log();
+      console.log('-'.repeat(60));
+      console.log();
+    }
+  }
+
+  // Banned gesture scan
+  console.log('\n# BANNED GESTURE SCAN (Final Story)\n');
+  let allClean = true;
+  for (const scan of analysis.bannedGestureScan) {
+    if (scan.clean) {
+      console.log(`✅ ${scan.name}: Clean`);
+    } else {
+      console.log(`❌ ${scan.name}: FOUND "${scan.found.join('", "')}"`);
+      allClean = false;
+    }
+  }
+  if (allClean) {
+    console.log('\n✅ All banned gestures successfully removed!');
+  }
+
+  // Summary
+  console.log('\n' + '='.repeat(80));
+  console.log('# SUMMARY\n');
+  const pageCount = (data.originalStory?.match(/--- Page \d+ ---/g) || []).length;
+  const issueCount = analysis.categories.filter(c => !c.passed).length;
+  const fixCount = analysis.fixes.length;
+  const fixedCount = analysis.fixes.filter(f => f.fixed).length;
+
+  console.log(`Total pages: ${pageCount}`);
+  console.log(`Categories with issues: ${issueCount}`);
+  console.log(`Fixes applied: ${fixedCount}/${fixCount}`);
+  console.log(`Banned gestures remaining: ${allClean ? '0 (all clean)' : 'Some found'}`);
+}
+
+async function main() {
+  console.log('Fetching story data...\n');
+
+  let data;
+  try {
+    if (storyId) {
+      console.log(`Using API for story: ${storyId}`);
+      data = await fetchFromApi(storyId);
+      data.id = storyId;
+    } else {
+      console.log('Using database for latest story');
+      data = await fetchFromDatabase();
+    }
+  } catch (err) {
+    console.error('Error fetching data:', err.message);
+    process.exit(1);
+  }
+
+  if (!data) {
+    console.log('No story data found');
+    process.exit(1);
+  }
+
+  const analysis = analyzeCriticalAnalysis(data.criticalAnalysis, data.originalStory);
+  printResults(data, analysis);
+}
+
+main().catch(err => {
+  console.error('Error:', err.message);
+  process.exit(1);
+});
