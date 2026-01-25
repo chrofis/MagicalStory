@@ -723,6 +723,16 @@ function clearStyledAvatarCache() {
 }
 
 /**
+ * Get stats about the styled avatar cache
+ * @returns {Object} Cache statistics including size
+ */
+function getStyledAvatarCacheStats() {
+  return {
+    size: styledAvatarCache.size
+  };
+}
+
+/**
  * Invalidate styled avatars for a specific character and clothing category.
  * Call this when a new source avatar is generated to ensure styled versions are regenerated.
  *
@@ -1139,6 +1149,7 @@ module.exports = {
   setStyledAvatar,
   hasStyledAvatar,
   clearStyledAvatarCache,
+  getStyledAvatarCacheStats,
   invalidateStyledAvatarForCategory,
 
   // Persistence
