@@ -10061,82 +10061,40 @@ async function processStoryJob(jobId) {
     log.debug(`📝 [JOB PROCESS] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
     log.debug(`📝 [JOB PROCESS] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
 
-    // Load full character data from DB (frontend strips avatar images to reduce payload)
-    // This restores the avatar images so we don't regenerate existing avatars
-    if (inputData.characters?.length > 0 && job.user_id) {
+    // Fetch full character data from database (job stores stripped metadata)
+    // This ensures processing has access to photos and avatar images
+    const requestedCharacterIds = (inputData.characters || []).map(c => c.id);
+    if (requestedCharacterIds.length > 0 && job.user_id) {
       try {
+        const characterRowId = `characters_${job.user_id}`;
         const charResult = await dbPool.query(
-          'SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
-          [job.user_id]
+          'SELECT data FROM characters WHERE id = $1',
+          [characterRowId]
         );
-
-        if (charResult.rows.length > 0) {
-          const dbData = typeof charResult.rows[0].data === 'string'
+        if (charResult.rows.length > 0 && charResult.rows[0].data) {
+          const fullCharData = typeof charResult.rows[0].data === 'string'
             ? JSON.parse(charResult.rows[0].data)
             : charResult.rows[0].data;
-          const dbCharacters = dbData.characters || [];
+          const allChars = Array.isArray(fullCharData) ? fullCharData : (fullCharData.characters || []);
 
-          // Merge DB character data into inputData characters
-          // (frontend strips heavy data to reduce payload, restore from DB)
-          let mergedCount = 0;
-          for (const char of inputData.characters) {
-            const dbChar = dbCharacters.find(c =>
-              c.name.trim().toLowerCase() === char.name.trim().toLowerCase()
-            );
+          // Replace stripped characters with full data (preserving request order)
+          const fullCharacters = requestedCharacterIds
+            .map(id => allChars.find(c => c.id === id))
+            .filter(Boolean);
 
-            if (dbChar) {
-              // Merge physical traits (needed for styled avatar prompts)
-              // Use deep merge: DB values as fallback, request values take priority
-              // Note: metadata includes physical, so char.physical may exist but be incomplete
-              if (dbChar.physical) {
-                const hadPhysical = !!char.physical;
-                const dbKeys = Object.keys(dbChar.physical);
-                char.physical = {
-                  ...dbChar.physical,
-                  ...(char.physical || {})
-                };
-                log.debug(`📸 [JOB PROCESS] Merged physical traits for ${char.name}: DB had [${dbKeys.join(',')}], request ${hadPhysical ? 'had' : 'missing'} physical`);
+          if (fullCharacters.length > 0) {
+            log.debug(`📸 [PROCESS] Loaded full character data for ${fullCharacters.length} characters`);
+            // Clear styledAvatars - regenerate fresh per story for consistency
+            for (const char of fullCharacters) {
+              if (char.avatars) {
+                char.avatars.styledAvatars = {};
               }
-              // Merge photos (face, body references)
-              if (dbChar.photos && !char.photos) {
-                char.photos = dbChar.photos;
-              }
-              // Merge physicalTraitsSource (same deep merge pattern)
-              if (dbChar.physicalTraitsSource) {
-                char.physicalTraitsSource = {
-                  ...dbChar.physicalTraitsSource,
-                  ...(char.physicalTraitsSource || {})
-                };
-              }
-
-              if (dbChar.avatars) {
-                // Merge avatar data: DB as fallback, request data wins (later spread overwrites)
-                // NOTE: styledAvatars intentionally NOT merged - regenerate fresh per story
-                // This ensures consistency between covers and pages (see styledAvatars.js line 385-389)
-                char.avatars = {
-                  ...dbChar.avatars,      // DB data first (fallback)
-                  ...char.avatars,        // Request data wins (new avatars override stale DB)
-                  styledAvatars: {},      // Clear - always regenerate fresh for each story
-                  costumed: {
-                    ...dbChar.avatars?.costumed,
-                    ...char.avatars?.costumed
-                  },
-                  clothing: {
-                    ...dbChar.avatars?.clothing,
-                    ...char.avatars?.clothing
-                  }
-                };
-              }
-              mergedCount++;
             }
-          }
-
-          if (mergedCount > 0) {
-            log.debug(`📸 [JOB PROCESS] Restored avatar data from DB for ${mergedCount} characters`);
+            inputData.characters = fullCharacters;
           }
         }
       } catch (dbErr) {
-        log.warn(`📸 [JOB PROCESS] Failed to load character avatars from DB: ${dbErr.message}`);
+        log.warn(`📸 [PROCESS] Failed to load character data from DB: ${dbErr.message}`);
       }
     }
 
@@ -12495,33 +12453,6 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
         );
 
         log.debug(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
-      }
-
-      // Fetch full character data from database (frontend sends stripped metadata version)
-      // This ensures story generation has access to photos and avatar images
-      const requestedCharacterIds = (inputData.characters || []).map(c => c.id);
-      if (requestedCharacterIds.length > 0) {
-        const characterRowId = `characters_${userId}`;
-        const charResult = await dbPool.query(
-          'SELECT data FROM characters WHERE id = $1',
-          [characterRowId]
-        );
-        if (charResult.rows.length > 0 && charResult.rows[0].data) {
-          const fullCharData = typeof charResult.rows[0].data === 'string'
-            ? JSON.parse(charResult.rows[0].data)
-            : charResult.rows[0].data;
-          const allChars = Array.isArray(fullCharData) ? fullCharData : (fullCharData.characters || []);
-
-          // Replace stripped characters with full data (preserving request order and filtering)
-          const fullCharacters = requestedCharacterIds
-            .map(id => allChars.find(c => c.id === id))
-            .filter(Boolean);
-
-          if (fullCharacters.length > 0) {
-            log.debug(`📸 [CREATE-STORY] Loaded full character data for ${fullCharacters.length} characters`);
-            inputData.characters = fullCharacters;
-          }
-        }
       }
 
       await dbPool.query(
