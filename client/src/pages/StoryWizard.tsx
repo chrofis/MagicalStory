@@ -94,6 +94,7 @@ export default function StoryWizard() {
     devSkipImages, setDevSkipImages,
     devSkipCovers, setDevSkipCovers,
     enableAutoRepair, setEnableAutoRepair,
+    useGridRepair, setUseGridRepair,
     enableFinalChecks, setEnableFinalChecks,
     incrementalConsistency, setIncrementalConsistency,
     incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
@@ -3176,6 +3177,7 @@ export default function StoryWizard() {
         skipCovers: devSkipCovers,
         // Developer feature options
         enableAutoRepair: enableAutoRepair,
+        useGridRepair: useGridRepair,
         enableFinalChecks: enableFinalChecks,
         checkOnlyMode: checkOnlyMode,  // Skip all regeneration, only run checks
         // Incremental consistency check (check each image against previous images)
@@ -4447,6 +4449,23 @@ export default function StoryWizard() {
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Versucht erkannte Bildfehler automatisch zu korrigieren (z.B. fehlende Finger)' : language === 'fr' ? 'Essaie de corriger automatiquement les erreurs d\'image détectées' : 'Attempts to automatically fix detected image issues (e.g., missing fingers)'}
                       </p>
+
+                      {enableAutoRepair && (
+                        <label className="flex items-center gap-2 cursor-pointer mt-2 ml-6">
+                          <input
+                            type="checkbox"
+                            checked={useGridRepair}
+                            onChange={(e) => setUseGridRepair(e.target.checked)}
+                            className="rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+                          />
+                          <span className="text-gray-700">{language === 'de' ? 'Grid-Reparatur verwenden' : language === 'fr' ? 'Utiliser la réparation en grille' : 'Use grid repair'}</span>
+                        </label>
+                      )}
+                      {enableAutoRepair && (
+                        <p className="text-xs text-gray-500 ml-12">
+                          {language === 'de' ? 'Extrahiert Problemregionen in ein Grid, repariert mit Gemini, verifiziert mit LPIPS+LLM' : language === 'fr' ? 'Extrait les régions problématiques dans une grille, répare avec Gemini, vérifie avec LPIPS+LLM' : 'Extracts issue regions to grid, repairs with Gemini, verifies with LPIPS+LLM'}
+                        </p>
+                      )}
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">
                         <input

@@ -38,6 +38,9 @@ interface DeveloperModeState {
   // Useful for analyzing issues before deciding on fixes
   checkOnlyMode: boolean;
   setCheckOnlyMode: (enable: boolean) => void;
+  // Grid-based repair: use grid extraction + Gemini repair instead of legacy inpainting
+  useGridRepair: boolean;
+  setUseGridRepair: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -67,6 +70,7 @@ const FEATURE_DEFAULTS = {
   incrementalConsistency: false,  // Incremental consistency: check each image against previous
   incrementalConsistencyDryRun: true, // Dry run: log what would be fixed without fixing
   checkOnlyMode: false,       // Check-only mode: run checks but skip all regeneration
+  useGridRepair: true,        // Grid-based repair: use grid extraction instead of legacy inpainting
 };
 
 /**
@@ -110,6 +114,9 @@ export function useDeveloperMode(): DeveloperModeState {
 
   // Check-only mode: run all quality checks but skip all regeneration/repair
   const [checkOnlyMode, setCheckOnlyMode] = useState(FEATURE_DEFAULTS.checkOnlyMode);
+
+  // Grid-based repair: use grid extraction + Gemini repair instead of legacy inpainting
+  const [useGridRepair, setUseGridRepair] = useState(FEATURE_DEFAULTS.useGridRepair);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -167,6 +174,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setIncrementalConsistencyDryRun,
     checkOnlyMode,
     setCheckOnlyMode,
+    useGridRepair,
+    setUseGridRepair,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

@@ -993,6 +993,7 @@ export const storyService = {
     skipCovers?: boolean;
     // Developer feature options
     enableAutoRepair?: boolean;
+    useGridRepair?: boolean;  // Use grid-based repair instead of legacy inpainting
     enableFinalChecks?: boolean;
     checkOnlyMode?: boolean;  // Skip all regeneration, only run checks
     // Incremental consistency check (check each image against previous images)
@@ -1065,6 +1066,7 @@ export const storyService = {
       skipCovers: data.skipCovers,
       // Developer feature options
       enableAutoRepair: data.enableAutoRepair,
+      useGridRepair: data.useGridRepair,
       enableFinalChecks: data.enableFinalChecks,
       checkOnlyMode: data.checkOnlyMode,  // Skip all regeneration, only run checks
       // Incremental consistency check
