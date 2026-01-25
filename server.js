@@ -8635,10 +8635,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // NOTE: For Swiss landmarks with photo variants, we'll load photos on-demand during image generation
     // This prefetch handles non-Swiss landmarks (historical events, Wikimedia search) that don't have variants
     let landmarkFetchPromise = null;
+    let landmarkCount = 0;
     const nonVariantLandmarks = (visualBible.locations || []).filter(
       l => l.isRealLandmark && !l.photoVariants?.length && l.photoFetchStatus !== 'success'
     );
     if (nonVariantLandmarks.length > 0 && !skipImages) {
+      landmarkCount = nonVariantLandmarks.length;
       log.info(`🌍 [UNIFIED] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)`);
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
     }
@@ -10405,10 +10407,12 @@ async function processStoryJob(jobId) {
     // Start background fetch for landmark reference photos
     // NOTE: For Swiss landmarks with photo variants, we'll load photos on-demand during image generation
     let landmarkFetchPromise = null;
+    let landmarkCount = 0;
     const nonVariantLandmarks = (visualBible.locations || []).filter(
       l => l.isRealLandmark && !l.photoVariants?.length && l.photoFetchStatus !== 'success'
     );
     if (nonVariantLandmarks.length > 0 && !skipImages) {
+      landmarkCount = nonVariantLandmarks.length;
       log.info(`🌍 [PIPELINE] Starting background fetch for ${nonVariantLandmarks.length} non-variant landmark photo(s)`);
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
     }
