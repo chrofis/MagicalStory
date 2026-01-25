@@ -1548,6 +1548,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const qualityUsage = qualityResult ? qualityResult.usage : null;
         const qualityModelId = qualityResult ? qualityResult.modelId : null;
         const fixTargets = qualityResult ? qualityResult.fixTargets : [];
+        const fixableIssues = qualityResult ? qualityResult.fixableIssues : [];
 
         // Store in cache (include text error info for covers)
         const result = {
@@ -1559,6 +1560,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           expectedText,
           actualText,
           fixTargets, // Bounding boxes for auto-repair (from evaluation)
+          fixableIssues, // New format without bboxes (for two-stage detection)
           modelId,  // Include which model was used for image generation
           qualityModelId,  // Include which model was used for quality evaluation
           imageUsage: imageUsage,  // Token usage for image generation
