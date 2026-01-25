@@ -4887,6 +4887,120 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
   }
 });
 
+// ============================================================================
+// STORY SHARING ENDPOINTS
+// ============================================================================
+
+// GET share status for a story
+app.get('/api/stories/:id/share-status', authenticateToken, async (req, res) => {
+  try {
+    const storyId = req.params.id;
+    const userId = req.user.id;
+
+    // Get story and verify ownership
+    const result = await dbQuery(
+      'SELECT is_shared, share_token FROM stories WHERE id = $1 AND user_id = $2',
+      [storyId, userId]
+    );
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = result[0];
+    const shareUrl = story.is_shared && story.share_token
+      ? `${req.protocol}://${req.get('host')}/shared/${story.share_token}`
+      : null;
+
+    res.json({
+      isShared: story.is_shared || false,
+      shareToken: story.share_token || null,
+      shareUrl
+    });
+  } catch (err) {
+    log.error('Error getting share status:', err);
+    res.status(500).json({ error: 'Failed to get share status' });
+  }
+});
+
+// POST enable sharing for a story
+app.post('/api/stories/:id/share', authenticateToken, async (req, res) => {
+  try {
+    const storyId = req.params.id;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const checkResult = await dbQuery(
+      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
+      [storyId, userId]
+    );
+
+    if (checkResult.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Generate share token if not exists
+    const crypto = require('crypto');
+    const shareToken = crypto.randomBytes(16).toString('hex');
+
+    await dbQuery(
+      'UPDATE stories SET is_shared = true, share_token = COALESCE(share_token, $1) WHERE id = $2',
+      [shareToken, storyId]
+    );
+
+    // Get the actual token (might be existing one)
+    const result = await dbQuery(
+      'SELECT share_token FROM stories WHERE id = $1',
+      [storyId]
+    );
+
+    const actualToken = result[0].share_token;
+    const shareUrl = `${req.protocol}://${req.get('host')}/shared/${actualToken}`;
+
+    res.json({
+      isShared: true,
+      shareToken: actualToken,
+      shareUrl
+    });
+  } catch (err) {
+    log.error('Error enabling sharing:', err);
+    res.status(500).json({ error: 'Failed to enable sharing' });
+  }
+});
+
+// DELETE disable sharing for a story
+app.delete('/api/stories/:id/share', authenticateToken, async (req, res) => {
+  try {
+    const storyId = req.params.id;
+    const userId = req.user.id;
+
+    // Verify ownership
+    const checkResult = await dbQuery(
+      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
+      [storyId, userId]
+    );
+
+    if (checkResult.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Disable sharing but keep the token for potential re-enabling
+    await dbQuery(
+      'UPDATE stories SET is_shared = false WHERE id = $1',
+      [storyId]
+    );
+
+    res.json({
+      isShared: false,
+      shareToken: null,
+      shareUrl: null
+    });
+  } catch (err) {
+    log.error('Error disabling sharing:', err);
+    res.status(500).json({ error: 'Failed to disable sharing' });
+  }
+});
+
 // Generate PDF from story (POST - with data in body)
 app.post('/api/generate-pdf', authenticateToken, async (req, res) => {
   try {

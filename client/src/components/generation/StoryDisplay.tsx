@@ -788,7 +788,7 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Action Buttons Grid - Order: Create Book, PDF, Edit, Create Another */}
+      {/* Action Buttons Grid - Order: Create Book, PDF, Share, Create Another */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {/* Create Book */}
         {hasImages && storyId && onAddToBook && (
@@ -855,17 +855,9 @@ export function StoryDisplay({
           </div>
         )}
 
-        {/* Edit Story */}
-        {onSaveStoryText && !isEditMode && (
-          <button
-            onClick={() => setIsEditMode(true)}
-            disabled={isGenerating}
-            className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-              isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-            }`}
-          >
-            <Edit3 size={16} /> {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
-          </button>
+        {/* Share Story - in grid */}
+        {hasImages && storyId && !isGenerating && (
+          <ShareButton storyId={storyId} variant="full" />
         )}
 
         {/* Create Another Story */}
@@ -881,10 +873,6 @@ export function StoryDisplay({
           </button>
         )}
 
-        {/* Share Story */}
-        {hasImages && storyId && !isGenerating && (
-          <ShareButton storyId={storyId} />
-        )}
       </div>
 
       {/* Developer Mode Buttons */}

@@ -5,6 +5,8 @@ import { useLanguage } from '@/context/LanguageContext';
 interface ShareButtonProps {
   storyId: string;
   onShareStatusChange?: (isShared: boolean) => void;
+  /** Use 'full' for grid layout with full-width button matching other action buttons */
+  variant?: 'compact' | 'full';
 }
 
 interface ShareStatus {
@@ -13,13 +15,15 @@ interface ShareStatus {
   shareUrl: string | null;
 }
 
-export function ShareButton({ storyId, onShareStatusChange }: ShareButtonProps) {
+export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' }: ShareButtonProps) {
   const { language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState<ShareStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isFullVariant = variant === 'full';
 
   // Translations
   const t = {
@@ -120,11 +124,14 @@ export function ShareButton({ storyId, onShareStatusChange }: ShareButtonProps) 
       {/* Main share button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md hover:shadow-lg"
+        className={isFullVariant
+          ? "bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full hover:bg-indigo-600"
+          : "flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md hover:shadow-lg"
+        }
         title={t.share}
       >
-        <Share2 className="w-4 h-4" />
-        <span className="hidden sm:inline">{t.share}</span>
+        <Share2 className={isFullVariant ? "w-4 h-4" : "w-4 h-4"} />
+        <span className={isFullVariant ? "" : "hidden sm:inline"}>{t.share}</span>
         {shareStatus?.isShared && (
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
         )}
