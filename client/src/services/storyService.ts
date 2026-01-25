@@ -489,9 +489,15 @@ export const storyService = {
 
     let loadedCount = 0;
 
-    // Load cover images first (title pages appear first in the UI)
-    for (const coverType of coverTypes) {
-      const result = await this.getCoverImage(id, coverType);
+    // Load cover images in parallel (faster on mobile)
+    const coverResults = await Promise.all(
+      coverTypes.map(async coverType => {
+        const result = await this.getCoverImage(id, coverType);
+        return { coverType, result };
+      })
+    );
+
+    for (const { coverType, result } of coverResults) {
       if (result) {
         loadedCount++;
         onImageLoaded(coverType, result.imageData, undefined, loadedCount);

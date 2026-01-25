@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, hasStorySeparateImages, saveStoryData } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -504,23 +504,15 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    // Try to get image from separate table first (FAST path)
-    const separateImage = await getStoryImage(id, 'scene', pageNum, 0);
+    // Try to get image with all versions in single query (FAST path)
+    const separateImage = await getStoryImageWithVersions(id, 'scene', pageNum);
     if (separateImage) {
-      // Also get image versions from separate table
-      const versions = [];
-      for (let i = 1; i <= 10; i++) {
-        const version = await getStoryImage(id, 'scene', pageNum, i);
-        if (!version) break;
-        versions.push(version);
-      }
-
       return res.json({
         pageNumber: pageNum,
         imageData: separateImage.imageData,
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt,
-        imageVersions: versions.length > 0 ? versions : undefined
+        imageVersions: separateImage.versions
       });
     }
 

@@ -652,6 +652,52 @@ async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
 }
 
 /**
+ * Get story image with all its versions in a single query (optimized).
+ * @param {string} storyId - Story ID
+ * @param {string} imageType - 'scene', 'frontCover', 'initialPage', 'backCover'
+ * @param {number|null} pageNumber - Page number (null for covers)
+ * @returns {object|null} Main image with versions array, or null if not found
+ */
+async function getStoryImageWithVersions(storyId, imageType, pageNumber) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  const rows = await dbQuery(
+    `SELECT version_index, image_data, quality_score, generated_at FROM story_images
+     WHERE story_id = $1 AND image_type = $2 AND page_number IS NOT DISTINCT FROM $3
+     ORDER BY version_index`,
+    [storyId, imageType, pageNumber]
+  );
+
+  if (rows.length === 0) {
+    return null;
+  }
+
+  // First row (version_index = 0) is the main image
+  const mainImage = rows.find(r => r.version_index === 0);
+  if (!mainImage) {
+    return null;
+  }
+
+  // Remaining rows are versions
+  const versions = rows
+    .filter(r => r.version_index > 0)
+    .map(r => ({
+      imageData: r.image_data,
+      qualityScore: r.quality_score,
+      generatedAt: r.generated_at
+    }));
+
+  return {
+    imageData: mainImage.image_data,
+    qualityScore: mainImage.quality_score,
+    generatedAt: mainImage.generated_at,
+    versions: versions.length > 0 ? versions : undefined
+  };
+}
+
+/**
  * Get all images for a story (for migration/export purposes).
  * @param {string} storyId - Story ID
  * @returns {array} Array of image records
@@ -712,6 +758,7 @@ module.exports = {
   // Image functions
   saveStoryImage,
   getStoryImage,
+  getStoryImageWithVersions,
   getAllStoryImages,
   hasStorySeparateImages,
   deleteStoryImages
