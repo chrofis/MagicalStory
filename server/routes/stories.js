@@ -455,6 +455,10 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           landmarkPhotos: story.coverImages.backCover.landmarkPhotos || null
         } : null
       } : null,
+      // Scene descriptions (outline extract, scene prompt, scene description text)
+      sceneDescriptions: story.sceneDescriptions || [],
+      // Visual Bible (characters, locations, objects)
+      visualBible: story.visualBible || null,
       // Generation log (avatar lookups, stage transitions, etc.)
       generationLog: story.generationLog || [],
       // Styled avatar generation log (for developer mode auditing)
