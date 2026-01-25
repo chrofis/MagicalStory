@@ -2688,6 +2688,11 @@ async function indexLandmarksForCities(options = {}) {
         await new Promise(r => setTimeout(r, 100));
       }
 
+      // Update progress after city completes
+      if (onProgress) {
+        onProgress(city, i + 1, citiesToProcess, savedCount, maxLandmarks);
+      }
+
       // Delay between cities
       await new Promise(r => setTimeout(r, 500));
 
