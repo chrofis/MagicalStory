@@ -1454,7 +1454,8 @@ async function initializeDatabase() {
     await dbPool.query(`
       DO $$
       BEGIN
-        IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'swiss_landmarks') THEN
+        IF EXISTS (SELECT FROM pg_tables WHERE tablename = 'swiss_landmarks')
+           AND NOT EXISTS (SELECT FROM pg_tables WHERE tablename = 'landmark_index') THEN
           -- Rename table
           ALTER TABLE swiss_landmarks RENAME TO landmark_index;
           -- Add country column if missing
