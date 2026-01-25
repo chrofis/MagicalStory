@@ -12497,6 +12497,33 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
         log.debug(`💳 Reserved ${creditsNeeded} credits for job ${jobId} (user balance: ${userCredits} -> ${newBalance})`);
       }
 
+      // Fetch full character data from database (frontend sends stripped metadata version)
+      // This ensures story generation has access to photos and avatar images
+      const requestedCharacterIds = (inputData.characters || []).map(c => c.id);
+      if (requestedCharacterIds.length > 0) {
+        const characterRowId = `characters_${userId}`;
+        const charResult = await dbPool.query(
+          'SELECT data FROM characters WHERE id = $1',
+          [characterRowId]
+        );
+        if (charResult.rows.length > 0 && charResult.rows[0].data) {
+          const fullCharData = typeof charResult.rows[0].data === 'string'
+            ? JSON.parse(charResult.rows[0].data)
+            : charResult.rows[0].data;
+          const allChars = Array.isArray(fullCharData) ? fullCharData : (fullCharData.characters || []);
+
+          // Replace stripped characters with full data (preserving request order and filtering)
+          const fullCharacters = requestedCharacterIds
+            .map(id => allChars.find(c => c.id === id))
+            .filter(Boolean);
+
+          if (fullCharacters.length > 0) {
+            log.debug(`📸 [CREATE-STORY] Loaded full character data for ${fullCharacters.length} characters`);
+            inputData.characters = fullCharacters;
+          }
+        }
+      }
+
       await dbPool.query(
         `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved, idempotency_key)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
