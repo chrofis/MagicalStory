@@ -464,6 +464,99 @@ function extractImageStats(jobLines) {
   return stats;
 }
 
+function extractTiming(jobLines) {
+  const timing = {
+    phases: {},
+    stageStarts: {}  // Track [GEN:xxx] stage starts
+  };
+
+  // Stage name mapping for cleaner output
+  const stageNames = {
+    'outline': 'Story Generation',
+    'avatars': 'Avatar Styling',
+    'scenes': 'Scene Validation',
+    'covers': 'Cover Generation',
+    'images': 'Page Images',
+    'final_checks': 'Final Checks',
+    'finalize': 'Finalization'
+  };
+
+  for (const line of jobLines) {
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
+    const ts = parseTimestamp(line.timestamp);
+
+    // Track [GEN:xxx] stage transitions
+    // Pattern: "[GEN:outline]  Starting outline stage"
+    const stageMatch = msg.match(/\[GEN:(\w+)\]\s+Starting (\w+) stage/);
+    if (stageMatch) {
+      const stageKey = stageMatch[1];
+      const displayName = stageNames[stageKey] || stageKey;
+
+      // End the previous stage
+      const stageOrder = ['outline', 'avatars', 'scenes', 'covers', 'images', 'final_checks', 'finalize'];
+      const currentIdx = stageOrder.indexOf(stageKey);
+      if (currentIdx > 0) {
+        const prevStage = stageOrder[currentIdx - 1];
+        const prevName = stageNames[prevStage] || prevStage;
+        if (timing.phases[prevName] && !timing.phases[prevName].end) {
+          timing.phases[prevName].end = ts;
+        }
+      }
+
+      // Start the new stage
+      timing.phases[displayName] = { start: ts };
+    }
+
+    // Unified story streaming start (more precise than [GEN:outline])
+    if (msg.includes('[STREAM] Starting streaming request to Anthropic') &&
+        msg.includes('64000 max tokens')) {
+      // This is the unified story call (large token limit)
+      if (timing.phases['Story Generation']) {
+        timing.phases['Story Generation'].streamStart = ts;
+      }
+    }
+
+    // Story text parsing complete
+    if (msg.includes('[UNIFIED] Streaming story complete') ||
+        msg.includes('[STREAM-UNIFIED] Story generation complete')) {
+      if (timing.phases['Story Generation']) {
+        timing.phases['Story Generation'].end = ts;
+      }
+    }
+
+    // Page images - track last quality success
+    if (msg.includes('[QUALITY RETRY]') && msg.includes('Success')) {
+      if (timing.phases['Page Images']) {
+        timing.phases['Page Images'].end = ts;
+      }
+    }
+
+    // Consistency check
+    if (msg.includes('[CONSISTENCY]') && msg.includes('Checking batch')) {
+      if (!timing.phases['Consistency Check']) {
+        timing.phases['Consistency Check'] = { start: ts };
+      }
+    }
+    if (msg.includes('[CONSISTENCY]') && msg.includes('Found')) {
+      if (timing.phases['Consistency Check']) {
+        timing.phases['Consistency Check'].end = ts;
+      }
+    }
+
+    // Job completion
+    if (msg.includes('Job') && msg.includes('completed successfully')) {
+      // End any open phases
+      for (const phase of Object.values(timing.phases)) {
+        if (phase.start && !phase.end) {
+          phase.end = ts;
+        }
+      }
+    }
+  }
+
+  return timing;
+}
+
 function extractIssues(jobLines) {
   const issues = {
     warnings: [],
@@ -609,7 +702,7 @@ function extractIssues(jobLines) {
 // OUTPUT
 // ============================================================================
 
-function printAnalysis(job, storyInfo, costs, issues, imageStats) {
+function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
   const duration = job.endTime ? job.endTime - job.startTime : null;
 
   console.log('\n' + '='.repeat(70));
@@ -638,6 +731,17 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
   if (job.endTime) {
     console.log(`   Ended: ${job.endTime.toISOString().substring(11, 19)}`);
     console.log(`   Total Duration: ${formatDuration(duration)}`);
+  }
+
+  // Per-phase timing
+  if (timing && Object.keys(timing.phases).length > 0) {
+    console.log('\n   By Phase:');
+    for (const [phase, data] of Object.entries(timing.phases)) {
+      if (data.start && data.end) {
+        const phaseDuration = data.end - data.start;
+        console.log(`   - ${phase}: ${formatDuration(phaseDuration)}`);
+      }
+    }
   }
 
   // Image Generation Stats
@@ -700,12 +804,20 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats) {
     console.log('   (no cost data found)');
   }
 
-  // By Function breakdown
+  // By Function breakdown with token details
   if (Object.keys(costs.byFunction).length > 0) {
     console.log('\n   By Function:');
     for (const [func, data] of Object.entries(costs.byFunction)) {
+      const inK = (data.inputTokens / 1000).toFixed(1);
+      const outK = (data.outputTokens / 1000).toFixed(1);
       console.log(`   - ${func}: $${data.cost.toFixed(4)} (${data.calls} calls) [${data.model}]`);
+      console.log(`     └─ ${inK}k in / ${outK}k out`);
     }
+
+    // Token totals
+    const totalIn = Object.values(costs.byFunction).reduce((sum, d) => sum + d.inputTokens, 0);
+    const totalOut = Object.values(costs.byFunction).reduce((sum, d) => sum + d.outputTokens, 0);
+    console.log(`\n   Token Totals: ${(totalIn/1000).toFixed(1)}k input, ${(totalOut/1000).toFixed(1)}k output`);
   }
 
   // Issues (real problems)
@@ -803,7 +915,8 @@ function analyzeLog(logPath) {
     const costs = extractCostSummary(job.lines);
     const issues = extractIssues(job.lines);
     const imageStats = extractImageStats(job.lines);
-    printAnalysis(job, storyInfo, costs, issues, imageStats);
+    const timing = extractTiming(job.lines);
+    printAnalysis(job, storyInfo, costs, issues, imageStats, timing);
   }
 }
 
