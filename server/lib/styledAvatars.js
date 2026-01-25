@@ -429,7 +429,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     const { clothingCategory, characterNames } = requirement;
 
     for (const charName of characterNames || []) {
-      const char = characters.find(c => c.name === charName);
+      // Case-insensitive character lookup with exact match fallback
+      const char = characters.find(c => c.name === charName) ||
+                   characters.find(c => c.name.toLowerCase() === charName.toLowerCase());
       if (!char) continue;
 
       const cacheKey = getAvatarCacheKey(charName, clothingCategory, artStyle);
@@ -504,6 +506,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
           if (costumeConfig?.used && costumeConfig?.description) {
             log.debug(`🎭 [STYLED AVATARS] ${charName}: generating costumed:${costumeType} on-demand...`);
+            let generationSucceeded = false;
             try {
               const result = await generateStyledCostumedAvatar(char, {
                 costume: costumeConfig.costume || costumeType,
@@ -526,16 +529,24 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
                   char.avatars.clothing.costumed[costumeType] = result.clothing;
                 }
                 log.debug(`✅ [STYLED AVATARS] ${charName}: costumed:${costumeType}@${artStyle} generated successfully`);
+                generationSucceeded = true;
               } else {
-                log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation failed: ${result.error || 'unknown'}`);
+                log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation failed: ${result.error || 'unknown'}, falling back to standard`);
               }
             } catch (err) {
-              log.error(`❌ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation error: ${err.message}`);
+              log.error(`❌ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation error: ${err.message}, falling back to standard`);
             }
+
+            if (generationSucceeded) {
+              continue; // Skip adding to neededAvatars - we already have the styled costumed avatar
+            }
+            // Fall through to add standard avatar to neededAvatars
+            clothingCategory = 'standard';
           } else {
-            log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} not found and no costume config in clothingRequirements`);
+            log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} not found and no costume config, falling back to standard`);
+            clothingCategory = 'standard';
           }
-          continue;
+          // Don't continue - let it fall through to neededAvatars with standard avatar
         }
       } else {
         // Check if this category was already generated with signature items
@@ -667,7 +678,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
  */
 function getStyledAvatar(characterName, clothingCategory, artStyle) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
-  return styledAvatarCache.get(cacheKey) || null;
+  const styledAvatar = styledAvatarCache.get(cacheKey);
+  if (!styledAvatar) {
+    log.info(`📍 [STYLED AVATARS] Cache miss: ${cacheKey}`);
+  }
+  return styledAvatar || null;
 }
 
 /**
