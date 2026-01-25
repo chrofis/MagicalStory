@@ -88,9 +88,9 @@ const CATEGORY_TO_TYPE = [
   { pattern: /ruin|ruine/i, type: 'Ruins' },
   { pattern: /roman|römisch|romain/i, type: 'Roman site' },
   { pattern: /\bbaths?\b|\bbad\b|therme|thermalbad|\bbain/i, type: 'Baths' },
-  { pattern: /lake|see|lac/i, type: 'Lake' },
+  { pattern: /\blake\b|see$|\blac\b/i, type: 'Lake' },
   { pattern: /river|fluss|rivière/i, type: 'River' },
-  { pattern: /mountain|berg|montagne/i, type: 'Mountain' },
+  { pattern: /\bmountain\b|berg$|\bmont\b|\bmontagne\b/i, type: 'Mountain' },
   { pattern: /cave|höhle|grotte/i, type: 'Cave' },
   { pattern: /waterfall|wasserfall|cascade/i, type: 'Waterfall' },
   // Generic fallbacks
