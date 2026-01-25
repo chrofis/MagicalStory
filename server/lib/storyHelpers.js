@@ -2736,6 +2736,16 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
   // Extract character names for Visual Bible exclusion
   const characterNames = characterSummary.map(c => c.name).join(', ');
 
+  // Separate main and primary character names for prompt
+  const mainCharacterNames = characterSummary
+    .filter(c => c.isMainCharacter)
+    .map(c => c.name)
+    .join(', ') || 'None';
+  const primaryCharacterNames = characterSummary
+    .filter(c => !c.isMainCharacter)
+    .map(c => c.name)
+    .join(', ') || 'None';
+
   // Build relationship descriptions
   let relationshipDescriptions = '';
   if (inputData.relationships) {
@@ -2884,6 +2894,8 @@ ${adventureGuide}` : ''}`;
       STORY_DETAILS: inputData.storyDetails || 'None',
       CHARACTERS: charactersJson,
       CHARACTER_NAMES: characterNames,
+      MAIN_CHARACTER_NAMES: mainCharacterNames,
+      PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
       CATEGORY_GUIDELINES: categoryGuidelines,
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection
     });

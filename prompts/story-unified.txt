@@ -32,7 +32,31 @@ Your task is to create a COMPLETE story including:
 - **Story Theme/Setting**: {STORY_TYPE}
 - **Story Topic**: {STORY_TOPIC}
 - **Story Details**: {STORY_DETAILS}
-- **Characters**: {CHARACTERS}
+
+# Character Types
+
+**Main Characters** ({MAIN_CHARACTER_NAMES})
+The protagonists. The story revolves around them.
+- Appear in the **majority of scenes** (at least 70% of pages)
+- Have full character arcs with growth and transformation
+- Drive the plot forward through their choices and actions
+
+**Primary Characters** ({PRIMARY_CHARACTER_NAMES})
+Supporting characters provided by the user. Important but don't drive the plot.
+- Appear in **some scenes**, not all:
+  - Short story (10 pages): 1-3 scenes each
+  - Medium story (20 pages): 2-5 scenes each
+  - Long story (30+ pages): 3-8 scenes each
+- Give them memorable moments and consistent behavior
+- They support the main characters, not overshadow them
+- Don't introduce all primary characters on page 1 - spread their entrances
+
+**Secondary Characters** (invented by you)
+Minor characters you create to serve the story (shopkeepers, teachers, passersby).
+- Use as needed for the plot, but keep them in the background
+- They should not steal focus from main or primary characters
+- Define them in the Visual Bible for visual consistency
+- Keep them simple - one or two defining traits
 
 # Story Category Guidelines
 
@@ -85,7 +109,19 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 - Mentioning the same trait more than once in the entire story
 - Generic dialogue that any character could say
 - Characters who all react the same way
-- **Repetitive physical gestures** - Do NOT overuse "put hand on shoulder", "ruffled hair", "patted on the back". Use each gesture ONCE in the entire story, maximum. Vary how characters show affection: a wink, a thumbs up, a gentle nudge, standing closer, a shared smile, a fist bump, holding hands, a quick hug, an arm around the waist, leaning in to whisper.
+
+**BANNED GESTURES (AI clichés - NEVER use these):**
+- "Hand on shoulder" - COMPLETELY FORBIDDEN, not even once
+- "Ruffled hair" / "tousled hair"
+- "Patted on the back"
+- "Nodded knowingly" / "nodded wisely"
+
+**Instead, show support/connection through:**
+- Actions: standing closer, walking side by side, sharing food, helping with a task
+- Expressions: a warm smile, a wink, raised eyebrows, eyes lighting up
+- Fun gestures: fist bump, high five, thumbs up, silly salute, pinky promise
+- Body language: leaning in, sitting next to, making eye contact, a quick nudge
+- Each gesture may appear ONCE in the entire story - then use a different one
 
 # Jokes and Humor
 
@@ -107,33 +143,26 @@ Let the story be warm and entertaining without trying to be a comedian.
 
 You MUST output ALL sections below in this EXACT order. Do not skip any section.
 
----TITLE---
-Create a title that:
-- Is SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
-- References a unique element: a character name, location, object, or pivotal moment
-- Creates curiosity or intrigue
-- Avoids clichés like "The [Adjective] [Noun]" patterns
-- Works well in {LANGUAGE}
-
-TITLE: [Your creative, specific title]
-
 ---CHARACTER ARCS---
 
-For EACH main character ({CHARACTER_NAMES}):
+For EACH **main character** ({MAIN_CHARACTER_NAMES}):
 
 ### [Character Name]
 **Starting Point**: How they are at the beginning (based on their traits)
 **Key Challenges**: Obstacles they face (with page numbers)
 **Turning Points**: Moments of growth (with page numbers)
 **End State**: How they've changed by the end
-**Key Moments**: Pages [X], [Y], [Z]
+**Key Moments**: Pages [X], [Y], [Z] — should be many, they're the focus
 
 
-For all other characters:
-**Starting Point**: In which scene do they enter the story. Do not have all characters start on scene 1.
-**Repeated behaviors**: Things they do repeatedly in the story that are characteristic for them.
-**Challenge**: One challenge / scene where the character shines.
+For EACH **primary character** ({PRIMARY_CHARACTER_NAMES}):
 
+### [Character Name]
+**Introduction**: Which scene they enter (spread entrances across the story)
+**Role**: How they support the main character(s)
+**Signature Behavior**: Something they do repeatedly that's characteristic
+**Key Moment**: One scene where this character shines
+**Appears in**: Pages [X], [Y], [Z] — limit based on story length
 
 
 ---PLOT STRUCTURE---
@@ -149,27 +178,54 @@ For all other characters:
 
 
 ---STORY DRAFT---
-Draft the story. Focus on creativity first.
+Draft the story with scene hints. Focus on creativity first.
 For EACH of the {PAGES} pages, output in this EXACT format:
 
 **Draft [Page number]**
 [Full story text for this page - follow reading level guidelines]
-*(Word count: X)*
+*(Word count: X)* — count story text only, not the scene hint
+
+Scene hint: [1-2 sentences describing the key visual moment]
+Characters:
+- [CharacterName]: [standard | winter | summer | costumed:type]
+Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/rainy/snowy]
 
 ... continue for ALL {PAGES} pages ...
 
 
 ---CRITICAL ANALYSIS---
 Analyze the draft above for logical issues. Be harsh and critical.
+
+**Story Logic:**
 1. List all logical inconsistencies (timeline errors, physical impossibilities, character motivation issues).
 2. List any reading level violations.
-3. **MAX 3 CHARACTERS PER SCENE** - Check each page: does the action focus on more than 3 characters?
-   - If 4+ characters do something together, REWRITE to focus on max 3 per page
-   - Split group actions across multiple pages (3 characters teleport on page 5, other 3 on page 6)
-   - Use close-up perspective: focus on the active character + 1-2 nearby characters
-   - Example: 6 people at dinner table → show close-up of speaker with person on left and right
+
+**Scene Hints Review:**
+3. **MAX 3 CHARACTERS PER SCENE** - Check each page: does the scene hint list more than 3 characters?
+   - If 4+ characters, pick the 3 most important for the visual moment
+   - Split group actions across multiple pages if needed
    - Background characters can be mentioned in text but scene hint focuses on 3 main actors
-4. For each issue, write a specific instruction on how you will fix it in the final version.
+4. **Character positions** - Does each scene hint specify left/right/center positions?
+5. **Clothing consistency** - Are clothing categories appropriate for the scene (winter for cold outdoor, costumed for costume scenes)?
+6. **Setting/Time/Weather** - Is weather consistent across outdoor scenes? Does time progress logically?
+
+**Cliché Check:**
+7. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely". These are FORBIDDEN. Replace with alternatives.
+8. **Repeated gestures** - Does any gesture (hug, smile, wink, etc.) appear more than once? Vary them.
+
+**Fixes:**
+For each issue found above, write a specific instruction on how you will fix it in the final version.
+
+
+---TITLE---
+Now that you have written and analyzed the full story, create a title that:
+- Is SPECIFIC to this story (not generic like "The Big Adventure" or "A Magical Day")
+- References a unique element: a character name, location, object, or pivotal moment from the story
+- Creates curiosity or intrigue
+- Avoids clichés like "The [Adjective] [Noun]" patterns
+- Works well in {LANGUAGE}
+
+TITLE: [Your creative, specific title]
 
 
 ---CLOTHING REQUIREMENTS---
@@ -218,44 +274,69 @@ Based on the story draft, determine which clothing variants each character needs
 }
 ```
 
-**Complete workflow example (STORY DRAFT → CRITICAL ANALYSIS → CLOTHING REQUIREMENTS):**
+**Complete workflow example (STORY DRAFT → CRITICAL ANALYSIS → TITLE → CLOTHING REQUIREMENTS):**
 ```
 ---STORY DRAFT---
 
 **Draft 1**
 Sophie woke up early and ran to the window. Snow! Real snow was falling outside. She grabbed her red boots and hurried downstairs to find Grandma already making hot chocolate.
 *(Word count: 32)*
+Scene hint: Sophie (right) presses her hands against the frosty window, eyes wide with wonder at the falling snow.
+Characters:
+- Sophie: standard
+Setting: indoor | Time: morning | Weather: snowy
 
 **Draft 2**
 "Can we build a snowman?" Sophie asked, bouncing on her toes. Grandma smiled and handed her a warm mug. "First, drink this. Then we'll bundle up."
 *(Word count: 28)*
+Scene hint: Sophie (left) bounces excitedly while Grandma (right) hands her a steaming mug of hot chocolate in the cozy kitchen.
+Characters:
+- Sophie: standard
+- Grandma: standard
+Setting: indoor | Time: morning | Weather: n/a
 
 **Draft 3**
 Outside, the garden looked like a white blanket. Sophie rolled the first snowball while Grandma watched from the porch with Max the dog.
 *(Word count: 24)*
+Scene hint: Sophie (center) rolls a large snowball in the snow-covered garden while Grandma (right) watches from the porch.
+Characters:
+- Sophie: winter
+- Grandma: winter
+Setting: outdoor | Time: morning | Weather: snowy
 
 ---CRITICAL ANALYSIS---
 
-1. **Logical inconsistencies:**
-   - Page 1: Sophie "grabbed her red boots" but we never see her put them on before going outside
-   - Page 3: Max appears without introduction - readers don't know who Max is
-   - Page 1-2: Timeline unclear - did Sophie get dressed between grabbing boots and drinking hot chocolate?
+**Story Logic:**
+1. Sophie "grabbed her red boots" but we never see her put them on before going outside
+2. Max appears without introduction - readers don't know who Max is
+3. Timeline unclear - did Sophie get dressed between grabbing boots and drinking hot chocolate?
 
-2. **Reading level violations:**
-   - None detected - word count appropriate for target level
+**Scene Hints Review:**
+4. Page 3: Max the dog is in the text but not in the scene hint characters - add or remove?
+5. Positions look good - left/right specified in each scene
+6. Clothing: Page 1-2 use "standard" (indoor), Page 3 switches to "winter" (outdoor) ✓
 
-3. **Fixes for final version:**
-   - Page 1: Change to "grabbed her coat" (boots can be assumed)
-   - Page 2: Add brief mention of Max the dog waiting by the door
-   - Page 3: Remove "Max the dog" since he's now introduced on page 2
+**Fixes:**
+- Page 1: Change to "grabbed her coat" (boots can be assumed)
+- Page 2: Add brief mention of Max the dog waiting by the door
+- Page 3: Remove "Max the dog" from text since we're focusing on Sophie and Grandma
+
+---TITLE---
+TITLE: Sophie's Snowy Surprise
 
 ---CLOTHING REQUIREMENTS---
 
 {
   "clothingRequirements": {
     "Sophie": {
-      "standard": { "used": false },
+      "standard": { "used": true, "signature": "none" },
       "winter": { "used": true, "signature": "red knitted scarf" },
+      "summer": { "used": false },
+      "costumed": { "used": false }
+    },
+    "Grandma": {
+      "standard": { "used": true, "signature": "floral apron" },
+      "winter": { "used": true, "signature": "warm shawl" },
       "summer": { "used": false },
       "costumed": { "used": false }
     }
