@@ -1872,13 +1872,16 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // The image itself was generated successfully, only the evaluation failed
     if (evalWasBlocked) {
       log.warn(`⚠️  [QUALITY RETRY] ${pageLabel}Accepting image (quality eval was blocked/failed after fallback)`);
+      // Extract rewrite usage from retryHistory if a scene was rewritten
+      const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
       return {
         ...result,
         wasRegenerated: attempts > 1,
         retryHistory: retryHistory,
         totalAttempts: attempts,
         evalSkipped: true,
-        score: null
+        score: null,
+        rewriteUsage: rewriteEntry?.rewriteUsage || null
       };
     }
 
@@ -2111,11 +2114,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Check if quality is good enough (and no text errors for covers)
     if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
       console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}${result.wasRepaired ? ' (after auto-repair)' : ''}`);
+      // Extract rewrite usage from retryHistory if a scene was rewritten
+      const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
       return {
         ...result,
         wasRegenerated: attempts > 1,
         retryHistory: retryHistory,
-        totalAttempts: attempts
+        totalAttempts: attempts,
+        rewriteUsage: rewriteEntry?.rewriteUsage || null
       };
     }
 
@@ -2129,11 +2135,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
   // All attempts exhausted, return best result
   console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore === -1 ? 'unknown' : bestScore + '%'}`);
+  // Extract rewrite usage from retryHistory if a scene was rewritten
+  const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
   return {
     ...bestResult,
     wasRegenerated: true,
     retryHistory: retryHistory,
-    totalAttempts: attempts
+    totalAttempts: attempts,
+    rewriteUsage: rewriteEntry?.rewriteUsage || null
   };
 }
 

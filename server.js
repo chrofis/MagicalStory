@@ -158,6 +158,7 @@ const {
   evaluateTextConsistency
 } = require('./server/lib/textModels');
 const {
+  MODEL_PRICING,
   calculateTextCost,
   calculateImageCost,
   formatCostSummary
@@ -6335,32 +6336,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Consistency check tracking
       consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() }
+      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      // Scene rewrite tracking (when safety blocks trigger rewrites)
+      scene_rewrite: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() }
     }
   };
 
-  // Pricing per million tokens by model (as of Dec 2025)
-  const MODEL_PRICING = {
-    // Anthropic models
-    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
-    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
-    'claude-opus-4-5': { input: 5.00, output: 25.00 },
-    // Gemini text models
-    'gemini-2.5-flash': { input: 0.30, output: 2.50 },
-    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
-    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
-    // Gemini image models
-    'gemini-2.5-flash-image': { input: 0.30, output: 30.00 },
-    'gemini-3-pro-image-preview': { input: 2.00, output: 120.00 },
-    'gemini-2.0-flash-exp-image-generation': { input: 0.10, output: 0.40 }  // Image editing
-  };
-
-  // Fallback pricing by provider (if model not found)
+  // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
   const PROVIDER_PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },
-    gemini_image: { input: 0.30, output: 30.00 },
-    gemini_quality: { input: 0.10, output: 0.40 },
-    gemini_text: { input: 0.30, output: 2.50 }
+    anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
+    gemini_image: MODEL_PRICING['gemini-2.5-flash-image'] || { input: 0.30, output: 30.00 },
+    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
@@ -6603,6 +6590,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         console.log(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
+        // Track scene rewrite usage if a safety block triggered a rewrite
+        if (imageResult?.rewriteUsage) {
+          addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
+        }
+
         const pageData = {
           pageNumber: pageNum,
           imageData: imageResult.imageData,
@@ -6759,6 +6751,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const streamCoverLabel = coverType === 'front' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
         const result = await generateImageWithQualityRetry(coverPrompt, referencePhotos, null, 'cover', null, streamCoverUsageTracker, null, coverModelOverrides, streamCoverLabel, { isAdmin, enableAutoRepair, checkOnlyMode });
 
+        // Track scene rewrite usage if a safety block triggered a rewrite
+        if (result?.rewriteUsage) {
+          addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
+        }
+
         const coverData = {
           imageData: result.imageData,
           description: sceneDescription,
@@ -6914,6 +6911,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       streamingTextModelId = streamResult.modelId || (textModelOverride ? textModelOverride : getActiveTextModel().modelId);
       streamingTextUsage = streamResult.usage || { input_tokens: 0, output_tokens: 0 };  // Save usage for dev mode
       addUsage('anthropic', streamResult.usage, 'story_text', streamingTextModelId);
+      // Log time-to-first-token for performance monitoring
+      if (streamResult.ttft) {
+        console.log(`[TIMING] TTFT unified story: ${streamResult.ttft}ms`);
+      }
       log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars (model: ${streamingTextModelId})`);
       log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
       log.debug(`🌊 [STREAM] ${streamingCoverPromises.length} cover images started during streaming`);
@@ -7229,6 +7230,11 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
           log.debug(`✅ [STORYBOOK] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (imageResult?.rewriteUsage) {
+            addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
+          }
+
           // Update progress
           const progressPercent = 30 + Math.floor((idx + 1) / sceneCount * 50);
           await dbPool.query(
@@ -7436,6 +7442,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const frontCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
           const frontCoverResult = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, frontCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           log.debug(`✅ [STORYBOOK] Front cover generated (score: ${frontCoverResult.score}${frontCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (frontCoverResult?.rewriteUsage) {
+            addUsage('anthropic', frontCoverResult.rewriteUsage, 'scene_rewrite');
+          }
           coverImages.frontCover = {
             imageData: frontCoverResult.imageData,
             description: titlePageScene,
@@ -7495,6 +7505,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const initialPageModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
           const initialResult = await generateImageWithQualityRetry(initialPrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, initialPageModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair, checkOnlyMode });
           log.debug(`✅ [STORYBOOK] Initial page generated (score: ${initialResult.score}${initialResult.wasRegenerated ? ', regenerated' : ''})`);
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (initialResult?.rewriteUsage) {
+            addUsage('anthropic', initialResult.rewriteUsage, 'scene_rewrite');
+          }
           coverImages.initialPage = {
             imageData: initialResult.imageData,
             description: initialPageScene,
@@ -7545,6 +7559,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           const backCoverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
           const backCoverResult = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, backCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           log.debug(`✅ [STORYBOOK] Back cover generated (score: ${backCoverResult.score}${backCoverResult.wasRegenerated ? ', regenerated' : ''})`);
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (backCoverResult?.rewriteUsage) {
+            addUsage('anthropic', backCoverResult.rewriteUsage, 'scene_rewrite');
+          }
           coverImages.backCover = {
             imageData: backCoverResult.imageData,
             description: backCoverScene,
@@ -8093,26 +8111,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Consistency check tracking
       consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() }
+      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      // Scene rewrite tracking (when safety blocks trigger rewrites)
+      scene_rewrite: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() }
     }
   };
 
-  // Pricing per million tokens
-  const MODEL_PRICING = {
-    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
-    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
-    'claude-opus-4-5': { input: 5.00, output: 25.00 },
-    'gemini-2.5-flash': { input: 0.30, output: 2.50 },
-    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
-    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
-    'gemini-2.5-flash-image': { input: 0.30, output: 30.00 },
-    'gemini-3-pro-image-preview': { input: 2.00, output: 120.00 }
-  };
+  // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
   const PROVIDER_PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },
-    gemini_image: { input: 0.30, output: 30.00 },
-    gemini_quality: { input: 0.10, output: 0.40 },
-    gemini_text: { input: 0.30, output: 2.50 }
+    anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
+    gemini_image: MODEL_PRICING['gemini-2.5-flash-image'] || { input: 0.30, output: 30.00 },
+    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
@@ -8386,6 +8396,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, checkOnlyMode }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
+        // Track scene rewrite usage if a safety block triggered a rewrite
+        if (coverResult?.rewriteUsage) {
+          addUsage('anthropic', coverResult.rewriteUsage, 'scene_rewrite');
+        }
 
         // Save partial_cover checkpoint for progressive display
         const coverKey = coverType === 'titlePage' ? 'frontCover' : coverType;
@@ -9032,6 +9046,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         { isAdmin, enableAutoRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
+      // Track scene rewrite usage if a safety block triggered a rewrite
+      if (imageResult?.rewriteUsage) {
+        addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
+      }
+
       if (imageResult?.imageData) {
 
         // Save partial_page checkpoint for progressive display
@@ -9477,6 +9496,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 { isAdmin: false, enableAutoRepair: false, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length }
               );
 
+              // Track scene rewrite usage if a safety block triggered a rewrite
+              if (imageResult?.rewriteUsage) {
+                addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
+              }
+
               if (imageResult?.imageData) {
                 // Summarize avatar info (without base64 data)
                 const avatarsUsed = pagePhotos.map(p => ({
@@ -9912,32 +9936,18 @@ async function processStoryJob(jobId) {
       avatar_costumed: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, direct_cost: 0, calls: 0, provider: null, models: new Set() },
       // Consistency check tracking
       consistency_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'gemini_quality', models: new Set() },
-      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() }
+      text_check: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
+      // Scene rewrite tracking (when safety blocks trigger rewrites)
+      scene_rewrite: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() }
     }
   };
 
-  // Pricing per million tokens by model (as of Dec 2025)
-  const MODEL_PRICING = {
-    // Anthropic models
-    'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00 },
-    'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00 },
-    'claude-opus-4-5': { input: 5.00, output: 25.00 },
-    // Gemini text models
-    'gemini-2.5-flash': { input: 0.30, output: 2.50 },
-    'gemini-2.5-pro': { input: 1.25, output: 10.00 },
-    'gemini-2.0-flash': { input: 0.10, output: 0.40 },
-    // Gemini image models
-    'gemini-2.5-flash-image': { input: 0.30, output: 30.00 },
-    'gemini-3-pro-image-preview': { input: 2.00, output: 120.00 },
-    'gemini-2.0-flash-exp-image-generation': { input: 0.10, output: 0.40 }  // Image editing
-  };
-
-  // Fallback pricing by provider (if model not found)
+  // Fallback pricing by provider (uses centralized MODEL_PRICING from server/config/models.js)
   const PROVIDER_PRICING = {
-    anthropic: { input: 3.00, output: 15.00 },
-    gemini_image: { input: 0.30, output: 30.00 },
-    gemini_quality: { input: 0.10, output: 0.40 },
-    gemini_text: { input: 0.30, output: 2.50 }
+    anthropic: MODEL_PRICING['claude-sonnet-4-5'] || { input: 3.00, output: 15.00 },
+    gemini_image: MODEL_PRICING['gemini-2.5-flash-image'] || { input: 0.30, output: 30.00 },
+    gemini_quality: MODEL_PRICING['gemini-2.0-flash'] || { input: 0.10, output: 0.40 },
+    gemini_text: MODEL_PRICING['gemini-2.5-flash'] || { input: 0.30, output: 2.50 }
   };
 
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
@@ -10100,6 +10110,7 @@ async function processStoryJob(jobId) {
             photoUrl: l.photo_url,
             photoDescription: l.photo_description,
             attribution: l.photo_attribution,
+            wikipediaExtract: l.wikipedia_extract,
             // Flag for lazy photo loading (support both old and new field names)
             isIndexed: true,
             isSwissPreIndexed: true,  // For backward compatibility
@@ -10536,6 +10547,10 @@ async function processStoryJob(jobId) {
           log.debug(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
           const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (result?.rewriteUsage) {
+            addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
+          }
           await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle, modelId: result.modelId || null }, 0);
           return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
         })(),
@@ -10543,6 +10558,10 @@ async function processStoryJob(jobId) {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
           const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair, checkOnlyMode });
           console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (result?.rewriteUsage) {
+            addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
+          }
           await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData, modelId: result.modelId || null }, 1);
           return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
         })(),
@@ -10550,6 +10569,10 @@ async function processStoryJob(jobId) {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
           const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair, checkOnlyMode });
           console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          // Track scene rewrite usage if a safety block triggered a rewrite
+          if (result?.rewriteUsage) {
+            addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
+          }
           await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData, modelId: result.modelId || null }, 2);
           return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
         })()
@@ -10822,6 +10845,11 @@ Output Format:
             }
 
             log.debug(`✅ [PAGE ${pageNum}] Image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
+
+            // Track scene rewrite usage if a safety block triggered a rewrite
+            if (imageResult?.rewriteUsage) {
+              addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
+            }
 
             const imageData = {
               pageNumber: pageNum,
@@ -11321,6 +11349,11 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             }
 
             log.debug(`✅ [PAGE ${pageNum}] Image generated successfully (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
+
+            // Track scene rewrite usage if a safety block triggered a rewrite
+            if (imageResult?.rewriteUsage) {
+              addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
+            }
 
             // Store this image as the previous image for the next iteration
             previousImage = imageResult.imageData;

@@ -171,6 +171,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   // Wrap entire request + stream reading in retry to handle mid-stream socket errors
   return await withRetry(async () => {
     console.log(`🌊 [STREAM] Starting streaming request to Anthropic (${maxTokens} max tokens)...`);
+    const startTime = Date.now();
 
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -204,6 +205,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     let buffer = '';
     let inputTokens = 0;
     let outputTokens = 0;
+    let firstChunkTime = null;
 
     try {
       while (true) {
@@ -212,6 +214,11 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         if (done) {
           log.debug('🌊 [STREAM] Stream complete');
           break;
+        }
+
+        // Capture time-to-first-token (TTFT)
+        if (!firstChunkTime && value) {
+          firstChunkTime = Date.now();
         }
 
         // Decode the chunk and add to buffer
@@ -266,7 +273,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         input_tokens: inputTokens,
         output_tokens: outputTokens
       },
-      modelId
+      modelId,
+      ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
   }, { maxRetries: 2, baseDelay: 2000 });
 }
@@ -277,7 +285,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
  * @param {number} maxTokens - Maximum tokens to generate
  * @param {string} modelId - The model ID to use
  * @param {function} onChunk - Callback function called with each text chunk
- * @returns {Promise<{text: string, usage: object}>}
+ * @returns {Promise<{text: string, usage: object, ttft: number|null}>}
  */
 async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -289,6 +297,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
   // Wrap entire request + stream reading in retry to handle mid-stream socket errors
   return await withRetry(async () => {
     console.log(`🌊 [STREAM] Starting streaming request to Gemini (${maxTokens} max tokens)...`);
+    const startTime = Date.now();
 
     // Use streamGenerateContent endpoint for streaming
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
@@ -320,6 +329,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     let inputTokens = 0;
     let outputTokens = 0;
     let thinkingTokens = 0;
+    let firstChunkTime = null;
 
     try {
       while (true) {
@@ -328,6 +338,11 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         if (done) {
           log.debug('🌊 [GEMINI STREAM] Stream complete');
           break;
+        }
+
+        // Capture time-to-first-token (TTFT)
+        if (!firstChunkTime && value) {
+          firstChunkTime = Date.now();
         }
 
         // Decode the chunk and add to buffer
@@ -385,7 +400,8 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         output_tokens: outputTokens,
         thinking_tokens: thinkingTokens
       },
-      modelId
+      modelId,
+      ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
   }, { maxRetries: 2, baseDelay: 2000 });
 }
