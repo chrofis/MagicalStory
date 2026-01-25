@@ -32,6 +32,8 @@ Your task is to create a COMPLETE story including:
 - **Story Theme/Setting**: {STORY_TYPE}
 - **Story Topic**: {STORY_TOPIC}
 - **Story Details**: {STORY_DETAILS}
+- **Characters**:
+{CHARACTERS}
 
 # Character Types
 
