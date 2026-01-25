@@ -77,43 +77,7 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 - Object Separation:
   - When objects touch, use distinct materials/colors: "A [wooden-brown] stick in a [pink-skin] hand"
 
-**CHARACTER DIFFERENTIATION:**
-- Each character must have UNIQUE pose and action
-- NEVER have multiple characters doing identical gestures
-- WRONG: "All children hold a finger to their lips"
-- RIGHT: "Sophie signals silence, Manuel freezes mid-step, Lukas cups his ear listening"
-
-**Scale Feasibility (CRITICAL):**
-
-| Camera Distance | What Fits | Character Detail |
-|-----------------|-----------|------------------|
-| EXTREME WIDE | Buildings, landscapes, vehicles | Silhouettes/colors only, NO faces |
-| WIDE | Room-sized spaces | Body language, hair/clothing colors, NO expressions |
-| FULL BODY | Standing figures head-to-toe | Clear silhouette, clothing details, basic face |
-| MEDIUM | 1-3 characters waist-up | Expressions OK, hand positions OK |
-| CLOSE-UP | Face/hands only | Full detail, but large objects cannot fit |
-
-**Auto-reject combinations:**
-- Spacecraft exterior + astronaut expressions = IMPOSSIBLE
-- Full building + character eye details = IMPOSSIBLE
-- Interior AND exterior of vehicle = IMPOSSIBLE
-
-**GOLDEN RULE**: One scale per scene. Pick HUMAN SCALE (expressions) or OBJECT SCALE (full buildings/vehicles), never both.
-
-**ILLUSTRATOR'S REALITY CHECK:**
-
-❌ IMPOSSIBLE (reject and recompose):
-- "Two spacecraft floating in space, astronauts waving through windows with excited expressions"
-  → At spacecraft scale, windows are dots. Astronauts invisible.
-- "The entire Eiffel Tower with Sophie at the top, her eyes sparkling with joy"
-  → At full-tower scale, Sophie is 1 pixel tall.
-- "A medieval battle with 100 soldiers, close-up on the knight's determined grimace"
-  → Wide battle = no face detail. Face detail = no battle.
-
-✅ POSSIBLE (good compositions):
-- "Inside the spacecraft, Neil peers through porthole at Earth, hand on glass, eyes wide"
-- "Sophie at Eiffel Tower observation deck, tower railing and Paris skyline behind her"
-- "Knight in foreground gripping sword, battle chaos blurred in background"
+**Scale & Differentiation:** See Checks #1 and #8 for detailed rules and examples.
 
 **Distant Characters (for wide shots):**
 - Specify frame regions: "Roger on left edge, Lukas on right edge"
@@ -174,8 +138,26 @@ This is your FIRST ATTEMPT - it may have issues that will be caught in Step 2.
 Review your draft against EVERY check below. Be harsh - find ALL problems.
 
 **1. Scale Feasibility:**
-- Camera distance vs character detail level - compatible?
-- Large objects + facial expressions = IMPOSSIBLE
+
+| Camera Distance | What Fits | Character Detail |
+|-----------------|-----------|------------------|
+| EXTREME WIDE | Buildings, landscapes, vehicles | Silhouettes/colors only, NO faces |
+| WIDE | Room-sized spaces | Body language, NO expressions |
+| FULL BODY | Standing figures head-to-toe | Clothing details, basic face |
+| MEDIUM | 1-3 characters waist-up | Expressions OK, hand positions OK |
+| CLOSE-UP | Face/hands only | Full detail, but large objects cannot fit |
+
+**Auto-reject:** Spacecraft exterior + expressions, Full building + face details, Interior AND exterior of vehicle
+
+**GOLDEN RULE:** One scale per scene. HUMAN SCALE (expressions) OR OBJECT SCALE (buildings/vehicles), never both.
+
+❌ IMPOSSIBLE:
+- "Entire Eiffel Tower with Sophie's sparkling eyes" → At tower scale, Sophie is 1 pixel
+- "Spacecraft in space, astronauts waving with excited expressions" → Windows are dots
+
+✅ FIX BY RECOMPOSING:
+- "Sophie at observation deck, tower railing and Paris skyline behind her"
+- "Inside spacecraft, Neil peers through porthole at Earth, eyes wide"
 
 **2. Object Orientation & Placement:**
 - Is each object VERTICAL (standing door, wall) or HORIZONTAL (floor, trap door, table)?
@@ -198,20 +180,23 @@ If ANY answer is NO → add specific position.
 - Pulling a vertical door = stand and pull TOWARD you
 - Bracing against wall while pulling = vertical door, NOT floor trap door
 
-**4. Character Connections:**
-- Facing directions correct?
-- Gaze directions reach their targets?
-- Positions and depth layers clear?
+**4. Character Positioning & Body:**
 
-**5. Body Consistency:**
-- Both arms accounted for each character?
-- Poses support ONE clear action?
+For EACH character verify:
+1. **Position:** Frame region + depth layer stated? (e.g., "left foreground")
+2. **Facing:** Direction explicit? (e.g., "facing right", "turned toward Manuel")
+3. **Gaze target:** If looking at something, is it in correct direction?
+   - Looking at object on LEFT → character faces left
+   - Looking at object in BACKGROUND → character faces away from camera
+4. **Arms:** Both accounted? L:[action] R:[action]
+5. **Pointing:** If pointing, geometry correct?
+   - Pointing LEFT = arm extends toward left side of frame
+   - Pointing at BACKGROUND object = arm extends away from camera
 
-**6. Gaze & Pointing Geometry:**
-- Left/right directions correct?
-- Depth layers allow the interaction?
+❌ "Sophie looks at tower on left" + "Sophie facing right" (contradiction)
+✅ "Sophie faces left toward tower, right arm pointing at its peak"
 
-**7. Camera-View Compatibility:**
+**5. Camera-View Compatibility:**
 | View Type | Expressions Allowed |
 |-----------|-------------------|
 | FRONT / THREE-QUARTER FRONT | Full expressions OK |
@@ -219,16 +204,18 @@ If ANY answer is NO → add specific position.
 | THREE-QUARTER BACK | Minimal (ear, cheek) |
 | BACK | NONE - body language only |
 
-**8. Character Differentiation:**
-- Each character has UNIQUE pose?
-- No identical gestures?
+**6. Character Differentiation:**
+- Each character MUST have UNIQUE pose and action
+- NEVER have multiple characters doing identical gestures
+- ❌ "All children hold a finger to their lips"
+- ✅ "Sophie signals silence, Manuel freezes mid-step, Lukas cups his ear listening"
 
-**9. Physics Check:**
+**7. Physics Check:**
 - Ropes taut? Heavy = straining posture?
 - Distinct materials where objects touch?
 - Obstacles actually block? (spans width / wedged / too large to bypass)
 
-**10. Weather & Indoor/Outdoor Consistency:**
+**8. Weather & Indoor/Outdoor Consistency:**
 - If INDOOR: Weather should NOT be directly visible (no rain/snow falling on characters)
   - Weather CAN be visible through windows (snow seen outside, rain on window panes)
   - Describe HOW weather is shown: "snow visible through frost-covered window" NOT "snow falling"
@@ -239,7 +226,7 @@ If ANY answer is NO → add specific position.
   - "Rain soaking characters" + "indoor" = WRONG
   - "Sunny sky above" + "indoor" = WRONG (unless skylight/outdoor area visible)
 
-**11. Distance & Separation (for confrontations/wide shots):**
+**9. Distance & Separation (for confrontations/wide shots):**
 - Are characters who should be FAR APART actually separated by depth layers?
 - Is the EMPTY SPACE between distant characters explicitly named/described?
   - WRONG: "Sophie foreground, villain background" (gap not described)
@@ -247,14 +234,25 @@ If ANY answer is NO → add specific position.
 - For adversaries/confrontations: describe what fills the gap (swirling snow, empty plaza, beam of light)
 - For distant characters: use scale language ("small figure", "distant silhouette")
 
-**12. Location Continuity:**
+**10. Location Continuity:**
 - Does the location match PREVIOUS_SCENES unless story text describes a location CHANGE?
 - Characters don't teleport between scenes without the story mentioning travel
 - WRONG: Previous scene at "Ruine Stein on hill", current scene suddenly at "Limmat riverbank" (no travel mentioned)
 - RIGHT: Keep same location until story text says they moved (e.g., "sie flogen zur Brücke")
 - Check: If machine/object was at Location A in previous scene, it's still at Location A unless moved
 
-**13. Linear Space Consistency:**
+**11. Story Text Fidelity:**
+Does your scene match the INPUT story text and scene summary?
+
+- **Spatial terms:** "vor" (in front of) ≠ inside/on; "neben" (beside) ≠ behind
+- **Character positions:** Match where story says they are
+- **Actions:** "betrachten" (looking at) = characters face toward object
+- **Object states:** "verschlossen" (locked/closed) = show it closed
+
+❌ Input: "stehen vor der Brücke" → Output: characters inside bridge
+✅ Input: "stehen vor der Brücke" → Output: characters at bridge entrance, facing bridge
+
+**12. Linear Space Consistency:**
 When scene involves a PATH (bridge, hallway, street, corridor, track, trail):
 
 1. State path ORIENTATION explicitly:
@@ -287,7 +285,7 @@ FOLLOWING:
 - ❌ "Forest trail leads from foreground into distant trees" + "guide on left, hikers on right"
 - ✅ "Forest trail starts bottom-left and goes to top-right" + "guide top-right (seen from behind), hikers bottom-left (seen from behind)"
 
-**14. Shared Object Interactions:**
+**13. Shared Object Interactions:**
 When 2+ characters physically interact with the SAME object (carrying, pushing, holding together):
 
 1. Object MUST appear in the Objects section with:
@@ -308,7 +306,7 @@ Examples:
      Pfadi-Bub: "pushing the beam, weight forward"
      (Clear - one beam, two people, positions defined)
 
-**15. Obstacle Logic:**
+**14. Obstacle Logic:**
 When an object is described as BLOCKING or PREVENTING passage, explain WHY it's impassable:
 - Spans full width (can't go around)
 - Wedged/jammed in place (can't push aside)
@@ -321,7 +319,7 @@ Examples:
 - ❌ "Rocks piled in the cave entrance" (could climb over a pile)
 - ✅ "Boulder fills the cave mouth from floor to ceiling, no gaps visible"
 
-**16. Holding Inventory:**
+**15. Holding Inventory:**
 For EACH character, track what they're holding via the `holding` field:
 
 1. Fill `leftHand` and `rightHand` for each character
@@ -340,7 +338,7 @@ Examples:
 - ✅ "leftHand": "map edge", "rightHand": "map edge" + Objects: "Wizard's staff leaning against pillar"
 - ❌ "Both hands: open book" + "Stuffed animal tucked under left arm" (left arm can't do both)
 
-**17. Background Feasibility:**
+**16. Background Feasibility:**
 When describing background elements visible through openings (windows, doors, archways):
 
 1. Can all listed background elements realistically be seen from this viewpoint?
@@ -407,28 +405,27 @@ Output raw JSON (no markdown code fences, no explanation text).
       {
         "id": "ART001 (only if from RECURRING ELEMENTS, otherwise omit id)",
         "name": "Object name",
-        "position": "Where in scene"
+        "position": "[left|center|right] [foreground|midground|background], relative to [landmark]"
       }
     ]
   },
   "critique": {
-    "scaleFeasibility": "Camera distance: X, Detail needed: Y, Compatible: YES/NO",
-    "objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, setting says X, action requires Y - CONSISTENT/INCONSISTENT. Position precise? [horizontal + depth] or VAGUE",
-    "actionCompatibility": "For EACH character-object interaction: [action] + [object orientation] = VALID/INVALID",
-    "characterConnections": "Who faces whom, gaze directions, positions, closeness",
-    "bodyConsistency": "Both arms accounted for, pose supports action",
-    "gazeGeometry": "Left/right pointing verified, depth layers verified",
-    "cameraViewCheck": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
-    "characterDifferentiation": "Each character has UNIQUE pose? YES/NO",
-    "physicsCheck": "Ropes taut? Heavy = straining? Materials distinct? Obstacles actually block?",
-    "weatherCheck": "Scene is INDOOR/OUTDOOR. Weather: X. Weather visibility: [how weather is shown - e.g., 'through window' or 'directly on characters']. Compatible: YES/NO",
-    "distanceSeparation": "Are distant/adversary characters separated? Is the gap named? What fills the space between them? ADEQUATE/INADEQUATE",
-    "locationContinuity": "Previous scene location: X. Current scene location: Y. Story mentions travel? YES/NO. Consistent: YES/NO",
-    "linearSpaceConsistency": "Path: [type]. Orientation: [lengthwise/crosswise/diagonal]. Character positions match orientation? YES/NO",
-    "sharedObjectInteractions": "Shared objects: [list or NONE]. Each in Objects section with grip points? YES/NO/N/A",
-    "obstacleLogic": "Obstacles blocking passage: [list or NONE]. Each explains WHY impassable (spans width/wedged/too large)? YES/NO/N/A",
-    "holdingInventory": "For EACH character: [Name] L:[item/empty] R:[item/empty] BOTH:[item/none]. Conflict? YES/NO",
-    "backgroundFeasibility": "Background elements: [list]. All visible from this viewpoint? Opening sizes respected? If too many elements for openings, which to DROP? FEASIBLE/SIMPLIFY",
+    "check1_scaleFeasibility": "Camera distance: X, Detail needed: Y, Compatible: YES/NO",
+    "check2_objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, setting says X, action requires Y - CONSISTENT/INCONSISTENT. Position precise? [horizontal + depth] or VAGUE",
+    "check3_actionCompatibility": "For EACH character-object interaction: [action] + [object orientation] = VALID/INVALID",
+    "check4_characterPositioning": "For EACH: [Name] position:[where] facing:[direction] L:[arm] R:[arm]. Gaze/pointing geometry correct? YES/NO",
+    "check5_cameraView": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
+    "check6_differentiation": "Each character has UNIQUE pose? YES/NO",
+    "check7_physics": "Ropes taut? Heavy = straining? Materials distinct? Obstacles actually block?",
+    "check8_weather": "Scene is INDOOR/OUTDOOR. Weather: X. Weather visibility: [how weather is shown - e.g., 'through window' or 'directly on characters']. Compatible: YES/NO",
+    "check9_distanceSeparation": "Are distant/adversary characters separated? Is the gap named? What fills the space between them? ADEQUATE/INADEQUATE",
+    "check10_locationContinuity": "Previous scene location: X. Current scene location: Y. Story mentions travel? YES/NO. Consistent: YES/NO",
+    "check11_storyTextFidelity": "Input says: [key spatial terms]. Output shows: [what scene depicts]. Match? YES/NO",
+    "check12_linearSpace": "Path: [type]. Orientation: [lengthwise/crosswise/diagonal]. Character positions match orientation? YES/NO",
+    "check13_sharedObjects": "Shared objects: [list or NONE]. Each in Objects section with grip points? YES/NO/N/A",
+    "check14_obstacleLogic": "Obstacles blocking passage: [list or NONE]. Each explains WHY impassable (spans width/wedged/too large)? YES/NO/N/A",
+    "check15_holdingInventory": "For EACH character: [Name] L:[item/empty] R:[item/empty] BOTH:[item/none]. Conflict? YES/NO",
+    "check16_backgroundFeasibility": "Background elements: [list]. All visible from this viewpoint? Opening sizes respected? If too many elements for openings, which to DROP? FEASIBLE/SIMPLIFY",
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
@@ -527,22 +524,21 @@ If your scene shows the bridge from across the river, select the wide exterior v
     ]
   },
   "critique": {
-    "scaleFeasibility": "Camera: WIDE, Detail: FULL BODY, Compatible: YES",
-    "objectPlacement": "Die magische Tür: Setting says 'set into floor stones' = HORIZONTAL trap door. But object is described as ornate door with handle = typically VERTICAL. INCONSISTENT.",
-    "actionCompatibility": "Manuel 'gripping door handle pulling it open, braced against wall' = VERTICAL door pulling action. But door is 'in floor stones' = HORIZONTAL. Bracing against wall doesn't help lift a floor door. INVALID.",
-    "characterConnections": "Sophie left foreground, Manuel center middle ground. Both focused on door area.",
-    "bodyConsistency": "Sophie: both arms accounted. Manuel: both arms accounted.",
-    "gazeGeometry": "Both looking at door in center - valid.",
-    "cameraViewCheck": "Elevated camera + characters looking DOWN at floor door = tops of heads visible, not faces. Sophie 'eyes wide, mouth open' INCOMPATIBLE with elevated camera seeing her from above/behind.",
-    "characterDifferentiation": "Sophie kneeling/pushing, Manuel standing/pulling - UNIQUE poses.",
-    "physicsCheck": "Door pulling mechanics inconsistent with floor placement. No blocking obstacles in scene.",
-    "weatherCheck": "Scene is OUTDOOR (ruins). Weather: winter. Weather visibility: directly on scene. Compatible: YES",
-    "distanceSeparation": "Characters are working together at same location (door) - no separation needed. N/A",
-    "locationContinuity": "Previous scene: Ruine Stein. Current scene: Ruine Stein. No travel mentioned. Consistent: YES",
-    "linearSpaceConsistency": "No linear path in scene - characters at door in room. N/A",
-    "sharedObjectInteractions": "Shared objects: door (Manuel and Sophie). In Objects section with grip points? YES - door position and who does what defined.",
-    "obstacleLogic": "No obstacles blocking passage in this scene. N/A",
-    "holdingInventory": "Sophie: L:braced on floor R:pushing stone BOTH:none. No conflict. Manuel: L:braced on wall R:door handle BOTH:none. No conflict.",
+    "check1_scaleFeasibility": "Camera: WIDE, Detail: FULL BODY, Compatible: YES",
+    "check2_objectPlacement": "Die magische Tür: Setting says 'set into floor stones' = HORIZONTAL trap door. But object is described as ornate door with handle = typically VERTICAL. INCONSISTENT.",
+    "check3_actionCompatibility": "Manuel 'gripping door handle pulling it open, braced against wall' = VERTICAL door pulling action. But door is 'in floor stones' = HORIZONTAL. Bracing against wall doesn't help lift a floor door. INVALID.",
+    "check4_characterPositioning": "Sophie: position:left foreground facing:right L:braced R:pushing. Manuel: position:center middle facing:door L:braced R:handle. Gaze at door center - valid.",
+    "check5_cameraView": "Elevated camera + characters looking DOWN at floor door = tops of heads visible, not faces. Sophie 'eyes wide, mouth open' INCOMPATIBLE with elevated camera seeing her from above/behind.",
+    "check6_differentiation": "Sophie kneeling/pushing, Manuel standing/pulling - UNIQUE poses.",
+    "check7_physics": "Door pulling mechanics inconsistent with floor placement. No blocking obstacles in scene.",
+    "check8_weather": "Scene is OUTDOOR (ruins). Weather: winter. Weather visibility: directly on scene. Compatible: YES",
+    "check9_distanceSeparation": "Characters are working together at same location (door) - no separation needed. N/A",
+    "check10_locationContinuity": "Previous scene: Ruine Stein. Current scene: Ruine Stein. No travel mentioned. Consistent: YES",
+    "check11_storyTextFidelity": "Input says: 'magical door hidden in ruins'. Output shows: door in stone wall of ruins. Match? YES",
+    "check12_linearSpace": "No linear path in scene - characters at door in room. N/A",
+    "check13_sharedObjects": "Shared objects: door (Manuel and Sophie). In Objects section with grip points? YES - door position and who does what defined.",
+    "check14_obstacleLogic": "No obstacles blocking passage in this scene. N/A",
+    "check15_holdingInventory": "Sophie: L:braced on floor R:pushing stone BOTH:none. No conflict. Manuel: L:braced on wall R:door handle BOTH:none. No conflict.",
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
@@ -590,6 +586,21 @@ If your scene shows the bridge from across the river, select the wide exterior v
   }
 }
 ```
+
+### MINI-EXAMPLES (Other Error Types)
+
+**Weather Fix:**
+- ❌ Draft: `"indoorOutdoor": "indoor"` + `"weather": "snow falling on characters"`
+- ✅ Fix: `"weatherVisibility": "snow visible through frost-covered window"`
+
+**Position Fix:**
+- ❌ Draft objects: `{"name": "Boathouse", "position": "visible through bridge opening"}`
+- ✅ Fix: `{"name": "Boathouse", "position": "right background, at riverbank beyond bridge"}`
+
+**Story Text Fidelity Fix:**
+- Input: "stehen **vor** der Brücke" (in front of bridge)
+- ❌ Draft: Characters positioned inside bridge on walkway
+- ✅ Fix: Characters at bridge entrance, facing toward bridge
 
 ---
 
