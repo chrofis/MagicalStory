@@ -2421,6 +2421,8 @@ const SWISS_CITIES = [
   { city: 'Sion', country: 'Switzerland', region: 'VS' },
   { city: 'Aarau', country: 'Switzerland', region: 'AG' },
   { city: 'Baden', country: 'Switzerland', region: 'AG' },
+  { city: 'Wettingen', country: 'Switzerland', region: 'AG' },
+  { city: 'Neuenhof', country: 'Switzerland', region: 'AG' },
   { city: 'Zug', country: 'Switzerland', region: 'ZG' },
   { city: 'Solothurn', country: 'Switzerland', region: 'SO' },
   { city: 'Olten', country: 'Switzerland', region: 'SO' },
