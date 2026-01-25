@@ -182,6 +182,16 @@ Review your draft against EVERY check below. Be harsh - find ALL problems.
 - Does the setting description match the object orientation?
 - CONFLICT EXAMPLE: "door in floor" (horizontal) + "pulling door handle" (vertical action) = INCONSISTENT
 
+**Position Test - For EACH object ask:**
+1. Could an artist point to exactly where it goes in the frame?
+2. Is horizontal position clear? (left / center-left / center / center-right / right)
+3. Is depth clear? (foreground / middle ground / background)
+
+If ANY answer is NO → add specific position.
+- ❌ "Castle in distance" → ✅ "Castle: center background, on hilltop"
+- ❌ "Tree on shore" → ✅ "Oak tree: left middle ground"
+- ❌ "Boathouse through opening" → ✅ "Boathouse: right background, at riverbank"
+
 **3. Action-Object Compatibility:**
 - Do character actions physically make sense with object orientation?
 - Pulling a horizontal trap door = squat and lift UP
@@ -403,7 +413,7 @@ Output raw JSON (no markdown code fences, no explanation text).
   },
   "critique": {
     "scaleFeasibility": "Camera distance: X, Detail needed: Y, Compatible: YES/NO",
-    "objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, setting says X, action requires Y - CONSISTENT/INCONSISTENT",
+    "objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, setting says X, action requires Y - CONSISTENT/INCONSISTENT. Position precise? [horizontal + depth] or VAGUE",
     "actionCompatibility": "For EACH character-object interaction: [action] + [object orientation] = VALID/INVALID",
     "characterConnections": "Who faces whom, gaze directions, positions, closeness",
     "bodyConsistency": "Both arms accounted for, pose supports action",
