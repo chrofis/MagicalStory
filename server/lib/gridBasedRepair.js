@@ -29,6 +29,7 @@ const {
   repairGridWithGemini,
   extractRepairedRegions,
   saveGridFiles,
+  buildGridRepairPrompt,
   MAX_PER_GRID
 } = require('./repairGrid');
 
@@ -200,6 +201,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   let currentImage = imageBuffer;
   let anyRepaired = false;
   const allRepairs = [];
+  const allGrids = [];  // Collect grid data for UI display
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
@@ -212,15 +214,28 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
       title: `Page ${pageNum} - Batch ${batchNum}`
     });
 
+    // Build repair prompt for this grid
+    const repairPrompt = buildGridRepairPrompt(manifest);
+
     // Save grid files
     let repairedGridBuffer = null;
     let gridFiles = null;
+
+    // Initialize grid entry for collection (will be updated with repaired buffer)
+    const gridEntry = {
+      batchNum,
+      original: gridBuffer.toString('base64'),
+      repaired: null,
+      manifest,
+      prompt: repairPrompt
+    };
 
     try {
       // Send to Gemini for repair
       progress('repair', `Sending batch ${batchNum} to Gemini`);
       const repairResult = await repairGridWithGemini(gridBuffer, manifest);
       repairedGridBuffer = repairResult.buffer;
+      gridEntry.repaired = repairedGridBuffer.toString('base64');
       history.totalAttempts++;
 
       // Save grid files
@@ -327,6 +342,9 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
         repaired: gridFiles.repairedPath
       } : null
     });
+
+    // Add grid data for UI display
+    allGrids.push(gridEntry);
   }
 
   // =========================================================================
@@ -408,7 +426,15 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
     history,
     fixedCount: history.fixedCount,
     failedCount: history.failedCount,
-    totalIssues: history.issueCount
+    totalIssues: history.issueCount,
+    // Grid images for UI display (base64 encoded)
+    grids: allGrids.map(g => ({
+      batchNum: g.batchNum,
+      original: g.original,
+      repaired: g.repaired,
+      manifest: g.manifest,
+      prompt: g.prompt
+    }))
   };
 }
 

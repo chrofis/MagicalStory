@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { History, ChevronRight, ChevronDown, Download } from 'lucide-react';
-import type { RetryAttempt } from '@/types/story';
+import type { RetryAttempt, GridRepairData } from '@/types/story';
 
 /**
  * Download text content as a file
@@ -282,8 +282,9 @@ export function RetryHistoryDisplay({
 
   if (!retryHistory || retryHistory.length === 0) return null;
 
-  // Count repairs in history
-  const repairCount = retryHistory.filter(a => a.type === 'auto_repair').length;
+  // Count repairs in history (both legacy and grid-based)
+  const repairCount = retryHistory.filter(a => a.type === 'auto_repair' || a.type === 'grid_repair').length;
+  const gridRepairCount = retryHistory.filter(a => a.type === 'grid_repair').length;
 
   return (
     <>
@@ -318,6 +319,7 @@ export function RetryHistoryDisplay({
             {repairCount > 0 && (
               <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
                 🔧 {repairCount} {language === 'de' ? 'Reparatur' : 'repair'}{repairCount > 1 ? (language === 'de' ? 'en' : 's') : ''}
+                {gridRepairCount > 0 && <span className="ml-1">({gridRepairCount} grid)</span>}
               </span>
             )}
           </span>
@@ -328,6 +330,7 @@ export function RetryHistoryDisplay({
       <div className="mt-3 space-y-3">
         {retryHistory.map((attempt, idx) => (
           <div key={idx} className={`border rounded-lg p-3 ${
+            attempt.type === 'grid_repair' ? 'bg-violet-50 border-violet-300' :
             attempt.type === 'auto_repair' ? 'bg-amber-50 border-amber-300' :
             idx === retryHistory.length - 1
               ? 'bg-green-50 border-green-300'
@@ -335,7 +338,9 @@ export function RetryHistoryDisplay({
           }`}>
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-sm">
-                {attempt.type === 'auto_repair' ? (
+                {attempt.type === 'grid_repair' ? (
+                  <span className="text-violet-700">🔲 Grid Repair</span>
+                ) : attempt.type === 'auto_repair' ? (
                   <span className="text-amber-700">🔧 Auto-Repair</span>
                 ) : (
                   <>
@@ -630,19 +635,175 @@ export function RetryHistoryDisplay({
               </div>
             )}
 
+            {/* Grid Repair specific display */}
+            {attempt.type === 'grid_repair' && (
+              <div className="space-y-2">
+                {/* Stats row */}
+                <div className="flex items-center gap-4 text-sm">
+                  {attempt.gridTotalIssues !== undefined && (
+                    <span className="text-violet-700">
+                      {language === 'de' ? 'Probleme:' : 'Issues:'} {attempt.gridTotalIssues}
+                    </span>
+                  )}
+                  {attempt.gridFixedCount !== undefined && (
+                    <span className="text-green-600">
+                      ✓ {language === 'de' ? 'Behoben:' : 'Fixed:'} {attempt.gridFixedCount}
+                    </span>
+                  )}
+                  {attempt.gridFailedCount !== undefined && attempt.gridFailedCount > 0 && (
+                    <span className="text-red-600">
+                      ✗ {language === 'de' ? 'Fehlgeschlagen:' : 'Failed:'} {attempt.gridFailedCount}
+                    </span>
+                  )}
+                </div>
+
+                {/* Before/After Evaluations */}
+                <details className="text-sm">
+                  <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
+                    📊 {language === 'de' ? 'Bewertungen anzeigen' : 'View Evaluations'}
+                  </summary>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Before evaluation */}
+                    <div className="bg-white p-4 rounded-lg border-2 border-red-200 shadow-sm">
+                      <div className="font-bold text-red-700 mb-2 text-base flex items-center gap-2">
+                        <span className="bg-red-100 px-2 py-0.5 rounded">Before</span>
+                        <span className="text-red-600">{attempt.preRepairScore}%</span>
+                      </div>
+                      <EvaluationDisplay
+                        data={attempt.preRepairEval || attempt.reasoning}
+                        language={language}
+                        title={`evaluation-before-grid-${idx}`}
+                      />
+                    </div>
+                    {/* After evaluation */}
+                    <div className="bg-white p-4 rounded-lg border-2 border-green-200 shadow-sm">
+                      <div className="font-bold text-green-700 mb-2 text-base flex items-center gap-2">
+                        <span className="bg-green-100 px-2 py-0.5 rounded">After</span>
+                        <span className="text-green-600">{attempt.postRepairScore}%</span>
+                      </div>
+                      <EvaluationDisplay
+                        data={attempt.postRepairEval}
+                        language={language}
+                        title={`evaluation-after-grid-${idx}`}
+                      />
+                    </div>
+                  </div>
+                </details>
+
+                {/* Grid images display */}
+                {attempt.grids && attempt.grids.length > 0 && (
+                  <details className="text-sm">
+                    <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
+                      🔲 {language === 'de' ? 'Grid-Details' : 'Grid Details'} ({attempt.grids.length} {attempt.grids.length === 1 ? 'grid' : 'grids'})
+                    </summary>
+                    <div className="mt-3 space-y-4">
+                      {attempt.grids.map((grid: GridRepairData, gIdx: number) => (
+                        <div key={gIdx} className="bg-white p-4 rounded-lg border shadow-sm">
+                          <div className="flex justify-between items-center mb-3">
+                            <span className="font-medium text-violet-800">
+                              {language === 'de' ? 'Grid' : 'Grid'} {grid.batchNum || gIdx + 1}
+                            </span>
+                            {grid.manifest?.issues && (
+                              <span className="text-xs text-gray-500">
+                                {grid.manifest.issues.length} {language === 'de' ? 'Regionen' : 'regions'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Issue descriptions */}
+                          {grid.manifest?.issues && grid.manifest.issues.length > 0 && (
+                            <div className="mb-3 p-2 bg-violet-50 rounded text-sm">
+                              <div className="font-medium text-violet-800 mb-1">
+                                {language === 'de' ? 'Zu reparierende Probleme:' : 'Issues to repair:'}
+                              </div>
+                              <div className="space-y-1">
+                                {grid.manifest.issues.map((issue, iIdx: number) => (
+                                  <div key={iIdx} className="flex gap-2">
+                                    <span className="font-mono font-bold text-violet-600 min-w-[20px]">{issue.letter}:</span>
+                                    <span className="text-gray-700">{issue.fixInstruction || issue.description || 'Unknown issue'}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Repair Prompt */}
+                          {grid.prompt && (
+                            <details className="mb-3">
+                              <summary className="text-gray-500 cursor-pointer hover:text-gray-700 text-sm flex items-center gap-2">
+                                {language === 'de' ? 'Reparatur-Prompt anzeigen' : 'Show repair prompt'}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    downloadAsText(grid.prompt || '', `grid-repair-prompt-${gIdx}.txt`);
+                                  }}
+                                  className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-0.5 bg-blue-50 rounded"
+                                >
+                                  <Download size={10} /> Download
+                                </button>
+                              </summary>
+                              <div className="mt-2 p-3 bg-gray-50 rounded text-sm text-gray-600 whitespace-pre-wrap font-mono max-h-48 overflow-auto">
+                                {grid.prompt}
+                              </div>
+                            </details>
+                          )}
+
+                          {/* Grid Images: Before and After */}
+                          <div className="flex gap-4 items-start flex-wrap">
+                            {/* Original Grid */}
+                            {grid.original && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1 font-medium">
+                                  {language === 'de' ? 'Original-Grid' : 'Input Grid'}
+                                </div>
+                                <img
+                                  src={`data:image/jpeg;base64,${grid.original}`}
+                                  alt="Input grid"
+                                  className="max-w-xs border rounded cursor-pointer hover:ring-2 hover:ring-violet-400"
+                                  onClick={() => setEnlargedImg({ src: `data:image/jpeg;base64,${grid.original}`, title: language === 'de' ? 'Original-Grid' : 'Input Grid' })}
+                                />
+                              </div>
+                            )}
+                            {/* Arrow */}
+                            {grid.original && grid.repaired && (
+                              <div className="flex items-center self-center text-gray-400 text-2xl">→</div>
+                            )}
+                            {/* Repaired Grid */}
+                            {grid.repaired && (
+                              <div>
+                                <div className="text-xs text-gray-500 mb-1 font-medium">
+                                  {language === 'de' ? 'Repariertes Grid' : 'Repaired Grid'}
+                                </div>
+                                <img
+                                  src={`data:image/jpeg;base64,${grid.repaired}`}
+                                  alt="Repaired grid"
+                                  className="max-w-xs border-2 border-green-300 rounded cursor-pointer hover:ring-2 hover:ring-green-400"
+                                  onClick={() => setEnlargedImg({ src: `data:image/jpeg;base64,${grid.repaired}`, title: language === 'de' ? 'Repariertes Grid' : 'Repaired Grid' })}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                )}
+              </div>
+            )}
+
             {/* Regular attempt feedback */}
-            {attempt.type !== 'auto_repair' && attempt.reasoning ? (
+            {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.reasoning ? (
               <details className="text-sm text-gray-600 mb-2">
                 <summary className="cursor-pointer">{language === 'de' ? 'Feedback' : 'Feedback'}</summary>
                 <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded text-sm overflow-auto max-h-60 font-mono">{attempt.reasoning}</pre>
               </details>
-            ) : attempt.type !== 'auto_repair' && attempt.score === 0 && (
+            ) : attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.score === 0 && (
               <div className="text-sm text-gray-500 italic mb-2">
                 {language === 'de' ? 'Qualitätsbewertung fehlgeschlagen' : language === 'fr' ? 'Évaluation de qualité échouée' : 'Quality evaluation failed'}
               </div>
             )}
 
-            {attempt.imageData && attempt.type !== 'auto_repair' && (
+            {attempt.imageData && attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && (
               <details>
                 <summary className="cursor-pointer text-sm text-blue-600">
                   {language === 'de' ? 'Bild anzeigen' : language === 'fr' ? 'Voir image' : 'View image'}

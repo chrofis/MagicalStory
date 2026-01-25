@@ -130,9 +130,37 @@ export interface BboxDetectionResult {
   timestamp: string;
 }
 
+// Grid repair manifest issue
+export interface GridManifestIssue {
+  letter: string;
+  issueId?: string;
+  source?: string;
+  type?: string;
+  severity?: string;
+  description?: string;
+  fixInstruction?: string;
+}
+
+// Grid repair data for UI display
+export interface GridRepairData {
+  batchNum?: number;
+  original?: string;  // base64 encoded grid image
+  repaired?: string;  // base64 encoded repaired grid image
+  prompt?: string;    // repair prompt sent to Gemini
+  manifest?: {
+    createdAt?: string;
+    title?: string;
+    dimensions?: { width: number; height: number };
+    cellSize?: number;
+    cols?: number;
+    rows?: number;
+    issues?: GridManifestIssue[];
+  };
+}
+
 export interface RetryAttempt {
   attempt: number;
-  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed';
+  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed' | 'grid_repair';
   imageData?: string;
   score?: number;
   reasoning?: string;
@@ -150,6 +178,11 @@ export interface RetryAttempt {
   // Two-stage bounding box detection results
   bboxDetection?: BboxDetectionResult[] | null;
   repairDetails?: RepairAttempt[];
+  // Grid repair specific fields
+  grids?: GridRepairData[];
+  gridFixedCount?: number;
+  gridFailedCount?: number;
+  gridTotalIssues?: number;
 }
 
 // Inpaint verification result (LPIPS + LLM)
