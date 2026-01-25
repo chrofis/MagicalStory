@@ -8678,7 +8678,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             characterNames: [char.name]
           }));
         });
-        await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, streamingClothingRequirements, addUsage);
+        await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage);
         log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
         // Bug #14 fix: Include stack trace for better debugging
