@@ -85,6 +85,26 @@ When they reached the tree, both children stopped to catch their breath. The vie
 
 You MUST follow these text length guidelines strictly. Each page's story text must match the reading level specified above.
 
+# Scene Hint Format
+
+Every page needs a scene hint for illustration. Use this EXACT format:
+
+```
+SCENE HINT:
+[1-2 sentences - the KEY VISUAL MOMENT with character positions]
+Characters (MAX 3):
+- [Name] (left/right/center): [standard | winter | summer | costumed:type]
+- [Name] (position): [clothing category]
+Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
+```
+
+**Rules:**
+- **MAX 3 CHARACTERS** - Pick the most important for this visual moment. Others can be in text but not illustration.
+- **POSITIONS REQUIRED** - Every character needs (left), (right), or (center). Example: "Luna (left) waves at Max (right)"
+- **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
+- **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
+- **INDOOR SCENES** - Use "n/a" for weather
+
 # Character Portrayal Guidelines
 
 - Write in third person (he/she/they)
@@ -123,19 +143,16 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 - Body language: leaning in, sitting next to, making eye contact, a quick nudge
 - Each gesture may appear ONCE in the entire story - then use a different one
 
-# Jokes and Humor
+**HUMOR (no jokes or puns):**
+- Do NOT include jokes, puns, or wordplay - AI humor isn't funny and puns don't translate
+- Instead create humor through: funny situations, silly reactions, absurd moments, physical comedy
+- Let the story be warm and entertaining without trying to be a comedian
 
-**DO NOT include jokes, puns, or wordplay in the story.**
-
-AI-generated humor is not funny. Puns don't translate well between languages. Nobody wants to read forced jokes.
-
-Instead of jokes, create humor through:
-- Funny situations (a character slipping, something unexpected happening)
-- Silly character reactions and expressions
-- Absurd but believable moments
-- Physical comedy that can be shown in illustrations
-
-Let the story be warm and entertaining without trying to be a comedian.
+**PACING:**
+- Vary the rhythm: slow down for emotional moments, speed up for action
+- Balance dialogue, description, and action - don't overload any single page
+- Give important moments room to breathe - don't rush past turning points
+- Use short sentences for tension, longer ones for calm scenes
 
 ---
 
@@ -179,42 +196,29 @@ For EACH **primary character** ({PRIMARY_CHARACTER_NAMES}):
 
 ---STORY DRAFT---
 Draft the story with scene hints. Focus on creativity first.
-For EACH of the {PAGES} pages, output in this EXACT format:
+For EACH of the {PAGES} pages:
 
 **Draft [Page number]**
-[Full story text for this page - follow reading level guidelines]
-*(Word count: X)* — count story text only, not the scene hint
-
-Scene hint: [1-2 sentences describing the key visual moment]
-Characters:
-- [CharacterName]: [standard | winter | summer | costumed:type]
-Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/rainy/snowy]
+[Story text]
+*(Word count: X)*
+[Scene hint - use format from "Scene Hint Format" section above]
 
 ... continue for ALL {PAGES} pages ...
 
 
 ---CRITICAL ANALYSIS---
-Analyze the draft above for logical issues. Be harsh and critical.
+Analyze the draft above. Be harsh and critical.
 
-**Story Logic:**
-1. List all logical inconsistencies (timeline errors, physical impossibilities, character motivation issues).
-2. List any reading level violations.
-
-**Scene Hints Review:**
-3. **MAX 3 CHARACTERS PER SCENE** - Check each page: does the scene hint list more than 3 characters?
-   - If 4+ characters, pick the 3 most important for the visual moment
-   - Split group actions across multiple pages if needed
-   - Background characters can be mentioned in text but scene hint focuses on 3 main actors
-4. **Character positions** - Does each scene hint specify left/right/center positions?
-5. **Clothing consistency** - Are clothing categories appropriate for the scene (winter for cold outdoor, costumed for costume scenes)?
-6. **Setting/Time/Weather** - Is weather consistent across outdoor scenes? Does time progress logically?
-
-**Cliché Check:**
-7. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely". These are FORBIDDEN. Replace with alternatives.
-8. **Repeated gestures** - Does any gesture (hug, smile, wink, etc.) appear more than once? Vary them.
+**Check for:**
+1. **Logic errors** - Timeline issues, physical impossibilities, character motivation problems
+2. **Reading level** - Is word count appropriate? Too simple or complex?
+3. **Scene hints** - Max 3 characters? Positions specified? Weather consistent?
+4. **Banned gestures** - Any "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely"? REMOVE.
+5. **Repeated gestures** - Same gesture used twice? Vary them.
+6. **Clothing** - Categories match the scene (winter for cold outdoor, costumed for costume scenes)?
 
 **Fixes:**
-For each issue found above, write a specific instruction on how you will fix it in the final version.
+For each issue, write how you will fix it in the final version.
 
 
 ---TITLE---
@@ -274,74 +278,26 @@ Based on the story draft, determine which clothing variants each character needs
 }
 ```
 
-**Complete workflow example (STORY DRAFT → CRITICAL ANALYSIS → TITLE → CLOTHING REQUIREMENTS):**
+**Brief example:**
 ```
 ---STORY DRAFT---
-
 **Draft 1**
-Sophie woke up early and ran to the window. Snow! Real snow was falling outside. She grabbed her red boots and hurried downstairs to find Grandma already making hot chocolate.
-*(Word count: 32)*
-Scene hint: Sophie (right) presses her hands against the frosty window, eyes wide with wonder at the falling snow.
+Sophie ran to the window. Snow was falling!
+*(Word count: 8)*
+Scene hint: Sophie (right) presses hands against frosty window.
 Characters:
-- Sophie: standard
+- Sophie (right): standard
 Setting: indoor | Time: morning | Weather: snowy
 
-**Draft 2**
-"Can we build a snowman?" Sophie asked, bouncing on her toes. Grandma smiled and handed her a warm mug. "First, drink this. Then we'll bundle up."
-*(Word count: 28)*
-Scene hint: Sophie (left) bounces excitedly while Grandma (right) hands her a steaming mug of hot chocolate in the cozy kitchen.
-Characters:
-- Sophie: standard
-- Grandma: standard
-Setting: indoor | Time: morning | Weather: n/a
-
-**Draft 3**
-Outside, the garden looked like a white blanket. Sophie rolled the first snowball while Grandma watched from the porch with Max the dog.
-*(Word count: 24)*
-Scene hint: Sophie (center) rolls a large snowball in the snow-covered garden while Grandma (right) watches from the porch.
-Characters:
-- Sophie: winter
-- Grandma: winter
-Setting: outdoor | Time: morning | Weather: snowy
-
 ---CRITICAL ANALYSIS---
-
-**Story Logic:**
-1. Sophie "grabbed her red boots" but we never see her put them on before going outside
-2. Max appears without introduction - readers don't know who Max is
-3. Timeline unclear - did Sophie get dressed between grabbing boots and drinking hot chocolate?
-
-**Scene Hints Review:**
-4. Page 3: Max the dog is in the text but not in the scene hint characters - add or remove?
-5. Positions look good - left/right specified in each scene
-6. Clothing: Page 1-2 use "standard" (indoor), Page 3 switches to "winter" (outdoor) ✓
-
-**Fixes:**
-- Page 1: Change to "grabbed her coat" (boots can be assumed)
-- Page 2: Add brief mention of Max the dog waiting by the door
-- Page 3: Remove "Max the dog" from text since we're focusing on Sophie and Grandma
+**Check:** 1. Logic OK  2. Positions OK  3. No banned gestures
+**Fixes:** None needed
 
 ---TITLE---
 TITLE: Sophie's Snowy Surprise
 
 ---CLOTHING REQUIREMENTS---
-
-{
-  "clothingRequirements": {
-    "Sophie": {
-      "standard": { "used": true, "signature": "none" },
-      "winter": { "used": true, "signature": "red knitted scarf" },
-      "summer": { "used": false },
-      "costumed": { "used": false }
-    },
-    "Grandma": {
-      "standard": { "used": true, "signature": "floral apron" },
-      "winter": { "used": true, "signature": "warm shawl" },
-      "summer": { "used": false },
-      "costumed": { "used": false }
-    }
-  }
-}
+{ "clothingRequirements": { "Sophie": { "standard": { "used": true, "signature": "none" }, "winter": { "used": true, "signature": "red scarf" } } } }
 ```
 
 
@@ -353,11 +309,11 @@ Scan the draft and extract all elements that need to be consistent for visualiza
 - **ALL OBJECTS** - Important items (toys, tools, magical items, furniture, food)
 - **ALL VEHICLES** - Cars, bicycles, boats, etc.
 - **ALL ANIMALS/PETS** - Any animals that appear
-- **ALL SECONDARY CHARACTERS** - Anyone who is not a main character
+- **SECONDARY CHARACTERS ONLY** - Characters YOU invent (shopkeepers, teachers, etc.)
 - **ALL CLOTHING/COSTUMES** - Capes, costumes, hats, uniforms, masks (MUST include character name!)
 
 **Rules:**
-- Do NOT include main characters ({CHARACTER_NAMES}) - they have reference photos
+- Do NOT include main or primary characters ({CHARACTER_NAMES}) - they have reference photos
 - Add at least {PAGES} entries. Even if an element appears only once, add it for visual consistency
 - Use empty arrays `[]` for categories with no elements
 
@@ -466,62 +422,33 @@ Characters:
 - [CharacterName]: [clothing category]
 
 ---STORY PAGES---
-Rewrite the story based on the draft, BUT YOU MUST APPLY ALL FIXES from the CRITICAL ANALYSIS section.
-The final output must be logically consistent and error-free.
+Rewrite the story applying ALL FIXES from CRITICAL ANALYSIS. No word counts - clean text only.
 
-**DO NOT include word count in the final STORY PAGES section.** Word counts are only for the draft - the final output should be clean text only.
-
-For EACH of the {PAGES} pages, output in this EXACT format:
+For EACH of the {PAGES} pages:
 
 --- Page 1 ---
 TEXT:
-[Full story text for this page - follow reading level guidelines, NO word count]
+[Story text]
 
 SCENE HINT:
-[1-2 sentences describing the KEY VISUAL MOMENT - MUST include left/right positions for each character, e.g., "Luna (left) waves at Max (right) across the playground"]
-Characters (MAX 3 per scene - pick the most important for THIS visual moment):
-- [CharacterName]: [standard | winter | summer | costumed:type]
-- [CharacterName]: [standard | winter | summer | costumed:type]
-Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/overcast/rainy/snowy]
+[Use format from "Scene Hint Format" section above]
 
 --- Page 2 ---
 TEXT:
-[Story text continues...]
+[Story continues...]
 
 SCENE HINT:
-[Key visual moment with left/right positions]
-Characters:
-- [CharacterName]: [clothing category]
-Setting: [indoor/outdoor] | Time: [time of day] | Weather: [weather - use SAME as previous outdoor scenes unless story requires change]
+[...]
 
 ... continue for ALL {PAGES} pages ...
 
-**IMPORTANT - Setting/Time/Weather Consistency:**
-- Weather should be CONSISTENT across outdoor scenes unless the story explicitly describes a weather change
-- Time should progress LOGICALLY (don't jump from sunset back to midday)
-- Indoor scenes: use "indoor" for Setting, omit Weather (or write "n/a")
-- This prevents jarring visual inconsistencies between scene illustrations
-
-**IMPORTANT - Character Clothing Format:**
-- List up to 3 characters per scene (pick the most important for the visual moment)
-- Each line MUST follow format: `- [Name]: [category]`
-- Valid categories: `standard`, `winter`, `summer`, `costumed:type` (e.g., `costumed:superhero`)
-- NEVER use "same" - always specify the explicit clothing category for each character
-- Different characters CAN have different clothing in the same scene
-- This format is machine-parsed, so follow it exactly
-
 ---
 
-# CRITICAL REMINDERS
+# FINAL CHECKLIST
 
-1. **Complete ALL sections** - Do not skip any section
-2. **Write ALL {PAGES} pages** - The story is incomplete without every page
-3. **Scene hints are BRIEF** - Just 1-2 sentences, not full descriptions
-4. **Follow reading level** - Match text length to specified reading level
-5. **Show don't tell** - Demonstrate character traits through actions
-6. **Per-character clothing** - Follow the format above exactly (machine-parsed)
-7. **Visual Bible accuracy** - Add all scenes and elements, with specific colors
-8. **Character names in illustrations** - Use the character's REAL NAME from the provided list, even if the story uses a nickname or alias. Add alias in parentheses: `- Tim (as Superbrain): costumed:superhero`
-9. **Positional consistency** - EVERY scene hint MUST specify left/right positions for each character: "Luna (left) talks to Max (right)". Maintain consistent positions across scenes in the same setting.
+- [ ] ALL sections complete (don't skip any)
+- [ ] ALL {PAGES} pages written with TEXT and SCENE HINT
+- [ ] Visual Bible has specific colors for all elements
+- [ ] Character names use REAL NAME (alias in parentheses if needed: `Tim (as Superbrain): costumed:superhero`)
 
-**DO NOT STOP until you have written all {PAGES} pages with TEXT and SCENE HINT for each.**
+**DO NOT STOP until you have written all {PAGES} pages.**
