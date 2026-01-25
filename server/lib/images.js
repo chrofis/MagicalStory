@@ -809,6 +809,11 @@ async function detectAllBoundingBoxes(imageData) {
       return null;
     }
 
+    if (!parsedResult) {
+      log.warn(`⚠️  [BBOX-DETECT] No JSON found in response: ${responseText.substring(0, 100)}`);
+      return null;
+    }
+
     // Normalize coordinates from 0-1000 to 0.0-1.0
     const normalizeBox = (box) => {
       if (!box || !Array.isArray(box) || box.length !== 4) return null;
@@ -854,7 +859,7 @@ async function detectAllBoundingBoxes(imageData) {
 async function detectBoundingBoxesForIssue(imageData, issueDescription) {
   log.warn('⚠️  [BBOX-DETECT] detectBoundingBoxesForIssue is deprecated, use detectAllBoundingBoxes');
   const result = await detectAllBoundingBoxes(imageData);
-  if (!result || result.figures.length === 0) return null;
+  if (!result || !result.figures || result.figures.length === 0) return null;
   // Return first figure for backwards compatibility
   const fig = result.figures[0];
   return {
