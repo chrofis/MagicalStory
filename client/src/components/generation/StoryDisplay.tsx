@@ -653,8 +653,9 @@ export function StoryDisplay({
 
   const maxViewablePage = getMaxViewablePage();
   const totalProgressivePages = progressiveData?.totalPages || storyPages.length;
-  // totalScenes = number of images to expect (different from totalPages for 2:1 layouts)
-  const totalScenes = progressiveData?.totalScenes || sceneImages.length || Math.ceil(totalProgressivePages / (isPictureBook ? 1 : 2));
+  // _totalScenes = number of images to expect (different from totalPages for 2:1 layouts)
+  const _totalScenes = progressiveData?.totalScenes || sceneImages.length || Math.ceil(totalProgressivePages / (isPictureBook ? 1 : 2));
+  void _totalScenes; // Preserved for future use
 
   // Debug: Log progressive state (only when values change significantly, to avoid spam)
   // Removed excessive logging - use browser DevTools if needed
