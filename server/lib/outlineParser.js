@@ -1785,12 +1785,13 @@ class ProgressiveUnifiedParser {
 
       // Only emit if we're confident the page is complete
       // Either there's a next page, or we have both TEXT and SCENE HINT plus at least one character with clothing
-      const hasCharacterClothing = /Characters:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:[^\n]+))/mi.test(content);
+      // Note: Characters section may be "Characters:" or "Characters (MAX N):"
+      const hasCharacterClothing = /Characters(?:\s*\([^)]*\))?:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:[^\n]+))/mi.test(content);
 
-      // IMPORTANT: Check if Characters block is fully received (ends with blank line or is followed by next page)
-      // This prevents emitting incomplete character clothing when next page header appears mid-stream
-      const charactersBlockComplete = /Characters:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*\n\s*\n/mi.test(content) ||
-        /Characters:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*$/mi.test(content);
+      // IMPORTANT: Check if Characters block is fully received
+      // Complete when: followed by Setting:, blank line, or end of content
+      const charactersBlockComplete = /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*\n(?:Setting:|[^\S\n]*\n)/mi.test(content) ||
+        /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*$/mi.test(content);
 
       if ((nextPageIndex > match.index && charactersBlockComplete) || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
@@ -1798,12 +1799,12 @@ class ProgressiveUnifiedParser {
         // Strip any trailing metadata like "*(Word count: 331)*" or similar
         const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').trim() : '';
 
-        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
+        const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*Page|$)/i);
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
         // Extract per-character clothing using shared helper
         // Debug: log raw content to see what format AI is producing
-        const charSection = content.match(/Characters:[\s\S]{0,300}/i);
+        const charSection = content.match(/Characters(?:\s*\([^)]*\))?:[\s\S]{0,300}/i);
         if (charSection) {
           log.debug(`[PAGE-CLOTHING] Page ${pageNum} Characters section: "${charSection[0].replace(/\n/g, '\\n')}"`);
         } else {
