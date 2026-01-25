@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -1066,7 +1066,8 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     storyData.sceneImages = sceneImages;
     storyData.updatedAt = new Date().toISOString();
 
-    await saveStoryData(id, storyData);
+    // Use lightweight update - don't re-save all images to story_images table
+    await updateStoryDataOnly(id, storyData);
 
     console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum}`);
 

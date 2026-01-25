@@ -507,6 +507,51 @@ async function saveStoryData(storyId, storyData) {
 }
 
 /**
+ * Update story data metadata only (without re-saving images).
+ * Use this for lightweight updates like changing isActive flags.
+ * Images are stripped from the data but NOT re-saved to story_images.
+ */
+async function updateStoryDataOnly(storyId, storyData) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  // Deep clone to avoid modifying original
+  const dataForStorage = JSON.parse(JSON.stringify(storyData));
+
+  // Strip imageData from scenes (but don't save them - they're already in story_images)
+  if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
+    for (const img of dataForStorage.sceneImages) {
+      delete img.imageData;
+      if (img.imageVersions && Array.isArray(img.imageVersions)) {
+        for (const version of img.imageVersions) {
+          delete version.imageData;
+        }
+      }
+    }
+  }
+
+  // Strip cover images
+  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+  for (const coverType of coverTypes) {
+    const coverData = dataForStorage.coverImages?.[coverType];
+    if (coverData) {
+      if (typeof coverData === 'object') {
+        delete coverData.imageData;
+      } else if (typeof coverData === 'string') {
+        dataForStorage.coverImages[coverType] = { stripped: true };
+      }
+    }
+  }
+
+  const metadata = buildStoryMetadata(storyData);
+  await dbQuery(
+    'UPDATE stories SET data = $1, metadata = $2 WHERE id = $3',
+    [JSON.stringify(dataForStorage), JSON.stringify(metadata), storyId]
+  );
+}
+
+/**
  * Insert or update story data with metadata.
  * OPTIMIZED: Extracts images to story_images table for faster queries.
  */
@@ -754,6 +799,7 @@ module.exports = {
   logActivity,
   buildStoryMetadata,
   saveStoryData,
+  updateStoryDataOnly,
   upsertStory,
   // Image functions
   saveStoryImage,
