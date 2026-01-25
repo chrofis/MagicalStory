@@ -351,11 +351,13 @@ function extractSceneMetadata(sceneDescription) {
 
   // Try NEW JSON format first using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
-  if (parsed && parsed.output && parsed.output.characters) {
+  // Support both "output" (old format) and "draft" (unified prompt format) wrappers
+  const parsedData = parsed?.output || parsed?.draft;
+  if (parsed && parsedData && parsedData.characters) {
     // Extract per-character clothing
     const characterClothing = {};
     const characterNames = [];
-    for (const char of parsed.output.characters) {
+    for (const char of parsedData.characters) {
       if (char.name) {
         characterNames.push(char.name);
         if (char.clothing) {
@@ -365,7 +367,7 @@ function extractSceneMetadata(sceneDescription) {
     }
 
     // Extract object IDs - handle both string format ("LOC001") and object format ({id, name})
-    const objectIds = (parsed.output.objects || []).map(obj => {
+    const objectIds = (parsedData.objects || []).map(obj => {
       if (typeof obj === 'string') {
         // String format: "LOC001" or "Stadtturm [LOC001]"
         return obj;
@@ -378,15 +380,15 @@ function extractSceneMetadata(sceneDescription) {
 
     // Also extract location from setting.location (e.g., "Kurpark [LOC001]")
     // This ensures landmark photos are passed to image generation
-    if (parsed.output.setting?.location) {
-      const locMatch = parsed.output.setting.location.match(/\[LOC\d+\]/i);
+    if (parsedData.setting?.location) {
+      const locMatch = parsedData.setting.location.match(/\[LOC\d+\]/i);
       if (locMatch) {
-        objectIds.push(parsed.output.setting.location);
+        objectIds.push(parsedData.setting.location);
       }
     }
 
     // Extract landmark photo variant selection (1-4, default 1)
-    const landmarkVariant = parsed.output.setting?.landmarkPhotoVariant || 1;
+    const landmarkVariant = parsedData.setting?.landmarkPhotoVariant || 1;
 
     return {
       characters: characterNames,
@@ -394,16 +396,16 @@ function extractSceneMetadata(sceneDescription) {
       clothing: null, // Per-character now, no single value
       objects: objectIds,
       // Store full parsed data for buildTextFromJson
-      fullData: parsed.output,
+      fullData: parsedData,
       thinking: parsed.thinking || null,
       // Extract translated summary for display in user's language
-      translatedSummary: parsed.output.translatedSummary || null,
+      translatedSummary: parsedData.translatedSummary || null,
       // Extract image summary (English) for reference
-      imageSummary: parsed.output.imageSummary || null,
+      imageSummary: parsedData.imageSummary || null,
       // Landmark photo variant selection (for Swiss landmarks with multiple photos)
       landmarkVariant,
       // Store setting for reference
-      setting: parsed.output.setting || null,
+      setting: parsedData.setting || null,
       isJsonFormat: true
     };
   }
