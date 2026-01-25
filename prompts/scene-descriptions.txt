@@ -15,14 +15,24 @@ Avoid these scene types:
 ## CRITICAL RULES
 
 1. **NO QUESTIONS** - Produce complete output immediately. Make reasonable assumptions if unclear.
+   - BAD: "Should Sophie be standing or sitting?"
+   - GOOD: [Just pick one and describe it]
 
 2. **ONE MOMENT ONLY** - Pick ONE key visual moment, not multiple actions.
+   - BAD: "Sophie opens the door, then walks in, then sits down"
+   - GOOD: "Sophie steps through the doorway, hand still on handle"
 
 3. **MAX 3 CHARACTERS** - Pick the 1-3 most important characters for THIS scene.
+   - BAD: Including all 5 family members when only 2 are acting
+   - GOOD: Focus on the 2 characters driving this scene's action
 
 4. **NO COLLECTIVE NOUNS** - Never "the family", "everyone", "the group". Use individual names.
+   - BAD: "The children gather around the table"
+   - GOOD: "Sophie, Manuel, and Lukas gather around the table"
 
-5. **NO PHYSICAL DESCRIPTIONS** - Don't describe main characters' appearance. Just use their names (the image system handles appearance separately).
+5. **NO PHYSICAL DESCRIPTIONS** - Don't describe main characters' appearance. Just use their names.
+   - BAD: "The tall boy with brown hair and blue eyes points"
+   - GOOD: "Manuel points" (image system handles his appearance)
 
 6. **ONE ACTION PER CHARACTER** - Body parts must work together, not independently.
    - BAD: "right arm pointing right, left arm pointing left"
@@ -31,6 +41,10 @@ Avoid these scene types:
 7. **VISUAL ADJECTIVES ONLY** - Describe what eyes can SEE, not emotions.
    - BAD: excited, calm, nervous, eager
    - GOOD: wide smile, raised eyebrows, hunched shoulders
+
+8. **SECONDARY CHARACTERS** - Must include their signature items from Visual Bible.
+   - BAD: Wizard appears but his staff is missing
+   - GOOD: Wizard holds staff
 
 ---
 
@@ -390,7 +404,6 @@ Output raw JSON (no markdown code fences, no explanation text).
     "characters": [
       // KEEP IT SIMPLE: natural poses that match the source description
       // Don't over-engineer - "searches for X" = looking around, NOT elaborate hand gestures
-      // SECONDARY CHARACTERS: Must include their signature items and clothing from visual bible
       {
         "name": "CharacterName",
         "position": "Frame region + depth layer",
@@ -527,18 +540,10 @@ If your scene shows the bridge from across the river, select the wide exterior v
     "check1_scaleFeasibility": "Camera: WIDE, Detail: FULL BODY, Compatible: YES",
     "check2_objectPlacement": "Die magische Tür: Setting says 'set into floor stones' = HORIZONTAL trap door. But object is described as ornate door with handle = typically VERTICAL. INCONSISTENT.",
     "check3_actionCompatibility": "Manuel 'gripping door handle pulling it open, braced against wall' = VERTICAL door pulling action. But door is 'in floor stones' = HORIZONTAL. Bracing against wall doesn't help lift a floor door. INVALID.",
-    "check4_characterPositioning": "Sophie: position:left foreground facing:right L:braced R:pushing. Manuel: position:center middle facing:door L:braced R:handle. Gaze at door center - valid.",
     "check5_cameraView": "Elevated camera + characters looking DOWN at floor door = tops of heads visible, not faces. Sophie 'eyes wide, mouth open' INCOMPATIBLE with elevated camera seeing her from above/behind.",
-    "check6_differentiation": "Sophie kneeling/pushing, Manuel standing/pulling - UNIQUE poses.",
-    "check7_physics": "Door pulling mechanics inconsistent with floor placement. No blocking obstacles in scene.",
     "check8_weather": "Scene is OUTDOOR (ruins). Weather: winter. Weather visibility: directly on scene. Compatible: YES",
-    "check9_distanceSeparation": "Characters are working together at same location (door) - no separation needed. N/A",
-    "check10_locationContinuity": "Previous scene: Ruine Stein. Current scene: Ruine Stein. No travel mentioned. Consistent: YES",
-    "check11_storyTextFidelity": "Input says: 'magical door hidden in ruins'. Output shows: door in stone wall of ruins. Match? YES",
     "check12_linearSpace": "No linear path in scene - characters at door in room. N/A",
-    "check13_sharedObjects": "Shared objects: door (Manuel and Sophie). In Objects section with grip points? YES - door position and who does what defined.",
-    "check14_obstacleLogic": "No obstacles blocking passage in this scene. N/A",
-    "check15_holdingInventory": "Sophie: L:braced on floor R:pushing stone BOTH:none. No conflict. Manuel: L:braced on wall R:door handle BOTH:none. No conflict.",
+    "...": "(other checks omitted for brevity - include ALL 16 in actual output)",
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
