@@ -28,8 +28,9 @@ API key.txt
 *.key
 .env
 
-# Claude Code
-.claude/
+# Claude Code (ignore all except skills)
+.claude/*
+!.claude/skills/
 
 # Server data (sensitive - don't commit to Git)
 /data/
