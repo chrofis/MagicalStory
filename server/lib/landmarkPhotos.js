@@ -1263,15 +1263,19 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   }
 
   // Separate exterior and interior images, sort by score, ensure diversity
+  // Filter out drawings/engravings (isActualPhoto === false OR description mentions it)
   const exteriorCandidates = allGoodImages
-    .filter(img => img.isExterior !== false)  // Include if exterior or unknown
+    .filter(img => img.isExterior !== false && img.isActualPhoto !== false && !isDrawingOrEngraving(img.description))
     .sort((a, b) => b.score - a.score);
 
   // Exclude information signs, plaques, maps from interior candidates
   const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
 
+  // Exclude drawings, engravings, illustrations (backup filter for description text)
+  const isDrawingOrEngraving = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|black and white illustration|historical artwork)\b/i.test(desc || '');
+
   const interiorCandidates = allGoodImages
-    .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description))
+    .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description) && !isDrawingOrEngraving(img.description))
     .sort((a, b) => b.score - a.score);
 
   // Select up to 3 diverse images for each type (async for AI checks)
