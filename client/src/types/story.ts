@@ -158,6 +158,28 @@ export interface GridManifestIssue {
   fixInstruction?: string;
 }
 
+// Per-repair verification result for UI display
+export interface GridRepairVerification {
+  letter: string;
+  issueId: string;
+  type?: string;
+  severity?: string;
+  description?: string;
+  fixInstruction?: string;
+  originalThumbnail?: string;    // base64 encoded 256x256 before
+  repairedThumbnail?: string;    // base64 encoded 256x256 after
+  comparisonImage?: string;      // base64 encoded side-by-side comparison
+  verification?: {
+    fixed: boolean;
+    changed: boolean;
+    confidence: number;
+    explanation: string;
+    newProblems: string[];
+    accepted: boolean;
+    reason: string;
+  };
+}
+
 // Grid repair data for UI display
 export interface GridRepairData {
   batchNum?: number;
@@ -173,6 +195,8 @@ export interface GridRepairData {
     rows?: number;
     issues?: GridManifestIssue[];
   };
+  // Per-repair verification results
+  repairs?: GridRepairVerification[];
 }
 
 export interface RetryAttempt {
@@ -202,6 +226,8 @@ export interface RetryAttempt {
   gridFixedCount?: number;
   gridFailedCount?: number;
   gridTotalIssues?: number;
+  // Annotated original image with bounding boxes (base64)
+  annotatedOriginal?: string;
   // Bbox detection only fields
   fixableIssuesCount?: number;
   enrichedTargetsCount?: number;

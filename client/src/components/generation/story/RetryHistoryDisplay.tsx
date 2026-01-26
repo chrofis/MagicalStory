@@ -657,6 +657,32 @@ export function RetryHistoryDisplay({
                   )}
                 </div>
 
+                {/* Step 1: Annotated Original with Bounding Boxes */}
+                {attempt.annotatedOriginal && (
+                  <details className="text-sm" open>
+                    <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
+                      📍 {language === 'de' ? 'Schritt 1: Erkannte Probleme' : 'Step 1: Detected Issues'}
+                    </summary>
+                    <div className="mt-3 bg-white p-4 rounded-lg border shadow-sm">
+                      <div className="text-xs text-gray-500 mb-2 font-medium">
+                        {language === 'de' ? 'Originalbild mit markierten Problembereichen' : 'Original image with marked issue regions'}
+                        <span className="ml-2 text-gray-400">
+                          (🔴 {language === 'de' ? 'kritisch' : 'critical'}, 🟠 {language === 'de' ? 'wichtig' : 'major'}, 🟡 {language === 'de' ? 'gering' : 'minor'})
+                        </span>
+                      </div>
+                      <img
+                        src={`data:image/jpeg;base64,${attempt.annotatedOriginal}`}
+                        alt="Annotated original"
+                        className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-violet-400"
+                        onClick={() => setEnlargedImg({
+                          src: `data:image/jpeg;base64,${attempt.annotatedOriginal}`,
+                          title: language === 'de' ? 'Erkannte Probleme' : 'Detected Issues'
+                        })}
+                      />
+                    </div>
+                  </details>
+                )}
+
                 {/* Before/After Evaluations */}
                 <details className="text-sm">
                   <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
@@ -783,6 +809,97 @@ export function RetryHistoryDisplay({
                               </div>
                             )}
                           </div>
+
+                          {/* Per-repair verification table */}
+                          {grid.repairs && grid.repairs.length > 0 && (
+                            <div className="mt-4">
+                              <div className="font-medium text-violet-800 mb-2">
+                                ✅ {language === 'de' ? 'Verifizierungsergebnisse' : 'Verification Results'}
+                              </div>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm border-collapse">
+                                  <thead>
+                                    <tr className="bg-violet-100 text-violet-800">
+                                      <th className="px-2 py-1 text-left border">{language === 'de' ? 'Ltr' : 'Ltr'}</th>
+                                      <th className="px-2 py-1 text-left border">{language === 'de' ? 'Problem' : 'Issue'}</th>
+                                      <th className="px-2 py-1 text-center border">{language === 'de' ? 'Vorher' : 'Before'}</th>
+                                      <th className="px-2 py-1 text-center border">{language === 'de' ? 'Nachher' : 'After'}</th>
+                                      <th className="px-2 py-1 text-center border">{language === 'de' ? 'Status' : 'Status'}</th>
+                                      <th className="px-2 py-1 text-center border">{language === 'de' ? 'Konfidenz' : 'Confidence'}</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {grid.repairs.map((repair, rIdx) => (
+                                      <tr key={rIdx} className={repair.verification?.accepted ? 'bg-green-50' : 'bg-red-50'}>
+                                        <td className="px-2 py-1 border font-mono font-bold text-violet-600">{repair.letter}</td>
+                                        <td className="px-2 py-1 border text-gray-700 max-w-[200px] truncate" title={repair.description}>
+                                          <span className={`inline-block px-1 py-0.5 rounded text-xs mr-1 ${
+                                            repair.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                                            repair.severity === 'major' ? 'bg-orange-200 text-orange-800' :
+                                            'bg-yellow-200 text-yellow-800'
+                                          }`}>
+                                            {repair.type || 'unknown'}
+                                          </span>
+                                          {repair.description?.substring(0, 40)}{(repair.description?.length || 0) > 40 ? '...' : ''}
+                                        </td>
+                                        <td className="px-2 py-1 border text-center">
+                                          {repair.originalThumbnail && (
+                                            <img
+                                              src={`data:image/jpeg;base64,${repair.originalThumbnail}`}
+                                              alt="Before"
+                                              className="w-12 h-12 object-contain inline-block cursor-pointer hover:ring-2 hover:ring-violet-400 rounded"
+                                              onClick={() => setEnlargedImg({
+                                                src: `data:image/jpeg;base64,${repair.originalThumbnail}`,
+                                                title: `${repair.letter}: Before`
+                                              })}
+                                            />
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-1 border text-center">
+                                          {repair.repairedThumbnail && (
+                                            <img
+                                              src={`data:image/jpeg;base64,${repair.repairedThumbnail}`}
+                                              alt="After"
+                                              className={`w-12 h-12 object-contain inline-block cursor-pointer hover:ring-2 rounded ${
+                                                repair.verification?.accepted ? 'hover:ring-green-400 border-green-300' : 'hover:ring-red-400 border-red-300'
+                                              }`}
+                                              onClick={() => setEnlargedImg({
+                                                src: `data:image/jpeg;base64,${repair.repairedThumbnail}`,
+                                                title: `${repair.letter}: After`
+                                              })}
+                                            />
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-1 border text-center">
+                                          {repair.verification?.accepted ? (
+                                            <span className="text-green-600 font-bold">✓</span>
+                                          ) : (
+                                            <span className="text-red-600 font-bold">✗</span>
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-1 border text-center">
+                                          <span className={`font-medium ${
+                                            (repair.verification?.confidence ?? 0) >= 0.7 ? 'text-green-600' :
+                                            (repair.verification?.confidence ?? 0) >= 0.5 ? 'text-yellow-600' :
+                                            'text-red-600'
+                                          }`}>
+                                            {Math.round((repair.verification?.confidence ?? 0) * 100)}%
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {/* Explanation for failed repairs */}
+                              {grid.repairs.filter(r => !r.verification?.accepted).map((repair, rIdx) => (
+                                <div key={rIdx} className="mt-2 text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                                  <span className="font-mono font-bold">{repair.letter}:</span>{' '}
+                                  {repair.verification?.reason || repair.verification?.explanation || 'Unknown failure reason'}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
