@@ -63,6 +63,31 @@ ALWAYS USE:
 - Relative closeness: shoulder to shoulder, arm's reach, clear gap, far apart, opposite edges
 - Scale: small figures, dominates frame, tiny silhouettes
 
+**9-Region Grid (for positioning and validation):**
+
+```
+ TL  |  TC  |  TR     (Top row = background/far)
+-----+------+-----
+ ML  |  MC  |  MR     (Middle row = midground)
+-----+------+-----
+ BL  |  BC  |  BR     (Bottom row = foreground/near)
+```
+
+| Code | Position |
+|------|----------|
+| TL | top-left background |
+| TC | top-center background |
+| TR | top-right background |
+| ML | middle-left midground |
+| MC | middle-center midground |
+| MR | middle-right midground |
+| BL | bottom-left foreground |
+| BC | bottom-center foreground |
+| BR | bottom-right foreground |
+
+Use region codes for character `position` and object `position` fields.
+Pointing/gaze validation compares character region → target region.
+
 **Hand Dominance:**
 - Default to RIGHT hand for pointing, holding, gesturing (most people are right-handed)
 - Only use left hand if right hand is already occupied
@@ -133,6 +158,27 @@ IMPORTANT CLOTHING RULES:
 
 ## PROCESS
 
+### STEP 0 - PLACE LANDMARKS
+
+Before drafting the scene, assign a region to EVERY landmark and major object:
+
+**Required for:**
+- Locations from Visual Bible (bridges, towers, ruins)
+- Major objects mentioned in scene summary
+- Any object a character will point at or look at
+
+**Format:**
+```json
+"landmarkPlacement": {
+  "tower": "TL",
+  "bridge": "TC-to-TR",
+  "magical door": "MC",
+  "villain's machine": "TR"
+}
+```
+
+This placement is FIXED - characters are then positioned relative to these landmarks.
+
 ### STEP 1 - DRAFT (Complete Scene)
 
 Create COMPLETE scene description with ALL fields:
@@ -194,21 +240,29 @@ If ANY answer is NO → add specific position.
 - Pulling a vertical door = stand and pull TOWARD you
 - Bracing against wall while pulling = vertical door, NOT floor trap door
 
-**4. Character Positioning & Body:**
+**4. Character Positioning & Pointing/Gaze Geometry:**
 
 For EACH character verify:
-1. **Position:** Frame region + depth layer stated? (e.g., "left foreground")
-2. **Facing:** Direction explicit? (e.g., "facing right", "turned toward Manuel")
-3. **Gaze target:** If looking at something, is it in correct direction?
-   - Looking at object on LEFT → character faces left
-   - Looking at object in BACKGROUND → character faces away from camera
-4. **Arms:** Both accounted? L:[action] R:[action]
-5. **Pointing:** If pointing, geometry correct?
-   - Pointing LEFT = arm extends toward left side of frame
-   - Pointing at BACKGROUND object = arm extends away from camera
+1. **Region:** Which grid region? (TL/TC/TR/ML/MC/MR/BL/BC/BR)
+2. **Facing:** Direction explicit? (left/right/toward-camera/away)
+3. **Pointing/Gaze:** If pointing at or looking at something:
+   - State character's region and target's region
+   - Verify direction matches the vector from character → target
 
-❌ "Sophie looks at tower on left" + "Sophie facing right" (contradiction)
-✅ "Sophie faces left toward tower, right arm pointing at its peak"
+**Direction Rules:**
+| Character → Target | Required Direction |
+|-------------------|-------------------|
+| Right → Left (e.g., MR→ML, BR→BL) | facing/pointing LEFT |
+| Left → Right (e.g., ML→MR, BL→BR) | facing/pointing RIGHT |
+| Bottom → Top (e.g., BC→TC, BL→TL) | facing/pointing UP/AWAY |
+| Same column, different row | UP or DOWN only |
+| Diagonal (e.g., BR→TL) | UP-LEFT (combine directions) |
+| **SAME REGION** | **INVALID - character overlaps target** |
+
+❌ Sophie in BR, tower in TL, arm points RIGHT (tower is LEFT of her)
+❌ Manuel in MC, door in MC (same region = overlap, INVALID)
+✅ Sophie in BR, tower in TL, arm extends UP-LEFT toward tower
+✅ Manuel in BC, door in MC, looking forward/up into midground
 
 **5. Camera-View Compatibility:**
 | View Type | Expressions Allowed |
@@ -405,6 +459,9 @@ Output raw JSON (no markdown code fences, no explanation text).
 ```
 {
   "draft": {
+    "landmarkPlacement": {
+      "landmark_name": "REGION_CODE (TL/TC/TR/ML/MC/MR/BL/BC/BR or range like TC-to-TR)"
+    },
     "imageSummary": "2-3 sentences: positions, actions, setting. End with: Main characters: Name1, Name2.",
     "setting": {
       "location": "Location name with [ID] if from Visual Bible",
@@ -456,6 +513,17 @@ Output raw JSON (no markdown code fences, no explanation text).
     "check15_holdingInventory": "For EACH character: [Name] L:[item/empty] R:[item/empty] BOTH:[item/none]. Conflict? YES/NO",
     "check16_backgroundFeasibility": "Background elements: [list]. All visible from this viewpoint? Opening sizes respected? If too many elements for openings, which to DROP? FEASIBLE/SIMPLIFY",
     "check17_characterCount": "Main characters with visible faces: [count]. If >3: which to show from behind or move to background? PASS/FIX",
+    "pointingGazeValidation": [
+      {
+        "character": "CharacterName",
+        "action": "pointing | looking",
+        "target": "target object name",
+        "characterRegion": "REGION_CODE",
+        "targetRegion": "REGION_CODE",
+        "direction": "left | right | up | down | up-left | up-right | etc.",
+        "valid": "YES/NO - explain geometry (e.g., 'BC→TL requires up-left, arm extends up-left')"
+      }
+    ],
     "issues": ["List every problem found - be specific"],
     "corrections": ["How each issue was fixed in the output"]
   },
@@ -521,6 +589,10 @@ If your scene shows the bridge from across the river, select the wide exterior v
 ```
 {
   "draft": {
+    "landmarkPlacement": {
+      "magical door": "MC",
+      "stone walls": "TL-TC-TR (background)"
+    },
     "imageSummary": "Manuel pulls open the magical door glowing with golden light while Sophie kneels at the floor gap pushing stones aside. The tower ruins surround them. Main characters: Manuel, Sophie.",
     "setting": {
       "location": "Ruine Stein [LOC001]",
@@ -561,6 +633,26 @@ If your scene shows the bridge from across the river, select the wide exterior v
     "check8_weather": "Scene is OUTDOOR (ruins). Weather: winter. Weather visibility: directly on scene. Compatible: YES",
     "check12_linearSpace": "No linear path in scene - characters at door in room. N/A",
     "...": "(other checks omitted for brevity - include ALL 17 in actual output)",
+    "pointingGazeValidation": [
+      {
+        "character": "Sophie",
+        "action": "looking",
+        "target": "magical door",
+        "characterRegion": "BL",
+        "targetRegion": "MC",
+        "direction": "right + up",
+        "valid": "YES - BL→MC requires looking right and slightly up/away into midground"
+      },
+      {
+        "character": "Manuel",
+        "action": "pulling",
+        "target": "magical door",
+        "characterRegion": "BC",
+        "targetRegion": "MC",
+        "direction": "forward/up",
+        "valid": "YES - BC→MC requires facing forward into midground"
+      }
+    ],
     "issues": [
       "1. Door orientation conflict: 'floor stones' (horizontal) vs 'handle pulling' (vertical)",
       "2. Manuel's action incompatible: bracing against wall while pulling floor door makes no sense",
