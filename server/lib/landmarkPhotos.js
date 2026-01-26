@@ -1262,17 +1262,15 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
     return selected;
   }
 
+  // Helper filters for non-useful images
+  const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
+  const isNotUsefulPhoto = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan|shows a wooden door|shows a door|shows an old door|detail of a|close-up of a|closeup of a)\b/i.test(desc || '');
+
   // Separate exterior and interior images, sort by score, ensure diversity
   // Filter out drawings/engravings (isActualPhoto === false OR description mentions it)
   const exteriorCandidates = allGoodImages
     .filter(img => img.isExterior !== false && img.isActualPhoto !== false && !isNotUsefulPhoto(img.description))
     .sort((a, b) => b.score - a.score);
-
-  // Exclude information signs, plaques, maps from interior candidates
-  const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
-
-  // Exclude non-useful images: drawings, maps, coats of arms, detail shots
-  const isNotUsefulPhoto = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan|shows a wooden door|shows a door|shows an old door|detail of a|close-up of a|closeup of a)\b/i.test(desc || '');
 
   const interiorCandidates = allGoodImages
     .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description) && !isNotUsefulPhoto(img.description))
