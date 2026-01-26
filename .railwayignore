@@ -27,3 +27,6 @@ test image inputs
 *.zip
 *.bak
 PLAN.md
+
+# Local temp/debug files (not needed for deploy)
+_local
