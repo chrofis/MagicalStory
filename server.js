@@ -424,6 +424,8 @@ const corsOptions = {
       'http://localhost:8000',
       'http://localhost:3000',
       'http://localhost:5173',  // Vite dev server
+      'http://localhost:5174',  // Vite dev server (alternate port)
+      'http://localhost:5175',  // Vite dev server (alternate port)
       'http://127.0.0.1:8000',
       'http://127.0.0.1:5173',
       'https://www.magicalstory.ch',
@@ -6709,11 +6711,16 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           log.debug(`🌍 [STREAM-IMG] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
         }
 
+        // Pass forceRepairThreshold if set
+        const streamingIncrConfig = incrementalConsistencyConfig?.forceRepairThreshold != null
+          ? { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold }
+          : null;
+
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: streamingIncrConfig });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -7445,9 +7452,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               enabled: true,
               dryRun: incrementalConsistencyConfig.dryRun,
               lookbackCount: incrementalConsistencyConfig.lookbackCount,
-              previousImages: lookbackImages
+              previousImages: lookbackImages,
+              forceRepairThreshold: incrementalConsistencyConfig?.forceRepairThreshold
             };
             log.debug(`🔍 [STORYBOOK] Page ${pageNum}: checking against ${lookbackImages.length} previous page(s)`);
+          } else if (incrementalConsistencyConfig?.forceRepairThreshold != null) {
+            // Even without incremental consistency, pass forceRepairThreshold if set
+            incrConfig = { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold };
           }
 
           const result = await generateImage(scene, i, previousImage, true, visualBible, incrConfig); // isSequential = true, with visual bible
@@ -8451,7 +8462,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.debug(`📕 [COVER] ${coverType}: Using fallback scene description (hint was empty)`);
         }
 
-        const coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
+        let coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
+
+        // Fallback: if scene description doesn't contain character names, use characters from hint.characterClothing
+        // This handles cases like "Two brothers stand..." where names aren't in the description but ARE in the character list
+        if (coverCharacters.length === 0 && hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
+          const clothingCharNames = Object.keys(hint.characterClothing);
+          coverCharacters = inputData.characters.filter(c =>
+            clothingCharNames.some(name => name.toLowerCase() === c.name.toLowerCase())
+          );
+          if (coverCharacters.length > 0) {
+            log.debug(`📕 [COVER] ${coverType}: Using ${coverCharacters.length} characters from hint.characterClothing (scene didn't contain names)`);
+          }
+        }
+
+        // Final fallback for title page: use main characters or all characters
+        if (coverCharacters.length === 0 && coverType === 'titlePage') {
+          const mainChars = inputData.characters.filter(c => c.isMainCharacter === true);
+          coverCharacters = mainChars.length > 0 ? mainChars : inputData.characters;
+          log.debug(`📕 [COVER] ${coverType}: Using ${mainChars.length > 0 ? 'main' : 'all'} ${coverCharacters.length} characters (no names found in hint)`);
+        }
 
         // Build coverClothingRequirements with _currentClothing for per-character lookup
         const coverClothingRequirements = {};
@@ -9298,9 +9328,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             enabled: true,
             dryRun: incrementalConsistencyConfig.dryRun,
             lookbackCount: incrementalConsistencyConfig.lookbackCount,
-            previousImages: lookbackImages
+            previousImages: lookbackImages,
+            forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold
           };
           log.debug(`🔍 [UNIFIED] Page ${pageNum}: checking against ${lookbackImages.length} previous page(s)`);
+        } else if (incrementalConsistencyConfig?.forceRepairThreshold != null) {
+          // Even without previous images (first page), pass forceRepairThreshold if set
+          incrConfig = { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold };
         }
 
         // Generate image with incremental consistency
@@ -9323,8 +9357,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // PARALLEL MODE (default) - faster but no incremental consistency
       log.debug(`🖼️ [UNIFIED] Using PARALLEL image generation (5 concurrent)`);
       const imageLimit = pLimit(5);
+      // Even in parallel mode, pass forceRepairThreshold if set
+      const parallelIncrConfig = incrementalConsistencyConfig?.forceRepairThreshold != null
+        ? { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold }
+        : null;
       allImages = await Promise.all(
-        expandedScenes.map((scene, index) => imageLimit(() => generatePageImage(scene, index, null)))
+        expandedScenes.map((scene, index) => imageLimit(() => generatePageImage(scene, index, parallelIncrConfig)))
       );
     }
 
@@ -11017,10 +11055,15 @@ Output Format:
               log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
             }
 
+            // Pass forceRepairThreshold if set
+            const parallelPipelineIncrConfig = incrementalConsistencyConfig?.forceRepairThreshold != null
+              ? { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold }
+              : null;
+
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: parallelPipelineIncrConfig });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
