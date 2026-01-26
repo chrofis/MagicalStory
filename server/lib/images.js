@@ -678,6 +678,15 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
       // This includes subject_mapping, identity_sync, rendering_integrity, scene_check
       const reasoning = JSON.stringify(parsedJson, null, 2);
 
+      // Extract figures and matches for character-aware bbox matching
+      // figures: [{id, position, hair, clothing, action, view}]
+      // matches: [{figure, reference (char name), confidence, face_bbox, issues}]
+      const figures = parsedJson.figures || [];
+      const matches = parsedJson.matches || [];
+      if (matches.length > 0) {
+        log.info(`⭐ [QUALITY] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
+      }
+
       return {
         score,
         rawScore, // Original 0-10 score
@@ -687,6 +696,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
         fixableIssues: fixableIssues,     // New format without bboxes (for two-stage detection)
+        figures,                          // Detected figures with descriptions
+        matches,                          // Character name → figure mapping with face_bbox
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -1017,9 +1028,10 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  *
  * @param {string} imageData - Base64 image data
  * @param {Array<{description: string, severity: string, type: string, fix: string}>} fixableIssues - Issues from quality eval
+ * @param {Array<{figure: number, reference: string, confidence: number, face_bbox: Array}>} qualityMatches - Character→figure mapping from quality eval
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = []) {
   // Always detect all elements for dev mode display
   log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
 
@@ -1034,6 +1046,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
   const detectionHistory = {
     figures: allDetections.figures,
     objects: allDetections.objects,
+    qualityMatches: qualityMatches,  // Include character matches for display
     usage: allDetections.usage,
     timestamp: new Date().toISOString()
   };
@@ -1043,6 +1056,23 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
   // If no issues to fix, just return the detections
   if (!fixableIssues || fixableIssues.length === 0) {
     return { targets: [], detectionHistory };
+  }
+
+  // Build character name → figure mapping from quality evaluation matches
+  // Example: {"patrick": {figureId: 1, faceBbox: [0.35, 0.28, 0.49, 0.36], confidence: 0.8}}
+  const charNameToFigure = {};
+  for (const match of qualityMatches) {
+    if (match.reference && match.figure) {
+      const charName = match.reference.toLowerCase();
+      charNameToFigure[charName] = {
+        figureId: match.figure,
+        faceBbox: match.face_bbox,
+        confidence: match.confidence || 0
+      };
+    }
+  }
+  if (Object.keys(charNameToFigure).length > 0) {
+    log.info(`📦 [BBOX-ENRICH] Character mapping: ${Object.entries(charNameToFigure).map(([name, info]) => `${name} → Figure ${info.figureId}`).join(', ')}`);
   }
 
   // Match issues to detected elements for repair targets using scored matching
@@ -1069,6 +1099,20 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
   const positions = ['left', 'right', 'center', 'middle', 'foreground', 'background'];
   const extractPositions = (text) => positions.filter(p => (text || '').toLowerCase().includes(p));
 
+  // Helper: extract character names mentioned in issue text
+  const extractCharacterNames = (text) => {
+    const textLower = (text || '').toLowerCase();
+    const foundChars = [];
+    for (const charName of Object.keys(charNameToFigure)) {
+      // Match character name with word boundaries (e.g., "patrick's" should match "patrick")
+      const regex = new RegExp(`\\b${charName}(?:'s)?\\b`, 'i');
+      if (regex.test(textLower)) {
+        foundChars.push(charName);
+      }
+    }
+    return foundChars;
+  };
+
   for (const issue of fixableIssues) {
     const issueDesc = (issue.description || '').toLowerCase();
     const issueFix = (issue.fix || '').toLowerCase();
@@ -1076,9 +1120,13 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
     const issueColors = extractColors(issueDesc + ' ' + issueFix);
     const issuePositions = extractPositions(issueDesc);
 
+    // Check if issue mentions a character name we know about
+    const mentionedChars = extractCharacterNames(issueDesc + ' ' + issueFix);
+
     // Score each element for this issue
     let bestMatch = null;
     let bestScore = 0;
+    let matchedByCharName = false;
 
     for (const element of allElements) {
       const label = (element.label || '').toLowerCase();
@@ -1087,6 +1135,21 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
       const elementColors = extractColors(label);
 
       let score = 0;
+
+      // CHARACTER NAME MATCH (strongest signal): +100 points
+      // If issue mentions a character and we know which figure that character is
+      if (mentionedChars.length > 0 && element.elementType === 'figure') {
+        for (const charName of mentionedChars) {
+          const charInfo = charNameToFigure[charName];
+          // Match by figure index (quality eval uses 1-indexed, detection is 0-indexed in array)
+          const figureIndex = allDetections.figures.indexOf(element);
+          if (charInfo && figureIndex === charInfo.figureId - 1) {
+            score += 100;
+            matchedByCharName = true;
+            log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → matched to Figure ${charInfo.figureId}`);
+          }
+        }
+      }
 
       // Position match (strong signal): +30 points
       if (position && issuePositions.includes(position)) {
@@ -1129,6 +1192,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
       if (score > bestScore) {
         bestScore = score;
         bestMatch = element;
+        matchedByCharName = score >= 100;  // Track if best match used character name
       }
     }
 
@@ -1177,6 +1241,12 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
         boundingBox = bestMatch.faceBox;  // Use face box for face issues
       }
 
+      // Find character name if matched by character
+      let matchedCharacter = null;
+      if (matchedByCharName && mentionedChars.length > 0) {
+        matchedCharacter = mentionedChars[0];  // Primary character mentioned in issue
+      }
+
       enrichedTargets.push({
         faceBox: bestMatch.faceBox,
         bodyBox: bestMatch.bodyBox,
@@ -1188,15 +1258,26 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues) {
         label: bestMatch.label,
         matchedPosition: bestMatch.position,
         matchScore: bestScore,
-        matchMethod: bestScore >= 5 ? 'scored' : 'fallback'
+        matchMethod: matchedByCharName ? 'character' : (bestScore >= 5 ? 'scored' : 'fallback'),
+        matchedCharacter: matchedCharacter  // Character name if matched by character
       });
-      log.debug(`📦 [BBOX-ENRICH] Matched (score=${bestScore}, ${bestScore >= 5 ? 'scored' : 'fallback'}): "${issue.description.substring(0, 30)}..." → "${bestMatch.label}"`);
+      const methodStr = matchedByCharName ? `character:${matchedCharacter}` : (bestScore >= 5 ? 'scored' : 'fallback');
+      log.debug(`📦 [BBOX-ENRICH] Matched (score=${bestScore}, ${methodStr}): "${issue.description.substring(0, 30)}..." → "${bestMatch.label}"`);
     } else {
       log.warn(`⚠️  [BBOX-ENRICH] Could not match issue (no elements detected): ${issue.description.substring(0, 50)}...`);
     }
   }
 
-  log.info(`📦 [BBOX-ENRICH] Matched ${enrichedTargets.length}/${fixableIssues.length} issues to detected elements`);
+  // Summarize matching methods used
+  const byChar = enrichedTargets.filter(t => t.matchMethod === 'character').length;
+  const byScore = enrichedTargets.filter(t => t.matchMethod === 'scored').length;
+  const byFallback = enrichedTargets.filter(t => t.matchMethod === 'fallback').length;
+  const methodSummary = [
+    byChar > 0 ? `${byChar} by character name` : null,
+    byScore > 0 ? `${byScore} by scoring` : null,
+    byFallback > 0 ? `${byFallback} by fallback` : null
+  ].filter(Boolean).join(', ');
+  log.info(`📦 [BBOX-ENRICH] Matched ${enrichedTargets.length}/${fixableIssues.length} issues to detected elements${methodSummary ? ` (${methodSummary})` : ''}`);
 
   return { targets: enrichedTargets, detectionHistory };
 }
@@ -2138,8 +2219,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // ALWAYS run bbox detection for every image (figure locations needed for other features)
     // This runs regardless of whether issues were found, incrEnabled, or autoRepair settings
     const fixableIssues = result.fixableIssues || [];
-    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues);
+    const qualityMatches = result.matches || [];  // Character → figure mapping from quality eval
+    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}...`);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches);
     bboxDetectionHistory = enrichResult.detectionHistory;
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {
