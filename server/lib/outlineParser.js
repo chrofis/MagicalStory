@@ -73,12 +73,13 @@ function parseCharacterClothingBlock(content) {
     // [-*]?\s* - optional bullet point
     // ([^:\n,]+) - name (no colon, newline, or comma)
     // :\s* - colon separator
-    // (standard|winter|summer|costumed:[^\n,]+) - clothing category (stops at comma or newline)
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^:\n,]+):\s*(standard|winter|summer|costumed:[^\n,]+)/gim;
+    // (standard|winter|summer|formal|costumed:[^\r\n,]+) - clothing category (stops at comma or newline)
+    // Note: [^\r\n,] handles both Unix (\n) and Windows (\r\n) line endings
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^:\r\n,]+):\s*(standard|winter|summer|formal|costumed:[^\r\n,]+)/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
-      const clothing = lineMatch[2].trim().toLowerCase();
+      const clothing = lineMatch[2].trim().toLowerCase().replace(/\r$/, ''); // Strip trailing \r if present
       // Extract base name (remove alias in parentheses for lookup, keep for display)
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
       characters.push(rawName);
@@ -1786,12 +1787,13 @@ class ProgressiveUnifiedParser {
       // Only emit if we're confident the page is complete
       // Either there's a next page, or we have both TEXT and SCENE HINT plus at least one character with clothing
       // Note: Characters section may be "Characters:" or "Characters (MAX N):"
-      const hasCharacterClothing = /Characters(?:\s*\([^)]*\))?:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\n]*:\s*(?:standard|winter|summer|costumed:[^\n]+))/mi.test(content);
+      // Note: [^\r\n] handles both Unix (\n) and Windows (\r\n) line endings
+      const hasCharacterClothing = /Characters(?:\s*\([^)]*\))?:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\r\n]*:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))/mi.test(content);
 
       // IMPORTANT: Check if Characters block is fully received
       // Complete when: followed by Setting:, blank line, or end of content
-      const charactersBlockComplete = /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*\n(?:Setting:|[^\S\n]*\n)/mi.test(content) ||
-        /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\n[-*]\s*[^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n]+))+\s*$/mi.test(content);
+      const charactersBlockComplete = /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*\r?\n(?:Setting:|[^\S\r\n]*\r?\n)/mi.test(content) ||
+        /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*$/mi.test(content);
 
       if ((nextPageIndex > match.index && charactersBlockComplete) || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
@@ -1832,6 +1834,39 @@ class ProgressiveUnifiedParser {
         }
       }
     }
+  }
+
+  /**
+   * Get the raw outline block for a specific page (for passing to scene expansion)
+   * Returns the exact text from "--- Page X ---" to the next page marker or end
+   * @param {number} pageNumber - The page number to get
+   * @returns {string|null} Raw page block or null if not found
+   */
+  getRawPageBlock(pageNumber) {
+    if (!this.fullText) return null;
+
+    // Match the specific page block
+    const pattern = new RegExp(
+      `---\\s*Page\\s+${pageNumber}\\s*---\\s*([\\s\\S]*?)(?=---\\s*Page\\s+\\d+\\s*---|$)`,
+      'i'
+    );
+    const match = this.fullText.match(pattern);
+    if (!match) return null;
+
+    // Return the header + content
+    return `--- Page ${pageNumber} ---\n${match[1].trim()}`;
+  }
+
+  /**
+   * Get raw outline blocks for multiple pages (for previous scenes context)
+   * @param {number[]} pageNumbers - Array of page numbers to get
+   * @returns {string} Combined raw blocks, or empty string if none found
+   */
+  getRawPageBlocks(pageNumbers) {
+    const blocks = pageNumbers
+      .map(pn => this.getRawPageBlock(pn))
+      .filter(Boolean);
+    return blocks.join('\n\n');
   }
 
   /**

@@ -813,6 +813,7 @@ function getCharactersInScene(sceneDescription, characters) {
   const metadata = extractSceneMetadata(sceneDescription);
   if (metadata && metadata.characters && metadata.characters.length > 0) {
     // Match JSON character names to available characters
+    // Use STRICT matching to avoid "Lukas Zimmer" (a room) matching character "Lukas"
     const matchedCharacters = characters.filter(char => {
       if (!char.name) return false;
       const nameLower = char.name.toLowerCase().trim();
@@ -820,12 +821,19 @@ function getCharactersInScene(sceneDescription, characters) {
 
       return metadata.characters.some(jsonName => {
         const jsonLower = jsonName.toLowerCase().trim();
-        return jsonLower === nameLower ||
-               jsonLower === firstName ||
-               jsonLower.includes(nameLower) ||
-               nameLower.includes(jsonLower) ||
-               jsonLower.includes(firstName) ||
-               firstName.includes(jsonLower);
+        const jsonFirstName = jsonLower.split(' ')[0];
+
+        // Exact match on full name or first name
+        if (jsonLower === nameLower || jsonLower === firstName) return true;
+        if (jsonFirstName === nameLower || jsonFirstName === firstName) return true;
+
+        // Only allow partial matches if the character name IS the scene entry
+        // (e.g., character "Lukas" matches scene entry "Lukas", not "Lukas Zimmer")
+        // Avoid matching if scene entry is longer and contains additional words
+        if (jsonLower.includes(nameLower) && jsonLower.split(' ').length === nameLower.split(' ').length) return true;
+        if (nameLower.includes(jsonLower) && nameLower.split(' ').length === jsonLower.split(' ').length) return true;
+
+        return false;
       });
     });
 
@@ -839,19 +847,25 @@ function getCharactersInScene(sceneDescription, characters) {
 
   if (parsedNames.length > 0) {
     // Match main characters whose names appear in the parsed list
+    // Use STRICT matching to avoid partial name matches
     const matchedCharacters = characters.filter(char => {
       if (!char.name) return false;
       const nameLower = char.name.toLowerCase().trim();
       const firstName = nameLower.split(' ')[0];
 
-      return parsedNames.some(parsed =>
-        parsed === nameLower ||
-        parsed === firstName ||
-        parsed.includes(nameLower) ||
-        nameLower.includes(parsed) ||
-        parsed.includes(firstName) ||
-        firstName.includes(parsed)
-      );
+      return parsedNames.some(parsed => {
+        const parsedFirstName = parsed.split(' ')[0];
+
+        // Exact match on full name or first name
+        if (parsed === nameLower || parsed === firstName) return true;
+        if (parsedFirstName === nameLower || parsedFirstName === firstName) return true;
+
+        // Only allow partial matches if same word count (avoid "Lukas Zimmer" matching "Lukas")
+        if (parsed.includes(nameLower) && parsed.split(' ').length === nameLower.split(' ').length) return true;
+        if (nameLower.includes(parsed) && nameLower.split(' ').length === parsed.split(' ').length) return true;
+
+        return false;
+      });
     });
 
     if (matchedCharacters.length > 0) {
@@ -860,13 +874,19 @@ function getCharactersInScene(sceneDescription, characters) {
   }
 
   // Step 2: Fallback to simple text matching if parser found nothing
+  // Use word boundary matching to avoid partial matches
   const sceneLower = sceneDescription.toLowerCase();
 
   return characters.filter(char => {
     if (!char.name) return false;
     const nameLower = char.name.toLowerCase();
     const firstName = nameLower.split(' ')[0];
-    return sceneLower.includes(nameLower) || sceneLower.includes(firstName);
+
+    // Use word boundary regex to match whole words only
+    const nameRegex = new RegExp(`\\b${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    const firstNameRegex = new RegExp(`\\b${firstName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+
+    return nameRegex.test(sceneLower) || firstNameRegex.test(sceneLower);
   });
 }
 
@@ -978,7 +998,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   const keywords = '(?:Clothing|Kleidung|Vêtements|Tenue)';
 
   // Valid clothing values (including costumed with optional sub-type)
-  const values = '(winter|summer|standard|costumed(?::[a-z]+)?)';
+  const values = '(winter|summer|standard|formal|costumed(?::[a-z]+)?)';
 
   // Pattern 1: Same line - keyword and value on same line with any markdown/separators
   // Handles: **Clothing:** winter, *Clothing*: **winter**, --Clothing--: winter, ## 4. Clothing: winter
@@ -1006,7 +1026,7 @@ function parseClothingCategory(sceneDescription, warnOnInvalid = true) {
   if (keywordMatch) {
     const startIndex = keywordMatch.index;
     const nearbyText = sceneDescription.substring(startIndex, startIndex + 100);
-    const valueMatch = nearbyText.match(/\b(winter|summer|standard|costumed(?::[a-z]+)?)\b/i);
+    const valueMatch = nearbyText.match(/\b(winter|summer|standard|formal|costumed(?::[a-z]+)?)\b/i);
     if (valueMatch) {
       const value = valueMatch[1].toLowerCase();
       return value === 'formal' ? 'standard' : value;
@@ -1083,7 +1103,7 @@ function parseSceneHintMetadata(sceneHint) {
     if (charBlock.includes('\n') && /^[-*]\s*\w/m.test(charBlock)) {
       // Multi-line format: extract and join character entries
       const charEntries = [];
-      const linePattern = /^[-*]\s*([^:\n]+:\s*(?:standard|winter|summer|costumed:[^\n,]+))/gim;
+      const linePattern = /^[-*]\s*([^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n,]+))/gim;
       let lineMatch;
       while ((lineMatch = linePattern.exec(charBlock)) !== null) {
         charEntries.push(lineMatch[1].trim());
@@ -2047,15 +2067,16 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
  * @param {number} pageNumber - Current page number
  * @param {string} pageContent - Text content for current page
  * @param {Array} characters - Character data array
- * @param {string} shortSceneDesc - Scene hint from outline (current page)
+ * @param {string} shortSceneDesc - Scene hint from outline (current page) - DEPRECATED when using rawOutlineContext
  * @param {string} language - Output language
  * @param {Object} visualBible - Visual Bible data
- * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2)
- * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string
+ * @param {Array} previousScenes - Array of {pageNumber, text, sceneHint, characterClothing} for previous pages (max 2) - DEPRECATED when using rawOutlineContext
+ * @param {Object|string} characterClothing - Per-character clothing map {Name: 'category'} or legacy string - DEPRECATED when using rawOutlineContext
  * @param {string} correctionNotes - Notes from previous failed attempt (for regeneration)
  * @param {string} availableAvatars - Pre-built string of available avatars per character
+ * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '') {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null) {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -2160,53 +2181,68 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     recurringElements = '(None available)';
   }
 
-  // Build previous scenes context (for narrative continuity and clothing consistency)
+  // Build previous scenes and current scene context
+  // SIMPLE MODE: When rawOutlineContext is provided, use raw outline blocks directly (no parsing)
+  // This avoids complex parsing bugs and passes the outline data exactly as generated
   let previousScenesText = '';
-  if (previousScenes && previousScenes.length > 0) {
-    previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
-    for (const prev of previousScenes) {
-      // Include full text - context is valuable and tokens are cheap
-      previousScenesText += `Page ${prev.pageNumber}: ${prev.text}\n`;
-      if (prev.sceneHint) {
-        previousScenesText += `  Scene: ${prev.sceneHint}\n`;
-      }
-      // Show per-character clothing for previous scenes
-      if (prev.characterClothing && typeof prev.characterClothing === 'object') {
-        const clothingList = Object.entries(prev.characterClothing)
-          .map(([name, cat]) => `${name}: ${cat}`)
-          .join(', ');
-        if (clothingList) {
-          previousScenesText += `  Clothing: ${clothingList}\n`;
-        }
-      } else if (prev.clothing) {
-        // Legacy format fallback
-        previousScenesText += `  Clothing: ${prev.clothing}\n`;
-      }
-    }
-    previousScenesText += '\n';
-  }
-
-  // Extract scene context (characters, setting, time, weather) from scene hint
   let sceneContextText = '';
-  const sceneMetadata = parseSceneHintMetadata(shortSceneDesc);
-  if (sceneMetadata) {
-    const contextParts = [];
-    // Characters in this scene (with their clothing for this scene)
-    if (sceneMetadata.characters) {
-      contextParts.push(`- Characters in this scene: ${sceneMetadata.characters}`);
+
+  if (rawOutlineContext) {
+    // SIMPLE: Use raw outline blocks directly
+    if (rawOutlineContext.previousPages) {
+      previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
+      previousScenesText += rawOutlineContext.previousPages + '\n\n';
     }
-    if (sceneMetadata.setting && sceneMetadata.setting.toLowerCase() !== 'n/a') {
-      contextParts.push(`- Setting: ${sceneMetadata.setting}`);
+    // Current page context is passed via rawOutlineContext.currentPage in SCENE_SUMMARY
+    // The raw block already contains TEXT, SCENE HINT, Characters, Setting, etc.
+    log.debug(`[SCENE PROMPT P${pageNumber}] Using raw outline context`);
+  } else {
+    // LEGACY: Parse and reconstruct from structured data (for backwards compatibility)
+    if (previousScenes && previousScenes.length > 0) {
+      previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
+      for (const prev of previousScenes) {
+        // Include full text - context is valuable and tokens are cheap
+        previousScenesText += `Page ${prev.pageNumber}: ${prev.text}\n`;
+        if (prev.sceneHint) {
+          previousScenesText += `  Scene: ${prev.sceneHint}\n`;
+        }
+        // Show per-character clothing for previous scenes
+        if (prev.characterClothing && typeof prev.characterClothing === 'object') {
+          const clothingList = Object.entries(prev.characterClothing)
+            .map(([name, cat]) => `${name}: ${cat}`)
+            .join(', ');
+          if (clothingList) {
+            previousScenesText += `  Clothing: ${clothingList}\n`;
+          }
+        } else if (prev.clothing) {
+          // Legacy format fallback
+          previousScenesText += `  Clothing: ${prev.clothing}\n`;
+        }
+      }
+      previousScenesText += '\n';
     }
-    if (sceneMetadata.time && sceneMetadata.time.toLowerCase() !== 'n/a') {
-      contextParts.push(`- Time of day: ${sceneMetadata.time}`);
-    }
-    if (sceneMetadata.weather && sceneMetadata.weather.toLowerCase() !== 'n/a') {
-      contextParts.push(`- Weather: ${sceneMetadata.weather}`);
-    }
-    if (contextParts.length > 0) {
-      sceneContextText = '**Scene Context:**\n' + contextParts.join('\n') + '\n\n';
-      log.debug(`[SCENE PROMPT P${pageNumber}] Scene context: ${JSON.stringify(sceneMetadata)}`);
+
+    // Extract scene context (characters, setting, time, weather) from scene hint
+    const sceneMetadata = parseSceneHintMetadata(shortSceneDesc);
+    if (sceneMetadata) {
+      const contextParts = [];
+      // Characters in this scene (with their clothing for this scene)
+      if (sceneMetadata.characters) {
+        contextParts.push(`- Characters in this scene: ${sceneMetadata.characters}`);
+      }
+      if (sceneMetadata.setting && sceneMetadata.setting.toLowerCase() !== 'n/a') {
+        contextParts.push(`- Setting: ${sceneMetadata.setting}`);
+      }
+      if (sceneMetadata.time && sceneMetadata.time.toLowerCase() !== 'n/a') {
+        contextParts.push(`- Time of day: ${sceneMetadata.time}`);
+      }
+      if (sceneMetadata.weather && sceneMetadata.weather.toLowerCase() !== 'n/a') {
+        contextParts.push(`- Weather: ${sceneMetadata.weather}`);
+      }
+      if (contextParts.length > 0) {
+        sceneContextText = '**Scene Context:**\n' + contextParts.join('\n') + '\n\n';
+        log.debug(`[SCENE PROMPT P${pageNumber}] Scene context: ${JSON.stringify(sceneMetadata)}`);
+      }
     }
   }
 
@@ -2215,9 +2251,19 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // Get the full language instruction with spelling rules (e.g., 'Write in German with Swiss spelling. Use ä,ö,ü...')
     const languageInstruction = getLanguageInstruction(language);
     const languageName = getLanguageNameEnglish(language);
+
+    // Build scene summary - use raw outline block when available (contains all structured data)
+    let sceneSummary = '';
+    if (rawOutlineContext?.currentPage) {
+      // Raw outline block already contains TEXT, SCENE HINT, Characters, Setting, Time, Weather
+      sceneSummary = rawOutlineContext.currentPage + '\n\n';
+    } else if (shortSceneDesc) {
+      sceneSummary = `Scene Summary: ${shortSceneDesc}\n\n`;
+    }
+
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       PREVIOUS_SCENES: previousScenesText,
-      SCENE_SUMMARY: shortSceneDesc ? `Scene Summary: ${shortSceneDesc}\n\n` : '',
+      SCENE_SUMMARY: sceneSummary,
       SCENE_CONTEXT: sceneContextText,
       PAGE_NUMBER: pageNumber.toString(),
       PAGE_CONTENT: pageContent,
@@ -2429,6 +2475,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     }
 
     for (const objName of metadata.objects) {
+      // First check if this is a character ID (CHR*) - AI sometimes puts characters in objects
+      const chrIdMatch = typeof objName === 'string' ? objName.match(/\[?(CHR\d{3})\]?/i) :
+                         (objName?.id?.match(/^CHR\d{3}$/i) ? [null, objName.id] : null);
+      if (chrIdMatch) {
+        const secondaryChar = (visualBible.secondaryCharacters || []).find(sc => matchesEntry(sc, objName, true));
+        if (secondaryChar) {
+          const description = secondaryChar.extractedDescription || secondaryChar.description;
+          requiredObjects.push({ name: secondaryChar.name, id: secondaryChar.id, type: 'secondary character', description });
+          continue;
+        }
+      }
+
       // Look up in artifacts
       const artifact = (visualBible.artifacts || []).find(a => matchesEntry(a, objName));
       if (artifact) {
