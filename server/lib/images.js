@@ -1872,8 +1872,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     ? { ...incrementalConsistencyInput, dryRun: true }
     : incrementalConsistencyInput;
 
-  // Grid repair: enabled by default when autoRepair is on (unless explicitly disabled)
-  const useGridRepair = useGridRepairInput !== null ? useGridRepairInput : enableAutoRepair;
+  // Grid repair: enabled by default (new system) unless explicitly disabled
+  const useGridRepair = useGridRepairInput !== null ? useGridRepairInput : CONFIG_DEFAULTS.useGridRepair;
   // Auto-generate output directory for grid repair if not provided
   const gridRepairOutputDir = gridRepairOutputDirInput || (useGridRepair ? path.join(os.tmpdir(), 'grid-repair', `job-${Date.now()}`) : null);
 

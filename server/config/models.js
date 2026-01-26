@@ -73,7 +73,9 @@ const MODEL_DEFAULTS = {
 
   // Feature flags for generation pipeline
   enableAutoRepair: false,             // Auto-repair: fix detected issues in generated images
-  enableFinalChecks: true              // Final checks: run consistency checks at end of generation
+  useGridRepair: true,                 // Grid-based repair (new system) - default ON when autoRepair enabled
+  enableFinalChecks: true,             // Final checks: run consistency checks at end of generation
+  checkOnlyMode: false                 // Check-only mode: run checks but skip all regeneration
 };
 
 // Available inpaint backends
