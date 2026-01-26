@@ -1191,7 +1191,7 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
     console.log(`✅ Sharing enabled for story ${id}, token: ${shareToken.substring(0, 8)}...`);
 
     res.json({
-      success: true,
+      isShared: true,
       shareToken,
       shareUrl
     });
@@ -1230,7 +1230,7 @@ router.delete('/:id/share', authenticateToken, async (req, res) => {
 
     console.log(`🚫 Sharing disabled for story ${id}`);
 
-    res.json({ success: true });
+    res.json({ isShared: false, shareToken: null, shareUrl: null });
   } catch (err) {
     console.error('Error disabling sharing:', err);
     res.status(500).json({ error: 'Failed to disable sharing' });
