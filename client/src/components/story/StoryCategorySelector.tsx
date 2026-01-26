@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles, Pencil } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import {
   storyCategories,
@@ -70,6 +70,9 @@ export function StoryCategorySelector({
       change: 'Change',
       customThemePlaceholder: 'Describe your story idea in detail...\n\nFor example:\n- A story about learning to ride a bike\n- An adventure in the Swiss mountains\n- Meeting a friendly dragon who helps with homework',
       customThemeLabel: 'Your custom theme:',
+      currentSelection: 'Current Selection',
+      changeStory: 'Choose Different Story',
+      category: 'Category',
     },
     de: {
       storyType: 'Geschichte',
@@ -85,6 +88,9 @@ export function StoryCategorySelector({
       change: 'Ändern',
       customThemePlaceholder: 'Beschreibe deine Geschichte hier...\n\nZum Beispiel:\n- Eine Geschichte über das Fahrradfahren lernen\n- Ein Abenteuer in den Schweizer Bergen\n- Ein freundlicher Drache, der bei den Hausaufgaben hilft',
       customThemeLabel: 'Dein eigenes Thema:',
+      currentSelection: 'Aktuelle Auswahl',
+      changeStory: 'Andere Geschichte wählen',
+      category: 'Kategorie',
     },
     fr: {
       storyType: 'Histoire',
@@ -100,6 +106,9 @@ export function StoryCategorySelector({
       change: 'Changer',
       customThemePlaceholder: 'Décris ton idée d\'histoire ici...\n\nPar exemple:\n- Une histoire sur l\'apprentissage du vélo\n- Une aventure dans les montagnes suisses\n- Un dragon amical qui aide aux devoirs',
       customThemeLabel: 'Ton thème personnalisé:',
+      currentSelection: 'Sélection actuelle',
+      changeStory: 'Choisir une autre histoire',
+      category: 'Catégorie',
     },
   };
   const t = translations[lang] || translations.en;
@@ -253,19 +262,25 @@ export function StoryCategorySelector({
 
   // Render step 2a: Adventure theme selection (grouped)
   if (storyCategory === 'adventure' && !storyTheme) {
+    const catData = storyCategories.find(c => c.id === storyCategory);
     return (
       <div className="space-y-4">
-        {/* Selected category indicator */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-            {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
-          </span>
-          <button
-            onClick={() => onCategoryChange('')}
-            className="text-indigo-600 hover:underline"
-          >
-            {t.change}
-          </button>
+        {/* Selected category chip */}
+        <div className="flex items-center gap-3">
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+            <span className="text-2xl">{catData?.emoji}</span>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
+              <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
+            </div>
+            <button
+              onClick={() => onCategoryChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -315,19 +330,25 @@ export function StoryCategorySelector({
 
   // Render step 2b: Life Challenge topic selection
   if (storyCategory === 'life-challenge' && !storyTopic) {
+    const catData = storyCategories.find(c => c.id === storyCategory);
     return (
       <div className="space-y-4">
-        {/* Selected category indicator */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-            {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
-          </span>
-          <button
-            onClick={() => onCategoryChange('')}
-            className="text-indigo-600 hover:underline"
-          >
-            {t.change}
-          </button>
+        {/* Selected category chip */}
+        <div className="flex items-center gap-3">
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+            <span className="text-2xl">{catData?.emoji}</span>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
+              <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
+            </div>
+            <button
+              onClick={() => onCategoryChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -379,19 +400,25 @@ export function StoryCategorySelector({
 
   // Render step 2c: Educational topic selection
   if (storyCategory === 'educational' && !storyTopic) {
+    const catData = storyCategories.find(c => c.id === storyCategory);
     return (
       <div className="space-y-4">
-        {/* Selected category indicator */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-            {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
-          </span>
-          <button
-            onClick={() => onCategoryChange('')}
-            className="text-indigo-600 hover:underline"
-          >
-            {t.change}
-          </button>
+        {/* Selected category chip */}
+        <div className="flex items-center gap-3">
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+            <span className="text-2xl">{catData?.emoji}</span>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
+              <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
+            </div>
+            <button
+              onClick={() => onCategoryChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -443,19 +470,25 @@ export function StoryCategorySelector({
 
   // Render step 2d: Historical event selection
   if (storyCategory === 'historical' && !storyTopic) {
+    const catData = storyCategories.find(c => c.id === storyCategory);
     return (
       <div className="space-y-4">
-        {/* Selected category indicator */}
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-            {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
-          </span>
-          <button
-            onClick={() => onCategoryChange('')}
-            className="text-indigo-600 hover:underline"
-          >
-            {t.change}
-          </button>
+        {/* Selected category chip */}
+        <div className="flex items-center gap-3">
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+            <span className="text-2xl">{catData?.emoji}</span>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
+              <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
+            </div>
+            <button
+              onClick={() => onCategoryChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
         </div>
 
         <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
@@ -527,27 +560,49 @@ export function StoryCategorySelector({
   // Show popular themes first, then all other themes in collapsed groups
   if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic && storyTheme === 'realistic') {
     const popularThemes = getStoryTypesByGroup('popular');
+    const catData = storyCategories.find(c => c.id === storyCategory);
+    const topEmoji = lifeChallenges.find(c => c.id === storyTopic)?.emoji ||
+                     educationalTopics.find(t => t.id === storyTopic)?.emoji;
 
     return (
       <div className="space-y-4">
-        {/* Selected category and topic indicator */}
-        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-          <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded">
-            {storyCategories.find(c => c.id === storyCategory)?.emoji} {getCategoryName(storyCategory)}
-          </span>
-          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
-            {getTopicName(storyTopic)}
-          </span>
-          <button
-            onClick={() => onTopicChange('')}
-            className="text-indigo-600 hover:underline"
-          >
-            {t.change}
-          </button>
+        {/* Selected category and topic chips */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+            <span className="text-2xl">{catData?.emoji}</span>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
+              <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
+            </div>
+            <button
+              onClick={() => onCategoryChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
+          <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+            <span className="text-2xl">{topEmoji}</span>
+            <div>
+              <div className="text-[10px] text-gray-400 uppercase">{t.selectedTopic}</div>
+              <div className="font-semibold text-sm">{getTopicName(storyTopic)}</div>
+            </div>
+            <button
+              onClick={() => onTopicChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
+          </div>
         </div>
 
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h3 className="font-bold text-gray-800 mb-1">{t.optionalTheme}</h3>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-2 flex items-center gap-2">
+            <Sparkles className="text-indigo-500" size={20} />
+            {t.optionalTheme}
+          </h3>
           <p className="text-sm text-gray-600 mb-3">{t.optionalThemeDesc}</p>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2 mb-4">
@@ -556,8 +611,8 @@ export function StoryCategorySelector({
               onClick={() => handleThemeWrapperSelect('realistic')}
               className={`p-2 rounded-lg border-2 transition-all ${
                 storyTheme === 'realistic'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 hover:border-blue-300'
+                  ? 'border-indigo-500 bg-indigo-50'
+                  : 'border-gray-200 hover:border-indigo-300'
               }`}
             >
               <div className="text-2xl mb-1">{realisticSetting.emoji}</div>
@@ -582,7 +637,7 @@ export function StoryCategorySelector({
           </div>
 
           {/* All other theme groups (collapsed) */}
-          <div className="space-y-2 border-t border-amber-200 pt-3">
+          <div className="space-y-2 border-t border-gray-200 pt-3">
             {adventureThemeGroups.filter(g => g.id !== 'popular' && g.id !== 'custom').map((group) => {
               const themes = getStoryTypesByGroup(group.id);
               const isExpanded = expandedAdventureGroups.includes(group.id);
@@ -626,90 +681,93 @@ export function StoryCategorySelector({
     );
   }
 
-  // Final state: Show selection summary (all selected)
+  // Final state: Show current selection + full selection UI below
   const categoryData = storyCategories.find(c => c.id === storyCategory);
+  const topicEmoji = lifeChallenges.find(c => c.id === storyTopic)?.emoji ||
+                     educationalTopics.find(t => t.id === storyTopic)?.emoji ||
+                     historicalEvents.find(e => e.id === storyTopic)?.emoji;
+  const themeEmoji = storyTheme === 'realistic'
+    ? realisticSetting.emoji
+    : storyTypes.find(t => t.id === storyTheme)?.emoji;
+
+  // Count how many chips we'll show
+  const showTopic = !!storyTopic;
+  const showTheme = storyCategory !== 'historical' && storyCategory !== 'custom' && !!storyTheme;
+  const chipCount = 1 + (showTopic ? 1 : 0) + (showTheme ? 1 : 0);
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-        <Sparkles className="text-indigo-600" size={24} />
-        {t.storyType}
-      </h2>
+    <div className="space-y-6">
+      {/* Current Selection - same style as Change Story section */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <Sparkles className="text-indigo-500" size={20} />
+          {t.currentSelection}
+        </h3>
 
-      {/* Selection summary */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 space-y-3">
-        {/* Category */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        {/* Selections in evenly spaced grid */}
+        <div className={`grid gap-4 ${chipCount === 1 ? 'grid-cols-1 max-w-xs' : chipCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
+          {/* Category chip */}
+          <div className="relative flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
             <span className="text-2xl">{categoryData?.emoji}</span>
-            <div>
-              <div className="text-xs text-gray-500">{t.selectedCategory}</div>
-              <div className="font-semibold">{getCategoryName(storyCategory)}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
+              <div className="font-semibold text-sm truncate">{getCategoryName(storyCategory)}</div>
             </div>
+            <button
+              onClick={() => onCategoryChange('')}
+              className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+              title={t.change}
+            >
+              <Pencil size={14} />
+            </button>
           </div>
-          <button
-            onClick={() => onCategoryChange('')}
-            className="text-indigo-600 hover:underline text-sm"
-          >
-            {t.change}
-          </button>
+
+          {/* Topic chip (for life-challenge, educational, historical) */}
+          {showTopic && (
+            <div className="relative flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+              <span className="text-2xl">{topicEmoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-gray-400 uppercase">{t.selectedTopic}</div>
+                <div className="font-semibold text-sm truncate">{getTopicName(storyTopic)}</div>
+              </div>
+              <button
+                onClick={() => onTopicChange('')}
+                className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+                title={t.change}
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* Theme chip - hide for historical and custom */}
+          {showTheme && (
+            <div className="relative flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
+              <span className="text-2xl">{themeEmoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-[10px] text-gray-400 uppercase">{t.selectedTheme}</div>
+                <div className="font-semibold text-sm truncate">{getThemeName(storyTheme)}</div>
+              </div>
+              <button
+                onClick={() => {
+                  if (storyCategory === 'adventure') {
+                    onThemeChange('');
+                  } else {
+                    onThemeChange('realistic');
+                  }
+                }}
+                className="p-1.5 rounded-full hover:bg-indigo-100 text-indigo-500 transition-colors"
+                title={t.change}
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
+          )}
         </div>
-
-        {/* Topic (for life-challenge, educational, and historical) */}
-        {storyTopic && (
-          <div className="flex items-center justify-between border-t border-indigo-100 pt-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">
-                {lifeChallenges.find(c => c.id === storyTopic)?.emoji ||
-                 educationalTopics.find(t => t.id === storyTopic)?.emoji ||
-                 historicalEvents.find(e => e.id === storyTopic)?.emoji}
-              </span>
-              <div>
-                <div className="text-xs text-gray-500">{t.selectedTopic}</div>
-                <div className="font-semibold">{getTopicName(storyTopic)}</div>
-              </div>
-            </div>
-            <button
-              onClick={() => onTopicChange('')}
-              className="text-indigo-600 hover:underline text-sm"
-            >
-              {t.change}
-            </button>
-          </div>
-        )}
-
-        {/* Theme - hide for historical and custom (no redundant theme row needed) */}
-        {storyCategory !== 'historical' && storyCategory !== 'custom' && (
-          <div className="flex items-center justify-between border-t border-indigo-100 pt-3">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">
-                {storyTheme === 'realistic'
-                  ? realisticSetting.emoji
-                  : storyTypes.find(t => t.id === storyTheme)?.emoji}
-              </span>
-              <div>
-                <div className="text-xs text-gray-500">{t.selectedTheme}</div>
-                <div className="font-semibold">{getThemeName(storyTheme)}</div>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                if (storyCategory === 'adventure') {
-                  onThemeChange('');
-                } else {
-                  onThemeChange('realistic');
-                }
-              }}
-              className="text-indigo-600 hover:underline text-sm"
-            >
-              {t.change}
-            </button>
-          </div>
-        )}
 
         {/* Custom theme input - shown when 'custom' is selected */}
         {storyTheme === 'custom' && (
-          <div className="pt-3">
+          <div className="mt-4">
             <textarea
               value={customThemeText}
               onChange={(e) => onCustomThemeTextChange?.(e.target.value)}
@@ -719,6 +777,43 @@ export function StoryCategorySelector({
             />
           </div>
         )}
+      </div>
+
+      {/* Change Story section - show full category selection */}
+      <div className="border-t border-gray-200 pt-6">
+        <h3 className="text-lg font-semibold text-gray-700 mb-4 flex items-center gap-2">
+          <Sparkles className="text-indigo-500" size={20} />
+          {t.changeStory}
+        </h3>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {storyCategories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => handleCategorySelect(category.id as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom')}
+              className={`p-4 rounded-xl border-2 transition-all ${
+                category.id === storyCategory
+                  ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
+                  : category.id === 'custom'
+                    ? 'border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50'
+                    : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+              }`}
+            >
+              {/* Horizontal layout: large emoji left, title + description right */}
+              <div className="flex items-center gap-3 text-left">
+                <div className="text-4xl flex-shrink-0">{category.emoji}</div>
+                <div>
+                  <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
+                    {category.name[lang] || category.name.en}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {category.description[lang] || category.description.en}
+                  </div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

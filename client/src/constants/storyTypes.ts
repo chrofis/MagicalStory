@@ -16,7 +16,7 @@ export const storyCategories: StoryCategory[] = [
   },
   {
     id: 'life-challenge',
-    name: { en: 'Life Skills', de: 'Lebensthemen', fr: 'Compétences de vie' },
+    name: { en: 'Life Skills', de: 'Lebenskompetenzen', fr: 'Compétences de vie' },
     description: {
       en: 'Help overcome everyday challenges',
       de: 'Hilfe bei alltäglichen Herausforderungen',

@@ -1338,22 +1338,30 @@ export default function StoryWizard() {
   // Handler for story theme change - auto-advances only at final step
   const handleThemeChange = (theme: string) => {
     setStoryTheme(theme);
+    // Don't auto-advance for special themes that indicate category changes
+    // 'custom' and 'realistic' are set when changing categories, not when selecting a theme
+    if (theme === 'custom' || theme === 'realistic' || theme === '') {
+      return;
+    }
     // Adventure: advance when theme is selected (this IS the final step)
-    if (storyCategory === 'adventure' && theme !== '') {
+    if (storyCategory === 'adventure') {
       safeSetStep(4);
     }
     // Life-challenge/Educational: advance when a non-realistic setting is selected
-    // Only advance if topic is already set AND theme is not 'realistic'
-    // 'realistic' means user wants to go back to theme selection, not advance
-    else if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '' && theme !== '' && theme !== 'realistic') {
+    // Only advance if topic is already set
+    else if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && storyTopic !== '') {
       safeSetStep(4);
     }
   };
 
-  // Handler for story topic change - doesn't auto-advance, user still needs to select setting
+  // Handler for story topic change
   const handleTopicChange = (topic: string) => {
     setStoryTopic(topic);
-    // Don't auto-advance - user still needs to select a setting next
+    // Historical: advance when topic is selected (no theme step for historical)
+    if (storyCategory === 'historical' && topic !== '') {
+      safeSetStep(4);
+    }
+    // Life-challenge/Educational: don't auto-advance, user still has optional theme step
   };
 
   // Handler for art style selection - sets style and auto-advances
@@ -2752,6 +2760,8 @@ export default function StoryWizard() {
       if (!storyCategory) return false;
       if (storyCategory === 'adventure' && !storyTheme) return false;
       if ((storyCategory === 'life-challenge' || storyCategory === 'educational') && !storyTopic) return false;
+      if (storyCategory === 'historical' && !storyTopic) return false;
+      if (storyCategory === 'custom' && !customThemeText?.trim()) return false;
       return true;
     }
     if (step === 4) {
