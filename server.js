@@ -3234,7 +3234,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, coverType } = req.params;
-    const { customPrompt, editedScene, characterIds } = req.body;
+    const { customPrompt, editedScene, characterIds, editedTitle, editedDedication } = req.body;
 
     // Accept both 'initial' and 'initialPage' for backwards compatibility
     const normalizedCoverType = coverType === 'initial' ? 'initialPage' : coverType;
@@ -3318,7 +3318,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
 
     // Extract cover scenes with clothing info
     const coverScenes = extractCoverScenes(storyData.outline || '');
-    const storyTitle = storyData.title || 'My Story';
+    // Use edited title/dedication if provided, otherwise use story data
+    const storyTitle = editedTitle !== undefined ? editedTitle : (storyData.title || 'My Story');
+    const coverDedication = editedDedication !== undefined ? editedDedication : storyData.dedication;
 
     // Determine scene description and clothing for this cover type
     let sceneDescription;
@@ -3418,11 +3420,11 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
           VISUAL_BIBLE: visualBiblePrompt
         });
       } else if (normalizedCoverType === 'initialPage') {
-        coverPrompt = storyData.dedication
+        coverPrompt = coverDedication
           ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
               INITIAL_PAGE_SCENE: sceneDescription,
               STYLE_DESCRIPTION: styleDescription,
-              DEDICATION: storyData.dedication,
+              DEDICATION: coverDedication,
               CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
               VISUAL_BIBLE: visualBiblePrompt
             })

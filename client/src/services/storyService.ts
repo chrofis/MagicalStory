@@ -617,7 +617,7 @@ export const storyService = {
     return response;
   },
 
-  async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial', editedScene?: string): Promise<{
+  async regenerateCover(storyId: string, coverType: 'front' | 'back' | 'initial', editedScene?: string, characterIds?: number[], editedTitle?: string, editedDedication?: string): Promise<{
     imageData: string;
     description?: string;
     prompt?: string;
@@ -628,6 +628,12 @@ export const storyService = {
     creditsUsed?: number;
     creditsRemaining?: number;
   }> {
+    const body: { editedScene?: string; characterIds?: number[]; editedTitle?: string; editedDedication?: string } = {};
+    if (editedScene) body.editedScene = editedScene;
+    if (characterIds && characterIds.length > 0) body.characterIds = characterIds;
+    if (editedTitle !== undefined) body.editedTitle = editedTitle;
+    if (editedDedication !== undefined) body.editedDedication = editedDedication;
+
     const response = await api.post<{
       imageData: string;
       description?: string;
@@ -640,7 +646,7 @@ export const storyService = {
       creditsRemaining?: number;
     }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`,
-      editedScene ? { editedScene } : undefined
+      Object.keys(body).length > 0 ? body : undefined
     );
     return response;
   },

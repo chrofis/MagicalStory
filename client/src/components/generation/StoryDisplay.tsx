@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
@@ -72,6 +72,7 @@ type ClothingRequirements = Record<string, CharacterClothingRequirements>;
 
 interface StoryDisplayProps {
   title: string;
+  dedication?: string;
   story: string;
   outline?: string;
   outlinePrompt?: string;
@@ -92,7 +93,7 @@ interface StoryDisplayProps {
   onCreateAnother?: () => void;
   onDownloadTxt?: () => void;
   onRegenerateImage?: (pageNumber: number, editedScene?: string, characterIds?: number[]) => Promise<void>;
-  onRegenerateCover?: (coverType: 'front' | 'back' | 'initial', editedScene?: string) => Promise<void>;
+  onRegenerateCover?: (coverType: 'front' | 'back' | 'initial', editedScene?: string, characterIds?: number[], editedTitle?: string, editedDedication?: string) => Promise<void>;
   // Characters for scene edit modal
   characters?: Array<{ id: number; name: string; photoData?: string }>;
   onEditImage?: (pageNumber: number) => void;
@@ -139,6 +140,7 @@ interface StoryDisplayProps {
 
 export function StoryDisplay({
   title,
+  dedication,
   story,
   outline,
   outlinePrompt,
@@ -226,7 +228,7 @@ export function StoryDisplay({
   const [regeneratingPages, setRegeneratingPages] = useState<Set<number>>(new Set()); // Track which pages are regenerating (supports parallel)
 
   // Cover edit modal state (for editing cover scene before regenerating)
-  const [coverEditModal, setCoverEditModal] = useState<{ coverType: 'front' | 'back' | 'initial'; scene: string } | null>(null);
+  const [coverEditModal, setCoverEditModal] = useState<{ coverType: 'front' | 'back' | 'initial'; scene: string; selectedCharacterIds: number[]; title?: string; dedication?: string } | null>(null);
 
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
@@ -521,31 +523,60 @@ export function StoryDisplay({
 
   // Open cover edit modal for regeneration (like openSceneEditModal but for covers)
   const openCoverEditModal = (coverType: 'front' | 'back' | 'initial') => {
-    // Get the current cover's description
+    // Get the current cover's description and reference photos
     let coverDescription = '';
+    let referencePhotos: Array<{ name: string }> = [];
+
     if (coverType === 'front' && coverImages?.frontCover) {
       const frontCover = coverImages.frontCover;
-      coverDescription = typeof frontCover === 'object' ? (frontCover as CoverImageData).description || '' : '';
+      if (typeof frontCover === 'object') {
+        coverDescription = (frontCover as CoverImageData).description || '';
+        referencePhotos = (frontCover as CoverImageData).referencePhotos || [];
+      }
     } else if (coverType === 'initial' && coverImages?.initialPage) {
       const initialPage = coverImages.initialPage;
-      coverDescription = typeof initialPage === 'object' ? (initialPage as CoverImageData).description || '' : '';
+      if (typeof initialPage === 'object') {
+        coverDescription = (initialPage as CoverImageData).description || '';
+        referencePhotos = (initialPage as CoverImageData).referencePhotos || [];
+      }
     } else if (coverType === 'back' && coverImages?.backCover) {
       const backCover = coverImages.backCover;
-      coverDescription = typeof backCover === 'object' ? (backCover as CoverImageData).description || '' : '';
+      if (typeof backCover === 'object') {
+        coverDescription = (backCover as CoverImageData).description || '';
+        referencePhotos = (backCover as CoverImageData).referencePhotos || [];
+      }
     }
-    setCoverEditModal({ coverType, scene: coverDescription });
+
+    // Determine initial character selection based on reference photos used
+    let initialCharacterIds: number[] = [];
+    if (referencePhotos.length > 0 && characters.length > 0) {
+      // Match reference photo names to character IDs
+      initialCharacterIds = characters
+        .filter(c => referencePhotos.some(ref => ref.name === c.name))
+        .map(c => c.id);
+    }
+    // If no reference photos found, default to all characters
+    if (initialCharacterIds.length === 0) {
+      initialCharacterIds = characters.map(c => c.id);
+    }
+
+    // Load title for front cover, dedication for initial page
+    const modalTitle = coverType === 'front' ? title : undefined;
+    const modalDedication = coverType === 'initial' ? dedication : undefined;
+
+    setCoverEditModal({ coverType, scene: coverDescription, selectedCharacterIds: initialCharacterIds, title: modalTitle, dedication: modalDedication });
   };
 
   // Handle regenerate cover with edited scene
   const handleRegenerateCoverWithScene = async () => {
     if (!coverEditModal || !_onRegenerateCover) return;
-    const { coverType, scene } = coverEditModal;
+    const { coverType, scene, selectedCharacterIds, title: editedTitle, dedication: editedDedication } = coverEditModal;
 
     // Close modal immediately
     setCoverEditModal(null);
 
     try {
-      await _onRegenerateCover(coverType, scene);
+      await _onRegenerateCover(coverType, scene, selectedCharacterIds, editedTitle, editedDedication);
     } catch (err) {
       console.error('Failed to regenerate cover:', err);
     }
@@ -3527,7 +3558,7 @@ export function StoryDisplay({
       {/* Cover Edit Modal - for editing cover scene before regenerating */}
       {coverEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full shadow-2xl">
+          <div className="bg-white rounded-xl max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                 <RefreshCw size={20} />
@@ -3543,46 +3574,170 @@ export function StoryDisplay({
               </h3>
               <p className="text-sm text-gray-500 mt-1">
                 {language === 'de'
-                  ? 'Beschreibe was auf dem Bild zu sehen sein soll'
+                  ? 'Bearbeite die Szenenbeschreibung und wähle die Charaktere aus'
                   : language === 'fr'
-                  ? 'Décrivez ce que l\'image doit montrer'
-                  : 'Describe what should be shown in the image'}
+                  ? 'Modifiez la description de la scène et sélectionnez les personnages'
+                  : 'Edit the scene description and select the characters'}
               </p>
             </div>
-            <div className="p-4">
-              <textarea
-                value={coverEditModal.scene}
-                onChange={(e) => setCoverEditModal({ ...coverEditModal, scene: e.target.value })}
-                placeholder={language === 'de'
-                  ? 'z.B. "Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang"'
-                  : language === 'fr'
-                  ? 'par ex. "Le personnage principal devant un château magique au coucher du soleil"'
-                  : 'e.g. "The main character standing in front of a magical castle at sunset"'}
-                className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
-              />
+            <div className="p-4 space-y-4">
+              {/* Character Selection */}
+              {characters.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                    <Users size={16} />
+                    {language === 'de' ? 'Charaktere auf dem Cover:' :
+                     language === 'fr' ? 'Personnages sur la couverture:' :
+                     'Characters on the cover:'}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {characters.map((char) => {
+                      const isSelected = coverEditModal.selectedCharacterIds.includes(char.id);
+                      return (
+                        <button
+                          key={char.id}
+                          type="button"
+                          onClick={() => {
+                            const newIds = isSelected
+                              ? coverEditModal.selectedCharacterIds.filter(id => id !== char.id)
+                              : [...coverEditModal.selectedCharacterIds, char.id];
+                            setCoverEditModal({ ...coverEditModal, selectedCharacterIds: newIds });
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                            isSelected
+                              ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          {char.photoData && (
+                            <img
+                              src={char.photoData}
+                              alt={char.name}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          )}
+                          <span className="font-medium">{char.name}</span>
+                          {isSelected && (
+                            <span className="text-indigo-500">✓</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    {language === 'de' ? 'Wähle die Charaktere aus, die auf dem Cover erscheinen sollen.' :
+                     language === 'fr' ? 'Sélectionnez les personnages qui doivent apparaître sur la couverture.' :
+                     'Select the characters that should appear on the cover.'}
+                  </p>
+                </div>
+              )}
+
+              {/* Title Input (Front Cover only) */}
+              {coverEditModal.coverType === 'front' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {language === 'de' ? 'Titel:' :
+                     language === 'fr' ? 'Titre:' :
+                     'Title:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={coverEditModal.title || ''}
+                    onChange={(e) => setCoverEditModal({ ...coverEditModal, title: e.target.value })}
+                    placeholder={language === 'de'
+                      ? 'Der Titel des Buches'
+                      : language === 'fr'
+                      ? 'Le titre du livre'
+                      : 'The book title'}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                </div>
+              )}
+
+              {/* Dedication Input (Initial Page only) */}
+              {coverEditModal.coverType === 'initial' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {language === 'de' ? 'Widmung:' :
+                     language === 'fr' ? 'Dédicace:' :
+                     'Dedication:'}
+                  </label>
+                  <input
+                    type="text"
+                    value={coverEditModal.dedication || ''}
+                    onChange={(e) => setCoverEditModal({ ...coverEditModal, dedication: e.target.value })}
+                    placeholder={language === 'de'
+                      ? 'z.B. "Für meine liebste Tochter Emma"'
+                      : language === 'fr'
+                      ? 'par ex. "Pour ma chère fille Emma"'
+                      : 'e.g. "For my dear daughter Emma"'}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    {language === 'de' ? 'Leer lassen für keine Widmung' :
+                     language === 'fr' ? 'Laisser vide pour aucune dédicace' :
+                     'Leave empty for no dedication'}
+                  </p>
+                </div>
+              )}
+
+              {/* Scene Description */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {language === 'de' ? 'Szenenbeschreibung:' :
+                   language === 'fr' ? 'Description de la scène:' :
+                   'Scene description:'}
+                </label>
+                <textarea
+                  value={coverEditModal.scene}
+                  onChange={(e) => setCoverEditModal({ ...coverEditModal, scene: e.target.value })}
+                  placeholder={language === 'de'
+                    ? 'z.B. "Die Hauptfigur steht vor einem magischen Schloss bei Sonnenuntergang"'
+                    : language === 'fr'
+                    ? 'par ex. "Le personnage principal devant un château magique au coucher du soleil"'
+                    : 'e.g. "The main character standing in front of a magical castle at sunset"'}
+                  className="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-y"
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  {language === 'de' ? 'Tipp: Beschreibe die Aktionen und die Umgebung. Die ausgewählten Charaktere werden automatisch hinzugefügt.' :
+                   language === 'fr' ? 'Conseil: Décrivez les actions et l\'environnement. Les personnages sélectionnés seront ajoutés automatiquement.' :
+                   'Tip: Describe the actions and the environment. Selected characters will be added automatically.'}
+                </p>
+              </div>
             </div>
-            <div className="p-4 border-t border-gray-200 flex gap-3 justify-end">
-              <button
-                onClick={() => setCoverEditModal(null)}
-                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium"
-              >
-                {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
-              </button>
-              <button
-                onClick={handleRegenerateCoverWithScene}
-                disabled={regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover')}
-                className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center gap-2 ${
-                  regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover')
-                    ? 'opacity-50 cursor-not-allowed'
-                    : 'hover:bg-indigo-700'
-                }`}
-              >
-                <RefreshCw size={16} />
-                {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
-                <span className="text-xs opacity-80">
-                  ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
-                </span>
-              </button>
+            <div className="p-4 border-t border-gray-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+              <div className="text-sm text-gray-500 text-center sm:text-left">
+                {coverEditModal.selectedCharacterIds.length > 0 && (
+                  <span>
+                    {language === 'de' ? `${coverEditModal.selectedCharacterIds.length} Charakter(e) ausgewählt` :
+                     language === 'fr' ? `${coverEditModal.selectedCharacterIds.length} personnage(s) sélectionné(s)` :
+                     `${coverEditModal.selectedCharacterIds.length} character(s) selected`}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                <button
+                  onClick={() => setCoverEditModal(null)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium order-2 sm:order-1"
+                >
+                  {language === 'de' ? 'Abbrechen' : language === 'fr' ? 'Annuler' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleRegenerateCoverWithScene}
+                  disabled={regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover') || coverEditModal.selectedCharacterIds.length === 0}
+                  className={`px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 order-1 sm:order-2 ${
+                    regeneratingCovers.has(coverEditModal.coverType === 'front' ? 'frontCover' : coverEditModal.coverType === 'initial' ? 'initialPage' : 'backCover') || coverEditModal.selectedCharacterIds.length === 0
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'hover:bg-indigo-700'
+                  }`}
+                >
+                  <RefreshCw size={16} />
+                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  <span className="text-xs opacity-80">
+                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
