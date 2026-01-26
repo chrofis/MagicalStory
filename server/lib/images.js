@@ -1722,6 +1722,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     const reason = candidate.finishReason || 'unknown';
     const message = candidate.finishMessage || 'no message';
     log.error(`❌ [IMAGE GEN] Image blocked: reason=${reason}, message=${message}`);
+    log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
     throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
   }
 
@@ -1730,10 +1731,12 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   if (textParts.length > 0) {
     const refusalMessage = textParts.map(p => p.text).join(' ').substring(0, 500);
     log.error(`❌ [IMAGE GEN] No image data - Gemini returned text instead: "${refusalMessage}"`);
+    log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
     throw new Error(`Image generation refused: ${refusalMessage.substring(0, 200)}`);
   }
 
   log.error('❌ [IMAGE GEN] No image data found in any part');
+  log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
   throw new Error('No image data in response - check logs for API response structure');
 }
 
