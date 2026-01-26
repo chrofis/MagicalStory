@@ -1271,8 +1271,8 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   // Exclude information signs, plaques, maps from interior candidates
   const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
 
-  // Exclude drawings, engravings, illustrations (backup filter for description text)
-  const isDrawingOrEngraving = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|black and white illustration|historical artwork)\b/i.test(desc || '');
+  // Exclude drawings, engravings, illustrations, maps, coats of arms (backup filter for description text)
+  const isDrawingOrEngraving = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan)\b/i.test(desc || '');
 
   const interiorCandidates = allGoodImages
     .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description) && !isDrawingOrEngraving(img.description))
