@@ -8478,7 +8478,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Final fallback for title page: use main characters or all characters
         if (coverCharacters.length === 0 && coverType === 'titlePage') {
-          const mainChars = inputData.characters.filter(c => c.isMainCharacter === true);
+          // Try isMainCharacter property first
+          let mainChars = inputData.characters.filter(c => c.isMainCharacter === true);
+
+          // Fallback: use mainCharacters array of IDs from input (e.g., [1767791620341, 1767793922148])
+          if (mainChars.length === 0 && inputData.mainCharacters && inputData.mainCharacters.length > 0) {
+            mainChars = inputData.characters.filter(c => inputData.mainCharacters.includes(c.id));
+            if (mainChars.length > 0) {
+              log.debug(`📕 [COVER] ${coverType}: Found ${mainChars.length} main characters by ID lookup`);
+            }
+          }
+
           coverCharacters = mainChars.length > 0 ? mainChars : inputData.characters;
           log.debug(`📕 [COVER] ${coverType}: Using ${mainChars.length > 0 ? 'main' : 'all'} ${coverCharacters.length} characters (no names found in hint)`);
         }

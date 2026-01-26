@@ -23,6 +23,12 @@ Safe, family-friendly content only.
 
 {CHARACTER_REFERENCE_LIST}
 
+**REFERENCE IMAGE USAGE (CRITICAL):**
+- Reference photos are PROVIDED FOR YOUR UNDERSTANDING ONLY
+- DO NOT include reference photos, thumbnails, or numbered image grids in the generated image
+- The output must be a SINGLE illustration showing ONLY the described scene
+- Reference photos show what characters LOOK LIKE - use them to draw the characters accurately, but NEVER show the photos themselves
+
 **IDENTITY PRESERVATION (CRITICAL):**
 Each [Image N - Name] label above corresponds to the reference photo that follows it.
 - COPY THE EXACT FACE from each labeled reference image

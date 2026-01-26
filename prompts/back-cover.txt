@@ -15,6 +15,12 @@ Create a back cover illustration for a children's book.
 
 {CHARACTER_REFERENCE_LIST}
 
+**REFERENCE IMAGE USAGE (CRITICAL):**
+- Reference photos are PROVIDED FOR YOUR UNDERSTANDING ONLY
+- DO NOT include reference photos, thumbnails, or numbered image grids in the generated image
+- The output must be a SINGLE illustration showing ONLY the described scene
+- Reference photos show what characters LOOK LIKE - use them to draw the characters accurately, but NEVER show the photos themselves
+
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene - include all characters together
 - Give EQUAL visual prominence to all characters - like a family/group photo
