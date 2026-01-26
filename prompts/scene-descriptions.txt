@@ -197,6 +197,8 @@ This is your FIRST ATTEMPT - it may have issues that will be caught in Step 2.
 
 Review your draft against EVERY check below. Be harsh - find ALL problems.
 
+**YOU MUST COMPLETE ALL 17 CHECKS.** Output includes check1_ through check17_ plus pointingGazeValidation. Write "N/A" for checks that don't apply, but NEVER skip a check field.
+
 **1. Scale Feasibility:**
 
 | Camera Distance | What Fits | Character Detail |
@@ -455,6 +457,8 @@ Examples:
 Apply ALL corrections from Step 2 to produce the final scene description.
 
 Output raw JSON (no markdown code fences, no explanation text).
+
+**CRITICAL: ALL checks required.** The critique object MUST include ALL fields: check1 through check17, plus pointingGazeValidation array. Do NOT skip checks - write "N/A" if not applicable.
 
 ```
 {
