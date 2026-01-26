@@ -7,6 +7,7 @@
 
 const sharp = require('sharp');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -96,17 +97,18 @@ async function verifyRepairWithGemini(originalBuffer, repairedBuffer, issue) {
 
   const specificChecks = typeChecks[issue.type] || typeChecks.object;
 
-  const prompt = `Compare these two image regions: BEFORE (left) and AFTER (right).
+  // Use template from prompts/ folder, with fallback to inline prompt
+  const promptTemplate = PROMPT_TEMPLATES.repairVerification || `Compare these two image regions: BEFORE (left) and AFTER (right).
 
-The original issue was: "${issue.description}"
-Fix instruction was: "${issue.fixInstruction}"
-Issue type: ${issue.type}
+The original issue was: "{ISSUE_DESCRIPTION}"
+Fix instruction was: "{FIX_INSTRUCTION}"
+Issue type: {ISSUE_TYPE}
 
 EVALUATE carefully:
 1. Is the issue FIXED in the AFTER image? Look for the specific problem mentioned.
 2. Is there any VISIBLE CHANGE between BEFORE and AFTER? (Even subtle changes count)
 3. Are there any NEW PROBLEMS in the AFTER image? Check for:
-   - ${specificChecks}
+   - {TYPE_SPECIFIC_CHECKS}
    - Blurry or smeared areas
    - Unnatural color transitions
    - Objects that don't connect properly
@@ -119,6 +121,13 @@ Return JSON only:
   "explanation": "brief explanation of what you see",
   "newProblems": ["list any new issues found"] or []
 }`;
+
+  const prompt = fillTemplate(promptTemplate, {
+    ISSUE_DESCRIPTION: issue.description || '',
+    FIX_INSTRUCTION: issue.fixInstruction || '',
+    ISSUE_TYPE: issue.type || 'object',
+    TYPE_SPECIFIC_CHECKS: specificChecks
+  });
 
   try {
     // Create side-by-side comparison
@@ -138,23 +147,43 @@ Return JSON only:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        fixed: parsed.fixed === true,
-        changed: parsed.changed === true,
-        confidence: parsed.confidence || 0,
-        explanation: parsed.explanation || '',
-        newProblems: parsed.newProblems || [],
-        comparisonImage: comparison
-      };
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        // Validate required fields exist
+        if (typeof parsed.fixed !== 'boolean') {
+          console.warn('Verification response missing "fixed" field, defaulting to false');
+        }
+        if (typeof parsed.changed !== 'boolean') {
+          console.warn('Verification response missing "changed" field, defaulting to false');
+        }
+        return {
+          fixed: parsed.fixed === true,
+          changed: parsed.changed === true,
+          confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
+          explanation: parsed.explanation || '',
+          newProblems: Array.isArray(parsed.newProblems) ? parsed.newProblems : [],
+          comparisonImage: comparison
+        };
+      } catch (parseErr) {
+        console.warn(`Failed to parse verification JSON: ${parseErr.message}`);
+        return {
+          fixed: false,
+          changed: false,
+          confidence: 0,
+          explanation: `JSON parse error: ${parseErr.message}`,
+          newProblems: [],
+          error: 'json_parse_error'
+        };
+      }
     }
 
     return {
       fixed: false,
       changed: false,
       confidence: 0,
-      explanation: 'Could not parse verification response',
-      newProblems: []
+      explanation: 'No JSON found in verification response',
+      newProblems: [],
+      error: 'no_json'
     };
   } catch (err) {
     console.error(`Gemini verification failed: ${err.message}`);
@@ -220,15 +249,20 @@ Return JSON only:
     const jsonMatch = text.match(/\{[\s\S]*\}/);
 
     if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        hasArtifacts: parsed.hasArtifacts === true,
-        artifacts: parsed.artifacts || [],
-        severity: parsed.severity || 'none'
-      };
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return {
+          hasArtifacts: parsed.hasArtifacts === true,
+          artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [],
+          severity: parsed.severity || 'none'
+        };
+      } catch (parseErr) {
+        console.warn(`Failed to parse artifact check JSON: ${parseErr.message}`);
+        return { hasArtifacts: false, artifacts: [], severity: 'none', error: 'json_parse_error' };
+      }
     }
 
-    return { hasArtifacts: false, artifacts: [], severity: 'none' };
+    return { hasArtifacts: false, artifacts: [], severity: 'none', error: 'no_json' };
   } catch (err) {
     console.error(`Artifact check failed: ${err.message}`);
     return { hasArtifacts: false, artifacts: [], error: err.message };

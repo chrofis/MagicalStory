@@ -37,8 +37,92 @@ const {
   verifyRepairedRegion,
   checkForNewArtifacts,
   applyVerifiedRepairs,
-  createComparisonImage
+  createComparisonImage,
+  createVerificationComparison
 } = require('./repairVerification');
+
+// Severity colors for annotated image
+const SEVERITY_COLORS = {
+  critical: { r: 220, g: 38, b: 38, name: 'red' },      // Red
+  major: { r: 234, g: 88, b: 12, name: 'orange' },     // Orange
+  minor: { r: 202, g: 138, b: 4, name: 'yellow' }       // Yellow
+};
+
+/**
+ * Create an annotated image showing detected issues with bounding boxes
+ *
+ * @param {Buffer} imageBuffer - Original image buffer
+ * @param {Object[]} issues - Array of issues with region.bbox (normalized [ymin, xmin, ymax, xmax])
+ * @returns {Promise<Buffer>} Annotated image with colored bounding boxes and labels
+ */
+async function createAnnotatedImage(imageBuffer, issues) {
+  const metadata = await sharp(imageBuffer).metadata();
+  const { width, height } = metadata;
+
+  // Filter issues that have bounding boxes
+  const issuesWithBoxes = issues.filter(i => i.region?.bbox);
+
+  if (issuesWithBoxes.length === 0) {
+    return imageBuffer; // No boxes to draw
+  }
+
+  // Build SVG overlay with all bounding boxes
+  const svgElements = [];
+
+  issuesWithBoxes.forEach((issue, idx) => {
+    const letter = String.fromCharCode(65 + idx); // A, B, C, ...
+    const [ymin, xmin, ymax, xmax] = issue.region.bbox;
+
+    // Convert normalized coords to pixels
+    const x = Math.round(xmin * width);
+    const y = Math.round(ymin * height);
+    const boxWidth = Math.round((xmax - xmin) * width);
+    const boxHeight = Math.round((ymax - ymin) * height);
+
+    const severity = issue.severity || 'major';
+    const color = SEVERITY_COLORS[severity] || SEVERITY_COLORS.major;
+    const strokeColor = `rgb(${color.r},${color.g},${color.b})`;
+    const fillColor = `rgba(${color.r},${color.g},${color.b},0.15)`;
+
+    // Rectangle with colored border
+    svgElements.push(`
+      <rect x="${x}" y="${y}" width="${boxWidth}" height="${boxHeight}"
+            fill="${fillColor}" stroke="${strokeColor}" stroke-width="3"/>
+    `);
+
+    // Label background circle
+    const labelX = x + 12;
+    const labelY = y + 12;
+    svgElements.push(`
+      <circle cx="${labelX}" cy="${labelY}" r="14"
+              fill="${strokeColor}" stroke="white" stroke-width="2"/>
+    `);
+
+    // Letter label
+    svgElements.push(`
+      <text x="${labelX}" y="${labelY + 5}" text-anchor="middle"
+            font-size="16" font-family="Arial, sans-serif" font-weight="bold" fill="white">${letter}</text>
+    `);
+  });
+
+  // Create SVG overlay
+  const svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      ${svgElements.join('\n')}
+    </svg>
+  `;
+
+  // Composite SVG onto the original image
+  const annotated = await sharp(imageBuffer)
+    .composite([{
+      input: Buffer.from(svg),
+      blend: 'over'
+    }])
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  return annotated;
+}
 
 // Default configuration
 const DEFAULT_OPTIONS = {
@@ -180,6 +264,19 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   }
 
   // =========================================================================
+  // Step 3.5: Create annotated original image with bounding boxes
+  // =========================================================================
+  progress('annotate', 'Creating annotated image with bounding boxes');
+
+  let annotatedOriginal = null;
+  try {
+    const annotatedBuffer = await createAnnotatedImage(imageBuffer, extractableIssues);
+    annotatedOriginal = annotatedBuffer.toString('base64');
+  } catch (err) {
+    console.warn(`  Warning: Could not create annotated image: ${err.message}`);
+  }
+
+  // =========================================================================
   // Step 4: Batch issues into grids
   // =========================================================================
   progress('batch', `Batching ${extractableIssues.length} issues`);
@@ -227,7 +324,8 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
       original: gridBuffer.toString('base64'),
       repaired: null,
       manifest,
-      prompt: repairPrompt
+      prompt: repairPrompt,
+      repairs: []  // Per-repair verification data
     };
 
     try {
@@ -247,6 +345,9 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
           config.outputDir,
           batchNum
         );
+        if (!gridFiles.success) {
+          console.warn(`Failed to save grid files for batch ${batchNum}: ${gridFiles.error}`);
+        }
       }
 
       // Extract repaired regions
@@ -279,6 +380,30 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
           verification,
           batchIndex: batchNum
         };
+
+        // Add per-repair data for UI display
+        gridEntry.repairs.push({
+          letter: region.letter,
+          issueId: issue.id,
+          type: issue.type,
+          severity: issue.severity,
+          description: issue.description,
+          fixInstruction: issue.fixInstruction,
+          originalThumbnail: originalBuffer.toString('base64'),
+          repairedThumbnail: region.buffer.toString('base64'),
+          comparisonImage: verification.gemini?.comparisonImage
+            ? verification.gemini.comparisonImage.toString('base64')
+            : null,
+          verification: {
+            fixed: verification.gemini?.fixed ?? false,
+            changed: verification.gemini?.changed ?? false,
+            confidence: verification.gemini?.confidence ?? 0,
+            explanation: verification.gemini?.explanation ?? '',
+            newProblems: verification.gemini?.newProblems ?? [],
+            accepted: verification.accepted,
+            reason: verification.reason
+          }
+        });
 
         // Record attempt
         issue.repairAttempts.push({
@@ -327,6 +452,9 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
       // Save original grid even on failure
       if (config.saveIntermediates) {
         gridFiles = await saveGridFiles(gridBuffer, null, manifest, config.outputDir, batchNum);
+        if (!gridFiles.success) {
+          console.warn(`Failed to save grid files for batch ${batchNum}: ${gridFiles.error}`);
+        }
       }
     }
 
@@ -468,13 +596,16 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
     fixedCount: history.fixedCount,
     failedCount: history.failedCount,
     totalIssues: history.issueCount,
+    // Annotated original with bounding boxes (base64)
+    annotatedOriginal,
     // Grid images for UI display (base64 encoded)
     grids: allGrids.map(g => ({
       batchNum: g.batchNum,
       original: g.original,
       repaired: g.repaired,
       manifest: g.manifest,
-      prompt: g.prompt
+      prompt: g.prompt,
+      repairs: g.repairs  // Per-repair verification data
     }))
   };
 }

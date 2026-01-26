@@ -2234,7 +2234,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           );
         }
 
-        if (repairResult.repaired && repairResult.imageData !== result.imageData) {
+        // Validate repair result: must have repaired=true, valid imageData, and be different from original
+        const hasValidRepairResult = repairResult.repaired &&
+          repairResult.imageData &&
+          typeof repairResult.imageData === 'string' &&
+          repairResult.imageData.length > 1000 &&  // Minimum size for a valid JPEG
+          repairResult.imageData !== result.imageData;
+
+        if (hasValidRepairResult) {
           // Verify images are actually different by comparing hashes
           const originalHash = hashImageData(result.imageData);
           const repairedHash = hashImageData(repairResult.imageData);
@@ -2326,7 +2333,16 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             }
           }
         } else {
-          log.info(`ℹ️  [QUALITY RETRY] Auto-repair did not change the image`);
+          // Log why repair was skipped
+          if (!repairResult.repaired) {
+            log.info(`ℹ️  [QUALITY RETRY] Auto-repair reported no repairs made`);
+          } else if (!repairResult.imageData) {
+            log.warn(`⚠️  [QUALITY RETRY] Auto-repair returned null/undefined imageData`);
+          } else if (repairResult.imageData.length <= 1000) {
+            log.warn(`⚠️  [QUALITY RETRY] Auto-repair returned invalid imageData (too small: ${repairResult.imageData.length} bytes)`);
+          } else {
+            log.info(`ℹ️  [QUALITY RETRY] Auto-repair did not change the image`);
+          }
         }
       } catch (repairError) {
         log.warn(`⚠️  [QUALITY RETRY] Auto-repair failed: ${repairError.message}`);

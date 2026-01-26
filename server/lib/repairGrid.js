@@ -344,35 +344,49 @@ async function extractRepairedRegions(repairedGrid, cellPositions) {
  */
 async function saveGridFiles(gridBuffer, repairedBuffer, manifest, outputDir, batchIndex = 1) {
   const gridsDir = path.join(outputDir, 'issues', 'grids');
-  if (!fs.existsSync(gridsDir)) {
-    fs.mkdirSync(gridsDir, { recursive: true });
-  }
 
-  // Save original grid
-  const gridPath = path.join(gridsDir, `batch_${batchIndex}.jpg`);
-  fs.writeFileSync(gridPath, gridBuffer);
-
-  // Save repaired grid if available
-  if (repairedBuffer) {
-    const repairedPath = path.join(gridsDir, `batch_${batchIndex}_repaired.jpg`);
-    fs.writeFileSync(repairedPath, repairedBuffer);
-  }
-
-  // Save manifest
-  const manifestPath = path.join(gridsDir, `batch_${batchIndex}_manifest.json`);
-  fs.writeFileSync(manifestPath, JSON.stringify({
-    ...manifest,
-    files: {
-      original: `batch_${batchIndex}.jpg`,
-      repaired: repairedBuffer ? `batch_${batchIndex}_repaired.jpg` : null
+  try {
+    if (!fs.existsSync(gridsDir)) {
+      fs.mkdirSync(gridsDir, { recursive: true });
     }
-  }, null, 2));
 
-  return {
-    gridPath,
-    repairedPath: repairedBuffer ? path.join(gridsDir, `batch_${batchIndex}_repaired.jpg`) : null,
-    manifestPath
-  };
+    // Save original grid
+    const gridPath = path.join(gridsDir, `batch_${batchIndex}.jpg`);
+    fs.writeFileSync(gridPath, gridBuffer);
+
+    // Save repaired grid if available
+    let repairedPath = null;
+    if (repairedBuffer) {
+      repairedPath = path.join(gridsDir, `batch_${batchIndex}_repaired.jpg`);
+      fs.writeFileSync(repairedPath, repairedBuffer);
+    }
+
+    // Save manifest
+    const manifestPath = path.join(gridsDir, `batch_${batchIndex}_manifest.json`);
+    fs.writeFileSync(manifestPath, JSON.stringify({
+      ...manifest,
+      files: {
+        original: `batch_${batchIndex}.jpg`,
+        repaired: repairedBuffer ? `batch_${batchIndex}_repaired.jpg` : null
+      }
+    }, null, 2));
+
+    return {
+      gridPath,
+      repairedPath,
+      manifestPath,
+      success: true
+    };
+  } catch (err) {
+    console.error(`Failed to save grid files for batch ${batchIndex}: ${err.message}`);
+    return {
+      gridPath: null,
+      repairedPath: null,
+      manifestPath: null,
+      success: false,
+      error: err.message
+    };
+  }
 }
 
 /**

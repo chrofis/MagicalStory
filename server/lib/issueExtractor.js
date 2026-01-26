@@ -11,6 +11,7 @@
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
+const { randomUUID } = require('crypto');
 
 // Standard region extraction size (matches face extraction)
 const TARGET_REGION_SIZE = 256;
@@ -30,6 +31,50 @@ const PADDING_BY_TYPE = {
 
 // Severity ordering for deduplication preference
 const SEVERITY_ORDER = { critical: 0, major: 1, minor: 2 };
+
+/**
+ * Generate a unique issue ID using UUID
+ * @param {number} pageNumber - Page number
+ * @param {string} source - Issue source (quality, incremental, final)
+ * @returns {string} Unique ID
+ */
+function generateIssueId(pageNumber, source) {
+  return `page${pageNumber}_${source}_${randomUUID().slice(0, 8)}`;
+}
+
+/**
+ * Validate that a bounding box is normalized (all values 0-1)
+ * @param {[number,number,number,number]} bbox - [ymin, xmin, ymax, xmax]
+ * @returns {{valid: boolean, reason?: string}}
+ */
+function validateNormalizedBbox(bbox) {
+  if (!bbox || !Array.isArray(bbox) || bbox.length !== 4) {
+    return { valid: false, reason: 'bbox must be array of 4 numbers' };
+  }
+  const [ymin, xmin, ymax, xmax] = bbox;
+
+  // Check all values are numbers
+  if (bbox.some(v => typeof v !== 'number' || isNaN(v))) {
+    return { valid: false, reason: 'bbox values must be numbers' };
+  }
+
+  // Check if values appear to be pixel coordinates (> 1)
+  if (ymax > 1 || xmax > 1) {
+    return { valid: false, reason: `bbox appears to be pixel coordinates (max values: ymax=${ymax}, xmax=${xmax})` };
+  }
+
+  // Check for negative values
+  if (ymin < 0 || xmin < 0) {
+    return { valid: false, reason: `bbox has negative values (ymin=${ymin}, xmin=${xmin})` };
+  }
+
+  // Check for inverted coordinates
+  if (ymax <= ymin || xmax <= xmin) {
+    return { valid: false, reason: `bbox has inverted coordinates (ymin=${ymin}, ymax=${ymax}, xmin=${xmin}, xmax=${xmax})` };
+  }
+
+  return { valid: true };
+}
 
 /**
  * Unified issue format used across the repair pipeline
@@ -69,13 +114,23 @@ function normalizeQualityIssue(issue, pageNumber, imgDimensions) {
   const issueType = mapIssueType(issue.element || issue.type || 'rendering');
   const severity = (issue.severity || 'major').toLowerCase();
 
+  // Validate bounding box if present
+  let validatedBbox = bbox;
+  if (bbox) {
+    const validation = validateNormalizedBbox(bbox);
+    if (!validation.valid) {
+      console.warn(`Invalid bbox in quality issue: ${validation.reason}, skipping bbox`);
+      validatedBbox = null;
+    }
+  }
+
   return {
-    id: `page${pageNumber}_quality_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: generateIssueId(pageNumber, 'quality'),
     source: 'quality',
     pageNumber,
     region: {
-      bbox,
-      pixelBox: bbox ? bboxToPixelBox(bbox, imgDimensions) : null
+      bbox: validatedBbox,
+      pixelBox: validatedBbox ? bboxToPixelBox(validatedBbox, imgDimensions) : null
     },
     type: issueType,
     severity,
@@ -103,13 +158,23 @@ function normalizeIncrementalIssue(issue, pageNumber, imgDimensions) {
   const issueType = mapIssueType(issue.type || 'consistency');
   const severity = (issue.severity || 'major').toLowerCase();
 
+  // Validate bounding box if present
+  let validatedBbox = bbox;
+  if (bbox) {
+    const validation = validateNormalizedBbox(bbox);
+    if (!validation.valid) {
+      console.warn(`Invalid bbox in incremental issue: ${validation.reason}, skipping bbox`);
+      validatedBbox = null;
+    }
+  }
+
   return {
-    id: `page${pageNumber}_incremental_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: generateIssueId(pageNumber, 'incremental'),
     source: 'incremental',
     pageNumber,
     region: {
-      bbox,
-      pixelBox: bbox ? bboxToPixelBox(bbox, imgDimensions) : null
+      bbox: validatedBbox,
+      pixelBox: validatedBbox ? bboxToPixelBox(validatedBbox, imgDimensions) : null
     },
     type: issueType,
     severity,
@@ -138,13 +203,23 @@ function normalizeFinalIssue(pageIssue, pageNumber, imgDimensions) {
   const issueType = mapIssueType(pageIssue.type || 'consistency');
   const severity = (pageIssue.severity || 'major').toLowerCase();
 
+  // Validate bounding box if present
+  let validatedBbox = bbox;
+  if (bbox) {
+    const validation = validateNormalizedBbox(bbox);
+    if (!validation.valid) {
+      console.warn(`Invalid bbox in final issue: ${validation.reason}, skipping bbox`);
+      validatedBbox = null;
+    }
+  }
+
   return {
-    id: `page${pageNumber}_final_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: generateIssueId(pageNumber, 'final'),
     source: 'final',
     pageNumber,
     region: {
-      bbox,
-      pixelBox: bbox ? bboxToPixelBox(bbox, imgDimensions) : null
+      bbox: validatedBbox,
+      pixelBox: validatedBbox ? bboxToPixelBox(validatedBbox, imgDimensions) : null
     },
     type: issueType,
     severity,
@@ -208,14 +283,19 @@ function calculateIoU(bbox1, bbox2) {
   const [y1min, x1min, y1max, x1max] = bbox1;
   const [y2min, x2min, y2max, x2max] = bbox2;
 
+  // Validate boxes have positive area (max > min)
+  const area1 = Math.max(0, x1max - x1min) * Math.max(0, y1max - y1min);
+  const area2 = Math.max(0, x2max - x2min) * Math.max(0, y2max - y2min);
+
+  // Skip if either box has zero/negative area
+  if (area1 <= 0 || area2 <= 0) return 0;
+
   // Calculate intersection
   const xOverlap = Math.max(0, Math.min(x1max, x2max) - Math.max(x1min, x2min));
   const yOverlap = Math.max(0, Math.min(y1max, y2max) - Math.max(y1min, y2min));
   const intersection = xOverlap * yOverlap;
 
   // Calculate union
-  const area1 = (x1max - x1min) * (y1max - y1min);
-  const area2 = (x2max - x2min) * (y2max - y2min);
   const union = area1 + area2 - intersection;
 
   return union > 0 ? intersection / union : 0;
