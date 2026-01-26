@@ -8,9 +8,12 @@
  * - Job checkpoints
  *
  * Usage:
- *   node scripts/analysis/fetch-story-data.js <storyId>
- *   node scripts/analysis/fetch-story-data.js --recent 10
- *   node scripts/analysis/fetch-story-data.js --list
+ *   node fetch-story-data.js <storyId>           Fetch single story
+ *   node fetch-story-data.js --last              Fetch most recent story
+ *   node fetch-story-data.js --page <N>          Show page N of last story
+ *   node fetch-story-data.js --page <id> <N>     Show page N of specific story
+ *   node fetch-story-data.js --recent 10         Fetch N recent stories
+ *   node fetch-story-data.js --list              List recent stories
  */
 
 require('dotenv').config();
@@ -163,6 +166,104 @@ async function listRecentStories(limit = 20) {
 }
 
 /**
+ * Get the most recent story ID
+ */
+async function getLastStoryId() {
+  const result = await pool.query(`
+    SELECT id FROM stories ORDER BY created_at DESC LIMIT 1
+  `);
+  return result.rows[0]?.id;
+}
+
+/**
+ * Fetch a specific page from a story
+ */
+async function fetchPageDetails(storyId, pageNumber) {
+  const storyResult = await pool.query(
+    'SELECT data FROM stories WHERE id = $1',
+    [storyId]
+  );
+
+  if (storyResult.rows.length === 0) {
+    throw new Error(`Story not found: ${storyId}`);
+  }
+
+  const storyData = storyResult.rows[0].data;
+  const page = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+
+  if (!page) {
+    throw new Error(`Page ${pageNumber} not found in story. Available pages: ${storyData.sceneImages?.map(s => s.pageNumber).join(', ')}`);
+  }
+
+  return {
+    storyId,
+    title: storyData.title,
+    pageNumber,
+    text: page.text,
+    outlineExtract: page.outlineExtract,
+    description: page.description,
+    sceneCharacters: page.sceneCharacters?.map(c => c.name) || [],
+    sceneCharacterClothing: page.sceneCharacterClothing,
+    qualityScore: page.qualityScore,
+    qualityReasoning: page.qualityReasoning,
+    totalAttempts: page.totalAttempts,
+    wasRegenerated: page.wasRegenerated,
+    retryHistory: page.retryHistory?.length || 0,
+    repairHistory: page.repairHistory?.length || 0
+  };
+}
+
+/**
+ * Print page details in a readable format
+ */
+function printPageDetails(page) {
+  console.log('\n' + '='.repeat(80));
+  console.log(`📖 ${page.title || '(no title)'}`);
+  console.log(`   Story ID: ${page.storyId}`);
+  console.log('='.repeat(80));
+
+  console.log(`\n📄 PAGE ${page.pageNumber}`);
+  console.log('-'.repeat(40));
+
+  console.log('\n📝 TEXT:');
+  console.log(page.text || '(no text)');
+
+  console.log('\n📋 OUTLINE EXTRACT:');
+  console.log(page.outlineExtract || '(none)');
+
+  console.log('\n👥 CHARACTERS:', page.sceneCharacters.join(', ') || '(none)');
+
+  if (page.sceneCharacterClothing) {
+    console.log('👔 CLOTHING:', JSON.stringify(page.sceneCharacterClothing));
+  }
+
+  console.log('\n🎨 SCENE DESCRIPTION:');
+  if (page.description) {
+    // Try to parse if it's JSON
+    try {
+      const desc = typeof page.description === 'string' ? JSON.parse(page.description) : page.description;
+      if (desc.draft?.imageSummary) {
+        console.log('   Summary:', desc.draft.imageSummary);
+      }
+      if (desc.draft?.setting) {
+        console.log('   Setting:', desc.draft.setting.location, '-', desc.draft.setting.description);
+      }
+    } catch {
+      console.log(page.description.substring(0, 500) + (page.description.length > 500 ? '...' : ''));
+    }
+  } else {
+    console.log('(none)');
+  }
+
+  console.log('\n📊 QUALITY:');
+  console.log(`   Score: ${page.qualityScore || 'N/A'}`);
+  console.log(`   Attempts: ${page.totalAttempts || 1}`);
+  console.log(`   Regenerated: ${page.wasRegenerated ? 'Yes' : 'No'}`);
+  console.log(`   Retry history: ${page.retryHistory} entries`);
+  console.log(`   Repair history: ${page.repairHistory} entries`);
+}
+
+/**
  * Save analysis to file
  */
 function saveAnalysis(analysis, outputDir) {
@@ -183,9 +284,12 @@ async function main() {
 
   if (args.length === 0) {
     console.log('Usage:');
-    console.log('  node fetch-story-data.js <storyId>        Fetch single story');
-    console.log('  node fetch-story-data.js --recent 10     Fetch N recent stories');
-    console.log('  node fetch-story-data.js --list          List recent stories');
+    console.log('  node fetch-story-data.js <storyId>           Fetch single story');
+    console.log('  node fetch-story-data.js --last              Fetch most recent story');
+    console.log('  node fetch-story-data.js --page <N>          Show page N of last story');
+    console.log('  node fetch-story-data.js --page <id> <N>     Show page N of specific story');
+    console.log('  node fetch-story-data.js --recent 10         Fetch N recent stories');
+    console.log('  node fetch-story-data.js --list              List recent stories');
     process.exit(1);
   }
 
@@ -193,6 +297,34 @@ async function main() {
     // Test connection
     await pool.query('SELECT 1');
     console.log('✓ Database connected');
+
+    // Handle --page command
+    if (args[0] === '--page') {
+      let storyId, pageNumber;
+      if (args.length === 2) {
+        // --page <N> - use last story
+        storyId = await getLastStoryId();
+        pageNumber = parseInt(args[1]);
+      } else {
+        // --page <id> <N>
+        storyId = args[1];
+        pageNumber = parseInt(args[2]);
+      }
+
+      if (!storyId) throw new Error('No stories found');
+      if (isNaN(pageNumber)) throw new Error('Invalid page number');
+
+      const page = await fetchPageDetails(storyId, pageNumber);
+      printPageDetails(page);
+      return;
+    }
+
+    // Handle --last command
+    if (args[0] === '--last') {
+      const storyId = await getLastStoryId();
+      if (!storyId) throw new Error('No stories found');
+      args[0] = storyId;  // Fall through to single story handling
+    }
 
     if (args[0] === '--list') {
       const stories = await listRecentStories(20);
