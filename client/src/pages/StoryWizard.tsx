@@ -3210,6 +3210,7 @@ export default function StoryWizard() {
         ideaGeneration: ideaGenerationInput && lastIdeaPrompt && generatedIdeas.length > 0 ? {
           input: ideaGenerationInput,
           output: generatedIdeas,
+          rawResponse: lastIdeaFullResponse,  // Full LLM response with [DRAFT], [REVIEW], [FINAL] stages
           prompt: lastIdeaPrompt.prompt,
           model: lastIdeaPrompt.model,
           selectedIndex: selectedIdeaIndex,

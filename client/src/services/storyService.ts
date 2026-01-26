@@ -1031,7 +1031,8 @@ export const storyService = {
         userLocation?: { city: string | null; region: string | null; country: string | null };
         season?: string;
       };
-      output: string[];  // Both generated ideas
+      output: string[];  // Both generated ideas (final only)
+      rawResponse?: string;  // Full LLM response with [DRAFT], [REVIEW], [FINAL] stages
       prompt: string;
       model: string;
       selectedIndex: number | null;  // 0, 1, or null if custom/edited
