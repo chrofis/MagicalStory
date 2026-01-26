@@ -169,6 +169,8 @@ async function initializeDatabase() {
     // Add metadata column if missing (for existing databases)
     await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS metadata JSONB`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_metadata ON stories USING GIN (metadata)`);
+    // Add image_version_meta column for fast active image switching
+    await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS image_version_meta JSONB DEFAULT '{}'`);
 
     // Story drafts table
     await dbPool.query(`
@@ -789,6 +791,106 @@ async function deleteStoryImages(storyId) {
   await dbQuery('DELETE FROM story_images WHERE story_id = $1', [storyId]);
 }
 
+// ============================================
+// ACTIVE IMAGE VERSION FUNCTIONS
+// ============================================
+
+/**
+ * Get active version for a page from image_version_meta column.
+ * Falls back to data.sceneImages for backwards compatibility.
+ * @param {string} storyId - Story ID
+ * @param {number|string} pageNumber - Page number or cover type
+ * @returns {Promise<number>} Active version index (0-based)
+ */
+async function getActiveVersion(storyId, pageNumber) {
+  if (!isDatabaseMode()) {
+    return 0;
+  }
+
+  const pageKey = pageNumber.toString();
+
+  // Try new column first (fast path)
+  const metaRows = await dbQuery(
+    `SELECT image_version_meta->$1 as meta FROM stories WHERE id = $2`,
+    [pageKey, storyId]
+  );
+
+  if (metaRows.length > 0 && metaRows[0].meta?.activeVersion !== undefined) {
+    return metaRows[0].meta.activeVersion;
+  }
+
+  // Fall back to data.sceneImages for backwards compatibility
+  const dataRows = await dbQuery(
+    `SELECT data->'sceneImages' as scene_images FROM stories WHERE id = $1`,
+    [storyId]
+  );
+
+  if (dataRows.length > 0 && dataRows[0].scene_images) {
+    const pageNum = parseInt(pageNumber);
+    const scene = dataRows[0].scene_images.find(s => s.pageNumber === pageNum);
+    if (scene?.imageVersions) {
+      const activeIdx = scene.imageVersions.findIndex(v => v.isActive);
+      return activeIdx >= 0 ? activeIdx : 0;
+    }
+  }
+
+  return 0;
+}
+
+/**
+ * Set active version for a page in image_version_meta column.
+ * Uses jsonb_set for O(1) targeted update instead of full data blob rewrite.
+ * @param {string} storyId - Story ID
+ * @param {number|string} pageNumber - Page number or cover type
+ * @param {number} versionIndex - Version index to set as active (0-based)
+ */
+async function setActiveVersion(storyId, pageNumber, versionIndex) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  const pageKey = pageNumber.toString();
+
+  // Single targeted update using jsonb_set (~1ms vs 6+ seconds)
+  await dbQuery(
+    `UPDATE stories
+     SET image_version_meta = jsonb_set(
+       COALESCE(image_version_meta, '{}')::jsonb,
+       $1::text[],
+       $2::jsonb
+     )
+     WHERE id = $3`,
+    [[pageKey], JSON.stringify({ activeVersion: versionIndex }), storyId]
+  );
+}
+
+/**
+ * Get all active versions for a story from image_version_meta column.
+ * @param {string} storyId - Story ID
+ * @returns {Promise<object>} Map of pageNumber -> activeVersion
+ */
+async function getAllActiveVersions(storyId) {
+  if (!isDatabaseMode()) {
+    return {};
+  }
+
+  const rows = await dbQuery(
+    `SELECT image_version_meta FROM stories WHERE id = $1`,
+    [storyId]
+  );
+
+  if (rows.length === 0 || !rows[0].image_version_meta) {
+    return {};
+  }
+
+  // Convert to simpler format: { "1": 0, "2": 2 }
+  const result = {};
+  for (const [pageKey, meta] of Object.entries(rows[0].image_version_meta)) {
+    result[pageKey] = meta.activeVersion ?? 0;
+  }
+  return result;
+}
+
 module.exports = {
   initializePool,
   initializeDatabase,
@@ -807,5 +909,9 @@ module.exports = {
   getStoryImageWithVersions,
   getAllStoryImages,
   hasStorySeparateImages,
-  deleteStoryImages
+  deleteStoryImages,
+  // Active version functions
+  getActiveVersion,
+  setActiveVersion,
+  getAllActiveVersions
 };

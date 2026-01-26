@@ -106,7 +106,7 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Import modular routes and services
-const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage } = require('./server/services/database');
+const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage, setActiveVersion } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
@@ -3157,6 +3157,11 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     storyData.sceneImages = sceneImages;
     await saveStoryData(id, storyData);
 
+    // Update image_version_meta with new active version (new version is always the last one)
+    const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length - 1 : 0;
+    await setActiveVersion(id, pageNumber, newActiveIndex);
+
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
     let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
     if (!hasInfiniteCredits) {
@@ -3229,7 +3234,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, coverType } = req.params;
-    const { customPrompt, editedScene } = req.body;
+    const { customPrompt, editedScene, characterIds } = req.body;
 
     // Accept both 'initial' and 'initialPage' for backwards compatibility
     const normalizedCoverType = coverType === 'initial' ? 'initialPage' : coverType;
@@ -3376,15 +3381,21 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
 
     // Get character photos with correct clothing variant
     let coverCharacterPhotos;
-    if (normalizedCoverType === 'front') {
-      // Front cover: use only MAIN characters (isMainCharacter: true)
+
+    // If user provided specific character IDs, use those
+    if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
+      const selectedCharacters = mergedCharacters.filter(c => characterIds.includes(c.id));
+      coverCharacterPhotos = getCharacterPhotoDetails(selectedCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: SELECTED ${selectedCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
+    } else if (normalizedCoverType === 'front') {
+      // Front cover default: use only MAIN characters (isMainCharacter: true)
       const allCharacters = mergedCharacters;
       const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
       const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
       coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else {
-      // Initial/Back covers: use ALL characters
+      // Initial/Back covers default: use ALL characters
       coverCharacterPhotos = getCharacterPhotoDetails(mergedCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
     }
@@ -8096,6 +8107,17 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
 
+    // Initialize image_version_meta with active versions for all pages
+    if (storyData.sceneImages?.length > 0) {
+      for (const scene of storyData.sceneImages) {
+        if (scene.imageVersions?.length > 0) {
+          const activeIndex = scene.imageVersions.length - 1;  // Last version is active
+          await setActiveVersion(storyId, scene.pageNumber, activeIndex);
+        }
+      }
+      log.debug(`📚 [STORYBOOK] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
+    }
+
     // Log credit completion (credits were already reserved at job creation)
     try {
       const jobResult = await dbPool.query(
@@ -10004,6 +10026,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`💾 [UNIFIED] Saving story to database... (generationLog has ${storyData.generationLog?.length || 0} entries)`);
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [UNIFIED] Story ${storyId} saved to stories table`);
+
+    // Initialize image_version_meta with active versions for all pages
+    // After consistency regen, the active version is the last one in imageVersions
+    if (storyData.sceneImages?.length > 0) {
+      for (const scene of storyData.sceneImages) {
+        if (scene.imageVersions?.length > 0) {
+          const activeIndex = scene.imageVersions.length - 1;  // Last version is active
+          await setActiveVersion(storyId, scene.pageNumber, activeIndex);
+        }
+      }
+      log.debug(`📚 [UNIFIED] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
+    }
 
     // Persist styled avatars to the characters table (so they show in character editor)
     if (artStyle !== 'realistic' && inputData.characters) {
@@ -12016,6 +12050,17 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     await upsertStory(storyId, job.user_id, storyData);
     log.debug(`📚 Story ${storyId} saved to stories table`);
 
+    // Initialize image_version_meta with active versions for all pages
+    if (storyData.sceneImages?.length > 0) {
+      for (const scene of storyData.sceneImages) {
+        if (scene.imageVersions?.length > 0) {
+          const activeIndex = scene.imageVersions.length - 1;  // Last version is active
+          await setActiveVersion(storyId, scene.pageNumber, activeIndex);
+        }
+      }
+      log.debug(`📚 Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
+    }
+
     // Log credit completion (credits were already reserved at job creation)
     try {
       const creditJobResult = await dbPool.query(
@@ -12284,6 +12329,16 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
             await upsertStory(jobId, userId, storyData);
             log.debug(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images to stories table`);
+
+            // Initialize image_version_meta with active versions for partial stories
+            if (sceneImages?.length > 0) {
+              for (const scene of sceneImages) {
+                if (scene.imageVersions?.length > 0) {
+                  const activeIndex = scene.imageVersions.length - 1;
+                  await setActiveVersion(jobId, scene.pageNumber, activeIndex);
+                }
+              }
+            }
           } else {
             log.debug('📚 [PARTIAL SAVE] No content to save');
           }

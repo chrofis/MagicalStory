@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -491,6 +491,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
 
 // GET /api/stories/:id/image/:pageNumber - Get individual page image
 // Optimized: First tries separate story_images table, falls back to data blob
+// Returns isActive flag from image_version_meta column for each version
 router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
@@ -515,15 +516,25 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
+    // Get active version from image_version_meta (fast lookup)
+    const activeVersion = await getActiveVersion(id, pageNum);
+
     // Try to get image with all versions in single query (FAST path)
     const separateImage = await getStoryImageWithVersions(id, 'scene', pageNum);
     if (separateImage) {
+      // Mark isActive on each version based on image_version_meta
+      const versionsWithActive = separateImage.versions?.map((v, i) => ({
+        ...v,
+        isActive: (i + 1) === activeVersion  // versions are 1-indexed in story_images
+      }));
+
       return res.json({
         pageNumber: pageNum,
         imageData: separateImage.imageData,
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt,
-        imageVersions: separateImage.versions
+        isActive: activeVersion === 0,  // version 0 is main image
+        imageVersions: versionsWithActive
       });
     }
 
@@ -539,10 +550,17 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
+    // Mark isActive based on image_version_meta (or fallback to legacy isActive in data)
+    const versionsWithActive = sceneImage.imageVersions?.map((v, i) => ({
+      ...v,
+      isActive: i === activeVersion
+    }));
+
     res.json({
       pageNumber: pageNum,
       imageData: sceneImage.imageData,
-      imageVersions: sceneImage.imageVersions
+      isActive: activeVersion === 0,
+      imageVersions: versionsWithActive
     });
   } catch (err) {
     console.error('❌ Error fetching page image:', err);
@@ -1029,6 +1047,7 @@ router.put('/:id/title', authenticateToken, async (req, res) => {
 });
 
 // PUT /api/stories/:id/pages/:pageNumber/active-image - Select which image version is active
+// OPTIMIZED: Uses image_version_meta column for O(1) update instead of rewriting entire data blob
 router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
@@ -1047,47 +1066,54 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
 
     const pool = getPool();
 
-    // OPTIMIZED: Only fetch sceneImages array, not entire 5MB+ data blob
-    const result = await pool.query(
-      `SELECT data->'sceneImages' as scene_images
-       FROM stories WHERE id = $1 AND user_id = $2`,
+    // Verify story ownership (fast query, no data loading)
+    const ownerCheck = await pool.query(
+      `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
       [id, req.user.id]
     );
 
-    if (result.rows.length === 0) {
+    if (ownerCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const sceneImages = result.rows[0].scene_images || [];
-    const sceneIndex = sceneImages.findIndex(s => s.pageNumber === pageNum);
-
-    if (sceneIndex === -1) {
-      return res.status(404).json({ error: 'Scene not found for this page' });
-    }
-
-    const scene = sceneImages[sceneIndex];
-    const versions = scene.imageVersions || [];
-
-    if (versionIndex >= versions.length) {
-      return res.status(400).json({ error: 'Invalid version index' });
-    }
-
-    // Update isActive flags
-    versions.forEach((v, i) => {
-      v.isActive = (i === versionIndex);
-    });
-    scene.imageVersions = versions;
-
-    // OPTIMIZED: Use jsonb_set to update only sceneImages, not entire data blob
-    await pool.query(
-      `UPDATE stories
-       SET data = jsonb_set(data::jsonb, '{sceneImages}', $1::jsonb),
-           metadata = jsonb_set(COALESCE(metadata::jsonb, '{}'), '{updatedAt}', $2::jsonb)
-       WHERE id = $3`,
-      [JSON.stringify(sceneImages), JSON.stringify(new Date().toISOString()), id]
+    // Validate version exists in story_images table
+    const versionCheck = await pool.query(
+      `SELECT 1 FROM story_images
+       WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
+      [id, pageNum, versionIndex]
     );
 
-    console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum}`);
+    if (versionCheck.rows.length === 0) {
+      // Fallback: check data blob for legacy stories without story_images entries
+      const dataCheck = await pool.query(
+        `SELECT jsonb_array_length(
+           (SELECT scene->'imageVersions'
+            FROM jsonb_array_elements(data->'sceneImages') AS scene
+            WHERE (scene->>'pageNumber')::int = $2
+            LIMIT 1)
+         ) as version_count
+         FROM stories WHERE id = $1`,
+        [id, pageNum]
+      );
+
+      const versionCount = dataCheck.rows[0]?.version_count || 0;
+      if (versionIndex >= versionCount) {
+        return res.status(400).json({ error: 'Invalid version index' });
+      }
+    }
+
+    // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
+    await setActiveVersion(id, pageNum, versionIndex);
+
+    // Also update metadata timestamp
+    await pool.query(
+      `UPDATE stories
+       SET metadata = jsonb_set(COALESCE(metadata::jsonb, '{}'), '{updatedAt}', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(new Date().toISOString()), id]
+    );
+
+    console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum} (fast path)`);
 
     res.json({
       success: true,
