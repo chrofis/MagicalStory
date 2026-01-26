@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wand2, Sparkles, Loader2, Pencil, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useRotatingMessage } from '@/hooks/useRotatingMessage';
 import { storyTypes, lifeChallenges, educationalTopics, historicalEvents, realisticSetting } from '@/constants/storyTypes';
 import { artStyles } from '@/constants/artStyles';
 import type { Character } from '@/types/character';
@@ -143,6 +144,7 @@ export function WizardStep6Summary({
 }: WizardStep6Props) {
   const { language } = useLanguage();
   const lang = language as 'en' | 'de' | 'fr';
+  const thinkingMessage = useRotatingMessage(lang);
 
   // Editable versions of the generated ideas
   const [editableIdeas, setEditableIdeas] = useState<string[]>([]);
@@ -493,7 +495,7 @@ export function WizardStep6Summary({
                         </div>
                         <p className="text-sm">
                           {(index === 0 ? ideaProgress1 : ideaProgress2) < 80
-                            ? (lang === 'de' ? 'Denke nach...' : lang === 'fr' ? 'Réflexion...' : 'Thinking...')
+                            ? thinkingMessage
                             : (lang === 'de' ? 'Schreibe Idee...' : lang === 'fr' ? 'Rédaction...' : 'Writing idea...')}
                         </p>
                       </div>

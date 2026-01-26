@@ -40,73 +40,68 @@ OUTPUT LANGUAGE:
 
 STORY LENGTH: {STORY_LENGTH_CATEGORY}
 
-OUTPUT FORMAT:
-Write the story idea as PLAIN TEXT PARAGRAPHS.
-- First paragraph: Setting (location and time)
-- Second paragraph: What happens (the plot events)
+{STORY_REQUIREMENTS}
 
-CRITICAL FORMAT RULES:
-- NO bold text (**text**) - never use asterisks
-- NO headers or labels like "LOCATION:", "HANDLUNG:", "KONFLIKT:" etc.
+---
+
+## GENERATION PROCESS
+
+For EACH story idea, output these three stages:
+
+[DRAFT_1]
+Write your first story idea.
+
+[REVIEW_1]
+Check for: plot holes, missing characters, age-appropriateness, complexity matching scene count.
+
+[FINAL_1]
+Corrected final version of story 1.
+
+[DRAFT_2]
+Write a DIFFERENT story idea (different structure and approach).
+
+[REVIEW_2]
+Check for same criteria.
+
+[FINAL_2]
+Corrected final version of story 2.
+
+---
+
+## OUTPUT FORMAT (FOLLOW EXACTLY)
+
+Each story idea must be PLAIN TEXT PARAGRAPHS:
+- Paragraph 1: Setting (location and time)
+- Paragraph 2: What happens (the plot events)
+
+**FORBIDDEN - DO NOT USE:**
+- NO **bold** or *italic* (no asterisks ever)
+- NO headers like "LOCATION:", "SETTING:", "HANDLUNG:", "KONFLIKT:"
 - NO bullet points or numbered lists
-- Just plain flowing paragraphs of text
+- NO adjectives like "magical", "brave", "beautiful", "exciting"
 
-LENGTH LIMITS:
-- Short stories (1-10 pages): 3-4 sentences total
-- Medium stories (11-20 pages): 5-6 sentences total
-- Long stories (21+ pages): 7-8 sentences total
+**REQUIRED:**
+- Plain flowing paragraphs only
+- All characters must appear
+- Focus on actions: who goes where, what they do, what happens
 
-CONTENT RULES:
-- NO adjectives! Do not describe things as "magical", "brave", "beautiful", "exciting", etc.
-- Focus ONLY on actions and events: who goes where, what they do, what happens next.
-- Be specific about locations and time periods.
-- All characters must be mentioned
-- Follow the SCENE COMPLEXITY guide above
+**LENGTH:** {STORY_LENGTH_CATEGORY}
+- Short (1-10 pages): 3-4 sentences
+- Medium (11-20 pages): 5-6 sentences
+- Long (21+ pages): 7-8 sentences
 
-EXAMPLES of good story ideas (note: plain text, no headers):
+## EXAMPLES (correct format):
 
-Example 1:
+[DRAFT_1]
 The story takes place on the high seas, traveling from the North Pole to Africa during summer.
 
 Pirates discover a map hidden in a bottle floating in icy waters. The crew follows the map to an underwater cave where they find a locked chest. They must solve three riddles carved into the cave walls to open the chest and claim the treasure inside.
 
-Example 2:
+[DRAFT_1]
 The story is set in a medieval castle during a cold winter when snow covers the land.
 
 The kitchen runs out of firewood and the cook sends her daughter to the forest to gather more. In the forest, the daughter meets a wolf who offers to help carry the heavy wood in exchange for a bowl of hot soup. She must decide whether to trust the wolf or find another way to bring the wood home.
 
 ---
 
-## GENERATION PROCESS:
-
-For EACH story idea, you MUST output ALL three stages:
-
-[DRAFT_1]
-Create your initial story outline following all guidelines above.
-
-[REVIEW_1]
-Check your draft for:
-- Logical inconsistencies or plot holes
-- Missing characters (all must appear)
-- Age-appropriateness issues
-- Complexity matching the scene count guide
-List any issues found.
-
-[FINAL_1]
-The corrected, final version of story 1.
-
-[DRAFT_2]
-Create your initial story outline for a DIFFERENT story.
-
-[REVIEW_2]
-Check your draft for the same criteria. List any issues found.
-
-[FINAL_2]
-The corrected, final version of story 2.
-
-IMPORTANT:
-- The two stories must be VERY DIFFERENT in structure and approach
-- Both must use the same characters
-- You MUST output all 6 sections in order: DRAFT_1, REVIEW_1, FINAL_1, DRAFT_2, REVIEW_2, FINAL_2
-
-{STORY_REQUIREMENTS}
+NOW GENERATE: Output [DRAFT_1], [REVIEW_1], [FINAL_1], [DRAFT_2], [REVIEW_2], [FINAL_2] in order.

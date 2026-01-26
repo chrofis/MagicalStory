@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wand2, Sparkles, Loader2, Pencil, Palette, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useRotatingMessage } from '@/hooks/useRotatingMessage';
 import { Modal } from '@/components/common/Modal';
 import { StoryCategorySelector } from './StoryCategorySelector';
 import { storyTypes, lifeChallenges, educationalTopics } from '@/constants/storyTypes';
@@ -121,6 +122,7 @@ export function StorySettings({
 }: StorySettingsProps) {
   const { t, language } = useLanguage();
   const lang = language as UILanguage;
+  const thinkingMessage = useRotatingMessage(lang);
 
   // Modal state for editing story type settings
   const [isEditSettingsOpen, setIsEditSettingsOpen] = useState(false);
@@ -507,7 +509,7 @@ export function StorySettings({
                       </div>
                       <span className="text-sm text-gray-500">
                         {ideaProgress1 < 80
-                          ? (language === 'de' ? 'Denke nach...' : language === 'fr' ? 'Réflexion...' : 'Thinking...')
+                          ? thinkingMessage
                           : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : 'Writing idea...')}
                       </span>
                     </div>
@@ -548,7 +550,7 @@ export function StorySettings({
                       </div>
                       <span className="text-sm text-gray-500">
                         {ideaProgress2 < 80
-                          ? (language === 'de' ? 'Denke nach...' : language === 'fr' ? 'Réflexion...' : 'Thinking...')
+                          ? thinkingMessage
                           : (language === 'de' ? 'Schreibe Idee...' : language === 'fr' ? 'Rédaction...' : 'Writing idea...')}
                       </span>
                     </div>
