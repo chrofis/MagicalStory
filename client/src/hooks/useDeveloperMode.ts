@@ -44,6 +44,10 @@ interface DeveloperModeState {
   // Grid-based repair: use grid extraction + Gemini repair instead of legacy inpainting
   useGridRepair: boolean;
   setUseGridRepair: (enable: boolean) => void;
+  // Force repair threshold: when set, repair ANY page with fixable issues if score < this value
+  // Set to 100 to always repair pages with issues (for testing), null to use standard logic
+  forceRepairThreshold: number | null;
+  setForceRepairThreshold: (threshold: number | null) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -75,6 +79,7 @@ const FEATURE_DEFAULTS = {
   lookbackCount: 3,             // Number of previous pages to compare (1-5)
   checkOnlyMode: false,       // Check-only mode: run checks but skip all regeneration
   useGridRepair: true,        // Grid-based repair: use grid extraction instead of legacy inpainting
+  forceRepairThreshold: null as number | null, // Force repair: null = standard logic, 100 = always repair
 };
 
 /**
@@ -122,6 +127,9 @@ export function useDeveloperMode(): DeveloperModeState {
 
   // Grid-based repair: use grid extraction + Gemini repair instead of legacy inpainting
   const [useGridRepair, setUseGridRepair] = useState(FEATURE_DEFAULTS.useGridRepair);
+
+  // Force repair threshold: when set, repair ANY page with fixable issues if score < this value
+  const [forceRepairThreshold, setForceRepairThreshold] = useState<number | null>(FEATURE_DEFAULTS.forceRepairThreshold);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -183,6 +191,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setCheckOnlyMode,
     useGridRepair,
     setUseGridRepair,
+    forceRepairThreshold,
+    setForceRepairThreshold,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

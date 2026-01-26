@@ -10346,6 +10346,7 @@ async function processStoryJob(jobId) {
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
     const useGridRepair = inputData.useGridRepair !== false; // Use grid-based repair (default: ON when autoRepair is on)
+    const forceRepairThreshold = typeof inputData.forceRepairThreshold === 'number' ? inputData.forceRepairThreshold : null; // Force repair on pages with issues below this score
     const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
     const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
 
@@ -10447,8 +10448,9 @@ async function processStoryJob(jobId) {
     const incrementalConsistencyConfig = enableIncrementalConsistency ? {
       enabled: true,
       dryRun: incrementalConsistencyDryRun,
-      lookbackCount: incrementalConsistencyLookback
-    } : null;
+      lookbackCount: incrementalConsistencyLookback,
+      forceRepairThreshold  // Pass through for image generation
+    } : { forceRepairThreshold };  // Even without incremental consistency, pass repair threshold
 
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {

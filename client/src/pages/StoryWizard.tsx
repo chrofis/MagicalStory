@@ -95,6 +95,7 @@ export default function StoryWizard() {
     devSkipCovers, setDevSkipCovers,
     enableAutoRepair, setEnableAutoRepair,
     useGridRepair, setUseGridRepair,
+    forceRepairThreshold, setForceRepairThreshold,
     enableFinalChecks, setEnableFinalChecks,
     incrementalConsistency, setIncrementalConsistency,
     incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
@@ -3183,6 +3184,7 @@ export default function StoryWizard() {
         // Developer feature options
         enableAutoRepair: enableAutoRepair,
         useGridRepair: useGridRepair,
+        forceRepairThreshold: forceRepairThreshold,
         enableFinalChecks: enableFinalChecks,
         checkOnlyMode: checkOnlyMode,  // Skip all regeneration, only run checks
         // Incremental consistency check (check each image against previous images)
@@ -4470,6 +4472,27 @@ export default function StoryWizard() {
                         <p className="text-xs text-gray-500 ml-12">
                           {language === 'de' ? 'Extrahiert Problemregionen in ein Grid, repariert mit Gemini, verifiziert mit LPIPS+LLM' : language === 'fr' ? 'Extrait les régions problématiques dans une grille, répare avec Gemini, vérifie avec LPIPS+LLM' : 'Extracts issue regions to grid, repairs with Gemini, verifies with LPIPS+LLM'}
                         </p>
+                      )}
+                      {enableAutoRepair && (
+                        <div className="mt-2 ml-6">
+                          <label className="flex items-center gap-2 text-gray-700">
+                            <span>{language === 'de' ? 'Reparatur-Schwelle:' : language === 'fr' ? 'Seuil de réparation:' : 'Force repair threshold:'}</span>
+                            <select
+                              value={forceRepairThreshold === null ? 'default' : forceRepairThreshold}
+                              onChange={(e) => setForceRepairThreshold(e.target.value === 'default' ? null : parseInt(e.target.value))}
+                              className="border border-gray-300 rounded px-2 py-1 text-sm"
+                            >
+                              <option value="default">{language === 'de' ? 'Standard (nur bei Fehler)' : language === 'fr' ? 'Défaut (seulement si erreur)' : 'Default (only on failure)'}</option>
+                              <option value="100">{language === 'de' ? '100% (immer reparieren)' : language === 'fr' ? '100% (toujours réparer)' : '100% (always repair)'}</option>
+                              <option value="90">90%</option>
+                              <option value="80">80%</option>
+                              <option value="75">75%</option>
+                            </select>
+                          </label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {language === 'de' ? 'Bei 100% werden alle Seiten mit Problemen repariert, auch wenn sie die Qualitätsprüfung bestehen' : language === 'fr' ? 'À 100%, toutes les pages avec des problèmes sont réparées, même si elles passent le contrôle qualité' : 'At 100%, all pages with issues are repaired even if they pass quality check'}
+                          </p>
+                        </div>
                       )}
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">

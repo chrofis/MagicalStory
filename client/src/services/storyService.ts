@@ -994,6 +994,7 @@ export const storyService = {
     // Developer feature options
     enableAutoRepair?: boolean;
     useGridRepair?: boolean;  // Use grid-based repair instead of legacy inpainting
+    forceRepairThreshold?: number | null;  // Force repair on pages with issues below this score (100 = always)
     enableFinalChecks?: boolean;
     checkOnlyMode?: boolean;  // Skip all regeneration, only run checks
     // Incremental consistency check (check each image against previous images)
@@ -1067,6 +1068,7 @@ export const storyService = {
       // Developer feature options
       enableAutoRepair: data.enableAutoRepair,
       useGridRepair: data.useGridRepair,
+      forceRepairThreshold: data.forceRepairThreshold,
       enableFinalChecks: data.enableFinalChecks,
       checkOnlyMode: data.checkOnlyMode,  // Skip all regeneration, only run checks
       // Incremental consistency check

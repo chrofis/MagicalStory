@@ -1863,7 +1863,16 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     gridRepairOutputDir: gridRepairOutputDirInput = null,
     // Story ID for grid-based repair manifest
     storyId = null,
+    // Force repair threshold: when set, repair ANY page with fixable issues if score < this value
+    // Default: null (use standard logic). Set to 100 to always repair pages with issues.
+    // Can also be passed via incrementalConsistency.forceRepairThreshold
+    forceRepairThreshold: forceRepairThresholdInput = null,
   } = options;
+
+  // Extract forceRepairThreshold from incrementalConsistency if not provided directly
+  const forceRepairThreshold = forceRepairThresholdInput !== null
+    ? forceRepairThresholdInput
+    : (incrementalConsistencyInput?.forceRepairThreshold ?? null);
 
   // In check-only mode: only 1 attempt, no auto-repair, force dry-run for consistency
   const MAX_ATTEMPTS = checkOnlyMode ? 1 : 3;
@@ -1879,6 +1888,10 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
   if (useGridRepair && enableAutoRepair) {
     log.info(`🔲 [QUALITY RETRY] Grid-based repair enabled (output: ${gridRepairOutputDir})`);
+  }
+
+  if (forceRepairThreshold !== null && enableAutoRepair) {
+    log.info(`🔧 [QUALITY RETRY] Force repair threshold: ${forceRepairThreshold}% (will repair any page with issues below this score)`);
   }
 
   if (checkOnlyMode) {
@@ -2151,6 +2164,32 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       }
     }
 
+    // Force repair override: if forceRepairThreshold is set and there are fix targets,
+    // force repair when score < forceRepairThreshold (set to 100 to always repair)
+    if (forceRepairThreshold !== null && !hasTextError) {
+      const hasFixTargets = (enrichedFixTargets && enrichedFixTargets.length > 0) ||
+                           (result.fixTargets && result.fixTargets.length > 0) ||
+                           (unifiedReport?.fixPlan?.fixTargets?.length > 0);
+      if (hasFixTargets && score < forceRepairThreshold) {
+        log.info(`🔧 [QUALITY RETRY] ${pageLabel}Force repair triggered (score ${score}% < forceRepairThreshold ${forceRepairThreshold}%)`);
+        shouldRepair = true;
+        // Use enriched targets if available, otherwise unified, otherwise raw
+        if (enrichedFixTargets && enrichedFixTargets.length > 0) {
+          fixTargetsToUse = enrichedFixTargets;
+        } else if (unifiedReport?.fixPlan?.fixTargets?.length > 0) {
+          fixTargetsToUse = unifiedReport.fixPlan.fixTargets.map(t => ({
+            element: t.type,
+            issue: t.instruction,
+            severity: t.severity,
+            bounds: t.region === 'full' ? null : t.region,
+            fix_instruction: t.instruction
+          }));
+        } else if (result.fixTargets) {
+          fixTargetsToUse = result.fixTargets;
+        }
+      }
+    }
+
     const couldRepair = shouldRepair && fixTargetsToUse.length > 0;
     if (couldRepair && !enableAutoRepair) {
       log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). ${fixTargetsToUse.length} fix targets available.`);
@@ -2358,6 +2397,23 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Check if quality is good enough (and no text errors for covers)
     if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
       console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}${result.wasRepaired ? ' (after auto-repair)' : ''}`);
+
+      // Add bbox detection to retryHistory if not already there (for dev mode visibility)
+      const hasBboxEntry = retryHistory.some(h => h.bboxDetection || h.bboxOverlayImage);
+      if (bboxDetectionHistory && !hasBboxEntry) {
+        retryHistory.push({
+          attempt: attempts,
+          type: 'bbox_detection_only',
+          score: score,
+          fixableIssuesCount: result.fixableIssues?.length || 0,
+          enrichedTargetsCount: enrichedFixTargets?.length || 0,
+          bboxDetection: bboxDetectionHistory,
+          bboxOverlayImage: bboxOverlayImage,
+          autoRepairEnabled: enableAutoRepair,
+          timestamp: new Date().toISOString()
+        });
+      }
+
       // Extract rewrite usage from retryHistory if a scene was rewritten
       const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
       return {
