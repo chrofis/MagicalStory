@@ -8367,25 +8367,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
 
-        // Build previous scenes context (last 2 pages) from pages parsed during streaming
-        const previousScenes = [];
-        for (let prevPage = page.pageNumber - 2; prevPage < page.pageNumber; prevPage++) {
-          if (prevPage >= 1 && streamingExpandedPages.has(prevPage)) {
-            const prev = streamingExpandedPages.get(prevPage);
-            previousScenes.push({
-              pageNumber: prevPage,
-              text: prev.text,
-              sceneHint: prev.sceneHint || '',
-              characterClothing: prev.characterClothing || null
-            });
-          }
+        // SIMPLE: Get raw outline blocks directly from parser (no parsing/reconstruction needed)
+        // Previous pages = raw outline blocks for pages N-2 and N-1
+        // Current page = raw outline block for page N
+        const prevPageNumbers = [];
+        for (let p = page.pageNumber - 2; p < page.pageNumber; p++) {
+          if (p >= 1) prevPageNumbers.push(p);
         }
+        const rawOutlineContext = {
+          previousPages: progressiveParser.getRawPageBlocks(prevPageNumbers),
+          currentPage: progressiveParser.getRawPageBlock(page.pageNumber)
+        };
 
-        const pageClothing = page.characterClothing || {};
-        const clothingStr = Object.keys(pageClothing).length > 0
-          ? Object.entries(pageClothing).map(([n, c]) => `${n}:${c}`).join(', ')
-          : 'none';
-        log.debug(`⚡ [STREAM-SCENE] Page ${page.pageNumber} starting expansion (clothing: ${clothingStr}, prev: ${previousScenes.length} pages)`);
+        log.debug(`⚡ [STREAM-SCENE] Page ${page.pageNumber} starting expansion (prev: ${prevPageNumbers.join(',') || 'none'})`);
 
         // Build available avatars string - only show clothing categories used in this story
         const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters, streamingClothingRequirements);
@@ -8394,13 +8388,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           page.pageNumber,
           page.text,
           sceneCharacters,
-          page.sceneHint,
+          '', // shortSceneDesc - not needed, using rawOutlineContext
           lang,
           streamingVisualBible,
-          previousScenes,
-          pageClothing,
+          [], // previousScenes - not needed, using rawOutlineContext
+          {}, // pageClothing - not needed, using rawOutlineContext
           '',  // correctionNotes
-          availableAvatars
+          availableAvatars,
+          rawOutlineContext // NEW: pass raw outline blocks directly
         );
 
         const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel);
@@ -9387,7 +9382,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Log by function
     log.debug(`   BY FUNCTION:`);
-    const getCostModel = (func) => func.provider || 'anthropic';
+    // Use first model for cost calculation (model-specific pricing), fall back to provider
+    const getCostModel = (func) => func.models?.size > 0 ? Array.from(func.models)[0] : (func.provider || 'anthropic');
 
     if (byFunc.unified_story?.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.unified_story), byFunc.unified_story.input_tokens, byFunc.unified_story.output_tokens, byFunc.unified_story.thinking_tokens);
