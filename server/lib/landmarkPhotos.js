@@ -1265,17 +1265,17 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
   // Separate exterior and interior images, sort by score, ensure diversity
   // Filter out drawings/engravings (isActualPhoto === false OR description mentions it)
   const exteriorCandidates = allGoodImages
-    .filter(img => img.isExterior !== false && img.isActualPhoto !== false && !isDrawingOrEngraving(img.description))
+    .filter(img => img.isExterior !== false && img.isActualPhoto !== false && !isNotUsefulPhoto(img.description))
     .sort((a, b) => b.score - a.score);
 
   // Exclude information signs, plaques, maps from interior candidates
   const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
 
-  // Exclude drawings, engravings, illustrations, maps, coats of arms (backup filter for description text)
-  const isDrawingOrEngraving = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan)\b/i.test(desc || '');
+  // Exclude non-useful images: drawings, maps, coats of arms, detail shots
+  const isNotUsefulPhoto = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan|shows a wooden door|shows a door|shows an old door|detail of a|close-up of a|closeup of a)\b/i.test(desc || '');
 
   const interiorCandidates = allGoodImages
-    .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description) && !isDrawingOrEngraving(img.description))
+    .filter(img => img.isExterior === false && img.isActualPhoto !== false && !isInformationSign(img.description) && !isNotUsefulPhoto(img.description))
     .sort((a, b) => b.score - a.score);
 
   // Select up to 3 diverse images for each type (async for AI checks)
