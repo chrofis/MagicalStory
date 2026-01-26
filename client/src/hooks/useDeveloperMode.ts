@@ -34,6 +34,9 @@ interface DeveloperModeState {
   setIncrementalConsistency: (enable: boolean) => void;
   incrementalConsistencyDryRun: boolean;
   setIncrementalConsistencyDryRun: (enable: boolean) => void;
+  // Number of previous pages to compare for incremental consistency (1-5)
+  lookbackCount: number;
+  setLookbackCount: (count: number) => void;
   // Check-only mode: run all quality checks but skip all regeneration/repair
   // Useful for analyzing issues before deciding on fixes
   checkOnlyMode: boolean;
@@ -69,6 +72,7 @@ const FEATURE_DEFAULTS = {
   enableFinalChecks: true,    // Final checks: run consistency checks at end of generation
   incrementalConsistency: false,  // Incremental consistency: check each image against previous
   incrementalConsistencyDryRun: true, // Dry run: log what would be fixed without fixing
+  lookbackCount: 3,             // Number of previous pages to compare (1-5)
   checkOnlyMode: false,       // Check-only mode: run checks but skip all regeneration
   useGridRepair: true,        // Grid-based repair: use grid extraction instead of legacy inpainting
 };
@@ -111,6 +115,7 @@ export function useDeveloperMode(): DeveloperModeState {
   // Incremental consistency: check each image against previous images as they're generated
   const [incrementalConsistency, setIncrementalConsistency] = useState(FEATURE_DEFAULTS.incrementalConsistency);
   const [incrementalConsistencyDryRun, setIncrementalConsistencyDryRun] = useState(FEATURE_DEFAULTS.incrementalConsistencyDryRun);
+  const [lookbackCount, setLookbackCount] = useState(FEATURE_DEFAULTS.lookbackCount);
 
   // Check-only mode: run all quality checks but skip all regeneration/repair
   const [checkOnlyMode, setCheckOnlyMode] = useState(FEATURE_DEFAULTS.checkOnlyMode);
@@ -172,6 +177,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setIncrementalConsistency,
     incrementalConsistencyDryRun,
     setIncrementalConsistencyDryRun,
+    lookbackCount,
+    setLookbackCount,
     checkOnlyMode,
     setCheckOnlyMode,
     useGridRepair,

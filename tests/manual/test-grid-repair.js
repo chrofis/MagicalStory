@@ -62,7 +62,7 @@ async function loadStoryData(storyId) {
  */
 async function loadPageImage(storyId, pageNumber) {
   const result = await pool.query(`
-    SELECT image_data, metadata
+    SELECT image_data, quality_score, generated_at
     FROM story_images
     WHERE story_id = $1 AND page_number = $2 AND image_type = 'scene'
     ORDER BY version_index DESC
@@ -75,7 +75,8 @@ async function loadPageImage(storyId, pageNumber) {
 
   return {
     imageData: result.rows[0].image_data,
-    metadata: result.rows[0].metadata
+    qualityScore: result.rows[0].quality_score,
+    generatedAt: result.rows[0].generated_at
   };
 }
 

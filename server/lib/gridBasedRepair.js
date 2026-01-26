@@ -348,6 +348,47 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   }
 
   // =========================================================================
+  // Step 7.5: Retry failed repairs (optional)
+  // =========================================================================
+  const failedRepairs = allRepairs.filter(r => !r.accepted);
+
+  if (config.retryFailed && failedRepairs.length > 0 && failedRepairs.length <= config.maxRetries * 3) {
+    progress('retry', `Retrying ${failedRepairs.length} failed repairs individually`);
+
+    const retryResults = await retryFailedRepairs(failedRepairs, imageBuffer, {
+      outputDir: config.outputDir,
+      skipVerification: config.skipVerification
+    });
+
+    // Merge successful retries into allRepairs
+    for (const retry of retryResults) {
+      if (retry.accepted) {
+        // Find and update the original repair entry
+        const originalIndex = allRepairs.findIndex(r => r.issueId === retry.issueId);
+        if (originalIndex >= 0) {
+          allRepairs[originalIndex] = retry;
+          history.fixedCount++;
+          history.failedCount--;
+
+          // Update issue status
+          const issue = extractedIssues.find(i => i.id === retry.issueId);
+          if (issue) {
+            issue.repairStatus = 'verified';
+          }
+        }
+      }
+    }
+
+    history.steps.push({
+      step: 'retry',
+      timestamp: new Date().toISOString(),
+      attempted: failedRepairs.length,
+      succeeded: retryResults.filter(r => r.accepted).length,
+      failed: retryResults.filter(r => !r.accepted).length
+    });
+  }
+
+  // =========================================================================
   // Step 8: Apply verified repairs
   // =========================================================================
   const acceptedRepairs = allRepairs.filter(r => r.accepted);
@@ -441,13 +482,125 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
 /**
  * Retry failed repairs with different strategies
  *
+ * Strategy: Retry each failed repair individually (not in grid) with an
+ * enhanced prompt that emphasizes the specific issue and prior failure.
+ *
  * @param {Object[]} failedRepairs - Repairs that failed verification
+ * @param {Buffer} imageBuffer - Original full image buffer
  * @param {Object} options - Retry options
+ * @param {string} options.outputDir - Output directory
+ * @param {boolean} options.skipVerification - Skip verification step
+ * @returns {Promise<Object[]>} Array of retry results
  */
-async function retryFailedRepairs(failedRepairs, options) {
-  // For now, just return empty - future enhancement
-  // Could try: different prompts, individual repair, higher quality model
-  return [];
+async function retryFailedRepairs(failedRepairs, imageBuffer, options = {}) {
+  if (!failedRepairs || failedRepairs.length === 0) {
+    return [];
+  }
+
+  const results = [];
+  const { outputDir, skipVerification = false } = options;
+
+  console.log(`  [Retry] Attempting ${failedRepairs.length} individual repairs...`);
+
+  for (const repair of failedRepairs) {
+    const { issue, verification } = repair;
+
+    if (!issue || !issue.extraction?.absolutePath) {
+      console.log(`    [Retry] Skipping ${repair.issueId}: no extraction data`);
+      continue;
+    }
+
+    try {
+      // Load original thumbnail
+      const originalBuffer = fs.readFileSync(issue.extraction.absolutePath);
+
+      // Create a single-cell grid for this issue
+      const singleIssue = [{
+        ...issue,
+        extraction: issue.extraction
+      }];
+
+      const { buffer: gridBuffer, manifest, cellPositions } = await createIssueGrid(singleIssue, {
+        title: `Retry: ${issue.description?.substring(0, 30)}...`
+      });
+
+      // Build enhanced prompt emphasizing the failure
+      const failureReason = verification?.reason || 'previous attempt failed';
+      const enhancedManifest = {
+        ...manifest,
+        issues: manifest.issues.map(i => ({
+          ...i,
+          fixInstruction: `CRITICAL: ${i.fixInstruction}. Previous attempt failed because: ${failureReason}. Be very careful to fully fix this issue.`
+        }))
+      };
+
+      // Send to Gemini for individual repair
+      console.log(`    [Retry] Repairing: ${issue.description?.substring(0, 40)}...`);
+      const repairResult = await repairGridWithGemini(gridBuffer, enhancedManifest);
+
+      // Extract the repaired region
+      const repairedRegions = await extractRepairedRegions(repairResult.buffer, cellPositions);
+
+      if (repairedRegions.length === 0) {
+        console.log(`    [Retry] Failed: no regions extracted`);
+        continue;
+      }
+
+      const repairedRegion = repairedRegions[0];
+
+      // Verify the retry
+      let retryVerification;
+      if (skipVerification) {
+        retryVerification = { accepted: true, reason: 'Verification skipped (retry)' };
+      } else {
+        retryVerification = await verifyRepairedRegion(originalBuffer, repairedRegion.buffer, issue);
+      }
+
+      const retryResult = {
+        issueId: issue.id,
+        letter: repair.letter,
+        issue,
+        buffer: repairedRegion.buffer,
+        accepted: retryVerification.accepted,
+        verification: retryVerification,
+        isRetry: true,
+        previousFailure: failureReason
+      };
+
+      if (retryVerification.accepted) {
+        console.log(`    [Retry] ✓ Success: ${issue.id}`);
+      } else {
+        console.log(`    [Retry] ✗ Failed again: ${retryVerification.reason}`);
+      }
+
+      // Record retry attempt on the issue
+      issue.repairAttempts.push({
+        attemptNumber: issue.repairAttempts.length + 1,
+        type: 'individual_retry',
+        verified: !skipVerification,
+        accepted: retryVerification.accepted,
+        reason: retryVerification.reason,
+        timestamp: new Date().toISOString()
+      });
+
+      results.push(retryResult);
+
+    } catch (err) {
+      console.error(`    [Retry] Error for ${repair.issueId}: ${err.message}`);
+      results.push({
+        issueId: repair.issueId,
+        issue: repair.issue,
+        accepted: false,
+        error: err.message,
+        isRetry: true
+      });
+    }
+  }
+
+  const successCount = results.filter(r => r.accepted).length;
+  console.log(`  [Retry] Completed: ${successCount}/${results.length} successful`);
+
+  return results;
 }
 
 /**

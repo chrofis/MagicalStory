@@ -98,6 +98,7 @@ export default function StoryWizard() {
     enableFinalChecks, setEnableFinalChecks,
     incrementalConsistency, setIncrementalConsistency,
     incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
+    lookbackCount, setLookbackCount,
     checkOnlyMode, setCheckOnlyMode,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
@@ -3188,7 +3189,7 @@ export default function StoryWizard() {
         incrementalConsistency: incrementalConsistency ? {
           enabled: true,
           dryRun: incrementalConsistencyDryRun,
-          lookbackCount: 3,
+          lookbackCount,
         } : undefined,
         // Developer model overrides (admin only)
         modelOverrides: (user?.role === 'admin' || isImpersonating) ? {
@@ -4512,6 +4513,27 @@ export default function StoryWizard() {
                         <p className="text-xs text-gray-500 ml-12">
                           {language === 'de' ? 'Zeigt nur an, was repariert würde, ohne tatsächlich zu reparieren' : language === 'fr' ? 'Affiche uniquement ce qui serait réparé sans effectuer de réparations' : 'Shows what would be fixed without actually fixing'}
                         </p>
+                      )}
+                      {incrementalConsistency && (
+                        <div className="mt-2 ml-6">
+                          <label className="flex items-center gap-2">
+                            <span className="text-gray-700 text-sm">
+                              {language === 'de' ? 'Vergleichsfenster:' : language === 'fr' ? 'Fenêtre de comparaison:' : 'Lookback window:'}
+                            </span>
+                            <input
+                              type="range"
+                              min="1"
+                              max="5"
+                              value={lookbackCount}
+                              onChange={(e) => setLookbackCount(parseInt(e.target.value, 10))}
+                              className="w-20 h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer"
+                            />
+                            <span className="text-gray-600 font-medium w-4">{lookbackCount}</span>
+                          </label>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {language === 'de' ? `Vergleicht jedes Bild mit den ${lookbackCount} vorherigen` : language === 'fr' ? `Compare chaque image avec les ${lookbackCount} précédentes` : `Compares each image with the previous ${lookbackCount}`}
+                          </p>
+                        </div>
                       )}
 
                       <label className="flex items-center gap-2 cursor-pointer mt-4">

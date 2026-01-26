@@ -14,6 +14,16 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Load prompt template
+const PROMPT_PATH = path.join(__dirname, '../../prompts/grid-repair.txt');
+let REPAIR_PROMPT_TEMPLATE = null;
+function getRepairPromptTemplate() {
+  if (!REPAIR_PROMPT_TEMPLATE) {
+    REPAIR_PROMPT_TEMPLATE = fs.readFileSync(PROMPT_PATH, 'utf-8');
+  }
+  return REPAIR_PROMPT_TEMPLATE;
+}
+
 // Grid configuration
 const CELL_SIZE = 256;      // Size of each cell (matches TARGET_REGION_SIZE)
 const MAX_COLS = 4;         // Maximum columns per grid
@@ -23,8 +33,8 @@ const PADDING = 10;         // Padding between cells
 const LABEL_HEIGHT = 30;    // Height for letter labels
 const TITLE_HEIGHT = 40;    // Height for grid title
 
-// Gemini model for image editing
-const REPAIR_MODEL = 'gemini-2.0-flash-exp';
+// Gemini model for image editing (same as page generation)
+const REPAIR_MODEL = 'gemini-2.5-flash-image';
 
 /**
  * Create a labeled grid image from extracted issue thumbnails
@@ -223,21 +233,11 @@ function buildGridRepairPrompt(manifest) {
     `${i.letter}: ${i.fixInstruction}`
   ).join('\n');
 
-  return `You are an expert illustration repair artist. This grid shows ${manifest.issues.length} regions from children's book illustrations that need fixes.
-
-Each region is labeled with a letter (${manifest.issues.map(i => i.letter).join(', ')}).
-
-FIX EACH REGION:
-${instructions}
-
-RULES:
-1. Maintain the exact same art style, colors, and character appearance
-2. Only modify what needs fixing - preserve everything else
-3. Keep faces recognizable and consistent with the character
-4. Ensure hands have exactly 5 fingers
-5. Keep clothing colors and patterns matching
-
-Return the grid image with ALL regions fixed while keeping the same layout and letter labels.`;
+  const template = getRepairPromptTemplate();
+  return template
+    .replace('{ISSUE_COUNT}', manifest.issues.length)
+    .replace('{LETTERS}', manifest.issues.map(i => i.letter).join(', '))
+    .replace('{INSTRUCTIONS}', instructions);
 }
 
 /**
