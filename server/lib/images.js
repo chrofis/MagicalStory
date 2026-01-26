@@ -1725,6 +1725,14 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
   }
 
+  // No image found - log what Gemini actually returned (likely a refusal message)
+  const textParts = candidate.content?.parts?.filter(p => p.text) || [];
+  if (textParts.length > 0) {
+    const refusalMessage = textParts.map(p => p.text).join(' ').substring(0, 500);
+    log.error(`❌ [IMAGE GEN] No image data - Gemini returned text instead: "${refusalMessage}"`);
+    throw new Error(`Image generation refused: ${refusalMessage.substring(0, 200)}`);
+  }
+
   log.error('❌ [IMAGE GEN] No image data found in any part');
   throw new Error('No image data in response - check logs for API response structure');
 }
