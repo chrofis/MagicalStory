@@ -740,10 +740,9 @@ export default function StoryWizard() {
               setImageLoadProgress({ loaded: 0, total: totalImages });
             }
 
-            // Fetch dev metadata only when explicitly requested via URL param (for faster initial load)
-            // Use ?storyId=X&dev=true to load dev metadata, or toggle dev mode on while viewing
-            const loadDevData = searchParams.get('dev') === 'true' || isImpersonating;
-            if (loadDevData) {
+            // Always fetch dev metadata for completed stories - needed for scene descriptions
+            // which are required for the scene edit/regeneration feature
+            {
               devMetadataLoadedRef.current = true; // Prevent duplicate fetch on dev mode toggle
               storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
                 mergeDevMetadata(devMetadata);
