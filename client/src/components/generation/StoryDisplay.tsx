@@ -3603,22 +3603,15 @@ export function StoryDisplay({
                               : [...coverEditModal.selectedCharacterIds, char.id];
                             setCoverEditModal({ ...coverEditModal, selectedCharacterIds: newIds });
                           }}
-                          className={`flex items-center gap-2 px-3 py-2 rounded-lg border-2 transition-all ${
+                          className={`px-3 py-2 rounded-lg border-2 transition-all ${
                             isSelected
                               ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
                               : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                           }`}
                         >
-                          {char.photoData && (
-                            <img
-                              src={char.photoData}
-                              alt={char.name}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          )}
                           <span className="font-medium">{char.name}</span>
                           {isSelected && (
-                            <span className="text-indigo-500">✓</span>
+                            <span className="text-indigo-500 ml-1">✓</span>
                           )}
                         </button>
                       );
