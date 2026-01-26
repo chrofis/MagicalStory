@@ -3548,7 +3548,7 @@ export function StoryDisplay({
           onRegenerate={handleRegenerateWithScene}
           isRegenerating={regeneratingPages.has(sceneEditModal.pageNumber)}
           imageRegenerationCost={imageRegenerationCost}
-          characters={characters.map(c => ({ id: c.id, name: c.name, photoUrl: c.photoData }))}
+          characters={characters.map(c => ({ id: c.id, name: c.name }))}
           selectedCharacterIds={sceneEditModal.selectedCharacterIds}
           onCharacterSelectionChange={(ids) => setSceneEditModal({ ...sceneEditModal, selectedCharacterIds: ids })}
           consistencyRegen={developerMode ? sceneImages.find(img => img.pageNumber === sceneEditModal.pageNumber)?.consistencyRegen : undefined}

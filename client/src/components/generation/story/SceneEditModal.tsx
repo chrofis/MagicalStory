@@ -7,7 +7,6 @@ import type { RetryAttempt } from '@/types/story';
 interface CharacterOption {
   id: number;
   name: string;
-  photoUrl?: string;
 }
 
 interface ConsistencyIssue {
@@ -128,13 +127,6 @@ export function SceneEditModal({
                           : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                       }`}
                     >
-                      {char.photoUrl && (
-                        <img
-                          src={char.photoUrl}
-                          alt={char.name}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                      )}
                       <span className="font-medium">{char.name}</span>
                       {isSelected && (
                         <span className="text-indigo-500">✓</span>
