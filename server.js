@@ -2792,7 +2792,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
-    const sceneResult = await callClaudeAPI(scenePrompt, 6000);
+    const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{' });
     const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
@@ -3010,7 +3010,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       );
 
       try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, 6000);
+        const expansionResult = await callClaudeAPI(expansionPrompt, 6000, null, { prefill: '{' });
         expandedDescription = expansionResult.text;
         console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
@@ -8448,7 +8448,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           rawOutlineContext // NEW: pass raw outline blocks directly
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel);
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel, { prefill: '{' });
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
@@ -9690,7 +9690,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 availableAvatars
               );
 
-              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel);
+              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel, { prefill: '{' });
 
               // Track token usage for scene expansion (Issue #1 fix)
               if (expandedDescriptionResult?.usage) {
@@ -11032,7 +11032,7 @@ Output Format:
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${sceneModelOverride ? ` [model: ${sceneModelOverride}]` : ''}`);
 
             // Generate detailed scene description (non-streaming for reliability with parallel calls)
-            const sceneDescResult = await callTextModel(scenePrompt, 4000, sceneModelOverride);
+            const sceneDescResult = await callTextModel(scenePrompt, 4000, sceneModelOverride, { prefill: '{' });
             let sceneDescription = sceneDescResult.text;
 
             // Fallback to outline extract if scene description is empty or too short
@@ -11518,7 +11518,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing, '', availableAvatars);
 
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
-            const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride);
+            const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride, { prefill: '{' });
             let sceneDescription = sceneDescResult.text;
 
             // Fallback to outline extract if scene description is empty or too short

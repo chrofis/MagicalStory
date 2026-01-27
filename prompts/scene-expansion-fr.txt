@@ -173,3 +173,7 @@ Choisissez en fonction de ce que la scène DOIT montrer, puis suivez les limites
 - Scènes de chambre/sommeil → utilisez salon, jardin, extérieur
 - Scènes de salle de bain → utilisez cuisine ou jeux d'eau extérieurs
 - Imagerie sombre/menaçante → gardez lumineux et joyeux
+
+---
+
+**COMMENCEZ IMMÉDIATEMENT:** Produisez UNIQUEMENT la description de scène dans le format ci-dessus. PAS de préambule, PAS d'introduction, PAS de "Je comprends", PAS de "Je vais générer", PAS de demande de confirmation. Commencez votre réponse directement par "1. **Image Summary**"

@@ -173,3 +173,7 @@ Wähle basierend darauf, was die Szene zeigen MUSS, dann folge den Detailgrenzen
 - Schlafzimmer-/Schlafszenen → verwende Wohnzimmer, Garten, Draussen
 - Badezimmerszenen → verwende Küche oder Wasserspiele im Freien
 - Dunkle/bedrohliche Bilder → halte es hell und fröhlich
+
+---
+
+**SOFORT BEGINNEN:** Gib NUR die Szenenbeschreibung im obigen Format aus. KEIN Vorwort, KEINE Einleitung, KEIN "Ich verstehe", KEIN "Ich werde generieren", KEINE Bestätigungsanfragen. Beginne deine Antwort direkt mit "1. **Image Summary**"

@@ -736,4 +736,4 @@ The `translatedSummary` field MUST follow these language rules exactly (dialect,
 
 ---
 
-**OUTPUT:** Return ONLY the raw JSON object. No markdown, no code fences, no explanation.
+**OUTPUT:** Return ONLY the raw JSON object. No markdown, no code fences, no explanation. No preamble, no "I understand", no "I'll generate". Start your response directly with the opening `{` brace.

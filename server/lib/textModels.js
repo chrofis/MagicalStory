@@ -95,7 +95,7 @@ function calculateOptimalBatchSize(totalPages, tokensPerPage = 400, safetyMargin
 /**
  * Call Anthropic Claude API
  */
-async function callAnthropicAPI(prompt, maxTokens, modelId) {
+async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -105,6 +105,12 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
   // Calculate timeout based on expected tokens (larger requests need more time)
   // Minimum 5 minutes, + 3 seconds per 1000 tokens for very large requests
   const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+
+  // Build messages - optionally add assistant prefill to prevent preamble
+  const messages = [{ role: 'user', content: prompt }];
+  if (options.prefill) {
+    messages.push({ role: 'assistant', content: options.prefill });
+  }
 
   const data = await withRetry(async () => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
@@ -117,10 +123,7 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
       body: JSON.stringify({
         model: modelId,
         max_tokens: maxTokens,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
+        messages
       }),
       signal: AbortSignal.timeout(timeoutMs)
     });
@@ -143,8 +146,11 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
     log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
   }
 
+  // Prepend prefill to response (Claude continues after the prefill, not including it)
+  const responseText = options.prefill ? options.prefill + data.content[0].text : data.content[0].text;
+
   return {
-    text: data.content[0].text,
+    text: responseText,
     usage: {
       input_tokens: inputTokens,
       output_tokens: outputTokens
@@ -161,11 +167,17 @@ async function callAnthropicAPI(prompt, maxTokens, modelId) {
  * @param {function} onChunk - Callback function called with each text chunk: (chunk: string, fullText: string) => void
  * @returns {Promise<{text: string, usage: object}>} The complete generated text and usage
  */
-async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
+async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
     throw new Error('Anthropic API key not configured (ANTHROPIC_API_KEY)');
+  }
+
+  // Build messages - optionally add assistant prefill to prevent preamble
+  const messages = [{ role: 'user', content: prompt }];
+  if (options.prefill) {
+    messages.push({ role: 'assistant', content: options.prefill });
   }
 
   // Wrap entire request + stream reading in retry to handle mid-stream socket errors
@@ -184,10 +196,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
         model: modelId,
         max_tokens: maxTokens,
         stream: true,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
+        messages
       })
     });
 
@@ -267,8 +276,11 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk) {
       log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
 
+    // Prepend prefill to response (Claude continues after the prefill, not including it)
+    const responseText = options.prefill ? options.prefill + fullText : fullText;
+
     return {
-      text: fullText,
+      text: responseText,
       usage: {
         input_tokens: inputTokens,
         output_tokens: outputTokens
@@ -494,7 +506,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
  * @param {number} maxTokens - Maximum tokens to generate (capped to model limit)
  * @returns {Promise<{text: string, usage: object}>}
  */
-async function callTextModel(prompt, maxTokens = 4096, modelOverride = null) {
+async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, options = {}) {
   // Use override if provided, otherwise use global active model
   let model = activeTextModel;
   let modelName = TEXT_MODEL;
@@ -513,7 +525,7 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null) {
   let result;
   switch (model.provider) {
     case 'anthropic':
-      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId);
+      result = await callAnthropicAPI(prompt, effectiveMaxTokens, model.modelId, options);
       break;
     case 'google':
       result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
@@ -531,7 +543,7 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null) {
  * @param {function} onChunk - Callback for each text chunk
  * @returns {Promise<{text: string, usage: object}>}
  */
-async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, modelOverride = null) {
+async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, modelOverride = null, options = {}) {
   // Use override if provided, otherwise use global active model
   let model = activeTextModel;
   let modelName = TEXT_MODEL;
@@ -550,7 +562,7 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
   let result;
   switch (model.provider) {
     case 'anthropic':
-      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+      result = await callAnthropicAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
       break;
     case 'google':
       result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
@@ -569,8 +581,8 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
 /**
  * Backward compatibility alias for Claude API
  */
-async function callClaudeAPI(prompt, maxTokens = 4096) {
-  return callTextModel(prompt, maxTokens);
+async function callClaudeAPI(prompt, maxTokens = 4096, modelOverride = null, options = {}) {
+  return callTextModel(prompt, maxTokens, modelOverride, options);
 }
 
 // =============================================================================

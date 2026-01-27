@@ -173,3 +173,7 @@ Choose based on what the scene MUST show, then follow detail limits:
 - Bedroom/sleeping scenes → use living room, garden, outdoor
 - Bathroom scenes → use kitchen or outdoor water play
 - Dark/threatening imagery → keep bright and cheerful
+
+---
+
+**BEGIN IMMEDIATELY:** Output ONLY the scene description in the format above. NO preamble, NO introduction, NO "I understand", NO "I'll generate", NO confirmation requests. Start your response directly with "1. **Image Summary**"
