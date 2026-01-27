@@ -1381,6 +1381,17 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_checkpoints_job ON story_job_checkpoints(job_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_checkpoints_step ON story_job_checkpoints(step_name)`);
 
+    // Add created_at column if missing (for tables created before this column existed)
+    await dbPool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_name='story_job_checkpoints' AND column_name='created_at') THEN
+          ALTER TABLE story_job_checkpoints ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+        END IF;
+      END $$;
+    `);
+
     // Pricing tiers table - single source of truth for book pricing
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS pricing_tiers (

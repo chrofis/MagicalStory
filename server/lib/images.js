@@ -4453,9 +4453,35 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
 
   // Parse JSON response
   try {
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
+    // Clean up response: remove markdown fences and trailing commas
+    let cleanedText = responseText
+      .replace(/```json\s*/gi, '')
+      .replace(/```\s*/gi, '')
+      .trim();
+
+    // Use a balanced brace matching approach to find the JSON object
+    const startIdx = cleanedText.indexOf('{');
+    if (startIdx === -1) throw new Error('No JSON object found in response');
+
+    let braceCount = 0;
+    let endIdx = -1;
+    for (let i = startIdx; i < cleanedText.length; i++) {
+      if (cleanedText[i] === '{') braceCount++;
+      else if (cleanedText[i] === '}') braceCount--;
+      if (braceCount === 0) {
+        endIdx = i + 1;
+        break;
+      }
+    }
+
+    if (endIdx === -1) throw new Error('Unbalanced braces in JSON response');
+
+    let jsonStr = cleanedText.substring(startIdx, endIdx);
+    // Clean trailing commas before } or ]
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+
+    const result = JSON.parse(jsonStr);
+    if (result) {
 
       // Log result
       if (result.consistent) {

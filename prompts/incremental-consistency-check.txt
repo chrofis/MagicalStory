@@ -51,7 +51,7 @@ You are evaluating a newly generated storybook illustration for consistency with
       "affectedCharacter": "character name or null for style issues",
       "comparedToPage": "page number where difference is most visible",
       "fixTarget": {
-        "region": "full" or {"x": 0, "y": 0, "width": 100, "height": 100},
+        "region": "full" or [ymin, xmin, ymax, xmax] (normalized 0-1 coordinates),
         "instruction": "Specific fix instruction for inpainting to match previous images"
       }
     }
