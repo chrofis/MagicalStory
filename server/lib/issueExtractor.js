@@ -359,16 +359,23 @@ function collectAllIssues(evalResults, pageNumber, imgDimensions, options = {}) 
     }
   }
 
-  // Enhance with body boxes from bbox detection (match by figure ID)
+  // Enhance with body boxes from bbox detection (spatial IoU matching on face bboxes)
+  // Quality eval and bbox detection number figures independently, so index-based matching is unreliable
   if (bboxDetection?.figures) {
     for (const [charName, charInfo] of Object.entries(characterBboxes)) {
-      const figureIdx = charInfo.figureId - 1;
-      if (Number.isInteger(charInfo.figureId) && charInfo.figureId > 0 && figureIdx < bboxDetection.figures.length && bboxDetection.figures[figureIdx]) {
-        const figure = bboxDetection.figures[figureIdx];
-        charInfo.bodyBbox = figure.bodyBox || null;
-        // Also fill in face box if we didn't have one
-        if (!charInfo.faceBbox && figure.faceBox) {
-          charInfo.faceBbox = figure.faceBox;
+      if (charInfo.faceBbox) {
+        let bestFigure = null;
+        let bestIoU = 0;
+        for (const figure of bboxDetection.figures) {
+          if (!figure.faceBox) continue;
+          const iou = calculateIoU(charInfo.faceBbox, figure.faceBox);
+          if (iou > bestIoU) { bestIoU = iou; bestFigure = figure; }
+        }
+        if (bestFigure && bestIoU > 0.3) {
+          charInfo.bodyBbox = bestFigure.bodyBox || null;
+          if (!charInfo.faceBbox && bestFigure.faceBox) {
+            charInfo.faceBbox = bestFigure.faceBox;
+          }
         }
       }
     }

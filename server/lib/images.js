@@ -1031,6 +1031,25 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{figure: number, reference: string, confidence: number, face_bbox: Array}>} qualityMatches - Character→figure mapping from quality eval
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
+/**
+ * Compute Intersection over Union between two bounding boxes.
+ * Both boxes in [ymin, xmin, ymax, xmax] format, 0-1 normalized.
+ * Returns 0-1 (0 = no overlap, 1 = identical).
+ */
+function computeIoU(boxA, boxB) {
+  if (!boxA || !boxB || boxA.length !== 4 || boxB.length !== 4) return 0;
+
+  const yOverlap = Math.max(0, Math.min(boxA[2], boxB[2]) - Math.max(boxA[0], boxB[0]));
+  const xOverlap = Math.max(0, Math.min(boxA[3], boxB[3]) - Math.max(boxA[1], boxB[1]));
+  const intersection = yOverlap * xOverlap;
+
+  const areaA = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1]);
+  const areaB = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1]);
+  const union = areaA + areaB - intersection;
+
+  return union > 0 ? intersection / union : 0;
+}
+
 async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = []) {
   // Always detect all elements for dev mode display
   log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
@@ -1075,6 +1094,31 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   }
   if (Object.keys(charNameToFigure).length > 0) {
     log.info(`📦 [BBOX-ENRICH] Character mapping: ${Object.entries(charNameToFigure).map(([name, info]) => `${name} → Figure ${info.figureId}`).join(', ')}`);
+  }
+
+  // Build spatial mapping: charName → detection figure element (by face bbox IoU)
+  // This replaces unreliable index-based matching (quality eval and bbox detection number figures independently)
+  const charToDetectionFigure = {};
+  for (const [charName, charInfo] of Object.entries(charNameToFigure)) {
+    if (!charInfo.faceBbox) continue;
+
+    let bestFigure = null;
+    let bestIoU = 0;
+    for (const figure of allDetections.figures) {
+      if (!figure.faceBox) continue;
+      const iou = computeIoU(charInfo.faceBbox, figure.faceBox);
+      if (iou > bestIoU) {
+        bestIoU = iou;
+        bestFigure = figure;
+      }
+    }
+
+    if (bestFigure && bestIoU > 0.3) {
+      charToDetectionFigure[charName] = bestFigure;
+      log.info(`📦 [BBOX-ENRICH] Spatial match: "${charName}" → "${bestFigure.label}" (IoU=${bestIoU.toFixed(2)})`);
+    } else {
+      log.warn(`⚠️ [BBOX-ENRICH] No spatial match for "${charName}" (best IoU=${bestIoU.toFixed(2)})`);
+    }
   }
 
   // Match issues to detected elements for repair targets using scored matching
@@ -1140,17 +1184,14 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       let score = 0;
 
       // CHARACTER NAME MATCH (strongest signal): +100 points
-      // If issue mentions a character and we know which figure that character is
+      // Uses spatial IoU matching (quality eval and bbox detection number figures independently)
       if (mentionedChars.length > 0 && element.elementType === 'figure') {
         for (const charName of mentionedChars) {
-          const charInfo = charNameToFigure[charName];
-          if (!charInfo || !Number.isInteger(charInfo.figureId) || charInfo.figureId < 1) continue;
-          // Match by figure index (quality eval uses 1-indexed, detection is 0-indexed in array)
-          const figureIndex = allDetections.figures.indexOf(element);
-          if (figureIndex >= 0 && figureIndex === charInfo.figureId - 1) {
+          const matchedFigure = charToDetectionFigure[charName];
+          if (matchedFigure && element === matchedFigure) {
             score += 100;
             matchedByCharName = true;
-            log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → matched to Figure ${charInfo.figureId}`);
+            log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → spatial match to "${matchedFigure.label}"`);
           }
         }
       }
