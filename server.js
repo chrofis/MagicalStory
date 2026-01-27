@@ -8831,6 +8831,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`);
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
 
+    // Start text consistency check early (runs in parallel with image generation)
+    // Only needs the story text, so we can fire it as soon as the outline is parsed
+    let textCheckPromise = null;
+    if (enableFinalChecks && fullStoryText && fullStoryText.length > 100) {
+      const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
+      const langCode = inputData.language || 'en';
+      const { getLanguageInstruction } = require('./server/lib/languages');
+      const languageInstruction = getLanguageInstruction(langCode);
+      const languageLevel = inputData.languageLevel || 'standard';
+      log.info(`📝 [UNIFIED] Starting text consistency check in background (parallel with images)...`);
+      textCheckPromise = evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, unifiedModelId)
+        .catch(err => {
+          log.warn(`⚠️ [UNIFIED] Early text check failed: ${err.message}`);
+          return null;
+        });
+    }
+
     // Compare streaming vs final parse results
     if (streamingPagesDetected !== storyPages.length) {
       log.warn(`⚠️ [UNIFIED] Page count mismatch: streaming detected ${streamingPagesDetected} pages, final parse found ${storyPages.length} pages`);
@@ -9904,15 +9921,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
 
-        // Run text consistency check - include detailed language instructions and reading level
-        // Use same model as story generation for language consistency
-        if (fullStoryText && fullStoryText.length > 100) {
-          const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
-          const langCode = inputData.language || 'en';
-          const { getLanguageInstruction } = require('./server/lib/languages');
-          const languageInstruction = getLanguageInstruction(langCode);
-          const languageLevel = inputData.languageLevel || 'standard';
-          const textCheck = await evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, unifiedModelId);
+        // Await text consistency check (started early, in parallel with image generation)
+        if (textCheckPromise) {
+          log.debug(`📝 [UNIFIED] Awaiting early text consistency check result...`);
+          const textCheck = await textCheckPromise;
           if (textCheck) {
             // Track token usage for text check
             if (textCheck.usage) {
