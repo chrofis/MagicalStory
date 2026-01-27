@@ -4887,6 +4887,8 @@ app.get('/api/stories/:id/print-pdf', authenticateToken, async (req, res) => {
         storyData = typeof storyResult[0].data === 'string'
           ? JSON.parse(storyResult[0].data)
           : storyResult[0].data;
+        // Rehydrate images from story_images table (images stripped from data blob)
+        storyData = await rehydrateStoryImages(storyId, storyData);
       }
     } else {
       // File mode - search all users
@@ -5403,10 +5405,12 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
         return res.status(404).json({ error: `Story not found: ${storyId}` });
       }
 
-      const storyData = typeof storyResult.rows[0].data === 'string'
+      let storyData = typeof storyResult.rows[0].data === 'string'
         ? JSON.parse(storyResult.rows[0].data)
         : storyResult.rows[0].data;
 
+      // Rehydrate images from story_images table (images stripped from data blob)
+      storyData = await rehydrateStoryImages(storyId, storyData);
       stories.push({ id: storyId, data: storyData });
     }
 
