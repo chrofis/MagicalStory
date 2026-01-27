@@ -13123,15 +13123,23 @@ app.get('/api/shared/:shareToken', async (req, res) => {
 
     // Return only safe public data (no user info, no prompts)
     const data = story.data;
+
+    // Extract pages from storyText (format: "--- Page N ---\ntext...")
+    const pages = [];
+    const pageCount = data.pageCount || data.pages || 10;
+    for (let i = 1; i <= pageCount; i++) {
+      const text = getPageText(data.storyText || data.generatedStory, i);
+      if (text) {
+        pages.push({ pageNumber: i, text });
+      }
+    }
+
     res.json({
       id: story.id,
       title: data.title,
       language: data.language,
-      pageCount: data.pageCount,
-      pages: data.pages?.map(p => ({
-        pageNumber: p.pageNumber,
-        text: p.text
-      })),
+      pageCount: pageCount,
+      pages,
       dedication: data.dedication,
       // Image URLs (client will fetch separately)
       hasImages: true
@@ -13162,13 +13170,14 @@ app.get('/api/shared/:shareToken/image/:pageNumber', async (req, res) => {
       return res.send(imageBuffer);
     }
 
-    // Fallback to data blob
-    const page = story.data.pages?.find(p => p.pageNumber === pageNum);
-    if (!page || !page.image) {
+    // Fallback to data blob (sceneImages array)
+    const sceneImage = story.data.sceneImages?.find(img => img.pageNumber === pageNum);
+    const imageData = sceneImage?.imageData;
+    if (!imageData) {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    const base64Data = page.image.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=86400');
@@ -13198,13 +13207,14 @@ app.get('/api/shared/:shareToken/cover-image/:coverType', async (req, res) => {
       return res.send(imageBuffer);
     }
 
-    // Fallback to data blob
-    const coverData = story.data.covers?.[coverType];
-    if (!coverData) {
+    // Fallback to data blob (coverImages object)
+    const coverObj = story.data.coverImages?.[coverType];
+    const coverImageData = typeof coverObj === 'string' ? coverObj : coverObj?.imageData;
+    if (!coverImageData) {
       return res.status(404).json({ error: 'Cover not found' });
     }
 
-    const base64Data = coverData.replace(/^data:image\/\w+;base64,/, '');
+    const base64Data = coverImageData.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
     res.set('Content-Type', 'image/png');
     res.set('Cache-Control', 'public, max-age=86400');
@@ -13228,9 +13238,13 @@ app.get('/api/shared/:shareToken/og-image', async (req, res) => {
     // Try to get front cover from separate images table
     let coverImage = await getStoryImage(story.id, 'frontCover', null, 0);
 
-    // Fallback to data blob
-    if (!coverImage && story.data.covers?.frontCover) {
-      coverImage = story.data.covers.frontCover.replace(/^data:image\/\w+;base64,/, '');
+    // Fallback to data blob (coverImages object)
+    if (!coverImage && story.data.coverImages?.frontCover) {
+      const fc = story.data.coverImages.frontCover;
+      const fcData = typeof fc === 'string' ? fc : fc?.imageData;
+      if (fcData) {
+        coverImage = fcData.replace(/^data:image\/\w+;base64,/, '');
+      }
     }
 
     if (!coverImage) {
