@@ -438,6 +438,11 @@ export interface CoverImageData {
   wasRegenerated?: boolean;
   totalAttempts?: number;
   retryHistory?: RetryAttempt[];
+  regenerationCount?: number;
+  // Previous version (immediate predecessor)
+  previousImage?: string;
+  previousScore?: number;
+  // Original version (from initial generation)
   originalImage?: string;
   originalScore?: number;
   // Reference photos used (for dev mode)

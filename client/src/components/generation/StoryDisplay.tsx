@@ -2352,6 +2352,42 @@ export function StoryDisplay({
                     language={language}
                   />
                 )}
+
+                {/* Previous / Original Image */}
+                {frontCoverObj.previousImage && (
+                  <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-orange-800 hover:text-orange-900">
+                      {language === 'de' ? 'Vorherige Version' : language === 'fr' ? 'Version précédente' : 'Previous Version'}
+                      {frontCoverObj.previousScore !== undefined && (
+                        <span className="ml-2 text-xs font-normal text-orange-600">({Math.round(frontCoverObj.previousScore)}%)</span>
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <img
+                        src={frontCoverObj.previousImage}
+                        alt="Previous version"
+                        className="w-full rounded border-2 border-orange-200 opacity-75"
+                      />
+                    </div>
+                  </details>
+                )}
+                {frontCoverObj.originalImage && frontCoverObj.originalImage !== frontCoverObj.previousImage && (
+                  <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                      {language === 'de' ? 'Originalbild' : language === 'fr' ? 'Image originale' : 'Original Image'}
+                      {frontCoverObj.originalScore !== undefined && (
+                        <span className="ml-2 text-xs font-normal text-amber-600">({Math.round(frontCoverObj.originalScore)}%)</span>
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <img
+                        src={frontCoverObj.originalImage}
+                        alt="Original version"
+                        className="w-full rounded border-2 border-amber-200 opacity-75"
+                      />
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </div>
@@ -2485,6 +2521,42 @@ export function StoryDisplay({
                     totalAttempts={initialPageObj.totalAttempts || initialPageObj.retryHistory.length}
                     language={language}
                   />
+                )}
+
+                {/* Previous / Original Image */}
+                {initialPageObj.previousImage && (
+                  <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-orange-800 hover:text-orange-900">
+                      {language === 'de' ? 'Vorherige Version' : language === 'fr' ? 'Version précédente' : 'Previous Version'}
+                      {initialPageObj.previousScore !== undefined && (
+                        <span className="ml-2 text-xs font-normal text-orange-600">({Math.round(initialPageObj.previousScore)}%)</span>
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <img
+                        src={initialPageObj.previousImage}
+                        alt="Previous version"
+                        className="w-full rounded border-2 border-orange-200 opacity-75"
+                      />
+                    </div>
+                  </details>
+                )}
+                {initialPageObj.originalImage && initialPageObj.originalImage !== initialPageObj.previousImage && (
+                  <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                      {language === 'de' ? 'Originalbild' : language === 'fr' ? 'Image originale' : 'Original Image'}
+                      {initialPageObj.originalScore !== undefined && (
+                        <span className="ml-2 text-xs font-normal text-amber-600">({Math.round(initialPageObj.originalScore)}%)</span>
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <img
+                        src={initialPageObj.originalImage}
+                        alt="Original version"
+                        className="w-full rounded border-2 border-amber-200 opacity-75"
+                      />
+                    </div>
+                  </details>
                 )}
               </div>
             )}
@@ -3378,6 +3450,42 @@ export function StoryDisplay({
                     totalAttempts={backCoverObj.totalAttempts || backCoverObj.retryHistory.length}
                     language={language}
                   />
+                )}
+
+                {/* Previous / Original Image */}
+                {backCoverObj.previousImage && (
+                  <details className="bg-orange-50 border border-orange-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-orange-800 hover:text-orange-900">
+                      {language === 'de' ? 'Vorherige Version' : language === 'fr' ? 'Version précédente' : 'Previous Version'}
+                      {backCoverObj.previousScore !== undefined && (
+                        <span className="ml-2 text-xs font-normal text-orange-600">({Math.round(backCoverObj.previousScore)}%)</span>
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <img
+                        src={backCoverObj.previousImage}
+                        alt="Previous version"
+                        className="w-full rounded border-2 border-orange-200 opacity-75"
+                      />
+                    </div>
+                  </details>
+                )}
+                {backCoverObj.originalImage && backCoverObj.originalImage !== backCoverObj.previousImage && (
+                  <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-amber-800 hover:text-amber-900">
+                      {language === 'de' ? 'Originalbild' : language === 'fr' ? 'Image originale' : 'Original Image'}
+                      {backCoverObj.originalScore !== undefined && (
+                        <span className="ml-2 text-xs font-normal text-amber-600">({Math.round(backCoverObj.originalScore)}%)</span>
+                      )}
+                    </summary>
+                    <div className="mt-2">
+                      <img
+                        src={backCoverObj.originalImage}
+                        alt="Original version"
+                        className="w-full rounded border-2 border-amber-200 opacity-75"
+                      />
+                    </div>
+                  </details>
                 )}
               </div>
             )}

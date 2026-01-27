@@ -4028,7 +4028,15 @@ export default function StoryWizard() {
                       qualityScore: result.qualityScore,
                       qualityReasoning: result.qualityReasoning,
                       totalAttempts: result.totalAttempts,
-                      retryHistory: result.retryHistory
+                      retryHistory: result.retryHistory,
+                      referencePhotos: result.referencePhotos,
+                      wasRegenerated: result.wasRegenerated,
+                      regenerationCount: result.regenerationCount,
+                      previousImage: result.previousImage,
+                      previousScore: result.previousScore,
+                      originalImage: result.originalImage,
+                      originalScore: result.originalScore,
+                      modelId: result.modelId,
                     } };
                   });
                   // Update user credits if we got the new balance

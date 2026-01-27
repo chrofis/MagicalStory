@@ -625,6 +625,14 @@ export const storyService = {
     qualityReasoning?: string;
     totalAttempts?: number;
     retryHistory?: RetryAttempt[];
+    referencePhotos?: ReferencePhoto[];
+    wasRegenerated?: boolean;
+    regenerationCount?: number;
+    previousImage?: string;
+    previousScore?: number;
+    originalImage?: string;
+    originalScore?: number;
+    modelId?: string;
     creditsUsed?: number;
     creditsRemaining?: number;
   }> {
@@ -642,6 +650,14 @@ export const storyService = {
       qualityReasoning?: string;
       totalAttempts?: number;
       retryHistory?: RetryAttempt[];
+      referencePhotos?: ReferencePhoto[];
+      wasRegenerated?: boolean;
+      regenerationCount?: number;
+      previousImage?: string;
+      previousScore?: number;
+      originalImage?: string;
+      originalScore?: number;
+      modelId?: string;
       creditsUsed?: number;
       creditsRemaining?: number;
     }>(
