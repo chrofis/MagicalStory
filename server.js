@@ -8428,7 +8428,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await landmarkDescriptionsPromise;
         }
 
-        const sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+        // Use pre-parsed character names from outline when available (sceneHint alone excludes the Characters section)
+        let sceneCharacters;
+        if (page.characters && page.characters.length > 0) {
+          const allChars = inputData.characters || [];
+          sceneCharacters = allChars.filter(char => {
+            if (!char.name) return false;
+            const nameLower = char.name.toLowerCase().trim();
+            const firstName = nameLower.split(' ')[0];
+            return page.characters.some(parsed => {
+              const parsedLower = parsed.toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
+              return parsedLower === nameLower || parsedLower === firstName;
+            });
+          });
+        }
+        if (!sceneCharacters || sceneCharacters.length === 0) {
+          sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+        }
 
         // SIMPLE: Get raw outline blocks directly from parser (no parsing/reconstruction needed)
         // Previous pages = raw outline blocks for pages N-2 and N-1
@@ -13163,8 +13179,9 @@ app.get('/api/shared/:shareToken/image/:pageNumber', async (req, res) => {
 
     // Try separate images table first
     const separateImage = await getStoryImage(story.id, 'scene', pageNum, 0);
-    if (separateImage) {
-      const imageBuffer = Buffer.from(separateImage, 'base64');
+    if (separateImage?.imageData) {
+      const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Buffer.from(base64, 'base64');
       res.set('Content-Type', 'image/png');
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);
@@ -13200,8 +13217,9 @@ app.get('/api/shared/:shareToken/cover-image/:coverType', async (req, res) => {
 
     // Try separate images table first
     const separateImage = await getStoryImage(story.id, coverType, null, 0);
-    if (separateImage) {
-      const imageBuffer = Buffer.from(separateImage, 'base64');
+    if (separateImage?.imageData) {
+      const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Buffer.from(base64, 'base64');
       res.set('Content-Type', 'image/png');
       res.set('Cache-Control', 'public, max-age=86400');
       return res.send(imageBuffer);
@@ -13236,7 +13254,8 @@ app.get('/api/shared/:shareToken/og-image', async (req, res) => {
     }
 
     // Try to get front cover from separate images table
-    let coverImage = await getStoryImage(story.id, 'frontCover', null, 0);
+    const coverImageResult = await getStoryImage(story.id, 'frontCover', null, 0);
+    let coverImage = coverImageResult?.imageData?.replace(/^data:image\/\w+;base64,/, '') || null;
 
     // Fallback to data blob (coverImages object)
     if (!coverImage && story.data.coverImages?.frontCover) {
