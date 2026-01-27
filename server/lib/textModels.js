@@ -699,7 +699,7 @@ async function evaluateTextConsistency(storyText, language = 'en', characterName
     }
 
     // Return prompt and raw response even on parse failure for debugging
-    return { evaluationPrompt: prompt, rawResponse: result.text, parseError: true };
+    return { evaluationPrompt: prompt, rawResponse: result.text, parseError: true, usage: result.usage };
   } catch (error) {
     log.error(`❌ [TEXT CHECK] Error: ${error.message}`);
     return null;
