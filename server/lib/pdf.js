@@ -142,10 +142,14 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const format = BOOK_FORMATS[bookFormat] || BOOK_FORMATS[DEFAULT_FORMAT];
   const { pageWidth, pageHeight, coverWidth, coverHeight } = format;
 
-  log.debug(`📄 [PRINT PDF] Using format: ${bookFormat} (${Math.round(pageWidth / 2.83465)}x${Math.round(pageHeight / 2.83465)}mm)`);
+  // Interior pages include bleed area (3mm each side) - Gelato requires this
+  const bleed = format.bleed || mmToPoints(3);
+  const interiorPageWidth = pageWidth + 2 * bleed;
+  const interiorPageHeight = pageHeight + 2 * bleed;
+
+  log.debug(`📄 [PRINT PDF] Using format: ${bookFormat} — content: ${Math.round(pageWidth / 2.83465)}x${Math.round(pageHeight / 2.83465)}mm, page with bleed: ${Math.round(interiorPageWidth / 2.83465)}x${Math.round(interiorPageHeight / 2.83465)}mm`);
 
   // Use actual spine width from Gelato API if provided, otherwise use default
-  const bleed = format.bleed || mmToPoints(3);
   const actualSpineWidthMm = options.actualSpineWidth || 10;
   const spineWidth = mmToPoints(actualSpineWidthMm);
 
@@ -204,18 +208,18 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
-  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
   // Page 3: Initial/dedication page (right side of first spread)
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
-  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   if (initialPageImageData) {
     const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
     const initialPageBuffer = Buffer.from(initialPageData, 'base64');
-    // Fill width completely, center vertically (for square images on portrait pages)
-    const initialImageHeight = pageWidth; // Square image height = width
-    const initialYOffset = (pageHeight - initialImageHeight) / 2;
-    doc.image(initialPageBuffer, 0, initialYOffset, { width: pageWidth });
+    // Center image within content area (offset by bleed)
+    const initialImageHeight = pageWidth; // Square image height = content width
+    const initialYOffset = bleed + (pageHeight - initialImageHeight) / 2;
+    doc.image(initialPageBuffer, bleed, initialYOffset, { width: pageWidth });
   }
 
   // Parse story pages
@@ -256,10 +260,11 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   }
 
   // Add content pages based on layout type (with consistent font size)
+  // Pass bleed so pages are sized with bleed and content is offset inward
   if (isPictureBook) {
-    addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
+    addPictureBookPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed);
   } else {
-    addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
+    addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed);
   }
 
   // Calculate total PDF page count
@@ -272,7 +277,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   // Interior pages must be even for print (pages are printed front/back)
   if (interiorPages % 2 !== 0) {
     interiorPages += 1;
-    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     log.debug(`📄 [PRINT PDF] Added 1 blank page to reach even interior count ${interiorPages}`);
   }
 
@@ -295,7 +300,9 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
  * @param {number} pageHeight - Page height in points
  * @param {number} fontSize - Consistent font size for all pages
  */
-function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14) {
+function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 14, bleed = 0) {
+  const interiorW = pageWidth + 2 * bleed;
+  const interiorH = pageHeight + 2 * bleed;
   const imageHeight = pageHeight * 0.85;
   const textAreaHeight = pageHeight * 0.15;
   const textMargin = mmToPoints(3);
@@ -308,12 +315,12 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
     const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
     if (image && image.imageData) {
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(imageBuffer, 0, 0, {
+        doc.image(imageBuffer, bleed, bleed, {
           fit: [pageWidth, imageHeight],
           align: 'center',
           valign: 'center'
@@ -326,8 +333,8 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
     // Add text in bottom portion with consistent font size and vertical centering
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
     const textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
-    const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-    doc.text(cleanText, textMargin, textY, { width: textWidth, align: 'center', lineGap });
+    const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
+    doc.text(cleanText, bleed + textMargin, textY, { width: textWidth, align: 'center', lineGap });
   });
 }
 
@@ -340,7 +347,9 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
  * @param {number} pageHeight - Page height in points
  * @param {number} fontSize - Consistent font size for all pages
  */
-function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13) {
+function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13, bleed = 0) {
+  const interiorW = pageWidth + 2 * bleed;
+  const interiorH = pageHeight + 2 * bleed;
   const margin = 20;
   const availableWidth = pageWidth - (margin * 2);
   const availableHeight = pageHeight - (margin * 2);
@@ -354,20 +363,20 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
     // Clean text and compress multiple newlines to single newline (paragraphGap handles spacing)
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
 
-    // Add text page with consistent font size
-    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: margin, bottom: margin, left: margin, right: margin } });
+    // Add text page with consistent font size (margins offset by bleed)
+    doc.addPage({ size: [interiorW, interiorH], margins: { top: bleed + margin, bottom: bleed + margin, left: bleed + margin, right: bleed + margin } });
 
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
     const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap, paragraphGap });
-    const yPosition = margin + (availableHeight - textHeight) / 2;
-    doc.text(cleanText, margin, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
+    const yPosition = bleed + margin + (availableHeight - textHeight) / 2;
+    doc.text(cleanText, bleed + margin, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
 
-    // Add image page if available (full-bleed, no margin)
+    // Add image page if available - image fills content area, centered within bleed
     if (image && image.imageData) {
-      doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      doc.addPage({ size: [interiorW, interiorH], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       try {
         const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(imageBuffer, 0, 0, {
+        doc.image(imageBuffer, bleed, bleed, {
           fit: [pageWidth, pageHeight],
           align: 'center',
           valign: 'center'
@@ -395,6 +404,9 @@ async function generateCombinedBookPdf(stories, options = {}) {
   const spineWidth = mmToPoints(actualSpineWidthMm);
   const bleed = mmToPoints(3);
 
+  // Interior pages include bleed (3mm each side)
+  const interiorPageSize = PAGE_SIZE + 2 * bleed;
+
   // Calculate actual cover width with spine
   const actualCoverWidth = bleed + PAGE_SIZE + spineWidth + PAGE_SIZE + bleed;
 
@@ -415,7 +427,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
 
   let totalStoryPages = 0;
 
-  // Helper: Add story content pages
+  // Helper: Add story content pages (with bleed offset)
   const addStoryContentPages = (storyData, storyPages) => {
     const isPictureBook = storyData.languageLevel === '1st-grade';
     const textMargin = 28;
@@ -433,13 +445,13 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
 
         if (image && image.imageData) {
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, 0, 0, { fit: [PAGE_SIZE, imageHeight], align: 'center', valign: 'center' });
+            doc.image(imageBuffer, bleed, bleed, { fit: [PAGE_SIZE, imageHeight], align: 'center', valign: 'center' });
           } catch (err) {
             log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
@@ -455,8 +467,8 @@ async function generateCombinedBookPdf(stories, options = {}) {
           textHeight = doc.heightOfString(cleanText, { width: textWidth, align: 'center', lineGap });
         }
 
-        const textY = imageHeight + (availableTextHeight - textHeight) / 2;
-        doc.text(cleanText, textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
+        const textY = bleed + imageHeight + (availableTextHeight - textHeight) / 2;
+        doc.text(cleanText, bleed + textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
       });
     } else {
       const availableWidth = PAGE_SIZE - (textMargin * 2);
@@ -468,7 +480,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: textMargin, bottom: textMargin, left: textMargin, right: textMargin } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: bleed + textMargin, bottom: bleed + textMargin, left: bleed + textMargin, right: bleed + textMargin } });
         totalStoryPages++;
 
         let fontSize = 13;
@@ -481,15 +493,15 @@ async function generateCombinedBookPdf(stories, options = {}) {
           textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap });
         }
 
-        const yPosition = textMargin + (availableHeight - textHeight) / 2;
-        doc.text(cleanText, textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
+        const yPosition = bleed + textMargin + (availableHeight - textHeight) / 2;
+        doc.text(cleanText, bleed + textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
 
         if (image && image.imageData) {
-          doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
           totalStoryPages++;
           try {
             const imageBuffer = Buffer.from(image.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-            doc.image(imageBuffer, 0, 0, { fit: [PAGE_SIZE, PAGE_SIZE], align: 'center', valign: 'center' });
+            doc.image(imageBuffer, bleed, bleed, { fit: [PAGE_SIZE, PAGE_SIZE], align: 'center', valign: 'center' });
           } catch (err) {
             log.error(`Error adding image for page ${pageNumber}:`, err.message);
           }
@@ -536,12 +548,15 @@ async function generateCombinedBookPdf(stories, options = {}) {
         // Spine area left blank (white) - no text for now
       }
 
-      // Introduction page
+      // Blank left page (required by Gelato - left side of first spread)
+      doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+      // Introduction/dedication page (right side of first spread)
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+      doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       if (initialPageImageData) {
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+        doc.image(initialPageBuffer, bleed, bleed, { width: PAGE_SIZE });
       }
 
       addStoryContentPages(storyData, storyPages);
@@ -550,19 +565,19 @@ async function generateCombinedBookPdf(stories, options = {}) {
       // STORY 2+: Front cover (title page)
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
       if (frontCoverImageData) {
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(frontCoverBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+        doc.image(frontCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
       }
 
       // Introduction page
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       if (initialPageImageData) {
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
         const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+        doc.image(initialPageBuffer, bleed, bleed, { width: PAGE_SIZE });
       }
 
       addStoryContentPages(storyData, storyPages);
@@ -570,15 +585,15 @@ async function generateCombinedBookPdf(stories, options = {}) {
       // Back cover for this story
       const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
       if (backCoverImageData) {
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(backCoverBuffer, 0, 0, { width: PAGE_SIZE, height: PAGE_SIZE });
+        doc.image(backCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
       }
 
       // Blank page between stories (if not last story)
       if (storyIndex < stories.length - 1) {
-        doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
       }
     }
@@ -586,7 +601,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
 
   // Add blank pages if needed for even page count
   if (totalStoryPages % 2 !== 0) {
-    doc.addPage({ size: [PAGE_SIZE, PAGE_SIZE], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     totalStoryPages++;
     log.debug(`📚 [COMBINED PDF] Added final blank page for even page count`);
   }
