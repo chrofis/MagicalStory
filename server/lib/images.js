@@ -833,6 +833,12 @@ async function detectAllBoundingBoxes(imageData) {
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     log.debug(`📊 [BBOX-DETECT] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
 
+    // Check finish reason for truncation or safety blocks
+    const finishReason = data.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP') {
+      log.warn(`⚠️  [BBOX-DETECT] Gemini finish reason: ${finishReason}`);
+    }
+
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
       log.warn('⚠️  [BBOX-DETECT] No response from Gemini');
       return null;
@@ -866,7 +872,30 @@ async function detectAllBoundingBoxes(imageData) {
         }
       }
       log.debug(`⚠️  [BBOX-DETECT] Raw response (first 1000 chars): ${responseText.substring(0, 1000)}`);
-      return null;
+
+      // Attempt to repair truncated JSON (e.g. from MAX_TOKENS finish reason)
+      try {
+        const jsonStart = responseText.match(/\{[\s\S]*/);
+        if (jsonStart) {
+          let truncated = jsonStart[0];
+          // Remove trailing commas
+          truncated = truncated.replace(/,(\s*)$/, '$1');
+          // Remove any incomplete key-value pair at the end
+          truncated = truncated.replace(/,?\s*"[^"]*":\s*("(?:[^"\\]|\\.)*)?$/, '');
+          truncated = truncated.replace(/,?\s*"[^"]*":\s*\[?\s*$/, '');
+          // Count open brackets/braces and close them
+          const openBraces = (truncated.match(/\{/g) || []).length - (truncated.match(/\}/g) || []).length;
+          const openBrackets = (truncated.match(/\[/g) || []).length - (truncated.match(/\]/g) || []).length;
+          // Remove any trailing comma before we close
+          truncated = truncated.replace(/,\s*$/, '');
+          truncated += ']'.repeat(Math.max(0, openBrackets)) + '}'.repeat(Math.max(0, openBraces));
+          parsedResult = JSON.parse(truncated);
+          log.info(`🔧 [BBOX-DETECT] Repaired truncated JSON (finishReason: ${finishReason || 'STOP'})`);
+        }
+      } catch (repairError) {
+        log.warn(`⚠️  [BBOX-DETECT] JSON repair also failed: ${repairError.message}`);
+        return null;
+      }
     }
 
     if (!parsedResult) {
@@ -1296,9 +1325,13 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
         faceBox: bestMatch.faceBox,
         bodyBox: bestMatch.bodyBox,
         boundingBox: boundingBox,
+        bounds: boundingBox,  // Alias for issueExtractor.collectAllIssues (expects "bounds")
         issue: issue.description,
+        fix_instruction: issue.fix || `Fix: ${issue.description}`,  // issueExtractor expects "fix_instruction"
         severity: issue.severity,
         type: issue.type,
+        element: issue.type,  // issueExtractor expects "element"
+        affectedCharacter: matchedCharacter,  // issueExtractor uses this for character lookup
         fixPrompt: issue.fix || `Fix: ${issue.description}`,
         label: bestMatch.label,
         matchedPosition: bestMatch.position,
