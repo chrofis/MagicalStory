@@ -148,7 +148,6 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   const bleed = format.bleed || mmToPoints(3);
   const actualSpineWidthMm = options.actualSpineWidth || 10;
   const spineWidth = mmToPoints(actualSpineWidthMm);
-  const minSpineForText = 6; // Minimum spine width in mm to add text
 
   log.debug(`📄 [PRINT PDF] Spine width: ${actualSpineWidthMm}mm`);
 
@@ -201,56 +200,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     // Place front cover (right side) - fills from frontCoverX to right edge
     doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
 
-    // Add spine text if spine is wide enough (>= 10mm)
-    if (actualSpineWidthMm >= minSpineForText) {
-      const spineFontSize = Math.min(actualSpineWidthMm * 0.7, 10); // Max 10pt, scale with spine
-      const spineTextColor = '#333333';
-      const spineMargin = mmToPoints(10); // 10mm margin from top/bottom edges
-      const spineTextHeight = coverHeight - (spineMargin * 2); // Available height for text
-
-      doc.save();
-
-      // Spine center position
-      const spineCenterX = spineX + (spineWidth / 2);
-
-      // Get book title
-      const bookTitle = storyData.title || '';
-      const brandText = 'MagicalStory.ch';
-
-      // Measure text widths (which become heights when rotated)
-      doc.fontSize(spineFontSize).font('Helvetica');
-      const titleWidth = bookTitle ? doc.widthOfString(bookTitle) : 0;
-      const brandWidth = doc.widthOfString(brandText);
-      const minGap = mmToPoints(5); // Minimum 5mm gap between title and brand
-
-      // Check if both texts fit without overlapping
-      const totalNeededSpace = titleWidth + minGap + brandWidth;
-      const showTitle = bookTitle && totalNeededSpace <= spineTextHeight;
-
-      // Draw brand text at bottom (which is left side when rotated -90)
-      doc.translate(spineCenterX, coverHeight - spineMargin);
-      doc.rotate(-90);
-      doc.fontSize(spineFontSize)
-         .fillColor(spineTextColor)
-         .font('Helvetica')
-         .text(brandText, 0, -spineFontSize / 2, { lineBreak: false });
-      doc.restore();
-
-      // Draw title at top (which is right side when rotated -90) if it fits
-      if (showTitle) {
-        doc.save();
-        doc.translate(spineCenterX, spineMargin + titleWidth);
-        doc.rotate(-90);
-        doc.fontSize(spineFontSize)
-           .fillColor(spineTextColor)
-           .font('Helvetica')
-           .text(bookTitle, 0, -spineFontSize / 2, { lineBreak: false });
-        doc.restore();
-        log.debug(`📄 [PRINT PDF] Added spine: title="${bookTitle}" + brand="${brandText}" at ${spineFontSize}pt`);
-      } else {
-        log.debug(`📄 [PRINT PDF] Added spine: brand="${brandText}" only (title too long or missing) at ${spineFontSize}pt`);
-      }
-    }
+    // Spine area left blank (white) - no text for now
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
@@ -444,7 +394,6 @@ async function generateCombinedBookPdf(stories, options = {}) {
   const actualSpineWidthMm = options.actualSpineWidth || 10;
   const spineWidth = mmToPoints(actualSpineWidthMm);
   const bleed = mmToPoints(3);
-  const minSpineForText = 6;
 
   // Calculate actual cover width with spine
   const actualCoverWidth = bleed + PAGE_SIZE + spineWidth + PAGE_SIZE + bleed;
@@ -584,45 +533,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
         // Place front cover (right side) - fills from frontCoverX to right edge
         doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
 
-        // Add spine text if spine is wide enough
-        if (actualSpineWidthMm >= minSpineForText) {
-          const spineFontSize = Math.min(actualSpineWidthMm * 0.7, 10);
-          const spineTextColor = '#333333';
-          const spineMargin = mmToPoints(10);
-
-          // Get combined book title (use first story's title)
-          const bookTitle = storyData.title || '';
-          const brandText = 'MagicalStory.ch';
-
-          doc.fontSize(spineFontSize).font('Helvetica');
-          const titleWidth = bookTitle ? doc.widthOfString(bookTitle) : 0;
-          const brandWidth = doc.widthOfString(brandText);
-          const spineTextHeight = COVER_HEIGHT - (spineMargin * 2);
-          const minGap = mmToPoints(5);
-          const showTitle = bookTitle && (titleWidth + minGap + brandWidth) <= spineTextHeight;
-
-          const spineCenterX = spineX + (spineWidth / 2);
-
-          // Draw brand text at bottom
-          doc.save();
-          doc.translate(spineCenterX, COVER_HEIGHT - spineMargin);
-          doc.rotate(-90);
-          doc.fontSize(spineFontSize).fillColor(spineTextColor).font('Helvetica')
-             .text(brandText, 0, -spineFontSize / 2, { lineBreak: false });
-          doc.restore();
-
-          // Draw title at top if it fits
-          if (showTitle) {
-            doc.save();
-            doc.translate(spineCenterX, spineMargin + titleWidth);
-            doc.rotate(-90);
-            doc.fontSize(spineFontSize).fillColor(spineTextColor).font('Helvetica')
-               .text(bookTitle, 0, -spineFontSize / 2, { lineBreak: false });
-            doc.restore();
-          }
-
-          log.debug(`📚 [COMBINED PDF] Added spine text: ${showTitle ? `"${bookTitle}" + ` : ''}"${brandText}"`);
-        }
+        // Spine area left blank (white) - no text for now
       }
 
       // Introduction page
