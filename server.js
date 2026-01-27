@@ -10571,7 +10571,7 @@ async function processStoryJob(jobId) {
     // Step 1: Generate story outline
     // Pass sceneCount to ensure outline matches the number of scenes we'll generate
     const outlinePrompt = buildStoryPrompt(inputData, sceneCount);
-    const outlineTokens = 16000;
+    const outlineTokens = 64000;
     const outlineModelOverride = modelOverrides.outlineModel || null;
     const outlineModelConfig = outlineModelOverride ? TEXT_MODELS[outlineModelOverride] : getActiveTextModel();
     const outlineProvider = outlineModelConfig?.provider === 'google' ? 'gemini_text' : 'anthropic';
