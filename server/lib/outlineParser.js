@@ -1059,7 +1059,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
 
   // Step 5: Fallback - look for character headers anywhere in the scene (bold format)
   // This handles scenes without a dedicated Characters section
-  log.debug(`[SCENE-PARSER] No Characters section found, using fallback pattern matching`);
+  log.debug(`[SCENE-PARSER] No Characters section found, using text matching`);
 
   // Look for patterns like "* **Name:**" followed by action/position keywords
   const fallbackPattern = /[\s\-\*\u2022]+\*\*([^*:]+?)\*\*\s*:[\s\S]*?(?:ACTION|POSITION|EXPRESSION|action|position|expression)/gi;
@@ -1072,7 +1072,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
   }
 
   if (characterNames.length > 0) {
-    log.debug(`[SCENE-PARSER] Fallback found ${characterNames.length} characters: ${characterNames.join(', ')}`);
+    log.debug(`[SCENE-PARSER] Text matching found ${characterNames.length} characters: ${characterNames.join(', ')}`);
   }
 
   return characterNames;
