@@ -9005,7 +9005,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // For costumed/signature avatars, use server/lib/storyAvatarGeneration.js if needed.
 
     // Prepare styled avatars (convert existing avatars to target art style)
-    if (avatarRequirements.length > 0 && artStyle !== 'realistic') {
+    // Skip if early avatar styling already completed (avoids duplicate costumed avatar generation)
+    if (avatarRequirements.length > 0 && artStyle !== 'realistic' && !streamingAvatarStylingPromise) {
       // Validate that characters have base avatars
       const charactersWithoutAvatars = (inputData.characters || []).filter(c =>
         !c.avatars?.standard && !c.photoUrl && !c.bodyNoBgUrl
@@ -9014,8 +9015,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.warn(`⚠️ [UNIFIED] Characters missing base avatars: ${charactersWithoutAvatars.map(c => c.name).join(', ')}`);
       }
 
-      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle}`);
+      log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle} (early styling did not run)`);
       await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage);
+    } else if (streamingAvatarStylingPromise) {
+      log.debug(`⏭️ [UNIFIED] Skipping PHASE 2 avatar styling - early styling already completed (${getStyledAvatarCacheStats().size} cached)`);
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
