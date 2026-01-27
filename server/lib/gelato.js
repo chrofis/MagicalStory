@@ -165,7 +165,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     }
     if (!printProductUid) {
       printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      log.warn(`[BACKGROUND] Using fallback product UID`);
+      log.warn(`⚠️ [BACKGROUND] No product found for format=${bookFormat} (${formatPattern}), coverType=${coverType}, pages=${estimatedPageCount}. Using fallback GELATO_PHOTOBOOK_UID=${printProductUid}`);
     }
 
     // Step 3b: Get cover dimensions from Gelato API for actual spine width
