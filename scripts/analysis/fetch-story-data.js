@@ -30,31 +30,243 @@ const pool = new Pool({
 });
 
 /**
- * Parse raw LLM response to extract [DRAFT_1], [REVIEW_1], [FINAL_1], etc.
+ * Parse raw LLM response to extract [DRAFT], [REVIEW], [FINAL] per story idea.
+ * Handles both formats:
+ *   - "=== STORY 1 ===" with [DRAFT]/[REVIEW]/[FINAL] (no number suffix)
+ *   - [DRAFT_1]/[REVIEW_1]/[FINAL_1] (numbered suffix)
  */
 function parseStoryIdeasResponse(rawResponse) {
   if (!rawResponse) return null;
 
-  const sections = {};
+  const result = { stories: [] };
 
-  // Extract each section using regex
-  const patterns = [
-    { key: 'draft1', regex: /\[DRAFT_1\]\s*([\s\S]*?)(?=\[REVIEW_1\]|\[FINAL_1\]|$)/i },
-    { key: 'review1', regex: /\[REVIEW_1\]\s*([\s\S]*?)(?=\[FINAL_1\]|$)/i },
-    { key: 'final1', regex: /\[FINAL_1\]\s*([\s\S]*?)(?=\n---|\[DRAFT_2\]|\[REVIEW_2\]|\[FINAL_2\]|##\s*STORY\s*2|$)/i },
-    { key: 'draft2', regex: /\[DRAFT_2\]\s*([\s\S]*?)(?=\[REVIEW_2\]|\[FINAL_2\]|$)/i },
-    { key: 'review2', regex: /\[REVIEW_2\]\s*([\s\S]*?)(?=\[FINAL_2\]|$)/i },
-    { key: 'final2', regex: /\[FINAL_2\]\s*([\s\S]*?)$/i },
-  ];
+  // Try per-story format first: "=== STORY N ==="
+  const storyBlocks = rawResponse.split(/===\s*STORY\s*(\d+)\s*===/i);
+  if (storyBlocks.length > 1) {
+    // storyBlocks = ['', '1', 'content1', '2', 'content2', ...]
+    for (let i = 1; i < storyBlocks.length; i += 2) {
+      const storyNum = parseInt(storyBlocks[i]);
+      const content = storyBlocks[i + 1] || '';
+      const story = parseIdeaSections(content);
+      story.storyNum = storyNum;
+      result.stories.push(story);
+    }
+  } else {
+    // Try numbered format: [DRAFT_1], [REVIEW_1], [FINAL_1]
+    const story1 = {};
+    const patterns = [
+      { key: 'draft', regex: /\[DRAFT_1\]\s*([\s\S]*?)(?=\[REVIEW_1\]|\[FINAL_1\]|$)/i },
+      { key: 'review', regex: /\[REVIEW_1\]\s*([\s\S]*?)(?=\[FINAL_1\]|$)/i },
+      { key: 'final', regex: /\[FINAL_1\]\s*([\s\S]*?)(?=\[DRAFT_2\]|\[REVIEW_2\]|\[FINAL_2\]|$)/i },
+    ];
+    for (const { key, regex } of patterns) {
+      const match = rawResponse.match(regex);
+      if (match) story1[key] = match[1].trim();
+    }
+    if (Object.keys(story1).length > 0) {
+      story1.storyNum = 1;
+      result.stories.push(story1);
+    }
 
-  for (const { key, regex } of patterns) {
-    const match = rawResponse.match(regex);
-    if (match) {
-      sections[key] = match[1].trim();
+    const story2 = {};
+    const patterns2 = [
+      { key: 'draft', regex: /\[DRAFT_2\]\s*([\s\S]*?)(?=\[REVIEW_2\]|\[FINAL_2\]|$)/i },
+      { key: 'review', regex: /\[REVIEW_2\]\s*([\s\S]*?)(?=\[FINAL_2\]|$)/i },
+      { key: 'final', regex: /\[FINAL_2\]\s*([\s\S]*?)$/i },
+    ];
+    for (const { key, regex } of patterns2) {
+      const match = rawResponse.match(regex);
+      if (match) story2[key] = match[1].trim();
+    }
+    if (Object.keys(story2).length > 0) {
+      story2.storyNum = 2;
+      result.stories.push(story2);
     }
   }
 
-  return Object.keys(sections).length > 0 ? sections : null;
+  return result.stories.length > 0 ? result : null;
+}
+
+/**
+ * Parse [DRAFT], [REVIEW], [FINAL] from a single story block
+ */
+function parseIdeaSections(content) {
+  const sections = {};
+  // Handle both "## [DRAFT]" and "[DRAFT]" formats
+  const draftMatch = content.match(/(?:##\s*)?\[DRAFT\]\s*([\s\S]*?)(?=(?:##\s*)?\[REVIEW\]|(?:##\s*)?\[FINAL\]|$)/i);
+  const reviewMatch = content.match(/(?:##\s*)?\[REVIEW\]\s*([\s\S]*?)(?=(?:##\s*)?\[FINAL\]|$)/i);
+  const finalMatch = content.match(/(?:##\s*)?\[FINAL\]\s*([\s\S]*?)$/i);
+
+  if (draftMatch) sections.draft = draftMatch[1].trim();
+  if (reviewMatch) sections.review = reviewMatch[1].trim();
+  if (finalMatch) sections.final = finalMatch[1].trim();
+
+  return sections;
+}
+
+/**
+ * Extract ACTIONS/OUTLINE lines from idea text for comparison
+ */
+function extractIdeaActions(text) {
+  if (!text) return null;
+  const actionsMatch = text.match(/ACTIONS[^:]*:\s*([\s\S]*?)(?=\n\s*\n|OUTLINE|$)/i);
+  const outlineMatch = text.match(/OUTLINE[^:]*:\s*([\s\S]*?)$/i);
+  return {
+    actions: actionsMatch ? actionsMatch[1].trim() : null,
+    outline: outlineMatch ? outlineMatch[1].trim() : null
+  };
+}
+
+/**
+ * Extract outline sections (STORY DRAFT, CRITICAL ANALYSIS, STORY PAGES) from unified outline
+ */
+function extractOutlineSections(outline) {
+  if (!outline) return null;
+
+  const result = {};
+
+  // Extract named sections
+  const sectionRegex = /---([A-Z\s]+)---/g;
+  const positions = [];
+  let match;
+  while ((match = sectionRegex.exec(outline)) !== null) {
+    positions.push({ name: match[1].trim(), start: match.index, headerEnd: match.index + match[0].length });
+  }
+
+  for (let i = 0; i < positions.length; i++) {
+    const start = positions[i].headerEnd;
+    const end = positions[i + 1]?.start || outline.length;
+    const content = outline.substring(start, end).trim();
+    result[positions[i].name] = content;
+  }
+
+  return result;
+}
+
+/**
+ * Compare story draft text vs final pages text, returning per-page diffs
+ */
+function compareStoryDraftVsFinal(draftSection, pagesSection) {
+  if (!draftSection || !pagesSection) return null;
+
+  // Extract per-page text from draft (**Draft N** = page N)
+  const draftPages = {};
+  const draftBlocks = draftSection.split(/\*\*Draft (\d+)\*\*/);
+  // draftBlocks = ['', '1', 'content1', '2', 'content2', ...]
+  for (let i = 1; i < draftBlocks.length; i += 2) {
+    const pageNum = parseInt(draftBlocks[i]);
+    let text = draftBlocks[i + 1] || '';
+    // Remove SCENE HINT blocks and word counts
+    text = text
+      .replace(/\n\s*\(?\*?\(Word count:.*?\)\*?\)?\s*/g, '\n')
+      .replace(/\nSCENE HINT:[\s\S]*?(?=\n\*\*Draft|\n--- Page|$)/g, '')
+      .trim();
+    draftPages[pageNum] = text;
+  }
+
+  // Extract per-page text from final (--- Page N --- TEXT:)
+  const finalPages = {};
+  const pageRegex = /--- Page (\d+) ---\s*TEXT:\s*([\s\S]*?)(?=SCENE HINT:|--- Page \d|$)/g;
+  let pm;
+  while ((pm = pageRegex.exec(pagesSection)) !== null) {
+    finalPages[parseInt(pm[1])] = pm[2].trim();
+  }
+
+  const allPageNums = [...new Set([...Object.keys(draftPages), ...Object.keys(finalPages)])]
+    .map(Number).sort((a, b) => a - b);
+
+  const pageComparisons = [];
+  let totalChanges = 0;
+
+  for (const pageNum of allPageNums) {
+    const draft = draftPages[pageNum] || '';
+    const final = finalPages[pageNum] || '';
+
+    if (draft === final) {
+      pageComparisons.push({ page: pageNum, identical: true });
+      continue;
+    }
+
+    // Find paragraph-level differences
+    const draftParas = draft.split(/\n\n+/).filter(p => p.trim());
+    const finalParas = final.split(/\n\n+/).filter(p => p.trim());
+    const changes = [];
+
+    const maxParas = Math.max(draftParas.length, finalParas.length);
+    for (let i = 0; i < maxParas; i++) {
+      const d = (draftParas[i] || '').trim();
+      const f = (finalParas[i] || '').trim();
+      if (d !== f && (d || f)) {
+        changes.push({ para: i + 1, draft: d, final: f });
+      }
+    }
+
+    totalChanges += changes.length;
+    pageComparisons.push({ page: pageNum, identical: false, changes });
+  }
+
+  return {
+    pageCount: allPageNums.length,
+    totalChanges,
+    allIdentical: totalChanges === 0,
+    pages: pageComparisons
+  };
+}
+
+/**
+ * Extract text check results from finalChecksReport
+ */
+function extractTextCheck(finalChecksReport) {
+  if (!finalChecksReport?.textCheck) return null;
+
+  const tc = finalChecksReport.textCheck;
+  let parsed = null;
+
+  // Parse rawResponse (may be wrapped in markdown fences, may have broken JSON)
+  if (tc.rawResponse) {
+    try {
+      let raw = tc.rawResponse;
+      raw = raw.replace(/```json\s*/gi, '').replace(/```\s*/gi, '');
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      }
+    } catch {
+      // JSON may have unescaped quotes in German text. Try extracting key fields with regex.
+      const raw = tc.rawResponse;
+      parsed = {
+        quality: (raw.match(/"quality"\s*:\s*"([^"]+)"/) || [])[1] || null,
+        overallScore: parseInt((raw.match(/"overallScore"\s*:\s*(\d+)/) || [])[1]) || null,
+        issues: [],
+        summary: (raw.match(/"summary"\s*:\s*"((?:[^"\\]|\\.)*)"/s) || [])[1] || null
+      };
+      // Count issues by finding issue objects
+      const issueMatches = raw.match(/"type"\s*:\s*"(\w+)"/g);
+      const severityMatches = raw.match(/"severity"\s*:\s*"(\w+)"/g);
+      const pageMatches = raw.match(/"page"\s*:\s*(\d+)/g);
+      const issueTextMatches = raw.match(/"issue"\s*:\s*"((?:[^"\\]|\\.)*)"/g);
+      if (issueMatches) {
+        for (let i = 0; i < issueMatches.length; i++) {
+          parsed.issues.push({
+            type: (issueMatches[i].match(/"(\w+)"$/) || [])[1],
+            severity: severityMatches?.[i] ? (severityMatches[i].match(/"(\w+)"$/) || [])[1] : null,
+            page: pageMatches?.[i] ? parseInt((pageMatches[i].match(/(\d+)/) || [])[1]) : null,
+            issue: issueTextMatches?.[i] ? (issueTextMatches[i].match(/"issue"\s*:\s*"(.*)"/) || [])[1] : null
+          });
+        }
+      }
+    }
+  }
+
+  return {
+    parseError: tc.parseError || false,
+    quality: parsed?.quality || null,
+    overallScore: parsed?.overallScore || null,
+    issues: parsed?.issues || [],
+    summary: parsed?.summary || null,
+    hasCorrections: !!(parsed?.fullCorrectedText),
+    textWasModified: tc.fullOriginalText !== undefined // if original was saved, text might have changed
+  };
 }
 
 /**
@@ -115,6 +327,38 @@ function extractCostAndTiming(generationLog) {
 /**
  * Extract scene description data per page
  */
+/**
+ * Compare two objects and return differences
+ */
+function diffObjects(draft, output, prefix = '') {
+  const diffs = [];
+  if (!draft || !output) return diffs;
+
+  const allKeys = new Set([...Object.keys(draft), ...Object.keys(output)]);
+  for (const key of allKeys) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const dVal = draft[key];
+    const oVal = output[key];
+
+    if (dVal === undefined && oVal !== undefined) {
+      diffs.push({ path, type: 'added', value: oVal });
+    } else if (dVal !== undefined && oVal === undefined) {
+      diffs.push({ path, type: 'removed', value: dVal });
+    } else if (typeof dVal === 'string' && typeof oVal === 'string' && dVal !== oVal) {
+      diffs.push({ path, type: 'changed', draft: dVal, output: oVal });
+    } else if (Array.isArray(dVal) && Array.isArray(oVal)) {
+      if (JSON.stringify(dVal) !== JSON.stringify(oVal)) {
+        diffs.push({ path, type: 'array_changed', draft: dVal, output: oVal });
+      }
+    } else if (typeof dVal === 'object' && typeof oVal === 'object' && dVal && oVal) {
+      diffs.push(...diffObjects(dVal, oVal, path));
+    } else if (dVal !== oVal) {
+      diffs.push({ path, type: 'changed', draft: dVal, output: oVal });
+    }
+  }
+  return diffs;
+}
+
 function extractSceneData(storyData) {
   const scenes = [];
 
@@ -137,18 +381,49 @@ function extractSceneData(storyData) {
       }
     }
 
+    const draft = parsedDescription?.draft || null;
+    const critique = parsedDescription?.critique || null;
+    const output = parsedDescription?.output || null;
+
+    // Compare draft vs output to find what changed
+    let draftVsOutput = [];
+    if (draft && output) {
+      draftVsOutput = diffObjects(draft, output);
+    }
+
     scenes.push({
       pageNumber: pageNum,
       // Outline hint (brief scene from outline)
       outlineHint: desc.outlineExtract || image?.outlineExtract || null,
       // Translated summary (what user sees)
       translatedSummary: desc.translatedSummary || null,
-      // Image summary (English, for image generation)
-      imageSummary: desc.imageSummary || parsedDescription?.draft?.imageSummary || null,
-      // Full description (may contain draft with setting, figures, objects)
-      setting: parsedDescription?.draft?.setting || null,
-      figures: parsedDescription?.draft?.figures || parsedDescription?.figures || null,
-      objects: parsedDescription?.draft?.objects || null,
+      // Image summary from output (final) or draft
+      imageSummary: desc.imageSummary || output?.imageSummary || draft?.imageSummary || null,
+      // Draft section
+      draft: draft ? {
+        imageSummary: draft.imageSummary || null,
+        setting: draft.setting || null,
+        characters: draft.characters || null,
+        objects: draft.objects || null
+      } : null,
+      // Critique section
+      critique: critique ? {
+        issues: critique.issues || [],
+        corrections: critique.corrections || [],
+        // Collect failed checks
+        failedChecks: Object.entries(critique)
+          .filter(([k, v]) => typeof v === 'string' && /fail|issue|incorrect|wrong|missing/i.test(v))
+          .map(([k, v]) => ({ check: k, result: v }))
+      } : null,
+      // Output (final) section
+      output: output ? {
+        imageSummary: output.imageSummary || null,
+        setting: output.setting || null,
+        characters: output.characters || null,
+        objects: output.objects || null
+      } : null,
+      // Differences between draft and output
+      draftVsOutput,
       // Character clothing for this page
       characterClothing: desc.characterClothing || image?.sceneCharacterClothing || null,
       // Model used
@@ -235,6 +510,15 @@ async function fetchStoryAnalysis(storyId) {
   // Extract scene data
   const sceneData = extractSceneData(storyData);
 
+  // Extract outline sections (STORY DRAFT, CRITICAL ANALYSIS, STORY PAGES)
+  const outlineSections = extractOutlineSections(storyData.outline);
+  const outlineComparison = outlineSections
+    ? compareStoryDraftVsFinal(outlineSections['STORY DRAFT'], outlineSections['STORY PAGES'])
+    : null;
+
+  // Extract text check
+  const textCheck = extractTextCheck(storyData.finalChecksReport);
+
   return {
     storyId,
     title: storyData.title,
@@ -258,10 +542,18 @@ async function fetchStoryAnalysis(storyId) {
       },
       model: ideaGeneration.model,
       selectedIndex: ideaGeneration.selectedIndex,
-      parsedFinals: ideaGeneration.output,  // The [FINAL] sections only
-      rawResponse: ideaGeneration.rawResponse,  // Full LLM response
-      parsedStages: parsedIdeas  // Extracted draft/review/final
+      parsedStages: parsedIdeas  // Extracted draft/review/final per story
     } : null,
+
+    // Outline: STORY DRAFT vs STORY PAGES + CRITICAL ANALYSIS
+    outline: {
+      sections: outlineSections ? Object.keys(outlineSections).map(k => ({ name: k, length: outlineSections[k].length })) : [],
+      criticalAnalysis: outlineSections?.['CRITICAL ANALYSIS'] || null,
+      draftVsFinal: outlineComparison
+    },
+
+    // Text consistency check
+    textCheck,
 
     // Scene descriptions per page
     scenes: sceneData,
@@ -452,31 +744,136 @@ function printAnalysisSummary(analysis) {
     console.log('\nIDEA GENERATION');
     console.log('-'.repeat(60));
     console.log(`   Model: ${analysis.ideaGeneration.model}`);
-    console.log(`   Selected: Idea ${analysis.ideaGeneration.selectedIndex !== null ? analysis.ideaGeneration.selectedIndex + 1 : 'custom'}`);
-    console.log(`   Has raw response: ${analysis.ideaGeneration.rawResponse ? 'YES' : 'NO'}`);
+    console.log(`   Selected: Idea ${analysis.ideaGeneration.selectedIndex != null ? analysis.ideaGeneration.selectedIndex + 1 : 'custom'}`);
 
-    if (analysis.ideaGeneration.parsedStages) {
-      const stages = analysis.ideaGeneration.parsedStages;
-      console.log('\n   Draft -> Review -> Final (Idea 1):');
-      if (stages.draft1) console.log(`     [DRAFT_1]  ${stages.draft1.slice(0, 120)}...`);
-      if (stages.review1) console.log(`     [REVIEW_1] ${stages.review1.slice(0, 120)}...`);
-      if (stages.final1) console.log(`     [FINAL_1]  ${stages.final1.slice(0, 120)}...`);
+    if (analysis.ideaGeneration.parsedStages?.stories) {
+      for (const story of analysis.ideaGeneration.parsedStages.stories) {
+        const isSelected = story.storyNum === (analysis.ideaGeneration.selectedIndex + 1);
+        console.log(`\n   Story ${story.storyNum}${isSelected ? ' ← SELECTED' : ''}:`);
 
-      if (stages.draft2) {
-        console.log('\n   Draft -> Review -> Final (Idea 2):');
-        console.log(`     [DRAFT_2]  ${stages.draft2.slice(0, 120)}...`);
-        if (stages.review2) console.log(`     [REVIEW_2] ${stages.review2.slice(0, 120)}...`);
-        if (stages.final2) console.log(`     [FINAL_2]  ${stages.final2.slice(0, 120)}...`);
+        if (story.review) {
+          console.log(`     [REVIEW] ${story.review.slice(0, 200)}${story.review.length > 200 ? '...' : ''}`);
+        }
+
+        // Compare ACTIONS between draft and final
+        const draftActions = extractIdeaActions(story.draft);
+        const finalActions = extractIdeaActions(story.final);
+
+        if (draftActions?.actions && finalActions?.actions && draftActions.actions !== finalActions.actions) {
+          console.log(`     [ACTIONS CHANGED]:`);
+          // Show sentences that differ
+          const dSentences = draftActions.actions.split(/\.\s+/).filter(s => s.trim());
+          const fSentences = finalActions.actions.split(/\.\s+/).filter(s => s.trim());
+          const allSentences = new Set([...dSentences, ...fSentences]);
+          for (const s of allSentences) {
+            const inDraft = dSentences.some(d => d === s);
+            const inFinal = fSentences.some(f => f === s);
+            if (!inDraft && inFinal) {
+              console.log(`       + ${s.slice(0, 120)}`);
+            } else if (inDraft && !inFinal) {
+              console.log(`       - ${s.slice(0, 120)}`);
+            }
+          }
+        } else if (draftActions?.actions && finalActions?.actions) {
+          console.log(`     [ACTIONS]: Draft and Final IDENTICAL`);
+        }
+      }
+    }
+  }
+
+  // === OUTLINE: STORY DRAFT vs FINAL ===
+  if (analysis.outline) {
+    console.log('\nOUTLINE (Unified Story)');
+    console.log('-'.repeat(60));
+
+    // Show sections
+    if (analysis.outline.sections.length > 0) {
+      console.log('   Sections:');
+      for (const s of analysis.outline.sections) {
+        console.log(`     ${s.name} (${(s.length / 1024).toFixed(1)}KB)`);
+      }
+    }
+
+    // Show critical analysis summary
+    if (analysis.outline.criticalAnalysis) {
+      const ca = analysis.outline.criticalAnalysis;
+      console.log('\n   Critical Analysis:');
+      // Extract FIXES REQUIRED section
+      const fixesMatch = ca.match(/\*\*FIXES REQUIRED:\*\*\s*([\s\S]*?)$/i) || ca.match(/FIXES REQUIRED[:\s]*([\s\S]*?)$/i);
+      if (fixesMatch) {
+        const fixes = fixesMatch[1].trim().split(/\n-\s*/).filter(s => s.trim());
+        for (const fix of fixes) {
+          console.log(`     • ${fix.trim().slice(0, 120)}`);
+        }
+      } else {
+        // Show first 300 chars
+        console.log(`     ${ca.slice(0, 300)}${ca.length > 300 ? '...' : ''}`);
+      }
+    }
+
+    // Show draft vs final comparison
+    const dvf = analysis.outline.draftVsFinal;
+    if (dvf) {
+      console.log(`\n   Story Text: Draft vs Final (${dvf.pageCount} pages):`);
+      if (dvf.allIdentical) {
+        console.log(`     All pages IDENTICAL — no changes from draft to final`);
+      } else {
+        console.log(`     ${dvf.totalChanges} paragraph(s) changed across pages`);
+        for (const pc of dvf.pages) {
+          if (pc.identical) continue;
+          console.log(`\n     Page ${pc.page} (${pc.changes.length} changes):`);
+          for (const ch of pc.changes) {
+            if (ch.draft && ch.final) {
+              console.log(`       ¶${ch.para}:`);
+              console.log(`         draft:  ${ch.draft.slice(0, 120)}`);
+              console.log(`         final:  ${ch.final.slice(0, 120)}`);
+            } else if (ch.final) {
+              console.log(`       ¶${ch.para}: + ${ch.final.slice(0, 120)}`);
+            } else {
+              console.log(`       ¶${ch.para}: - ${ch.draft.slice(0, 120)}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // === TEXT CHECK ===
+  if (analysis.textCheck) {
+    console.log('\nTEXT CONSISTENCY CHECK');
+    console.log('-'.repeat(60));
+    const tc = analysis.textCheck;
+    console.log(`   Quality: ${tc.quality || 'N/A'} | Score: ${tc.overallScore || 'N/A'}/10`);
+    console.log(`   Parse error: ${tc.parseError ? 'YES' : 'no'} | Text modified: ${tc.hasCorrections ? 'YES' : 'no'}`);
+
+    if (tc.issues.length > 0) {
+      // Group by type
+      const byType = {};
+      for (const issue of tc.issues) {
+        const type = issue.type || 'other';
+        if (!byType[type]) byType[type] = [];
+        byType[type].push(issue);
       }
 
-      // Show what changed between draft and final
-      if (stages.draft1 && stages.final1 && stages.draft1 !== stages.final1) {
-        console.log('\n   Changes (Idea 1): Draft and Final DIFFER');
-        console.log(`     Draft length: ${stages.draft1.length} chars`);
-        console.log(`     Final length: ${stages.final1.length} chars`);
-      } else if (stages.draft1 && stages.final1) {
-        console.log('\n   Changes (Idea 1): Draft and Final are IDENTICAL');
+      console.log(`   Issues (${tc.issues.length}):`);
+      for (const [type, issues] of Object.entries(byType)) {
+        console.log(`     ${type} (${issues.length}):`);
+        for (const issue of issues.slice(0, 5)) {
+          const page = issue.page ? `p${issue.page}` : '';
+          const sev = issue.severity ? `[${issue.severity}]` : '';
+          console.log(`       ${page} ${sev} ${(issue.issue || issue.description || '').slice(0, 100)}`);
+          if (issue.originalText && issue.correctedText && issue.originalText !== issue.correctedText) {
+            console.log(`         "${issue.originalText.slice(0, 60)}" → "${issue.correctedText.slice(0, 60)}"`);
+          }
+        }
+        if (issues.length > 5) console.log(`       ... and ${issues.length - 5} more`);
       }
+    } else {
+      console.log(`   No issues found`);
+    }
+
+    if (tc.summary) {
+      console.log(`   Summary: ${tc.summary.slice(0, 200)}`);
     }
   }
 
@@ -492,16 +889,80 @@ function printAnalysisSummary(analysis) {
       if (scene.imageSummary) {
         console.log(`     Summary: ${scene.imageSummary.slice(0, 100)}${scene.imageSummary.length > 100 ? '...' : ''}`);
       }
-      if (scene.setting) {
-        console.log(`     Setting: ${scene.setting.location || ''} - ${scene.setting.description || ''}`);
+
+      // Show draft setting
+      const draftSetting = scene.draft?.setting;
+      const outputSetting = scene.output?.setting;
+      if (draftSetting) {
+        console.log(`     Setting: ${draftSetting.location || ''} - ${draftSetting.description || ''}`);
       }
-      if (scene.figures && Array.isArray(scene.figures)) {
-        console.log(`     Figures: ${scene.figures.map(f => f.label || f.name || '?').join(', ')}`);
+
+      // Show characters from draft
+      if (scene.draft?.characters && Array.isArray(scene.draft.characters)) {
+        const chars = scene.draft.characters.map(c => {
+          const name = c.label || c.name || '?';
+          const pos = c.position || '';
+          return pos ? `${name} (${pos})` : name;
+        }).join(', ');
+        console.log(`     Characters: ${chars}`);
       }
+
       if (scene.characterClothing) {
         const clothing = Object.entries(scene.characterClothing).map(([name, cat]) => `${name}:${cat}`).join(', ');
         console.log(`     Clothing: ${clothing}`);
       }
+
+      // Show critique issues and corrections
+      if (scene.critique) {
+        const issues = scene.critique.issues || [];
+        const corrections = scene.critique.corrections || [];
+        const failedChecks = scene.critique.failedChecks || [];
+
+        if (issues.length > 0 || corrections.length > 0 || failedChecks.length > 0) {
+          console.log(`     Critique:`);
+          for (const issue of issues) {
+            console.log(`       ⚠ ${typeof issue === 'string' ? issue : JSON.stringify(issue)}`);
+          }
+          for (const fix of corrections) {
+            console.log(`       ✏ ${typeof fix === 'string' ? fix : JSON.stringify(fix)}`);
+          }
+          for (const fc of failedChecks) {
+            console.log(`       ✗ ${fc.check}: ${fc.result.slice(0, 100)}`);
+          }
+        } else {
+          console.log(`     Critique: No issues found`);
+        }
+      }
+
+      // Show draft vs output differences
+      if (scene.draftVsOutput && scene.draftVsOutput.length > 0) {
+        console.log(`     Changes (${scene.draftVsOutput.length}):`);
+        for (const diff of scene.draftVsOutput) {
+          if (diff.type === 'changed') {
+            const dStr = typeof diff.draft === 'string' ? diff.draft : JSON.stringify(diff.draft);
+            const oStr = typeof diff.output === 'string' ? diff.output : JSON.stringify(diff.output);
+            // Truncate long values
+            const dShort = dStr.length > 80 ? dStr.slice(0, 80) + '...' : dStr;
+            const oShort = oStr.length > 80 ? oStr.slice(0, 80) + '...' : oStr;
+            console.log(`       ${diff.path}:`);
+            console.log(`         draft:  ${dShort}`);
+            console.log(`         output: ${oShort}`);
+          } else if (diff.type === 'added') {
+            const vStr = typeof diff.value === 'string' ? diff.value : JSON.stringify(diff.value);
+            console.log(`       + ${diff.path}: ${vStr.slice(0, 100)}`);
+          } else if (diff.type === 'removed') {
+            const vStr = typeof diff.value === 'string' ? diff.value : JSON.stringify(diff.value);
+            console.log(`       - ${diff.path}: ${vStr.slice(0, 100)}`);
+          } else if (diff.type === 'array_changed') {
+            console.log(`       ${diff.path}: array changed (${JSON.stringify(diff.draft).length} → ${JSON.stringify(diff.output).length} chars)`);
+          }
+        }
+      } else if (scene.draft && scene.output) {
+        console.log(`     Changes: Draft and Output are IDENTICAL`);
+      } else if (!scene.draft && !scene.output) {
+        console.log(`     (No draft/output structure found)`);
+      }
+
       if (scene.textModelId) {
         console.log(`     Model: ${scene.textModelId}`);
       }
