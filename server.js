@@ -5702,12 +5702,13 @@ app.post('/api/admin/orders/:orderId/retry-print-order', authenticateToken, asyn
     const storyScenes = storyData.pages || storyData.sceneImages?.length || 15;
     const isPictureBook = storyData.languageLevel === '1st-grade';
 
-    // Calculate interior pages (covers not counted)
-    let interiorPages = isPictureBook ? storyScenes : storyScenes * 2;
-
-    // Round up to even page count for Gelato (accepts any even number)
-    const printPageCount = interiorPages % 2 === 0 ? interiorPages : interiorPages + 1;
-    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, printPageCount=${printPageCount}`);
+    // Calculate total PDF pages (cover spread + dedication + story pages)
+    // Must match what generatePrintPdf() produces
+    const hasDedication = !!storyData.coverImages?.initialPage;
+    let interiorPages = (hasDedication ? 1 : 0) + (isPictureBook ? storyScenes : storyScenes * 2);
+    if (interiorPages % 2 !== 0) interiorPages += 1; // Pad to even
+    const printPageCount = 1 + interiorPages; // +1 for cover spread
+    log.debug(`📄 [ADMIN RETRY] Story has ${storyScenes} scenes, layout=${isPictureBook ? 'Picture Book' : 'Standard'}, interior=${interiorPages}, total=${printPageCount}`);
 
     // Get print product UID - prefer softcover for retry (can be changed in admin UI)
     const productsResult = await dbPool.query(

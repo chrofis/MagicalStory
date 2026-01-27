@@ -309,25 +309,28 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
   }
 
-  // Calculate page count and add blank pages if needed (must be even for print)
-  let actualPdfPages = isPictureBook ? storyPages.length : storyPages.length * 2;
-  const targetPageCount = actualPdfPages % 2 === 0 ? actualPdfPages : actualPdfPages + 1;
-  const blankPagesToAdd = targetPageCount - actualPdfPages;
+  // Calculate total PDF page count including cover spread and dedication page
+  // Gelato counts ALL pages in the PDF file, including the cover spread (page 1)
+  const hasInitialPage = !!initialPageImageData;
+  const coverSpreadPages = 1; // Cover spread is always page 1 of the PDF
+  const storyContentPages = isPictureBook ? storyPages.length : storyPages.length * 2;
+  let interiorPages = (hasInitialPage ? 1 : 0) + storyContentPages;
 
-  if (blankPagesToAdd > 0) {
-    log.debug(`📄 [PRINT PDF] Adding ${blankPagesToAdd} blank page(s) to reach even count ${targetPageCount}`);
-  }
-
-  for (let i = 0; i < blankPagesToAdd; i++) {
+  // Interior pages must be even for print (pages are printed front/back)
+  if (interiorPages % 2 !== 0) {
+    interiorPages += 1;
     doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    log.debug(`📄 [PRINT PDF] Added 1 blank page to reach even interior count ${interiorPages}`);
   }
+
+  const totalPdfPages = coverSpreadPages + interiorPages;
 
   doc.end();
   const pdfBuffer = await pdfPromise;
 
-  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${targetPageCount} interior pages, font: ${consistentFontSize}pt`);
+  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${totalPdfPages} total pages (${interiorPages} interior + cover spread), font: ${consistentFontSize}pt`);
 
-  return { pdfBuffer, pageCount: targetPageCount, fontSizeWarning };
+  return { pdfBuffer, pageCount: totalPdfPages, fontSizeWarning };
 }
 
 /**
