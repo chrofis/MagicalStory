@@ -259,7 +259,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   });
 
   // Filter to only issues with successful extraction
-  const extractableIssues = extractedIssues.filter(i => i.extraction?.absolutePath);
+  const extractableIssues = extractedIssues.filter(i => i.region?.bbox && i.extraction?.absolutePath);
 
   if (extractableIssues.length === 0) {
     progress('extract', 'No extractable issues (missing bounding boxes)');

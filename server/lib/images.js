@@ -1062,12 +1062,14 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   // Example: {"patrick": {figureId: 1, faceBbox: [0.35, 0.28, 0.49, 0.36], confidence: 0.8}}
   const charNameToFigure = {};
   for (const match of qualityMatches) {
-    if (match.reference && match.figure) {
+    if (match.reference && match.figure && Number.isInteger(match.figure) && match.figure > 0) {
+      const confidence = match.confidence || 0;
+      if (confidence < 0.5) continue;  // Skip low-confidence matches
       const charName = match.reference.toLowerCase();
       charNameToFigure[charName] = {
         figureId: match.figure,
         faceBbox: match.face_bbox,
-        confidence: match.confidence || 0
+        confidence
       };
     }
   }
@@ -1105,7 +1107,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     const foundChars = [];
     for (const charName of Object.keys(charNameToFigure)) {
       // Match character name with word boundaries (e.g., "patrick's" should match "patrick")
-      const regex = new RegExp(`\\b${charName}(?:'s)?\\b`, 'i');
+      const escapedName = charName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedName}(?:[\u2019']s)?\\b`, 'i');
       if (regex.test(textLower)) {
         foundChars.push(charName);
       }
@@ -1141,9 +1144,10 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       if (mentionedChars.length > 0 && element.elementType === 'figure') {
         for (const charName of mentionedChars) {
           const charInfo = charNameToFigure[charName];
+          if (!charInfo || !Number.isInteger(charInfo.figureId) || charInfo.figureId < 1) continue;
           // Match by figure index (quality eval uses 1-indexed, detection is 0-indexed in array)
           const figureIndex = allDetections.figures.indexOf(element);
-          if (charInfo && figureIndex === charInfo.figureId - 1) {
+          if (figureIndex >= 0 && figureIndex === charInfo.figureId - 1) {
             score += 100;
             matchedByCharName = true;
             log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → matched to Figure ${charInfo.figureId}`);

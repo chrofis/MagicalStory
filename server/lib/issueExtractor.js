@@ -362,8 +362,9 @@ function collectAllIssues(evalResults, pageNumber, imgDimensions, options = {}) 
   // Enhance with body boxes from bbox detection (match by figure ID)
   if (bboxDetection?.figures) {
     for (const [charName, charInfo] of Object.entries(characterBboxes)) {
-      if (charInfo.figureId && bboxDetection.figures[charInfo.figureId - 1]) {
-        const figure = bboxDetection.figures[charInfo.figureId - 1];
+      const figureIdx = charInfo.figureId - 1;
+      if (Number.isInteger(charInfo.figureId) && charInfo.figureId > 0 && figureIdx < bboxDetection.figures.length && bboxDetection.figures[figureIdx]) {
+        const figure = bboxDetection.figures[figureIdx];
         charInfo.bodyBbox = figure.bodyBox || null;
         // Also fill in face box if we didn't have one
         if (!charInfo.faceBbox && figure.faceBox) {
