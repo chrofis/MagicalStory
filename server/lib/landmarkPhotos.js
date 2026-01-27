@@ -1264,7 +1264,7 @@ async function findBestLandmarkImage(landmarkName, landmarkType, lang = null, pa
 
   // Helper filters for non-useful images
   const isInformationSign = (desc) => /\b(sign|plaque|board|map|diagram|information|commemorat)/i.test(desc || '');
-  const isNotUsefulPhoto = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan|shows a wooden door|shows a door|shows an old door|detail of a|close-up of a|closeup of a)\b/i.test(desc || '');
+  const isNotUsefulPhoto = (desc) => /\b(engraving|illustration|drawing|sketch|painting|artwork|lithograph|woodcut|etching|historical artwork|historical map|coat of arms|heraldry|painted coat|layout of|floor plan|architectural plan|shows a wooden door|shows a door|shows an old door|detail of a|close-up of a|closeup of a|museum exhibit|display case|window display|shows a spoon|shows a sign|stone tablet|archaeological dig|statue.*bronze|bronze statue|golden statue|shows tools|shows documents)\b/i.test(desc || '');
 
   // Separate exterior and interior images, sort by score, ensure diversity
   // Filter out drawings/engravings (isActualPhoto === false OR description mentions it)
