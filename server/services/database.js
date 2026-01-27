@@ -891,6 +891,86 @@ async function getAllActiveVersions(storyId) {
   return result;
 }
 
+/**
+ * Rehydrate story data by loading images from story_images table back into the data blob.
+ * Used by PDF generation which needs imageData in the sceneImages array.
+ * @param {string} storyId - Story ID
+ * @param {object} storyData - Parsed story data blob (sceneImages, coverImages, etc.)
+ * @returns {object} storyData with imageData populated from story_images table
+ */
+async function rehydrateStoryImages(storyId, storyData) {
+  if (!isDatabaseMode() || !storyData) return storyData;
+
+  const hasSeparate = await hasStorySeparateImages(storyId);
+  if (!hasSeparate) return storyData; // Images still inline in data blob
+
+  // Load all active images (version_index 0 = main image)
+  const images = await dbQuery(
+    `SELECT image_type, page_number, version_index, image_data
+     FROM story_images WHERE story_id = $1 AND version_index = 0
+     ORDER BY page_number`,
+    [storyId]
+  );
+
+  // Also load active versions from image_version_meta
+  const metaResult = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
+  const versionMeta = metaResult[0]?.image_version_meta || {};
+
+  // For pages with non-zero active version, load that version's image instead
+  for (const [pageNum, meta] of Object.entries(versionMeta)) {
+    if (meta.activeVersion && meta.activeVersion > 0) {
+      const activeImg = await dbQuery(
+        `SELECT image_data FROM story_images
+         WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2 AND version_index = $3`,
+        [storyId, parseInt(pageNum), meta.activeVersion]
+      );
+      if (activeImg.length > 0) {
+        // Replace the main image entry with the active version
+        const existing = images.find(i => i.image_type === 'scene' && i.page_number === parseInt(pageNum));
+        if (existing) {
+          existing.image_data = activeImg[0].image_data;
+        }
+      }
+    }
+  }
+
+  // Populate sceneImages
+  if (storyData.sceneImages) {
+    for (const scene of storyData.sceneImages) {
+      if (!scene.imageData) {
+        const img = images.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
+        if (img) scene.imageData = img.image_data;
+      }
+    }
+  }
+
+  // Populate coverImages
+  if (storyData.coverImages) {
+    const covers = ['frontCover', 'backCover', 'initialPage'];
+    for (const coverType of covers) {
+      if (storyData.coverImages[coverType] && !getCoverData(storyData.coverImages[coverType])) {
+        const img = images.find(i => i.image_type === coverType);
+        if (img) {
+          if (typeof storyData.coverImages[coverType] === 'string') {
+            storyData.coverImages[coverType] = img.image_data;
+          } else if (storyData.coverImages[coverType]) {
+            storyData.coverImages[coverType].imageData = img.image_data;
+          }
+        }
+      }
+    }
+  }
+
+  return storyData;
+}
+
+function getCoverData(cover) {
+  if (!cover) return null;
+  if (typeof cover === 'string' && cover.startsWith('data:')) return cover;
+  if (cover.imageData) return cover.imageData;
+  return null;
+}
+
 module.exports = {
   initializePool,
   initializeDatabase,
@@ -910,6 +990,7 @@ module.exports = {
   getAllStoryImages,
   hasStorySeparateImages,
   deleteStoryImages,
+  rehydrateStoryImages,
   // Active version functions
   getActiveVersion,
   setActiveVersion,

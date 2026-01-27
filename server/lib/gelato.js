@@ -6,6 +6,7 @@
 
 const { log } = require('../utils/logger');
 const { generatePrintPdf, generateCombinedBookPdf } = require('./pdf');
+const { rehydrateStoryImages } = require('../services/database');
 
 /**
  * Get cover dimensions from Gelato API including spine width
@@ -116,6 +117,8 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       if (typeof storyData === 'string') {
         storyData = JSON.parse(storyData);
       }
+      // Rehydrate images from story_images table (images stripped from data blob)
+      storyData = await rehydrateStoryImages(row.id, storyData);
       storiesMap.set(row.id, { id: row.id, data: storyData });
     }
     const stories = allStoryIds.map(id => storiesMap.get(id));

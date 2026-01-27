@@ -106,7 +106,7 @@ const email = require('./email');
 const admin = require('firebase-admin');
 
 // Import modular routes and services
-const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage, setActiveVersion } = require('./server/services/database');
+const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage, setActiveVersion, rehydrateStoryImages } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
 const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
@@ -3518,6 +3518,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       originalImage: trueOriginalImage,
       originalScore: trueOriginalScore,
       originalReasoning: trueOriginalReasoning,
+      referencePhotos: coverCharacterPhotos,
       regeneratedAt: new Date().toISOString(),
       regenerationCount: (previousCover?.regenerationCount || 0) + 1
     };
@@ -3576,6 +3577,8 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       // Credit info
       creditsUsed: requiredCredits,
       creditsRemaining: newCredits,
+      // Reference photos used
+      referencePhotos: coverCharacterPhotos,
       // API cost tracking
       apiCost: coverImageCost,
       apiCostModel: coverImageModelId
@@ -4830,10 +4833,13 @@ app.get('/api/stories/:id/pdf', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const storyData = typeof storyResult.rows[0].data === 'string'
+    let storyData = typeof storyResult.rows[0].data === 'string'
       ? JSON.parse(storyResult.rows[0].data)
       : storyResult.rows[0].data;
     log.debug(`📄 [PDF DOWNLOAD] Story found: ${storyData.title}`);
+
+    // Rehydrate images from story_images table (images stripped from data blob)
+    storyData = await rehydrateStoryImages(storyId, storyData);
 
     // Generate PDF using shared library function
     const pdfBuffer = await generateViewPdf(storyData, bookFormat);
