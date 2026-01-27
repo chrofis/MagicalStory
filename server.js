@@ -2125,7 +2125,8 @@ app.post('/api/generate-story-ideas', authenticateToken, async (req, res) => {
       if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
       if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
       if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
-      if (c.traits?.specialDetails) traits.push(`special: ${c.traits.specialDetails}`);
+      const specialDetails = c.traits?.specialDetails || c.specialDetails || c.special_details;
+      if (specialDetails) traits.push(`special: ${specialDetails}`);
       const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
       return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
     }).join('\n');
@@ -2435,7 +2436,8 @@ app.post('/api/generate-story-ideas-stream', authenticateToken, async (req, res)
       if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
       if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
       if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
-      if (c.traits?.specialDetails) traits.push(`special: ${c.traits.specialDetails}`);
+      const specialDetails = c.traits?.specialDetails || c.specialDetails || c.special_details;
+      if (specialDetails) traits.push(`special: ${specialDetails}`);
       const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
       return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
     }).join('\n');
@@ -6570,8 +6572,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       if (char.weaknesses && char.weaknesses.length > 0) {
         details.push(`Weaknesses: ${char.weaknesses.join(', ')}`);
       }
-      if (char.specialDetails) {
-        details.push(`Details: ${char.specialDetails}`);
+      const specialDetails = char.traits?.specialDetails || char.specialDetails || char.special_details;
+      if (specialDetails) {
+        details.push(`Details: ${specialDetails}`);
       }
       if (details.length > 0) {
         desc += `: ${details.join(', ')}`;

@@ -1776,7 +1776,7 @@ function buildBasePrompt(inputData, textPageCount = null) {
       isMainCharacter: isMain,
       gender: char.gender,
       age: char.age,
-      specialDetails: traits.specialDetails || char.specialDetails || ''  // Includes hobbies, hopes, fears, favorite animals
+      specialDetails: traits.specialDetails || char.specialDetails || char.special_details || ''  // Includes hobbies, hopes, fears, favorite animals
     };
   });
 
@@ -1845,7 +1845,7 @@ function buildStoryPrompt(inputData, sceneCount = null) {
       strengths: traits.strengths || char.strengths || [],
       flaws: traits.flaws || char.weaknesses || [],
       challenges: traits.challenges || char.fears || [],
-      specialDetails: traits.specialDetails || char.specialDetails || ''
+      specialDetails: traits.specialDetails || char.specialDetails || char.special_details || ''
       // Explicitly exclude photoUrl and other large fields
     };
   });
@@ -2776,7 +2776,7 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
       strengths: traits.strengths || char.strengths || [],
       flaws: traits.flaws || char.weaknesses || [],
       challenges: traits.challenges || char.fears || [],
-      specialDetails: traits.specialDetails || char.specialDetails || ''
+      specialDetails: traits.specialDetails || char.specialDetails || char.special_details || ''
     };
   });
 
