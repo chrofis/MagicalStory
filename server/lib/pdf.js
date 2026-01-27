@@ -253,10 +253,13 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     }
   }
 
-  // Initial page (dedication/intro page)
+  // Page 2: Blank left page (required by Gelato - left side of first spread)
+  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
+  // Page 3: Initial/dedication page (right side of first spread)
   const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
+  doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
   if (initialPageImageData) {
-    doc.addPage({ size: [pageWidth, pageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     const initialPageData = initialPageImageData.replace(/^data:image\/\w+;base64,/, '');
     const initialPageBuffer = Buffer.from(initialPageData, 'base64');
     // Fill width completely, center vertically (for square images on portrait pages)
@@ -309,12 +312,12 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize);
   }
 
-  // Calculate total PDF page count including cover spread and dedication page
-  // Gelato counts ALL pages in the PDF file, including the cover spread (page 1)
-  const hasInitialPage = !!initialPageImageData;
-  const coverSpreadPages = 1; // Cover spread is always page 1 of the PDF
+  // Calculate total PDF page count
+  // Gelato counts ALL pages in the PDF: cover spread (1) + blank (1) + dedication (1) + story + padding
+  const coverSpreadPages = 1;
+  const frontMatterPages = 2; // Always: blank left page + dedication right page
   const storyContentPages = isPictureBook ? storyPages.length : storyPages.length * 2;
-  let interiorPages = (hasInitialPage ? 1 : 0) + storyContentPages;
+  let interiorPages = frontMatterPages + storyContentPages;
 
   // Interior pages must be even for print (pages are printed front/back)
   if (interiorPages % 2 !== 0) {
