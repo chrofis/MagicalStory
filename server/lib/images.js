@@ -2319,7 +2319,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             quality: {
               score: result.score,
               fixTargets: fixTargetsToUse,
-              reasoning: result.reasoning
+              reasoning: result.reasoning,
+              matches: result.matches || []  // Character → figure mapping with face_bbox
             },
             incremental: incrEnabled ? consistencyResult : null,
             final: null  // Final consistency handled separately
@@ -2334,6 +2335,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               storyId: storyId,
               skipVerification: false,
               saveIntermediates: isAdmin,
+              bboxDetection: bboxDetectionHistory,  // Pass bbox detection for character lookup
               onProgress: (step, msg) => log.debug(`  [GRID] ${step}: ${msg}`)
             }
           );

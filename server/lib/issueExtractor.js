@@ -149,22 +149,45 @@ function normalizeQualityIssue(issue, pageNumber, imgDimensions) {
  * @param {Object} issue - Issue from consistencyResult.issues
  * @param {number} pageNumber - Page number
  * @param {{width: number, height: number}} imgDimensions - Image dimensions
+ * @param {Object} characterBboxes - Map of character name → {faceBbox, bodyBbox} from quality eval
  * @returns {UnifiedIssue}
  */
-function normalizeIncrementalIssue(issue, pageNumber, imgDimensions) {
+function normalizeIncrementalIssue(issue, pageNumber, imgDimensions, characterBboxes = {}) {
   // Format: { type, severity, description, affectedCharacter, comparedToPage, fixTarget: { region, instruction } }
 
-  const bbox = issue.fixTarget?.region || null;
+  let bbox = issue.fixTarget?.region || null;
   const issueType = mapIssueType(issue.type || 'consistency');
   const severity = (issue.severity || 'major').toLowerCase();
 
   // Validate bounding box if present
-  let validatedBbox = bbox;
+  let validatedBbox = null;
   if (bbox) {
     const validation = validateNormalizedBbox(bbox);
-    if (!validation.valid) {
-      console.warn(`Invalid bbox in incremental issue: ${validation.reason}, skipping bbox`);
-      validatedBbox = null;
+    if (validation.valid) {
+      validatedBbox = bbox;
+    } else {
+      console.warn(`Invalid bbox in incremental issue: ${validation.reason}, will try character lookup`);
+    }
+  }
+
+  // If no valid bbox but we have affectedCharacter, look up from quality eval matches
+  if (!validatedBbox && issue.affectedCharacter && characterBboxes) {
+    const charName = issue.affectedCharacter.toLowerCase();
+    const charBbox = characterBboxes[charName];
+    if (charBbox) {
+      // Use body box for clothing issues, face box for face issues, body box as default
+      if (issueType === 'face' && charBbox.faceBbox) {
+        validatedBbox = charBbox.faceBbox;
+        console.log(`  Using face bbox from quality eval for ${issue.affectedCharacter}`);
+      } else if (charBbox.bodyBbox) {
+        validatedBbox = charBbox.bodyBbox;
+        console.log(`  Using body bbox from quality eval for ${issue.affectedCharacter}`);
+      } else if (charBbox.faceBbox) {
+        validatedBbox = charBbox.faceBbox;
+        console.log(`  Using face bbox (fallback) from quality eval for ${issue.affectedCharacter}`);
+      }
+    } else {
+      console.warn(`  No bbox found for character "${issue.affectedCharacter}" in quality matches`);
     }
   }
 
@@ -310,11 +333,49 @@ function calculateIoU(bbox1, bbox2) {
  * @param {Object} evalResults.final - Result from runFinalConsistencyChecks (has pagesToFix[])
  * @param {number} pageNumber - Page number
  * @param {{width: number, height: number}} imgDimensions - Image dimensions
+ * @param {Object} options - Additional options
+ * @param {Array} options.qualityMatches - Character matches from quality eval [{figure, reference, face_bbox}]
+ * @param {Object} options.bboxDetection - Bbox detection results {figures: [{label, faceBox, bodyBox}]}
  * @returns {UnifiedIssue[]} Array of normalized issues
  */
-function collectAllIssues(evalResults, pageNumber, imgDimensions) {
+function collectAllIssues(evalResults, pageNumber, imgDimensions, options = {}) {
   const issues = [];
   const { quality, incremental, final } = evalResults;
+  const { qualityMatches = [], bboxDetection = null } = options;
+
+  // Build character name → bbox mapping from quality matches and bbox detection
+  // This allows us to look up bboxes for issues that mention a character by name
+  const characterBboxes = {};
+
+  // First, add from quality eval matches (most reliable - has character identification)
+  for (const match of qualityMatches) {
+    if (match.reference) {
+      const charName = match.reference.toLowerCase();
+      characterBboxes[charName] = {
+        faceBbox: match.face_bbox || null,
+        bodyBbox: null,  // Quality matches only have face_bbox
+        figureId: match.figure
+      };
+    }
+  }
+
+  // Enhance with body boxes from bbox detection (match by figure ID)
+  if (bboxDetection?.figures) {
+    for (const [charName, charInfo] of Object.entries(characterBboxes)) {
+      if (charInfo.figureId && bboxDetection.figures[charInfo.figureId - 1]) {
+        const figure = bboxDetection.figures[charInfo.figureId - 1];
+        charInfo.bodyBbox = figure.bodyBox || null;
+        // Also fill in face box if we didn't have one
+        if (!charInfo.faceBbox && figure.faceBox) {
+          charInfo.faceBbox = figure.faceBox;
+        }
+      }
+    }
+  }
+
+  if (Object.keys(characterBboxes).length > 0) {
+    console.log(`  [ISSUE-EXTRACT] Character bboxes available: ${Object.keys(characterBboxes).join(', ')}`);
+  }
 
   // Collect from quality evaluation (fixTargets with bounding boxes)
   if (quality?.fixTargets) {
@@ -344,10 +405,12 @@ function collectAllIssues(evalResults, pageNumber, imgDimensions) {
   }
 
   // Collect from incremental consistency
+  // Now includes issues WITHOUT explicit regions - we can look up bbox by character name
   if (incremental?.issues) {
     for (const issue of incremental.issues) {
-      if (issue.fixTarget?.region) {  // Only include issues with regions
-        issues.push(normalizeIncrementalIssue(issue, pageNumber, imgDimensions));
+      // Include issues with regions OR issues with affected character (we can look up bbox)
+      if (issue.fixTarget?.region || issue.affectedCharacter) {
+        issues.push(normalizeIncrementalIssue(issue, pageNumber, imgDimensions, characterBboxes));
       }
     }
   }

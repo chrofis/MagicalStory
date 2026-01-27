@@ -195,7 +195,15 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   // =========================================================================
   progress('collect', 'Collecting issues from evaluations');
 
-  const rawIssues = collectAllIssues(evalResults, pageNum, imgDimensions);
+  // Extract quality matches for character → bbox lookup
+  // Quality eval returns: matches: [{figure, reference, face_bbox, confidence}]
+  const qualityMatches = evalResults.quality?.matches || [];
+  const bboxDetection = config.bboxDetection || null;
+
+  const rawIssues = collectAllIssues(evalResults, pageNum, imgDimensions, {
+    qualityMatches,
+    bboxDetection
+  });
   history.steps.push({
     step: 'collect',
     timestamp: new Date().toISOString(),
