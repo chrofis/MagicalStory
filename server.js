@@ -1218,6 +1218,10 @@ async function initializeDatabase() {
     await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS share_token VARCHAR(255)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_share_token ON stories(share_token) WHERE share_token IS NOT NULL`);
 
+    // Image version metadata column (migration for existing tables)
+    await dbPool.query(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS image_version_meta JSONB DEFAULT '{}'`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_stories_image_version_meta ON stories USING GIN (image_version_meta)`);
+
     // Story drafts table - stores unsaved story settings (step 1 & 4 data)
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS story_drafts (
