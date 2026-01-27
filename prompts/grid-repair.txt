@@ -1,0 +1,15 @@
+You are an expert illustration repair artist. This grid shows {ISSUE_COUNT} regions from children's book illustrations that need fixes.
+
+Each region is labeled with a letter ({LETTERS}).
+
+FIX EACH REGION:
+{INSTRUCTIONS}
+
+RULES:
+1. Maintain the exact same art style, colors, and character appearance
+2. Only modify what needs fixing - preserve everything else
+3. Keep faces recognizable and consistent with the character
+4. Ensure hands have exactly 5 fingers
+5. Keep clothing colors and patterns matching
+
+Return the grid image with ALL regions fixed while keeping the same layout and letter labels.
