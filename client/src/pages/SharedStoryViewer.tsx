@@ -142,7 +142,7 @@ export default function SharedStoryViewer() {
             className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
           >
             <Sparkles className="w-4 h-4" />
-            Create Your Own
+            Create Your Own Story
           </Link>
         </div>
       </header>
