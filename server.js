@@ -7238,7 +7238,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
       // Generate reference images for secondary elements (recurring characters, artifacts, etc.)
       if (visualBible) {
-        const styleDescription = getStyleDescription(artStyle);
+        const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
         try {
           const refResult = await generateReferenceSheet(visualBible, styleDescription, {
             minAppearances: 2,
@@ -8880,7 +8880,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // This generates reference images for recurring characters, animals, artifacts etc.
     let referenceSheetPromise = null;
     if (!skipImages) {
-      const styleDescription = getStyleDescription(artStyle);
+      const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
       referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {
         minAppearances: 2, // Elements appearing on 2+ pages
         maxPerBatch: 4     // Max 4 elements per grid for quality
