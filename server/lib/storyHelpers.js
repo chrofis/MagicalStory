@@ -3204,7 +3204,7 @@ module.exports = {
   buildStoryPrompt,
   buildSceneDescriptionPrompt,
   buildImagePrompt,
-  buildSceneExpansionPrompt,
+  // buildSceneExpansionPrompt,  // UNUSED - templates moved to prompts/_unused/
   buildUnifiedStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,

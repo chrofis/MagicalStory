@@ -47,10 +47,10 @@ async function loadPromptTemplates() {
     // Auto-repair / Inpainting prompt
     PROMPT_TEMPLATES.imageInspection = await fs.readFile(path.join(promptsDir, 'image-inspection.txt'), 'utf-8');
     PROMPT_TEMPLATES.inpainting = await fs.readFile(path.join(promptsDir, 'inpainting.txt'), 'utf-8');
-    // Scene expansion for regeneration
-    PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneExpansionDe = await fs.readFile(path.join(promptsDir, 'scene-expansion-de.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneExpansionFr = await fs.readFile(path.join(promptsDir, 'scene-expansion-fr.txt'), 'utf-8');
+    // Scene expansion - UNUSED, moved to prompts/_unused/
+    // PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
+    // PROMPT_TEMPLATES.sceneExpansionDe = await fs.readFile(path.join(promptsDir, 'scene-expansion-de.txt'), 'utf-8');
+    // PROMPT_TEMPLATES.sceneExpansionFr = await fs.readFile(path.join(promptsDir, 'scene-expansion-fr.txt'), 'utf-8');
     // Unified story generation (single prompt for complete story)
     PROMPT_TEMPLATES.storyUnified = await fs.readFile(path.join(promptsDir, 'story-unified.txt'), 'utf-8');
     // Final consistency check prompts
