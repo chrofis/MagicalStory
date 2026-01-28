@@ -377,6 +377,55 @@ async function sendOrderShippedEmail(customerEmail, customerName, trackingDetail
   }
 }
 
+/**
+ * Send order failed notification to customer
+ * @param {string} customerEmail - Customer email address
+ * @param {string} customerName - Customer's full name
+ * @param {string} errorMessage - Error description
+ */
+async function sendOrderFailedEmail(customerEmail, customerName, errorMessage) {
+  if (!resend) {
+    console.log('📧 Email not configured - skipping order failed notification');
+    return null;
+  }
+
+  const greeting = getGreetingName(customerName);
+
+  try {
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      replyTo: EMAIL_REPLY_TO,
+      to: customerEmail,
+      subject: 'Bestellproblem – Wir kümmern uns darum / Order Issue – We're on it',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #dc2626;">Bestellproblem / Order Issue</h2>
+          <p>Liebe/r ${greeting},</p>
+          <p>Bei der Verarbeitung Ihrer Buchbestellung ist leider ein technisches Problem aufgetreten. Unser Team wurde automatisch benachrichtigt und kümmert sich um die Lösung.</p>
+          <p>Sie müssen nichts weiter tun – wir melden uns bei Ihnen, sobald das Problem behoben ist. Sollte eine Rückerstattung nötig sein, werden wir diese veranlassen.</p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;" />
+          <p>Dear ${greeting},</p>
+          <p>Unfortunately, a technical issue occurred while processing your book order. Our team has been automatically notified and is working on a resolution.</p>
+          <p>No action is needed from you – we'll reach out once the issue is resolved. If a refund is necessary, we will process it for you.</p>
+          <p style="margin-top: 20px;">Bei Fragen / For questions: <a href="mailto:support@magicalstory.ch">support@magicalstory.ch</a></p>
+          <p>MagicalStory Team</p>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('❌ Failed to send order failed email:', error);
+      return null;
+    }
+
+    console.log(`📧 Order failed email sent to ${customerEmail}, id: ${data.id}`);
+    return data;
+  } catch (err) {
+    console.error('❌ Email send error:', err);
+    return null;
+  }
+}
+
 // ===========================================
 // AUTHENTICATION EMAILS
 // ===========================================
@@ -674,6 +723,7 @@ module.exports = {
   sendStoryFailedEmail,
   sendOrderConfirmationEmail,
   sendOrderShippedEmail,
+  sendOrderFailedEmail,
   // Auth emails (return structured results)
   sendEmailVerificationEmail,
   sendPasswordResetEmail,

@@ -5413,16 +5413,14 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
 
     log.debug(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
 
-    // Estimate page count and fetch actual spine width from Gelato API
-    // (same logic as gelato.js processBookOrder)
-    let estimatedPageCount = 0;
+    // Estimate Gelato page count: dedication (1) + story content + trailing blank (1)
+    let storyContentPages = 0;
     for (const story of stories) {
       const storyPages = parseStoryPages(story.data);
       const isPictureBook = story.data.languageLevel === '1st-grade';
-      estimatedPageCount += isPictureBook ? storyPages.length : storyPages.length * 2;
+      storyContentPages += isPictureBook ? storyPages.length : storyPages.length * 2;
     }
-    estimatedPageCount += stories.length * 4; // cover pages padding
-    if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
+    const estimatedPageCount = 1 + storyContentPages + 1;
 
     // Find matching product to get spine width
     const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';

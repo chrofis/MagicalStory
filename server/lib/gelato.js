@@ -133,19 +133,18 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       throw new Error('GELATO_API_KEY not configured');
     }
 
-    // Estimate page count from story data
+    // Estimate Gelato page count from story data
+    // Gelato counts: dedication (1) + story content pages + trailing blank (1)
+    // Does NOT count: cover spread, blank page 2
     const { parseStoryPages } = require('./pdf');
-    let estimatedPageCount = 0;
+    let storyContentPages = 0;
     for (const story of stories) {
       const storyPages = parseStoryPages(story.data);
       const isPictureBook = story.data.languageLevel === '1st-grade';
-      estimatedPageCount += isPictureBook ? storyPages.length : storyPages.length * 2;
+      storyContentPages += isPictureBook ? storyPages.length : storyPages.length * 2;
     }
-    // Add padding for covers, initial pages, endpapers, etc.
-    estimatedPageCount += stories.length * 4; // Rough estimate for cover pages
-    // Round up to even number
-    if (estimatedPageCount % 2 !== 0) estimatedPageCount++;
-    log.debug(`📊 [BACKGROUND] Estimated page count: ${estimatedPageCount}`);
+    const estimatedPageCount = 1 + storyContentPages + 1; // dedication + content + trailing blank
+    log.debug(`📊 [BACKGROUND] Estimated Gelato page count: ${estimatedPageCount} (${storyContentPages} story content pages)`);
 
     // Step 3a: Select product based on estimated page count
     const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
@@ -328,12 +327,13 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       log.error('❌ [BACKGROUND] Failed to update order status:', updateError);
     }
 
-    // Send admin alert about the failure
+    // Send failure emails: customer notification + admin alert
     try {
-      const { sendAdminOrderFailureAlert } = require('../../email.js');
+      const { sendOrderFailedEmail, sendAdminOrderFailureAlert } = require('../../email.js');
+      await sendOrderFailedEmail(customerInfo.email, customerInfo.name, error.message);
       await sendAdminOrderFailureAlert(sessionId, customerInfo.email, customerInfo.name, error.message);
     } catch (emailError) {
-      log.error('❌ [BACKGROUND] Failed to send failure alert email:', emailError);
+      log.error('❌ [BACKGROUND] Failed to send failure emails:', emailError);
     }
 
     throw error;
