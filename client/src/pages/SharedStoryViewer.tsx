@@ -1,6 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+
+// Swipe detection hook
+function useSwipe(onSwipeLeft: () => void, onSwipeRight: () => void) {
+  const touchStart = useRef<number | null>(null);
+  const touchEnd = useRef<number | null>(null);
+  const minSwipeDistance = 50;
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    touchEnd.current = null;
+    touchStart.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    touchEnd.current = e.targetTouches[0].clientX;
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart.current || !touchEnd.current) return;
+    const distance = touchStart.current - touchEnd.current;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    if (isLeftSwipe) onSwipeLeft();
+    if (isRightSwipe) onSwipeRight();
+  };
+
+  return { onTouchStart, onTouchMove, onTouchEnd };
+}
 
 interface SharedStoryPage {
   pageNumber: number;
@@ -64,12 +91,17 @@ export default function SharedStoryViewer() {
     }
   };
 
+  const swipeHandlers = useSwipe(
+    () => goToPage(currentPage + 1), // swipe left = next
+    () => goToPage(currentPage - 1)  // swipe right = prev
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-amber-600 mx-auto mb-4" />
-          <p className="text-amber-800">Loading story...</p>
+          <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-indigo-800">Loading story...</p>
         </div>
       </div>
     );
@@ -77,14 +109,14 @@ export default function SharedStoryViewer() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-amber-900 mb-2">Story Not Found</h1>
-          <p className="text-amber-700 mb-6">{error}</p>
+          <AlertCircle className="w-16 h-16 text-indigo-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-indigo-900 mb-2">Story Not Found</h1>
+          <p className="text-indigo-700 mb-6">{error}</p>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-3 rounded-full font-semibold hover:from-amber-600 hover:to-orange-600 transition-all"
+            className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-6 py-3 rounded-full font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
           >
             <Sparkles className="w-5 h-5" />
             Create Your Own Story
@@ -97,17 +129,17 @@ export default function SharedStoryViewer() {
   if (!story) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-amber-50 to-orange-50">
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-amber-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-indigo-200 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-amber-600" />
-            <span className="font-bold text-amber-900 hidden sm:inline">MagicalStory</span>
+            <BookOpen className="w-6 h-6 text-indigo-600" />
+            <span className="font-bold text-indigo-900 hidden sm:inline">MagicalStory</span>
           </div>
           <Link
             to="/"
-            className="inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-amber-600 hover:to-orange-600 transition-all"
+            className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
           >
             <Sparkles className="w-4 h-4" />
             Create Your Own
@@ -116,18 +148,20 @@ export default function SharedStoryViewer() {
       </header>
 
       {/* Story Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main
+        className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 md:py-8"
+        {...swipeHandlers}
+      >
         {/* Book container */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-4 border-amber-200">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200">
           {/* Cover Page */}
           {currentPage === 0 && (
-            <div className="aspect-[3/4] md:aspect-[4/3] relative bg-gradient-to-br from-amber-100 to-orange-100">
+            <div className="aspect-[3/4] md:aspect-[4/3] lg:aspect-[16/9] relative bg-gradient-to-br from-indigo-100 to-blue-100">
               <img
                 src={`/api/shared/${shareToken}/cover-image/frontCover`}
                 alt="Story Cover"
-                className="w-full h-full object-contain"
+                className="w-full h-full object-cover"
                 onError={(e) => {
-                  // Hide broken image
                   e.currentTarget.style.display = 'none';
                 }}
               />
@@ -143,12 +177,12 @@ export default function SharedStoryViewer() {
           {/* Story Pages */}
           {currentPage > 0 && story.pages[currentPage - 1] && (
             <div className="md:grid md:grid-cols-2">
-              {/* Image */}
-              <div className="aspect-square bg-gradient-to-br from-amber-50 to-orange-50 flex items-center justify-center">
+              {/* Image - 50% width, scales to fill height */}
+              <div className="aspect-square md:aspect-auto bg-gradient-to-br from-indigo-50 to-blue-50">
                 <img
                   src={`/api/shared/${shareToken}/image/${story.pages[currentPage - 1].pageNumber}`}
                   alt={`Page ${currentPage}`}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover md:object-contain"
                   loading="lazy"
                   onError={(e) => {
                     e.currentTarget.src = '';
@@ -156,12 +190,12 @@ export default function SharedStoryViewer() {
                   }}
                 />
               </div>
-              {/* Text */}
-              <div className="p-6 md:p-8 flex flex-col justify-center bg-amber-50/50">
-                <p className="text-lg md:text-xl leading-relaxed text-amber-900 whitespace-pre-wrap">
+              {/* Text - 50% width */}
+              <div className="p-6 md:p-8 lg:p-10 flex flex-col justify-center bg-indigo-50/50 md:min-h-[400px] lg:min-h-[500px]">
+                <p className="text-lg md:text-xl lg:text-2xl leading-relaxed text-gray-800 whitespace-pre-wrap">
                   {story.pages[currentPage - 1].text}
                 </p>
-                <div className="mt-4 text-right text-amber-400 text-sm">
+                <div className="mt-4 text-right text-indigo-400 text-sm">
                   Page {currentPage} of {story.pages.length}
                 </div>
               </div>
@@ -174,7 +208,7 @@ export default function SharedStoryViewer() {
           <button
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 0}
-            className="p-3 rounded-full bg-white shadow-md border border-amber-200 text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 transition-colors"
+            className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
             aria-label="Previous page"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -182,14 +216,13 @@ export default function SharedStoryViewer() {
 
           <div className="flex items-center gap-2">
             {Array.from({ length: Math.min(totalPages, 10) }).map((_, i) => {
-              // Show dots for pages, with special handling for many pages
               const pageIndex = totalPages <= 10 ? i :
                 i < 4 ? i :
-                i === 4 ? -1 : // ellipsis
+                i === 4 ? -1 :
                 totalPages - (9 - i);
 
               if (pageIndex === -1) {
-                return <span key={i} className="text-amber-400">...</span>;
+                return <span key={i} className="text-indigo-400">...</span>;
               }
 
               return (
@@ -198,8 +231,8 @@ export default function SharedStoryViewer() {
                   onClick={() => goToPage(pageIndex)}
                   className={`w-3 h-3 rounded-full transition-all ${
                     currentPage === pageIndex
-                      ? 'bg-amber-500 scale-125'
-                      : 'bg-amber-200 hover:bg-amber-300'
+                      ? 'bg-indigo-500 scale-125'
+                      : 'bg-indigo-200 hover:bg-indigo-300'
                   }`}
                   aria-label={`Go to page ${pageIndex}`}
                 />
@@ -210,40 +243,18 @@ export default function SharedStoryViewer() {
           <button
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage >= totalPages - 1}
-            className="p-3 rounded-full bg-white shadow-md border border-amber-200 text-amber-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-amber-50 transition-colors"
+            className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
             aria-label="Next page"
           >
             <ChevronRight className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Call to Action */}
-        <div className="mt-12 text-center bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl p-8 border border-amber-200">
-          <h2 className="text-2xl font-bold text-amber-900 mb-2">
-            Love this story?
-          </h2>
-          <p className="text-amber-700 mb-6">
-            Create your own personalized magical story in minutes!
-          </p>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white px-8 py-4 rounded-full text-lg font-bold hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg hover:shadow-xl"
-          >
-            <Sparkles className="w-6 h-6" />
-            Create Your Own Story
-          </Link>
-        </div>
+        {/* Swipe hint on mobile */}
+        <p className="text-center text-indigo-400 text-sm mt-3 md:hidden">
+          Swipe to navigate
+        </p>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white/60 border-t border-amber-200 py-6 mt-12">
-        <div className="max-w-4xl mx-auto px-4 text-center text-amber-600 text-sm">
-          Shared with love from{' '}
-          <a href="https://magicalstory.ch" className="font-semibold hover:text-amber-800">
-            MagicalStory.ch
-          </a>
-        </div>
-      </footer>
     </div>
   );
 }
