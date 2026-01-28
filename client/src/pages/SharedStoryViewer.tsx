@@ -132,7 +132,7 @@ export default function SharedStoryViewer() {
     <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-blue-50 flex flex-col">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-indigo-200 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <BookOpen className="w-6 h-6 text-indigo-600" />
             <span className="font-bold text-indigo-900 hidden sm:inline">MagicalStory</span>
@@ -147,16 +147,26 @@ export default function SharedStoryViewer() {
         </div>
       </header>
 
-      {/* Story Content */}
+      {/* Story Content with side arrows */}
       <main
-        className="flex-1 max-w-6xl w-full mx-auto px-4 py-6 md:py-8"
+        className="flex-1 flex items-center justify-center px-2 md:px-4 py-4 md:py-6"
         {...swipeHandlers}
       >
+        {/* Left arrow - desktop only */}
+        <button
+          onClick={() => goToPage(currentPage - 1)}
+          disabled={currentPage === 0}
+          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors mr-3 lg:mr-6 flex-shrink-0"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="w-6 h-6 lg:w-8 lg:h-8" />
+        </button>
+
         {/* Book container */}
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
           {/* Cover Page */}
           {currentPage === 0 && (
-            <div className="aspect-[3/4] md:aspect-[4/3] lg:aspect-[16/9] relative bg-gradient-to-br from-indigo-100 to-blue-100">
+            <div className="aspect-[3/4] md:aspect-[4/3] lg:aspect-[16/10] xl:aspect-[16/9] relative bg-gradient-to-br from-indigo-100 to-blue-100">
               <img
                 src={`/api/shared/${shareToken}/cover-image/frontCover`}
                 alt="Story Cover"
@@ -176,9 +186,9 @@ export default function SharedStoryViewer() {
 
           {/* Story Pages */}
           {currentPage > 0 && story.pages[currentPage - 1] && (
-            <div className="md:grid md:grid-cols-2">
-              {/* Image - 50% width, scales to fill height */}
-              <div className="aspect-square md:aspect-auto bg-gradient-to-br from-indigo-50 to-blue-50">
+            <div className="md:grid md:grid-cols-2 md:h-[500px] lg:h-[600px] xl:h-[650px]">
+              {/* Image - 50% width */}
+              <div className="aspect-square md:aspect-auto md:h-full bg-gradient-to-br from-indigo-50 to-blue-50">
                 <img
                   src={`/api/shared/${shareToken}/image/${story.pages[currentPage - 1].pageNumber}`}
                   alt={`Page ${currentPage}`}
@@ -190,46 +200,37 @@ export default function SharedStoryViewer() {
                   }}
                 />
               </div>
-              {/* Text - 50% width */}
-              <div className="p-6 md:p-8 lg:p-10 flex flex-col justify-center bg-indigo-50/50 md:min-h-[400px] lg:min-h-[500px]">
-                <p className="text-lg md:text-xl lg:text-2xl leading-relaxed text-gray-800 whitespace-pre-wrap">
-                  {story.pages[currentPage - 1].text}
-                </p>
-                <div className="mt-4 text-right text-indigo-400 text-sm">
+              {/* Text - 50% width, scrollable */}
+              <div className="p-5 md:p-6 lg:p-8 flex flex-col bg-indigo-50/50 md:h-full">
+                <div className="flex-1 overflow-y-auto">
+                  <p className="text-base md:text-lg leading-relaxed text-gray-800 whitespace-pre-wrap">
+                    {story.pages[currentPage - 1].text}
+                  </p>
+                </div>
+                <div className="mt-3 pt-3 border-t border-indigo-100 text-right text-indigo-400 text-sm flex-shrink-0">
                   Page {currentPage} of {story.pages.length}
                 </div>
               </div>
             </div>
           )}
-        </div>
 
-        {/* Navigation */}
-        <div className="flex items-center justify-center gap-4 mt-6">
-          <button
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 0}
-            className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="w-6 h-6" />
-          </button>
-
-          <div className="flex items-center gap-2">
-            {Array.from({ length: Math.min(totalPages, 10) }).map((_, i) => {
-              const pageIndex = totalPages <= 10 ? i :
-                i < 4 ? i :
-                i === 4 ? -1 :
-                totalPages - (9 - i);
+          {/* Page dots - inside book container */}
+          <div className="flex items-center justify-center gap-2 py-3 bg-white border-t border-indigo-100">
+            {Array.from({ length: Math.min(totalPages, 12) }).map((_, i) => {
+              const pageIndex = totalPages <= 12 ? i :
+                i < 5 ? i :
+                i === 5 ? -1 :
+                totalPages - (11 - i);
 
               if (pageIndex === -1) {
-                return <span key={i} className="text-indigo-400">...</span>;
+                return <span key={i} className="text-indigo-300 text-xs">...</span>;
               }
 
               return (
                 <button
                   key={i}
                   onClick={() => goToPage(pageIndex)}
-                  className={`w-3 h-3 rounded-full transition-all ${
+                  className={`w-2.5 h-2.5 rounded-full transition-all ${
                     currentPage === pageIndex
                       ? 'bg-indigo-500 scale-125'
                       : 'bg-indigo-200 hover:bg-indigo-300'
@@ -239,22 +240,39 @@ export default function SharedStoryViewer() {
               );
             })}
           </div>
-
-          <button
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage >= totalPages - 1}
-            className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors"
-            aria-label="Next page"
-          >
-            <ChevronRight className="w-6 h-6" />
-          </button>
         </div>
 
-        {/* Swipe hint on mobile */}
-        <p className="text-center text-indigo-400 text-sm mt-3 md:hidden">
-          Swipe to navigate
-        </p>
+        {/* Right arrow - desktop only */}
+        <button
+          onClick={() => goToPage(currentPage + 1)}
+          disabled={currentPage >= totalPages - 1}
+          className="hidden md:flex p-2 lg:p-3 rounded-full bg-white shadow-lg border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-indigo-50 transition-colors ml-3 lg:ml-6 flex-shrink-0"
+          aria-label="Next page"
+        >
+          <ChevronRight className="w-6 h-6 lg:w-8 lg:h-8" />
+        </button>
       </main>
+
+      {/* Mobile navigation - bottom */}
+      <div className="md:hidden flex items-center justify-center gap-6 pb-4">
+        <button
+          onClick={() => goToPage(currentPage - 1)}
+          disabled={currentPage === 0}
+          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Previous page"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+        <p className="text-indigo-400 text-sm">Swipe or tap</p>
+        <button
+          onClick={() => goToPage(currentPage + 1)}
+          disabled={currentPage >= totalPages - 1}
+          className="p-3 rounded-full bg-white shadow-md border border-indigo-200 text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
+          aria-label="Next page"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+      </div>
     </div>
   );
 }
