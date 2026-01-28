@@ -325,11 +325,12 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
   } catch (error) {
     log.error('❌ [BACKGROUND] Error processing book order:', error);
 
-    // Update order status to failed
+    // Update order status to failed (both payment_status and gelato_status)
     try {
       await dbPool.query(`
         UPDATE orders
         SET payment_status = 'failed',
+            gelato_status = 'failed',
             updated_at = CURRENT_TIMESTAMP
         WHERE stripe_session_id = $1
       `, [sessionId]);

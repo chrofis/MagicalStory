@@ -243,7 +243,9 @@ router.get('/orders', authenticateToken, async (req, res) => {
           amount: order.amount_total,
           currency: order.currency,
           paymentStatus: order.payment_status,
-          orderStatus: order.gelato_status || 'processing',
+          // Show "paid" if no Gelato status yet (payment received, waiting for print processing)
+          // Show "failed" if payment failed even without Gelato feedback
+          orderStatus: order.gelato_status || (order.payment_status === 'failed' ? 'failed' : 'paid'),
           trackingNumber: order.tracking_number,
           trackingUrl: order.tracking_url,
           createdAt: order.created_at,

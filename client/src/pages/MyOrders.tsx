@@ -80,8 +80,15 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
           text: language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : 'Failed',
           className: 'bg-red-100 text-red-800'
         };
+      case 'paid':
+        return {
+          icon: <CheckCircle size={14} />,
+          text: language === 'de' ? 'Bezahlt' : language === 'fr' ? 'Payé' : 'Paid',
+          className: 'bg-emerald-100 text-emerald-800'
+        };
       case 'created':
       case 'passed':
+      case 'submitted':
       case 'processing':
       default:
         return {
