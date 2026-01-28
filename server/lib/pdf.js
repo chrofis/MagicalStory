@@ -149,18 +149,33 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
 
   log.debug(`📄 [PRINT PDF] Using format: ${bookFormat} — content: ${Math.round(pageWidth / 2.83465)}x${Math.round(pageHeight / 2.83465)}mm, page with bleed: ${Math.round(interiorPageWidth / 2.83465)}x${Math.round(interiorPageHeight / 2.83465)}mm`);
 
-  // Use actual spine width from Gelato API if provided, otherwise use default
-  const actualSpineWidthMm = options.actualSpineWidth || 10;
-  const spineWidth = mmToPoints(actualSpineWidthMm);
+  // Cover dimensions from Gelato API (exact size for page 1)
+  const gelatoCoverDims = options.gelatoCoverDims;
+  let coverSpreadWidth, coverSpreadHeight;
+  let contentBack, contentFront; // { width, height, left, top } in mm
 
-  log.debug(`📄 [PRINT PDF] Spine width: ${actualSpineWidthMm}mm`);
-
-  // Recalculate cover width based on actual spine
-  // Cover = bleed + back cover + spine + front cover + bleed
-  const actualCoverWidth = bleed + pageWidth + spineWidth + pageWidth + bleed;
+  if (gelatoCoverDims && gelatoCoverDims.coverPageWidth) {
+    // Use exact dimensions from Gelato API
+    coverSpreadWidth = mmToPoints(gelatoCoverDims.coverPageWidth);
+    coverSpreadHeight = mmToPoints(gelatoCoverDims.coverPageHeight);
+    contentBack = gelatoCoverDims.contentBack;   // mm
+    contentFront = gelatoCoverDims.contentFront;  // mm
+    log.debug(`📄 [PRINT PDF] Cover from Gelato API: ${gelatoCoverDims.coverPageWidth}x${gelatoCoverDims.coverPageHeight}mm`);
+  } else {
+    // Fallback: calculate from format (for softcover or when API unavailable)
+    const spineWidthMm = gelatoCoverDims?.spineWidth || 10;
+    coverSpreadWidth = bleed + pageWidth + mmToPoints(spineWidthMm) + pageWidth + bleed;
+    coverSpreadHeight = pageHeight + 2 * bleed;
+    // Estimate content areas
+    const bleedMm = 3;
+    const pageWidthMm = Math.round(pageWidth / 2.83465);
+    contentBack = { left: bleedMm, top: bleedMm, width: pageWidthMm, height: Math.round(pageHeight / 2.83465) };
+    contentFront = { left: bleedMm + pageWidthMm + spineWidthMm, top: bleedMm, width: pageWidthMm, height: Math.round(pageHeight / 2.83465) };
+    log.debug(`📄 [PRINT PDF] Cover from fallback calc: ${Math.round(coverSpreadWidth / 2.83465)}x${Math.round(coverSpreadHeight / 2.83465)}mm`);
+  }
 
   const doc = new PDFDocument({
-    size: [actualCoverWidth, coverHeight],
+    size: [coverSpreadWidth, coverSpreadHeight],
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
     autoFirstPage: false
   });
@@ -173,9 +188,8 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     doc.on('error', reject);
   });
 
-  // PAGE 1: Cover spread (Back Cover + Spine + Front Cover) - Gelato requirement
-  // Layout: Back Cover (left) | Spine (center) | Front Cover (right)
-  doc.addPage({ size: [actualCoverWidth, coverHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  // PAGE 1: Cover spread - use exact Gelato dimensions
+  doc.addPage({ size: [coverSpreadWidth, coverSpreadHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
   const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
   const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
@@ -184,22 +198,20 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    // Cover layout: bleed (white) | back image | spine (white) | front image | bleed (white)
-    const backCoverX = bleed;
-    const spineX = bleed + pageWidth;
-    const frontCoverX = bleed + pageWidth + spineWidth;
+    // Place images in the content areas defined by Gelato API
+    const backX = mmToPoints(contentBack.left);
+    const backY = mmToPoints(contentBack.top);
+    const backW = mmToPoints(contentBack.width);
+    const backH = mmToPoints(contentBack.height);
+    const frontX = mmToPoints(contentFront.left);
+    const frontY = mmToPoints(contentFront.top);
+    const frontW = mmToPoints(contentFront.width);
+    const frontH = mmToPoints(contentFront.height);
 
-    // For square source images, center vertically within the cover area
-    const coverImageHeight = pageWidth; // Square image: height = width
-    const coverYOffset = (coverHeight - coverImageHeight) / 2;
-
-    // Place back cover image in its pageWidth area (after left bleed margin)
-    doc.image(backCoverBuffer, backCoverX, coverYOffset, { width: pageWidth });
-    // Spine area stays white
-    // Place front cover image in its pageWidth area (before right bleed margin)
-    doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: pageWidth });
-
-    // Spine area left blank (white) - no text for now
+    // Place back cover image centered in its content area
+    doc.image(backCoverBuffer, backX, backY, { fit: [backW, backH], align: 'center', valign: 'center' });
+    // Place front cover image centered in its content area
+    doc.image(frontCoverBuffer, frontX, frontY, { fit: [frontW, frontH], align: 'center', valign: 'center' });
   }
 
   // Page 2: Blank left page (required by Gelato - left side of first spread)
@@ -387,21 +399,36 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
 async function generateCombinedBookPdf(stories, options = {}) {
   log.debug(`📚 [COMBINED PDF] Generating book with ${stories.length} stories`);
 
-  // Get spine width from options or use default
-  const actualSpineWidthMm = options.actualSpineWidth || 10;
-  const spineWidth = mmToPoints(actualSpineWidthMm);
   const bleed = mmToPoints(3);
 
   // Interior pages include bleed (3mm each side)
   const interiorPageSize = PAGE_SIZE + 2 * bleed;
 
-  // Calculate actual cover width with spine
-  const actualCoverWidth = bleed + PAGE_SIZE + spineWidth + PAGE_SIZE + bleed;
+  // Cover dimensions from Gelato API
+  const gelatoCoverDims = options.gelatoCoverDims;
+  let coverSpreadWidth, coverSpreadHeight;
+  let contentBack, contentFront;
 
-  log.debug(`📚 [COMBINED PDF] Spine width: ${actualSpineWidthMm}mm, cover width: ${Math.round(actualCoverWidth / 2.83465)}mm`);
+  if (gelatoCoverDims && gelatoCoverDims.coverPageWidth) {
+    coverSpreadWidth = mmToPoints(gelatoCoverDims.coverPageWidth);
+    coverSpreadHeight = mmToPoints(gelatoCoverDims.coverPageHeight);
+    contentBack = gelatoCoverDims.contentBack;
+    contentFront = gelatoCoverDims.contentFront;
+    log.debug(`📚 [COMBINED PDF] Cover from Gelato API: ${gelatoCoverDims.coverPageWidth}x${gelatoCoverDims.coverPageHeight}mm`);
+  } else {
+    const spineWidthMm = gelatoCoverDims?.spineWidth || 10;
+    const spineWidth = mmToPoints(spineWidthMm);
+    coverSpreadWidth = bleed + PAGE_SIZE + spineWidth + PAGE_SIZE + bleed;
+    coverSpreadHeight = COVER_HEIGHT;
+    const pageSizeMm = Math.round(PAGE_SIZE / 2.83465);
+    const bleedMm = 3;
+    contentBack = { left: bleedMm, top: bleedMm, width: pageSizeMm, height: pageSizeMm };
+    contentFront = { left: bleedMm + pageSizeMm + spineWidthMm, top: bleedMm, width: pageSizeMm, height: pageSizeMm };
+    log.debug(`📚 [COMBINED PDF] Cover from fallback: ${Math.round(coverSpreadWidth / 2.83465)}x${Math.round(coverSpreadHeight / 2.83465)}mm`);
+  }
 
   const doc = new PDFDocument({
-    size: [actualCoverWidth, COVER_HEIGHT],
+    size: [coverSpreadWidth, coverSpreadHeight],
     margins: { top: 0, bottom: 0, left: 0, right: 0 },
     autoFirstPage: false
   });
@@ -507,8 +534,8 @@ async function generateCombinedBookPdf(stories, options = {}) {
     log.debug(`📚 [COMBINED PDF] Processing story ${storyIndex + 1}: "${storyData.title}" with ${storyPages.length} pages`);
 
     if (isFirstStory) {
-      // STORY 1: Back cover + Spine + Front cover (combined spread for book binding)
-      doc.addPage({ size: [actualCoverWidth, COVER_HEIGHT], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      // STORY 1: Cover spread - use exact Gelato dimensions
+      doc.addPage({ size: [coverSpreadWidth, coverSpreadHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
       const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
@@ -517,21 +544,18 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-        // Cover layout: bleed (white) | back image | spine (white) | front image | bleed (white)
-        const backCoverX = bleed;
-        const frontCoverX = bleed + PAGE_SIZE + spineWidth;
+        // Place images in Gelato content areas
+        const backX = mmToPoints(contentBack.left);
+        const backY = mmToPoints(contentBack.top);
+        const backW = mmToPoints(contentBack.width);
+        const backH = mmToPoints(contentBack.height);
+        const frontX = mmToPoints(contentFront.left);
+        const frontY = mmToPoints(contentFront.top);
+        const frontW = mmToPoints(contentFront.width);
+        const frontH = mmToPoints(contentFront.height);
 
-        // For square source images, center vertically within the cover area
-        const coverImageHeight = PAGE_SIZE; // Square image: height = width
-        const coverYOffset = (COVER_HEIGHT - coverImageHeight) / 2;
-
-        // Place back cover image in its PAGE_SIZE area (after left bleed margin)
-        doc.image(backCoverBuffer, backCoverX, coverYOffset, { width: PAGE_SIZE });
-        // Spine area stays white
-        // Place front cover image in its PAGE_SIZE area (before right bleed margin)
-        doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: PAGE_SIZE });
-
-        // Spine area left blank (white) - no text for now
+        doc.image(backCoverBuffer, backX, backY, { fit: [backW, backH], align: 'center', valign: 'center' });
+        doc.image(frontCoverBuffer, frontX, frontY, { fit: [frontW, frontH], align: 'center', valign: 'center' });
       }
 
       // Blank left page (required by Gelato - left side of first spread)

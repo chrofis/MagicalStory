@@ -5443,13 +5443,12 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
       log.warn(`📚 [BOOK PDF] No product found, using fallback: ${printProductUid}`);
     }
 
-    // Fetch actual spine width from Gelato API
-    let actualSpineWidth = 10; // fallback
+    // Fetch cover dimensions from Gelato API
+    let coverDims = null;
     if (printProductUid) {
-      const coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
-      if (coverDims && coverDims.spineWidth) {
-        actualSpineWidth = coverDims.spineWidth;
-        log.debug(`📚 [BOOK PDF] Gelato spine width: ${actualSpineWidth}mm for ${estimatedPageCount} pages`);
+      coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
+      if (coverDims) {
+        log.debug(`📚 [BOOK PDF] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
       }
     }
 
@@ -5457,11 +5456,11 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     let pdfBuffer, pageCount;
 
     if (stories.length === 1) {
-      const result = await generatePrintPdf(stories[0].data, bookFormat, { actualSpineWidth });
+      const result = await generatePrintPdf(stories[0].data, bookFormat, { gelatoCoverDims: coverDims });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     } else {
-      const result = await generateCombinedBookPdf(stories, { actualSpineWidth });
+      const result = await generateCombinedBookPdf(stories, { gelatoCoverDims: coverDims });
       pdfBuffer = result.pdfBuffer;
       pageCount = result.pageCount;
     }

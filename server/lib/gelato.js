@@ -42,17 +42,27 @@ async function getCoverDimensions(productUid, pageCount) {
     const data = await response.json();
     log.debug(`[GELATO] Cover dimensions response:`, JSON.stringify(data, null, 2));
 
-    // Extract spine width from response
+    // Extract dimensions from response
     const spineSize = data.spineSize || data.spine;
     if (spineSize) {
       const spineWidth = spineSize.width || spineSize;
       log.debug(`[GELATO] Spine width for ${pageCount} pages: ${spineWidth}mm`);
-      return {
+
+      // wraparoundInsideSize = full cover page size required by Gelato
+      // contentBackSize/contentFrontSize = where back/front cover images go
+      const result = {
         spineWidth: spineWidth,
-        coverWidth: data.wraparoundEdgeSize?.width || data.coverWidth,
-        coverHeight: data.wraparoundEdgeSize?.height || data.coverHeight,
+        // Full cover page dimensions (what Gelato expects as page 1 size)
+        coverPageWidth: data.wraparoundInsideSize?.width,
+        coverPageHeight: data.wraparoundInsideSize?.height,
+        // Content areas for image placement (where the actual cover images go)
+        contentBack: data.contentBackSize,   // { width, height, left, top }
+        contentFront: data.contentFrontSize, // { width, height, left, top }
+        spineArea: data.spineSize,           // { width, height, left, top }
         raw: data
       };
+      log.debug(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm`);
+      return result;
     }
 
     return null;
@@ -167,32 +177,29 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       log.warn(`⚠️ [BACKGROUND] No product found for format=${bookFormat} (${formatPattern}), coverType=${coverType}, pages=${estimatedPageCount}. Using fallback GELATO_PHOTOBOOK_UID=${printProductUid}`);
     }
 
-    // Step 3b: Get cover dimensions from Gelato API for actual spine width
-    let actualSpineWidth = 10; // Default 10mm
+    // Step 3b: Get cover dimensions from Gelato API
+    let coverDims = null;
     if (printProductUid) {
-      const coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
-      if (coverDims && coverDims.spineWidth) {
-        actualSpineWidth = coverDims.spineWidth;
-        log.debug(`📏 [BACKGROUND] Gelato spine width: ${actualSpineWidth}mm`);
+      coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
+      if (coverDims) {
+        log.debug(`📏 [BACKGROUND] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
       }
     }
-    // PDF generation will add title + "MagicalStory.ch" to spine if wide enough (>= 10mm)
 
-    // Step 3c: Generate PDF with actual spine width
+    // Step 3c: Generate PDF with actual cover dimensions
     let pdfBuffer, targetPageCount;
 
     if (stories.length === 1) {
-      // Single story - use existing generatePrintPdf with format and spine options
-      log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat}, spine: ${actualSpineWidth}mm)...`);
+      log.debug(`📄 [BACKGROUND] Generating single-story PDF (format: ${bookFormat})...`);
       const result = await generatePrintPdf(stories[0].data, bookFormat, {
-        actualSpineWidth
+        gelatoCoverDims: coverDims
       });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     } else {
-      // Multiple stories - generate combined book PDF with spine text
-      log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF (spine: ${actualSpineWidth}mm)...`);
-      const result = await generateCombinedBookPdf(stories, { actualSpineWidth });
+      // Multiple stories - generate combined book PDF
+      log.debug(`📄 [BACKGROUND] Generating combined multi-story PDF...`);
+      const result = await generateCombinedBookPdf(stories, { gelatoCoverDims: coverDims });
       pdfBuffer = result.pdfBuffer;
       targetPageCount = result.pageCount;
     }
