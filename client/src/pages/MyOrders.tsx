@@ -11,10 +11,12 @@ const log = createLogger('MyOrders');
 
 interface Order {
   id: number | string;
+  displayOrderId?: string;  // Gelato order ID (first 8 chars) for display
   type: 'book' | 'credits';
   // Book order fields
   storyId?: string;
   storyTitle?: string;
+  thumbnailUrl?: string;    // URL to fetch cover thumbnail
   customerName?: string;
   shippingName?: string;
   shippingAddress?: {
@@ -40,6 +42,8 @@ interface Order {
 }
 
 function OrderStatusBadge({ status, language }: { status: string; language: string }) {
+  // Map Gelato statuses to user-friendly display
+  // Gelato: created, passed, in_production, printed, shipped, delivered, failed
   const getStatusConfig = () => {
     switch (status.toLowerCase()) {
       case 'delivered':
@@ -52,16 +56,33 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
       case 'in_transit':
         return {
           icon: <Truck size={14} />,
-          text: language === 'de' ? 'Unterwegs' : language === 'fr' ? 'En transit' : 'Shipped',
+          text: language === 'de' ? 'Versendet' : language === 'fr' ? 'Expédié' : 'Shipped',
           className: 'bg-blue-100 text-blue-800'
+        };
+      case 'printed':
+        return {
+          icon: <Package size={14} />,
+          text: language === 'de' ? 'Gedruckt' : language === 'fr' ? 'Imprimé' : 'Printed',
+          className: 'bg-indigo-100 text-indigo-800'
+        };
+      case 'in_production':
+      case 'printing':
+        return {
+          icon: <Clock size={14} />,
+          text: language === 'de' ? 'Wird gedruckt' : language === 'fr' ? 'Impression' : 'Printing',
+          className: 'bg-purple-100 text-purple-800'
         };
       case 'cancelled':
       case 'canceled':
+      case 'failed':
         return {
           icon: <Clock size={14} />,
-          text: language === 'de' ? 'Storniert' : language === 'fr' ? 'Annulé' : 'Cancelled',
+          text: language === 'de' ? 'Fehlgeschlagen' : language === 'fr' ? 'Échoué' : 'Failed',
           className: 'bg-red-100 text-red-800'
         };
+      case 'created':
+      case 'passed':
+      case 'processing':
       default:
         return {
           icon: <Clock size={14} />,
@@ -149,22 +170,49 @@ function BookOrderCard({
   formatDate: (date: string | null) => string;
   formatAmount: (amount: number, currency: string) => string;
 }) {
+  const [thumbnailData, setThumbnailData] = useState<string | null>(null);
+
+  // Load thumbnail on mount
+  useEffect(() => {
+    if (order.thumbnailUrl) {
+      api.get<{ coverImage: string }>(order.thumbnailUrl)
+        .then(data => {
+          if (data.coverImage) {
+            setThumbnailData(data.coverImage);
+          }
+        })
+        .catch(() => {
+          // Ignore thumbnail load errors
+        });
+    }
+  }, [order.thumbnailUrl]);
+
   return (
     <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+      {/* Thumbnail header */}
+      {thumbnailData && (
+        <div className="h-32 bg-gray-100 overflow-hidden">
+          <img
+            src={thumbnailData.startsWith('data:') ? thumbnailData : `data:image/jpeg;base64,${thumbnailData}`}
+            alt={order.storyTitle || 'Book cover'}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
       <div className="p-4">
         {/* Header: Order info and status */}
         <div className="flex items-start justify-between mb-3">
           <div>
             <p className="text-xs text-gray-500">
-              {language === 'de' ? 'Bestellung' : language === 'fr' ? 'Commande' : 'Order'} #{order.id}
+              {language === 'de' ? 'Bestellung' : language === 'fr' ? 'Commande' : 'Order'} {order.displayOrderId || `#${order.id}`}
             </p>
-            <h3 className="font-bold text-lg text-gray-800">{order.storyTitle}</h3>
+            <h3 className="font-bold text-lg text-gray-800 line-clamp-2">{order.storyTitle || 'Untitled Story'}</h3>
           </div>
           <OrderStatusBadge status={order.orderStatus} language={language} />
         </div>
 
         {/* Order details */}
-        <div className="space-y-2 text-sm text-gray-600 mb-4">
+        <div className="space-y-1 text-sm text-gray-600 mb-4">
           <p>
             <span className="font-medium">
               {language === 'de' ? 'Datum:' : language === 'fr' ? 'Date:' : 'Date:'}

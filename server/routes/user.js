@@ -178,6 +178,7 @@ router.get('/orders', authenticateToken, async (req, res) => {
         SELECT
           o.id,
           o.story_id,
+          o.gelato_order_id,
           o.customer_name,
           o.shipping_name,
           o.shipping_address_line1,
@@ -201,22 +202,36 @@ router.get('/orders', authenticateToken, async (req, res) => {
       `;
       const rows = await dbQuery(query, [req.user.id]);
 
-      // Parse story data to get title
+      // Parse story data to get title and thumbnail
       const orders = rows.map(order => {
         let storyTitle = 'Untitled Story';
+        let thumbnailUrl = null;
         if (order.story_data) {
           try {
-            const storyData = JSON.parse(order.story_data);
+            const storyData = typeof order.story_data === 'string'
+              ? JSON.parse(order.story_data)
+              : order.story_data;
             storyTitle = storyData.title || storyData.storyTitle || 'Untitled Story';
+            // Check if story has cover images for thumbnail
+            if (storyData.coverImages?.frontCover || storyData.sceneImages?.length > 0) {
+              thumbnailUrl = `/api/stories/${order.story_id}/cover`;
+            }
           } catch (e) {
             // Ignore parse errors
           }
         }
 
+        // Use first 5 chars of Gelato order ID for display (hides internal DB id)
+        const displayOrderId = order.gelato_order_id
+          ? order.gelato_order_id.substring(0, 8).toUpperCase()
+          : `#${order.id}`;
+
         return {
           id: order.id,
+          displayOrderId,
           storyId: order.story_id,
           storyTitle,
+          thumbnailUrl,
           customerName: order.customer_name,
           shippingName: order.shipping_name,
           shippingAddress: {
