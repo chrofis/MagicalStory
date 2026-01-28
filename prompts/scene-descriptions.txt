@@ -48,6 +48,14 @@ Avoid these scene types:
 
 ---
 
+## SIMPLICITY RULE
+
+- Maximum 3 main characters with visible faces
+- One clear focal point - don't split attention
+- If scene feels crowded, REMOVE elements rather than shrink them
+
+---
+
 ## VISUAL LANGUAGE RULES
 
 **Positioning (CRITICAL - image generators cannot interpret metrics):**
