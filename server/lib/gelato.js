@@ -330,7 +330,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
 
     // Send failure notification email to customer
     try {
-      const { sendEmail } = require('../../../email.js');
+      const { sendEmail } = require('../../email.js');
       await sendEmail({
         to: customerInfo.email,
         subject: 'Book Order Failed - MagicalStory',
