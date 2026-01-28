@@ -184,25 +184,20 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
     const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-    // Calculate cover positions with spine in the middle
-    // Back cover: from 0, width = bleed + pageWidth (image extends into left bleed)
-    // Spine: in the middle
-    // Front cover: starts after back cover + spine, width = pageWidth + bleed
-    const backCoverWidth = bleed + pageWidth;
-    const spineX = backCoverWidth;
-    const frontCoverX = backCoverWidth + spineWidth;
-    const frontCoverWidth = pageWidth + bleed;
+    // Cover layout: bleed (white) | back image | spine (white) | front image | bleed (white)
+    const backCoverX = bleed;
+    const spineX = bleed + pageWidth;
+    const frontCoverX = bleed + pageWidth + spineWidth;
 
-    // For square source images, center vertically on cover
-    // Images must extend to outer edges (into bleed area)
-    const coverImageHeight = backCoverWidth; // Square image: height = width when scaled
+    // For square source images, center vertically within the cover area
+    const coverImageHeight = pageWidth; // Square image: height = width
     const coverYOffset = (coverHeight - coverImageHeight) / 2;
 
-    // Place back cover (left side) - fills from x=0 to x=backCoverWidth
-    doc.image(backCoverBuffer, 0, coverYOffset, { width: backCoverWidth });
-    // Spine area stays white (no image)
-    // Place front cover (right side) - fills from frontCoverX to right edge
-    doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
+    // Place back cover image in its pageWidth area (after left bleed margin)
+    doc.image(backCoverBuffer, backCoverX, coverYOffset, { width: pageWidth });
+    // Spine area stays white
+    // Place front cover image in its pageWidth area (before right bleed margin)
+    doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: pageWidth });
 
     // Spine area left blank (white) - no text for now
   }
@@ -529,21 +524,19 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
 
-        // Calculate cover positions with spine in the middle
-        const backCoverWidth = bleed + PAGE_SIZE;
-        const spineX = backCoverWidth;
-        const frontCoverX = backCoverWidth + spineWidth;
-        const frontCoverWidth = PAGE_SIZE + bleed;
+        // Cover layout: bleed (white) | back image | spine (white) | front image | bleed (white)
+        const backCoverX = bleed;
+        const frontCoverX = bleed + PAGE_SIZE + spineWidth;
 
-        // For square source images, center vertically on cover
-        const coverImageHeight = backCoverWidth; // Square image: height = width when scaled
+        // For square source images, center vertically within the cover area
+        const coverImageHeight = PAGE_SIZE; // Square image: height = width
         const coverYOffset = (COVER_HEIGHT - coverImageHeight) / 2;
 
-        // Place back cover (left side) - fills from x=0 to x=backCoverWidth
-        doc.image(backCoverBuffer, 0, coverYOffset, { width: backCoverWidth });
+        // Place back cover image in its PAGE_SIZE area (after left bleed margin)
+        doc.image(backCoverBuffer, backCoverX, coverYOffset, { width: PAGE_SIZE });
         // Spine area stays white
-        // Place front cover (right side) - fills from frontCoverX to right edge
-        doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: frontCoverWidth });
+        // Place front cover image in its PAGE_SIZE area (before right bleed margin)
+        doc.image(frontCoverBuffer, frontCoverX, coverYOffset, { width: PAGE_SIZE });
 
         // Spine area left blank (white) - no text for now
       }
