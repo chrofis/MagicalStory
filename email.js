@@ -272,10 +272,60 @@ async function sendStoryFailedEmail(userEmail, firstName, language = 'English') 
 }
 
 /**
+ * Format delivery estimate based on language
+ * @param {Date|string} minDate - Minimum delivery date
+ * @param {Date|string} maxDate - Maximum delivery date
+ * @param {string} language - Language for formatting
+ * @returns {string} Formatted delivery estimate string
+ */
+function formatDeliveryEstimate(minDate, maxDate, language) {
+  // Default fallbacks by language
+  const defaults = {
+    'English': '5-10 business days',
+    'German': '5-10 Werktage',
+    'French': '5-10 jours ouvrables'
+  };
+
+  if (!minDate && !maxDate) {
+    return defaults[language] || defaults['English'];
+  }
+
+  // Locale mapping
+  const locales = {
+    'English': 'en-US',
+    'German': 'de-DE',
+    'French': 'fr-FR'
+  };
+  const locale = locales[language] || 'en-US';
+
+  const formatOptions = { month: 'short', day: 'numeric' };
+
+  try {
+    const minDateObj = minDate ? new Date(minDate) : null;
+    const maxDateObj = maxDate ? new Date(maxDate) : null;
+
+    if (minDateObj && maxDateObj) {
+      const minFormatted = minDateObj.toLocaleDateString(locale, formatOptions);
+      const maxFormatted = maxDateObj.toLocaleDateString(locale, formatOptions);
+      return `${minFormatted} - ${maxFormatted}`;
+    } else if (minDateObj) {
+      return minDateObj.toLocaleDateString(locale, formatOptions);
+    } else if (maxDateObj) {
+      const byLabel = { 'English': 'by', 'German': 'bis', 'French': 'avant le' };
+      return `${byLabel[language] || 'by'} ${maxDateObj.toLocaleDateString(locale, formatOptions)}`;
+    }
+  } catch (e) {
+    console.error('❌ Error formatting delivery estimate:', e);
+  }
+
+  return defaults[language] || defaults['English'];
+}
+
+/**
  * Send order confirmation email
  * @param {string} customerEmail - Customer email address
  * @param {string} customerName - Customer's full name
- * @param {object} orderDetails - Order details including orderId, amount, currency, shippingAddress
+ * @param {object} orderDetails - Order details including orderId, amount, currency, shippingAddress, deliveryEstimateMin, deliveryEstimateMax
  * @param {string} language - Language for email content (English, German, French)
  */
 async function sendOrderConfirmationEmail(customerEmail, customerName, orderDetails, language = 'English') {
@@ -291,6 +341,13 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     return null;
   }
 
+  // Format delivery estimate
+  const deliveryEstimate = formatDeliveryEstimate(
+    orderDetails.deliveryEstimateMin,
+    orderDetails.deliveryEstimateMax,
+    language
+  );
+
   // Fill in placeholders
   const values = {
     greeting: getGreetingName(customerName),
@@ -300,7 +357,8 @@ async function sendOrderConfirmationEmail(customerEmail, customerName, orderDeta
     addressLine1: orderDetails.shippingAddress?.line1 || '',
     city: orderDetails.shippingAddress?.city || '',
     postalCode: orderDetails.shippingAddress?.postal_code || '',
-    country: orderDetails.shippingAddress?.country || ''
+    country: orderDetails.shippingAddress?.country || '',
+    deliveryEstimate: deliveryEstimate
   };
 
   try {

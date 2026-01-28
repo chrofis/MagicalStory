@@ -804,41 +804,9 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             );
           });
 
-          // Send order confirmation email to customer
-          // Get language for email localization - prefer user's preference, fall back to story language
-          let orderEmailLanguage = 'English';
-          try {
-            // First try user's preferred language
-            const userLangResult = await dbPool.query(
-              'SELECT preferred_language FROM users WHERE id = $1',
-              [userId]
-            );
-            if (userLangResult.rows.length > 0 && userLangResult.rows[0].preferred_language) {
-              orderEmailLanguage = userLangResult.rows[0].preferred_language;
-            } else {
-              // Fall back to first story's language
-              const storyLangResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [primaryStoryId]);
-              if (storyLangResult.rows.length > 0) {
-                const storyData = typeof storyLangResult.rows[0].data === 'string'
-                  ? JSON.parse(storyLangResult.rows[0].data)
-                  : storyLangResult.rows[0].data;
-                orderEmailLanguage = storyData?.inputData?.language || storyData?.language || 'English';
-              }
-            }
-          } catch (e) {
-            log.warn('⚠️ Could not get language for order email:', e.message);
-          }
-          email.sendOrderConfirmationEmail(
-            customerInfo.email,
-            customerInfo.name,
-            {
-              orderId: fullSession.id.slice(-8).toUpperCase(),
-              amount: (fullSession.amount_total / 100).toFixed(2),
-              currency: fullSession.currency.toUpperCase(),
-              shippingAddress: address
-            },
-            orderEmailLanguage
-          ).catch(err => log.error('❌ Failed to send order confirmation email:', err));
+          // Order confirmation email is now sent when Gelato validates the order (via webhook)
+          // This prevents sending "Order Confirmed" followed by "Order Failed" if Gelato rejects
+          // See Gelato webhook handler for 'passed' status
 
           console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
         } else {
@@ -960,6 +928,64 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
 
       console.log('✅ [GELATO WEBHOOK] Order status updated to:', newStatus);
 
+      // Send order confirmation email when Gelato validates the order (passed or in_production)
+      // This ensures customers only receive "Order Confirmed" after Gelato accepts the order
+      if ((fulfillmentStatus === 'passed' || fulfillmentStatus === 'in_production') && order.customer_email) {
+        try {
+          // Check if confirmation email was already sent (idempotency)
+          const emailCheck = await dbPool.query(
+            'SELECT confirmation_email_sent, delivery_estimate_min, delivery_estimate_max, amount, currency, shipping_address FROM orders WHERE id = $1',
+            [order.id]
+          );
+          const orderData = emailCheck.rows[0];
+
+          if (!orderData?.confirmation_email_sent) {
+            // Get user's preferred language
+            let language = 'English';
+            if (order.user_id) {
+              const userResult = await dbPool.query(
+                'SELECT preferred_language FROM users WHERE id = $1',
+                [order.user_id]
+              );
+              if (userResult.rows.length > 0 && userResult.rows[0].preferred_language) {
+                language = userResult.rows[0].preferred_language;
+              }
+            }
+
+            // Parse shipping address
+            const shippingAddress = typeof orderData.shipping_address === 'string'
+              ? JSON.parse(orderData.shipping_address)
+              : orderData.shipping_address;
+
+            await email.sendOrderConfirmationEmail(
+              order.customer_email,
+              order.customer_name,
+              {
+                orderId: order.id,
+                amount: orderData.amount ? (orderData.amount / 100).toFixed(2) : '0.00',
+                currency: (orderData.currency || 'CHF').toUpperCase(),
+                shippingAddress: shippingAddress,
+                deliveryEstimateMin: orderData.delivery_estimate_min,
+                deliveryEstimateMax: orderData.delivery_estimate_max
+              },
+              language
+            );
+
+            // Mark confirmation email as sent (prevent duplicates)
+            await dbPool.query(
+              'UPDATE orders SET confirmation_email_sent = TRUE WHERE id = $1',
+              [order.id]
+            );
+
+            console.log('📧 [GELATO WEBHOOK] Order confirmation email sent to:', order.customer_email);
+          } else {
+            log.debug('📧 [GELATO WEBHOOK] Confirmation email already sent for order:', order.id);
+          }
+        } catch (emailErr) {
+          log.error('❌ [GELATO WEBHOOK] Failed to send confirmation email:', emailErr.message);
+        }
+      }
+
       // Send email notification for shipped orders
       if (fulfillmentStatus === 'shipped' && order.customer_email) {
         try {
@@ -998,6 +1024,46 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
         status: newStatus,
         trackingNumber
       });
+    }
+
+    // Handle delivery estimate updates from Gelato
+    if (event.event === 'order_delivery_estimate_updated') {
+      const { orderId, minDeliveryDate, maxDeliveryDate } = event;
+
+      log.debug('📦 [GELATO WEBHOOK] Delivery estimate update for order:', orderId);
+      log.debug('   Min delivery:', minDeliveryDate);
+      log.debug('   Max delivery:', maxDeliveryDate);
+
+      // Find the order
+      const orderResult = await dbPool.query(
+        'SELECT id, user_id FROM orders WHERE gelato_order_id = $1',
+        [orderId]
+      );
+
+      if (orderResult.rows.length > 0) {
+        const order = orderResult.rows[0];
+
+        // Store delivery estimates in database
+        await dbPool.query(`
+          UPDATE orders
+          SET delivery_estimate_min = $1,
+              delivery_estimate_max = $2,
+              updated_at = NOW()
+          WHERE gelato_order_id = $3
+        `, [minDeliveryDate || null, maxDeliveryDate || null, orderId]);
+
+        console.log('✅ [GELATO WEBHOOK] Delivery estimate stored for order:', order.id);
+
+        // Log activity
+        await logActivity(order.user_id, null, 'DELIVERY_ESTIMATE_UPDATED', {
+          orderId: order.id,
+          gelatoOrderId: orderId,
+          minDeliveryDate,
+          maxDeliveryDate
+        });
+      } else {
+        log.warn('⚠️ [GELATO WEBHOOK] Order not found for delivery estimate update:', orderId);
+      }
     }
 
     // Always return 200 to acknowledge receipt
