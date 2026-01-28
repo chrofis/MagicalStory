@@ -396,7 +396,7 @@ async function sendOrderFailedEmail(customerEmail, customerName, errorMessage) {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: customerEmail,
-      subject: 'Bestellproblem – Wir kümmern uns darum / Order Issue – We're on it',
+      subject: "Bestellproblem – Wir kümmern uns darum / Order Issue – We're on it",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #dc2626;">Bestellproblem / Order Issue</h2>
