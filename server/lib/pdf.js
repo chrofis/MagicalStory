@@ -262,18 +262,22 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     addStandardPages(doc, storyData, storyPages, pageWidth, pageHeight, consistentFontSize, bleed);
   }
 
+  // Trailing blank page (last page of the book, left side of last spread)
+  doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+
   // Calculate total PDF page count
-  // Gelato counts ALL pages in the PDF: cover spread (1) + blank (1) + dedication (1) + story + padding
+  // Layout: cover spread (1) + blank (1) + dedication (1) + story pages + trailing blank (1)
   const coverSpreadPages = 1;
-  const frontMatterPages = 2; // Always: blank left page + dedication right page
+  const frontMatterPages = 2; // blank left page + dedication right page
   const storyContentPages = isPictureBook ? storyPages.length : storyPages.length * 2;
-  let interiorPages = frontMatterPages + storyContentPages;
+  const trailingBlankPages = 1;
+  let interiorPages = frontMatterPages + storyContentPages + trailingBlankPages;
 
   // Interior pages must be even for print (pages are printed front/back)
   if (interiorPages % 2 !== 0) {
     interiorPages += 1;
     doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-    log.debug(`📄 [PRINT PDF] Added 1 blank page to reach even interior count ${interiorPages}`);
+    log.debug(`📄 [PRINT PDF] Added 1 extra blank page to reach even interior count ${interiorPages}`);
   }
 
   const totalPdfPages = coverSpreadPages + interiorPages;
@@ -592,11 +596,15 @@ async function generateCombinedBookPdf(stories, options = {}) {
     }
   }
 
-  // Add blank pages if needed for even page count
+  // Trailing blank page (last page of the book)
+  doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+  totalStoryPages++;
+
+  // Add extra blank page if needed for even page count
   if (totalStoryPages % 2 !== 0) {
     doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
     totalStoryPages++;
-    log.debug(`📚 [COMBINED PDF] Added final blank page for even page count`);
+    log.debug(`📚 [COMBINED PDF] Added extra blank page for even page count`);
   }
 
   doc.end();
