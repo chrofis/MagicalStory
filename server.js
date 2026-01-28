@@ -5414,12 +5414,14 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     log.debug(`📚 [BOOK PDF] Loaded ${stories.length} stories: ${stories.map(s => s.data.title).join(', ')}`);
 
     // Estimate Gelato page count: dedication (1) + story content + trailing blank (1)
+    // NOTE: parseStoryPages from storyHelpers expects a TEXT string, not storyData object
     let storyContentPages = 0;
     for (const story of stories) {
-      const storyPages = parseStoryPages(story.data);
+      const storyText = story.data.storyText || story.data.generatedStory || story.data.story || story.data.text || '';
+      const storyPages = parseStoryPages(storyText);
       const isPictureBook = story.data.languageLevel === '1st-grade';
       const pagesFromStory = isPictureBook ? storyPages.length : storyPages.length * 2;
-      console.log(`📊 [BOOK PDF] Story "${story.data.title}": parseStoryPages=${storyPages.length}, isPictureBook=${isPictureBook}, contentPages=${pagesFromStory}, hasStoryText=${!!story.data.storyText}, hasGeneratedStory=${!!story.data.generatedStory}, languageLevel=${story.data.languageLevel}`);
+      console.log(`📊 [BOOK PDF] Story "${story.data.title}": ${storyPages.length} parsed pages, contentPages=${pagesFromStory}`);
       storyContentPages += pagesFromStory;
     }
     const estimatedPageCount = 1 + storyContentPages + 1;
