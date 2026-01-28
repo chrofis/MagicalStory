@@ -274,7 +274,7 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   doc.end();
   const pdfBuffer = await pdfPromise;
 
-  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB) with ${totalPdfPages} total pages (${interiorPages} interior + cover spread), font: ${consistentFontSize}pt`);
+  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), Gelato page count: ${totalPdfPages}, font: ${consistentFontSize}pt`);
 
   return { pdfBuffer, pageCount: totalPdfPages, fontSizeWarning };
 }

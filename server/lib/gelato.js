@@ -328,41 +328,12 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
       log.error('❌ [BACKGROUND] Failed to update order status:', updateError);
     }
 
-    // Send failure notification email to customer
+    // Send admin alert about the failure
     try {
-      const { sendEmail } = require('../../email.js');
-      await sendEmail({
-        to: customerInfo.email,
-        subject: 'Book Order Failed - MagicalStory',
-        text: `Dear ${customerInfo.name},
-
-Unfortunately, your book order could not be processed.
-
-Error: ${error.message}
-
-Please contact us at support@magicalstory.ch for assistance.
-
-We apologize for the inconvenience.
-
-Best regards,
-The MagicalStory Team`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2 style="color: #dc2626;">Book Order Failed</h2>
-            <p>Dear ${customerInfo.name},</p>
-            <p>Unfortunately, your book order could not be processed.</p>
-            <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 15px; border-radius: 8px; margin: 20px 0;">
-              <strong>Error:</strong> ${error.message}
-            </div>
-            <p>Please contact us at <a href="mailto:support@magicalstory.ch">support@magicalstory.ch</a> for assistance.</p>
-            <p>We apologize for the inconvenience.</p>
-            <p>Best regards,<br>The MagicalStory Team</p>
-          </div>
-        `
-      });
-      console.log(`📧 [BACKGROUND] Failure notification sent to ${customerInfo.email}`);
+      const { sendAdminOrderFailureAlert } = require('../../email.js');
+      await sendAdminOrderFailureAlert(sessionId, customerInfo.email, customerInfo.name, error.message);
     } catch (emailError) {
-      log.error('❌ [BACKGROUND] Failed to send failure email:', emailError);
+      log.error('❌ [BACKGROUND] Failed to send failure alert email:', emailError);
     }
 
     throw error;
