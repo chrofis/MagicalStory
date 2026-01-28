@@ -283,8 +283,9 @@ export function RetryHistoryDisplay({
   if (!retryHistory || retryHistory.length === 0) return null;
 
   // Count repairs in history (both legacy and grid-based)
-  const repairCount = retryHistory.filter(a => a.type === 'auto_repair' || a.type === 'grid_repair').length;
-  const gridRepairCount = retryHistory.filter(a => a.type === 'grid_repair').length;
+  const repairCount = retryHistory.filter(a => a.type === 'auto_repair' || a.type === 'grid_repair' || a.type === 'grid_repair_failed').length;
+  const gridRepairCount = retryHistory.filter(a => a.type === 'grid_repair' || a.type === 'grid_repair_failed').length;
+  const gridRepairFailedCount = retryHistory.filter(a => a.type === 'grid_repair_failed').length;
 
   return (
     <>
@@ -319,7 +320,7 @@ export function RetryHistoryDisplay({
             {repairCount > 0 && (
               <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
                 🔧 {repairCount} {language === 'de' ? 'Reparatur' : 'repair'}{repairCount > 1 ? (language === 'de' ? 'en' : 's') : ''}
-                {gridRepairCount > 0 && <span className="ml-1">({gridRepairCount} grid)</span>}
+                {gridRepairCount > 0 && <span className="ml-1">({gridRepairCount} grid{gridRepairFailedCount > 0 ? `, ${gridRepairFailedCount} failed` : ''})</span>}
               </span>
             )}
           </span>
@@ -330,6 +331,7 @@ export function RetryHistoryDisplay({
       <div className="mt-3 space-y-3">
         {retryHistory.map((attempt, idx) => (
           <div key={idx} className={`border rounded-lg p-3 ${
+            attempt.type === 'grid_repair_failed' ? 'bg-red-50 border-red-300' :
             attempt.type === 'grid_repair' ? 'bg-violet-50 border-violet-300' :
             attempt.type === 'auto_repair' ? 'bg-amber-50 border-amber-300' :
             idx === retryHistory.length - 1
@@ -338,7 +340,9 @@ export function RetryHistoryDisplay({
           }`}>
             <div className="flex items-center justify-between mb-2">
               <span className="font-semibold text-sm">
-                {attempt.type === 'grid_repair' ? (
+                {attempt.type === 'grid_repair_failed' ? (
+                  <span className="text-red-700">🔲 Grid Repair Failed</span>
+                ) : attempt.type === 'grid_repair' ? (
                   <span className="text-violet-700">🔲 Grid Repair</span>
                 ) : attempt.type === 'auto_repair' ? (
                   <span className="text-amber-700">🔧 Auto-Repair</span>
@@ -635,8 +639,8 @@ export function RetryHistoryDisplay({
               </div>
             )}
 
-            {/* Grid Repair specific display */}
-            {attempt.type === 'grid_repair' && (
+            {/* Grid Repair specific display (including failed attempts) */}
+            {(attempt.type === 'grid_repair' || attempt.type === 'grid_repair_failed') && (
               <div className="space-y-2">
                 {/* Stats row */}
                 <div className="flex items-center gap-4 text-sm">
@@ -656,6 +660,19 @@ export function RetryHistoryDisplay({
                     </span>
                   )}
                 </div>
+
+                {/* Fail reason for failed grid repairs */}
+                {attempt.type === 'grid_repair_failed' && attempt.failReason && (
+                  <div className="text-sm text-red-600 bg-red-100 p-2 rounded border border-red-200">
+                    ⚠️ {language === 'de' ? 'Fehlergrund:' : 'Failure reason:'} {
+                      attempt.failReason === 'no_repairs_made' ? (language === 'de' ? 'Keine Reparaturen durchgeführt' : 'No repairs were made') :
+                      attempt.failReason === 'no_image_data' ? (language === 'de' ? 'Keine Bilddaten zurückgegeben' : 'No image data returned') :
+                      attempt.failReason === 'image_too_small' ? (language === 'de' ? 'Zurückgegebenes Bild zu klein/ungültig' : 'Returned image too small/invalid') :
+                      attempt.failReason === 'image_unchanged' ? (language === 'de' ? 'Bild wurde nicht verändert' : 'Image was not changed') :
+                      attempt.failReason
+                    }
+                  </div>
+                )}
 
                 {/* Step 1: Annotated Original with Bounding Boxes */}
                 {attempt.annotatedOriginal && (
@@ -994,7 +1011,7 @@ export function RetryHistoryDisplay({
             )}
 
             {/* Input Prompt (for regular attempts) */}
-            {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.prompt && (
+            {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.type !== 'grid_repair_failed' && attempt.prompt && (
               <details className="text-sm mb-2">
                 <summary className="cursor-pointer text-blue-700 font-medium hover:text-blue-900 flex items-center gap-2">
                   📤 {language === 'de' ? 'Eingabe-Prompt' : 'Input Prompt'}
@@ -1013,19 +1030,19 @@ export function RetryHistoryDisplay({
             )}
 
             {/* Regular attempt feedback */}
-            {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.reasoning ? (
+            {attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.type !== 'grid_repair_failed' && attempt.reasoning ? (
               <details className="text-sm text-gray-600 mb-2">
                 <summary className="cursor-pointer font-medium">📥 {language === 'de' ? 'Bewertungs-Feedback' : 'Evaluation Feedback'}</summary>
                 <pre className="mt-2 whitespace-pre-wrap bg-gray-50 p-3 rounded text-sm overflow-auto max-h-[500px] font-mono">{attempt.reasoning}</pre>
               </details>
-            ) : attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.score === 0 && (
+            ) : attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.type !== 'grid_repair_failed' && attempt.score === 0 && (
               <div className="text-sm text-gray-500 italic mb-2">
                 {language === 'de' ? 'Qualitätsbewertung fehlgeschlagen' : language === 'fr' ? 'Évaluation de qualité échouée' : 'Quality evaluation failed'}
               </div>
             )}
 
             {/* Image - show directly for regular attempts, not hidden */}
-            {attempt.imageData && attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && (
+            {attempt.imageData && attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.type !== 'grid_repair_failed' && (
               <div className="mt-2">
                 <div className="text-xs text-gray-500 mb-1 font-medium">
                   {language === 'de' ? 'Generiertes Bild' : 'Generated Image'}

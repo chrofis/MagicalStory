@@ -201,7 +201,7 @@ export interface GridRepairData {
 
 export interface RetryAttempt {
   attempt: number;
-  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed' | 'grid_repair' | 'bbox_detection_only';
+  type: 'generation' | 'text_edit' | 'text_edit_failed' | 'auto_repair' | 'auto_repair_failed' | 'grid_repair' | 'grid_repair_failed' | 'bbox_detection_only';
   imageData?: string;
   score?: number;
   reasoning?: string;
@@ -226,6 +226,7 @@ export interface RetryAttempt {
   gridFixedCount?: number;
   gridFailedCount?: number;
   gridTotalIssues?: number;
+  failReason?: string;  // For grid_repair_failed: why the repair was not used
   // Annotated original image with bounding boxes (base64)
   annotatedOriginal?: string;
   // Bbox detection only fields

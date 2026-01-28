@@ -2546,14 +2546,36 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
           }
         } else {
           // Log why repair was skipped
+          let failReason = 'unknown';
           if (!repairResult.repaired) {
             log.info(`ℹ️  [QUALITY RETRY] Auto-repair reported no repairs made`);
+            failReason = 'no_repairs_made';
           } else if (!repairResult.imageData) {
             log.warn(`⚠️  [QUALITY RETRY] Auto-repair returned null/undefined imageData`);
+            failReason = 'no_image_data';
           } else if (repairResult.imageData.length <= 1000) {
             log.warn(`⚠️  [QUALITY RETRY] Auto-repair returned invalid imageData (too small: ${repairResult.imageData.length} bytes)`);
+            failReason = 'image_too_small';
           } else {
             log.info(`ℹ️  [QUALITY RETRY] Auto-repair did not change the image`);
+            failReason = 'image_unchanged';
+          }
+
+          // Store failed grid repairs for debugging (grids data shows what was attempted)
+          if (repairResult.grids && repairResult.grids.length > 0) {
+            retryHistory.push({
+              attempt: attempts,
+              type: 'grid_repair_failed',
+              failReason,
+              preRepairScore: score,
+              gridFixedCount: repairResult.gridFixedCount || 0,
+              gridFailedCount: repairResult.gridFailedCount || 0,
+              gridTotalIssues: repairResult.gridTotalIssues || 0,
+              grids: repairResult.grids,
+              bboxDetection: bboxDetectionHistory,
+              bboxOverlayImage: bboxOverlayImage,
+              timestamp: new Date().toISOString()
+            });
           }
         }
       } catch (repairError) {
