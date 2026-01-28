@@ -5387,7 +5387,7 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Missing or invalid storyIds array' });
     }
 
-    log.debug(`📚 [BOOK PDF] Generating book with ${storyIds.length} stories, format: ${bookFormat}, cover: ${coverType}`);
+    console.log(`📚 [BOOK PDF] Generating book with ${storyIds.length} stories, format: ${bookFormat}, cover: ${coverType}`);
 
     // Fetch all stories from database
     const stories = [];
@@ -5440,7 +5440,9 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     }
     if (!printProductUid) {
       printProductUid = process.env.GELATO_PHOTOBOOK_UID;
-      log.warn(`📚 [BOOK PDF] No product found, using fallback: ${printProductUid}`);
+      console.log(`⚠️ [BOOK PDF] No product found for coverType=${coverType}, format=${formatPattern}, pages=${estimatedPageCount}. Fallback: ${printProductUid}`);
+    } else {
+      console.log(`📚 [BOOK PDF] Product: ${printProductUid} (coverType=${coverType}, format=${formatPattern})`);
     }
 
     // Fetch cover dimensions from Gelato API
@@ -5448,7 +5450,9 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     if (printProductUid) {
       coverDims = await getCoverDimensions(printProductUid, estimatedPageCount);
       if (coverDims) {
-        log.debug(`📚 [BOOK PDF] Gelato cover: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
+        console.log(`📚 [BOOK PDF] Gelato cover dims: ${coverDims.coverPageWidth}x${coverDims.coverPageHeight}mm, spine: ${coverDims.spineWidth}mm`);
+      } else {
+        console.log(`⚠️ [BOOK PDF] getCoverDimensions returned null for product=${printProductUid}, pages=${estimatedPageCount}`);
       }
     }
 

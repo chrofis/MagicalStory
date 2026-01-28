@@ -40,31 +40,34 @@ async function getCoverDimensions(productUid, pageCount) {
     }
 
     const data = await response.json();
-    log.debug(`[GELATO] Cover dimensions response:`, JSON.stringify(data, null, 2));
+    console.log(`[GELATO] Cover dimensions response for ${productUid}:`, JSON.stringify(data));
 
     // Extract dimensions from response
     const spineSize = data.spineSize || data.spine;
     if (spineSize) {
       const spineWidth = spineSize.width || spineSize;
-      log.debug(`[GELATO] Spine width for ${pageCount} pages: ${spineWidth}mm`);
+      console.log(`[GELATO] Spine width for ${pageCount} pages: ${spineWidth}mm`);
 
-      // wraparoundInsideSize = full cover page size required by Gelato
-      // contentBackSize/contentFrontSize = where back/front cover images go
+      // wraparoundInsideSize = full cover page size required by Gelato (hardcover)
+      // For softcover, use productInsideSize as fallback
+      const fullCoverSize = data.wraparoundInsideSize || data.productInsideSize;
+
       const result = {
         spineWidth: spineWidth,
         // Full cover page dimensions (what Gelato expects as page 1 size)
-        coverPageWidth: data.wraparoundInsideSize?.width,
-        coverPageHeight: data.wraparoundInsideSize?.height,
+        coverPageWidth: fullCoverSize?.width,
+        coverPageHeight: fullCoverSize?.height,
         // Content areas for image placement (where the actual cover images go)
         contentBack: data.contentBackSize,   // { width, height, left, top }
         contentFront: data.contentFrontSize, // { width, height, left, top }
         spineArea: data.spineSize,           // { width, height, left, top }
         raw: data
       };
-      log.debug(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm`);
+      console.log(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm (source: ${data.wraparoundInsideSize ? 'wraparoundInsideSize' : data.productInsideSize ? 'productInsideSize' : 'none'})`);
       return result;
     }
 
+    console.log(`[GELATO] No spineSize in response, returning null`);
     return null;
   } catch (error) {
     log.error('[GELATO] Error fetching cover dimensions:', error.message);
