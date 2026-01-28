@@ -254,7 +254,7 @@ export default function BookBuilder() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ storyIds, bookFormat })
+        body: JSON.stringify({ storyIds, bookFormat, coverType })
       });
 
       if (!response.ok) {
