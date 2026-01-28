@@ -101,7 +101,9 @@ function tryParseVisualBibleJSON(outline) {
         description: buildCharacterDescription(char),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
-        source: 'outline'
+        source: 'outline',
+        referenceImageData: null,
+        referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.secondaryCharacters.length} secondary characters from JSON`);
     }
@@ -115,7 +117,9 @@ function tryParseVisualBibleJSON(outline) {
         description: buildAnimalDescription(animal),
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
-        source: 'outline'
+        source: 'outline',
+        referenceImageData: null,
+        referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.animals.length} animals from JSON`);
     }
@@ -130,7 +134,9 @@ function tryParseVisualBibleJSON(outline) {
         type: artifact.type,
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
-        source: 'outline'
+        source: 'outline',
+        referenceImageData: null,
+        referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.artifacts.length} artifacts from JSON`);
     }
@@ -169,7 +175,9 @@ function tryParseVisualBibleJSON(outline) {
         signatureElement: veh.signatureElement,
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
-        source: 'outline'
+        source: 'outline',
+        referenceImageData: null,
+        referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.vehicles.length} vehicles from JSON`);
     }
@@ -186,7 +194,9 @@ function tryParseVisualBibleJSON(outline) {
         type: 'clothing',
         extractedDescription: null,
         firstAppearanceAnalyzed: false,
-        source: 'outline'
+        source: 'outline',
+        referenceImageData: null,
+        referenceImageGenerated: false
       }));
       log.debug(`[VISUAL BIBLE] Parsed ${visualBible.clothing.length} clothing items from JSON`);
     }
@@ -461,7 +471,9 @@ function parseVisualBibleEntries(sectionText) {
         description,
         extractedDescription: null, // Will be filled after first image analysis
         firstAppearanceAnalyzed: false,
-        source: 'outline' // Track where entry came from
+        source: 'outline', // Track where entry came from
+        referenceImageData: null, // Will be filled by generateReferenceSheet
+        referenceImageGenerated: false
       });
     }
   }
@@ -1652,6 +1664,127 @@ function injectHistoricalLocations(visualBible, historicalLocations) {
 }
 
 // ============================================================================
+// REFERENCE IMAGE FUNCTIONS
+// ============================================================================
+
+/**
+ * Get Visual Bible elements that need reference images generated
+ * Returns elements that:
+ * 1. Appear in 2+ pages (recurring elements)
+ * 2. Don't already have reference images
+ * 3. Are secondary characters or important artifacts (not locations which have landmark photos)
+ *
+ * @param {Object} visualBible - The Visual Bible object
+ * @param {number} minAppearances - Minimum page appearances to qualify (default 2)
+ * @returns {Array} Elements needing reference images
+ */
+function getElementsNeedingReferenceImages(visualBible, minAppearances = 2) {
+  if (!visualBible) return [];
+
+  const needsReference = [];
+
+  const checkEntries = (entries, type) => {
+    for (const entry of entries || []) {
+      // Skip if already has reference image or fewer than minAppearances pages
+      if (entry.referenceImageGenerated) continue;
+      if (entry.referenceImageData) continue;
+      if (!entry.appearsInPages || entry.appearsInPages.length < minAppearances) continue;
+
+      needsReference.push({
+        ...entry,
+        type,
+        pageCount: entry.appearsInPages.length
+      });
+    }
+  };
+
+  // Only include secondary characters and artifacts (key objects)
+  // Skip locations (they have landmark photo support) and clothing (worn by characters)
+  checkEntries(visualBible.secondaryCharacters, 'character');
+  checkEntries(visualBible.artifacts, 'artifact');
+  checkEntries(visualBible.animals, 'animal');
+  checkEntries(visualBible.vehicles, 'vehicle');
+
+  // Sort by page count (most appearances first)
+  needsReference.sort((a, b) => b.pageCount - a.pageCount);
+
+  return needsReference;
+}
+
+/**
+ * Update Visual Bible element with generated reference image
+ * @param {Object} visualBible - The Visual Bible object
+ * @param {string} elementId - Element ID (e.g., CHR001, ART001)
+ * @param {string} referenceImageData - Base64 image data
+ */
+function updateElementReferenceImage(visualBible, elementId, referenceImageData) {
+  if (!visualBible || !elementId || !referenceImageData) return;
+
+  const findAndUpdate = (entries) => {
+    for (const entry of entries || []) {
+      if (entry.id === elementId) {
+        entry.referenceImageData = referenceImageData;
+        entry.referenceImageGenerated = true;
+        log.info(`[VISUAL BIBLE] 🖼️ Set reference image for "${entry.name}" [${elementId}]`);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Check all element arrays
+  if (findAndUpdate(visualBible.secondaryCharacters)) return;
+  if (findAndUpdate(visualBible.artifacts)) return;
+  if (findAndUpdate(visualBible.animals)) return;
+  if (findAndUpdate(visualBible.vehicles)) return;
+
+  log.warn(`[VISUAL BIBLE] Could not find element with ID ${elementId} to update reference image`);
+}
+
+/**
+ * Get reference images for a specific page from Visual Bible elements
+ * Returns elements that appear on this page and have reference images
+ * Limited to MAX_ELEMENT_REFERENCES_PER_PAGE to avoid overloading the prompt
+ *
+ * @param {Object} visualBible - The Visual Bible object
+ * @param {number} pageNumber - Page number
+ * @param {number} maxRefs - Maximum reference images to return (default 4)
+ * @returns {Array} Elements with reference images for this page
+ */
+function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) {
+  if (!visualBible) return [];
+
+  const relevantRefs = [];
+
+  const checkEntries = (entries, type, priority) => {
+    for (const entry of entries || []) {
+      // Must have reference image and appear on this page
+      if (!entry.referenceImageData) continue;
+      if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+
+      relevantRefs.push({
+        id: entry.id,
+        name: entry.name,
+        type,
+        description: entry.extractedDescription || entry.description,
+        referenceImageData: entry.referenceImageData,
+        priority // Lower = higher priority
+      });
+    }
+  };
+
+  // Priority order: characters > animals > artifacts > vehicles
+  checkEntries(visualBible.secondaryCharacters, 'character', 1);
+  checkEntries(visualBible.animals, 'animal', 2);
+  checkEntries(visualBible.artifacts, 'artifact', 3);
+  checkEntries(visualBible.vehicles, 'vehicle', 4);
+
+  // Sort by priority and limit
+  relevantRefs.sort((a, b) => a.priority - b.priority);
+  return relevantRefs.slice(0, maxRefs);
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -1690,5 +1823,10 @@ module.exports = {
   linkPreDiscoveredLandmarks,
 
   // Historical locations
-  injectHistoricalLocations
+  injectHistoricalLocations,
+
+  // Reference image support
+  getElementsNeedingReferenceImages,
+  updateElementReferenceImage,
+  getElementReferenceImagesForPage
 };

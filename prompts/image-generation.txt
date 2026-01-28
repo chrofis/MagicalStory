@@ -35,6 +35,7 @@ Each [Image N - Name] label above corresponds to the reference photo that follow
 - Preserve: eye shape, nose, jawline, facial proportions, hair color/style
 - Each character must look like the SAME PERSON as their reference - not similar, IDENTICAL
 - Do NOT average or blend features between different characters
+- For element references (animals, objects, artifacts): match the EXACT appearance from the reference
 
 **SCENE:** {SCENE_DESCRIPTION}
 

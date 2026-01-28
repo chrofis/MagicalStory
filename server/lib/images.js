@@ -4749,6 +4749,255 @@ function logDryRunReport(pageContext, report) {
   console.log(`${'='.repeat(60)}\n`);
 }
 
+// =============================================================================
+// REFERENCE SHEET GENERATION FOR SECONDARY ELEMENTS
+// =============================================================================
+
+/**
+ * Split a grid image into individual reference images
+ * Used after generating reference sheets to extract individual element references
+ *
+ * @param {Buffer|string} gridImage - Grid image as Buffer or base64 data URL
+ * @param {number} count - Number of elements in the grid
+ * @returns {Promise<string[]>} Array of base64 PNG images (without data URL prefix)
+ */
+async function splitGridIntoReferences(gridImage, count) {
+  // Convert base64 data URL to buffer if needed
+  let buffer;
+  if (typeof gridImage === 'string') {
+    const base64Data = gridImage.replace(/^data:image\/\w+;base64,/, '');
+    buffer = Buffer.from(base64Data, 'base64');
+  } else {
+    buffer = gridImage;
+  }
+
+  const metadata = await sharp(buffer).metadata();
+  const { width, height } = metadata;
+
+  if (!width || !height) {
+    throw new Error('Could not get grid image dimensions');
+  }
+
+  // Calculate grid layout (always 2 columns for simplicity)
+  const cols = count <= 2 ? count : 2;
+  const rows = Math.ceil(count / cols);
+  const cellWidth = Math.floor(width / cols);
+  const cellHeight = Math.floor(height / rows);
+
+  log.debug(`[REF-SHEET] Splitting ${width}x${height} grid into ${cols}x${rows} cells (${cellWidth}x${cellHeight} each)`);
+
+  const references = [];
+  for (let i = 0; i < count; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+
+    try {
+      const cropped = await sharp(buffer)
+        .extract({
+          left: col * cellWidth,
+          top: row * cellHeight,
+          width: cellWidth,
+          height: cellHeight
+        })
+        .resize(512, 512, { fit: 'cover' }) // Standardize size
+        .png()
+        .toBuffer();
+
+      references.push(cropped.toString('base64'));
+      log.debug(`[REF-SHEET] Extracted cell ${i + 1}/${count} (col=${col}, row=${row})`);
+    } catch (err) {
+      log.error(`[REF-SHEET] Failed to extract cell ${i}: ${err.message}`);
+      references.push(null);
+    }
+  }
+
+  return references;
+}
+
+/**
+ * Build reference sheet prompt for a batch of elements
+ *
+ * @param {Array} elements - Elements to include (from getElementsNeedingReferenceImages)
+ * @param {string} styleDescription - Art style description
+ * @returns {string} Complete prompt for reference sheet generation
+ */
+function buildReferenceSheetPrompt(elements, styleDescription) {
+  const count = elements.length;
+  const cols = count <= 2 ? count : 2;
+  const rows = Math.ceil(count / cols);
+
+  // Build grid layout description
+  const positions = ['Top-left', 'Top-right', 'Bottom-left', 'Bottom-right'];
+  const gridLayoutLines = elements.map((el, i) => {
+    const pos = positions[i] || `Cell ${i + 1}`;
+    const desc = el.extractedDescription || el.description;
+    return `${pos}: ${el.name} (${el.type}) - ${desc}`;
+  });
+
+  const prompt = fillTemplate(PROMPT_TEMPLATES.referenceSheet, {
+    STYLE_DESCRIPTION: styleDescription,
+    GRID_SIZE: `${cols}x${rows}`,
+    GRID_LAYOUT: gridLayoutLines.join('\n'),
+    COLS: cols.toString(),
+    ROWS: rows.toString()
+  });
+
+  return prompt;
+}
+
+/**
+ * Generate reference sheet for Visual Bible elements
+ * Creates a grid image with reference illustrations for secondary characters and key objects
+ *
+ * @param {Object} visualBible - Visual Bible object
+ * @param {string} styleDescription - Art style description for the story
+ * @param {Object} options - Generation options
+ * @param {number} options.minAppearances - Minimum page appearances (default 2)
+ * @param {number} options.maxPerBatch - Maximum elements per grid (default 4)
+ * @param {string} options.imageModel - Image model override
+ * @returns {Promise<{generated: number, failed: number, elements: Array}>}
+ */
+async function generateReferenceSheet(visualBible, styleDescription, options = {}) {
+  const {
+    minAppearances = 2,
+    maxPerBatch = 4,
+    imageModel = null
+  } = options;
+
+  // Import the function here to avoid circular dependency
+  const { getElementsNeedingReferenceImages, updateElementReferenceImage } = require('./visualBible');
+
+  // Get elements that need reference images
+  const needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances);
+
+  if (needsReference.length === 0) {
+    log.info('[REF-SHEET] No elements need reference images');
+    return { generated: 0, failed: 0, elements: [] };
+  }
+
+  log.info(`[REF-SHEET] 🎨 Generating reference images for ${needsReference.length} element(s)`);
+  log.info(`[REF-SHEET] Elements: ${needsReference.map(e => `${e.name} (${e.type}, ${e.pageCount} pages)`).join(', ')}`);
+
+  let generated = 0;
+  let failed = 0;
+  const processedElements = [];
+
+  // Batch elements into grids (max 4 per grid for quality)
+  const batches = [];
+  for (let i = 0; i < needsReference.length; i += maxPerBatch) {
+    batches.push(needsReference.slice(i, i + maxPerBatch));
+  }
+
+  log.info(`[REF-SHEET] Processing ${batches.length} batch(es)`);
+
+  for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+    const batch = batches[batchIdx];
+    log.info(`[REF-SHEET] Batch ${batchIdx + 1}/${batches.length}: ${batch.length} elements`);
+
+    try {
+      // Build the prompt for this batch
+      const prompt = buildReferenceSheetPrompt(batch, styleDescription);
+
+      // Generate the grid image using Gemini
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Gemini API key not configured');
+      }
+
+      // Use the image model from config or default
+      const modelId = imageModel || MODEL_DEFAULTS.image || 'gemini-2.5-flash-preview-05-20';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseModalities: ['image', 'text'],
+            responseMimeType: 'text/plain'
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+
+      // Extract image from response
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      let gridImageData = null;
+
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          gridImageData = part.inlineData.data;
+          break;
+        }
+      }
+
+      if (!gridImageData) {
+        throw new Error('Gemini did not return an image');
+      }
+
+      log.info(`[REF-SHEET] ✓ Generated ${batch.length}-element grid (${Math.round(gridImageData.length / 1024)}KB)`);
+
+      // Split grid into individual references
+      const references = await splitGridIntoReferences(gridImageData, batch.length);
+
+      // Update Visual Bible with extracted references
+      for (let i = 0; i < batch.length; i++) {
+        const element = batch[i];
+        const refImage = references[i];
+
+        if (refImage) {
+          updateElementReferenceImage(visualBible, element.id, `data:image/png;base64,${refImage}`);
+          generated++;
+          processedElements.push({
+            id: element.id,
+            name: element.name,
+            type: element.type,
+            success: true
+          });
+        } else {
+          failed++;
+          processedElements.push({
+            id: element.id,
+            name: element.name,
+            type: element.type,
+            success: false,
+            error: 'Failed to extract from grid'
+          });
+        }
+      }
+    } catch (err) {
+      log.error(`[REF-SHEET] ❌ Batch ${batchIdx + 1} failed: ${err.message}`);
+
+      // Mark all elements in batch as failed
+      for (const element of batch) {
+        failed++;
+        processedElements.push({
+          id: element.id,
+          name: element.name,
+          type: element.type,
+          success: false,
+          error: err.message
+        });
+      }
+    }
+  }
+
+  log.info(`[REF-SHEET] Complete: ${generated} generated, ${failed} failed`);
+
+  return {
+    generated,
+    failed,
+    elements: processedElements
+  };
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -4796,6 +5045,11 @@ module.exports = {
   mergeEvaluationIssues,
   logDryRunReport,
   INCREMENTAL_CONSISTENCY_DEFAULTS,
+
+  // Reference sheet generation for secondary elements
+  splitGridIntoReferences,
+  buildReferenceSheetPrompt,
+  generateReferenceSheet,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,

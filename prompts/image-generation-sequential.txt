@@ -21,6 +21,11 @@ From previous scene image COPY: props, furniture, background elements, art style
 DO NOT COPY: poses, positions, facial expressions - these must be NEW for the current scene
 CLOTHING RULE: Characters wear the SAME clothes as the previous scene unless the scene description explicitly specifies a clothing change (bedtime, next day, costume change)
 
+**IDENTITY PRESERVATION:**
+- Each [Image N - Name] label corresponds to the reference that follows it
+- Characters must look IDENTICAL to their reference - same face, same person
+- For element references (animals, objects, artifacts): match the EXACT appearance from the reference
+
 ---
 
 {CHARACTER_REFERENCE_LIST}

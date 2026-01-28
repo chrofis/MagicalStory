@@ -1,0 +1,36 @@
+You are creating reference images for a children's storybook.
+
+**ART STYLE:** {STYLE_DESCRIPTION}
+
+Generate a {GRID_SIZE} grid image with clear separation between cells.
+Each cell shows ONE element in isolation against a simple neutral background.
+
+**GRID LAYOUT:**
+{GRID_LAYOUT}
+
+**REQUIREMENTS:**
+- Each cell must show ONLY that single element, clearly visible and centered
+- Consistent art style across ALL cells matching the style description above
+- Simple backgrounds: solid pastel color or subtle gradient (no detailed scenes)
+- Clear visual separation between grid cells (visible gap or thin border)
+- All content must be safe, family-friendly, and age-appropriate
+
+**FOR CHARACTERS:**
+- 3/4 view showing face and upper body clearly
+- Neutral standing pose, arms at sides or relaxed
+- Character facing slightly toward viewer
+- Clear view of distinctive features and clothing
+
+**FOR OBJECTS/ARTIFACTS:**
+- Centered in the cell, well-lit
+- Show the complete object at a good size
+- Include key identifying details
+- Simple angle that shows the object clearly
+
+**FOR ANIMALS:**
+- Full body visible in a natural pose
+- Show distinctive coloring and features
+- Facing the viewer or in 3/4 view
+
+Generate as a single square image divided into {COLS}x{ROWS} equal cells.
+The grid structure must be clearly visible with equal-sized cells.

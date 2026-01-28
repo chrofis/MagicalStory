@@ -16,6 +16,11 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 - Empty space is a compositional element - preserve it as described
 - "Left/right edge" means AT THE EDGE of the frame, not near center
 
+**IDENTITY PRESERVATION:**
+- Each [Image N - Name] label corresponds to the reference that follows it
+- Characters must look IDENTICAL to their reference - same face, same person
+- For element references (animals, objects, artifacts): match the EXACT appearance from the reference
+
 ---
 
 {CHARACTER_REFERENCE_LIST}

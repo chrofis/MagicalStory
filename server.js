@@ -125,6 +125,7 @@ const {
   autoRepairImage,
   autoRepairWithTargets,
   runFinalConsistencyChecks,
+  generateReferenceSheet,
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
@@ -181,7 +182,8 @@ const {
   mergeNewVisualBibleEntries,
   extractStoryTextFromOutput,
   linkPreDiscoveredLandmarks,
-  injectHistoricalLocations
+  injectHistoricalLocations,
+  getElementReferenceImagesForPage
 } = require('./server/lib/visualBible');
 const {
   prefetchLandmarkPhotos,
@@ -6602,8 +6604,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
-        // Log with visual bible info if available
+        // Get element reference images for this page (secondary characters, artifacts, etc.)
         if (vBible) {
+          const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 4);
+          if (elementReferences.length > 0) {
+            const elementRefPhotos = elementReferences.map(el => ({
+              name: `${el.name} (${el.type})`,
+              photoUrl: el.referenceImageData,
+              photoType: 'elementReference',
+              clothingCategory: null,
+              clothingDescription: el.description,
+              hasPhoto: true
+            }));
+            referencePhotos = [...referencePhotos, ...elementRefPhotos];
+            log.debug(`🖼️ [STREAM-IMG] Page ${pageNum} added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+          }
+
           const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
           log.debug(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
         } else {
@@ -7220,6 +7236,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
       }
 
+      // Generate reference images for secondary elements (recurring characters, artifacts, etc.)
+      if (visualBible) {
+        const styleDescription = getStyleDescription(artStyle);
+        try {
+          const refResult = await generateReferenceSheet(visualBible, styleDescription, {
+            minAppearances: 2,
+            maxPerBatch: 4
+          });
+          if (refResult.generated > 0) {
+            log.info(`🖼️ [STORYBOOK] Reference images ready: ${refResult.generated} generated for secondary elements`);
+          }
+        } catch (err) {
+          log.warn(`⚠️ [STORYBOOK] Reference sheet generation failed: ${err.message}`);
+        }
+      }
+
       // Helper function to generate a single image (used for sequential mode)
       const generateImage = async (scene, idx, previousImage = null, isSequential = false, vBible = null, incrConfig = null) => {
         const pageNum = scene.pageNumber;
@@ -7260,8 +7292,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
           }
 
-          // Log visual bible usage
+          // Get element reference images for this page (secondary characters, artifacts, etc.)
           if (vBible) {
+            const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 4);
+            if (elementReferences.length > 0) {
+              const elementRefPhotos = elementReferences.map(el => ({
+                name: `${el.name} (${el.type})`,
+                photoUrl: el.referenceImageData,
+                photoType: 'elementReference',
+                clothingCategory: null,
+                clothingDescription: el.description,
+                hasPhoto: true
+              }));
+              referencePhotos = [...referencePhotos, ...elementRefPhotos];
+              log.debug(`🖼️ [STORYBOOK] Page ${pageNum} added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+            }
+
             const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
             log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingCategory}, ${relevantEntries.length} visual bible entries)...`);
           } else {
@@ -8830,6 +8876,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       landmarkFetchPromise = prefetchLandmarkPhotos(visualBible);
     }
 
+    // Start background reference sheet generation for secondary elements
+    // This generates reference images for recurring characters, animals, artifacts etc.
+    let referenceSheetPromise = null;
+    if (!skipImages) {
+      const styleDescription = getStyleDescription(artStyle);
+      referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {
+        minAppearances: 2, // Elements appearing on 2+ pages
+        maxPerBatch: 4     // Max 4 elements per grid for quality
+      }).catch(err => {
+        log.warn(`⚠️ [UNIFIED] Reference sheet generation failed: ${err.message}`);
+        return { generated: 0, failed: 0, elements: [] };
+      });
+    }
+
     // Save checkpoint
     await saveCheckpoint(jobId, 'unified_story', {
       title,
@@ -9136,6 +9196,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.info(`🌍 [UNIFIED] Landmark photos ready: ${successCount}/${landmarkCount} fetched successfully`);
     }
 
+    // Wait for reference sheet generation (for secondary element consistency)
+    if (referenceSheetPromise) {
+      const refResult = await referenceSheetPromise;
+      if (refResult.generated > 0) {
+        log.info(`🖼️ [UNIFIED] Reference images ready: ${refResult.generated} generated for secondary elements`);
+      }
+    }
+
     // PHASE 5: Generate page images
     // Sequential mode when incremental consistency is enabled, parallel otherwise
     genLog.setStage('images');
@@ -9217,7 +9285,24 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (pageLandmarkPhotos.length > 0) {
         log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => `${l.name}${l.variantNumber > 1 ? ` (v${l.variantNumber})` : ''}`).join(', ')}`);
       }
-      const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
+
+      // Get element reference images for secondary characters, animals, artifacts appearing on this page
+      // Limit to 4 element references to avoid overloading the model (main character photos take priority)
+      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
+      const elementRefPhotos = elementReferences.map(el => ({
+        name: `${el.name} (${el.type})`,
+        photoUrl: el.referenceImageData,
+        photoType: 'elementReference',
+        clothingCategory: null,
+        clothingDescription: el.description,
+        hasPhoto: true
+      }));
+      if (elementRefPhotos.length > 0) {
+        log.debug(`🖼️ [UNIFIED] Page ${pageNum} has ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+      }
+
+      // Combine character photos with element references (character photos first for priority)
+      const allReferencePhotos = [...pagePhotos, ...elementRefPhotos];
 
       const imagePrompt = buildImagePrompt(
         scene.sceneDescription,
@@ -9705,7 +9790,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Get landmark photos (loads selected variant on-demand for Swiss landmarks)
               const sceneMetadata = extractSceneMetadata(expandedDescription);
               const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
-              const allReferencePhotos = pagePhotos;  // Landmarks passed separately in options.landmarkPhotos
+
+              // Get element reference images for this page
+              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
+              const elementRefPhotos = elementReferences.map(el => ({
+                name: `${el.name} (${el.type})`,
+                photoUrl: el.referenceImageData,
+                photoType: 'elementReference',
+                clothingCategory: null,
+                clothingDescription: el.description,
+                hasPhoto: true
+              }));
+              const allReferencePhotos = [...pagePhotos, ...elementRefPhotos];
 
               // Build new image prompt
               const imagePrompt = buildImagePrompt(
@@ -11016,6 +11112,23 @@ Output Format:
             if (clothingCategory !== 'costumed') {
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             }
+
+            // Get element reference images for this page
+            if (visualBible) {
+              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
+              if (elementReferences.length > 0) {
+                const elementRefPhotos = elementReferences.map(el => ({
+                  name: `${el.name} (${el.type})`,
+                  photoUrl: el.referenceImageData,
+                  photoType: 'elementReference',
+                  clothingCategory: null,
+                  clothingDescription: el.description,
+                  hasPhoto: true
+                }));
+                referencePhotos = [...referencePhotos, ...elementRefPhotos];
+                log.debug(`🖼️ [PAGE ${pageNum}] Added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+              }
+            }
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingRaw})...`);
 
             // Generate image
@@ -11503,6 +11616,23 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Apply styled avatars for non-costumed characters (costumed already styled via getCharacterPhotoDetails)
             if (clothingCategory !== 'costumed') {
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+            }
+
+            // Get element reference images for this page
+            if (visualBible) {
+              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
+              if (elementReferences.length > 0) {
+                const elementRefPhotos = elementReferences.map(el => ({
+                  name: `${el.name} (${el.type})`,
+                  photoUrl: el.referenceImageData,
+                  photoType: 'elementReference',
+                  clothingCategory: null,
+                  clothingDescription: el.description,
+                  hasPhoto: true
+                }));
+                referencePhotos = [...referencePhotos, ...elementRefPhotos];
+                log.debug(`🖼️ [PAGE ${pageNum}] Added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+              }
             }
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingRaw})...`);
 

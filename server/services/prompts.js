@@ -62,6 +62,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.boundingBoxDetection = await fs.readFile(path.join(promptsDir, 'bounding-box-detection.txt'), 'utf-8');
     // Grid-based repair verification prompt
     PROMPT_TEMPLATES.repairVerification = await fs.readFile(path.join(promptsDir, 'repair-verification.txt'), 'utf-8');
+    // Reference sheet generation prompt for secondary elements
+    PROMPT_TEMPLATES.referenceSheet = await fs.readFile(path.join(promptsDir, 'reference-sheet.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
