@@ -277,18 +277,28 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
   // Trailing blank page (last page of the book)
   doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-  // Calculate Gelato page count
-  // Gelato counts: dedication (1) + story pages + trailing blank (1)
-  // Gelato does NOT count: cover spread, blank page 2
+  // Gelato pageCount: only counts dedication + story content + trailing blank
+  // Does NOT count: cover spread, blank page 2, or even-padding blanks
   const storyContentPages = isPictureBook ? storyPages.length : storyPages.length * 2;
-  const totalPdfPages = 1 + storyContentPages + 1; // dedication + story + trailing blank
+  const gelatoPageCount = 1 + storyContentPages + 1; // dedication + story + trailing blank
+
+  // Track actual PDF pages to ensure even interior count
+  // PDF pages: cover(1) + blank(2) + dedication(3) + story + trailing blank
+  let actualPdfPages = 1 + 1 + 1 + storyContentPages + 1;
+
+  // Interior pages (all except cover spread) must be even for front/back printing
+  if ((actualPdfPages - 1) % 2 !== 0) {
+    doc.addPage({ size: [interiorPageWidth, interiorPageHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    actualPdfPages++;
+    log.debug(`📄 [PRINT PDF] Added extra blank page for even interior count`);
+  }
 
   doc.end();
   const pdfBuffer = await pdfPromise;
 
-  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), Gelato page count: ${totalPdfPages}, font: ${consistentFontSize}pt`);
+  console.log(`✅ [PRINT PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), PDF pages: ${actualPdfPages}, Gelato pageCount: ${gelatoPageCount}, font: ${consistentFontSize}pt`);
 
-  return { pdfBuffer, pageCount: totalPdfPages, fontSizeWarning };
+  return { pdfBuffer, pageCount: gelatoPageCount, fontSizeWarning };
 }
 
 /**
@@ -612,13 +622,24 @@ async function generateCombinedBookPdf(stories, options = {}) {
   // Trailing blank page (last page of the book)
   doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
+  // Gelato pageCount: only counts dedication + story content + trailing blank
+  // Does NOT count: cover spread, blank page 2, or even-padding blanks
+  const gelatoPageCount = 1 + totalStoryPages + 1; // dedication + story + trailing blank
+
+  // Track actual PDF pages to ensure even interior count
+  let actualPdfPages = 1 + 1 + 1 + totalStoryPages + 1;
+
+  // Interior pages (all except cover spread) must be even for front/back printing
+  if ((actualPdfPages - 1) % 2 !== 0) {
+    doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+    actualPdfPages++;
+    log.debug(`📚 [COMBINED PDF] Added extra blank page for even interior count`);
+  }
+
   doc.end();
   const pdfBuffer = await pdfPromise;
 
-  // Gelato page count: dedication (1) + story content pages + trailing blank (1)
-  // Does NOT count: cover spread, blank page 2
-  const gelatoPageCount = 1 + totalStoryPages + 1;
-  console.log(`✅ [COMBINED PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), Gelato page count: ${gelatoPageCount}`);
+  console.log(`✅ [COMBINED PDF] Generated (${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB), PDF pages: ${actualPdfPages}, Gelato pageCount: ${gelatoPageCount}`);
 
   return { pdfBuffer, pageCount: gelatoPageCount };
 }
