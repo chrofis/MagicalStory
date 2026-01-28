@@ -5418,9 +5418,12 @@ app.post('/api/generate-book-pdf', authenticateToken, async (req, res) => {
     for (const story of stories) {
       const storyPages = parseStoryPages(story.data);
       const isPictureBook = story.data.languageLevel === '1st-grade';
-      storyContentPages += isPictureBook ? storyPages.length : storyPages.length * 2;
+      const pagesFromStory = isPictureBook ? storyPages.length : storyPages.length * 2;
+      console.log(`📊 [BOOK PDF] Story "${story.data.title}": parseStoryPages=${storyPages.length}, isPictureBook=${isPictureBook}, contentPages=${pagesFromStory}, hasStoryText=${!!story.data.storyText}, hasGeneratedStory=${!!story.data.generatedStory}, languageLevel=${story.data.languageLevel}`);
+      storyContentPages += pagesFromStory;
     }
     const estimatedPageCount = 1 + storyContentPages + 1;
+    console.log(`📊 [BOOK PDF] Estimated Gelato pageCount: ${estimatedPageCount} (${storyContentPages} story content pages)`);
 
     // Find matching product to get spine width
     const formatPattern = bookFormat === 'A4' ? '210x280' : '200x200';
