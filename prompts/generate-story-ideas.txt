@@ -52,7 +52,16 @@ For EACH story idea, output these three stages:
 Write your first story idea.
 
 [REVIEW_1]
-Check for: plot holes, missing characters, age-appropriateness, complexity matching scene count.
+You MUST list exactly 5 improvements. Never say "no issues" - always find ways to make it better.
+
+Check: (1) Language correct? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) ALL characters appear with a role? (5) Complexity matches scene count?
+
+5 improvements:
+1. [specific improvement]
+2. [specific improvement]
+3. [specific improvement]
+4. [specific improvement]
+5. [specific improvement]
 
 [FINAL_1]
 Corrected final version of story 1.
@@ -61,7 +70,12 @@ Corrected final version of story 1.
 Write a DIFFERENT story idea (different structure and approach).
 
 [REVIEW_2]
-Check for same criteria.
+Same process - list exactly 5 improvements:
+1. [specific improvement]
+2. [specific improvement]
+3. [specific improvement]
+4. [specific improvement]
+5. [specific improvement]
 
 [FINAL_2]
 Corrected final version of story 2.

@@ -79,12 +79,28 @@ You MUST output ALL three stages:
 Create your initial story outline following all guidelines above.
 
 [REVIEW]
-Check your draft for:
-- Logical inconsistencies or plot holes
-- Missing characters (all must appear)
-- Age-appropriateness issues
-- Complexity matching the scene count guide
-List any issues found.
+You MUST list exactly 5 improvements, even if the draft seems good. Never say "no issues" - always find ways to make it better.
+
+Check and critique:
+1. **Language**: Is the output in the correct language as specified? Any mixed languages?
+2. **Formatting**:
+   - No **bold** or *italic* (no asterisks)?
+   - Plain paragraphs only (no headers, bullets, or lists)?
+   - No adjectives (magical, brave, beautiful, exciting)?
+   - Within sentence limits for the story length?
+3. **Logic & Consistency**:
+   - Do events follow logically from each other?
+   - Any plot holes or unexplained jumps?
+   - Is the timeline coherent?
+4. **Characters**: Do ALL characters appear and have a role? Anyone missing or passive?
+5. **Complexity**: Does it match the scene count guide? Too simple or too complex?
+
+List your 5 improvements (be specific):
+1. [improvement]
+2. [improvement]
+3. [improvement]
+4. [improvement]
+5. [improvement]
 
 [FINAL]
 The corrected, final version of the story idea.
