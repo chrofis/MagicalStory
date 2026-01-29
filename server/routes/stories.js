@@ -496,6 +496,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
   try {
     const { id, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
+    console.log(`📷 [IMAGE REQUEST] story=${id}, page=${pageNum}`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -518,9 +519,11 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
 
     // Get active version from image_version_meta (fast lookup)
     const activeVersion = await getActiveVersion(id, pageNum);
+    console.log(`📷 [IMAGE] page=${pageNum} activeVersion=${activeVersion}`);
 
     // Try to get image with all versions in single query (FAST path)
     const separateImage = await getStoryImageWithVersions(id, 'scene', pageNum);
+    console.log(`📷 [IMAGE] page=${pageNum} separateImage=${separateImage ? 'found' : 'not found'}, imageSize=${separateImage?.imageData?.length || 0}, versions=${separateImage?.versions?.length || 0}`);
     if (separateImage) {
       // Mark isActive on each version based on image_version_meta
       const versionsWithActive = separateImage.versions?.map((v, i) => ({
@@ -528,6 +531,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
         isActive: (i + 1) === activeVersion  // versions are 1-indexed in story_images
       }));
 
+      console.log(`📷 [IMAGE] page=${pageNum} sending response...`);
       return res.json({
         pageNumber: pageNum,
         imageData: separateImage.imageData,
