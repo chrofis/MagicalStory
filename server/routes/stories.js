@@ -493,6 +493,15 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
 // Optimized: First tries separate story_images table, falls back to data blob
 // Returns isActive flag from image_version_meta column for each version
 router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
+  // Detect if client disconnects
+  let clientDisconnected = false;
+  req.on('close', () => {
+    if (!res.writableEnded) {
+      clientDisconnected = true;
+      console.log(`📷 [IMAGE] page=${req.params.pageNumber} CLIENT DISCONNECTED before response`);
+    }
+  });
+
   try {
     const { id, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
@@ -503,6 +512,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     }
 
     // First, verify user has access to this story (fast query, no data loading)
+    console.log(`📷 [IMAGE] page=${pageNum} checking access...`);
     let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
@@ -512,9 +522,15 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     } else {
       rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     }
+    console.log(`📷 [IMAGE] page=${pageNum} access check done, found=${rows.length > 0}`);
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
+    }
+
+    if (clientDisconnected) {
+      console.log(`📷 [IMAGE] page=${pageNum} aborting - client already disconnected`);
+      return;
     }
 
     // Get active version from image_version_meta (fast lookup)
