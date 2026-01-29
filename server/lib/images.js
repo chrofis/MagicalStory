@@ -805,7 +805,7 @@ async function detectAllBoundingBoxes(imageData) {
         body: JSON.stringify({
           contents: [{ parts }],
           generationConfig: {
-            maxOutputTokens: 8000,  // Increased for complex scenes with many figures/objects
+            maxOutputTokens: 16000,  // Doubled to avoid MAX_TOKENS truncation in complex scenes
             temperature: 0.1,  // Low temperature for precise detection
             responseMimeType: 'application/json'
           },
@@ -878,23 +878,64 @@ async function detectAllBoundingBoxes(imageData) {
         const jsonStart = responseText.match(/\{[\s\S]*/);
         if (jsonStart) {
           let truncated = jsonStart[0];
-          // Remove trailing commas
-          truncated = truncated.replace(/,(\s*)$/, '$1');
-          // Remove any incomplete key-value pair at the end
-          truncated = truncated.replace(/,?\s*"[^"]*":\s*("(?:[^"\\]|\\.)*)?$/, '');
-          truncated = truncated.replace(/,?\s*"[^"]*":\s*\[?\s*$/, '');
+
+          // Strategy: Find last complete object in array and truncate there
+          // Look for pattern like: }, or }] that marks end of complete object
+          const lastCompleteObject = truncated.lastIndexOf('},');
+          const lastArrayEnd = truncated.lastIndexOf('}]');
+          const cutPoint = Math.max(lastCompleteObject, lastArrayEnd);
+
+          if (cutPoint > 0 && cutPoint < truncated.length - 5) {
+            // Cut at the last complete structure
+            truncated = truncated.substring(0, cutPoint + 1);
+          } else {
+            // Fallback: remove incomplete trailing data
+            truncated = truncated.replace(/,(\s*)$/, '$1');
+            // Remove incomplete arrays like [10, 20, or [10, 20, 30
+            truncated = truncated.replace(/\[\s*[\d\s,]*$/, '');
+            // Remove incomplete key-value pairs
+            truncated = truncated.replace(/,?\s*"[^"]*":\s*("(?:[^"\\]|\\.)*)?$/, '');
+            truncated = truncated.replace(/,?\s*"[^"]*":\s*\[?\s*$/, '');
+            truncated = truncated.replace(/,?\s*"[^"]*"\s*$/, '');
+          }
+
           // Count open brackets/braces and close them
           const openBraces = (truncated.match(/\{/g) || []).length - (truncated.match(/\}/g) || []).length;
           const openBrackets = (truncated.match(/\[/g) || []).length - (truncated.match(/\]/g) || []).length;
           // Remove any trailing comma before we close
           truncated = truncated.replace(/,\s*$/, '');
+          // Close in correct order: inner brackets first, then braces
           truncated += ']'.repeat(Math.max(0, openBrackets)) + '}'.repeat(Math.max(0, openBraces));
           parsedResult = JSON.parse(truncated);
           log.info(`🔧 [BBOX-DETECT] Repaired truncated JSON (finishReason: ${finishReason || 'STOP'})`);
         }
       } catch (repairError) {
-        log.warn(`⚠️  [BBOX-DETECT] JSON repair also failed: ${repairError.message}`);
-        return null;
+        log.warn(`⚠️  [BBOX-DETECT] JSON repair failed: ${repairError.message}`);
+
+        // Last resort: try to extract complete figure objects using regex
+        try {
+          const figurePattern = /\{\s*"label"\s*:\s*"([^"]+)"\s*,\s*"position"\s*:\s*"([^"]+)"\s*,\s*"face_box"\s*:\s*\[(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\]\s*,\s*"body_box"\s*:\s*\[(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\]\s*\}/g;
+          const extractedFigures = [];
+          let match;
+          while ((match = figurePattern.exec(responseText)) !== null) {
+            extractedFigures.push({
+              label: match[1],
+              position: match[2],
+              face_box: [parseInt(match[3]), parseInt(match[4]), parseInt(match[5]), parseInt(match[6])],
+              body_box: [parseInt(match[7]), parseInt(match[8]), parseInt(match[9]), parseInt(match[10])]
+            });
+          }
+          if (extractedFigures.length > 0) {
+            parsedResult = { figures: extractedFigures, objects: [] };
+            log.info(`🔧 [BBOX-DETECT] Extracted ${extractedFigures.length} figures via regex fallback`);
+          }
+        } catch (regexError) {
+          log.warn(`⚠️  [BBOX-DETECT] Regex extraction also failed: ${regexError.message}`);
+        }
+
+        if (!parsedResult) {
+          return null;
+        }
       }
     }
 
