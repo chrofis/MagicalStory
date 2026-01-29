@@ -340,6 +340,15 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
       // Send to Gemini for repair
       progress('repair', `Sending batch ${batchNum} to Gemini`);
       const repairResult = await repairGridWithGemini(gridBuffer, manifest);
+
+      // Handle case where Gemini didn't return an image after retries
+      if (!repairResult || !repairResult.buffer) {
+        console.warn(`⚠️  Batch ${batchNum} repair failed: Gemini did not return an image`);
+        history.errors.push({ batch: batchNum, error: 'Gemini did not return an image' });
+        history.gridsFailed++;
+        continue;  // Skip to next batch
+      }
+
       repairedGridBuffer = repairResult.buffer;
       gridEntry.repaired = repairedGridBuffer.toString('base64');
       history.totalAttempts++;
@@ -676,6 +685,12 @@ async function retryFailedRepairs(failedRepairs, imageBuffer, options = {}) {
       // Send to Gemini for individual repair
       console.log(`    [Retry] Repairing: ${issue.description?.substring(0, 40)}...`);
       const repairResult = await repairGridWithGemini(gridBuffer, enhancedManifest);
+
+      // Handle case where Gemini didn't return an image
+      if (!repairResult || !repairResult.buffer) {
+        console.log(`    [Retry] Failed: Gemini did not return an image`);
+        continue;
+      }
 
       // Extract the repaired region
       const repairedRegions = await extractRepairedRegions(repairResult.buffer, cellPositions);

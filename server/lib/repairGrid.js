@@ -285,12 +285,16 @@ async function repairGridWithGemini(gridBuffer, manifest, retryCount = 0) {
     }
 
     if (!repairedBuffer) {
-      // Retry once with a more explicit prompt
-      if (retryCount < 1) {
-        console.log(`  Grid repair returned text instead of image, retrying...`);
+      // Retry up to 2 times (3 total attempts)
+      if (retryCount < 2) {
+        console.log(`  Grid repair returned text instead of image (attempt ${retryCount + 1}/3), retrying...`);
+        // Add small delay before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
         return repairGridWithGemini(gridBuffer, manifest, retryCount + 1);
       }
-      throw new Error('Gemini did not return an image. Response: ' + textResponse.substring(0, 100));
+      // Return null instead of throwing to allow graceful degradation
+      console.warn(`⚠️  Grid repair exhausted retries. Response: ${textResponse.substring(0, 100)}`);
+      return null;
     }
 
     return {
