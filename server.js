@@ -13368,6 +13368,68 @@ app.get('/s/:shareToken', async (req, res) => {
   }
 });
 
+// GET /shared/:shareToken - Serve React app with OG meta tags for social previews
+// This is the URL users copy from browser, needs OG tags for WhatsApp/Facebook
+app.get('/shared/:shareToken', async (req, res) => {
+  const { shareToken } = req.params;
+
+  try {
+    const story = await getSharedStory(shareToken);
+
+    if (story && hasDistFolder) {
+      // Read the index.html
+      const indexPath = path.join(distPath, 'index.html');
+      let html = fs.readFileSync(indexPath, 'utf8');
+
+      const title = story.data.title || 'Eine magische Geschichte';
+      const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
+      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image`;
+      const pageUrl = `https://magicalstory.ch/shared/${shareToken}`;
+
+      // Create OG meta tags
+      const ogTags = `
+  <!-- Story-specific Open Graph / Facebook / WhatsApp -->
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="${pageUrl}">
+  <meta property="og:title" content="${title}">
+  <meta property="og:description" content="${description}">
+  <meta property="og:image" content="${ogImageUrl}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${title}">
+  <meta name="twitter:description" content="${description}">
+  <meta name="twitter:image" content="${ogImageUrl}">
+  <title>${title} - MagicalStory</title>`;
+
+      // Replace the default OG tags and title with story-specific ones
+      // Remove existing OG tags
+      html = html.replace(/<meta property="og:[^>]*>\s*/g, '');
+      html = html.replace(/<meta name="twitter:[^>]*>\s*/g, '');
+      // Replace title
+      html = html.replace(/<title>[^<]*<\/title>/, '');
+      // Insert story-specific tags after <head>
+      html = html.replace('<head>', '<head>' + ogTags);
+
+      res.type('text/html').send(html);
+    } else {
+      // Story not found or no dist folder - serve default
+      if (hasDistFolder) {
+        res.sendFile(path.join(distPath, 'index.html'));
+      } else {
+        res.sendFile(path.join(__dirname, 'index.html'));
+      }
+    }
+  } catch (err) {
+    log.error('Error serving shared story page:', err);
+    if (hasDistFolder) {
+      res.sendFile(path.join(distPath, 'index.html'));
+    } else {
+      res.sendFile(path.join(__dirname, 'index.html'));
+    }
+  }
+});
+
 // SPA fallback - serve index.html for client-side routing
 // This must be the LAST route, after all API routes
 app.get('*', (req, res, next) => {
