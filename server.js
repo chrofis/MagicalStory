@@ -865,13 +865,39 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
       const { orderId, orderReferenceId, fulfillmentStatus, items } = event;
 
       // Find the order in our database using Gelato order ID
-      const orderResult = await dbPool.query(
+      let orderResult = await dbPool.query(
         'SELECT id, user_id, customer_email, customer_name, story_id FROM orders WHERE gelato_order_id = $1',
         [orderId]
       );
 
+      // Fallback: if not found by gelato_order_id, try orderReferenceId which contains story ID
+      // Format: "story-{storyId}-{timestamp}" or "story-multi-{count}-{storyId}-{timestamp}"
+      if (orderResult.rows.length === 0 && orderReferenceId) {
+        log.debug('📦 [GELATO WEBHOOK] Trying fallback lookup by orderReferenceId:', orderReferenceId);
+        const storyIdMatch = orderReferenceId.match(/story-(?:multi-\d+-)?([^-]+)-\d+/);
+        if (storyIdMatch) {
+          const storyId = storyIdMatch[1];
+          // Find recent order for this story that doesn't have a gelato_order_id yet
+          orderResult = await dbPool.query(
+            `SELECT id, user_id, customer_email, customer_name, story_id FROM orders
+             WHERE story_id = $1 AND (gelato_order_id IS NULL OR gelato_order_id = $2)
+             ORDER BY created_at DESC LIMIT 1`,
+            [storyId, orderId]
+          );
+
+          if (orderResult.rows.length > 0) {
+            // Update the order with the Gelato order ID for future webhooks
+            await dbPool.query(
+              'UPDATE orders SET gelato_order_id = $1, updated_at = NOW() WHERE id = $2',
+              [orderId, orderResult.rows[0].id]
+            );
+            console.log('✅ [GELATO WEBHOOK] Linked order via story ID fallback:', orderResult.rows[0].id);
+          }
+        }
+      }
+
       if (orderResult.rows.length === 0) {
-        log.warn('⚠️ [GELATO WEBHOOK] Order not found for Gelato ID:', orderId);
+        log.warn('⚠️ [GELATO WEBHOOK] Order not found for Gelato ID:', orderId, '| orderReferenceId:', orderReferenceId);
         // Still return 200 to prevent retries
         return res.status(200).json({ received: true, warning: 'Order not found' });
       }
