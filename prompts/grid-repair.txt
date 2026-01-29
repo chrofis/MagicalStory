@@ -12,4 +12,4 @@ RULES:
 4. Ensure hands have exactly 5 fingers
 5. Keep clothing colors and patterns matching
 
-Return the grid image with ALL regions fixed while keeping the same layout and letter labels.
+IMPORTANT: You MUST output the repaired grid as an IMAGE. Edit the grid image directly - do not describe changes in text. Return the complete grid image with all labeled regions fixed, keeping the same layout and letter labels visible.

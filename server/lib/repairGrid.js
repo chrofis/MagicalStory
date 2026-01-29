@@ -247,11 +247,12 @@ function buildGridRepairPrompt(manifest) {
  * @param {Object} manifest - Grid manifest
  * @returns {Promise<{buffer: Buffer, usage: Object}>} Repaired grid
  */
-async function repairGridWithGemini(gridBuffer, manifest) {
+async function repairGridWithGemini(gridBuffer, manifest, retryCount = 0) {
   const model = genAI.getGenerativeModel({
     model: REPAIR_MODEL,
     generationConfig: {
-      responseModalities: ['image', 'text']
+      responseModalities: ["IMAGE", "TEXT"],  // IMAGE first to prioritize image output
+      temperature: 0.5
     }
   });
 
@@ -284,7 +285,12 @@ async function repairGridWithGemini(gridBuffer, manifest) {
     }
 
     if (!repairedBuffer) {
-      throw new Error('Gemini did not return an image. Response: ' + textResponse);
+      // Retry once with a more explicit prompt
+      if (retryCount < 1) {
+        console.log(`  Grid repair returned text instead of image, retrying...`);
+        return repairGridWithGemini(gridBuffer, manifest, retryCount + 1);
+      }
+      throw new Error('Gemini did not return an image. Response: ' + textResponse.substring(0, 100));
     }
 
     return {
