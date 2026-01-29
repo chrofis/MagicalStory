@@ -191,21 +191,23 @@ export default function SharedStoryViewer() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
           {/* Cover Page */}
           {currentPage === 0 && (
-            <div className="h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px] relative bg-gradient-to-br from-indigo-100 to-blue-100">
-              <img
-                src={`/api/shared/${shareToken}/cover-image/frontCover`}
-                alt="Story Cover"
-                className="w-full h-full object-contain"
-                loading="eager"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-              {/* Title overlay */}
-              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
-                <h1 className="text-2xl md:text-3xl font-bold text-white text-center drop-shadow-lg">
-                  {story.title}
-                </h1>
+            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
+              <div className="relative">
+                <img
+                  src={`/api/shared/${shareToken}/cover-image/frontCover`}
+                  alt="Story Cover"
+                  className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
+                  loading="eager"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+                {/* Title overlay */}
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 rounded-b-lg">
+                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white text-center drop-shadow-lg">
+                    {story.title}
+                  </h1>
+                </div>
               </div>
             </div>
           )}
