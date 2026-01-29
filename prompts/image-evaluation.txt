@@ -26,9 +26,18 @@ Match each figure to reference photos:
 - Which reference matches? (by name or index)
 - Hair match? Color and style
 - Clothing match? Colors and type
-- Face bounding box: [ymin, xmin, ymax, xmax] normalized 0-1
+- Position in image (left/center/right)
 
 Check for DUPLICATES: Two figures matching same reference = CRITICAL error
+
+---
+
+**STEP 2B: OBJECT/ANIMAL/LANDMARK MATCHING**
+
+If the prompt mentions animals, landmarks, vehicles, or notable objects:
+- Identify each in the generated image
+- Note: position (left/center/right), visual appearance
+- Match to reference name from prompt if applicable
 
 ---
 
@@ -98,10 +107,19 @@ Return JSON only (no other text):
       "figure": 1,
       "reference": "Lukas",
       "confidence": 0.85,
-      "face_bbox": [0.15, 0.3, 0.35, 0.5],
-      "hair_ok": true,
-      "clothing_ok": false,
+      "position": "left",
+      "hair": "blonde, short",
+      "clothing": "blue hoodie, dark pants",
       "issues": ["pants missing green accents"]
+    }
+  ],
+  "object_matches": [
+    {
+      "reference": "Fluffy the cat",
+      "type": "animal",
+      "position": "center",
+      "appearance": "orange tabby cat sitting",
+      "confidence": 0.9
     }
   ],
   "rendering": {
@@ -151,6 +169,13 @@ Return JSON only (no other text):
   - `fix`: What to render (visual description only, NO names)
   - `fixable`: true if can fix with inpainting, false if requires regeneration
 - Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration
-- `face_bbox`: [ymin, xmin, ymax, xmax] normalized 0-1
 - `confidence`: 0.0-1.0 reference match confidence
+- `position`: left, center, or right (where the figure/object is in the image)
+- `hair`: describe hair color and style as seen in image
+- `clothing`: describe clothing as seen in image
+- `object_matches`: for animals, landmarks, vehicles, artifacts mentioned in prompt
+  - `reference`: name from prompt (e.g., "Fluffy the cat", "Eiffel Tower")
+  - `type`: animal, landmark, vehicle, artifact
+  - `position`: left, center, or right
+  - `appearance`: visual description as seen in image
 - `spatial.checks`: Only include if prompt mentions pointing, looking at, facing, or gesturing toward something

@@ -1098,7 +1098,8 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  *
  * @param {string} imageData - Base64 image data
  * @param {Array<{description: string, severity: string, type: string, fix: string}>} fixableIssues - Issues from quality eval
- * @param {Array<{figure: number, reference: string, confidence: number, face_bbox: Array}>} qualityMatches - Character→figure mapping from quality eval
+ * @param {Array<{figure: number, reference: string, confidence: number, position: string, hair: string, clothing: string}>} qualityMatches - Character→figure mapping from quality eval
+ * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
 /**
@@ -1120,7 +1121,7 @@ function computeIoU(boxA, boxB) {
   return union > 0 ? intersection / union : 0;
 }
 
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = []) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = []) {
   // Always detect all elements for dev mode display
   log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
 
@@ -1136,6 +1137,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     figures: allDetections.figures,
     objects: allDetections.objects,
     qualityMatches: qualityMatches,  // Include character matches for display
+    objectMatches: objectMatches,    // Include object/animal/landmark matches for display
     usage: allDetections.usage,
     timestamp: new Date().toISOString()
   };
@@ -1148,7 +1150,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   }
 
   // Build character name → figure mapping from quality evaluation matches
-  // Example: {"patrick": {figureId: 1, faceBbox: [0.35, 0.28, 0.49, 0.36], confidence: 0.8}}
+  // Example: {"patrick": {figureId: 1, position: "left", hair: "blonde", clothing: "blue hoodie", confidence: 0.8}}
   const charNameToFigure = {};
   for (const match of qualityMatches) {
     if (match.reference && match.figure && Number.isInteger(match.figure) && match.figure > 0) {
@@ -1157,37 +1159,99 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       const charName = match.reference.toLowerCase();
       charNameToFigure[charName] = {
         figureId: match.figure,
-        faceBbox: match.face_bbox,
+        position: match.position,     // "left", "right", "center"
+        hair: match.hair,             // "blonde, short"
+        clothing: match.clothing,     // "blue hoodie, dark pants"
         confidence
       };
     }
   }
   if (Object.keys(charNameToFigure).length > 0) {
-    log.info(`📦 [BBOX-ENRICH] Character mapping: ${Object.entries(charNameToFigure).map(([name, info]) => `${name} → Figure ${info.figureId}`).join(', ')}`);
+    log.info(`📦 [BBOX-ENRICH] Character mapping: ${Object.entries(charNameToFigure).map(([name, info]) => `${name} → Figure ${info.figureId} (${info.position || 'no position'})`).join(', ')}`);
   }
 
-  // Build spatial mapping: charName → detection figure element (by face bbox IoU)
-  // This replaces unreliable index-based matching (quality eval and bbox detection number figures independently)
+  // Build attribute-based mapping: charName → detection figure element (by position, hair, clothing)
   const charToDetectionFigure = {};
   for (const [charName, charInfo] of Object.entries(charNameToFigure)) {
-    if (!charInfo.faceBbox) continue;
-
     let bestFigure = null;
-    let bestIoU = 0;
+    let bestScore = 0;
+
     for (const figure of allDetections.figures) {
-      if (!figure.faceBox) continue;
-      const iou = computeIoU(charInfo.faceBbox, figure.faceBox);
-      if (iou > bestIoU) {
-        bestIoU = iou;
+      let score = 0;
+      const label = (figure.label || '').toLowerCase();
+
+      // Position match (strongest signal)
+      if (charInfo.position && figure.position === charInfo.position) {
+        score += 3;
+      }
+
+      // Hair keywords in label
+      if (charInfo.hair) {
+        const hairWords = charInfo.hair.toLowerCase().split(/[,\s]+/).filter(w => w.length > 2);
+        score += hairWords.filter(w => label.includes(w)).length * 2;
+      }
+
+      // Clothing keywords in label
+      if (charInfo.clothing) {
+        const clothingWords = charInfo.clothing.toLowerCase().split(/[,\s]+/).filter(w => w.length > 2);
+        score += clothingWords.filter(w => label.includes(w)).length * 2;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
         bestFigure = figure;
       }
     }
 
-    if (bestFigure && bestIoU > 0.3) {
+    if (bestFigure && bestScore > 0) {
       charToDetectionFigure[charName] = bestFigure;
-      log.info(`📦 [BBOX-ENRICH] Spatial match: "${charName}" → "${bestFigure.label}" (IoU=${bestIoU.toFixed(2)})`);
+      log.info(`📦 [BBOX-ENRICH] Match: "${charName}" → "${bestFigure.label}" (score=${bestScore})`);
     } else {
-      log.warn(`⚠️ [BBOX-ENRICH] No spatial match for "${charName}" (best IoU=${bestIoU.toFixed(2)})`);
+      log.warn(`⚠️ [BBOX-ENRICH] No match for "${charName}" (position=${charInfo.position}, hair=${charInfo.hair})`);
+    }
+  }
+
+  // Build object/animal/landmark mapping: name → detected object
+  const objectToDetection = {};
+  for (const objMatch of objectMatches) {
+    if (!objMatch.reference) continue;
+    const confidence = objMatch.confidence || 0;
+    if (confidence < 0.5) continue;
+
+    const objName = objMatch.reference.toLowerCase();
+    let bestObject = null;
+    let bestScore = 0;
+
+    for (const obj of allDetections.objects) {
+      let score = 0;
+      const label = (obj.label || '').toLowerCase();
+
+      // Position match
+      if (objMatch.position && obj.position === objMatch.position) {
+        score += 3;
+      }
+
+      // Appearance keywords in label
+      if (objMatch.appearance) {
+        const appearanceWords = objMatch.appearance.toLowerCase().split(/[,\s]+/).filter(w => w.length > 2);
+        score += appearanceWords.filter(w => label.includes(w)).length * 2;
+      }
+
+      // Reference name keywords in label
+      const nameWords = objName.split(/[,\s]+/).filter(w => w.length > 2);
+      score += nameWords.filter(w => label.includes(w)).length * 3;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestObject = obj;
+      }
+    }
+
+    if (bestObject && bestScore > 0) {
+      objectToDetection[objName] = bestObject;
+      log.info(`📦 [BBOX-ENRICH] Object match: "${objMatch.reference}" → "${bestObject.label}" (score=${bestScore})`);
+    } else {
+      log.warn(`⚠️ [BBOX-ENRICH] No object match for "${objMatch.reference}" (position=${objMatch.position})`);
     }
   }
 
@@ -1529,6 +1593,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         detectedProblems: qualityResult.detectedProblems || [],
         figures: qualityResult.figures || [],
         matches: qualityResult.matches || [],
+        objectMatches: qualityResult.object_matches || [],
         fixTargets: qualityResult.fixTargets || [],
         fixableIssues: qualityResult.fixableIssues || [],
         usage: result.usage
@@ -1901,6 +1966,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const fixableIssues = qualityResult ? qualityResult.fixableIssues : [];
         const figures = qualityResult ? qualityResult.figures : [];
         const matches = qualityResult ? qualityResult.matches : [];
+        const objectMatches = qualityResult ? qualityResult.object_matches : [];
 
         // Store in cache (include text error info for covers)
         const result = {
@@ -1915,6 +1981,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           fixableIssues, // New format without bboxes (for two-stage detection)
           figures, // Figure detection results from evaluation
           matches, // Character-to-figure matches from evaluation
+          objectMatches, // Object/animal/landmark matches from evaluation
           modelId,  // Include which model was used for image generation
           qualityModelId,  // Include which model was used for quality evaluation
           imageUsage: imageUsage,  // Token usage for image generation
@@ -2347,8 +2414,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // This runs regardless of whether issues were found, incrEnabled, or autoRepair settings
     const fixableIssues = result.fixableIssues || [];
     const qualityMatches = result.matches || [];  // Character → figure mapping from quality eval
-    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches);
+    const objectMatches = result.objectMatches || [];  // Object/animal/landmark mapping from quality eval
+    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}...`);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches);
     bboxDetectionHistory = enrichResult.detectionHistory;
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {
