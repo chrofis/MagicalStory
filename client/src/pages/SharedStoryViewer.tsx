@@ -192,23 +192,15 @@ export default function SharedStoryViewer() {
           {/* Cover Page */}
           {currentPage === 0 && (
             <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
-              <div className="relative">
-                <img
-                  src={`/api/shared/${shareToken}/cover-image/frontCover`}
-                  alt="Story Cover"
-                  className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
-                  loading="eager"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
-                />
-                {/* Title overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4 rounded-b-lg">
-                  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white text-center drop-shadow-lg">
-                    {story.title}
-                  </h1>
-                </div>
-              </div>
+              <img
+                src={`/api/shared/${shareToken}/cover-image/frontCover`}
+                alt={story.title}
+                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
+                loading="eager"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
             </div>
           )}
 
