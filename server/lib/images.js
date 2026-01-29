@@ -1527,6 +1527,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         score: qualityResult.score,
         reasoning: qualityResult.reasoning,
         detectedProblems: qualityResult.detectedProblems || [],
+        figures: qualityResult.figures || [],
+        matches: qualityResult.matches || [],
+        fixTargets: qualityResult.fixTargets || [],
+        fixableIssues: qualityResult.fixableIssues || [],
         usage: result.usage
       };
 
@@ -1895,6 +1899,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         const qualityModelId = qualityResult ? qualityResult.modelId : null;
         const fixTargets = qualityResult ? qualityResult.fixTargets : [];
         const fixableIssues = qualityResult ? qualityResult.fixableIssues : [];
+        const figures = qualityResult ? qualityResult.figures : [];
+        const matches = qualityResult ? qualityResult.matches : [];
 
         // Store in cache (include text error info for covers)
         const result = {
@@ -1907,6 +1913,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           actualText,
           fixTargets, // Bounding boxes for auto-repair (from evaluation)
           fixableIssues, // New format without bboxes (for two-stage detection)
+          figures, // Figure detection results from evaluation
+          matches, // Character-to-figure matches from evaluation
           modelId,  // Include which model was used for image generation
           qualityModelId,  // Include which model was used for quality evaluation
           imageUsage: imageUsage,  // Token usage for image generation
