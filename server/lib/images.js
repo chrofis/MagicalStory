@@ -5043,8 +5043,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
         throw new Error('Gemini API key not configured');
       }
 
-      // Use the image model from config or default
-      const modelId = imageModel || MODEL_DEFAULTS.image || 'gemini-2.5-flash-preview-05-20';
+      // Use the image model from config or default (pageImage is for regular illustrations)
+      const modelId = imageModel || MODEL_DEFAULTS.pageImage;
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
       const response = await fetch(url, {
