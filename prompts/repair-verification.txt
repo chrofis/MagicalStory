@@ -1,22 +1,42 @@
 Compare these two image regions: BEFORE (left) and AFTER (right).
 
-The original issue was: "{ISSUE_DESCRIPTION}"
-Fix instruction was: "{FIX_INSTRUCTION}"
-Issue type: {ISSUE_TYPE}
+This is a CROP from a larger illustration. The repair should ONLY fix the specific issue while keeping everything else identical.
 
-EVALUATE carefully:
-1. Is the issue FIXED in the AFTER image? Look for the specific problem mentioned.
-2. Is there any VISIBLE CHANGE between BEFORE and AFTER? (Even subtle changes count)
-3. Are there any NEW PROBLEMS in the AFTER image? Check for:
+ISSUE TO FIX:
+- Problem: "{ISSUE_DESCRIPTION}"
+- Fix instruction: "{FIX_INSTRUCTION}"
+- Issue type: {ISSUE_TYPE}
+
+EVALUATE CAREFULLY:
+
+1. ISSUE FIXED? Is the specific problem mentioned above fixed in the AFTER image?
+
+2. POSITION PRESERVED? Are ALL elements in the EXACT same position?
+   - Nothing should have moved, shifted, or been resized
+   - This crop goes back into a larger image - alignment is critical
+
+3. STYLE PRESERVED? Does the AFTER match the BEFORE exactly in:
+   - Art style and line quality
+   - Colors and lighting
+   - Background and textures
+
+4. MINIMAL CHANGE? Was ONLY the fix instruction applied?
+   - No other "improvements" or changes should be visible
+   - Everything except the fix should be pixel-perfect identical
+
+5. NEW PROBLEMS? Check for:
    - {TYPE_SPECIFIC_CHECKS}
    - Blurry or smeared areas
    - Unnatural color transitions
-   - Objects that don't connect properly
+   - Elements that don't connect properly
+   - Shifted or misaligned elements
 
 Return JSON only:
 {
   "fixed": true/false,
   "changed": true/false,
+  "positionPreserved": true/false,
+  "stylePreserved": true/false,
   "confidence": 0.0-1.0,
   "explanation": "brief explanation of what you see",
   "newProblems": ["list any new issues found"] or []

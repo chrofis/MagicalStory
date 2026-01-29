@@ -159,6 +159,8 @@ Return JSON only:
         return {
           fixed: parsed.fixed === true,
           changed: parsed.changed === true,
+          positionPreserved: parsed.positionPreserved !== false, // Default true if not specified
+          stylePreserved: parsed.stylePreserved !== false, // Default true if not specified
           confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
           explanation: parsed.explanation || '',
           newProblems: Array.isArray(parsed.newProblems) ? parsed.newProblems : [],
@@ -312,14 +314,28 @@ async function verifyRepairedRegion(originalBuffer, repairedBuffer, issue) {
     return results;
   }
 
-  // Check 3: Sufficient confidence?
+  // Check 3: Position preserved? (elements must not move)
+  if (results.gemini.positionPreserved === false) {
+    results.accepted = false;
+    results.reason = `Position changed - elements shifted or resized`;
+    return results;
+  }
+
+  // Check 4: Style preserved? (art style must match)
+  if (results.gemini.stylePreserved === false) {
+    results.accepted = false;
+    results.reason = `Style changed - art style, colors, or lighting don't match`;
+    return results;
+  }
+
+  // Check 5: Sufficient confidence?
   if (results.gemini.confidence < LLM_CONFIDENCE_THRESHOLD) {
     results.accepted = false;
     results.reason = `Low confidence (${(results.gemini.confidence * 100).toFixed(0)}%)`;
     return results;
   }
 
-  // Check 4: No new problems introduced?
+  // Check 6: No new problems introduced?
   if (results.gemini.newProblems && results.gemini.newProblems.length > 0) {
     results.accepted = false;
     results.reason = `New problems: ${results.gemini.newProblems.join(', ')}`;
