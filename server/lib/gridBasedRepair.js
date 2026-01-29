@@ -606,8 +606,13 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
 
   progress('done', `Fixed ${history.fixedCount}/${history.issueCount} issues`);
 
+  // Convert buffer to base64 string for caller compatibility
+  const finalImageData = Buffer.isBuffer(currentImage)
+    ? currentImage.toString('base64')
+    : currentImage;
+
   return {
-    imageData: currentImage,
+    imageData: finalImageData,
     repaired: anyRepaired,
     history,
     fixedCount: history.fixedCount,
