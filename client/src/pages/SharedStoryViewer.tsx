@@ -83,6 +83,31 @@ export default function SharedStoryViewer() {
     fetchStory();
   }, [shareToken]);
 
+  // Preload adjacent page images for faster navigation
+  useEffect(() => {
+    if (!story || !shareToken) return;
+
+    const pagesToPreload: number[] = [];
+    // Preload next page
+    if (currentPage > 0 && currentPage < story.pages.length) {
+      pagesToPreload.push(story.pages[currentPage].pageNumber);
+    }
+    // Preload previous page
+    if (currentPage > 1) {
+      pagesToPreload.push(story.pages[currentPage - 2].pageNumber);
+    }
+    // Preload cover if on page 1
+    if (currentPage === 1) {
+      const coverImg = new Image();
+      coverImg.src = `/api/shared/${shareToken}/cover-image/frontCover`;
+    }
+
+    pagesToPreload.forEach(pageNum => {
+      const img = new Image();
+      img.src = `/api/shared/${shareToken}/image/${pageNum}`;
+    });
+  }, [currentPage, story, shareToken]);
+
   const totalPages = story ? story.pages.length + 1 : 0; // +1 for cover
 
   const goToPage = (page: number) => {
@@ -166,18 +191,19 @@ export default function SharedStoryViewer() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
           {/* Cover Page */}
           {currentPage === 0 && (
-            <div className="aspect-[3/4] md:aspect-[4/3] lg:aspect-[16/10] xl:aspect-[16/9] relative bg-gradient-to-br from-indigo-100 to-blue-100">
+            <div className="h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px] relative bg-gradient-to-br from-indigo-100 to-blue-100">
               <img
                 src={`/api/shared/${shareToken}/cover-image/frontCover`}
                 alt="Story Cover"
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
+                loading="eager"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
                 }}
               />
               {/* Title overlay */}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
-                <h1 className="text-2xl md:text-4xl font-bold text-white text-center drop-shadow-lg">
+                <h1 className="text-2xl md:text-3xl font-bold text-white text-center drop-shadow-lg">
                   {story.title}
                 </h1>
               </div>
@@ -186,14 +212,14 @@ export default function SharedStoryViewer() {
 
           {/* Story Pages */}
           {currentPage > 0 && story.pages[currentPage - 1] && (
-            <div className="md:grid md:grid-cols-2 md:h-[500px] lg:h-[600px] xl:h-[650px]">
+            <div className="md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
               {/* Image - 50% width */}
-              <div className="aspect-square md:aspect-auto md:h-full bg-gradient-to-br from-indigo-50 to-blue-50">
+              <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
                 <img
                   src={`/api/shared/${shareToken}/image/${story.pages[currentPage - 1].pageNumber}`}
                   alt={`Page ${currentPage}`}
-                  className="w-full h-full object-cover md:object-contain"
-                  loading="lazy"
+                  className="w-full h-full object-contain"
+                  loading="eager"
                   onError={(e) => {
                     e.currentTarget.src = '';
                     e.currentTarget.alt = 'Image not available';
@@ -201,18 +227,19 @@ export default function SharedStoryViewer() {
                 />
               </div>
               {/* Text - 50% width, scrollable */}
-              <div className="p-5 md:p-6 lg:p-8 flex flex-col bg-indigo-50/50 md:h-full">
-                <div className="flex-1 overflow-y-auto">
-                  <p className="text-base md:text-lg leading-relaxed text-gray-800 whitespace-pre-wrap">
+              <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden">
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <p className="text-sm md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
                     {story.pages[currentPage - 1].text}
                   </p>
                 </div>
-                <div className="mt-3 pt-3 border-t border-indigo-100 text-right text-indigo-400 text-sm flex-shrink-0">
+                <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
                   Page {currentPage} of {story.pages.length}
                 </div>
               </div>
             </div>
           )}
+
 
           {/* Page dots - inside book container */}
           <div className="flex items-center justify-center gap-2 py-3 bg-white border-t border-indigo-100">
