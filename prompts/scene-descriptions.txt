@@ -254,25 +254,47 @@ If ANY answer is NO → add specific position.
 
 For EACH character verify:
 1. **Region:** Which grid region? (TL/TC/TR/ML/MC/MR/BL/BC/BR)
-2. **Facing:** Direction explicit? (left/right/toward-camera/away)
+2. **Facing:** Direction explicit? (left/right/toward-camera/away-from-camera)
 3. **Pointing/Gaze:** If pointing at or looking at something:
-   - State character's region and target's region
-   - Verify direction matches the vector from character → target
+   - State character's region, facing direction, and target's region
+   - Verify pointing direction is PHYSICALLY POSSIBLE given the facing direction
 
-**Direction Rules:**
+**CRITICAL - Facing Direction Constraint:**
+A character can ONLY point/look in directions within their forward 180° arc:
+| Facing Direction | CAN point at | CANNOT point at |
+|------------------|--------------|-----------------|
+| toward-camera (forward) | left, right, up, down, anything IN FRONT | anything BEHIND them (background) |
+| away-from-camera (backward) | anything BEHIND them (background) | anything IN FRONT (camera side) |
+| left | left side, forward-left, backward-left | pure right |
+| right | right side, forward-right, backward-right | pure left |
+
+**THE POINTING PARADOX (CRITICAL ERROR TO CATCH):**
+If character FACES CAMERA but target is in BACKGROUND → IMPOSSIBLE
+- Character in foreground (BC), facing camera, pointing at mountain in background (TC) = INVALID
+- They would need to point BEHIND themselves - arms don't bend that way!
+- FIX: Either turn character to face the target (away from camera) OR reposition target
+
+**Direction Rules (position-based):**
 | Character → Target | Required Direction |
 |-------------------|-------------------|
-| Right → Left (e.g., MR→ML, BR→BL) | facing/pointing LEFT |
-| Left → Right (e.g., ML→MR, BL→BR) | facing/pointing RIGHT |
-| Bottom → Top (e.g., BC→TC, BL→TL) | facing/pointing UP/AWAY |
+| Right → Left (e.g., MR→ML, BR→BL) | pointing LEFT |
+| Left → Right (e.g., ML→MR, BL→BR) | pointing RIGHT |
+| Bottom → Top (e.g., BC→TC, BL→TL) | pointing UP/AWAY into background |
 | Same column, different row | UP or DOWN only |
 | Diagonal (e.g., BR→TL) | UP-LEFT (combine directions) |
 | **SAME REGION** | **INVALID - character overlaps target** |
 
-❌ Sophie in BR, tower in TL, arm points RIGHT (tower is LEFT of her)
-❌ Manuel in MC, door in MC (same region = overlap, INVALID)
-✅ Sophie in BR, tower in TL, arm extends UP-LEFT toward tower
+**Combined Validation (BOTH must pass):**
+1. Position vector check: Does direction match character→target grid positions?
+2. Facing check: Can the character physically reach that direction given their facing?
+
+❌ Sophie in BR, tower in TL, arm points RIGHT (tower is LEFT of her) - POSITION FAIL
+❌ Manuel in MC, door in MC (same region = overlap) - POSITION FAIL
+❌ John in BC facing camera, points at Everest in TC background - FACING FAIL (can't point behind while facing forward)
+❌ Sophie in BC facing camera, expression "looking at castle" in TC - FACING FAIL (would need to turn around)
+✅ Sophie in BR, tower in TL, arm extends UP-LEFT toward tower, body angled toward tower
 ✅ Manuel in BC, door in MC, looking forward/up into midground
+✅ John in BC facing AWAY (back to camera), pointing UP at Everest in TC - body orientation allows reaching target
 
 **5. Camera-View Compatibility:**
 | View Type | Expressions Allowed |
@@ -280,7 +302,9 @@ For EACH character verify:
 | FRONT / THREE-QUARTER FRONT | Full expressions OK |
 | SIDE PROFILE | Profile only (jaw, one eye) |
 | THREE-QUARTER BACK | Minimal (ear, cheek) |
-| BACK | NONE - body language only |
+| BACK / AWAY-FROM-CAMERA | NONE - body language only |
+
+**CRITICAL:** If character must face AWAY to point at a background target, their expression field should be body language only (e.g., "shoulders squared, determined stance") - NOT facial details like "eyes wide, mouth open".
 
 **6. Character Differentiation:**
 - Each character MUST have UNIQUE pose and action
@@ -511,7 +535,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     "check1_scaleFeasibility": "Camera distance: X, Detail needed: Y, Compatible: YES/NO",
     "check2_objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, setting says X, action requires Y - CONSISTENT/INCONSISTENT. Position precise? [horizontal + depth] or VAGUE",
     "check3_actionCompatibility": "For EACH character-object interaction: [action] + [object orientation] = VALID/INVALID",
-    "check4_characterPositioning": "For EACH: [Name] position:[where] facing:[direction] L:[arm] R:[arm]. Gaze/pointing geometry correct? YES/NO",
+    "check4_characterPositioning": "For EACH: [Name] position:[region] facing:[toward-camera/away/left/right] L:[arm] R:[arm]. If pointing/looking: target in [region]. Position vector OK? Facing allows reaching target? (CRITICAL: facing camera + target behind = IMPOSSIBLE)",
     "check5_cameraView": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
     "check6_differentiation": "Each character has UNIQUE pose? YES/NO",
     "check7_physics": "Ropes taut? Heavy = straining? Materials distinct? Obstacles actually block?",
@@ -531,9 +555,12 @@ Output raw JSON (no markdown code fences, no explanation text).
         "action": "pointing | looking",
         "target": "target object name",
         "characterRegion": "REGION_CODE",
+        "characterFacing": "toward-camera | away-from-camera | left | right",
         "targetRegion": "REGION_CODE",
-        "direction": "left | right | up | down | up-left | up-right | etc.",
-        "valid": "YES/NO - explain geometry (e.g., 'BC→TL requires up-left, arm extends up-left')"
+        "requiredDirection": "left | right | up | down | up-left | up-right | etc.",
+        "positionCheck": "YES/NO - does grid vector match pointing direction?",
+        "facingCheck": "YES/NO - can character physically reach this direction given their facing? (e.g., 'facing camera but target behind = NO')",
+        "valid": "YES only if BOTH checks pass, otherwise NO with explanation"
       }
     ],
     "issues": ["List every problem found - be specific"],
@@ -651,18 +678,24 @@ If your scene shows the bridge from across the river, select the wide exterior v
         "action": "looking",
         "target": "magical door",
         "characterRegion": "BL",
+        "characterFacing": "right (toward door)",
         "targetRegion": "MC",
-        "direction": "right + up",
-        "valid": "YES - BL→MC requires looking right and slightly up/away into midground"
+        "requiredDirection": "right + up",
+        "positionCheck": "YES - BL→MC requires looking right and slightly up/away",
+        "facingCheck": "YES - facing right, door is to her right in midground",
+        "valid": "YES - both checks pass"
       },
       {
         "character": "Manuel",
         "action": "pulling",
         "target": "magical door",
         "characterRegion": "BC",
+        "characterFacing": "away-from-camera (toward door in wall)",
         "targetRegion": "MC",
-        "direction": "forward/up",
-        "valid": "YES - BC→MC requires facing forward into midground"
+        "requiredDirection": "forward/up",
+        "positionCheck": "YES - BC→MC requires facing forward into midground",
+        "facingCheck": "YES - facing away from camera toward door in middle ground",
+        "valid": "YES - both checks pass"
       }
     ],
     "issues": [
@@ -714,6 +747,14 @@ If your scene shows the bridge from across the river, select the wide exterior v
 ```
 
 ### MINI-EXAMPLES (Other Error Types)
+
+**Pointing Direction Fix (CRITICAL - The Pointing Paradox):**
+- ❌ Draft: John faces camera in foreground, "right arm extended, pointing at Mount Everest" (which is in background behind him)
+  - `pointingGazeValidation`: characterFacing: "toward-camera", targetRegion: "TC" (background)
+  - `facingCheck`: "NO - facing camera but target is behind character, arm cannot reach backward"
+- ✅ Fix Option A: Turn John to face away from camera: "John stands with back to camera, right arm pointing up at the towering peak"
+- ✅ Fix Option B: Reposition so target is in front: "John faces camera, pointing LEFT at Everest rising on the left side of frame"
+- ✅ Fix Option C: Side profile view: "John in profile view facing right, pointing right toward Everest in background"
 
 **Weather Fix:**
 - ❌ Draft: `"indoorOutdoor": "indoor"` + `"weather": "snow falling on characters"`

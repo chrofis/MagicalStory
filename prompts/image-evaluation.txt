@@ -50,13 +50,27 @@ Note: Hidden/occluded parts are OK - only flag visible errors.
 - Style consistent across figures?
 - Scene matches the prompt description?
 
+**STEP 5: SPATIAL/ACTION VALIDATION**
+
+For each figure with a POINTING or LOOKING action in the prompt:
+1. What direction are they pointing/looking in the IMAGE? (up, left, right, at another figure, at object X)
+2. What were they SUPPOSED to point/look at per the prompt?
+3. Is that target VISIBLE in the image?
+4. Is the gesture DIRECTED at the target? (not just vaguely "up" when target is specific)
+
+Flag MISMATCH if:
+- Pointing up at sky when should point at specific object
+- Looking at camera when should look at another character
+- Target exists but gesture doesn't reach it
+- Facing away from camera but detailed facial expression described
+
 ---
 
 **SCORING (0-10)**
 
 - CRITICAL (-3): Missing/wrong character, duplicate character, severe rendering errors
-- MAJOR (-2): Unrecognizable character, 6+ fingers, floating limbs
-- MODERATE (-1): Wrong clothing color, minor issues
+- MAJOR (-2): Unrecognizable character, 6+ fingers, floating limbs, pointing/looking at wrong target
+- MODERATE (-1): Wrong clothing color, minor spatial misalignment
 - MINOR (-0.5): Small differences
 
 VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
@@ -99,6 +113,21 @@ Return JSON only (no other text):
     "missing": ["Manuel"],
     "style_consistent": true
   },
+  "spatial": {
+    "checks": [
+      {
+        "figure": 2,
+        "action_type": "pointing",
+        "prompt_target": "Mount Everest",
+        "observed_direction": "straight up at sky",
+        "target_visible": true,
+        "target_position": "top-center background",
+        "aligned": false,
+        "issue": "pointing at sky, not at mountain in background"
+      }
+    ],
+    "issues": ["Figure 2 pointing direction doesn't reach target"]
+  },
   "score": 7,
   "verdict": "PASS",
   "issues_summary": "Manuel missing; pants missing green accents",
@@ -118,7 +147,10 @@ Return JSON only (no other text):
 - `fixable_issues`: only if score < 9 and issues are fixable by inpainting
   - `description`: Visual description (position, appearance) - NO character names
   - `severity`: CRITICAL, MAJOR, MODERATE, MINOR
-  - `type`: face, hand, clothing, object, environment
+  - `type`: face, hand, clothing, object, environment, spatial
   - `fix`: What to render (visual description only, NO names)
+  - `fixable`: true if can fix with inpainting, false if requires regeneration
+- Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration
 - `face_bbox`: [ymin, xmin, ymax, xmax] normalized 0-1
 - `confidence`: 0.0-1.0 reference match confidence
+- `spatial.checks`: Only include if prompt mentions pointing, looking at, facing, or gesturing toward something
