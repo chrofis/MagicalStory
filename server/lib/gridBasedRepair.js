@@ -367,8 +367,8 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
         }
       }
 
-      // Extract repaired regions
-      const repairedRegions = await extractRepairedRegions(repairedGridBuffer, cellPositions);
+      // Extract repaired regions (pass original dimensions for scaling)
+      const repairedRegions = await extractRepairedRegions(repairedGridBuffer, cellPositions, manifest.dimensions);
 
       // Verify each repair
       progress('verify', `Verifying ${repairedRegions.length} repairs`);
@@ -697,8 +697,8 @@ async function retryFailedRepairs(failedRepairs, imageBuffer, options = {}) {
         continue;
       }
 
-      // Extract the repaired region
-      const repairedRegions = await extractRepairedRegions(repairResult.buffer, cellPositions);
+      // Extract the repaired region (pass original dimensions for scaling)
+      const repairedRegions = await extractRepairedRegions(repairResult.buffer, cellPositions, manifest.dimensions);
 
       if (repairedRegions.length === 0) {
         console.log(`    [Retry] Failed: no regions extracted`);

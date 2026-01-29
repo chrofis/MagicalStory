@@ -313,20 +313,44 @@ async function repairGridWithGemini(gridBuffer, manifest, retryCount = 0) {
  *
  * @param {Buffer} repairedGrid - Repaired grid image buffer
  * @param {Object[]} cellPositions - Cell positions from createIssueGrid
+ * @param {Object} originalDimensions - Original grid dimensions {width, height} for scaling
  * @returns {Promise<Object[]>} Array of {letter, issueId, buffer}
  */
-async function extractRepairedRegions(repairedGrid, cellPositions) {
+async function extractRepairedRegions(repairedGrid, cellPositions, originalDimensions = null) {
   const regions = [];
+
+  // Get actual dimensions of repaired grid
+  const metadata = await sharp(repairedGrid).metadata();
+  const repairedWidth = metadata.width;
+  const repairedHeight = metadata.height;
+
+  // Calculate scale factors if original dimensions provided
+  let scaleX = 1;
+  let scaleY = 1;
+  if (originalDimensions) {
+    scaleX = repairedWidth / originalDimensions.width;
+    scaleY = repairedHeight / originalDimensions.height;
+    if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
+      console.log(`  [GRID] Scaling cell positions: ${originalDimensions.width}x${originalDimensions.height} → ${repairedWidth}x${repairedHeight} (scale: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)})`);
+    }
+  }
 
   for (const cell of cellPositions) {
     try {
+      // Scale cell positions to match repaired grid dimensions
+      const scaledX = Math.round(cell.x * scaleX);
+      const scaledY = Math.round(cell.y * scaleY);
+      const scaledWidth = Math.round(cell.width * scaleX);
+      const scaledHeight = Math.round(cell.height * scaleY);
+
+      // Clamp to image bounds
+      const left = Math.max(0, Math.min(scaledX, repairedWidth - 1));
+      const top = Math.max(0, Math.min(scaledY, repairedHeight - 1));
+      const width = Math.min(scaledWidth, repairedWidth - left);
+      const height = Math.min(scaledHeight, repairedHeight - top);
+
       const buffer = await sharp(repairedGrid)
-        .extract({
-          left: cell.x,
-          top: cell.y,
-          width: cell.width,
-          height: cell.height
-        })
+        .extract({ left, top, width, height })
         .jpeg({ quality: 95 })
         .toBuffer();
 
