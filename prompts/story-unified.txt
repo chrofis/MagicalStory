@@ -218,12 +218,19 @@ Analyze the draft above. Be harsh and critical - pretend you are editing someone
 4. **Stakes** - Is it clear what the characters stand to gain/lose? Does the reader care?
 5. **Resolution** - Is the ending satisfying? Does it feel complete, not just stopped?
 
-**B. CHARACTER & DIALOGUE:**
-6. **Character consistency** - Do characters act according to their established traits? Any out-of-character moments?
-7. **Character voice** - Does each character speak differently? Or do they all sound the same?
-8. **Show vs tell** - Are emotions SHOWN through actions/dialogue? Or just TOLD ("He felt sad")?
-9. **Motivation** - Is it clear WHY characters do what they do? Any unmotivated actions?
-10. **Growth** - Does the main character learn/change? Is the arc believable?
+**B. CHARACTER & DIALOGUE (ANALYZE EACH CHARACTER INDIVIDUALLY):**
+For EACH character ({CHARACTER_NAMES}), answer these questions BY NAME:
+
+6. **Character consistency** - Does [Name] act according to their established traits? Any out-of-character moments? Any location/ability violations (e.g., character with fear of heights appearing at high altitude)?
+7. **Character voice** - Does [Name] have a distinct way of speaking? Or do they sound like other characters?
+8. **Show vs tell** - Are [Name]'s emotions SHOWN through actions/dialogue? Or just TOLD?
+9. **Motivation** - Is it clear WHY [Name] does what they do? Any unmotivated actions?
+10. **Growth** (main characters only) - Does [Name] learn/change? Is the arc believable?
+
+**FORMAT - You MUST analyze each character separately:**
+- **[Character 1 Name]**: consistency [✓/✗], voice [✓/✗], show vs tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Issues: [list any]
+- **[Character 2 Name]**: consistency [✓/✗], voice [✓/✗], show vs tell [✓/✗], motivation [✓/✗], growth [✓/✗ or N/A]. Issues: [list any]
+- ... (continue for ALL characters)
 
 **C. PROSE QUALITY:**
 11. **Reading level** - Is word count appropriate? Vocabulary too simple or complex for target?
