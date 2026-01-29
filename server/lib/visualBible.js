@@ -1698,12 +1698,31 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2) {
     }
   };
 
-  // Only include secondary characters and artifacts (key objects)
-  // Skip locations (they have landmark photo support) and clothing (worn by characters)
+  // Include secondary characters, artifacts, animals, and vehicles
+  // Skip clothing (worn by characters) - they appear on character reference images
   checkEntries(visualBible.secondaryCharacters, 'character');
   checkEntries(visualBible.artifacts, 'artifact');
   checkEntries(visualBible.animals, 'animal');
   checkEntries(visualBible.vehicles, 'vehicle');
+
+  // Include non-landmark locations (imaginary locations need reference images; real landmarks have photos)
+  if (visualBible.locations) {
+    for (const loc of visualBible.locations) {
+      // Skip real landmarks (they have landmark photos)
+      if (loc.isRealLandmark) continue;
+      // Skip if already has reference image
+      if (loc.referenceImageGenerated) continue;
+      if (loc.referenceImageData) continue;
+      // Skip if fewer than minAppearances
+      if (!loc.appearsInPages || loc.appearsInPages.length < minAppearances) continue;
+
+      needsReference.push({
+        ...loc,
+        type: 'location',
+        pageCount: loc.appearsInPages.length
+      });
+    }
+  }
 
   // Sort by page count (most appearances first)
   needsReference.sort((a, b) => b.pageCount - a.pageCount);
@@ -1732,11 +1751,12 @@ function updateElementReferenceImage(visualBible, elementId, referenceImageData)
     return false;
   };
 
-  // Check all element arrays
+  // Check all element arrays (including locations for non-landmark places)
   if (findAndUpdate(visualBible.secondaryCharacters)) return;
   if (findAndUpdate(visualBible.artifacts)) return;
   if (findAndUpdate(visualBible.animals)) return;
   if (findAndUpdate(visualBible.vehicles)) return;
+  if (findAndUpdate(visualBible.locations)) return;
 
   log.warn(`[VISUAL BIBLE] Could not find element with ID ${elementId} to update reference image`);
 }

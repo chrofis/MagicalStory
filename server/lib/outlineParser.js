@@ -1234,6 +1234,35 @@ class UnifiedStoryParser {
       try {
         this._cache.visualBible = JSON.parse(jsonMatch[1]);
 
+        // Normalize pages -> appearsInPages field mapping (Claude generates "pages", code expects "appearsInPages")
+        const normalizeVisualBibleEntries = (entries) => {
+          if (!entries || !Array.isArray(entries)) return entries;
+          return entries.map(entry => ({
+            ...entry,
+            appearsInPages: entry.appearsInPages || entry.pages || [],
+          }));
+        };
+
+        // Apply normalization to all entry arrays
+        if (this._cache.visualBible.secondaryCharacters) {
+          this._cache.visualBible.secondaryCharacters = normalizeVisualBibleEntries(this._cache.visualBible.secondaryCharacters);
+        }
+        if (this._cache.visualBible.artifacts) {
+          this._cache.visualBible.artifacts = normalizeVisualBibleEntries(this._cache.visualBible.artifacts);
+        }
+        if (this._cache.visualBible.animals) {
+          this._cache.visualBible.animals = normalizeVisualBibleEntries(this._cache.visualBible.animals);
+        }
+        if (this._cache.visualBible.vehicles) {
+          this._cache.visualBible.vehicles = normalizeVisualBibleEntries(this._cache.visualBible.vehicles);
+        }
+        if (this._cache.visualBible.locations) {
+          this._cache.visualBible.locations = normalizeVisualBibleEntries(this._cache.visualBible.locations);
+        }
+        if (this._cache.visualBible.clothing) {
+          this._cache.visualBible.clothing = normalizeVisualBibleEntries(this._cache.visualBible.clothing);
+        }
+
         // Add computed 'description' field for secondary characters (combining individual fields)
         if (this._cache.visualBible.secondaryCharacters) {
           this._cache.visualBible.secondaryCharacters = this._cache.visualBible.secondaryCharacters.map(char => {
@@ -1648,6 +1677,23 @@ class ProgressiveUnifiedParser {
       try {
         const parsed = JSON.parse(jsonMatch[1]);
         this.emitted.visualBible = true;
+
+        // Normalize pages -> appearsInPages field mapping (Claude generates "pages", code expects "appearsInPages")
+        const normalizeVisualBibleEntries = (entries) => {
+          if (!entries || !Array.isArray(entries)) return entries;
+          return entries.map(entry => ({
+            ...entry,
+            appearsInPages: entry.appearsInPages || entry.pages || [],
+          }));
+        };
+
+        // Apply normalization to all entry arrays
+        if (parsed.secondaryCharacters) parsed.secondaryCharacters = normalizeVisualBibleEntries(parsed.secondaryCharacters);
+        if (parsed.artifacts) parsed.artifacts = normalizeVisualBibleEntries(parsed.artifacts);
+        if (parsed.animals) parsed.animals = normalizeVisualBibleEntries(parsed.animals);
+        if (parsed.vehicles) parsed.vehicles = normalizeVisualBibleEntries(parsed.vehicles);
+        if (parsed.locations) parsed.locations = normalizeVisualBibleEntries(parsed.locations);
+        if (parsed.clothing) parsed.clothing = normalizeVisualBibleEntries(parsed.clothing);
 
         // Add computed 'description' field for all entry types (same logic as extractVisualBible)
         if (parsed.secondaryCharacters) {

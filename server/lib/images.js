@@ -4905,6 +4905,28 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     imageModel = null
   } = options;
 
+  // DEBUG: Log visual bible contents to diagnose reference image generation
+  log.info(`[REF-SHEET] Visual Bible summary:`);
+  log.info(`  - Secondary characters: ${visualBible?.secondaryCharacters?.length || 0}`);
+  log.info(`  - Artifacts: ${visualBible?.artifacts?.length || 0}`);
+  log.info(`  - Animals: ${visualBible?.animals?.length || 0}`);
+  log.info(`  - Vehicles: ${visualBible?.vehicles?.length || 0}`);
+  log.info(`  - Locations (non-landmark): ${(visualBible?.locations || []).filter(l => !l.isRealLandmark).length}`);
+
+  // Log each element with page appearances for debugging
+  const logEntries = (entries, type) => {
+    for (const e of entries || []) {
+      const pages = e.appearsInPages || e.pages || [];
+      const status = pages.length >= minAppearances ? '✓' : '✗';
+      log.debug(`  ${status} ${type}: "${e.name}" pages=[${pages.join(',')}] (${pages.length} appearances)`);
+    }
+  };
+  logEntries(visualBible?.secondaryCharacters, 'char');
+  logEntries(visualBible?.artifacts, 'artifact');
+  logEntries(visualBible?.animals, 'animal');
+  logEntries(visualBible?.vehicles, 'vehicle');
+  logEntries((visualBible?.locations || []).filter(l => !l.isRealLandmark), 'location');
+
   // Import the function here to avoid circular dependency
   const { getElementsNeedingReferenceImages, updateElementReferenceImage } = require('./visualBible');
 
@@ -4912,7 +4934,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   const needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances);
 
   if (needsReference.length === 0) {
-    log.info('[REF-SHEET] No elements need reference images');
+    log.info('[REF-SHEET] No elements need reference images (none with 2+ page appearances)');
     return { generated: 0, failed: 0, elements: [] };
   }
 
