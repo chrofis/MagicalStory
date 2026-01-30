@@ -480,47 +480,47 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           // Include evaluation data for dev mode display (no image data in these)
           preRepairEval: r.preRepairEval || null,
           postRepairEval: r.postRepairEval || null,
-          // Include image data for before/after comparison in dev mode
-          imageData: r.imageData || null,
-          originalImage: r.originalImage || null,
-          bboxOverlayImage: r.bboxOverlayImage || null,
+          // Flags for lazy loading images
+          hasImageData: !!r.imageData,
+          hasOriginalImage: !!r.originalImage,
+          hasBboxOverlay: !!r.bboxOverlayImage,
           // Keep small metadata from evaluations
           unifiedReport: r.unifiedReport,
           reEvalUsage: r.reEvalUsage,
           repairUsage: r.repairUsage
         })),
-        // repairHistory with images for dev mode
+        // repairHistory - flags only, images lazy loaded
         repairHistory: (img.repairHistory || []).map(r => ({
           timestamp: r.timestamp,
           type: r.type,
           score: r.score,
           reasoning: r.reasoning,
-          imageData: r.imageData || null,
-          originalImage: r.originalImage || null
+          hasImageData: !!r.imageData,
+          hasOriginalImage: !!r.originalImage
         })),
         wasRegenerated: img.wasRegenerated || false,
-        // Include original image for before/after comparison in dev mode
-        originalImage: img.originalImage || null,
+        // Flag for lazy loading original image
+        hasOriginalImage: !!img.originalImage,
         originalScore: img.originalScore || null,
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        // Include reference photos with image data for dev mode display
+        // Reference photos metadata - images lazy loaded via /dev-image endpoint
         referencePhotos: (img.referencePhotos || []).map(p => ({
           name: p.name,
           photoType: p.photoType,
           clothingCategory: p.clothingCategory,
           clothingDescription: p.clothingDescription,
-          photoUrl: p.photoUrl || null
+          hasPhoto: !!(p.photoUrl || p.photoData)
         })),
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
-          photoData: p.photoData || null
+          hasPhoto: !!p.photoData
         })),
-        // Consistency regeneration data with images for dev mode
+        // Consistency regeneration - flags only, images lazy loaded
         consistencyRegen: img.consistencyRegen ? {
-          originalImage: img.consistencyRegen.originalImage || null,
-          fixedImage: img.consistencyRegen.fixedImage || null,
+          hasOriginalImage: !!img.consistencyRegen.originalImage,
+          hasFixedImage: !!img.consistencyRegen.fixedImage,
           correctionNotes: img.consistencyRegen.correctionNotes,
           issues: img.consistencyRegen.issues,
           score: img.consistencyRegen.score,
@@ -658,6 +658,132 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching dev metadata:', err);
     res.status(500).json({ error: 'Failed to fetch dev metadata', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/dev-image - Lazy load images for dev mode
+// Query params:
+//   page: page number (required)
+//   type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency'
+//   index: index in array (for retry/repair history)
+//   field: specific field like 'imageData', 'originalImage', 'bboxOverlay'
+router.get('/:id/dev-image', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page, type, index, field } = req.query;
+    const pageNum = parseInt(page, 10);
+
+    if (!page || isNaN(pageNum)) {
+      return res.status(400).json({ error: 'page query parameter required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await query('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = rows[0].data;
+    const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
+
+    if (!sceneImage) {
+      return res.status(404).json({ error: `Page ${pageNum} not found` });
+    }
+
+    let result = {};
+
+    switch (type) {
+      case 'original':
+        result = { originalImage: sceneImage.originalImage || null };
+        break;
+
+      case 'retry': {
+        const idx = parseInt(index, 10);
+        const entry = sceneImage.retryHistory?.[idx];
+        if (!entry) {
+          return res.status(404).json({ error: `Retry history index ${idx} not found` });
+        }
+        if (field === 'imageData') {
+          result = { imageData: entry.imageData || null };
+        } else if (field === 'originalImage') {
+          result = { originalImage: entry.originalImage || null };
+        } else if (field === 'bboxOverlay') {
+          result = { bboxOverlayImage: entry.bboxOverlayImage || null };
+        } else {
+          // Return all available images for this retry entry
+          result = {
+            imageData: entry.imageData || null,
+            originalImage: entry.originalImage || null,
+            bboxOverlayImage: entry.bboxOverlayImage || null
+          };
+        }
+        break;
+      }
+
+      case 'repair': {
+        const idx = parseInt(index, 10);
+        const entry = sceneImage.repairHistory?.[idx];
+        if (!entry) {
+          return res.status(404).json({ error: `Repair history index ${idx} not found` });
+        }
+        result = {
+          imageData: entry.imageData || null,
+          originalImage: entry.originalImage || null
+        };
+        break;
+      }
+
+      case 'reference':
+        // Return all reference photos with their image data
+        result = {
+          referencePhotos: (sceneImage.referencePhotos || []).map(p => ({
+            name: p.name,
+            photoType: p.photoType,
+            clothingCategory: p.clothingCategory,
+            clothingDescription: p.clothingDescription,
+            photoUrl: p.photoUrl || null
+          }))
+        };
+        break;
+
+      case 'landmark':
+        // Return all landmark photos with their image data
+        result = {
+          landmarkPhotos: (sceneImage.landmarkPhotos || []).map(p => ({
+            name: p.name,
+            photoData: p.photoData || null
+          }))
+        };
+        break;
+
+      case 'consistency':
+        if (!sceneImage.consistencyRegen) {
+          return res.status(404).json({ error: 'No consistency regen data' });
+        }
+        result = {
+          originalImage: sceneImage.consistencyRegen.originalImage || null,
+          fixedImage: sceneImage.consistencyRegen.fixedImage || null
+        };
+        break;
+
+      default:
+        return res.status(400).json({ error: `Unknown type: ${type}` });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error fetching dev image:', err);
+    res.status(500).json({ error: 'Failed to fetch dev image', details: err.message });
   }
 });
 
