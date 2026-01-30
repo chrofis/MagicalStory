@@ -575,26 +575,15 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
         isActive: (i + 1) === activeVersion  // versions are 1-indexed in story_images
       }));
 
-      console.log(`📷 [IMAGE] page=${pageNum} sending response, imageData starts with: ${separateImage.imageData?.substring(0, 50)}`);
-      try {
-        const response = {
-          pageNumber: pageNum,
-          imageData: separateImage.imageData,
-          qualityScore: separateImage.qualityScore,
-          generatedAt: separateImage.generatedAt,
-          isActive: activeVersion === 0,  // version 0 is main image
-          imageVersions: versionsWithActive
-        };
-        const jsonStr = JSON.stringify(response);
-        console.log(`📷 [IMAGE] page=${pageNum} JSON size: ${jsonStr.length} bytes`);
-        res.setHeader('Content-Type', 'application/json');
-        res.send(jsonStr);
-        console.log(`📷 [IMAGE] page=${pageNum} response sent successfully`);
-        return;
-      } catch (sendErr) {
-        console.error(`📷 [IMAGE] page=${pageNum} ERROR sending:`, sendErr);
-        throw sendErr;
-      }
+      console.log(`📷 [IMAGE] page=${pageNum} sending response...`);
+      return res.json({
+        pageNumber: pageNum,
+        imageData: separateImage.imageData,
+        qualityScore: separateImage.qualityScore,
+        generatedAt: separateImage.generatedAt,
+        isActive: activeVersion === 0,  // version 0 is main image
+        imageVersions: versionsWithActive
+      });
     }
 
     // Fallback: Load from data blob (SLOW path for non-migrated stories)
