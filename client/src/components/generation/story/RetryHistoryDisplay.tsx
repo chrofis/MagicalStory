@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { History, ChevronRight, ChevronDown, Download } from 'lucide-react';
+import { History, ChevronRight, ChevronDown, Download, Loader2 } from 'lucide-react';
 import type { RetryAttempt, GridRepairData } from '@/types/story';
 
 /**
@@ -53,6 +53,8 @@ interface RetryHistoryDisplayProps {
   totalAttempts: number;
   language: string;
   onRevertRepair?: (attemptIndex: number, beforeImage: string) => void;
+  storyId?: string | null;
+  pageNumber?: number;
 }
 
 /**
@@ -276,9 +278,44 @@ export function RetryHistoryDisplay({
   retryHistory,
   totalAttempts,
   language,
-  onRevertRepair
+  onRevertRepair,
+  storyId,
+  pageNumber
 }: RetryHistoryDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
+  const [loadedGridImages, setLoadedGridImages] = useState<Record<number, { annotatedOriginal?: string; grids?: GridRepairData[] }>>({});
+  const [loadingGridImages, setLoadingGridImages] = useState<Set<number>>(new Set());
+
+  // Fetch grid repair images for a specific retry entry
+  const fetchGridImages = async (retryIdx: number) => {
+    if (!storyId || pageNumber === undefined || loadingGridImages.has(retryIdx)) return;
+
+    setLoadingGridImages(prev => new Set(prev).add(retryIdx));
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/stories/${storyId}/image-data/${pageNumber}/retry/${retryIdx}?field=all`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLoadedGridImages(prev => ({
+          ...prev,
+          [retryIdx]: {
+            annotatedOriginal: data.annotatedOriginal,
+            grids: data.grids
+          }
+        }));
+      }
+    } catch (err) {
+      console.error(`Failed to load grid images for retry ${retryIdx}:`, err);
+    } finally {
+      setLoadingGridImages(prev => {
+        const next = new Set(prev);
+        next.delete(retryIdx);
+        return next;
+      });
+    }
+  };
 
   if (!retryHistory || retryHistory.length === 0) return null;
 
@@ -675,30 +712,52 @@ export function RetryHistoryDisplay({
                 )}
 
                 {/* Step 1: Annotated Original with Bounding Boxes */}
-                {attempt.annotatedOriginal && (
-                  <details className="text-sm" open>
-                    <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
-                      📍 {language === 'de' ? 'Schritt 1: Erkannte Probleme' : 'Step 1: Detected Issues'}
-                    </summary>
-                    <div className="mt-3 bg-white p-4 rounded-lg border shadow-sm">
-                      <div className="text-xs text-gray-500 mb-2 font-medium">
-                        {language === 'de' ? 'Originalbild mit markierten Problembereichen' : 'Original image with marked issue regions'}
-                        <span className="ml-2 text-gray-400">
-                          (🔴 {language === 'de' ? 'kritisch' : 'critical'}, 🟠 {language === 'de' ? 'wichtig' : 'major'}, 🟡 {language === 'de' ? 'gering' : 'minor'})
-                        </span>
-                      </div>
-                      <img
-                        src={`data:image/jpeg;base64,${attempt.annotatedOriginal}`}
-                        alt="Annotated original"
-                        className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-violet-400"
-                        onClick={() => setEnlargedImg({
-                          src: `data:image/jpeg;base64,${attempt.annotatedOriginal}`,
-                          title: language === 'de' ? 'Erkannte Probleme' : 'Detected Issues'
-                        })}
-                      />
-                    </div>
-                  </details>
-                )}
+                {(() => {
+                  const annotatedData = attempt.annotatedOriginal || loadedGridImages[idx]?.annotatedOriginal;
+                  if (annotatedData) {
+                    return (
+                      <details className="text-sm" open>
+                        <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
+                          📍 {language === 'de' ? 'Schritt 1: Erkannte Probleme' : 'Step 1: Detected Issues'}
+                        </summary>
+                        <div className="mt-3 bg-white p-4 rounded-lg border shadow-sm">
+                          <div className="text-xs text-gray-500 mb-2 font-medium">
+                            {language === 'de' ? 'Originalbild mit markierten Problembereichen' : 'Original image with marked issue regions'}
+                            <span className="ml-2 text-gray-400">
+                              (🔴 {language === 'de' ? 'kritisch' : 'critical'}, 🟠 {language === 'de' ? 'wichtig' : 'major'}, 🟡 {language === 'de' ? 'gering' : 'minor'})
+                            </span>
+                          </div>
+                          <img
+                            src={`data:image/jpeg;base64,${annotatedData}`}
+                            alt="Annotated original"
+                            className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-violet-400"
+                            onClick={() => setEnlargedImg({
+                              src: `data:image/jpeg;base64,${annotatedData}`,
+                              title: language === 'de' ? 'Erkannte Probleme' : 'Detected Issues'
+                            })}
+                          />
+                        </div>
+                      </details>
+                    );
+                  }
+                  // Show load button if hasAnnotatedOriginal but not loaded
+                  if (attempt.hasAnnotatedOriginal && storyId && pageNumber !== undefined) {
+                    return (
+                      <button
+                        onClick={() => fetchGridImages(idx)}
+                        disabled={loadingGridImages.has(idx)}
+                        className="text-sm px-3 py-2 bg-violet-100 hover:bg-violet-200 text-violet-700 rounded border border-violet-300 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {loadingGridImages.has(idx) ? (
+                          <><Loader2 size={14} className="animate-spin" /> Loading...</>
+                        ) : (
+                          <>📍 Load Detected Issues</>
+                        )}
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
 
                 {/* Before/After Evaluations */}
                 <details className="text-sm">
@@ -734,13 +793,16 @@ export function RetryHistoryDisplay({
                 </details>
 
                 {/* Grid images display */}
-                {attempt.grids && attempt.grids.length > 0 && (
-                  <details className="text-sm">
-                    <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
-                      🔲 {language === 'de' ? 'Grid-Details' : 'Grid Details'} ({attempt.grids.length} {attempt.grids.length === 1 ? 'grid' : 'grids'})
-                    </summary>
-                    <div className="mt-3 space-y-4">
-                      {attempt.grids.map((grid: GridRepairData, gIdx: number) => (
+                {(() => {
+                  const gridsData = attempt.grids || loadedGridImages[idx]?.grids;
+                  if (gridsData && gridsData.length > 0) {
+                    return (
+                      <details className="text-sm">
+                        <summary className="cursor-pointer text-violet-700 font-medium hover:text-violet-900">
+                          🔲 {language === 'de' ? 'Grid-Details' : 'Grid Details'} ({gridsData.length} {gridsData.length === 1 ? 'grid' : 'grids'})
+                        </summary>
+                        <div className="mt-3 space-y-4">
+                          {gridsData.map((grid: GridRepairData, gIdx: number) => (
                         <div key={gIdx} className="bg-white p-4 rounded-lg border shadow-sm">
                           <div className="flex justify-between items-center mb-3">
                             <span className="font-medium text-violet-800">
@@ -918,10 +980,29 @@ export function RetryHistoryDisplay({
                             </div>
                           )}
                         </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  }
+                  // Show load button if hasGrids but not loaded
+                  if (attempt.hasGrids && storyId && pageNumber !== undefined && !loadedGridImages[idx]?.grids) {
+                    return (
+                      <button
+                        onClick={() => fetchGridImages(idx)}
+                        disabled={loadingGridImages.has(idx)}
+                        className="text-sm px-3 py-2 bg-violet-100 hover:bg-violet-200 text-violet-700 rounded border border-violet-300 flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {loadingGridImages.has(idx) ? (
+                          <><Loader2 size={14} className="animate-spin" /> Loading...</>
+                        ) : (
+                          <>🔲 Load Grid Details ({attempt.gridsCount || '?'} grids)</>
+                        )}
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             )}
 
