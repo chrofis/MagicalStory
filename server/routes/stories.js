@@ -504,16 +504,17 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        // Strip image data from reference photos, keep just names/descriptions
+        // Include reference photos with image data for dev mode display
         referencePhotos: (img.referencePhotos || []).map(p => ({
           name: p.name,
+          photoType: p.photoType,
           clothingCategory: p.clothingCategory,
           clothingDescription: p.clothingDescription,
-          hasPhoto: !!(p.photoUrl || p.photoData)
+          photoUrl: p.photoUrl || null
         })),
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
-          hasPhoto: !!p.photoData
+          photoData: p.photoData || null
         })),
         // Consistency regeneration data - strip image data, keep metadata only
         consistencyRegen: img.consistencyRegen ? {
