@@ -120,9 +120,21 @@ const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS, 'ref')
 // Quality threshold from environment or default
 const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
 
-// Maximum mask coverage for inpainting (percentage of image area)
-// Masks larger than this will skip repair - inpainting doesn't work well for large areas
+// Maximum mask coverage (%) before skipping repair - larger masks degrade quality
+// Inpainting works best for small, targeted fixes. For large areas, regenerate the image instead.
 const MAX_MASK_COVERAGE_PERCENT = 25;
+
+// Scoring weights for matching issues to detected elements in enrichWithBoundingBoxes
+const MATCH_SCORING = {
+  CHARACTER_NAME: 100,      // Character name found in issue description (via spatial matching)
+  POSITION: 30,             // Position match (left/center/right)
+  KEYWORD: 10,              // Per keyword overlap between issue and element label
+  COLOR: 15,                // Per color match
+  TYPE_AFFINITY_FIGURE: 5,  // Issue type (face/hand/clothing) matches figure element
+  TYPE_AFFINITY_OBJECT: 10, // Issue type matches object element
+  CHARACTER_KEYWORD: 8,     // Character-related keyword in issue boosts figure matches
+  OBJECT_KEYWORD: 8         // Object-related keyword in issue boosts object matches
+};
 
 /**
  * Hash image data for comparison/caching
@@ -444,14 +456,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     };
 
     let response = await callQualityAPI(modelId);
-
-    // Fallback: If 2.5 model fails at HTTP level, try 2.0
-    if (!response.ok && modelId.includes('2.5')) {
-      const error = await response.text();
-      log.warn(`⚠️  [QUALITY] Model ${modelId} failed (HTTP ${response.status}), falling back to gemini-2.0-flash-lite. Error: ${error.substring(0, 200)}`);
-      modelId = 'gemini-2.0-flash-lite';
-      response = await callQualityAPI(modelId);
-    }
 
     if (!response.ok) {
       const error = await response.text();
@@ -1317,61 +1321,61 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
 
       let score = 0;
 
-      // CHARACTER NAME MATCH (strongest signal): +100 points
+      // CHARACTER NAME MATCH (strongest signal)
       // Uses spatial IoU matching (quality eval and bbox detection number figures independently)
       if (mentionedChars.length > 0 && element.elementType === 'figure') {
         for (const charName of mentionedChars) {
           const matchedFigure = charToDetectionFigure[charName];
           if (matchedFigure && element === matchedFigure) {
-            score += 100;
+            score += MATCH_SCORING.CHARACTER_NAME;
             matchedByCharName = true;
             log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → spatial match to "${matchedFigure.label}"`);
           }
         }
       }
 
-      // Position match (strong signal): +30 points
+      // Position match (strong signal)
       if (position && issuePositions.includes(position)) {
-        score += 30;
+        score += MATCH_SCORING.POSITION;
       }
 
-      // Keyword overlap: +10 per matching keyword
+      // Keyword overlap
       for (const keyword of issueKeywords) {
         if (elementKeywords.includes(keyword) || label.includes(keyword)) {
-          score += 10;
+          score += MATCH_SCORING.KEYWORD;
         }
       }
 
-      // Color match: +15 per matching color
+      // Color match
       for (const color of issueColors) {
         if (elementColors.includes(color)) {
-          score += 15;
+          score += MATCH_SCORING.COLOR;
         }
       }
 
       // Issue type affinity: prefer figures for character issues, objects for object issues
       if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
-        if (element.elementType === 'figure') score += 5;
+        if (element.elementType === 'figure') score += MATCH_SCORING.TYPE_AFFINITY_FIGURE;
       } else if (issue.type === 'object') {
-        if (element.elementType === 'object') score += 10;
+        if (element.elementType === 'object') score += MATCH_SCORING.TYPE_AFFINITY_OBJECT;
       }
 
       // Character-related keywords in issue boost figure matches
       const characterKeywords = ['character', 'person', 'boy', 'girl', 'man', 'woman', 'child', 'kid', 'face', 'hand', 'arm', 'leg', 'hair', 'clothes', 'wearing'];
       if (characterKeywords.some(k => issueDesc.includes(k)) && element.elementType === 'figure') {
-        score += 8;
+        score += MATCH_SCORING.CHARACTER_KEYWORD;
       }
 
       // Object-related keywords boost object matches
       const objectKeywords = ['object', 'item', 'thing', 'toy', 'ball', 'sword', 'book', 'bag', 'bicycle', 'car', 'tree', 'flower', 'animal', 'dog', 'cat'];
       if (objectKeywords.some(k => issueDesc.includes(k)) && element.elementType === 'object') {
-        score += 8;
+        score += MATCH_SCORING.OBJECT_KEYWORD;
       }
 
       if (score > bestScore) {
         bestScore = score;
         bestMatch = element;
-        matchedByCharName = score >= 100;  // Track if best match used character name
+        matchedByCharName = score >= MATCH_SCORING.CHARACTER_NAME;  // Track if best match used character name
       }
     }
 
@@ -2931,16 +2935,35 @@ async function inspectImageForErrors(imageData) {
   }
 }
 
+// Simple cache for image dimensions to avoid repeated Sharp metadata calls
+const dimensionCache = new Map();
+const DIMENSION_CACHE_MAX_SIZE = 100;
+
 /**
- * Get image dimensions from base64 data
+ * Get image dimensions from base64 data (with caching)
  * @param {string} imageData - Base64 image data URL
  * @returns {Promise<{width: number, height: number}>}
  */
 async function getImageDimensions(imageData) {
+  // Use first 100 chars of base64 as cache key (unique enough, cheap to compute)
+  const cacheKey = imageData.substring(0, 100);
+  if (dimensionCache.has(cacheKey)) {
+    return dimensionCache.get(cacheKey);
+  }
+
   const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
   const buffer = Buffer.from(base64Data, 'base64');
   const metadata = await sharp(buffer).metadata();
-  return { width: metadata.width, height: metadata.height };
+  const dimensions = { width: metadata.width, height: metadata.height };
+
+  // Limit cache size to prevent memory issues
+  if (dimensionCache.size >= DIMENSION_CACHE_MAX_SIZE) {
+    const firstKey = dimensionCache.keys().next().value;
+    dimensionCache.delete(firstKey);
+  }
+  dimensionCache.set(cacheKey, dimensions);
+
+  return dimensions;
 }
 
 /**
@@ -3084,7 +3107,15 @@ function padBoundingBox(bbox, issueType) {
   };
 
   const pad = padding[issueType] || padding.default;
-  const [ymin, xmin, ymax, xmax] = bbox;
+  let [ymin, xmin, ymax, xmax] = bbox;
+
+  // Normalize to 0-1 format if in 0-1000 format (consistent with createCombinedMask)
+  if (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) {
+    ymin /= 1000;
+    xmin /= 1000;
+    ymax /= 1000;
+    xmax /= 1000;
+  }
 
   return [
     Math.max(0, ymin - pad),  // ymin
@@ -3405,58 +3436,63 @@ async function createCombinedMask(width, height, boundingBoxes) {
 
   log.debug(`🎭 [MASK] Creating combined mask with ${boundingBoxes.length} regions`);
 
-  // Create black background
-  const blackBackground = await sharp({
-    create: {
-      width: width,
-      height: height,
-      channels: 3,
-      background: { r: 0, g: 0, b: 0 }
-    }
-  }).png().toBuffer();
-
-  // Create white rectangles for each bounding box
-  const compositeInputs = [];
-  for (let i = 0; i < boundingBoxes.length; i++) {
-    const [ymin, xmin, ymax, xmax] = boundingBoxes[i];
-
-    // Handle both 0.0-1.0 format (from FIX_TARGETS) and 0-1000 format (legacy)
-    const scale = (ymin <= 1 && xmin <= 1 && ymax <= 1 && xmax <= 1) ? 1 : 1000;
-
-    const left = Math.floor((xmin / scale) * width);
-    const top = Math.floor((ymin / scale) * height);
-    const rectWidth = Math.max(1, Math.floor(((xmax - xmin) / scale) * width));
-    const rectHeight = Math.max(1, Math.floor(((ymax - ymin) / scale) * height));
-
-    log.debug(`🎭 [MASK] Box ${i + 1}: [${left},${top},${rectWidth},${rectHeight}]`);
-
-    // Create white rectangle for this box
-    const whiteRect = await sharp({
+  try {
+    // Create black background
+    const blackBackground = await sharp({
       create: {
-        width: rectWidth,
-        height: rectHeight,
+        width: width,
+        height: height,
         channels: 3,
-        background: { r: 255, g: 255, b: 255 }
+        background: { r: 0, g: 0, b: 0 }
       }
     }).png().toBuffer();
 
-    compositeInputs.push({
-      input: whiteRect,
-      left: left,
-      top: top
-    });
+    // Create white rectangles for each bounding box
+    const compositeInputs = [];
+    for (let i = 0; i < boundingBoxes.length; i++) {
+      const [ymin, xmin, ymax, xmax] = boundingBoxes[i];
+
+      // Handle both 0.0-1.0 format (from FIX_TARGETS) and 0-1000 format (legacy)
+      const scale = (ymin <= 1 && xmin <= 1 && ymax <= 1 && xmax <= 1) ? 1 : 1000;
+
+      const left = Math.floor((xmin / scale) * width);
+      const top = Math.floor((ymin / scale) * height);
+      const rectWidth = Math.max(1, Math.floor(((xmax - xmin) / scale) * width));
+      const rectHeight = Math.max(1, Math.floor(((ymax - ymin) / scale) * height));
+
+      log.debug(`🎭 [MASK] Box ${i + 1}: [${left},${top},${rectWidth},${rectHeight}]`);
+
+      // Create white rectangle for this box
+      const whiteRect = await sharp({
+        create: {
+          width: rectWidth,
+          height: rectHeight,
+          channels: 3,
+          background: { r: 255, g: 255, b: 255 }
+        }
+      }).png().toBuffer();
+
+      compositeInputs.push({
+        input: whiteRect,
+        left: left,
+        top: top
+      });
+    }
+
+    // Composite all white rectangles onto black background
+    const maskBuffer = await sharp(blackBackground)
+      .composite(compositeInputs)
+      .png()
+      .toBuffer();
+
+    const maskBase64 = `data:image/png;base64,${maskBuffer.toString('base64')}`;
+    log.info(`🎭 [MASK] Combined mask created with ${boundingBoxes.length} regions`);
+
+    return maskBase64;
+  } catch (error) {
+    log.error(`[MASK] Failed to create combined mask: ${error.message}`);
+    throw new Error(`Mask generation failed for ${boundingBoxes.length} regions: ${error.message}`);
   }
-
-  // Composite all white rectangles onto black background
-  const maskBuffer = await sharp(blackBackground)
-    .composite(compositeInputs)
-    .png()
-    .toBuffer();
-
-  const maskBase64 = `data:image/png;base64,${maskBuffer.toString('base64')}`;
-  log.info(`🎭 [MASK] Combined mask created with ${boundingBoxes.length} regions`);
-
-  return maskBase64;
 }
 
 /**
@@ -3789,27 +3825,33 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
           timestamp: new Date().toISOString()
         };
 
-        // Run targeted verification in background (non-blocking for performance)
-        // Verification results stored for dev mode display
+        // Always run verification (LPIPS is fast, provides useful metrics)
+        try {
+          const verification = await verifyInpaintResult(currentImage, repaired.imageData, targets);
+          historyEntry.verification = verification;
+
+          if (verification.success) {
+            log.info(`🔍 [REPAIR VERIFY] Verification: repair successful`);
+          } else {
+            log.warn(`🔍 [REPAIR VERIFY] Verification: repair may not have fixed issue`);
+          }
+
+          if (verification.lpips) {
+            log.info(`🔍 [REPAIR VERIFY] LPIPS: ${verification.lpips.lpipsScore?.toFixed(4)} (${verification.lpips.changed ? 'changed' : 'unchanged'})`);
+          }
+          if (verification.llm) {
+            log.info(`🔍 [REPAIR VERIFY] LLM: ${verification.llm.fixed ? '✅ Fixed' : '❌ Not fixed'} (${(verification.llm.confidence * 100).toFixed(0)}% confidence)`);
+          }
+        } catch (verifyErr) {
+          log.debug(`[REPAIR VERIFY] Verification failed: ${verifyErr.message}`);
+          historyEntry.verification = { error: verifyErr.message };
+        }
+
+        // Only store images in debug mode (to save memory)
         if (includeDebugImages) {
           historyEntry.maskImage = mask;
           historyEntry.beforeImage = currentImage;
           historyEntry.afterImage = repaired.imageData;
-
-          // Run verification and add results to history entry
-          try {
-            const verification = await verifyInpaintResult(currentImage, repaired.imageData, targets);
-            historyEntry.verification = verification;
-            if (verification.lpips) {
-              log.info(`🔍 [REPAIR VERIFY] LPIPS: ${verification.lpips.lpipsScore?.toFixed(4)} (${verification.lpips.changed ? 'changed' : 'unchanged'})`);
-            }
-            if (verification.llm) {
-              log.info(`🔍 [REPAIR VERIFY] LLM: ${verification.llm.fixed ? '✅ Fixed' : '❌ Not fixed'} (${(verification.llm.confidence * 100).toFixed(0)}% confidence)`);
-            }
-          } catch (verifyErr) {
-            log.debug(`[REPAIR VERIFY] Verification failed: ${verifyErr.message}`);
-            historyEntry.verification = { error: verifyErr.message };
-          }
         }
 
         repairHistory.push(historyEntry);
@@ -3887,18 +3929,25 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
   }
 
   const successCount = repairHistory.filter(r => r.success).length;
+  const skippedCount = repairHistory.filter(r => r.skipped && !r.success).length;
+  const failedCount = repairHistory.filter(r => !r.success && !r.skipped).length;
 
-  // Sum up total usage from all repair attempts
+  // Sum up total usage from all repair attempts (including verification LLM costs)
   const totalUsage = repairHistory.reduce((acc, r) => {
     if (r.usage) {
       acc.input_tokens += r.usage.input_tokens || 0;
       acc.output_tokens += r.usage.output_tokens || 0;
       acc.thinking_tokens += r.usage.thinking_tokens || 0;
     }
+    // Include verification LLM usage if present
+    if (r.verification?.llm?.usage) {
+      acc.input_tokens += r.verification.llm.usage.inputTokens || 0;
+      acc.output_tokens += r.verification.llm.usage.outputTokens || 0;
+    }
     return acc;
   }, { input_tokens: 0, output_tokens: 0, thinking_tokens: 0 });
 
-  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount > 0 ? 'success' : 'failed'} (total tokens: ${totalUsage.input_tokens} in, ${totalUsage.output_tokens} out)`);
+  log.info(`✅ [AUTO-REPAIR] Targeted repair complete: ${successCount} successful, ${skippedCount} skipped, ${failedCount} failed (total tokens: ${totalUsage.input_tokens} in, ${totalUsage.output_tokens} out)`);
 
   return {
     imageData: currentImage,
