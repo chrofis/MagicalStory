@@ -422,23 +422,48 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       // Story outline review data
       criticalAnalysis,
       originalStory: story.originalStory || null,
-      // Scene images dev data
+      // Scene images dev data (strip large image data to keep response fast)
       sceneImages: story.sceneImages?.map(img => ({
         pageNumber: img.pageNumber,
         prompt: img.prompt || null,
         qualityReasoning: img.qualityReasoning || null,
-        retryHistory: img.retryHistory || [],
-        repairHistory: img.repairHistory || [],
+        // Strip imageData from retryHistory entries
+        retryHistory: (img.retryHistory || []).map(r => ({
+          ...r,
+          imageData: r.imageData ? '[IMAGE DATA STRIPPED]' : null
+        })),
+        // Strip imageData from repairHistory entries
+        repairHistory: (img.repairHistory || []).map(r => ({
+          ...r,
+          imageData: r.imageData ? '[IMAGE DATA STRIPPED]' : null,
+          originalImage: r.originalImage ? '[IMAGE DATA STRIPPED]' : null
+        })),
         wasRegenerated: img.wasRegenerated || false,
         originalImage: img.originalImage ? true : false, // Just flag, not data
         originalScore: img.originalScore || null,
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
         faceEvaluation: img.faceEvaluation || null,
-        referencePhotos: img.referencePhotos || null,
-        landmarkPhotos: img.landmarkPhotos || null,
-        // Consistency regeneration data (includes before/after images for comparison)
-        consistencyRegen: img.consistencyRegen || null
+        // Strip image data from reference photos, keep just names/descriptions
+        referencePhotos: (img.referencePhotos || []).map(p => ({
+          name: p.name,
+          clothingCategory: p.clothingCategory,
+          clothingDescription: p.clothingDescription,
+          hasPhoto: !!p.photoUrl
+        })),
+        landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
+          name: p.name,
+          hasPhoto: !!p.photoData
+        })),
+        // Consistency regeneration data - strip image data, keep metadata only
+        consistencyRegen: img.consistencyRegen ? {
+          hasOriginalImage: !!img.consistencyRegen.originalImage,
+          hasFixedImage: !!img.consistencyRegen.fixedImage,
+          correctionNotes: img.consistencyRegen.correctionNotes,
+          issues: img.consistencyRegen.issues,
+          score: img.consistencyRegen.score,
+          timestamp: img.consistencyRegen.timestamp
+        } : null
       })) || [],
       // Cover images dev data
       coverImages: story.coverImages ? {
@@ -469,14 +494,56 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       } : null,
       // Scene descriptions (outline extract, scene prompt, scene description text)
       sceneDescriptions: story.sceneDescriptions || [],
-      // Visual Bible (characters, locations, objects)
-      visualBible: story.visualBible || null,
+      // Visual Bible (strip referenceImageData to keep response small)
+      visualBible: story.visualBible ? {
+        ...story.visualBible,
+        locations: (story.visualBible.locations || []).map(loc => ({
+          ...loc,
+          referenceImageData: loc.referenceImageData ? '[IMAGE DATA STRIPPED]' : null
+        })),
+        objects: (story.visualBible.objects || []).map(obj => ({
+          ...obj,
+          referenceImageData: obj.referenceImageData ? '[IMAGE DATA STRIPPED]' : null
+        })),
+        secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
+          ...char,
+          referenceImageData: char.referenceImageData ? '[IMAGE DATA STRIPPED]' : null
+        }))
+      } : null,
       // Generation log (avatar lookups, stage transitions, etc.)
       generationLog: story.generationLog || [],
-      // Styled avatar generation log (for developer mode auditing)
-      styledAvatarGeneration: story.styledAvatarGeneration || [],
-      // Costumed avatar generation log (for developer mode auditing)
-      costumedAvatarGeneration: story.costumedAvatarGeneration || [],
+      // Styled avatar generation log - strip image data, keep metadata
+      styledAvatarGeneration: (story.styledAvatarGeneration || []).map(entry => ({
+        timestamp: entry.timestamp,
+        characterName: entry.characterName,
+        artStyle: entry.artStyle,
+        clothingCategory: entry.clothingCategory,
+        durationMs: entry.durationMs,
+        success: entry.success,
+        error: entry.error,
+        prompt: entry.prompt,
+        inputs: entry.inputs ? {
+          facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto.identifier, sizeKB: entry.inputs.facePhoto.sizeKB } : null,
+          originalAvatar: entry.inputs.originalAvatar ? { identifier: entry.inputs.originalAvatar.identifier, sizeKB: entry.inputs.originalAvatar.sizeKB } : null,
+          styleSample: entry.inputs.styleSample ? { identifier: entry.inputs.styleSample.identifier, sizeKB: entry.inputs.styleSample.sizeKB } : null
+        } : null,
+        output: entry.output ? { identifier: entry.output.identifier, sizeKB: entry.output.sizeKB } : null
+      })),
+      // Costumed avatar generation log - strip image data, keep metadata
+      costumedAvatarGeneration: (story.costumedAvatarGeneration || []).map(entry => ({
+        timestamp: entry.timestamp,
+        characterName: entry.characterName,
+        costumeType: entry.costumeType,
+        durationMs: entry.durationMs,
+        success: entry.success,
+        error: entry.error,
+        prompt: entry.prompt,
+        inputs: entry.inputs ? {
+          facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto?.identifier, sizeKB: entry.inputs.facePhoto?.sizeKB } : null,
+          standardAvatar: entry.inputs.standardAvatar ? { identifier: entry.inputs.standardAvatar?.identifier, sizeKB: entry.inputs.standardAvatar?.sizeKB } : null
+        } : null,
+        output: entry.output ? { identifier: entry.output?.identifier, sizeKB: entry.output?.sizeKB } : null
+      })),
       // Final consistency checks report (if final checks were enabled)
       finalChecksReport: story.finalChecksReport || null
     };
