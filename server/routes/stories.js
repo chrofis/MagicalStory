@@ -477,6 +477,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           gridTotalIssues: r.gridTotalIssues,
           fixTargetsCount: r.fixTargetsCount,
           postRepairScore: r.postRepairScore,
+          // Include evaluation data for dev mode display (no image data in these)
+          preRepairEval: r.preRepairEval || null,
+          postRepairEval: r.postRepairEval || null,
           // Strip all image data fields
           hasImageData: !!r.imageData,
           hasGrids: !!(r.grids && r.grids.length > 0),
@@ -806,6 +809,84 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
   } catch (err) {
     console.error('❌ Error fetching cover image:', err);
     res.status(500).json({ error: 'Failed to fetch cover', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/visual-bible-image/:elementId - Get Visual Bible reference image
+// Lazy-loads reference images for secondary characters, animals, artifacts, etc.
+router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, res) => {
+  try {
+    const { id, elementId } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access to this story
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Load story data to find the Visual Bible element
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+    const visualBible = story.visualBible;
+
+    if (!visualBible) {
+      return res.status(404).json({ error: 'Visual Bible not found' });
+    }
+
+    // Search all element arrays for the requested ID
+    const allArrays = [
+      visualBible.secondaryCharacters,
+      visualBible.animals,
+      visualBible.artifacts,
+      visualBible.locations,
+      visualBible.vehicles,
+      visualBible.clothing
+    ];
+
+    let foundElement = null;
+    for (const arr of allArrays) {
+      if (!arr) continue;
+      const element = arr.find(e => e.id === elementId);
+      if (element) {
+        foundElement = element;
+        break;
+      }
+    }
+
+    if (!foundElement) {
+      return res.status(404).json({ error: 'Element not found' });
+    }
+
+    if (!foundElement.referenceImageData) {
+      return res.status(404).json({ error: 'No reference image for this element' });
+    }
+
+    res.json({
+      elementId,
+      name: foundElement.name,
+      imageData: normalizeImageData(foundElement.referenceImageData)
+    });
+
+  } catch (err) {
+    console.error('❌ Error fetching Visual Bible image:', err);
+    res.status(500).json({ error: 'Failed to fetch image', details: err.message });
   }
 });
 
