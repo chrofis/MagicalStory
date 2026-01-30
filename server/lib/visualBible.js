@@ -1793,11 +1793,29 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
     }
   };
 
-  // Priority order: characters > animals > artifacts > vehicles
+  // Priority order: characters > animals > artifacts > vehicles > locations
   checkEntries(visualBible.secondaryCharacters, 'character', 1);
   checkEntries(visualBible.animals, 'animal', 2);
   checkEntries(visualBible.artifacts, 'artifact', 3);
   checkEntries(visualBible.vehicles, 'vehicle', 4);
+
+  // Add non-landmark locations (landmarks use real photos via getLandmarkPhotosForPage instead)
+  for (const entry of visualBible.locations || []) {
+    // Skip landmarks - they use real photos, not generated reference images
+    if (entry.isRealLandmark) continue;
+    // Must have generated reference image and appear on this page
+    if (!entry.referenceImageData) continue;
+    if (!entry.appearsInPages || !entry.appearsInPages.includes(pageNumber)) continue;
+
+    relevantRefs.push({
+      id: entry.id,
+      name: entry.name,
+      type: 'location',
+      description: entry.extractedDescription || entry.description,
+      referenceImageData: entry.referenceImageData,
+      priority: 5 // Lower priority than objects/characters
+    });
+  }
 
   // Sort by priority and limit
   relevantRefs.sort((a, b) => a.priority - b.priority);

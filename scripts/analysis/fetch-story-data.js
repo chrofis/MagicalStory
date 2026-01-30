@@ -980,7 +980,6 @@ function printAnalysisSummary(analysis) {
       const flags = [
         e.wasRegenerated ? 'REGEN' : null,
         e.wasAutoRepaired ? 'REPAIRED' : null,
-        e.retryHistory.length > 0 ? `${e.retryHistory.length} retries` : null,
       ].filter(Boolean).join(', ');
       console.log(`   Page ${e.pageNumber}: score=${score}${fixes > 0 ? `, fixes=${fixes}` : ''}${attempts > 1 ? `, attempts=${attempts}` : ''}${flags ? ` [${flags}]` : ''}`);
     }
