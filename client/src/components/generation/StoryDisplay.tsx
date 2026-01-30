@@ -240,6 +240,65 @@ export function StoryDisplay({
   const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('square');
   const [showPdfFormatDropdown, setShowPdfFormatDropdown] = useState(false);
 
+  // Visual Bible reference images (lazy-loaded)
+  const [loadedRefImages, setLoadedRefImages] = useState<Record<string, string>>({});
+  const [loadingRefImages, setLoadingRefImages] = useState<Set<string>>(new Set());
+
+  // Fetch a Visual Bible reference image on demand
+  const fetchReferenceImage = async (elementId: string) => {
+    if (!storyId || loadedRefImages[elementId] || loadingRefImages.has(elementId)) return;
+
+    setLoadingRefImages(prev => new Set(prev).add(elementId));
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/stories/${storyId}/visual-bible-image/${elementId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setLoadedRefImages(prev => ({ ...prev, [elementId]: data.imageData }));
+      }
+    } catch (err) {
+      console.error(`Failed to load reference image for ${elementId}:`, err);
+    } finally {
+      setLoadingRefImages(prev => {
+        const next = new Set(prev);
+        next.delete(elementId);
+        return next;
+      });
+    }
+  };
+
+  // Render reference image thumbnail for a Visual Bible element
+  const renderRefImageThumbnail = (elementId: string, hasReferenceImage?: boolean) => {
+    if (!hasReferenceImage || !developerMode) return null;
+
+    const imageData = loadedRefImages[elementId];
+    const isLoading = loadingRefImages.has(elementId);
+
+    if (imageData) {
+      return (
+        <img
+          src={imageData}
+          alt="Reference"
+          className="w-16 h-16 object-cover rounded border border-rose-300 cursor-pointer hover:opacity-80"
+          onClick={() => setEnlargedImage({ src: imageData, title: 'Reference Image' })}
+        />
+      );
+    }
+
+    return (
+      <button
+        onClick={() => fetchReferenceImage(elementId)}
+        disabled={isLoading}
+        className="w-16 h-16 flex items-center justify-center bg-rose-100 border border-rose-300 rounded text-rose-500 hover:bg-rose-200 disabled:opacity-50"
+        title="Load reference image"
+      >
+        {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Images size={16} />}
+      </button>
+    );
+  };
+
   // Update edited story when story prop changes (e.g., after save)
   useEffect(() => {
     if (!isEditMode) {
@@ -1106,17 +1165,20 @@ export function StoryDisplay({
                     </h4>
                     <div className="space-y-2">
                       {visualBible.secondaryCharacters.map((entry) => (
-                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800 flex items-center gap-2">
-                            {entry.name}
-                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
-                            {entry.source && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                {entry.source === 'outline' ? 'Outline' : 'Story'}
-                              </span>
-                            )}
-                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
-                          </div>
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm flex gap-3">
+                          {renderRefImageThumbnail(entry.id, entry.hasReferenceImage)}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
+                              {entry.name}
+                              {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                              {entry.source && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {entry.source === 'outline' ? 'Outline' : 'Story'}
+                                </span>
+                              )}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
+                            </div>
                           {editingEntry?.type === 'secondaryCharacter' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
@@ -1153,6 +1215,7 @@ export function StoryDisplay({
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
                             </div>
                           )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1167,17 +1230,20 @@ export function StoryDisplay({
                     </h4>
                     <div className="space-y-2">
                       {visualBible.animals.map((entry) => (
-                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800 flex items-center gap-2">
-                            {entry.name}
-                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
-                            {entry.source && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                {entry.source === 'outline' ? 'Outline' : 'Story'}
-                              </span>
-                            )}
-                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
-                          </div>
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm flex gap-3">
+                          {renderRefImageThumbnail(entry.id, entry.hasReferenceImage)}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
+                              {entry.name}
+                              {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                              {entry.source && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {entry.source === 'outline' ? 'Outline' : 'Story'}
+                                </span>
+                              )}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
+                            </div>
                           {editingEntry?.type === 'animal' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
@@ -1214,6 +1280,7 @@ export function StoryDisplay({
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
                             </div>
                           )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1228,17 +1295,20 @@ export function StoryDisplay({
                     </h4>
                     <div className="space-y-2">
                       {visualBible.artifacts.map((entry) => (
-                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800 flex items-center gap-2">
-                            {entry.name}
-                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
-                            {entry.source && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                {entry.source === 'outline' ? 'Outline' : 'Story'}
-                              </span>
-                            )}
-                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
-                          </div>
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm flex gap-3">
+                          {renderRefImageThumbnail(entry.id, entry.hasReferenceImage)}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
+                              {entry.name}
+                              {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                              {entry.source && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {entry.source === 'outline' ? 'Outline' : 'Story'}
+                                </span>
+                              )}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
+                            </div>
                           {editingEntry?.type === 'artifact' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
                             <div className="mt-1">
                               <textarea
@@ -1275,6 +1345,7 @@ export function StoryDisplay({
                               <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
                             </div>
                           )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1289,27 +1360,30 @@ export function StoryDisplay({
                     </h4>
                     <div className="space-y-2">
                       {visualBible.locations.map((entry) => (
-                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
-                            {entry.name}
-                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
-                            {entry.source && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                {entry.source === 'outline' ? 'Outline' : 'Story'}
-                              </span>
-                            )}
-                            {entry.isRealLandmark && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
-                                📍 LANDMARK
-                              </span>
-                            )}
-                            {entry.photoFetchStatus === 'success' && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
-                                📷 Photo
-                              </span>
-                            )}
-                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
-                          </div>
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm flex gap-3">
+                          {!entry.isRealLandmark && renderRefImageThumbnail(entry.id, entry.hasReferenceImage)}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
+                              {entry.name}
+                              {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                              {entry.source && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {entry.source === 'outline' ? 'Outline' : 'Story'}
+                                </span>
+                              )}
+                              {entry.isRealLandmark && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                                  📍 LANDMARK
+                                </span>
+                              )}
+                              {entry.photoFetchStatus === 'success' && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700">
+                                  📷 Photo
+                                </span>
+                              )}
+                              {!entry.isRealLandmark && entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
+                            </div>
                           {entry.isRealLandmark && entry.landmarkQuery && (
                             <div className="text-amber-700 text-xs mt-1">
                               Landmark: <span className="font-mono bg-amber-50 px-1 rounded">{entry.landmarkQuery}</span>
@@ -1366,6 +1440,7 @@ export function StoryDisplay({
                               )}
                             </div>
                           )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1380,23 +1455,27 @@ export function StoryDisplay({
                     </h4>
                     <div className="space-y-2">
                       {visualBible.vehicles.map((entry) => (
-                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm">
-                          <div className="font-semibold text-rose-800 flex items-center gap-2">
-                            {entry.name}
-                            {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
-                            {entry.source && (
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
-                                {entry.source === 'outline' ? 'Outline' : 'Story'}
-                              </span>
-                            )}
-                            {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
-                          </div>
-                          <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
-                          {entry.extractedDescription && (
-                            <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
-                              <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                        <div key={entry.id} className="bg-rose-50 p-2 rounded text-sm flex gap-3">
+                          {renderRefImageThumbnail(entry.id, entry.hasReferenceImage)}
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-rose-800 flex items-center gap-2 flex-wrap">
+                              {entry.name}
+                              {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
+                              {entry.source && (
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                  {entry.source === 'outline' ? 'Outline' : 'Story'}
+                                </span>
+                              )}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                             </div>
-                          )}
+                            <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
+                            {entry.extractedDescription && (
+                              <div className="text-green-700 text-xs mt-1 bg-green-50 p-1 rounded">
+                                <span className="font-semibold">Extracted:</span> {entry.extractedDescription}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>

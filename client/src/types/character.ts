@@ -268,6 +268,7 @@ export interface VisualBibleEntry {
   extractedDescription: string | null;
   firstAppearanceAnalyzed: boolean;
   source?: 'outline' | 'story_text';  // Where this entry was added from
+  hasReferenceImage?: boolean;  // True if server has a generated reference image for this element
   // Landmark-related properties (for locations)
   isRealLandmark?: boolean;
   landmarkQuery?: string;  // Exact name to search for landmark photo
