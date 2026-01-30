@@ -2934,6 +2934,8 @@ export function StoryDisplay({
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
                                 language={language}
+                                storyId={storyId || undefined}
+                                pageNumber={pageNumber}
                               />
                             )}
 
@@ -3279,6 +3281,8 @@ export function StoryDisplay({
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
                                 language={language}
+                                storyId={storyId || undefined}
+                                pageNumber={pageNumber}
                               />
                             )}
 

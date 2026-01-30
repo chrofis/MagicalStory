@@ -433,6 +433,51 @@ export const storyService = {
     }
   },
 
+  // Lazy load dev mode images on demand
+  async getDevImage(
+    storyId: string,
+    pageNumber: number,
+    type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency',
+    options?: { index?: number; field?: string }
+  ): Promise<{
+    originalImage?: string | null;
+    imageData?: string | null;
+    bboxOverlayImage?: string | null;
+    fixedImage?: string | null;
+    referencePhotos?: Array<{
+      name: string;
+      photoType?: string;
+      clothingCategory?: string;
+      clothingDescription?: string;
+      photoUrl?: string | null;
+    }>;
+    landmarkPhotos?: Array<{
+      name: string;
+      photoData?: string | null;
+    }>;
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const params = new URLSearchParams({ page: String(pageNumber), type });
+      if (options?.index !== undefined) params.append('index', String(options.index));
+      if (options?.field) params.append('field', options.field);
+
+      const response = await fetch(`/api/stories/${storyId}/dev-image?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch dev image: HTTP ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.warn('Failed to fetch dev image:', err);
+      return null;
+    }
+  },
+
   // Get individual page image
   async getPageImage(storyId: string, pageNumber: number): Promise<{ imageData: string; imageVersions?: unknown[] } | null> {
     try {

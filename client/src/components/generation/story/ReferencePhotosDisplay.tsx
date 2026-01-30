@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import type { ReferencePhoto } from '@/types/story';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
+import storyService from '@/services/storyService';
 
 interface LandmarkPhoto {
   name: string;
@@ -14,6 +15,9 @@ interface ReferencePhotosDisplayProps {
   referencePhotos: ReferencePhoto[];
   landmarkPhotos?: LandmarkPhoto[];
   language: string;
+  // For lazy loading
+  storyId?: string;
+  pageNumber?: number;
 }
 
 /**
@@ -22,12 +26,56 @@ interface ReferencePhotosDisplayProps {
 export function ReferencePhotosDisplay({
   referencePhotos,
   landmarkPhotos,
-  language
+  language,
+  storyId,
+  pageNumber
 }: ReferencePhotosDisplayProps) {
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [loadedReferencePhotos, setLoadedReferencePhotos] = useState<ReferencePhoto[] | null>(null);
+  const [loadedLandmarkPhotos, setLoadedLandmarkPhotos] = useState<LandmarkPhoto[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const hasCharacterPhotos = referencePhotos && referencePhotos.length > 0;
-  const hasLandmarkPhotos = landmarkPhotos && landmarkPhotos.length > 0;
+  // Check if we need to lazy load (photos have hasPhoto flag but no actual data)
+  const needsLazyLoadRef = referencePhotos?.some(p => p.hasPhoto && !p.photoUrl);
+  const needsLazyLoadLandmark = landmarkPhotos?.some(p => p.hasPhoto && !p.photoData);
+
+  const loadImages = useCallback(async () => {
+    if (!storyId || !pageNumber || isLoading) return;
+    if (!needsLazyLoadRef && !needsLazyLoadLandmark) return;
+
+    setIsLoading(true);
+    setLoadError(null);
+
+    try {
+      // Load reference photos
+      if (needsLazyLoadRef) {
+        const refData = await storyService.getDevImage(storyId, pageNumber, 'reference');
+        if (refData?.referencePhotos) {
+          setLoadedReferencePhotos(refData.referencePhotos as ReferencePhoto[]);
+        }
+      }
+
+      // Load landmark photos
+      if (needsLazyLoadLandmark) {
+        const landmarkData = await storyService.getDevImage(storyId, pageNumber, 'landmark');
+        if (landmarkData?.landmarkPhotos) {
+          setLoadedLandmarkPhotos(landmarkData.landmarkPhotos as LandmarkPhoto[]);
+        }
+      }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load images');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [storyId, pageNumber, isLoading, needsLazyLoadRef, needsLazyLoadLandmark]);
+
+  // Use loaded photos if available, otherwise use props
+  const displayRefPhotos = loadedReferencePhotos || referencePhotos;
+  const displayLandmarkPhotos = loadedLandmarkPhotos || landmarkPhotos;
+
+  const hasCharacterPhotos = displayRefPhotos && displayRefPhotos.length > 0;
+  const hasLandmarkPhotos = displayLandmarkPhotos && displayLandmarkPhotos.length > 0;
 
   if (!hasCharacterPhotos && !hasLandmarkPhotos) return null;
 
@@ -64,7 +112,7 @@ export function ReferencePhotosDisplay({
   };
 
   // Get clothing category from first photo that has it
-  const clothingCategory = referencePhotos.find(p => p.clothingCategory)?.clothingCategory;
+  const clothingCategory = displayRefPhotos?.find(p => p.clothingCategory)?.clothingCategory;
 
   const getClothingLabel = (category: string | undefined) => {
     if (!category) return '';
@@ -78,7 +126,14 @@ export function ReferencePhotosDisplay({
   };
 
   return (
-    <details className="bg-pink-50 border border-pink-300 rounded-lg p-3">
+    <details
+      className="bg-pink-50 border border-pink-300 rounded-lg p-3"
+      onToggle={(e) => {
+        if ((e.target as HTMLDetailsElement).open && (needsLazyLoadRef || needsLazyLoadLandmark)) {
+          loadImages();
+        }
+      }}
+    >
       <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-900 flex items-center gap-2">
         <span>📸</span>
         {language === 'de' ? 'Referenzfotos' : language === 'fr' ? 'Photos de référence' : 'Reference Photos'}
@@ -90,15 +145,25 @@ export function ReferencePhotosDisplay({
         )}
         {hasLandmarkPhotos && (
           <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 text-xs rounded">
-            📍 {landmarkPhotos!.length} {language === 'de' ? 'Wahrzeichen' : 'Landmark'}
+            📍 {displayLandmarkPhotos!.length} {language === 'de' ? 'Wahrzeichen' : 'Landmark'}
           </span>
         )}
+        {isLoading && (
+          <span className="ml-2 text-xs text-gray-500 animate-pulse">Loading...</span>
+        )}
       </summary>
+
+      {/* Loading error */}
+      {loadError && (
+        <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">
+          {loadError}
+        </div>
+      )}
 
       {/* Character photos */}
       {hasCharacterPhotos && (
         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {referencePhotos.map((photo, idx) => (
+          {displayRefPhotos!.map((photo, idx) => (
             <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-xs text-gray-800 truncate">{photo.name}</span>
@@ -147,7 +212,7 @@ export function ReferencePhotosDisplay({
             📍 {language === 'de' ? 'Wahrzeichen-Referenzfotos' : language === 'fr' ? 'Photos de monuments' : 'Landmark Reference Photos'}
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {landmarkPhotos!.map((landmark, idx) => (
+            {displayLandmarkPhotos!.map((landmark, idx) => (
               <div key={idx} className="bg-amber-50 rounded-lg p-2 border border-amber-200">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-semibold text-xs text-gray-800 truncate">{landmark.name}</span>
