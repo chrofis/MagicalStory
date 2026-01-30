@@ -329,7 +329,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
     // Initialize grid entry for collection (will be updated with repaired buffer)
     const gridEntry = {
       batchNum,
-      original: gridBuffer.toString('base64'),
+      original: `data:image/png;base64,${gridBuffer.toString('base64')}`,
       repaired: null,
       manifest,
       prompt: repairPrompt,
@@ -350,7 +350,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
       }
 
       repairedGridBuffer = repairResult.buffer;
-      gridEntry.repaired = repairedGridBuffer.toString('base64');
+      gridEntry.repaired = `data:image/png;base64,${repairedGridBuffer.toString('base64')}`;
       history.totalAttempts++;
 
       // Save grid files
