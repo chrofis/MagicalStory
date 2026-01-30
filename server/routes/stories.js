@@ -534,21 +534,54 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         createdAt: story.visualBible.createdAt,
         updatedAt: story.visualBible.updatedAt,
         locations: (story.visualBible.locations || []).map(loc => ({
+          id: loc.id,
           name: loc.name,
           description: loc.description,
+          extractedDescription: loc.extractedDescription,
           attributes: loc.attributes,
+          source: loc.source,
+          isRealLandmark: loc.isRealLandmark,
+          appearsInPages: loc.appearsInPages,
           hasReferenceImage: !!loc.referenceImageData
         })),
         objects: (story.visualBible.objects || []).map(obj => ({
+          id: obj.id,
           name: obj.name,
           description: obj.description,
+          extractedDescription: obj.extractedDescription,
           attributes: obj.attributes,
+          source: obj.source,
+          appearsInPages: obj.appearsInPages,
           hasReferenceImage: !!obj.referenceImageData
         })),
+        animals: (story.visualBible.animals || []).map(animal => ({
+          id: animal.id,
+          name: animal.name,
+          description: animal.description,
+          extractedDescription: animal.extractedDescription,
+          attributes: animal.attributes,
+          source: animal.source,
+          appearsInPages: animal.appearsInPages,
+          hasReferenceImage: !!animal.referenceImageData
+        })),
+        artifacts: (story.visualBible.artifacts || []).map(artifact => ({
+          id: artifact.id,
+          name: artifact.name,
+          description: artifact.description,
+          extractedDescription: artifact.extractedDescription,
+          attributes: artifact.attributes,
+          source: artifact.source,
+          appearsInPages: artifact.appearsInPages,
+          hasReferenceImage: !!artifact.referenceImageData
+        })),
         secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
+          id: char.id,
           name: char.name,
           description: char.description,
+          extractedDescription: char.extractedDescription,
           attributes: char.attributes,
+          source: char.source,
+          appearsInPages: char.appearsInPages,
           hasReferenceImage: !!char.referenceImageData
         }))
       } : null,

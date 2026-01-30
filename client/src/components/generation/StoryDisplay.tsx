@@ -1160,7 +1160,7 @@ export function StoryDisplay({
                 )}
 
                 {/* Animals & Creatures */}
-                {visualBible.animals.length > 0 && (
+                {visualBible.animals?.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
                       {language === 'de' ? 'Tiere & Wesen' : language === 'fr' ? 'Animaux & Créatures' : 'Animals & Creatures'}
@@ -1221,7 +1221,7 @@ export function StoryDisplay({
                 )}
 
                 {/* Artifacts */}
-                {visualBible.artifacts.length > 0 && (
+                {visualBible.artifacts?.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
                       {language === 'de' ? 'Artefakte & Objekte' : language === 'fr' ? 'Artefacts & Objets' : 'Artifacts & Objects'}
@@ -1282,7 +1282,7 @@ export function StoryDisplay({
                 )}
 
                 {/* Locations */}
-                {visualBible.locations.length > 0 && (
+                {visualBible.locations?.length > 0 && (
                   <div className="bg-white border border-rose-200 rounded-lg p-3">
                     <h4 className="text-sm font-bold text-rose-700 mb-2">
                       {language === 'de' ? 'Wiederkehrende Orte' : language === 'fr' ? 'Lieux Récurrents' : 'Recurring Locations'}
