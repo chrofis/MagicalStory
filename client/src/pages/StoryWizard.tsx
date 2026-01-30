@@ -403,13 +403,13 @@ export default function StoryWizard() {
 
     // Load styled avatar generation log from dev metadata
     if (devMetadata.styledAvatarGeneration?.length) {
-      console.log('[StoryWizard] Dev metadata styledAvatarGeneration:', devMetadata.styledAvatarGeneration.length, 'entries');
+      console.log('[StoryWizard] Dev metadata styledAvatarGeneration:', devMetadata.styledAvatarGeneration?.length ?? 0, 'entries');
       setStyledAvatarGeneration(devMetadata.styledAvatarGeneration);
     }
 
     // Load costumed avatar generation log from dev metadata
     if (devMetadata.costumedAvatarGeneration?.length) {
-      console.log('[StoryWizard] Dev metadata costumedAvatarGeneration:', devMetadata.costumedAvatarGeneration.length, 'entries');
+      console.log('[StoryWizard] Dev metadata costumedAvatarGeneration:', devMetadata.costumedAvatarGeneration?.length ?? 0, 'entries');
       setCostumedAvatarGeneration(devMetadata.costumedAvatarGeneration);
     }
 
@@ -649,7 +649,7 @@ export default function StoryWizard() {
             // Note: generationLog is loaded from devMetadata, not from story metadata
             // Don't overwrite here - it would clear entries set from job result
             if (story.generationLog?.length) {
-              console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog.length, 'entries');
+              console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog?.length ?? 0, 'entries');
               setGenerationLog(story.generationLog);
             }
 
