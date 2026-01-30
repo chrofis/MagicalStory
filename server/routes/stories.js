@@ -660,6 +660,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
 // Optimized: First tries separate story_images table, falls back to data blob
 // Returns isActive flag from image_version_meta column for each version
 router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
+  const startTime = Date.now();
   try {
     const { id, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
@@ -695,6 +696,10 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
         isActive: (i + 1) === activeVersion  // versions are 1-indexed in story_images
       }));
 
+      const imageSize = separateImage.imageData?.length || 0;
+      const versionsCount = separateImage.versions?.length || 0;
+      console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, ${Date.now() - startTime}ms`);
+
       return res.json({
         pageNumber: pageNum,
         imageData: normalizeImageData(separateImage.imageData),
@@ -723,6 +728,10 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       isActive: i === activeVersion
     }));
 
+    const imageSize = sceneImage.imageData?.length || 0;
+    const versionsCount = sceneImage.imageVersions?.length || 0;
+    console.log(`📷 [IMAGE-FALLBACK] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, ${Date.now() - startTime}ms`);
+
     res.json({
       pageNumber: pageNum,
       imageData: normalizeImageData(sceneImage.imageData),
@@ -730,7 +739,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       imageVersions: versionsWithActive
     });
   } catch (err) {
-    console.error('❌ Error fetching page image:', err);
+    console.error(`❌ Error fetching page image ${req.params.id}/page${req.params.pageNumber}:`, err);
     res.status(500).json({ error: 'Failed to fetch image', details: err.message });
   }
 });
