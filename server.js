@@ -129,6 +129,9 @@ const {
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
+  runEntityConsistencyChecks
+} = require('./server/lib/entityConsistency');
+const {
   prepareStyledAvatars,
   applyStyledAvatars,
   collectAvatarRequirements,
@@ -7878,21 +7881,55 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               referenceClothing: (img.referencePhotos || []).reduce((acc, p) => {
                 if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
                 return acc;
-              }, {})
+              }, {}),
+              // Include retryHistory for entity consistency check (has bbox detection)
+              retryHistory: img.retryHistory || []
             };
           })
         };
-        finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
+        // LEGACY: Full-image consistency check
+        const legacyReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
         });
 
-        // Track consistency check token usage
-        if (finalChecksReport?.tokenUsage) {
+        // Track legacy check token usage
+        if (legacyReport?.tokenUsage) {
           addUsage('gemini_quality', {
-            input_tokens: finalChecksReport.tokenUsage.inputTokens || 0,
-            output_tokens: finalChecksReport.tokenUsage.outputTokens || 0
-          }, 'consistency_check', finalChecksReport.tokenUsage.model || 'gemini-2.5-flash');
+            input_tokens: legacyReport.tokenUsage.inputTokens || 0,
+            output_tokens: legacyReport.tokenUsage.outputTokens || 0
+          }, 'consistency_check', legacyReport.tokenUsage.model || 'gemini-2.5-flash');
         }
+
+        // NEW: Entity-grouped consistency check (stores grids for review)
+        log.info('🔍 [STORYBOOK] Running entity-grouped consistency checks...');
+        const entityReport = await runEntityConsistencyChecks(imageCheckData, inputData.characters || [], {
+          checkCharacters: true,
+          checkObjects: false,  // Objects not yet implemented
+          minAppearances: 2,
+          saveGrids: false  // Grids stored in report instead
+        });
+
+        // Track entity check token usage
+        if (entityReport?.tokenUsage) {
+          addUsage('gemini_quality', {
+            input_tokens: entityReport.tokenUsage.inputTokens || 0,
+            output_tokens: entityReport.tokenUsage.outputTokens || 0
+          }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
+        }
+
+        // Combine reports: entity as primary, legacy as fallback
+        finalChecksReport = {
+          ...legacyReport,
+          entity: entityReport,
+          legacy: {
+            imageChecks: legacyReport.imageChecks,
+            summary: legacyReport.summary
+          },
+          // Use entity issues as primary if available
+          totalIssues: (entityReport?.totalIssues || 0) + (legacyReport?.totalIssues || 0),
+          overallConsistent: (entityReport?.overallConsistent ?? true) && (legacyReport?.overallConsistent ?? true),
+          summary: entityReport?.summary || legacyReport?.summary
+        };
 
         // Run text consistency check - include detailed language instructions and reading level
         // Use same model as story generation for language consistency
@@ -9622,21 +9659,55 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               referenceClothing: (img.referencePhotos || []).reduce((acc, p) => {
                 if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
                 return acc;
-              }, {})
+              }, {}),
+              // Include retryHistory for entity consistency check (has bbox detection)
+              retryHistory: img.retryHistory || []
             };
           })
         };
-        finalChecksReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
+        // LEGACY: Full-image consistency check
+        const legacyReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
         });
 
-        // Track consistency check token usage
-        if (finalChecksReport?.tokenUsage) {
+        // Track legacy check token usage
+        if (legacyReport?.tokenUsage) {
           addUsage('gemini_quality', {
-            input_tokens: finalChecksReport.tokenUsage.inputTokens || 0,
-            output_tokens: finalChecksReport.tokenUsage.outputTokens || 0
-          }, 'consistency_check', finalChecksReport.tokenUsage.model || 'gemini-2.5-flash');
+            input_tokens: legacyReport.tokenUsage.inputTokens || 0,
+            output_tokens: legacyReport.tokenUsage.outputTokens || 0
+          }, 'consistency_check', legacyReport.tokenUsage.model || 'gemini-2.5-flash');
         }
+
+        // NEW: Entity-grouped consistency check (stores grids for review)
+        log.info('🔍 [UNIFIED] Running entity-grouped consistency checks...');
+        const entityReport = await runEntityConsistencyChecks(imageCheckData, inputData.characters || [], {
+          checkCharacters: true,
+          checkObjects: false,  // Objects not yet implemented
+          minAppearances: 2,
+          saveGrids: false  // Grids stored in report instead
+        });
+
+        // Track entity check token usage
+        if (entityReport?.tokenUsage) {
+          addUsage('gemini_quality', {
+            input_tokens: entityReport.tokenUsage.inputTokens || 0,
+            output_tokens: entityReport.tokenUsage.outputTokens || 0
+          }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
+        }
+
+        // Combine reports: entity as primary, legacy as fallback
+        finalChecksReport = {
+          ...legacyReport,
+          entity: entityReport,
+          legacy: {
+            imageChecks: legacyReport.imageChecks,
+            summary: legacyReport.summary
+          },
+          // Use entity issues as primary if available
+          totalIssues: (entityReport?.totalIssues || 0) + (legacyReport?.totalIssues || 0),
+          overallConsistent: (entityReport?.overallConsistent ?? true) && (legacyReport?.overallConsistent ?? true),
+          summary: entityReport?.summary || legacyReport?.summary
+        };
 
         // =====================================================================
         // AUTO-REGENERATE IMAGES WITH CONSISTENCY ISSUES

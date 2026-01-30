@@ -1,0 +1,96 @@
+# Entity Consistency Check
+
+You are reviewing cropped images of a single entity (character or object) across multiple pages of a children's picture book.
+
+## Entity Information
+
+**Entity Type:** {ENTITY_TYPE}
+**Entity Name:** {ENTITY_NAME}
+{REFERENCE_PHOTO_INFO}
+
+## Grid Layout
+
+The image shows a grid of cropped appearances of this entity labeled A, B, C, etc.
+Each cell shows the entity from a different page of the story.
+
+**Cell Information (JSON format):**
+{CELL_INFO}
+
+Each entry contains:
+- "cell": The letter label (A, B, C, etc.)
+- "page": Story page number this crop came from
+- "clothing": Expected clothing for this page (if applicable)
+- "cropType": "face" (256px face crop) or "body" (512px full body crop)
+
+## Your Task
+
+Analyze whether this entity (specifically {ENTITY_NAME}) looks consistent across all the cells shown.
+
+### For CHARACTER entities, check:
+1. **Facial Features**: Eyes, nose, mouth proportions should be consistent
+2. **Hair**: Color, style, length should match across pages
+3. **Skin Tone**: Should be consistent throughout
+4. **Age Appearance**: Should look the same age in all panels
+5. **Body Build**: Proportions should be similar
+6. **Clothing**: Should match the listed category per page (ignore intentional costume changes)
+
+### For OBJECT/PET entities, check:
+1. **Color**: Primary colors should be consistent
+2. **Shape/Form**: Basic shape and proportions should match
+3. **Distinctive Features**: Key identifying features should persist
+4. **Size Relative to Scene**: Should appear appropriately sized
+
+## Clothing Rules
+
+- Different clothing between cells is EXPECTED if the clothing field differs
+- Only flag as inconsistent if clothing looks wrong WITHIN the same clothing category
+- Example: If cell A has "winter" and cell B has "standard", different outfits are fine
+- Example: If both cells have "standard" but one shows a jacket and one shows a t-shirt, that's inconsistent
+
+## Output Format
+
+Return ONLY valid JSON (no markdown, no explanation):
+
+{
+  "consistent": true/false,
+  "score": 1-10,
+  "issues": [
+    {
+      "cells": ["B", "D"],
+      "pagesToFix": [3],
+      "type": "face_mismatch" | "hair_change" | "skin_tone" | "age_shift" | "clothing_inconsistent" | "color_change" | "shape_change",
+      "description": "Clear description of what's inconsistent between cells",
+      "details": {
+        "cellA": "What it looks like in cell A (reference/correct version)",
+        "cellB": "What it looks like in problematic cell B"
+      },
+      "canonicalVersion": "Description of what the correct appearance should be",
+      "fixInstruction": "Specific action to fix (e.g., 'Change hair to blonde to match cell A')",
+      "severity": "minor" | "major" | "critical"
+    }
+  ],
+  "summary": "Brief overall assessment of this entity's consistency"
+}
+
+## Issue Detection Rules
+
+1. **Use first appearance as canonical**: Cell A represents the first appearance; match other cells to it
+2. **Majority wins**: If 3 cells show blonde hair and 1 shows brown, the brown cell is wrong
+3. **pagesToFix**: List ONLY the page number(s) that need correction
+4. **Reference photo priority**: If a reference photo was provided, that is the ultimate truth
+
+## Severity Guide
+
+- **critical**: Entity is unrecognizable (completely different face, wrong species for pets)
+- **major**: Obvious difference readers will notice (wrong hair color, significantly different features)
+- **minor**: Subtle variation that might go unnoticed (slightly different proportions, minor color shift)
+
+## Perfect Consistency Response
+
+If no issues found, return:
+{
+  "consistent": true,
+  "score": 10,
+  "issues": [],
+  "summary": "{ENTITY_NAME} appears consistent across all {CELL_COUNT} appearances"
+}

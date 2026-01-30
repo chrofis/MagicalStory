@@ -317,6 +317,81 @@ export interface FinalChecksTextCheck {
   parseError?: boolean;        // True if response couldn't be parsed as JSON
 }
 
+// Entity consistency check issue (from entity grid evaluation)
+export interface EntityConsistencyIssue {
+  id: string;
+  source: 'entity';
+  pageNumber: number | null;
+  region: null;
+  type: 'consistency';
+  subType: 'face_mismatch' | 'hair_change' | 'skin_tone' | 'age_shift' | 'clothing_inconsistent' | 'color_change' | 'shape_change';
+  severity: 'minor' | 'major' | 'critical';
+  description: string;
+  fixInstruction: string;
+  affectedCharacter: string;
+  cells?: string[];
+  pagesToFix?: number[];
+  canonicalVersion?: string;
+}
+
+// Entity check result (per character or object)
+export interface EntityCheckResult {
+  gridImage?: string;  // Base64 data URI of the grid
+  consistent: boolean;
+  score: number;
+  issues: EntityConsistencyIssue[];
+  summary?: string;
+  error?: string;
+}
+
+// Entity grid entry (for dev panel display)
+export interface EntityGridEntry {
+  entityName: string;
+  entityType: 'character' | 'object';
+  gridImage: string;  // Base64 data URI
+  manifest: {
+    createdAt: string;
+    title: string;
+    dimensions: { width: number; height: number };
+    cellSize: number;
+    cols: number;
+    rows: number;
+    cellCount: number;
+    cells: Array<{
+      letter: string;
+      pageNumber?: number;
+      isReference?: boolean;
+      clothing?: string;
+      cropType?: string;
+    }>;
+  };
+  cellCount: number;
+}
+
+// Entity consistency report
+export interface EntityConsistencyReport {
+  timestamp: string;
+  characters: Record<string, EntityCheckResult>;
+  objects: Record<string, EntityCheckResult>;
+  grids: EntityGridEntry[];
+  totalIssues: number;
+  overallConsistent: boolean;
+  summary: string;
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    calls: number;
+    model: string;
+  };
+  error?: string;
+}
+
+// Legacy consistency report (full-image checks)
+export interface LegacyConsistencyReport {
+  imageChecks: FinalChecksImageCheck[];
+  summary: string;
+}
+
 export interface FinalChecksReport {
   timestamp: string;
   imageChecks: FinalChecksImageCheck[];
@@ -325,6 +400,17 @@ export interface FinalChecksReport {
   totalIssues: number;
   summary: string;
   error?: string;
+  // New entity consistency report
+  entity?: EntityConsistencyReport;
+  // Legacy full-image consistency report
+  legacy?: LegacyConsistencyReport;
+  // Token usage for all consistency checks
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    calls: number;
+    model: string | null;
+  };
 }
 
 // Generation log entry for debugging story generation

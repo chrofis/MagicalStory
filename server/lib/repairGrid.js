@@ -427,12 +427,193 @@ async function saveGridFiles(gridBuffer, repairedBuffer, manifest, outputDir, ba
  * Escape XML special characters for SVG text
  */
 function escapeXml(text) {
-  return text
+  if (!text) return '';
+  return String(text)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;');
+}
+
+/**
+ * Create a letter label SVG for a grid cell
+ *
+ * @param {string} letter - The letter to display (A, B, C, etc.)
+ * @param {number} width - Label width
+ * @param {number} height - Label height
+ * @param {string} pageInfo - Optional page info to display below letter
+ * @returns {Buffer} SVG buffer
+ */
+function createCellLabel(letter, width, height, pageInfo = null) {
+  const fontSize = pageInfo ? 14 : 18;
+  const letterY = pageInfo ? '45%' : '70%';
+
+  let svg = `
+    <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#333"/>
+      <text x="50%" y="${letterY}" text-anchor="middle" font-size="${fontSize}" font-family="Arial" font-weight="bold" fill="white">
+        ${escapeXml(letter)}
+      </text>`;
+
+  if (pageInfo) {
+    svg += `
+      <text x="50%" y="80%" text-anchor="middle" font-size="11" font-family="Arial" fill="#ccc">
+        ${escapeXml(pageInfo)}
+      </text>`;
+  }
+
+  svg += `
+    </svg>`;
+
+  return Buffer.from(svg);
+}
+
+/**
+ * Create a labeled grid image from cell buffers
+ * Generic function that can be used for both repair grids and entity consistency grids
+ *
+ * @param {Object[]} cells - Array of {buffer, letter, pageInfo?, metadata?}
+ * @param {Object} options - Grid options
+ * @param {string} options.title - Grid title
+ * @param {number} options.cellSize - Cell size in pixels (default 256)
+ * @param {number} options.maxCols - Maximum columns (default 4)
+ * @param {number} options.maxRows - Maximum rows (default 3)
+ * @param {boolean} options.showPageInfo - Show page number below letter (default false)
+ * @returns {Promise<{buffer: Buffer, manifest: Object, cellMap: Object}>}
+ */
+async function createLabeledGrid(cells, options = {}) {
+  const {
+    title = 'Grid',
+    cellSize = CELL_SIZE,
+    maxCols = MAX_COLS,
+    maxRows = MAX_ROWS,
+    showPageInfo = false,
+    padding = PADDING,
+    labelHeight = LABEL_HEIGHT,
+    titleHeight = TITLE_HEIGHT
+  } = options;
+
+  const maxPerGrid = maxCols * maxRows;
+
+  if (cells.length === 0) {
+    throw new Error('No cells to create grid');
+  }
+
+  // Limit to max cells
+  const count = Math.min(cells.length, maxPerGrid);
+  const cols = Math.min(count, maxCols);
+  const rows = Math.ceil(count / cols);
+
+  const gridWidth = cols * cellSize + padding * (cols + 1);
+  const gridHeight = titleHeight + rows * (cellSize + labelHeight) + padding * (rows + 1);
+
+  const composites = [];
+  const cellMap = {};
+
+  // Add title
+  const titleSvg = Buffer.from(`
+    <svg width="${gridWidth}" height="${titleHeight}" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100%" height="100%" fill="#f0f0f0"/>
+      <text x="50%" y="70%" text-anchor="middle" font-size="20" font-family="Arial" font-weight="bold" fill="#333">
+        ${escapeXml(title)}
+      </text>
+    </svg>
+  `);
+
+  composites.push({
+    input: titleSvg,
+    left: 0,
+    top: 0
+  });
+
+  // Add each cell with letter label
+  for (let i = 0; i < count; i++) {
+    const cell = cells[i];
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+
+    const x = padding + col * (cellSize + padding);
+    const y = titleHeight + padding + row * (cellSize + labelHeight + padding);
+
+    try {
+      // Resize cell image to fit
+      let cellBuffer;
+      if (Buffer.isBuffer(cell.buffer)) {
+        cellBuffer = await sharp(cell.buffer)
+          .resize(cellSize, cellSize, { fit: 'cover' })
+          .toBuffer();
+      } else if (typeof cell.buffer === 'string') {
+        // Handle base64 data URI
+        const base64Data = cell.buffer.replace(/^data:image\/\w+;base64,/, '');
+        cellBuffer = await sharp(Buffer.from(base64Data, 'base64'))
+          .resize(cellSize, cellSize, { fit: 'cover' })
+          .toBuffer();
+      } else {
+        console.error(`  Invalid cell buffer type for cell ${i}`);
+        continue;
+      }
+
+      composites.push({
+        input: cellBuffer,
+        left: x,
+        top: y
+      });
+
+      // Add letter label with optional page info
+      const letter = cell.letter || String.fromCharCode(65 + i);
+      const pageInfo = showPageInfo ? cell.pageInfo : null;
+      const labelSvg = createCellLabel(letter, cellSize, labelHeight, pageInfo);
+
+      composites.push({
+        input: labelSvg,
+        left: x,
+        top: y + cellSize
+      });
+
+      // Record cell position
+      cellMap[letter] = {
+        x,
+        y,
+        width: cellSize,
+        height: cellSize,
+        metadata: cell.metadata || {}
+      };
+    } catch (err) {
+      console.error(`  Failed to add cell ${i} to grid: ${err.message}`);
+    }
+  }
+
+  // Create the grid image
+  const gridBuffer = await sharp({
+    create: {
+      width: gridWidth,
+      height: gridHeight,
+      channels: 4,
+      background: { r: 255, g: 255, b: 255, alpha: 1 }
+    }
+  })
+    .composite(composites)
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  // Build manifest
+  const manifest = {
+    createdAt: new Date().toISOString(),
+    title,
+    dimensions: { width: gridWidth, height: gridHeight },
+    cellSize,
+    cols,
+    rows,
+    cellCount: count,
+    cells: cells.slice(0, count).map((cell, i) => ({
+      letter: cell.letter || String.fromCharCode(65 + i),
+      pageNumber: cell.metadata?.pageNumber,
+      ...cell.metadata
+    }))
+  };
+
+  return { buffer: gridBuffer, manifest, cellMap };
 }
 
 module.exports = {
@@ -441,10 +622,16 @@ module.exports = {
   MAX_COLS,
   MAX_ROWS,
   MAX_PER_GRID,
+  PADDING,
+  LABEL_HEIGHT,
+  TITLE_HEIGHT,
 
   // Grid creation
   createIssueGrid,
   batchIssuesForGrids,
+  createLabeledGrid,  // Generic grid creation for reuse
+  createCellLabel,    // Cell label creation for reuse
+  escapeXml,          // XML escaping for SVG
 
   // Repair
   buildGridRepairPrompt,
