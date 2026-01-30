@@ -43,6 +43,31 @@ function buildStoryMetadata(story) {
   };
 }
 
+/**
+ * Normalize image data to ensure it has the correct data URI prefix.
+ * Some images were saved without the prefix, causing rendering failures.
+ */
+function normalizeImageData(imageData) {
+  if (!imageData) return imageData;
+
+  // Already has the prefix - return as-is
+  if (imageData.startsWith('data:image/')) {
+    return imageData;
+  }
+
+  // Raw base64 - add JPEG prefix (most common format)
+  // PNG would start with iVBORw0KGgo, JPEG with /9j/
+  if (imageData.startsWith('/9j/')) {
+    return `data:image/jpeg;base64,${imageData}`;
+  }
+  if (imageData.startsWith('iVBORw0KGgo')) {
+    return `data:image/png;base64,${imageData}`;
+  }
+
+  // Unknown format - assume JPEG
+  return `data:image/jpeg;base64,${imageData}`;
+}
+
 // ============================================
 // HISTORICAL EVENTS API
 // ============================================
@@ -672,7 +697,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
 
       return res.json({
         pageNumber: pageNum,
-        imageData: separateImage.imageData,
+        imageData: normalizeImageData(separateImage.imageData),
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt,
         isActive: activeVersion === 0,  // version 0 is main image
@@ -700,7 +725,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
 
     res.json({
       pageNumber: pageNum,
-      imageData: sceneImage.imageData,
+      imageData: normalizeImageData(sceneImage.imageData),
       isActive: activeVersion === 0,
       imageVersions: versionsWithActive
     });
@@ -740,7 +765,7 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
     if (separateImage) {
       return res.json({
         coverType,
-        imageData: separateImage.imageData,
+        imageData: normalizeImageData(separateImage.imageData),
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt
       });
@@ -766,7 +791,7 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
 
     res.json({
       coverType,
-      imageData,
+      imageData: normalizeImageData(imageData),
       ...(typeof coverData === 'object' ? { description: coverData.description, storyTitle: coverData.storyTitle } : {})
     });
   } catch (err) {
