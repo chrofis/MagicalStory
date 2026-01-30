@@ -73,6 +73,35 @@ router.get('/', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
+    // Runtime stripping for non-admin mode - handles stale metadata with embedded base64
+    // These fields should have been stripped when saving but some old data has them
+    if (!includeAllAvatars && characterData.characters) {
+      const preStripSize = JSON.stringify(characterData).length;
+      characterData.characters = characterData.characters.map(char => {
+        // Strip heavy base64 fields that shouldn't be in metadata
+        const {
+          body_no_bg_url, body_photo_url, photo_url, thumbnail_url,
+          clothing_avatars, photos, styledAvatars, costumedAvatars,
+          ...lightChar
+        } = char;
+
+        // Also strip faceThumbnails except 'standard' (they're 260-330KB each)
+        if (lightChar.avatars?.faceThumbnails) {
+          const standardThumb = lightChar.avatars.faceThumbnails.standard;
+          lightChar.avatars = {
+            ...lightChar.avatars,
+            faceThumbnails: standardThumb ? { standard: standardThumb } : undefined
+          };
+        }
+
+        return lightChar;
+      });
+      const postStripSize = JSON.stringify(characterData).length;
+      if (preStripSize - postStripSize > 100000) {
+        console.log(`[Characters] GET - Runtime stripped ${Math.round((preStripSize - postStripSize)/1024)}KB from stale metadata`);
+      }
+    }
+
     // Fire and forget - don't block response for logging
     logActivity(req.user.id, req.user.username, 'CHARACTERS_LOADED', { count: characterData.characters.length }).catch(() => {});
     res.json(characterData);
