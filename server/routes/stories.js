@@ -418,28 +418,60 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
     }
 
     // Extract only dev-relevant fields (no image data, no characters)
+    // IMPORTANT: Explicitly list fields to include - never use spread operator on objects
+    // that may contain large image data (retryHistory, repairHistory, grids, etc.)
     const devMetadata = {
       // Story outline review data
       criticalAnalysis,
       originalStory: story.originalStory || null,
-      // Scene images dev data (strip large image data to keep response fast)
+      // Scene images dev data - ONLY include specific fields, no spreading
       sceneImages: story.sceneImages?.map(img => ({
         pageNumber: img.pageNumber,
         prompt: img.prompt || null,
         qualityReasoning: img.qualityReasoning || null,
-        // Strip imageData from retryHistory entries
+        // retryHistory: ONLY include metadata fields, NO image data or grids
         retryHistory: (img.retryHistory || []).map(r => ({
-          ...r,
-          imageData: r.imageData ? '[IMAGE DATA STRIPPED]' : null
+          type: r.type,
+          score: r.score,
+          attempt: r.attempt,
+          modelId: r.modelId,
+          reasoning: r.reasoning,
+          textIssue: r.textIssue,
+          timestamp: r.timestamp,
+          evalSkipped: r.evalSkipped,
+          autoRepairEnabled: r.autoRepairEnabled,
+          fixableIssuesCount: r.fixableIssuesCount,
+          enrichedTargetsCount: r.enrichedTargetsCount,
+          dryRun: r.dryRun,
+          consistencyScore: r.consistencyScore,
+          consistencyIssues: r.consistencyIssues,
+          failReason: r.failReason,
+          gridFixedCount: r.gridFixedCount,
+          preRepairScore: r.preRepairScore,
+          gridFailedCount: r.gridFailedCount,
+          gridTotalIssues: r.gridTotalIssues,
+          fixTargetsCount: r.fixTargetsCount,
+          postRepairScore: r.postRepairScore,
+          // Strip all image data fields
+          hasImageData: !!r.imageData,
+          hasGrids: !!(r.grids && r.grids.length > 0),
+          hasBboxOverlay: !!r.bboxOverlayImage,
+          // Keep small metadata from evaluations
+          unifiedReport: r.unifiedReport,
+          reEvalUsage: r.reEvalUsage,
+          repairUsage: r.repairUsage
         })),
-        // Strip imageData from repairHistory entries
+        // repairHistory: ONLY include metadata fields
         repairHistory: (img.repairHistory || []).map(r => ({
-          ...r,
-          imageData: r.imageData ? '[IMAGE DATA STRIPPED]' : null,
-          originalImage: r.originalImage ? '[IMAGE DATA STRIPPED]' : null
+          timestamp: r.timestamp,
+          type: r.type,
+          score: r.score,
+          reasoning: r.reasoning,
+          hasImageData: !!r.imageData,
+          hasOriginalImage: !!r.originalImage
         })),
         wasRegenerated: img.wasRegenerated || false,
-        originalImage: img.originalImage ? true : false, // Just flag, not data
+        hasOriginalImage: !!img.originalImage, // Just flag, not data
         originalScore: img.originalScore || null,
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
@@ -449,7 +481,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           name: p.name,
           clothingCategory: p.clothingCategory,
           clothingDescription: p.clothingDescription,
-          hasPhoto: !!p.photoUrl
+          hasPhoto: !!(p.photoUrl || p.photoData)
         })),
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
@@ -463,7 +495,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           issues: img.consistencyRegen.issues,
           score: img.consistencyRegen.score,
           timestamp: img.consistencyRegen.timestamp
-        } : null
+        } : null,
+        // sceneCharacters - just names, not full character data with avatars
+        sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown')
       })) || [],
       // Cover images dev data
       coverImages: story.coverImages ? {
@@ -494,20 +528,28 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
       } : null,
       // Scene descriptions (outline extract, scene prompt, scene description text)
       sceneDescriptions: story.sceneDescriptions || [],
-      // Visual Bible (strip referenceImageData to keep response small)
+      // Visual Bible - explicitly list fields, no spreading
       visualBible: story.visualBible ? {
-        ...story.visualBible,
+        artStyle: story.visualBible.artStyle,
+        createdAt: story.visualBible.createdAt,
+        updatedAt: story.visualBible.updatedAt,
         locations: (story.visualBible.locations || []).map(loc => ({
-          ...loc,
-          referenceImageData: loc.referenceImageData ? '[IMAGE DATA STRIPPED]' : null
+          name: loc.name,
+          description: loc.description,
+          attributes: loc.attributes,
+          hasReferenceImage: !!loc.referenceImageData
         })),
         objects: (story.visualBible.objects || []).map(obj => ({
-          ...obj,
-          referenceImageData: obj.referenceImageData ? '[IMAGE DATA STRIPPED]' : null
+          name: obj.name,
+          description: obj.description,
+          attributes: obj.attributes,
+          hasReferenceImage: !!obj.referenceImageData
         })),
         secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
-          ...char,
-          referenceImageData: char.referenceImageData ? '[IMAGE DATA STRIPPED]' : null
+          name: char.name,
+          description: char.description,
+          attributes: char.attributes,
+          hasReferenceImage: !!char.referenceImageData
         }))
       } : null,
       // Generation log (avatar lookups, stage transitions, etc.)
