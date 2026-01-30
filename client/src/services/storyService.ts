@@ -504,8 +504,9 @@ export const storyService = {
       }
     }
 
-    // Load page images in parallel batches (3 at a time for balance)
-    const BATCH_SIZE = 3;
+    // Load page images in parallel batches
+    // TEMP: Using batch size of 1 to debug ERR_CONNECTION_CLOSED issue
+    const BATCH_SIZE = 1;
     for (let i = 0; i < pageNumbers.length; i += BATCH_SIZE) {
       const batch = pageNumbers.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(

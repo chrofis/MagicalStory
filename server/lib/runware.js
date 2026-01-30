@@ -29,13 +29,19 @@ if (RUNWARE_API_KEY) {
   log.warn(`🎨 Runware API: ❌ Not configured (RUNWARE_API_KEY not set)`);
 }
 
-// Available inpainting models
+// Available models
+// Text-to-image: https://runware.ai/models
+// Inpainting/Tools: https://runware.ai/docs/en/image-inference/flux-tools
 const RUNWARE_MODELS = {
-  SD15: 'runware:100@1',       // SD 1.5 Inpaint - $0.0006/image, fastest but low quality
-  SDXL: 'runware:101@1',       // SDXL Inpaint - $0.002/image, better quality
-  FLUX_FILL: 'runware:102@1',  // FLUX Fill - best inpainting, auto-optimal settings
-  FLUX_SCHNELL: 'runware:5@1', // FLUX Schnell - $0.0006/image (text-to-image only)
-  FLUX_DEV: 'runware:6@1'      // FLUX Dev - $0.004/image, best quality (text-to-image only)
+  // Text-to-image models
+  FLUX_SCHNELL: 'runware:100@1', // FLUX.1 Schnell - $0.0006/image, fast 4-step
+  FLUX_DEV: 'runware:101@1',     // FLUX.1 Dev - $0.004/image, better quality
+  SDXL: 'civitai:101055@128078', // SDXL base v1.0 VAE fix - for PuLID compatibility
+  // FLUX Tools (inpainting, etc)
+  FLUX_FILL: 'runware:102@1',    // FLUX Fill - inpainting/outpainting
+  FLUX_DEPTH: 'runware:103@1',   // FLUX Depth - depth map guidance
+  FLUX_CANNY: 'runware:104@1',   // FLUX Canny - edge guidance
+  FLUX_REDUX: 'runware:105@1'    // FLUX Redux - image variation
 };
 
 /**
@@ -478,7 +484,7 @@ async function generateWithPuLID(referenceImage, prompt, options = {}) {
     taskUUID: taskUUID,
     positivePrompt: prompt,
     negativePrompt: 'blurry, low quality, distorted, disfigured, bad anatomy, naked, nude, nsfw',
-    model: RUNWARE_MODELS.SDXL,  // runware:101@1 - SDXL works with PuLID
+    model: RUNWARE_MODELS.SDXL,  // SDXL base - required for PuLID
     width: width,
     height: height,
     steps: steps,

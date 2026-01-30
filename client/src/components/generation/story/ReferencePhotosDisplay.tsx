@@ -4,7 +4,8 @@ import { ImageLightbox } from '@/components/common/ImageLightbox';
 
 interface LandmarkPhoto {
   name: string;
-  photoData: string;
+  photoData?: string;  // May be stripped in dev-metadata response
+  hasPhoto?: boolean;  // Flag when photoData is stripped
   attribution?: string;
   source?: string;
 }
@@ -101,16 +102,18 @@ export function ReferencePhotosDisplay({
             <div key={idx} className="bg-white rounded-lg p-2 border border-pink-200">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold text-xs text-gray-800 truncate">{photo.name}</span>
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
-                  {getPhotoTypeLabel(photo.photoType)}
-                </span>
+                {photo.photoType && (
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap ${getPhotoTypeColor(photo.photoType)}`}>
+                    {getPhotoTypeLabel(photo.photoType)}
+                  </span>
+                )}
               </div>
-              {photo.photoUrl && (
+              {photo.photoUrl ? (
                 <>
                   <div className="relative">
                     <img
                       src={photo.photoUrl}
-                      alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType)}`}
+                      alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType || 'unknown')}`}
                       className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
                       onClick={() => setLightboxImage(photo.photoUrl)}
                       title="Click to enlarge"
@@ -127,6 +130,10 @@ export function ReferencePhotosDisplay({
                     </div>
                   )}
                 </>
+              ) : (
+                <div className="text-xs text-gray-500 italic py-2 text-center bg-gray-100 rounded">
+                  {language === 'de' ? 'Foto nicht geladen' : 'Photo not loaded'}
+                </div>
               )}
             </div>
           ))}
@@ -148,14 +155,14 @@ export function ReferencePhotosDisplay({
                     📍 LANDMARK
                   </span>
                 </div>
-                {landmark.photoData && (
+                {landmark.photoData ? (
                   <>
                     <div className="relative">
                       <img
                         src={landmark.photoData}
                         alt={`${landmark.name} landmark`}
                         className="w-full max-h-32 object-contain rounded border border-amber-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setLightboxImage(landmark.photoData)}
+                        onClick={() => setLightboxImage(landmark.photoData!)}
                         title="Click to enlarge"
                       />
                     </div>
@@ -170,6 +177,10 @@ export function ReferencePhotosDisplay({
                       </div>
                     )}
                   </>
+                ) : (
+                  <div className="text-xs text-gray-500 italic py-2 text-center bg-gray-100 rounded">
+                    {language === 'de' ? 'Foto nicht geladen' : 'Photo not loaded'}
+                  </div>
                 )}
               </div>
             ))}

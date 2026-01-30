@@ -574,13 +574,19 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
       if (!originalAvatar) {
         originalAvatar = avatars?.standard ||
                          avatars?.formal ||  // Legacy backwards compat
-                         char.bodyNoBgUrl ||
-                         char.photoUrl;
+                         char.bodyNoBgUrl || char.body_no_bg_url ||  // Support both camelCase and snake_case
+                         char.photoUrl || char.photo_url;
       }
 
       // Get high-resolution face photo for identity preservation
       // Priority: face thumbnail (768px) > original photo
-      const facePhoto = char.photos?.face || char.photos?.original || char.photoUrl || null;
+      // Support both camelCase (new) and snake_case (legacy DB fields)
+      const facePhoto = char.photos?.face || char.photos?.original ||
+                        char.photoUrl || char.photo_url ||
+                        char.thumbnail_url || null;
+
+      // Log what data is available for debugging
+      log.debug(`🎨 [STYLED AVATAR] ${charName}: facePhoto=${facePhoto ? 'yes' : 'no'}, photos.face=${char.photos?.face ? 'yes' : 'no'}, photo_url=${char.photo_url ? 'yes' : 'no'}, physical=${Object.keys(char.physical || {}).length} keys`);
 
       // Get clothing description text (for explicit clothing in styled avatar)
       let clothingDescription = null;

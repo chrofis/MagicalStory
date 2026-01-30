@@ -40,14 +40,19 @@
 
 ```
 POST /api/jobs/create-story → Background Job:
-  1. Generate Outline (Claude)           → 5%
-  2. Extract Scene Hints                 → Internal
-  3. Generate Story Text (Claude)        → 10-40%
-  4. Generate Scene Descriptions         → Parallel
-  5. Generate Images (Gemini)            → 10-90%
-  6. Quality Evaluation + Auto-Repair    → Optional
-  7. Generate Covers                     → 95%
-  8. Save Final Result                   → 100%
+  1. Generate Outline (Claude)                    → 5%
+  2. Extract Scene Hints                          → Internal
+  3. Generate Story Text (Claude)                 → 10-40%
+  4. Start Text Consistency Check (background)    → Parallel ─┐
+  5. Generate Scene Descriptions                  → Parallel  │
+  6. Generate Images (Gemini)                     → 10-90%    │
+     ├─ Quality Evaluation (per page)                         │
+     ├─ Incremental Consistency Check (per page)              │
+     └─ Grid-based Repair (if needed)                         │
+  7. Apply Text Corrections (from step 4)         ← ──────────┘
+  8. Final Consistency Checks                     → Post-images
+  9. Generate Covers                              → 95%
+  10. Save Final Result                           → 100%
   → GET /api/jobs/:id/status (polling)
 ```
 
@@ -59,7 +64,7 @@ POST /api/jobs/create-story → Background Job:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  BACKGROUND JOB (processStoryJob)                           │
+│  BACKGROUND JOB (processStoryJob / processUnifiedStoryJob)  │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  Step 1: Generate Outline (5%)                              │
@@ -71,20 +76,39 @@ POST /api/jobs/create-story → Background Job:
 │  Step 3: Generate Story Text (10-40%)                       │
 │      └─► Claude API batches → fullStoryText + checkpoint    │
 │                                                             │
-│  Step 4: Generate Scene Descriptions (parallel)             │
+│  Step 4: Text Consistency Check (STARTS IN BACKGROUND)      │
+│      └─► Runs parallel with steps 5-6, checks grammar,      │
+│          spelling, character names, language level          │
+│                                                             │
+│  Step 5: Generate Scene Descriptions (parallel)             │
 │      └─► Claude API per page → allSceneDescriptions[]       │
 │                                                             │
-│  Step 5: Generate Images (10-90%, parallel/sequential)      │
-│      ├─► Gemini API per page → raw image                    │
+│  Step 6: Generate Images (10-90%, parallel/sequential)      │
+│      FOR EACH PAGE:                                         │
+│      ├─► Gemini API → raw image                             │
 │      ├─► Compress to JPEG                                   │
-│      ├─► Gemini API: evaluateImageQuality() → score 0-100   │
-│      └─► Quality retry if below threshold + checkpoint      │
+│      ├─► Quality Evaluation → score + fixTargets            │
+│      ├─► Incremental Consistency Check (vs previous pages)  │
+│      ├─► Merge issues → unified fix plan                    │
+│      ├─► Bbox Detection → enrich fix targets                │
+│      ├─► Grid-based Repair (if issues found)                │
+│      │   └─► Extract regions → grid → Gemini repair         │
+│      │   └─► Verify repairs → apply successful ones         │
+│      └─► Re-evaluate + checkpoint                           │
 │                                                             │
-│  Step 6: Generate Covers (95%)                              │
+│  Step 7: Apply Text Corrections                             │
+│      └─► Wait for step 4, apply corrections to story text   │
+│                                                             │
+│  Step 8: Final Consistency Checks                           │
+│      ├─► Full cross-image consistency check                 │
+│      ├─► Per-character consistency (up to 3 characters)     │
+│      └─► Identify any remaining pagesToFix[]                │
+│                                                             │
+│  Step 9: Generate Covers (95%)                              │
 │      ├─► Gemini API × 3 → coverImages{}                     │
 │      └─► Quality evaluation with text accuracy check        │
 │                                                             │
-│  Step 7: Save Final Result (100%)                           │
+│  Step 10: Save Final Result (100%)                          │
 │      └─► UPDATE story_jobs SET result_data = {...}          │
 │          + Send completion email                            │
 └─────────────────────────────────────────────────────────────┘
@@ -575,35 +599,144 @@ When enabled, admins can:
 
 ---
 
-## 10. Quality Evaluation
+## 10. Quality Evaluation & Repair Pipeline
 
-### Evaluation Process
+### Complete Evaluation & Repair Flow
 
-```javascript
-// Scene images evaluated by Gemini for:
-// - Character accuracy (faces match reference photos)
-// - Scene matching (elements match description)
-// - Art style consistency
-
-// Cover images additionally checked for:
-// - Text accuracy (title spelling)
-// - Text errors force score to 0
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│  TEXT CONSISTENCY CHECK (early, parallel with images)           │
+│  Model: Claude/Gemini (same as story generation)                │
+│  Starts: After story text generated, BEFORE image generation    │
+│  Checks: Grammar, spelling, character name consistency,         │
+│          language level appropriateness                         │
+│  Auto-applies corrections if issues found                       │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  FOR EACH PAGE:                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  1. GENERATE IMAGE (Gemini)                                     │
+│                                                                 │
+│  2. QUALITY EVALUATION (evaluateImageQuality)                   │
+│     Model: Gemini 2.5 Flash                                     │
+│     Returns:                                                    │
+│       - score (0-100)                                           │
+│       - fixTargets[] with bounding boxes                        │
+│       - matches[] (character → figure mapping with face_bbox)   │
+│       - identity_sync[] (face-specific issues)                  │
+│                                                                 │
+│  3. INCREMENTAL CONSISTENCY CHECK (evaluateIncrementalConsistency)
+│     Model: Gemini 2.5 Flash                                     │
+│     Compares current page with previous N pages (lookback)      │
+│     Checks:                                                     │
+│       - Character appearance consistency (hair, face, body)     │
+│       - Clothing consistency across scenes                      │
+│       - Object/prop consistency (recurring items)               │
+│       - Art style consistency                                   │
+│     Returns:                                                    │
+│       - issues[] with fixTarget.region                          │
+│       - affectedCharacter (for bbox lookup)                     │
+│                                                                 │
+│  4. MERGE ISSUES (mergeEvaluationIssues)                        │
+│     Combines quality + incremental → unifiedReport              │
+│       - allIssues[]                                             │
+│       - fixPlan.fixTargets[]                                    │
+│                                                                 │
+│  5. BOUNDING BOX DETECTION (enrichWithBoundingBoxes)            │
+│     Model: Gemini                                               │
+│     Detects ALL figures and objects in scene                    │
+│     Matches issues to detected elements via scoring:            │
+│       - Character name match: +100 pts                          │
+│       - Position match (left/right/center): +30 pts             │
+│       - Keyword overlap: +10 pts each                           │
+│       - Color match: +15 pts each                               │
+│     Returns: enrichedFixTargets[] with precise bboxes           │
+│                                                                 │
+│  6. GRID-BASED REPAIR (if issues found)                         │
+│     Model: Gemini 2.5 Flash Image                               │
+│                                                                 │
+│     a. COLLECT ALL ISSUES (collectAllIssues)                    │
+│        Sources:                                                 │
+│          - Quality eval (fixTargets, identity_sync)             │
+│          - Incremental consistency (issues[])                   │
+│          - Final consistency (pagesToFix[]) - if available      │
+│                                                                 │
+│     b. Extract issue regions → 256x256 thumbnails               │
+│     c. Batch into labeled grids (max 12 per grid)               │
+│     d. Send grid + repair prompt to Gemini                      │
+│     e. Extract repaired regions from returned grid              │
+│     f. Verify each repair (LPIPS + LLM check)                   │
+│     g. Apply only successful repairs                            │
+│                                                                 │
+│  7. RE-EVALUATE repaired image                                  │
+│     If improved → use repaired                                  │
+│     If worse → keep original                                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────────┐
+│  AFTER ALL PAGES GENERATED:                                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  FINAL CONSISTENCY CHECKS (runFinalConsistencyChecks)           │
+│  Model: Gemini                                                  │
+│                                                                 │
+│  a. Full consistency check across ALL images                    │
+│     - Compare all pages together for drift                      │
+│                                                                 │
+│  b. Character-specific checks (up to 3 main characters)         │
+│     - Track each character's appearance across all pages        │
+│                                                                 │
+│  c. Text consistency check (if not run earlier)                 │
+│     - Final grammar/spelling verification                       │
+│                                                                 │
+│  Returns: pagesToFix[] for any remaining issues                 │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Issue Sources for Repair
+
+| Source | When | What it catches |
+|--------|------|-----------------|
+| **Quality Eval** | Per page | Anatomy, faces, hands, missing objects, wrong colors |
+| **Incremental Consistency** | Per page (vs previous) | Character drift, clothing changes, style shifts |
+| **Final Consistency** | After all pages | Cross-story inconsistencies missed earlier |
 
 ### Configuration
 
-| Setting | Value |
-|---------|-------|
-| Quality threshold | 50% (configurable) |
-| Scene retry attempts | 2 |
-| Cover retry attempts | 3 |
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Quality threshold | 50% | Minimum score to accept without retry |
+| Auto-repair threshold | 90% | Score below which repair is attempted |
+| Scene retry attempts | 2 | Max regeneration attempts |
+| Cover retry attempts | 3 | Covers get more retries |
+| Incremental lookback | 3 pages | How many previous pages to compare |
+| Max mask coverage | 25% | Skip repair if mask too large |
+| useGridRepair | true | Use Gemini grid repair (vs Runware inpainting) |
 
-### Auto-Repair
+### Repair Methods
 
-If quality evaluation identifies specific issues:
-1. **Fix targets** identified (character faces, missing elements)
-2. **Inpainting** applied to specific regions
-3. **Re-evaluation** after repair
+| Method | Model | When Used | Best For |
+|--------|-------|-----------|----------|
+| **Grid-based** (default) | Gemini 2.5 Flash Image | `useGridRepair: true` | Most repairs, batch efficiency |
+| **Direct inpainting** | Runware SDXL/FLUX | `useGridRepair: false` | Legacy fallback |
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `server/lib/images.js` | Quality eval, bbox detection, repair orchestration |
+| `server/lib/gridBasedRepair.js` | Grid-based repair orchestrator |
+| `server/lib/repairGrid.js` | Grid creation, Gemini repair calls |
+| `server/lib/issueExtractor.js` | Normalize & collect issues from all sources |
+| `server/lib/repairVerification.js` | LPIPS + LLM verification |
+| `prompts/image-evaluation.txt` | Quality evaluation prompt |
+| `prompts/incremental-consistency-check.txt` | Incremental check prompt |
+| `prompts/final-consistency-check.txt` | Final check prompt |
+| `prompts/grid-repair.txt` | Grid repair prompt |
 
 ---
 
@@ -655,12 +788,20 @@ All prompts located in `/prompts/` folder:
 
 | Function | File | Purpose |
 |----------|------|---------|
-| `processStoryJob()` | server.js | Main job processor |
+| `processStoryJob()` | server.js | Main job processor (legacy modes) |
 | `processUnifiedStoryJob()` | server.js | Unified mode handler |
 | `buildImagePrompt()` | server/lib/storyHelpers.js | Build image prompts |
 | `buildCharacterReferenceList()` | server/lib/storyHelpers.js | Character descriptions |
 | `buildHairDescription()` | server/lib/storyHelpers.js | Hair description logic |
 | `getCharacterPhotoDetails()` | server/lib/storyHelpers.js | Avatar selection |
 | `parseVisualBible()` | server/lib/visualBible.js | Parse Visual Bible |
-| `evaluateImageQuality()` | server/lib/images.js | Quality evaluation |
 | `generatePrintPdf()` | server/lib/pdf.js | PDF generation |
+| **Evaluation & Repair** | | |
+| `evaluateImageQuality()` | server/lib/images.js | Quality evaluation (score + fixTargets) |
+| `evaluateIncrementalConsistency()` | server/lib/images.js | Per-page consistency vs previous pages |
+| `runFinalConsistencyChecks()` | server/lib/images.js | Post-story cross-image checks |
+| `evaluateTextConsistency()` | server/lib/textModels.js | Text grammar/spelling check |
+| `enrichWithBoundingBoxes()` | server/lib/images.js | Detect figures/objects, match to issues |
+| `gridBasedRepair()` | server/lib/gridBasedRepair.js | Orchestrate grid-based Gemini repair |
+| `collectAllIssues()` | server/lib/issueExtractor.js | Normalize issues from all eval sources |
+| `autoRepairWithTargets()` | server/lib/images.js | Legacy Runware inpainting repair |
