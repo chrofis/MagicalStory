@@ -229,6 +229,13 @@ export interface RetryAttempt {
   failReason?: string;  // For grid_repair_failed: why the repair was not used
   // Annotated original image with bounding boxes (base64)
   annotatedOriginal?: string;
+  // Lazy loading flags (when images are stripped from dev-metadata)
+  hasImageData?: boolean;
+  hasOriginalImage?: boolean;
+  hasBboxOverlay?: boolean;
+  hasAnnotatedOriginal?: boolean;
+  hasGrids?: boolean;
+  gridsCount?: number;
   // Bbox detection only fields
   fixableIssuesCount?: number;
   enrichedTargetsCount?: number;

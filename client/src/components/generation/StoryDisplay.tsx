@@ -2971,6 +2971,8 @@ export function StoryDisplay({
                                 totalAttempts={image?.totalAttempts || image.retryHistory.length}
                                 language={language}
                                 onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
+                                storyId={storyId}
+                                pageNumber={image.pageNumber}
                               />
                             )}
 
@@ -3318,6 +3320,8 @@ export function StoryDisplay({
                                 totalAttempts={image.totalAttempts || image.retryHistory.length}
                                 language={language}
                                 onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
+                                storyId={storyId}
+                                pageNumber={image.pageNumber}
                               />
                             )}
 
