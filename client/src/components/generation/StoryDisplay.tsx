@@ -251,9 +251,9 @@ export function StoryDisplay({
 
     setLoadingRefImages(prev => new Set(prev).add(elementId));
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(`/api/stories/${storyId}/visual-bible-image/${elementId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (response.ok) {
         const data = await response.json();

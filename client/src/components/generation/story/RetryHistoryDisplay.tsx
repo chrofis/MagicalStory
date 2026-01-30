@@ -292,9 +292,14 @@ export function RetryHistoryDisplay({
 
     setLoadingGridImages(prev => new Set(prev).add(retryIdx));
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/stories/${storyId}/image-data/${pageNumber}/retry/${retryIdx}?field=all`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+      const token = localStorage.getItem('auth_token');
+      const params = new URLSearchParams({
+        page: String(pageNumber),
+        type: 'retry',
+        index: String(retryIdx)
+      });
+      const response = await fetch(`/api/stories/${storyId}/dev-image?${params}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       if (response.ok) {
         const data = await response.json();
