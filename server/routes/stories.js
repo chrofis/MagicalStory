@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getRetryHistoryImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -518,6 +518,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         })),
         landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
           name: p.name,
+          attribution: p.attribution,
+          source: p.source,
           hasPhoto: !!p.photoData
         })),
         // Consistency regeneration - flags only, images lazy loaded
@@ -771,6 +773,8 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         result = {
           landmarkPhotos: (sceneImage.landmarkPhotos || []).map(p => ({
             name: p.name,
+            attribution: p.attribution,
+            source: p.source,
             photoData: p.photoData || null
           }))
         };
