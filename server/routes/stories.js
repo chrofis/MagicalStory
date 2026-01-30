@@ -499,31 +499,31 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         // sceneCharacters - just names, not full character data with avatars
         sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown')
       })) || [],
-      // Cover images dev data
+      // Cover images dev data - strip image data from retryHistory and reference photos
       coverImages: story.coverImages ? {
         frontCover: story.coverImages.frontCover && typeof story.coverImages.frontCover === 'object' ? {
           prompt: story.coverImages.frontCover.prompt || null,
           qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
-          retryHistory: story.coverImages.frontCover.retryHistory || [],
+          retryHistoryCount: (story.coverImages.frontCover.retryHistory || []).length,
           totalAttempts: story.coverImages.frontCover.totalAttempts || null,
-          referencePhotos: story.coverImages.frontCover.referencePhotos || null,
-          landmarkPhotos: story.coverImages.frontCover.landmarkPhotos || null
+          referencePhotosCount: (story.coverImages.frontCover.referencePhotos || []).length,
+          landmarkPhotosCount: (story.coverImages.frontCover.landmarkPhotos || []).length
         } : null,
         initialPage: story.coverImages.initialPage && typeof story.coverImages.initialPage === 'object' ? {
           prompt: story.coverImages.initialPage.prompt || null,
           qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
-          retryHistory: story.coverImages.initialPage.retryHistory || [],
+          retryHistoryCount: (story.coverImages.initialPage.retryHistory || []).length,
           totalAttempts: story.coverImages.initialPage.totalAttempts || null,
-          referencePhotos: story.coverImages.initialPage.referencePhotos || null,
-          landmarkPhotos: story.coverImages.initialPage.landmarkPhotos || null
+          referencePhotosCount: (story.coverImages.initialPage.referencePhotos || []).length,
+          landmarkPhotosCount: (story.coverImages.initialPage.landmarkPhotos || []).length
         } : null,
         backCover: story.coverImages.backCover && typeof story.coverImages.backCover === 'object' ? {
           prompt: story.coverImages.backCover.prompt || null,
           qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
-          retryHistory: story.coverImages.backCover.retryHistory || [],
+          retryHistoryCount: (story.coverImages.backCover.retryHistory || []).length,
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
-          referencePhotos: story.coverImages.backCover.referencePhotos || null,
-          landmarkPhotos: story.coverImages.backCover.landmarkPhotos || null
+          referencePhotosCount: (story.coverImages.backCover.referencePhotos || []).length,
+          landmarkPhotosCount: (story.coverImages.backCover.landmarkPhotos || []).length
         } : null
       } : null,
       // Scene descriptions (outline extract, scene prompt, scene description text)
