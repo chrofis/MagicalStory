@@ -484,6 +484,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           hasImageData: !!r.imageData,
           hasOriginalImage: !!r.originalImage,
           hasBboxOverlay: !!r.bboxOverlayImage,
+          hasAnnotatedOriginal: !!r.annotatedOriginal,
+          hasGrids: !!(r.grids && r.grids.length > 0),
+          gridsCount: r.grids?.length || 0,
           // Keep small metadata from evaluations
           unifiedReport: r.unifiedReport,
           reEvalUsage: r.reEvalUsage,
@@ -719,12 +722,19 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
           result = { originalImage: entry.originalImage || null };
         } else if (field === 'bboxOverlay') {
           result = { bboxOverlayImage: entry.bboxOverlayImage || null };
+        } else if (field === 'annotatedOriginal') {
+          result = { annotatedOriginal: entry.annotatedOriginal || null };
+        } else if (field === 'grids') {
+          // Return grid images for grid-based repair
+          result = { grids: entry.grids || [] };
         } else {
           // Return all available images for this retry entry
           result = {
             imageData: entry.imageData || null,
             originalImage: entry.originalImage || null,
-            bboxOverlayImage: entry.bboxOverlayImage || null
+            bboxOverlayImage: entry.bboxOverlayImage || null,
+            annotatedOriginal: entry.annotatedOriginal || null,
+            grids: entry.grids || []
           };
         }
         break;
@@ -945,6 +955,7 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
 router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, res) => {
   try {
     const { id, elementId } = req.params;
+    console.log(`🖼️ GET visual-bible-image - Story: ${id}, Element: ${elementId}, User: ${req.user?.username || 'unknown'}`);
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
