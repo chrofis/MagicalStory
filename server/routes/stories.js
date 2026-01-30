@@ -380,50 +380,6 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/stories/:id/diagnose-images - Diagnostic endpoint to check image storage (admin only)
-router.get('/:id/diagnose-images', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // Admin only
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin only' });
-    }
-
-    // Check story_images table
-    const images = await dbQuery(
-      `SELECT page_number, version_index, length(image_data) as data_length,
-              left(image_data, 100) as data_preview, quality_score
-       FROM story_images
-       WHERE story_id = $1 AND image_type = 'scene'
-       ORDER BY page_number, version_index`,
-      [id]
-    );
-
-    // Check if images exist in data blob
-    const blobCheck = await dbQuery(
-      `SELECT jsonb_array_length(data->'sceneImages') as blob_count
-       FROM stories WHERE id = $1`,
-      [id]
-    );
-
-    res.json({
-      storyId: id,
-      storyImagesTable: images.map(img => ({
-        page: img.page_number,
-        version: img.version_index,
-        size: img.data_length,
-        preview: img.data_preview,
-        quality: img.quality_score
-      })),
-      dataBlobCount: blobCheck[0]?.blob_count || 0
-    });
-  } catch (err) {
-    console.error('Diagnose images error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // GET /api/stories/:id/dev-metadata - Get developer-only metadata (prompts, quality reasoning, retry history)
 // This is loaded separately to keep the main metadata endpoint fast for normal users
 router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
