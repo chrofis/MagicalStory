@@ -989,7 +989,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
               order.customer_email,
               order.customer_name,
               {
-                orderId: order.id,
+                orderId: orderId.substring(0, 8).toUpperCase(),
                 amount: orderData.amount ? (orderData.amount / 100).toFixed(2) : '0.00',
                 currency: (orderData.currency || 'CHF').toUpperCase(),
                 shippingAddress: shippingAddress,
@@ -1033,7 +1033,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
             order.customer_email,
             order.customer_name,
             {
-              orderId: order.id,
+              orderId: orderId.substring(0, 8).toUpperCase(),
               trackingNumber,
               trackingUrl
             },
@@ -6398,7 +6398,7 @@ class ProgressiveStoryPageParser {
 
 
 // Process picture book (storybook) job - simplified flow with combined text+scene generation
-async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false) {
+async function processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false) {
   log.debug(`📖 [STORYBOOK] Starting picture book generation for job ${jobId}`);
 
   // Generation logger for tracking API usage and debugging
@@ -8244,7 +8244,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -10513,6 +10513,7 @@ async function processStoryJob(jobId) {
     const forceRepairThreshold = typeof inputData.forceRepairThreshold === 'number' ? inputData.forceRepairThreshold : null; // Force repair on pages with issues below this score
     const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
     const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
+    const enableSceneValidation = inputData.enableSceneValidation === true; // Developer mode: validate scene composition with cheap preview (default: OFF)
 
     // Incremental consistency check options (check each image against previous N images)
     const incrementalConsistencyOptions = inputData.incrementalConsistency || {};
@@ -10524,6 +10525,9 @@ async function processStoryJob(jobId) {
     }
     if (checkOnlyMode) {
       log.debug(`🔍 [PIPELINE] Check-only mode ENABLED - all regeneration will be skipped`);
+    }
+    if (enableSceneValidation) {
+      log.debug(`🔍 [PIPELINE] Scene validation ENABLED - will generate preview images for composition checks`);
     }
 
     // Check if user is admin (for including debug images in repair history)
@@ -10619,12 +10623,12 @@ async function processStoryJob(jobId) {
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation);
     }
 
     if (generationMode === 'pictureBook') {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode);
+      return await processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation);
     }
 
     // outlineAndText mode (legacy): Separate outline + text generation
@@ -11109,7 +11113,52 @@ Output Format:
             addUsage(sceneDescProvider, sceneDescResult.usage, 'scene_descriptions', sceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             // Extract translatedSummary and imageSummary from JSON
-            const sceneMetadata = extractSceneMetadata(sceneDescription);
+            let sceneMetadata = extractSceneMetadata(sceneDescription);
+
+            // Scene validation: generate cheap preview, analyze geometry, repair if issues found
+            let validationResult = null;
+            if (enableSceneValidation && sceneMetadata) {
+              try {
+                const { validateAndRepairScene, isValidationAvailable } = require('./server/lib/sceneValidator');
+                if (isValidationAvailable()) {
+                  log.debug(`🔍 [PAGE ${pageNum}] Running scene composition validation...`);
+                  validationResult = await validateAndRepairScene(sceneMetadata);
+
+                  // Track validation costs
+                  if (validationResult.usage) {
+                    if (validationResult.usage.previewCost) {
+                      addUsage('runware', { cost: validationResult.usage.previewCost }, 'scene_validation_preview');
+                    }
+                    if (validationResult.usage.visionCost || validationResult.usage.comparisonCost) {
+                      addUsage('gemini_text', {
+                        promptTokenCount: validationResult.usage.visionTokens + validationResult.usage.comparisonTokens,
+                        candidatesTokenCount: 0
+                      }, 'scene_validation_analysis');
+                    }
+                    if (validationResult.repair?.usage) {
+                      addUsage('anthropic', validationResult.repair.usage, 'scene_validation_repair');
+                    }
+                  }
+
+                  if (validationResult.wasRepaired) {
+                    log.info(`🔧 [PAGE ${pageNum}] Scene repaired: ${validationResult.repair.fixes.length} fixes applied`);
+                    // Update scene description with repaired version
+                    sceneDescription = JSON.stringify(validationResult.finalScene);
+                    sceneMetadata = validationResult.finalScene;
+                  } else if (!validationResult.validation.passesCompositionCheck) {
+                    log.warn(`⚠️  [PAGE ${pageNum}] Scene has composition issues but repair failed`);
+                  } else {
+                    log.debug(`✅ [PAGE ${pageNum}] Scene passes composition check`);
+                  }
+                } else {
+                  log.debug(`[PAGE ${pageNum}] Scene validation skipped - Runware or Gemini not configured`);
+                }
+              } catch (validationError) {
+                log.warn(`⚠️  [PAGE ${pageNum}] Scene validation error: ${validationError.message}`);
+                // Continue with original scene on validation error
+              }
+            }
+
             allSceneDescriptions.push({
               pageNumber: pageNum,
               description: sceneDescription,
@@ -11117,7 +11166,13 @@ Output Format:
               scenePrompt: scenePrompt,
               textModelId: sceneDescResult.modelId,
               translatedSummary: sceneMetadata?.translatedSummary || null,
-              imageSummary: sceneMetadata?.imageSummary || null
+              imageSummary: sceneMetadata?.imageSummary || null,
+              validationResult: validationResult ? {
+                passesCompositionCheck: validationResult.validation?.passesCompositionCheck,
+                wasRepaired: validationResult.wasRepaired,
+                fixes: validationResult.repair?.fixes || [],
+                issues: validationResult.validation?.compositionIssues || []
+              } : null
             });
 
             // Detect which characters appear in this scene
@@ -11612,7 +11667,52 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             addUsage(seqSceneDescProvider, sceneDescResult.usage, 'scene_descriptions', seqSceneModelConfig?.modelId || getActiveTextModel().modelId);
 
             // Extract translatedSummary and imageSummary from JSON
-            const sceneMetadata = extractSceneMetadata(sceneDescription);
+            let sceneMetadata = extractSceneMetadata(sceneDescription);
+
+            // Scene validation: generate cheap preview, analyze geometry, repair if issues found
+            let validationResult = null;
+            if (enableSceneValidation && sceneMetadata) {
+              try {
+                const { validateAndRepairScene, isValidationAvailable } = require('./server/lib/sceneValidator');
+                if (isValidationAvailable()) {
+                  log.debug(`🔍 [PAGE ${pageNum}] Running scene composition validation...`);
+                  validationResult = await validateAndRepairScene(sceneMetadata);
+
+                  // Track validation costs
+                  if (validationResult.usage) {
+                    if (validationResult.usage.previewCost) {
+                      addUsage('runware', { cost: validationResult.usage.previewCost }, 'scene_validation_preview');
+                    }
+                    if (validationResult.usage.visionCost || validationResult.usage.comparisonCost) {
+                      addUsage('gemini_text', {
+                        promptTokenCount: validationResult.usage.visionTokens + validationResult.usage.comparisonTokens,
+                        candidatesTokenCount: 0
+                      }, 'scene_validation_analysis');
+                    }
+                    if (validationResult.repair?.usage) {
+                      addUsage('anthropic', validationResult.repair.usage, 'scene_validation_repair');
+                    }
+                  }
+
+                  if (validationResult.wasRepaired) {
+                    log.info(`🔧 [PAGE ${pageNum}] Scene repaired: ${validationResult.repair.fixes.length} fixes applied`);
+                    // Update scene description with repaired version
+                    sceneDescription = JSON.stringify(validationResult.finalScene);
+                    sceneMetadata = validationResult.finalScene;
+                  } else if (!validationResult.validation.passesCompositionCheck) {
+                    log.warn(`⚠️  [PAGE ${pageNum}] Scene has composition issues but repair failed`);
+                  } else {
+                    log.debug(`✅ [PAGE ${pageNum}] Scene passes composition check`);
+                  }
+                } else {
+                  log.debug(`[PAGE ${pageNum}] Scene validation skipped - Runware or Gemini not configured`);
+                }
+              } catch (validationError) {
+                log.warn(`⚠️  [PAGE ${pageNum}] Scene validation error: ${validationError.message}`);
+                // Continue with original scene on validation error
+              }
+            }
+
             allSceneDescriptions.push({
               pageNumber: pageNum,
               description: sceneDescription,
@@ -11620,7 +11720,13 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               scenePrompt: scenePrompt,        // Store the Art Director prompt for debugging
               textModelId: sceneDescResult.modelId,
               translatedSummary: sceneMetadata?.translatedSummary || null,
-              imageSummary: sceneMetadata?.imageSummary || null
+              imageSummary: sceneMetadata?.imageSummary || null,
+              validationResult: validationResult ? {
+                passesCompositionCheck: validationResult.validation?.passesCompositionCheck,
+                wasRepaired: validationResult.wasRepaired,
+                fixes: validationResult.repair?.fixes || [],
+                issues: validationResult.validation?.compositionIssues || []
+              } : null
             });
 
             // Detect which characters appear in this scene

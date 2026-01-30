@@ -64,6 +64,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.repairVerification = await fs.readFile(path.join(promptsDir, 'repair-verification.txt'), 'utf-8');
     // Reference sheet generation prompt for secondary elements
     PROMPT_TEMPLATES.referenceSheet = await fs.readFile(path.join(promptsDir, 'reference-sheet.txt'), 'utf-8');
+    // Scene repair prompt for geometric issue fixing
+    PROMPT_TEMPLATES.sceneRepair = await fs.readFile(path.join(promptsDir, 'scene-repair.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {
