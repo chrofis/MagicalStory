@@ -604,12 +604,13 @@ export default function StoryWizard() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Track which story is currently being loaded to prevent duplicate loads
-  const loadingStoryIdRef = useRef<string | null>(null);
-
   // Load saved story from URL parameter - uses progressive loading for better UX
   useEffect(() => {
     const urlStoryId = searchParams.get('storyId');
+    // Ensure step is 6 when viewing a saved story (even if localStorage has a different step)
+    if (urlStoryId && step !== 6) {
+      setStep(6);
+    }
 
     const loadSavedStory = async () => {
       if (!urlStoryId || !isAuthenticated) return;
@@ -619,19 +620,6 @@ export default function StoryWizard() {
         justFinishedGenerating.current = false;
         log.info('Skipping story reload - just finished generating');
         return;
-      }
-
-      // Prevent duplicate concurrent loads of the same story
-      // This handles the case where the effect re-runs while loading is in progress
-      if (loadingStoryIdRef.current === urlStoryId) {
-        log.info('Skipping duplicate load - already loading:', urlStoryId);
-        return;
-      }
-      loadingStoryIdRef.current = urlStoryId;
-
-      // Set step to 6 BEFORE starting async work to avoid re-render during loading
-      if (step !== 6) {
-        setStep(6);
       }
 
       log.info('Loading saved story progressively:', urlStoryId);
@@ -795,7 +783,6 @@ export default function StoryWizard() {
           () => {
             log.info('All images loaded');
             setImageLoadProgress(null);
-            loadingStoryIdRef.current = null; // Allow loading different story
           }
         );
       } catch (error) {
@@ -803,7 +790,6 @@ export default function StoryWizard() {
         setIsLoading(false);
         setLoadingProgress(null);
         setImageLoadProgress(null);
-        loadingStoryIdRef.current = null; // Allow retry on error
       }
     };
 
