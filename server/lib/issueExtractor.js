@@ -159,6 +159,11 @@ function normalizeIncrementalIssue(issue, pageNumber, imgDimensions, characterBb
   const issueType = mapIssueType(issue.type || 'consistency');
   const severity = (issue.severity || 'major').toLowerCase();
 
+  // Handle "full" region - convert to full-image bbox
+  if (bbox === 'full') {
+    bbox = [0, 0, 1, 1];  // Full image in normalized coordinates
+  }
+
   // Validate bounding box if present
   let validatedBbox = null;
   if (bbox) {
@@ -222,9 +227,14 @@ function normalizeIncrementalIssue(issue, pageNumber, imgDimensions, characterBb
 function normalizeFinalIssue(pageIssue, pageNumber, imgDimensions) {
   // Format: { character, issue, fix, severity, fixTarget }
 
-  const bbox = pageIssue.fixTarget?.region || pageIssue.fixTarget?.bounds || null;
+  let bbox = pageIssue.fixTarget?.region || pageIssue.fixTarget?.bounds || null;
   const issueType = mapIssueType(pageIssue.type || 'consistency');
   const severity = (pageIssue.severity || 'major').toLowerCase();
+
+  // Handle "full" region - convert to full-image bbox
+  if (bbox === 'full') {
+    bbox = [0, 0, 1, 1];  // Full image in normalized coordinates
+  }
 
   // Validate bounding box if present
   let validatedBbox = bbox;
