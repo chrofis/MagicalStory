@@ -9410,8 +9410,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         wasRegenerated: imageResult?.wasRegenerated,
         totalAttempts: imageResult?.totalAttempts,
         retryHistory: imageResult?.retryHistory,
-        // Dev mode: which reference photos/avatars were used
-        referencePhotos: pagePhotos,
+        // Dev mode: which reference photos/avatars were used (includes element references)
+        referencePhotos: allReferencePhotos,
         // Landmark photos (separate for frontend display)
         landmarkPhotos: pageLandmarkPhotos,
         // Include characters info for incremental consistency tracking
@@ -13580,10 +13580,16 @@ app.get('*', (req, res, next) => {
 });
 
 initialize().then(() => {
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`🚀 MagicalStory Server Running`);
     console.log(`📍 URL: http://localhost:${PORT}`);
   });
+
+  // Configure server timeouts to prevent premature connection closures
+  // This helps with Railway's edge proxy and HTTP/2 connection management
+  server.keepAliveTimeout = 65000; // 65 seconds (longer than typical proxy timeout of 60s)
+  server.headersTimeout = 66000;   // Slightly longer than keepAliveTimeout
+  console.log(`🔗 Keep-alive timeout: ${server.keepAliveTimeout}ms`);
 }).catch(err => {
   log.error('Failed to initialize server:', err);
   process.exit(1);
