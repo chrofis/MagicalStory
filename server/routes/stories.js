@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -754,14 +754,14 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
       }
 
       case 'reference':
-        // Return all reference photos with their image data
+        // Return all reference photos with their image data (photoUrl or photoData)
         result = {
           referencePhotos: (sceneImage.referencePhotos || []).map(p => ({
             name: p.name,
             photoType: p.photoType,
             clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription,
-            photoUrl: p.photoUrl || null
+            photoUrl: p.photoUrl || p.photoData || null  // photoData contains base64 data URI
           }))
         };
         break;
@@ -794,6 +794,235 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching dev image:', err);
     res.status(500).json({ error: 'Failed to fetch dev image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/avatar-generation-image - Lazy load images for avatar generation log
+// Query params:
+//   type: 'styled' | 'costumed'
+//   index: index in the array
+//   field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'output'
+router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, index, field } = req.query;
+    const idx = parseInt(index, 10);
+
+    if (!type || !['styled', 'costumed'].includes(type)) {
+      return res.status(400).json({ error: "type must be 'styled' or 'costumed'" });
+    }
+
+    if (isNaN(idx)) {
+      return res.status(400).json({ error: 'index query parameter required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await query('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = rows[0].data;
+    const arrayName = type === 'styled' ? 'styledAvatarGeneration' : 'costumedAvatarGeneration';
+    const entries = story[arrayName] || [];
+
+    if (idx < 0 || idx >= entries.length) {
+      return res.status(404).json({ error: `${type} avatar generation index ${idx} not found` });
+    }
+
+    const entry = entries[idx];
+    let result = {};
+
+    // Return specific field or all fields
+    if (field) {
+      switch (field) {
+        case 'facePhoto':
+          result = { facePhoto: entry.inputs?.facePhoto?.imageData || null };
+          break;
+        case 'originalAvatar':
+          result = { originalAvatar: entry.inputs?.originalAvatar?.imageData || null };
+          break;
+        case 'styleSample':
+          result = { styleSample: entry.inputs?.styleSample?.imageData || null };
+          break;
+        case 'standardAvatar':
+          result = { standardAvatar: entry.inputs?.standardAvatar?.imageData || null };
+          break;
+        case 'output':
+          result = { output: entry.output?.imageData || null };
+          break;
+        default:
+          return res.status(400).json({ error: `Unknown field: ${field}` });
+      }
+    } else {
+      // Return all images for this entry
+      result = {
+        facePhoto: entry.inputs?.facePhoto?.imageData || null,
+        originalAvatar: entry.inputs?.originalAvatar?.imageData || null,
+        styleSample: entry.inputs?.styleSample?.imageData || null,
+        standardAvatar: entry.inputs?.standardAvatar?.imageData || null,
+        output: entry.output?.imageData || null
+      };
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error fetching avatar generation image:', err);
+    res.status(500).json({ error: 'Failed to fetch avatar generation image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/images - Get ALL images in one request (optimized batch load)
+// This dramatically improves story load time: 1 request instead of 20+
+router.get('/:id/images', authenticateToken, async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access to this story (fast query, no data loading)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Get all active versions from image_version_meta (fast lookup)
+    const activeVersions = await getAllActiveVersions(id);
+
+    // Try FAST path: get all images from story_images table
+    const separateImages = await getAllStoryImages(id);
+
+    if (separateImages && separateImages.length > 0) {
+      // Group images by page/cover type
+      const sceneImagesMap = new Map();
+      const covers = {};
+
+      for (const row of separateImages) {
+        if (row.image_type === 'scene') {
+          const pageNum = row.page_number;
+          if (!sceneImagesMap.has(pageNum)) {
+            sceneImagesMap.set(pageNum, {
+              pageNumber: pageNum,
+              imageData: null,
+              qualityScore: null,
+              generatedAt: null,
+              imageVersions: []
+            });
+          }
+          const scene = sceneImagesMap.get(pageNum);
+
+          if (row.version_index === 0) {
+            // Main image
+            scene.imageData = normalizeImageData(row.image_data);
+            scene.qualityScore = row.quality_score;
+            scene.generatedAt = row.generated_at;
+          } else {
+            // Version image
+            scene.imageVersions.push({
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              isActive: activeVersions[pageNum.toString()] === row.version_index
+            });
+          }
+        } else {
+          // Cover image (frontCover, initialPage, backCover)
+          if (row.version_index === 0) {
+            covers[row.image_type] = {
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at
+            };
+          }
+        }
+      }
+
+      // Convert map to sorted array and mark active versions
+      const images = Array.from(sceneImagesMap.values())
+        .sort((a, b) => a.pageNumber - b.pageNumber)
+        .map(img => {
+          const activeIdx = activeVersions[img.pageNumber.toString()];
+          return {
+            ...img,
+            isActive: activeIdx === 0 || activeIdx === undefined,
+            imageVersions: img.imageVersions.length > 0 ? img.imageVersions : undefined
+          };
+        });
+
+      const totalSize = separateImages.reduce((sum, r) => sum + (r.image_data?.length || 0), 0);
+      console.log(`📷 [BATCH] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Math.round(totalSize/1024)}KB, ${Date.now() - startTime}ms`);
+
+      return res.json({ images, covers });
+    }
+
+    // SLOW path: Load from data blob (for non-migrated stories)
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+
+    const images = (story.sceneImages || []).map(img => {
+      const activeIdx = activeVersions[img.pageNumber?.toString()];
+      return {
+        pageNumber: img.pageNumber,
+        imageData: normalizeImageData(img.imageData),
+        qualityScore: img.qualityScore,
+        isActive: activeIdx === 0 || activeIdx === undefined,
+        imageVersions: img.imageVersions?.map((v, i) => ({
+          imageData: normalizeImageData(v.imageData),
+          qualityScore: v.qualityScore,
+          isActive: activeIdx === (i + 1)
+        }))
+      };
+    });
+
+    const covers = {};
+    if (story.coverImages) {
+      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+        const coverData = story.coverImages[coverType];
+        if (coverData) {
+          const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+          if (imageData) {
+            covers[coverType] = {
+              imageData: normalizeImageData(imageData),
+              qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null
+            };
+          }
+        }
+      }
+    }
+
+    console.log(`📷 [BATCH-FALLBACK] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Date.now() - startTime}ms`);
+
+    return res.json({ images, covers });
+
+  } catch (err) {
+    console.error(`❌ Error fetching batch images for ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to fetch images', details: err.message });
   }
 });
 

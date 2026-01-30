@@ -478,6 +478,40 @@ export const storyService = {
     }
   },
 
+  // Lazy load avatar generation images (styled/costumed avatar logs)
+  async getAvatarGenerationImage(
+    storyId: string,
+    type: 'styled' | 'costumed',
+    index: number,
+    field?: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'output'
+  ): Promise<{
+    facePhoto?: string | null;
+    originalAvatar?: string | null;
+    styleSample?: string | null;
+    standardAvatar?: string | null;
+    output?: string | null;
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const params = new URLSearchParams({ type, index: String(index) });
+      if (field) params.append('field', field);
+
+      const response = await fetch(`/api/stories/${storyId}/avatar-generation-image?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch avatar generation image: HTTP ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.warn('Failed to fetch avatar generation image:', err);
+      return null;
+    }
+  },
+
   // Get individual page image
   async getPageImage(storyId: string, pageNumber: number): Promise<{ imageData: string; imageVersions?: unknown[] } | null> {
     try {
@@ -502,7 +536,51 @@ export const storyService = {
     }
   },
 
-  // Progressive story loading: metadata first, then images one by one
+  // Get ALL images in one request (batch load - 15x faster than individual requests)
+  async getAllImages(storyId: string): Promise<{
+    images: Array<{
+      pageNumber: number;
+      imageData: string;
+      qualityScore?: number;
+      isActive?: boolean;
+      imageVersions?: Array<{
+        imageData: string;
+        qualityScore?: number;
+        isActive?: boolean;
+      }>;
+    }>;
+    covers: {
+      frontCover?: { imageData: string; qualityScore?: number };
+      initialPage?: { imageData: string; qualityScore?: number };
+      backCover?: { imageData: string; qualityScore?: number };
+    };
+  } | null> {
+    try {
+      const response = await api.get<{
+        images: Array<{
+          pageNumber: number;
+          imageData: string;
+          qualityScore?: number;
+          isActive?: boolean;
+          imageVersions?: Array<{
+            imageData: string;
+            qualityScore?: number;
+            isActive?: boolean;
+          }>;
+        }>;
+        covers: {
+          frontCover?: { imageData: string; qualityScore?: number };
+          initialPage?: { imageData: string; qualityScore?: number };
+          backCover?: { imageData: string; qualityScore?: number };
+        };
+      }>(`/api/stories/${storyId}/images`);
+      return response;
+    } catch {
+      return null;
+    }
+  },
+
+  // Progressive story loading: metadata first, then ALL images in one batch request
   async getStoryProgressively(
     id: string,
     onMetadataLoaded: (story: SavedStory, totalImages: number) => void,
@@ -518,25 +596,60 @@ export const storyService = {
     // Notify that metadata is ready - UI can render immediately
     onMetadataLoaded(metadata, metadata.totalImages);
 
-    // Step 2: Load images progressively
-    // Note: hasImage is added by the metadata endpoint but not in the type
+    // Step 2: Load ALL images in one batch request (15x faster than individual requests)
+    const batchResult = await this.getAllImages(id);
+
+    // Check if batch result has actual images (not just empty arrays)
+    const hasImages = batchResult && (
+      batchResult.images.length > 0 ||
+      Object.keys(batchResult.covers).length > 0
+    );
+
+    if (hasImages) {
+      let loadedCount = 0;
+
+      // Notify cover images
+      const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
+      for (const coverType of coverTypes) {
+        const cover = batchResult.covers[coverType];
+        if (cover?.imageData) {
+          loadedCount++;
+          onImageLoaded(coverType, cover.imageData, undefined, loadedCount);
+        }
+      }
+
+      // Notify page images
+      for (const img of batchResult.images) {
+        if (img.imageData) {
+          loadedCount++;
+          onImageLoaded(img.pageNumber, img.imageData, img.imageVersions, loadedCount);
+        }
+      }
+
+      onComplete();
+      return;
+    }
+
+    // Fallback to individual requests if batch fails (shouldn't happen normally)
+    console.warn('[getStoryProgressively] Batch load failed, falling back to individual requests');
+
     const pageNumbers = metadata.sceneImages
       ?.filter(img => (img as { hasImage?: boolean }).hasImage !== false && img.pageNumber)
       .map(img => img.pageNumber) || [];
 
-    const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = [];
+    const coverTypesToLoad: ('frontCover' | 'initialPage' | 'backCover')[] = [];
     const fc = metadata.coverImages?.frontCover;
     const ip = metadata.coverImages?.initialPage;
     const bc = metadata.coverImages?.backCover;
-    if (fc && (typeof fc === 'string' || (fc as { hasImage?: boolean }).hasImage)) coverTypes.push('frontCover');
-    if (ip && (typeof ip === 'string' || (ip as { hasImage?: boolean }).hasImage)) coverTypes.push('initialPage');
-    if (bc && (typeof bc === 'string' || (bc as { hasImage?: boolean }).hasImage)) coverTypes.push('backCover');
+    if (fc && (typeof fc === 'string' || (fc as { hasImage?: boolean }).hasImage)) coverTypesToLoad.push('frontCover');
+    if (ip && (typeof ip === 'string' || (ip as { hasImage?: boolean }).hasImage)) coverTypesToLoad.push('initialPage');
+    if (bc && (typeof bc === 'string' || (bc as { hasImage?: boolean }).hasImage)) coverTypesToLoad.push('backCover');
 
     let loadedCount = 0;
 
-    // Load cover images in parallel (faster on mobile)
+    // Load cover images in parallel
     const coverResults = await Promise.all(
-      coverTypes.map(async coverType => {
+      coverTypesToLoad.map(async coverType => {
         const result = await this.getCoverImage(id, coverType);
         return { coverType, result };
       })
@@ -550,8 +663,7 @@ export const storyService = {
     }
 
     // Load page images in parallel batches
-    // TEMP: Using batch size of 1 to debug ERR_CONNECTION_CLOSED issue
-    const BATCH_SIZE = 1;
+    const BATCH_SIZE = 3;
     for (let i = 0; i < pageNumbers.length; i += BATCH_SIZE) {
       const batch = pageNumbers.slice(i, i + BATCH_SIZE);
       const results = await Promise.all(
