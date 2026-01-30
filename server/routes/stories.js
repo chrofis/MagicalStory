@@ -480,26 +480,27 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           // Include evaluation data for dev mode display (no image data in these)
           preRepairEval: r.preRepairEval || null,
           postRepairEval: r.postRepairEval || null,
-          // Strip all image data fields
-          hasImageData: !!r.imageData,
-          hasGrids: !!(r.grids && r.grids.length > 0),
-          hasBboxOverlay: !!r.bboxOverlayImage,
+          // Include image data for before/after comparison in dev mode
+          imageData: r.imageData || null,
+          originalImage: r.originalImage || null,
+          bboxOverlayImage: r.bboxOverlayImage || null,
           // Keep small metadata from evaluations
           unifiedReport: r.unifiedReport,
           reEvalUsage: r.reEvalUsage,
           repairUsage: r.repairUsage
         })),
-        // repairHistory: ONLY include metadata fields
+        // repairHistory with images for dev mode
         repairHistory: (img.repairHistory || []).map(r => ({
           timestamp: r.timestamp,
           type: r.type,
           score: r.score,
           reasoning: r.reasoning,
-          hasImageData: !!r.imageData,
-          hasOriginalImage: !!r.originalImage
+          imageData: r.imageData || null,
+          originalImage: r.originalImage || null
         })),
         wasRegenerated: img.wasRegenerated || false,
-        hasOriginalImage: !!img.originalImage, // Just flag, not data
+        // Include original image for before/after comparison in dev mode
+        originalImage: img.originalImage || null,
         originalScore: img.originalScore || null,
         originalReasoning: img.originalReasoning || null,
         totalAttempts: img.totalAttempts || null,
@@ -516,10 +517,10 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           name: p.name,
           photoData: p.photoData || null
         })),
-        // Consistency regeneration data - strip image data, keep metadata only
+        // Consistency regeneration data with images for dev mode
         consistencyRegen: img.consistencyRegen ? {
-          hasOriginalImage: !!img.consistencyRegen.originalImage,
-          hasFixedImage: !!img.consistencyRegen.fixedImage,
+          originalImage: img.consistencyRegen.originalImage || null,
+          fixedImage: img.consistencyRegen.fixedImage || null,
           correctionNotes: img.consistencyRegen.correctionNotes,
           issues: img.consistencyRegen.issues,
           score: img.consistencyRegen.score,
