@@ -10,16 +10,11 @@ const router = express.Router();
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 
-// GET /api/characters - Get user's characters
-// Query params:
-//   - includeAllAvatars=true: Include all avatar variants (dev mode only)
-//   By default, only returns 'standard' avatar to reduce payload size
+// GET /api/characters - Get user's characters (lightweight, for list view)
+// Returns stripped metadata only - use /:characterId/avatars for full avatar data
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const startTime = Date.now();
-    // Allow includeAllAvatars for admins OR when admin is impersonating a user
-    const includeAllAvatars = req.query.includeAllAvatars === 'true' &&
-      (req.user.role === 'admin' || req.user.impersonating);
 
     let characterData = {
       characters: [],
@@ -33,32 +28,25 @@ router.get('/', authenticateToken, async (req, res) => {
 
     if (isDatabaseMode()) {
       const characterId = `characters_${req.user.id}`;
-      let rows;
       const queryStart = Date.now();
 
-      if (includeAllAvatars) {
-        // Admin mode: return full data
-        rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
-        if (rows.length === 0) {
-          rows = await dbQuery('SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
-        }
-      } else {
-        // Normal mode: use metadata column (pre-stripped, ~100KB vs 14MB)
-        rows = await dbQuery('SELECT metadata FROM characters WHERE id = $1', [characterId]);
-        if (rows.length === 0) {
-          rows = await dbQuery('SELECT metadata FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
-        }
-        // Rename metadata to data for consistent handling below
-        if (rows.length > 0 && rows[0].metadata) {
-          rows[0].data = rows[0].metadata;
-        } else if (rows.length > 0 && !rows[0].metadata) {
-          // Fallback: metadata column not populated yet, use full data with JS stripping
-          console.log('[Characters] GET - metadata column empty, falling back to full data');
-          rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
-        }
+      // Use metadata column (pre-stripped, ~100KB vs 14MB)
+      let rows = await dbQuery('SELECT metadata FROM characters WHERE id = $1', [characterId]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT metadata FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1', [req.user.id]);
       }
+
+      // Rename metadata to data for consistent handling below
+      if (rows.length > 0 && rows[0].metadata) {
+        rows[0].data = rows[0].metadata;
+      } else if (rows.length > 0 && !rows[0].metadata) {
+        // Fallback: metadata column not populated yet, use full data with JS stripping
+        console.log('[Characters] GET - metadata column empty, falling back to full data');
+        rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+      }
+
       const queryTime = Date.now() - queryStart;
-      console.log(`[Characters] GET - Query took ${queryTime}ms for user_id: ${req.user.id}, mode: ${includeAllAvatars ? 'full' : 'metadata'}`);
+      console.log(`[Characters] GET - Query took ${queryTime}ms for user_id: ${req.user.id}`);
 
       if (rows.length > 0 && rows[0].data) {
         const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
@@ -73,9 +61,9 @@ router.get('/', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
-    // Runtime stripping for non-admin mode - handles stale metadata with embedded base64
+    // Runtime stripping - handles stale metadata with embedded base64
     // These fields should have been stripped when saving but some old data has them
-    if (!includeAllAvatars && characterData.characters) {
+    if (characterData.characters) {
       const preStripSize = JSON.stringify(characterData).length;
       characterData.characters = characterData.characters.map(char => {
         // Strip heavy base64 fields that shouldn't be in metadata
