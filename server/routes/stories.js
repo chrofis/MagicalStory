@@ -687,16 +687,16 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
     // Verify user access
     let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
-      rows = await query('SELECT data FROM stories WHERE id = $1', [id]);
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
-      rows = await query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     }
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = rows[0].data;
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
 
     if (!sceneImage) {
@@ -823,16 +823,16 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
     // Verify user access
     let rows;
     if (req.user.impersonating && req.user.originalAdminId) {
-      rows = await query('SELECT data FROM stories WHERE id = $1', [id]);
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
     } else {
-      rows = await query('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
     }
 
     if (rows.length === 0) {
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    const story = rows[0].data;
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
     const arrayName = type === 'styled' ? 'styledAvatarGeneration' : 'costumedAvatarGeneration';
     const entries = story[arrayName] || [];
 
