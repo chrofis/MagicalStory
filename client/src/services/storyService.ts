@@ -1212,6 +1212,7 @@ export const storyService = {
     forceRepairThreshold?: number | null;  // Force repair on pages with issues below this score (100 = always)
     enableFinalChecks?: boolean;
     checkOnlyMode?: boolean;  // Skip all regeneration, only run checks
+    enableSceneValidation?: boolean;  // Cheap preview + geometry check
     // Incremental consistency check (check each image against previous images)
     incrementalConsistency?: {
       enabled: boolean;
