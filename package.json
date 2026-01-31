@@ -2,6 +2,9 @@
   "name": "magical-story",
   "version": "2.0.0",
   "description": "AI-powered personalized story generator with authentication",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
