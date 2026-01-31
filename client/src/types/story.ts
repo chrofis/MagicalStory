@@ -179,6 +179,7 @@ export interface GridRepairVerification {
   fixInstruction?: string;
   originalThumbnail?: string;    // base64 encoded 256x256 before
   repairedThumbnail?: string;    // base64 encoded 256x256 after
+  diffImage?: string;            // base64 encoded diff image highlighting changes
   comparisonImage?: string;      // base64 encoded side-by-side comparison
   verification?: {
     fixed: boolean;

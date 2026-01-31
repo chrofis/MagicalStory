@@ -38,7 +38,8 @@ const {
   checkForNewArtifacts,
   applyVerifiedRepairs,
   createComparisonImage,
-  createVerificationComparison
+  createVerificationComparison,
+  createDiffImage
 } = require('./repairVerification');
 
 // Severity colors for annotated image
@@ -388,6 +389,17 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
           verification = await verifyRepairedRegion(originalBuffer, region.buffer, issue);
         }
 
+        // Generate diff image to highlight changes
+        let diffImageBase64 = null;
+        try {
+          const diffBuffer = await createDiffImage(originalBuffer, region.buffer);
+          if (diffBuffer) {
+            diffImageBase64 = diffBuffer.toString('base64');
+          }
+        } catch (diffErr) {
+          console.debug(`  [GRID] Failed to create diff image for ${region.letter}: ${diffErr.message}`);
+        }
+
         const repair = {
           issueId: issue.id,
           letter: region.letter,
@@ -408,6 +420,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
           fixInstruction: issue.fixInstruction,
           originalThumbnail: originalBuffer.toString('base64'),
           repairedThumbnail: region.buffer.toString('base64'),
+          diffImage: diffImageBase64,
           comparisonImage: verification.gemini?.comparisonImage
             ? verification.gemini.comparisonImage.toString('base64')
             : null,

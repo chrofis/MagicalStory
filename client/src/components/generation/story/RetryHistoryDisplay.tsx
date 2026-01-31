@@ -909,6 +909,7 @@ export function RetryHistoryDisplay({
                                       <th className="px-2 py-1 text-left border">{language === 'de' ? 'Problem' : 'Issue'}</th>
                                       <th className="px-2 py-1 text-center border">{language === 'de' ? 'Vorher' : 'Before'}</th>
                                       <th className="px-2 py-1 text-center border">{language === 'de' ? 'Nachher' : 'After'}</th>
+                                      <th className="px-2 py-1 text-center border">Diff</th>
                                       <th className="px-2 py-1 text-center border">{language === 'de' ? 'Status' : 'Status'}</th>
                                       <th className="px-2 py-1 text-center border">{language === 'de' ? 'Konfidenz' : 'Confidence'}</th>
                                     </tr>
@@ -953,6 +954,21 @@ export function RetryHistoryDisplay({
                                                 title: `${repair.letter}: After`
                                               })}
                                             />
+                                          )}
+                                        </td>
+                                        <td className="px-2 py-1 border text-center">
+                                          {repair.diffImage ? (
+                                            <img
+                                              src={`data:image/jpeg;base64,${repair.diffImage}`}
+                                              alt="Diff"
+                                              className="w-12 h-12 object-contain inline-block cursor-pointer hover:ring-2 hover:ring-purple-400 rounded"
+                                              onClick={() => setEnlargedImg({
+                                                src: `data:image/jpeg;base64,${repair.diffImage}`,
+                                                title: `${repair.letter}: Diff`
+                                              })}
+                                            />
+                                          ) : (
+                                            <span className="text-gray-400 text-xs">-</span>
                                           )}
                                         </td>
                                         <td className="px-2 py-1 border text-center">
