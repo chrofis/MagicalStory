@@ -886,6 +886,45 @@ router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) =
   }
 });
 
+// GET /api/stories/:id/retry-images/:pageNumber - Get retry history images for a page (dev mode)
+// Lazy-loads retry attempt images, bbox overlays, and grid repair images
+router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    if (isNaN(pageNum)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access to this story
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Get retry history images from separate table
+    const images = await getRetryHistoryImages(id, pageNum);
+
+    console.log(`📷 [RETRY-IMAGES] ${id}/page${pageNum} - ${images.length} retry entries loaded`);
+
+    res.json({ images });
+  } catch (err) {
+    console.error('❌ Error fetching retry history images:', err);
+    res.status(500).json({ error: 'Failed to fetch retry history images', details: err.message });
+  }
+});
+
 // GET /api/stories/:id/images - Get ALL images in one request (optimized batch load)
 // This dramatically improves story load time: 1 request instead of 20+
 router.get('/:id/images', authenticateToken, async (req, res) => {

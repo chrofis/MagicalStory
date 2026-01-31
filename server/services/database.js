@@ -346,6 +346,23 @@ async function initializeDatabase() {
       )
     `);
 
+    // Story retry images table - stores retry history images separately to keep data blob small
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS story_retry_images (
+        id SERIAL PRIMARY KEY,
+        story_id VARCHAR(255) NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+        page_number INT NOT NULL,
+        retry_index INT NOT NULL,
+        image_type VARCHAR(50) NOT NULL,
+        grid_index INT,
+        image_data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_retry_images_story ON story_retry_images(story_id)`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_retry_images_page ON story_retry_images(story_id, page_number)`);
+
     // Seed default pricing tiers if table is empty
     const pricingCheck = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers');
     if (parseInt(pricingCheck[0].count) === 0) {
@@ -473,6 +490,24 @@ async function saveStoryData(storyId, storyData) {
           }
         }
       }
+
+      // Save retry history images to separate table and strip from data blob
+      if (img.retryHistory?.length) {
+        await saveRetryHistoryImages(storyId, img.pageNumber, img.retryHistory);
+        for (const entry of img.retryHistory) {
+          delete entry.imageData;
+          delete entry.bboxOverlayImage;
+          delete entry.originalImage;
+          delete entry.annotatedOriginal;
+          if (entry.grids) {
+            for (const grid of entry.grids) {
+              delete grid.imageData;
+              delete grid.repairedImageData;
+            }
+          }
+        }
+      }
+      delete img.originalImage;
     }
   }
 
@@ -530,6 +565,22 @@ async function updateStoryDataOnly(storyId, storyData) {
           delete version.imageData;
         }
       }
+      // Strip retry history images (they're already in story_retry_images)
+      if (img.retryHistory) {
+        for (const entry of img.retryHistory) {
+          delete entry.imageData;
+          delete entry.bboxOverlayImage;
+          delete entry.originalImage;
+          delete entry.annotatedOriginal;
+          if (entry.grids) {
+            for (const grid of entry.grids) {
+              delete grid.imageData;
+              delete grid.repairedImageData;
+            }
+          }
+        }
+      }
+      delete img.originalImage;
     }
   }
 
@@ -605,6 +656,24 @@ async function upsertStory(storyId, userId, storyData) {
           }
         }
       }
+
+      // Save retry history images to separate table and strip from data blob
+      if (img.retryHistory?.length) {
+        await saveRetryHistoryImages(storyId, img.pageNumber, img.retryHistory);
+        for (const entry of img.retryHistory) {
+          delete entry.imageData;
+          delete entry.bboxOverlayImage;
+          delete entry.originalImage;
+          delete entry.annotatedOriginal;
+          if (entry.grids) {
+            for (const grid of entry.grids) {
+              delete grid.imageData;
+              delete grid.repairedImageData;
+            }
+          }
+        }
+      }
+      delete img.originalImage;
     }
   }
 
@@ -971,6 +1040,135 @@ function getCoverData(cover) {
   return null;
 }
 
+// ============================================
+// RETRY HISTORY IMAGE FUNCTIONS
+// ============================================
+
+/**
+ * Save retry history images to a separate table.
+ * This keeps the main data blob small for fast /metadata queries.
+ * @param {string} storyId - Story ID
+ * @param {number} pageNumber - Page number
+ * @param {array} retryHistory - Array of retry history entries
+ */
+async function saveRetryHistoryImages(storyId, pageNumber, retryHistory) {
+  if (!isDatabaseMode() || !retryHistory?.length) return;
+
+  for (let retryIdx = 0; retryIdx < retryHistory.length; retryIdx++) {
+    const entry = retryHistory[retryIdx];
+
+    // Save main attempt image
+    if (entry.imageData) {
+      await dbQuery(
+        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
+         VALUES ($1, $2, $3, 'attempt', $4)
+         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
+        [storyId, pageNumber, retryIdx, entry.imageData]
+      );
+    }
+
+    // Save bbox overlay
+    if (entry.bboxOverlayImage) {
+      await dbQuery(
+        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
+         VALUES ($1, $2, $3, 'bboxOverlay', $4)
+         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
+        [storyId, pageNumber, retryIdx, entry.bboxOverlayImage]
+      );
+    }
+
+    // Save original image
+    if (entry.originalImage) {
+      await dbQuery(
+        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
+         VALUES ($1, $2, $3, 'original', $4)
+         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
+        [storyId, pageNumber, retryIdx, entry.originalImage]
+      );
+    }
+
+    // Save annotated original
+    if (entry.annotatedOriginal) {
+      await dbQuery(
+        `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, image_data)
+         VALUES ($1, $2, $3, 'annotatedOriginal', $4)
+         ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
+        [storyId, pageNumber, retryIdx, entry.annotatedOriginal]
+      );
+    }
+
+    // Save grid images
+    if (entry.grids?.length) {
+      for (let gridIdx = 0; gridIdx < entry.grids.length; gridIdx++) {
+        const grid = entry.grids[gridIdx];
+        if (grid.imageData) {
+          await dbQuery(
+            `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data)
+             VALUES ($1, $2, $3, 'grid', $4, $5)
+             ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
+            [storyId, pageNumber, retryIdx, gridIdx, grid.imageData]
+          );
+        }
+        if (grid.repairedImageData) {
+          await dbQuery(
+            `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data)
+             VALUES ($1, $2, $3, 'gridRepaired', $4, $5)
+             ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
+            [storyId, pageNumber, retryIdx, gridIdx, grid.repairedImageData]
+          );
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Get retry history images from the separate table.
+ * Used for lazy-loading retry images in dev mode.
+ * @param {string} storyId - Story ID
+ * @param {number} pageNumber - Page number
+ * @returns {array} Reconstructed retry history with images
+ */
+async function getRetryHistoryImages(storyId, pageNumber) {
+  if (!isDatabaseMode()) return [];
+
+  const rows = await dbQuery(
+    `SELECT retry_index, image_type, grid_index, image_data
+     FROM story_retry_images
+     WHERE story_id = $1 AND page_number = $2
+     ORDER BY retry_index, image_type, grid_index`,
+    [storyId, pageNumber]
+  );
+
+  if (rows.length === 0) return [];
+
+  // Reconstruct retryHistory structure
+  const retryMap = new Map();
+  for (const row of rows) {
+    if (!retryMap.has(row.retry_index)) {
+      retryMap.set(row.retry_index, { grids: [] });
+    }
+    const entry = retryMap.get(row.retry_index);
+
+    switch (row.image_type) {
+      case 'attempt': entry.imageData = row.image_data; break;
+      case 'bboxOverlay': entry.bboxOverlayImage = row.image_data; break;
+      case 'original': entry.originalImage = row.image_data; break;
+      case 'annotatedOriginal': entry.annotatedOriginal = row.image_data; break;
+      case 'grid':
+        entry.grids[row.grid_index] = entry.grids[row.grid_index] || {};
+        entry.grids[row.grid_index].imageData = row.image_data;
+        break;
+      case 'gridRepaired':
+        entry.grids[row.grid_index] = entry.grids[row.grid_index] || {};
+        entry.grids[row.grid_index].repairedImageData = row.image_data;
+        break;
+    }
+  }
+
+  return Array.from(retryMap.values());
+}
+
 module.exports = {
   initializePool,
   initializeDatabase,
@@ -994,5 +1192,8 @@ module.exports = {
   // Active version functions
   getActiveVersion,
   setActiveVersion,
-  getAllActiveVersions
+  getAllActiveVersions,
+  // Retry history image functions
+  saveRetryHistoryImages,
+  getRetryHistoryImages
 };

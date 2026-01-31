@@ -512,6 +512,40 @@ export const storyService = {
     }
   },
 
+  // Lazy load retry history images for a page (dev mode)
+  async getRetryHistoryImages(
+    storyId: string,
+    pageNumber: number
+  ): Promise<{
+    images: Array<{
+      imageData?: string | null;
+      bboxOverlayImage?: string | null;
+      originalImage?: string | null;
+      annotatedOriginal?: string | null;
+      grids?: Array<{
+        imageData?: string | null;
+        repairedImageData?: string | null;
+      }>;
+    }>;
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/retry-images/${pageNumber}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch retry history images: HTTP ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.warn('Failed to fetch retry history images:', err);
+      return null;
+    }
+  },
+
   // Get individual page image
   async getPageImage(storyId: string, pageNumber: number): Promise<{ imageData: string; imageVersions?: unknown[] } | null> {
     try {
@@ -574,8 +608,10 @@ export const storyService = {
           backCover?: { imageData: string; qualityScore?: number };
         };
       }>(`/api/stories/${storyId}/images`);
+      console.log(`[getAllImages] Loaded ${response.images?.length || 0} pages, ${Object.keys(response.covers || {}).length} covers`);
       return response;
-    } catch {
+    } catch (err) {
+      console.error('[getAllImages] Failed to load batch images:', err);
       return null;
     }
   },
@@ -600,10 +636,9 @@ export const storyService = {
     const batchResult = await this.getAllImages(id);
 
     // Check if batch result has actual images (not just empty arrays)
-    const hasImages = batchResult && (
-      batchResult.images.length > 0 ||
-      Object.keys(batchResult.covers).length > 0
-    );
+    const images = batchResult?.images || [];
+    const covers = batchResult?.covers || {};
+    const hasImages = images.length > 0 || Object.keys(covers).length > 0;
 
     if (hasImages) {
       let loadedCount = 0;
@@ -611,7 +646,7 @@ export const storyService = {
       // Notify cover images
       const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
       for (const coverType of coverTypes) {
-        const cover = batchResult.covers[coverType];
+        const cover = covers[coverType];
         if (cover?.imageData) {
           loadedCount++;
           onImageLoaded(coverType, cover.imageData, undefined, loadedCount);
@@ -619,7 +654,7 @@ export const storyService = {
       }
 
       // Notify page images
-      for (const img of batchResult.images) {
+      for (const img of images) {
         if (img.imageData) {
           loadedCount++;
           onImageLoaded(img.pageNumber, img.imageData, img.imageVersions, loadedCount);
