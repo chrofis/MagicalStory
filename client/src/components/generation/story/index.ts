@@ -1,4 +1,5 @@
 export { RetryHistoryDisplay } from './RetryHistoryDisplay';
+export { ObjectDetectionDisplay } from './ObjectDetectionDisplay';
 export { ReferencePhotosDisplay } from './ReferencePhotosDisplay';
 export { SceneEditModal } from './SceneEditModal';
 export { ImageHistoryModal } from './ImageHistoryModal';

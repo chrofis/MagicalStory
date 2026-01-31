@@ -5,7 +5,7 @@ import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
+import { RetryHistoryDisplay, ObjectDetectionDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
 import type { GenerationSettings } from './story';
 import { ShareButton } from '@/components/story/ShareButton';
 import storyService from '@/services/storyService';
@@ -3232,6 +3232,14 @@ export function StoryDisplay({
                               </details>
                             )}
 
+                            {/* Object Detection (separate from retry history for visibility) */}
+                            <ObjectDetectionDisplay
+                              retryHistory={image?.retryHistory}
+                              language={language}
+                              storyId={storyId}
+                              pageNumber={image?.pageNumber}
+                            />
+
                             {/* Retry History (shows all attempts with images) */}
                             {image?.retryHistory && image.retryHistory.length > 0 && (
                               <RetryHistoryDisplay
@@ -3595,6 +3603,14 @@ export function StoryDisplay({
                                 )}
                               </details>
                             )}
+
+                            {/* Object Detection (separate from retry history for visibility) */}
+                            <ObjectDetectionDisplay
+                              retryHistory={image.retryHistory}
+                              language={language}
+                              storyId={storyId}
+                              pageNumber={image.pageNumber}
+                            />
 
                             {/* Retry History (shows all attempts with images) */}
                             {image.retryHistory && image.retryHistory.length > 0 && (
