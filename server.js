@@ -3379,6 +3379,382 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
   }
 });
 
+// Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
+// This endpoint analyzes the current image, feeds composition to the scene description prompt,
+// runs the 17 validation checks, and regenerates with a corrected scene description
+app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const pageNumber = parseInt(pageNum);
+    const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
+
+    // Check if admin is impersonating - they get free iterations
+    const isImpersonating = req.user.impersonating === true;
+    log.info(`🔄 [ITERATE] Starting iteration for story ${id}, page ${pageNumber}${isImpersonating ? ' (admin impersonating)' : ''}`);
+
+    // Check user credits first (-1 means infinite/unlimited, impersonating admins also skip)
+    const userResult = await dbPool.query('SELECT credits, role FROM users WHERE id = $1', [req.user.id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userCredits = userResult.rows[0].credits || 0;
+    const userRole = userResult.rows[0].role;
+    const hasInfiniteCredits = userCredits === -1 || isImpersonating;
+
+    // Only admins can use iteration (dev mode feature)
+    if (userRole !== 'admin' && !isImpersonating) {
+      return res.status(403).json({ error: 'Iteration is only available in developer mode' });
+    }
+
+    if (!hasInfiniteCredits && userCredits < creditCost) {
+      return res.status(402).json({
+        error: 'Insufficient credits',
+        required: creditCost,
+        available: userCredits
+      });
+    }
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
+
+    // Get current image
+    const sceneImages = storyData.sceneImages || [];
+    const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
+    if (!currentImage || !currentImage.imageData) {
+      return res.status(400).json({ error: `No image found for page ${pageNumber}` });
+    }
+
+    // Get current scene description
+    const sceneDescriptions = storyData.sceneDescriptions || [];
+    const currentScene = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+    if (!currentScene) {
+      return res.status(400).json({ error: `No scene description found for page ${pageNumber}` });
+    }
+
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
+
+    // Step 1: Analyze the current image using describeImage
+    const { describeImage } = require('./server/lib/sceneValidator');
+    const imageDescription = await describeImage(currentImage.imageData);
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
+    log.debug(`🔄 [ITERATE] Composition: ${imageDescription.description.substring(0, 200)}...`);
+
+    // Step 2: Build previewFeedback from the image analysis
+    const previewFeedback = {
+      composition: imageDescription.description
+    };
+
+    // Step 3: Gather context for scene description prompt
+    const pageText = getPageText(storyData.storyText, pageNumber);
+    if (!pageText) {
+      return res.status(404).json({ error: `Page ${pageNumber} text not found` });
+    }
+
+    const characters = storyData.characters || [];
+    const language = storyData.language || 'en';
+    const visualBible = storyData.visualBible || null;
+    const clothingRequirements = storyData.clothingRequirements || null;
+    const pageClothingData = storyData.pageClothing || null;
+
+    // Build previous scenes context
+    const previousScenes = [];
+    for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
+      if (prevPage >= 1) {
+        const prevText = getPageText(storyData.storyText, prevPage);
+        if (prevText) {
+          let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
+          if (!prevClothing) {
+            const prevSceneDesc = sceneDescriptions.find(s => s.pageNumber === prevPage);
+            prevClothing = prevSceneDesc ? parseClothingCategory(prevSceneDesc.description) : null;
+          }
+          previousScenes.push({
+            pageNumber: prevPage,
+            text: prevText,
+            sceneHint: '',
+            clothing: prevClothing
+          });
+        }
+      }
+    }
+
+    // Get expected clothing for this page
+    const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
+    log.debug(`🔄 [ITERATE] Expected clothing: ${expectedClothing}`);
+
+    // Build available avatars
+    const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
+
+    // Extract short scene description from current scene (the "hint" that will be critiqued)
+    let shortSceneDesc = '';
+    const sceneMetadata = extractSceneMetadata(currentScene.description);
+    if (sceneMetadata?.imageSummary) {
+      shortSceneDesc = sceneMetadata.imageSummary;
+    } else {
+      // Fall back to first part of description
+      shortSceneDesc = currentScene.description.substring(0, 500);
+    }
+
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
+
+    // Step 4: Build the scene description prompt with preview feedback
+    const scenePrompt = buildSceneDescriptionPrompt(
+      pageNumber,
+      pageText,
+      characters,
+      shortSceneDesc,  // The current scene hint to critique
+      language,
+      visualBible,
+      previousScenes,
+      expectedClothing,
+      '',  // No correction notes for iteration
+      availableAvatars,
+      null,  // rawOutlineContext
+      previewFeedback  // The actual image analysis feedback!
+    );
+
+    // Step 5: Call Claude to run 17 checks and generate corrected scene
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
+    const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{"previewMismatches":[' });
+    const newSceneDescription = sceneResult.text;
+
+    // Parse the scene JSON to extract previewMismatches
+    let previewMismatches = [];
+    let checksRun = {};
+    try {
+      const sceneJson = JSON.parse(newSceneDescription);
+      previewMismatches = sceneJson.previewMismatches || [];
+      checksRun = sceneJson.selfCritique || {};
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
+    } catch (parseErr) {
+      log.warn(`🔄 [ITERATE] Could not parse scene JSON for mismatches: ${parseErr.message}`);
+    }
+
+    // Update scene description in story data
+    const existingSceneIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
+    const translatedSummary = extractSceneMetadata(newSceneDescription)?.translatedSummary || null;
+    const imageSummary = extractSceneMetadata(newSceneDescription)?.imageSummary || null;
+
+    const sceneEntry = {
+      pageNumber,
+      description: newSceneDescription,
+      translatedSummary,
+      imageSummary,
+      iteratedAt: new Date().toISOString(),
+      iterationFeedback: previewFeedback.composition
+    };
+
+    if (existingSceneIndex >= 0) {
+      sceneDescriptions[existingSceneIndex] = { ...sceneDescriptions[existingSceneIndex], ...sceneEntry };
+    } else {
+      sceneDescriptions.push(sceneEntry);
+      sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+    }
+
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Generating new image with corrected scene description...`);
+
+    // Step 6: Regenerate image with corrected scene
+    // Determine which characters appear in this scene
+    const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
+
+    // Get clothing category
+    let clothingCategory = typeof pageClothingData?.pageClothing?.[pageNumber] === 'string'
+      ? pageClothingData.pageClothing[pageNumber]
+      : parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+
+    let effectiveClothing = clothingCategory;
+    let costumeType = null;
+    if (clothingCategory && clothingCategory.startsWith('costumed:')) {
+      costumeType = clothingCategory.split(':')[1];
+      effectiveClothing = 'costumed';
+    }
+
+    const artStyle = storyData.artStyle || 'pixar';
+    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+    if (effectiveClothing !== 'costumed') {
+      referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+    }
+
+    // Build landmark photos and VB grid
+    const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+    const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
+
+    let vbGrid = null;
+    if (visualBible) {
+      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+      const secondaryLandmarks = pageLandmarkPhotos.slice(1);
+      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+        vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+      }
+    }
+
+    // Build image prompt
+    const imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+
+    // Clear cache to force new generation
+    const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
+    deleteFromImageCache(cacheKey);
+
+    // Store previous image data
+    const previousImageData = currentImage.imageData;
+    const previousScore = currentImage.qualityScore || null;
+
+    // Generate new image
+    const imageModelId = 'gemini-3-pro-image-preview';
+    const imageResult = await generateImageWithQualityRetry(
+      imagePrompt, referencePhotos, null, 'scene', null, null, null,
+      { imageModel: imageModelId },
+      `PAGE ${pageNumber} ITERATE`,
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
+    );
+
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
+
+    // Step 7: Update the image in story data
+    const existingImageIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
+
+    const newImageData = {
+      pageNumber,
+      imageData: imageResult.imageData,
+      description: newSceneDescription,
+      prompt: imagePrompt,
+      qualityScore: imageResult.score,
+      qualityReasoning: imageResult.reasoning || null,
+      qualityModelId: imageResult.qualityModelId || null,
+      fixTargets: imageResult.fixTargets || [],
+      wasIterated: true,
+      iteratedAt: new Date().toISOString(),
+      iterationFeedback: previewFeedback.composition,
+      previewMismatches,
+      totalAttempts: imageResult.totalAttempts || 1,
+      previousImage: previousImageData,
+      previousScore: previousScore,
+      originalImage: currentImage.originalImage || previousImageData,
+      originalScore: currentImage.originalScore || previousScore,
+      referencePhotos,
+      landmarkPhotos: pageLandmarkPhotos,
+      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+      modelId: imageResult.modelId || null,
+      iterationCount: (currentImage.iterationCount || 0) + 1
+    };
+
+    // Initialize imageVersions if needed
+    if (currentImage && !currentImage.imageVersions) {
+      currentImage.imageVersions = [{
+        imageData: currentImage.imageData,
+        description: currentImage.description,
+        prompt: currentImage.prompt,
+        modelId: currentImage.modelId,
+        createdAt: storyData.createdAt || new Date().toISOString(),
+        isActive: false,
+        type: 'original'
+      }];
+    }
+
+    // Create new version entry
+    const newVersion = {
+      imageData: imageResult.imageData,
+      description: newSceneDescription,
+      prompt: imagePrompt,
+      modelId: imageResult.modelId || null,
+      createdAt: new Date().toISOString(),
+      isActive: true,
+      type: 'iteration',
+      iterationFeedback: previewFeedback.composition,
+      previewMismatches
+    };
+
+    if (existingImageIndex >= 0) {
+      if (sceneImages[existingImageIndex].imageVersions) {
+        sceneImages[existingImageIndex].imageVersions.forEach(v => v.isActive = false);
+        sceneImages[existingImageIndex].imageVersions.push(newVersion);
+      } else {
+        sceneImages[existingImageIndex].imageVersions = [newVersion];
+      }
+      Object.assign(sceneImages[existingImageIndex], newImageData);
+    } else {
+      newImageData.imageVersions = [newVersion];
+      sceneImages.push(newImageData);
+      sceneImages.sort((a, b) => a.pageNumber - b.pageNumber);
+    }
+
+    // Update image prompts
+    storyData.imagePrompts = storyData.imagePrompts || {};
+    storyData.imagePrompts[pageNumber] = imagePrompt;
+
+    // Save updated story
+    storyData.sceneImages = sceneImages;
+    storyData.sceneDescriptions = sceneDescriptions;
+    await saveStoryData(id, storyData);
+
+    // Update active version in metadata
+    const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length - 1 : 0;
+    await setActiveVersion(id, pageNumber, newActiveIndex);
+
+    // Deduct credits if not unlimited
+    let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
+    if (!hasInfiniteCredits) {
+      await dbPool.query(
+        'UPDATE users SET credits = credits - $1 WHERE id = $2',
+        [creditCost, req.user.id]
+      );
+      await dbPool.query(
+        `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+         VALUES ($1, $2, $3, 'image_iteration', $4)`,
+        [req.user.id, -creditCost, newCredits, `Iterate image for page ${pageNumber}`]
+      );
+    }
+
+    log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${imageResult.score})`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      // What the vision model saw
+      composition: previewFeedback.composition,
+      // Claude's analysis
+      previewMismatches,
+      checksRun,
+      // New content
+      sceneDescription: newSceneDescription,
+      imageData: imageResult.imageData,
+      qualityScore: imageResult.score,
+      qualityReasoning: imageResult.reasoning,
+      modelId: imageResult.modelId,
+      totalAttempts: imageResult.totalAttempts,
+      // Previous version
+      previousImage: previousImageData,
+      previousScore: previousScore,
+      // Credits
+      creditsUsed: hasInfiniteCredits ? 0 : creditCost,
+      creditsRemaining: newCredits,
+      // Reference info
+      referencePhotos,
+      landmarkPhotos: pageLandmarkPhotos,
+      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+      message: previewMismatches.length > 0
+        ? `Found ${previewMismatches.length} mismatch(es), regenerated with corrections`
+        : 'No mismatches found, regenerated with fresh analysis'
+    });
+
+  } catch (err) {
+    log.error('Error iterating image:', err);
+    res.status(500).json({ error: 'Failed to iterate image: ' + err.message });
+  }
+});
+
 // Regenerate cover image (front, initialPage, or back)
 app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {

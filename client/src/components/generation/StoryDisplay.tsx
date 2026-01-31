@@ -100,6 +100,7 @@ interface StoryDisplayProps {
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onRepairImage?: (pageNumber: number) => Promise<void>;
+  onIteratePage?: (pageNumber: number) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
@@ -169,6 +170,7 @@ export function StoryDisplay({
   onEditImage,
   onEditCover: _onEditCover,
   onRepairImage,
+  onIteratePage,
   onRevertRepair,
   onVisualBibleChange,
   storyId,
@@ -237,6 +239,9 @@ export function StoryDisplay({
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
   const [repairingEntity, setRepairingEntity] = useState<string | null>(null);
+
+  // Iterative improvement state (dev mode only)
+  const [iteratingPage, setIteratingPage] = useState<number | null>(null);
 
   // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
@@ -486,6 +491,19 @@ export function StoryDisplay({
       console.error('Failed to repair image:', err);
     } finally {
       setRepairingPage(null);
+    }
+  };
+
+  // Handle iterate page (dev mode) - analyze current image, run 17 checks, regenerate
+  const handleIteratePage = async (pageNumber: number) => {
+    if (!onIteratePage || iteratingPage !== null) return;
+    setIteratingPage(pageNumber);
+    try {
+      await onIteratePage(pageNumber);
+    } catch (err) {
+      console.error('Failed to iterate page:', err);
+    } finally {
+      setIteratingPage(null);
     }
   };
 
@@ -3230,6 +3248,30 @@ export function StoryDisplay({
                               </button>
                             )}
 
+                            {/* Next Iteration button - dev only */}
+                            {onIteratePage && (
+                              <button
+                                onClick={() => handleIteratePage(pageNumber)}
+                                disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
+                                className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                                }`}
+                                title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
+                              >
+                                {iteratingPage === pageNumber ? (
+                                  <>
+                                    <Loader size={14} className="animate-spin" />
+                                    {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw size={14} />
+                                    {language === 'de' ? 'Nächste Iteration' : language === 'fr' ? 'Prochaine Itération' : 'Next Iteration'}
+                                  </>
+                                )}
+                              </button>
+                            )}
+
                             {/* Repair History - show if image was auto-repaired */}
                             {image?.repairHistory && image.repairHistory.length > 0 && (
                               <details className="bg-amber-50 border border-amber-300 rounded-lg p-3">
@@ -3598,6 +3640,30 @@ export function StoryDisplay({
                                   <>
                                     <Wrench size={14} />
                                     {language === 'de' ? 'Auto-Reparatur' : language === 'fr' ? 'Auto-Réparation' : 'Auto-Repair'}
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {/* Next Iteration button - dev only */}
+                            {onIteratePage && (
+                              <button
+                                onClick={() => handleIteratePage(pageNumber)}
+                                disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
+                                className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                  isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                                }`}
+                                title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
+                              >
+                                {iteratingPage === pageNumber ? (
+                                  <>
+                                    <Loader size={14} className="animate-spin" />
+                                    {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw size={14} />
+                                    {language === 'de' ? 'Nächste Iteration' : language === 'fr' ? 'Prochaine Itération' : 'Next Iteration'}
                                   </>
                                 )}
                               </button>

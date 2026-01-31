@@ -4132,6 +4132,52 @@ export default function StoryWizard() {
                   throw error;
                 }
               } : undefined}
+              // Iterate page using 17-check scene description with actual image analysis (dev mode only)
+              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number) => {
+                try {
+                  log.info('Starting iteration for page:', pageNumber);
+                  const result = await storyService.iteratePage(storyId, pageNumber);
+
+                  if (result.success) {
+                    // Update the scene image with the iterated version
+                    setSceneImages(prev => prev.map(img => {
+                      if (img.pageNumber === pageNumber) {
+                        return {
+                          ...img,
+                          imageData: result.imageData,
+                          description: result.sceneDescription,
+                          qualityScore: result.qualityScore,
+                          qualityReasoning: result.qualityReasoning,
+                          wasIterated: true,
+                          iteratedAt: new Date().toISOString(),
+                          iterationFeedback: result.composition,
+                          previewMismatches: result.previewMismatches
+                        };
+                      }
+                      return img;
+                    }));
+                    // Update scene descriptions too
+                    setSceneDescriptions(prev => prev.map(scene => {
+                      if (scene.pageNumber === pageNumber) {
+                        return {
+                          ...scene,
+                          description: result.sceneDescription,
+                          iteratedAt: new Date().toISOString()
+                        };
+                      }
+                      return scene;
+                    }));
+                    log.info('Iteration completed successfully:', {
+                      mismatches: result.previewMismatches?.length || 0,
+                      score: result.qualityScore,
+                      message: result.message
+                    });
+                  }
+                } catch (error) {
+                  log.error('Iteration failed:', error);
+                  throw error;
+                }
+              } : undefined}
               // Revert repair to original image (dev mode only)
               onRevertRepair={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, beforeImage: string) => {
                 try {

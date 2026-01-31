@@ -979,6 +979,61 @@ export const storyService = {
     return response;
   },
 
+  // Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
+  async iteratePage(storyId: string, pageNumber: number): Promise<{
+    success: boolean;
+    pageNumber: number;
+    // What the vision model saw
+    composition: string;
+    // Claude's analysis
+    previewMismatches: string[];
+    checksRun: Record<string, unknown>;
+    // New content
+    sceneDescription: string;
+    imageData: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+    modelId?: string;
+    totalAttempts?: number;
+    // Previous version
+    previousImage?: string;
+    previousScore?: number;
+    // Credits
+    creditsUsed?: number;
+    creditsRemaining?: number;
+    // Reference info
+    referencePhotos?: ReferencePhoto[];
+    landmarkPhotos?: LandmarkPhoto[];
+    visualBibleGrid?: string;
+    message: string;
+  }> {
+    const response = await api.post<{
+      success: boolean;
+      pageNumber: number;
+      composition: string;
+      previewMismatches: string[];
+      checksRun: Record<string, unknown>;
+      sceneDescription: string;
+      imageData: string;
+      qualityScore?: number;
+      qualityReasoning?: string;
+      modelId?: string;
+      totalAttempts?: number;
+      previousImage?: string;
+      previousScore?: number;
+      creditsUsed?: number;
+      creditsRemaining?: number;
+      referencePhotos?: ReferencePhoto[];
+      landmarkPhotos?: LandmarkPhoto[];
+      visualBibleGrid?: string;
+      message: string;
+    }>(
+      `/api/stories/${storyId}/iterate/${pageNumber}`,
+      {}
+    );
+    return response;
+  },
+
   // Update scene image directly (admin only - for reverting repairs)
   async updateSceneImage(storyId: string, pageNumber: number, imageData: string): Promise<{
     success: boolean;
