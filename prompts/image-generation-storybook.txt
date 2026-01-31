@@ -2,12 +2,12 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
 **STYLE: {STYLE_DESCRIPTION}**
 
-**STYLE TRANSFORMATION:**
-- Reference images show REAL PHOTOGRAPHS - transform into the art style
-- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
-- Render in artistic style - NOT photo-realistic copies
-- ALL characters in the SAME consistent style
-- Character CLOTHING: Use EXACTLY what is shown in the reference images (the correct outfit has been pre-selected)
+**REFERENCE HANDLING:**
+- Transform real photos into the art style (NOT photo-realistic)
+- Characters must remain RECOGNIZABLE (same face, hair color, age, build)
+- Use EXACTLY the clothing shown in reference images
+- ALL characters in consistent style
+- For element references (animals, objects): match EXACT appearance from reference
 
 **COMPOSITION (CRITICAL):**
 - RESPECT exact spatial positions described in the scene (left edge, right edge, center, etc.)
@@ -16,16 +16,12 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 - Empty space is a compositional element - preserve it as described
 - "Left/right edge" means AT THE EDGE of the frame, not near center
 
-**IDENTITY PRESERVATION:**
-- Each [Image N - Name] label corresponds to the reference that follows it
-- Characters must look IDENTICAL to their reference - same face, same person
-- For element references (animals, objects, artifacts): match the EXACT appearance from the reference
-
 ---
 
 {CHARACTER_REFERENCE_LIST}
 
-**SCENE:** {SCENE_DESCRIPTION}
+**SCENE:**
+{SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
 
@@ -34,4 +30,3 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 ---
 
 Show appropriate emotions. Clean, clear composition. No text or watermarks.
-This is a wholesome children's storybook illustration. All content is innocent and age-appropriate.

@@ -269,83 +269,61 @@ function expandPositionAbbreviations(position) {
 }
 
 /**
- * Build readable text from JSON scene description output
- * Converts the structured JSON to markdown text for image generation prompt
- * @param {Object} output - The output section from JSON scene description
- * @returns {string} Formatted text for image prompt
+ * Converts the structured JSON scene to concise prose for image generation prompt
+ * @param {Object} scene - The scene section from JSON scene description
+ * @returns {string} Formatted prose for image prompt
  */
-function buildTextFromJson(output) {
-  if (!output) return '';
+function buildTextFromJson(scene) {
+  if (!scene) return '';
 
-  let text = '';
+  const lines = [];
 
-  // Section 1: Image Summary
-  if (output.imageSummary) {
-    text += `## 1. Image Summary\n${output.imageSummary}\n\n`;
+  // Main description (imageSummary is the key description)
+  if (scene.imageSummary) {
+    lines.push(scene.imageSummary);
   }
 
-  // Section 2: Setting & Atmosphere & Camera
-  if (output.setting) {
-    text += `## 2. Setting & Atmosphere & Camera\n`;
-    if (output.setting.location) {
-      text += `**${output.setting.location}**: `;
-    }
-    if (output.setting.description) {
-      text += `${output.setting.description} `;
-    }
-    if (output.setting.lighting) {
-      text += `${output.setting.lighting}. `;
-    }
-    text += '\n';
-    if (output.setting.camera) {
-      text += `Camera: ${output.setting.camera}\n`;
-    }
-    if (output.setting.depthLayers) {
-      text += `Depth layers: ${output.setting.depthLayers}\n`;
-    }
-    text += '\n';
-  }
-
-  // Section 3: Character Composition
-  if (output.characters && output.characters.length > 0) {
-    text += `## 3. Character Composition\n\n`;
-    for (const char of output.characters) {
-      text += `**${char.name}:**\n`;
-      // Expand position abbreviations (MC -> middle-center midground, etc.)
-      if (char.position) text += `- POSITION: ${expandPositionAbbreviations(char.position)}\n`;
-      if (char.pose) text += `- POSE: ${char.pose}\n`;
-      if (char.action) text += `- ACTION: ${char.action}\n`;
-      if (char.expression) text += `- EXPRESSION: ${char.expression}\n`;
-      text += '\n';
+  // Character positions and actions (concise bullet format)
+  if (scene.characters && scene.characters.length > 0) {
+    lines.push('');
+    for (const char of scene.characters) {
+      const position = expandPositionAbbreviations(char.position) || '';
+      const parts = [char.name + ':'];
+      if (position) parts.push(position);
+      if (char.action) parts.push(char.action);
+      if (char.expression) parts.push(char.expression);
+      lines.push('- ' + parts.join(', '));
     }
   }
 
-  // Section 4: Clothing Categories (from JSON character clothing data)
-  // This ensures the correct clothing from JSON metadata is used, not the potentially
-  // inconsistent text section the AI generated
-  if (output.characters && output.characters.some(c => c.clothing)) {
-    text += `## 4. Clothing Categories\n`;
-    for (const char of output.characters) {
-      if (char.name && char.clothing) {
-        text += `* **${char.name}:** ${char.clothing}\n`;
-      }
+  // Setting summary (one line)
+  if (scene.setting) {
+    const settingParts = [];
+    if (scene.setting.location) settingParts.push(scene.setting.location);
+    if (scene.setting.description) settingParts.push(scene.setting.description);
+    if (settingParts.length > 0) {
+      lines.push('');
+      lines.push('Setting: ' + settingParts.join('. '));
     }
-    text += '\n';
+    if (scene.setting.camera) {
+      lines.push('Camera: ' + scene.setting.camera);
+    }
   }
 
-  // Section 5: Objects & Animals
-  if (output.objects && output.objects.length > 0) {
-    text += `## 5. Objects & Animals\n`;
-    for (const obj of output.objects) {
+  // Objects (if any have IDs from Visual Bible)
+  if (scene.objects && scene.objects.length > 0) {
+    const objectLines = scene.objects.map(obj => {
       const idPart = obj.id ? ` [${obj.id}]` : '';
-      // Expand position abbreviations for objects too
-      const expandedPos = expandPositionAbbreviations(obj.position) || 'in scene';
-      text += `* ${obj.name}${idPart}: ${expandedPos}\n`;
+      const expandedPos = expandPositionAbbreviations(obj.position) || '';
+      return `${obj.name}${idPart}${expandedPos ? ': ' + expandedPos : ''}`;
+    });
+    if (objectLines.length > 0) {
+      lines.push('');
+      lines.push('Objects: ' + objectLines.join('; '));
     }
-    text += '\n';
   }
 
-  return text.trim();
+  return lines.join('\n').trim();
 }
 
 /**
@@ -361,9 +339,11 @@ function stripSceneMetadata(sceneDescription) {
 
   // Try NEW JSON format first using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
-  if (parsed && parsed.output) {
-    // Convert structured JSON to text for image prompt
-    return buildTextFromJson(parsed.output);
+  // Support all wrapper formats: "scene" (critique-only), "output" (old), "draft" (unified), or raw
+  const sceneData = parsed?.scene || parsed?.output || parsed?.draft || parsed;
+  if (sceneData && (sceneData.imageSummary || sceneData.characters)) {
+    // Convert structured JSON to prose for image prompt
+    return buildTextFromJson(sceneData);
   }
 
   // LEGACY: Regex-based stripping for markdown format

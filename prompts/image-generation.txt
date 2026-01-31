@@ -1,13 +1,13 @@
-Safe, family-friendly content only.
+CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 
 **STYLE: {STYLE_DESCRIPTION}**
 
-**STYLE TRANSFORMATION:**
-- Reference images show REAL PHOTOGRAPHS - transform into the art style
-- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
-- Render in artistic style - NOT photo-realistic copies
-- ALL characters in the SAME consistent style
-- Character CLOTHING: Use EXACTLY what is shown in the reference images (the correct outfit has been pre-selected)
+**REFERENCE HANDLING:**
+- Transform real photos into the art style (NOT photo-realistic)
+- Characters must remain RECOGNIZABLE (same face, hair color, age, build)
+- Use EXACTLY the clothing shown in reference images
+- ALL characters in consistent style
+- For element references (animals, objects): match EXACT appearance from reference
 
 **COMPOSITION (CRITICAL):**
 - RESPECT exact spatial positions described in the scene (left edge, right edge, center, etc.)
@@ -15,33 +15,21 @@ Safe, family-friendly content only.
 - If scene describes distance between characters: show them FAR APART, not close together
 - Empty space is a compositional element - preserve it as described
 - "Left/right edge" means AT THE EDGE of the frame, not near center
-- IGNORE any metric distances (meters, feet) or percentages if present in scene description
-- Interpret closeness: "arm's reach" = close together, "far apart" = opposite sides of frame
-- Frame regions: "left edge" = very left, "left side" = left third, "center" = middle, "right side" = right third
 
 ---
 
 {CHARACTER_REFERENCE_LIST}
 
-**REFERENCE IMAGE USAGE (CRITICAL):**
-- Reference photos are PROVIDED FOR YOUR UNDERSTANDING ONLY
-- DO NOT include reference photos, thumbnails, or numbered image grids in the generated image
-- The output must be a SINGLE illustration showing ONLY the described scene
-- Reference photos show what characters LOOK LIKE - use them to draw the characters accurately, but NEVER show the photos themselves
+**REFERENCE IMAGE USAGE:**
+- Reference photos are FOR YOUR UNDERSTANDING ONLY - do NOT show them in the output
+- Output must be a SINGLE illustration showing ONLY the described scene
+- Each character must look IDENTICAL to their reference - same face, same person
 
-**IDENTITY PRESERVATION (CRITICAL):**
-Each [Image N - Name] label above corresponds to the reference photo that follows it.
-- COPY THE EXACT FACE from each labeled reference image
-- Preserve: eye shape, nose, jawline, facial proportions, hair color/style
-- Each character must look like the SAME PERSON as their reference - not similar, IDENTICAL
-- Do NOT average or blend features between different characters
-- For element references (animals, objects, artifacts): match the EXACT appearance from the reference
-
-**SCENE:** {SCENE_DESCRIPTION}
+**SCENE:**
+{SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
 
 ---
 
 Show appropriate emotions. Clean, clear composition. No text or watermarks.
-All content must be innocent and age-appropriate.
