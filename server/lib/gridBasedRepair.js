@@ -279,7 +279,7 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   let annotatedOriginal = null;
   try {
     const annotatedBuffer = await createAnnotatedImage(imageBuffer, extractableIssues);
-    annotatedOriginal = annotatedBuffer.toString('base64');
+    annotatedOriginal = `data:image/jpeg;base64,${annotatedBuffer.toString('base64')}`;
   } catch (err) {
     console.warn(`  Warning: Could not create annotated image: ${err.message}`);
   }
@@ -606,10 +606,16 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
 
   progress('done', `Fixed ${history.fixedCount}/${history.issueCount} issues`);
 
-  // Convert buffer to base64 string for caller compatibility
+  // Convert buffer to base64 data URI for caller compatibility
   const finalImageData = Buffer.isBuffer(currentImage)
-    ? currentImage.toString('base64')
+    ? `data:image/jpeg;base64,${currentImage.toString('base64')}`
     : currentImage;
+
+  // Log final dimensions for debugging
+  if (Buffer.isBuffer(currentImage)) {
+    const finalMeta = await sharp(currentImage).metadata();
+    console.log(`  [GRID] Final image dimensions: ${finalMeta.width}x${finalMeta.height} (original: ${imgDimensions.width}x${imgDimensions.height})`);
+  }
 
   return {
     imageData: finalImageData,
