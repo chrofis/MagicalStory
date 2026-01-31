@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
-const { hashImageData } = require('./images');
+// Note: hashImageData is lazy-loaded to avoid circular dependency with images.js
 const { buildVisualBiblePrompt } = require('./visualBible');
 const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = require('./outlineParser');
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
@@ -1505,7 +1505,7 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         id: char.id,
         photoType,
         photoUrl,
-        photoHash: hashImageData(photoUrl),  // For dev mode verification
+        photoHash: require('./images').hashImageData(photoUrl),  // For dev mode verification (lazy-loaded)
         clothingCategory: usedClothingCategory || effectiveClothingCategory || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         hasPhoto: photoType !== 'none'

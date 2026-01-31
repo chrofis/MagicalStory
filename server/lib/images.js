@@ -14,8 +14,6 @@ const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
-const { extractSceneMetadata, normalizePositionToLCR } = require('./storyHelpers');
-
 // Grid-based repair (lazy-loaded to avoid circular dependencies)
 let gridBasedRepairModule = null;
 function getGridBasedRepair() {
@@ -23,6 +21,15 @@ function getGridBasedRepair() {
     gridBasedRepairModule = require('./gridBasedRepair');
   }
   return gridBasedRepairModule;
+}
+
+// storyHelpers functions (lazy-loaded to avoid circular dependencies)
+let storyHelpersModule = null;
+function getStoryHelpers() {
+  if (!storyHelpersModule) {
+    storyHelpersModule = require('./storyHelpers');
+  }
+  return storyHelpersModule;
 }
 
 // =============================================================================
@@ -1228,7 +1235,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
 
     // Get expected position from scene description (stronger signal than quality eval guess)
     const expectedPos = expectedPositions[charName] || expectedPositions[charName.charAt(0).toUpperCase() + charName.slice(1)];
-    const expectedLCR = normalizePositionToLCR(expectedPos);
+    const expectedLCR = getStoryHelpers().normalizePositionToLCR(expectedPos);
 
     for (const figure of allDetections.figures) {
       let score = 0;
@@ -1280,7 +1287,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     const expectedPos = expectedPositions[charName] ||
       expectedPositions[charName.charAt(0).toUpperCase() + charName.slice(1)];
     if (expectedPos) {
-      const expectedLCR = normalizePositionToLCR(expectedPos);
+      const expectedLCR = getStoryHelpers().normalizePositionToLCR(expectedPos);
       if (expectedLCR && figure.position && figure.position !== expectedLCR) {
         positionMismatches.push({
           character: charName,
@@ -2510,7 +2517,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
 
     // Extract expected character positions from scene description in prompt
     // Scene descriptions contain structured JSON with character positions like "bottom-left foreground"
-    const sceneMetadata = extractSceneMetadata(currentPrompt);
+    const sceneMetadata = getStoryHelpers().extractSceneMetadata(currentPrompt);
     const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
     if (Object.keys(expectedCharacterPositions).length > 0) {
       log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected character positions: ${Object.entries(expectedCharacterPositions).map(([n, p]) => `${n}=${p}`).join(', ')}`);
