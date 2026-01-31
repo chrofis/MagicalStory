@@ -127,7 +127,13 @@ const {
   runFinalConsistencyChecks,
   generateReferenceSheet,
   buildVisualBibleGrid,
-  IMAGE_QUALITY_THRESHOLD
+  IMAGE_QUALITY_THRESHOLD,
+  // Separated evaluation pipeline functions
+  generateImageOnly,
+  evaluateImageBatch,
+  buildRepairPlan,
+  executeRepairPlan,
+  mergeRepairResults
 } = require('./server/lib/images');
 const {
   runEntityConsistencyChecks
@@ -3150,6 +3156,25 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     }
     log.debug(`🔄 [REGEN] Scene has ${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingCategory}${pageClothingData ? ' (from outline)' : ' (parsed)'}`);
 
+    // Build landmark photos and Visual Bible grid for this page
+    // Extract scene metadata from expanded description to find which landmarks are needed
+    const sceneMetadata = extractSceneMetadata(expandedDescription);
+    const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, sceneMetadata) : [];
+    if (pageLandmarkPhotos.length > 0) {
+      log.debug(`🌍 [REGEN] Page ${pageNumber} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+    }
+
+    // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+    let vbGrid = null;
+    if (visualBible) {
+      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+      const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+        vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+        log.debug(`🔲 [REGEN] Page ${pageNumber} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
+      }
+    }
+
     // Build image prompt with scene-specific characters and visual bible
     // Use isStorybook=true to include Visual Bible section in prompt
     // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
@@ -3188,7 +3213,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
       { imageModel: imageModelId },
-      `PAGE ${pageNumber}`
+      `PAGE ${pageNumber}`,
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
     );
 
     // Log API costs for this regeneration
@@ -3220,6 +3246,8 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       originalScore: trueOriginalScore,
       originalReasoning: trueOriginalReasoning,
       referencePhotos,
+      landmarkPhotos: pageLandmarkPhotos,
+      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
       modelId: imageResult.modelId || null,
       regeneratedAt: new Date().toISOString(),
       regenerationCount: (existingImage?.regenerationCount || 0) + 1
@@ -3338,7 +3366,11 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       sceneWasEdited,
       sceneWasExpanded: shouldExpand,  // Flag if expansion was done
       // All image versions
-      imageVersions: sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions || []
+      imageVersions: sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions || [],
+      // Reference images used (for dev mode display)
+      referencePhotos,
+      landmarkPhotos: pageLandmarkPhotos,
+      visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null
     });
 
   } catch (err) {
@@ -8411,7 +8443,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false, separatedEvaluation = false) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -9667,7 +9699,299 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       };
     };
 
-    if (incrementalConsistencyConfig?.enabled) {
+    if (separatedEvaluation && !incrementalConsistencyConfig?.enabled) {
+      // =======================================================================
+      // SEPARATED EVALUATION PIPELINE (NEW ARCHITECTURE)
+      // Phase 5a: Generate ALL images first (no retry)
+      // Phase 5b: Evaluate ALL in parallel
+      // Phase 5c: Build repair plan
+      // Phase 5d: Execute repairs
+      // =======================================================================
+      log.info(`🚀 [UNIFIED] Using SEPARATED EVALUATION pipeline`);
+
+      // Helper function to prepare page data without generation (for later use by pipeline)
+      const preparePageData = async (scene, index) => {
+        const pageNum = scene.pageNumber;
+        const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
+        const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
+        const perCharClothing = sceneMetadataForClothing?.characterClothing || scene.characterClothing || {};
+        const defaultClothing = 'standard';
+        const sceneClothingRequirements = { ...clothingRequirements };
+        for (const char of sceneCharacters) {
+          const charNameTrimmed = char.name.trim().toLowerCase();
+          const charClothing = Object.entries(perCharClothing).find(
+            ([name]) => name.trim().toLowerCase() === charNameTrimmed
+          )?.[1] || defaultClothing;
+          if (!sceneClothingRequirements[char.name]) {
+            sceneClothingRequirements[char.name] = {};
+          }
+          sceneClothingRequirements[char.name]._currentClothing = charClothing;
+        }
+        let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, null, inputData.artStyle, sceneClothingRequirements);
+        pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
+        const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
+        const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+        const secondaryLandmarks = pageLandmarkPhotos.slice(1);
+        let vbGrid = null;
+        if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+          vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+        }
+        const imagePrompt = buildImagePrompt(
+          scene.sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, true, pagePhotos
+        );
+        return {
+          pageNumber: pageNum,
+          index,
+          scene,
+          prompt: imagePrompt,
+          characterPhotos: pagePhotos,
+          landmarkPhotos: pageLandmarkPhotos,
+          visualBibleGrid: vbGrid,
+          sceneCharacters,
+          perCharClothing
+        };
+      };
+
+      // Phase 5a: Prepare all page data
+      log.info(`📸 [UNIFIED] Phase 5a: Preparing ${expandedScenes.length} pages for image generation...`);
+      const pageDataArray = await Promise.all(
+        expandedScenes.map((scene, index) => preparePageData(scene, index))
+      );
+
+      // Phase 5a continued: Generate ALL images (no evaluation)
+      log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
+      const genStartTime = Date.now();
+      const genLimit = pLimit(5);
+
+      const rawImages = await Promise.all(
+        pageDataArray.map(pageData => genLimit(async () => {
+          const progressPercent = 50 + Math.floor((pageData.index / expandedScenes.length) * 30);
+          await dbPool.query(
+            'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+            [progressPercent, `Generating illustration ${pageData.pageNumber}/${expandedScenes.length}...`, jobId]
+          );
+
+          try {
+            const genResult = await generateImageOnly(
+              pageData.prompt,
+              pageData.characterPhotos,
+              {
+                imageModelOverride: modelOverrides.imageModel,
+                imageBackendOverride: modelOverrides.imageBackend,
+                landmarkPhotos: pageData.landmarkPhotos,
+                visualBibleGrid: pageData.visualBibleGrid,
+                pageNumber: pageData.pageNumber
+              }
+            );
+
+            // Track usage
+            if (genResult.usage) {
+              const isRunware = genResult.modelId && genResult.modelId.startsWith('runware:');
+              const provider = isRunware ? 'runware' : 'gemini_image';
+              addUsage(provider, genResult.usage, 'page_images', genResult.modelId);
+            }
+
+            // Save checkpoint for progressive display
+            if (genResult.imageData) {
+              await saveCheckpoint(jobId, 'partial_page', {
+                pageNumber: pageData.pageNumber,
+                text: pageData.scene.text,
+                sceneDescription: pageData.scene.sceneDescription,
+                imageData: genResult.imageData,
+                modelId: genResult.modelId
+              }, pageData.pageNumber);
+            }
+
+            return {
+              pageNumber: pageData.pageNumber,
+              imageData: genResult.imageData,
+              modelId: genResult.modelId,
+              usage: genResult.usage,
+              prompt: pageData.prompt,
+              characterPhotos: pageData.characterPhotos,
+              landmarkPhotos: pageData.landmarkPhotos,
+              visualBibleGrid: pageData.visualBibleGrid,
+              sceneDescription: pageData.scene.sceneDescription,
+              text: pageData.scene.text,
+              sceneCharacters: pageData.sceneCharacters,
+              perCharClothing: pageData.perCharClothing,
+              scene: pageData.scene
+            };
+          } catch (genError) {
+            log.error(`❌ [UNIFIED] Page ${pageData.pageNumber} generation failed: ${genError.message}`);
+            return {
+              pageNumber: pageData.pageNumber,
+              imageData: null,
+              error: genError.message,
+              prompt: pageData.prompt,
+              characterPhotos: pageData.characterPhotos,
+              sceneDescription: pageData.scene.sceneDescription,
+              text: pageData.scene.text,
+              sceneCharacters: pageData.sceneCharacters,
+              perCharClothing: pageData.perCharClothing,
+              scene: pageData.scene
+            };
+          }
+        }))
+      );
+
+      const genDuration = ((Date.now() - genStartTime) / 1000).toFixed(1);
+      const successCount = rawImages.filter(r => r.imageData).length;
+      log.info(`✅ [UNIFIED] Phase 5a complete: ${successCount}/${rawImages.length} images generated in ${genDuration}s`);
+
+      // Phase 5b: Evaluate ALL images in parallel
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [85, 'Evaluating image quality...', jobId]
+      );
+
+      log.info(`🔍 [UNIFIED] Phase 5b: Evaluating all ${successCount} images...`);
+      const evalStartTime = Date.now();
+
+      const evaluations = await evaluateImageBatch(
+        rawImages.filter(r => r.imageData).map(img => ({
+          imageData: img.imageData,
+          pageNumber: img.pageNumber,
+          prompt: img.prompt,
+          characterPhotos: img.characterPhotos,
+          sceneDescription: img.sceneDescription
+        })),
+        {
+          concurrency: 10,
+          qualityModelOverride: modelOverrides.qualityModel
+        }
+      );
+
+      // Track quality eval usage
+      for (const evalResult of evaluations) {
+        if (evalResult.usage) {
+          addUsage('gemini_quality', evalResult.usage, 'page_quality', evalResult.modelId);
+        }
+      }
+
+      const evalDuration = ((Date.now() - evalStartTime) / 1000).toFixed(1);
+      const avgScore = evaluations.reduce((sum, e) => sum + (e.qualityScore || 0), 0) / Math.max(1, evaluations.length);
+      log.info(`✅ [UNIFIED] Phase 5b complete: ${evaluations.length} evaluations in ${evalDuration}s (avg score: ${avgScore.toFixed(0)}%)`);
+
+      // Phase 5c: Build repair plan
+      log.info(`📋 [UNIFIED] Phase 5c: Building repair plan...`);
+      const repairPlan = buildRepairPlan(evaluations, {
+        regenerateThreshold: 30,
+        repairThreshold: enableAutoRepair ? 70 : 0,  // Only plan repairs if autoRepair is enabled
+        keepThreshold: 50
+      });
+
+      log.info(`📋 [UNIFIED] Repair plan: ${repairPlan.pagesToRegenerate.length} regen, ${repairPlan.pagesToRepair.length} repair, ${repairPlan.pagesToKeep.length} keep`);
+
+      // Phase 5d: Execute repair plan (if enabled)
+      if (enableAutoRepair && (repairPlan.pagesToRegenerate.length > 0 || repairPlan.pagesToRepair.length > 0)) {
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [90, 'Repairing images...', jobId]
+        );
+
+        log.info(`🔧 [UNIFIED] Phase 5d: Executing repair plan...`);
+
+        // Build page data and evaluation maps
+        const pageDataMap = new Map();
+        const evalMap = new Map();
+        for (const img of rawImages) {
+          pageDataMap.set(img.pageNumber, img);
+        }
+        for (const evalResult of evaluations) {
+          evalMap.set(evalResult.pageNumber, evalResult);
+        }
+
+        const repairResults = await executeRepairPlan(
+          repairPlan,
+          pageDataMap,
+          evalMap,
+          {
+            modelOverrides,
+            usageTracker: (imgUsage, qualUsage, imgModel, qualModel, isInpaint) => {
+              if (imgUsage) {
+                const isRunware = imgModel && imgModel.startsWith('runware:');
+                const provider = isRunware ? 'runware' : 'gemini_image';
+                const funcName = isInpaint ? 'inpaint' : 'page_images';
+                addUsage(provider, imgUsage, funcName, imgModel);
+              }
+              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
+            },
+            visualBible,
+            isAdmin
+          },
+          { repairFirst: true, useGridRepair }
+        );
+
+        log.info(`✅ [UNIFIED] Phase 5d complete: ${repairResults.repaired.size} repaired, ${repairResults.regenerated.size} regenerated`);
+
+        // Merge results
+        allImages = mergeRepairResults(rawImages, evaluations, repairResults).map(img => ({
+          pageNumber: img.pageNumber,
+          text: img.text,
+          description: img.sceneDescription,
+          outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          imageData: img.imageData,
+          prompt: img.prompt,
+          sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+          sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
+          qualityScore: img.qualityScore,
+          qualityReasoning: img.qualityReasoning,
+          wasRegenerated: img.wasRegenerated,
+          wasRepaired: img.wasRepaired,
+          repairMethod: img.repairMethod,
+          referencePhotos: img.characterPhotos,
+          landmarkPhotos: img.landmarkPhotos,
+          visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
+          sceneCharacters: img.sceneCharacters,
+          sceneCharacterClothing: img.perCharClothing,
+          bboxDetection: img.bboxDetection,
+          bboxOverlayImage: img.bboxOverlayImage,
+          retryHistory: [{
+            attempt: 1,
+            type: 'separated_evaluation',
+            score: img.qualityScore,
+            bboxDetection: img.bboxDetection,
+            bboxOverlayImage: img.bboxOverlayImage,
+            timestamp: new Date().toISOString()
+          }]
+        }));
+      } else {
+        // No repair needed - just merge raw images with evaluation data
+        allImages = rawImages.map(img => {
+          const evalResult = evaluations.find(e => e.pageNumber === img.pageNumber);
+          return {
+            pageNumber: img.pageNumber,
+            text: img.text,
+            description: img.sceneDescription,
+            outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+            imageData: img.imageData,
+            prompt: img.prompt,
+            sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+            sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
+            qualityScore: evalResult?.qualityScore,
+            qualityReasoning: evalResult?.reasoning,
+            referencePhotos: img.characterPhotos,
+            landmarkPhotos: img.landmarkPhotos,
+            visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
+            sceneCharacters: img.sceneCharacters,
+            sceneCharacterClothing: img.perCharClothing,
+            bboxDetection: evalResult?.bboxDetection,
+            bboxOverlayImage: evalResult?.bboxOverlayImage,
+            retryHistory: [{
+              attempt: 1,
+              type: 'separated_evaluation',
+              score: evalResult?.qualityScore,
+              bboxDetection: evalResult?.bboxDetection,
+              bboxOverlayImage: evalResult?.bboxOverlayImage,
+              timestamp: new Date().toISOString()
+            }]
+          };
+        });
+      }
+
+    } else if (incrementalConsistencyConfig?.enabled) {
       // SEQUENTIAL MODE for incremental consistency
       // Generate images one at a time, comparing each against previous images
       log.info(`🔍 [UNIFIED] Using SEQUENTIAL image generation for incremental consistency (lookback: ${incrementalConsistencyConfig.lookbackCount})`);
@@ -10800,7 +11124,13 @@ async function processStoryJob(jobId) {
     const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
     const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
     const enableSceneValidation = inputData.enableSceneValidation === true; // Developer mode: validate scene composition with cheap preview (default: OFF)
+    // Separated Evaluation: Generate all images first, then evaluate/repair in batch
+    // This reduces latency and allows smarter repair decisions across all pages
+    const separatedEvaluation = inputData.separatedEvaluation === true || MODEL_DEFAULTS.separatedEvaluation === true;
     log.debug(`🔧 [PIPELINE] Scene validation input: ${inputData.enableSceneValidation} (type: ${typeof inputData.enableSceneValidation}), resolved: ${enableSceneValidation}`);
+    if (separatedEvaluation) {
+      log.info(`🔧 [PIPELINE] Separated evaluation ENABLED - will generate all images first, then batch evaluate`);
+    }
 
     // Incremental consistency check options (check each image against previous N images)
     const incrementalConsistencyOptions = inputData.incrementalConsistency || {};
@@ -10910,7 +11240,7 @@ async function processStoryJob(jobId) {
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation, separatedEvaluation);
     }
 
     if (generationMode === 'pictureBook') {

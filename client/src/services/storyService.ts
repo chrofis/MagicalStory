@@ -785,6 +785,10 @@ export const storyService = {
     newDescription?: string;
     originalPrompt?: string;
     newPrompt?: string;
+    // Reference images used for this regeneration
+    referencePhotos?: ReferencePhoto[];
+    landmarkPhotos?: LandmarkPhoto[];
+    visualBibleGrid?: string;
   }> {
     const response = await api.post<{
       imageData: string;
@@ -803,6 +807,9 @@ export const storyService = {
       newDescription?: string;
       originalPrompt?: string;
       newPrompt?: string;
+      referencePhotos?: ReferencePhoto[];
+      landmarkPhotos?: LandmarkPhoto[];
+      visualBibleGrid?: string;
     }>(
       `/api/stories/${storyId}/regenerate/image/${pageNum}`,
       { editedScene, characterIds }

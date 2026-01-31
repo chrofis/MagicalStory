@@ -3803,7 +3803,11 @@ export default function StoryWizard() {
                       originalImage: result.originalImage,
                       originalScore: result.originalScore,
                       originalReasoning: result.originalReasoning,
-                      imageVersions: result.imageVersions
+                      imageVersions: result.imageVersions,
+                      // Update reference images used for this regeneration (for dev mode display)
+                      referencePhotos: result.referencePhotos || img.referencePhotos,
+                      landmarkPhotos: result.landmarkPhotos || img.landmarkPhotos,
+                      visualBibleGrid: result.visualBibleGrid || img.visualBibleGrid
                     } : img
                   ));
                   // Update user credits if we got the new balance
