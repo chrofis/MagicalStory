@@ -1219,23 +1219,33 @@ async function detectSubRegion(characterCrop, targetElement) {
 }
 
 /**
- * Build expected characters array for bbox detection from character descriptions and positions
+ * Build expected characters array for bbox detection from character descriptions, positions, and clothing
  * @param {Object} characterDescriptions - Map of charName → {age, gender, isChild, genderTerm}
  * @param {Object} expectedPositions - Map of charName → position string
+ * @param {Object} characterClothing - Map of charName → clothing description string
  * @returns {Array<{name: string, description: string, position: string}>}
  */
-function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions) {
+function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing = {}) {
   const chars = [];
   const addedNames = new Set();
+
+  // Helper to get clothing for a character name (case-insensitive lookup)
+  const getClothing = (name) => {
+    return characterClothing?.[name] ||
+           characterClothing?.[name.charAt(0).toUpperCase() + name.slice(1)] ||
+           characterClothing?.[name.toLowerCase()] || '';
+  };
 
   // First, add characters from characterDescriptions (which have age/gender info)
   for (const [name, desc] of Object.entries(characterDescriptions || {})) {
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
+    const clothing = getClothing(name);
     const descParts = [];
     if (desc.genderTerm) descParts.push(desc.genderTerm);
     if (desc.age) descParts.push(`${desc.age} years old`);
     if (desc.isChild === true) descParts.push('child');
     else if (desc.isChild === false) descParts.push('adult');
+    if (clothing) descParts.push(clothing);
     chars.push({
       name,
       description: descParts.join(', ') || 'character',
@@ -1248,13 +1258,14 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   // These are characters that appear in the scene but didn't have parsed descriptions
   for (const [name, position] of Object.entries(expectedPositions || {})) {
     if (!addedNames.has(name.toLowerCase())) {
+      const clothing = getClothing(name);
       chars.push({
         name,
-        description: 'character',  // No description available
+        description: clothing || 'character',  // Use clothing if available, else fallback
         position
       });
       addedNames.add(name.toLowerCase());
-      log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (no description available)`);
+      log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (clothing: ${clothing || 'none'})`);
     }
   }
 
@@ -1415,9 +1426,9 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}) {
   // Build expected characters for bbox detection (AI will identify by name)
-  const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions);
+  const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
   log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects...`);
 
@@ -2611,11 +2622,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const qualityMatches = result.matches || [];  // Character → figure mapping from quality eval
     const objectMatches = result.objectMatches || [];  // Object/animal/landmark mapping from quality eval
 
-    // Extract expected character positions and objects from scene description in prompt
+    // Extract expected character positions, clothing, and objects from scene description in prompt
     // Scene descriptions contain structured JSON with character positions like "bottom-left foreground"
     // and objects like "star [ART001]"
     const sceneMetadata = getStoryHelpers().extractSceneMetadata(currentPrompt);
     const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
+    const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
 
     // Parse character descriptions (age, gender) from prompt for smarter matching
@@ -2637,7 +2649,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     }
 
     log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing);
     bboxDetectionHistory = enrichResult.detectionHistory;
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {
