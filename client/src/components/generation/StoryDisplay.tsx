@@ -925,14 +925,28 @@ export function StoryDisplay({
     return img;
   };
 
-  // Helper to get scene description for a page
+  // Helper to get scene description for a page (pretty-printed JSON)
   const getSceneDescription = (pageNumber: number): string | undefined => {
     // First check sceneDescriptions array
     const fromDescriptions = sceneDescriptions.find(s => s.pageNumber === pageNumber)?.description;
-    if (fromDescriptions) return fromDescriptions;
-    // Fall back to image.description if available
-    const image = sceneImages.find(img => img.pageNumber === pageNumber);
-    return image?.description;
+    const rawDesc = fromDescriptions || sceneImages.find(img => img.pageNumber === pageNumber)?.description;
+
+    if (!rawDesc) return undefined;
+
+    // Pretty-print JSON for readability
+    if (typeof rawDesc === 'string') {
+      try {
+        const parsed = JSON.parse(rawDesc);
+        return JSON.stringify(parsed, null, 2);
+      } catch {
+        return rawDesc;
+      }
+    }
+    // If it's an object, format it nicely
+    if (typeof rawDesc === 'object') {
+      return JSON.stringify(rawDesc, null, 2);
+    }
+    return String(rawDesc);
   };
 
   // Helper to get outline extract for a page
