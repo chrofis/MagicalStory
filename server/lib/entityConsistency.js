@@ -501,14 +501,18 @@ async function extractEntityCrops(appearances, options = {}) {
       }
 
       // Extract crop from image
-      // Figures: 1:1 no padding, no resize, original aspect
-      // Objects: 15% padding, no resize, original aspect
+      // Figures: asymmetric padding (10% up, 5% sides) to avoid cutting off heads
+      // Objects: 15% uniform padding, no resize, original aspect
       const cropResult = await extractCropFromImage(
         app.imageData,
         bbox,
         null,  // No resize - keep original size
-        isObject ? 0.15 : 0,  // 15% padding for objects, none for figures
-        { forRegeneration }
+        isObject ? 0.15 : 0,  // Uniform padding for objects
+        {
+          forRegeneration,
+          // Asymmetric padding for figures: extend upward to capture full head
+          asymmetricPadding: isObject ? null : { top: 0.10, bottom: 0, left: 0.05, right: 0.05 }
+        }
       );
 
       if (cropResult && cropResult.buffer) {
@@ -544,13 +548,14 @@ async function extractEntityCrops(appearances, options = {}) {
  * @param {string} imageData - Base64 image data
  * @param {number[]} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized 0-1
  * @param {number|null} targetSize - Target crop size in pixels, or null for no resize (keep original)
- * @param {number} padding - Padding ratio to add around bbox (0-0.5)
+ * @param {number} padding - Uniform padding ratio to add around bbox (0-0.5)
  * @param {object} options - Additional options
  * @param {boolean} options.forRegeneration - If true, output PNG for lossless quality
+ * @param {object} options.asymmetricPadding - Optional asymmetric padding {top, bottom, left, right} as ratios
  * @returns {Promise<{buffer: Buffer, paddedBox: number[]}|null>} Cropped image buffer and normalized padded box
  */
 async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, options = {}) {
-  const { forRegeneration = false } = options;
+  const { forRegeneration = false, asymmetricPadding = null } = options;
 
   try {
     // Handle data URI prefix
@@ -570,7 +575,21 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, op
     let y2 = Math.round(ymax * height);
 
     // Add padding if specified
-    if (padding > 0) {
+    if (asymmetricPadding) {
+      // Asymmetric padding: different amounts for each direction
+      const bboxWidth = x2 - x1;
+      const bboxHeight = y2 - y1;
+      const padTop = Math.round(bboxHeight * (asymmetricPadding.top || 0));
+      const padBottom = Math.round(bboxHeight * (asymmetricPadding.bottom || 0));
+      const padLeft = Math.round(bboxWidth * (asymmetricPadding.left || 0));
+      const padRight = Math.round(bboxWidth * (asymmetricPadding.right || 0));
+
+      y1 = Math.max(0, y1 - padTop);
+      y2 = Math.min(height, y2 + padBottom);
+      x1 = Math.max(0, x1 - padLeft);
+      x2 = Math.min(width, x2 + padRight);
+    } else if (padding > 0) {
+      // Uniform padding
       const bboxWidth = x2 - x1;
       const bboxHeight = y2 - y1;
       const padX = Math.round(bboxWidth * padding);
