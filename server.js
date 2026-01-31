@@ -126,6 +126,7 @@ const {
   autoRepairWithTargets,
   runFinalConsistencyChecks,
   generateReferenceSheet,
+  buildVisualBibleGrid,
   IMAGE_QUALITY_THRESHOLD
 } = require('./server/lib/images');
 const {
@@ -4127,6 +4128,7 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       gridBeforeRepair: repairResult.gridBeforeRepair,
       gridAfterRepair: repairResult.gridAfterRepair,
       gridDiff: repairResult.gridDiff,
+      cellComparisons: repairResult.cellComparisons,
       usage: repairResult.usage
     };
 
@@ -6762,22 +6764,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
         log.debug(`🔍 [DEBUG PAGE ${pageNum}] Reference photos selected: ${referencePhotos.map(p => `${p.name}:${p.photoType}:${p.photoHash}`).join(', ') || 'NONE'}`);
 
-        // Get element reference images for this page (secondary characters, artifacts, etc.)
-        if (vBible) {
-          const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 4);
-          if (elementReferences.length > 0) {
-            const elementRefPhotos = elementReferences.map(el => ({
-              name: `${el.name} (${el.type})`,
-              photoUrl: el.referenceImageData,
-              photoType: 'elementReference',
-              clothingCategory: null,
-              clothingDescription: el.description,
-              hasPhoto: true
-            }));
-            referencePhotos = [...referencePhotos, ...elementRefPhotos];
-            log.debug(`🖼️ [STREAM-IMG] Page ${pageNum} added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
-          }
+        // Get landmark photos for this page (fetched early so we can separate primary vs secondary)
+        const pageLandmarkPhotos = vBible ? getLandmarkPhotosForPage(vBible, pageNum) : [];
+        if (pageLandmarkPhotos.length > 0) {
+          log.debug(`🌍 [STREAM-IMG] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+        }
 
+        // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+        // VB elements are NO LONGER added individually to referencePhotos
+        let vbGrid = null;
+        if (vBible) {
+          const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 6);
+          const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+          if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+            vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+            log.debug(`🔲 [STREAM-IMG] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
+          }
           const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
           log.debug(`📸 [STREAM-IMG] Generating image for page ${pageNum} (${sceneCharacters.length} chars, ${relevantEntries.length} visual bible entries)...`);
         } else {
@@ -6823,12 +6825,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
         };
 
-        // Get landmark photos for this page
-        const pageLandmarkPhotos = vBible ? getLandmarkPhotosForPage(vBible, pageNum) : [];
-        if (pageLandmarkPhotos.length > 0) {
-          log.debug(`🌍 [STREAM-IMG] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
-        }
-
         // Pass forceRepairThreshold if set
         const streamingIncrConfig = incrementalConsistencyConfig?.forceRepairThreshold != null
           ? { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold }
@@ -6837,8 +6833,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         while (retries <= MAX_RETRIES && !imageResult) {
           try {
             // Use quality retry with labeled character photos (name + photoUrl)
+            // Pass vbGrid for combined reference (instead of individual VB element photos)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: streamingIncrConfig });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: streamingIncrConfig });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -7450,22 +7447,22 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
           }
 
-          // Get element reference images for this page (secondary characters, artifacts, etc.)
-          if (vBible) {
-            const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 4);
-            if (elementReferences.length > 0) {
-              const elementRefPhotos = elementReferences.map(el => ({
-                name: `${el.name} (${el.type})`,
-                photoUrl: el.referenceImageData,
-                photoType: 'elementReference',
-                clothingCategory: null,
-                clothingDescription: el.description,
-                hasPhoto: true
-              }));
-              referencePhotos = [...referencePhotos, ...elementRefPhotos];
-              log.debug(`🖼️ [STORYBOOK] Page ${pageNum} added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
-            }
+          // Get landmark photos for this page (fetched early so we can separate primary vs secondary)
+          const pageLandmarkPhotos = vBible ? getLandmarkPhotosForPage(vBible, pageNum) : [];
+          if (pageLandmarkPhotos.length > 0) {
+            log.debug(`🌍 [STORYBOOK] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+          }
 
+          // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+          // VB elements are NO LONGER added individually to referencePhotos
+          let vbGrid = null;
+          if (vBible) {
+            const elementReferences = getElementReferenceImagesForPage(vBible, pageNum, 6);
+            const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+            if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+              vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+              log.debug(`🔲 [STORYBOOK] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
+            }
             const relevantEntries = getVisualBibleEntriesForPage(vBible, pageNum);
             log.debug(`📸 [STORYBOOK] Generating image for page ${pageNum} (${sceneCharacters.length} chars, clothing: ${clothingCategory}, ${relevantEntries.length} visual bible entries)...`);
           } else {
@@ -7488,12 +7485,6 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
           };
 
-          // Get landmark photos for this page
-          const pageLandmarkPhotos = vBible ? getLandmarkPhotosForPage(vBible, pageNum) : [];
-          if (pageLandmarkPhotos.length > 0) {
-            log.debug(`🌍 [STORYBOOK] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
-          }
-
           let imageResult = null;
           let retries = 0;
 
@@ -7502,13 +7493,14 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               // Pass labeled character photos (name + photoUrl)
               // In sequential mode, also pass previous image for consistency
               // Use quality retry to regenerate if score is below threshold
+              // Pass vbGrid for combined reference (instead of individual VB element photos)
               const seqSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
               // Add current page's characters to incremental consistency config
               const incrConfigWithCurrentChars = incrConfig ? {
                 ...incrConfig,
                 currentCharacters: sceneCharacters.map(c => c.name)
               } : null;
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrConfigWithCurrentChars });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrConfigWithCurrentChars });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -9561,23 +9553,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => `${l.name}${l.variantNumber > 1 ? ` (v${l.variantNumber})` : ''}`).join(', ')}`);
       }
 
-      // Get element reference images for secondary characters, animals, artifacts appearing on this page
-      // Limit to 4 element references to avoid overloading the model (main character photos take priority)
-      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
-      const elementRefPhotos = elementReferences.map(el => ({
-        name: `${el.name} (${el.type})`,
-        photoUrl: el.referenceImageData,
-        photoType: 'elementReference',
-        clothingCategory: null,
-        clothingDescription: el.description,
-        hasPhoto: true
-      }));
-      if (elementRefPhotos.length > 0) {
-        log.debug(`🖼️ [UNIFIED] Page ${pageNum} has ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+      // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+      // VB elements are NO LONGER added individually to referencePhotos
+      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+      const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+      let vbGrid = null;
+      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+        vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+        log.debug(`🔲 [UNIFIED] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
       }
 
-      // Combine character photos with element references (character photos first for priority)
-      const allReferencePhotos = [...pagePhotos, ...elementRefPhotos];
+      // Only character photos go in allReferencePhotos (no VB elements)
+      const allReferencePhotos = pagePhotos;
 
       const imagePrompt = buildImagePrompt(
         scene.sceneDescription,
@@ -9621,7 +9608,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
+        { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
       // Track scene rewrite usage if a safety block triggered a rewrite
@@ -11478,20 +11465,21 @@ Output Format:
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             }
 
-            // Get element reference images for this page
+            // Get landmark photos for this page (fetched early so we can separate primary vs secondary)
+            const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
+            if (pageLandmarkPhotos.length > 0) {
+              log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+            }
+
+            // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+            // VB elements are NO LONGER added individually to referencePhotos
+            let vbGrid = null;
             if (visualBible) {
-              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
-              if (elementReferences.length > 0) {
-                const elementRefPhotos = elementReferences.map(el => ({
-                  name: `${el.name} (${el.type})`,
-                  photoUrl: el.referenceImageData,
-                  photoType: 'elementReference',
-                  clothingCategory: null,
-                  clothingDescription: el.description,
-                  hasPhoto: true
-                }));
-                referencePhotos = [...referencePhotos, ...elementRefPhotos];
-                log.debug(`🖼️ [PAGE ${pageNum}] Added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+              const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+              if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+                vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+                log.debug(`🔲 [PAGE ${pageNum}] VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
               }
             }
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters, clothing: ${clothingRaw})...`);
@@ -11535,12 +11523,6 @@ Output Format:
               if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
-            // Get landmark photos for this page
-            const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
-            if (pageLandmarkPhotos.length > 0) {
-              log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
-            }
-
             // Pass forceRepairThreshold if set
             const parallelPipelineIncrConfig = incrementalConsistencyConfig?.forceRepairThreshold != null
               ? { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold }
@@ -11548,8 +11530,9 @@ Output Format:
 
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
+                // Pass vbGrid for combined reference (instead of individual VB element photos)
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: parallelPipelineIncrConfig });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: parallelPipelineIncrConfig });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -12034,20 +12017,21 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
             }
 
-            // Get element reference images for this page
+            // Get landmark photos for this page (fetched early so we can separate primary vs secondary)
+            const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
+            if (pageLandmarkPhotos.length > 0) {
+              log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
+            }
+
+            // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+            // VB elements are NO LONGER added individually to referencePhotos
+            let vbGrid = null;
             if (visualBible) {
-              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
-              if (elementReferences.length > 0) {
-                const elementRefPhotos = elementReferences.map(el => ({
-                  name: `${el.name} (${el.type})`,
-                  photoUrl: el.referenceImageData,
-                  photoType: 'elementReference',
-                  clothingCategory: null,
-                  clothingDescription: el.description,
-                  hasPhoto: true
-                }));
-                referencePhotos = [...referencePhotos, ...elementRefPhotos];
-                log.debug(`🖼️ [PAGE ${pageNum}] Added ${elementRefPhotos.length} element reference(s): ${elementReferences.map(e => e.name).join(', ')}`);
+              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+              const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+              if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+                vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+                log.debug(`🔲 [PAGE ${pageNum}] VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
               }
             }
             log.debug(`📸 [PAGE ${pageNum}] Generating image (${sceneCharacters.length} characters: ${sceneCharacters.map(c => c.name).join(', ') || 'none'}, clothing: ${clothingRaw})...`);
@@ -12091,12 +12075,6 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
             };
 
-            // Get landmark photos for this page
-            const pageLandmarkPhotos = getLandmarkPhotosForPage(visualBible, pageNum);
-            if (pageLandmarkPhotos.length > 0) {
-              log.debug(`🌍 [PAGE ${pageNum}] Has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => l.name).join(', ')}`);
-            }
-
             // Build incrementalConsistency options with previous images
             let incrementalConsistencyConfig = null;
             if (enableIncrementalConsistency && previousImagesForConsistency.length > 0) {
@@ -12114,11 +12092,12 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             while (retries <= MAX_RETRIES && !imageResult) {
               try {
                 // Pass labeled character photos (name + photoUrl) + previous image for continuity (SEQUENTIAL MODE)
+                // Pass vbGrid for combined reference (instead of individual VB element photos)
                 // Use quality retry to regenerate if score is below threshold
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
                 imageResult = await generateImageWithQualityRetry(
                   imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`,
-                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, incrementalConsistency: incrementalConsistencyConfig }
+                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrementalConsistencyConfig }
                 );
               } catch (error) {
                 retries++;

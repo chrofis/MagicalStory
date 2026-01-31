@@ -1053,6 +1053,49 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
       log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate diff: ${diffErr.message}`);
     }
 
+    // Generate per-cell comparisons (before/after/diff for each cell)
+    const cellComparisons = [];
+    for (let i = 0; i < crops.length; i++) {
+      const crop = crops[i];
+      const repairedCell = repairedCells.find(c => c.letter === cellLetters[i]);
+      if (!repairedCell) continue;
+
+      try {
+        // Get the original crop buffer
+        const beforeBuffer = crop.buffer;
+        const afterBuffer = repairedCell.buffer;
+
+        // Resize after to match before dimensions for diff
+        const beforeMeta = await sharp(beforeBuffer).metadata();
+        const afterMeta = await sharp(afterBuffer).metadata();
+
+        let afterResized = afterBuffer;
+        if (beforeMeta.width !== afterMeta.width || beforeMeta.height !== afterMeta.height) {
+          afterResized = await sharp(afterBuffer)
+            .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
+            .toBuffer();
+        }
+
+        // Create cell diff
+        const cellDiffBuffer = await sharp(beforeBuffer)
+          .composite([{ input: afterResized, blend: 'difference' }])
+          .modulate({ brightness: 3 })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+
+        cellComparisons.push({
+          letter: cellLetters[i],
+          pageNumber: crop.pageNumber,
+          before: `data:image/jpeg;base64,${beforeBuffer.toString('base64')}`,
+          after: `data:image/jpeg;base64,${afterBuffer.toString('base64')}`,
+          diff: `data:image/jpeg;base64,${cellDiffBuffer.toString('base64')}`
+        });
+      } catch (cellErr) {
+        log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate cell comparison for ${cellLetters[i]}: ${cellErr.message}`);
+      }
+    }
+    log.info(`🔧 [ENTITY-REPAIR] Generated ${cellComparisons.length} cell comparisons`);
+
     // Build result
     const repairResult = {
       success: true,
@@ -1064,6 +1107,7 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
       gridBeforeRepair: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
       gridAfterRepair: `data:image/jpeg;base64,${repairedGridBuffer.toString('base64')}`,
       gridDiff,
+      cellComparisons,  // Per-cell before/after/diff
       usage: response.usageMetadata
     };
 

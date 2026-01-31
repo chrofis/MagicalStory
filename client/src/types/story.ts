@@ -464,6 +464,13 @@ export interface FinalChecksReport {
     gridBeforeRepair: string;
     gridAfterRepair: string;
     gridDiff?: string | null;
+    cellComparisons?: Array<{
+      letter: string;
+      pageNumber: number;
+      before: string;
+      after: string;
+      diff: string;
+    }>;
     usage?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;
