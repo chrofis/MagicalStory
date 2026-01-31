@@ -687,28 +687,98 @@ function createCellLabel(letter, width, height, pageInfo = null) {
 }
 
 /**
+ * Analyze input cells and determine optimal cell dimensions
+ * Uses average aspect ratio to choose wide/tall/square cells
+ *
+ * @param {Object[]} cells - Array of {buffer, ...}
+ * @returns {Promise<{cellWidth: number, cellHeight: number, avgRatio: number}>}
+ */
+async function analyzeCellDimensions(cells) {
+  const ratios = [];
+
+  for (const cell of cells) {
+    try {
+      let imgBuffer;
+      if (Buffer.isBuffer(cell.buffer)) {
+        imgBuffer = cell.buffer;
+      } else if (typeof cell.buffer === 'string') {
+        const base64Data = cell.buffer.replace(/^data:image\/\w+;base64,/, '');
+        imgBuffer = Buffer.from(base64Data, 'base64');
+      } else {
+        continue;
+      }
+
+      const meta = await sharp(imgBuffer).metadata();
+      if (meta.width && meta.height) {
+        ratios.push(meta.width / meta.height);
+      }
+    } catch (err) {
+      // Skip cells we can't read
+    }
+  }
+
+  if (ratios.length === 0) {
+    // Fallback to square
+    return { cellWidth: CELL_SIZE, cellHeight: CELL_SIZE, avgRatio: 1.0 };
+  }
+
+  const avgRatio = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+
+  // Choose cell dimensions based on average aspect ratio
+  // Use Gemini-friendly ratios: 4:3 (1.33), 3:4 (0.75), 1:1 (1.0)
+  let cellWidth, cellHeight;
+
+  if (avgRatio > 1.15) {
+    // Wide inputs → use landscape cells (4:3)
+    cellWidth = 320;  // 4:3 ratio at reasonable size
+    cellHeight = 240;
+  } else if (avgRatio < 0.85) {
+    // Tall inputs → use portrait cells (3:4)
+    cellWidth = 240;
+    cellHeight = 320;
+  } else {
+    // Square-ish inputs → use square cells
+    cellWidth = CELL_SIZE;
+    cellHeight = CELL_SIZE;
+  }
+
+  return { cellWidth, cellHeight, avgRatio };
+}
+
+/**
  * Create a labeled grid image from cell buffers
  * Generic function that can be used for both repair grids and entity consistency grids
+ *
+ * Smart cell sizing: analyzes input aspect ratios and chooses wide/tall/square cells
+ * Uses 'contain' mode with padding (not 'cover' which crops)
  *
  * @param {Object[]} cells - Array of {buffer, letter, pageInfo?, metadata?}
  * @param {Object} options - Grid options
  * @param {string} options.title - Grid title
- * @param {number} options.cellSize - Cell size in pixels (default 256)
+ * @param {number} options.cellSize - Cell size in pixels (default: auto-detected)
+ * @param {number} options.cellWidth - Explicit cell width (overrides cellSize)
+ * @param {number} options.cellHeight - Explicit cell height (overrides cellSize)
  * @param {number} options.maxCols - Maximum columns (default 4)
  * @param {number} options.maxRows - Maximum rows (default 3)
  * @param {boolean} options.showPageInfo - Show page number below letter (default false)
+ * @param {string} options.padColor - Padding color 'white' or 'black' (default 'white')
+ * @param {boolean} options.autoSize - Auto-detect cell dimensions from inputs (default true)
  * @returns {Promise<{buffer: Buffer, manifest: Object, cellMap: Object}>}
  */
 async function createLabeledGrid(cells, options = {}) {
   const {
     title = 'Grid',
-    cellSize = CELL_SIZE,
+    cellSize = null,  // Will be auto-detected if not specified
+    cellWidth: explicitCellWidth = null,
+    cellHeight: explicitCellHeight = null,
     maxCols = MAX_COLS,
     maxRows = MAX_ROWS,
     showPageInfo = false,
     padding = PADDING,
     labelHeight = LABEL_HEIGHT,
-    titleHeight = TITLE_HEIGHT
+    titleHeight = TITLE_HEIGHT,
+    padColor = 'white',
+    autoSize = true
   } = options;
 
   const maxPerGrid = maxCols * maxRows;
@@ -717,16 +787,48 @@ async function createLabeledGrid(cells, options = {}) {
     throw new Error('No cells to create grid');
   }
 
+  // Determine cell dimensions
+  let cellWidth, cellHeight, avgRatio;
+
+  if (explicitCellWidth && explicitCellHeight) {
+    // Use explicit dimensions
+    cellWidth = explicitCellWidth;
+    cellHeight = explicitCellHeight;
+    avgRatio = cellWidth / cellHeight;
+  } else if (cellSize) {
+    // Legacy: use square cells
+    cellWidth = cellSize;
+    cellHeight = cellSize;
+    avgRatio = 1.0;
+  } else if (autoSize) {
+    // Auto-detect from input aspect ratios
+    const dims = await analyzeCellDimensions(cells);
+    cellWidth = dims.cellWidth;
+    cellHeight = dims.cellHeight;
+    avgRatio = dims.avgRatio;
+    console.log(`  [GRID] Auto-sized cells: ${cellWidth}x${cellHeight} (avg ratio: ${avgRatio.toFixed(2)})`);
+  } else {
+    // Default to square
+    cellWidth = CELL_SIZE;
+    cellHeight = CELL_SIZE;
+    avgRatio = 1.0;
+  }
+
   // Limit to max cells
   const count = Math.min(cells.length, maxPerGrid);
   const cols = Math.min(count, maxCols);
   const rows = Math.ceil(count / cols);
 
-  const gridWidth = cols * cellSize + padding * (cols + 1);
-  const gridHeight = titleHeight + rows * (cellSize + labelHeight) + padding * (rows + 1);
+  const gridWidth = cols * cellWidth + padding * (cols + 1);
+  const gridHeight = titleHeight + rows * (cellHeight + labelHeight) + padding * (rows + 1);
 
   const composites = [];
   const cellMap = {};
+
+  // Background color for padding
+  const bgColor = padColor === 'black'
+    ? { r: 0, g: 0, b: 0, alpha: 1 }
+    : { r: 255, g: 255, b: 255, alpha: 1 };
 
   // Add title
   const titleSvg = Buffer.from(`
@@ -750,21 +852,27 @@ async function createLabeledGrid(cells, options = {}) {
     const col = i % cols;
     const row = Math.floor(i / cols);
 
-    const x = padding + col * (cellSize + padding);
-    const y = titleHeight + padding + row * (cellSize + labelHeight + padding);
+    const x = padding + col * (cellWidth + padding);
+    const y = titleHeight + padding + row * (cellHeight + labelHeight + padding);
 
     try {
-      // Resize cell image to fit
+      // Resize cell image to fit with padding (contain), not cropping (cover)
       let cellBuffer;
       if (Buffer.isBuffer(cell.buffer)) {
         cellBuffer = await sharp(cell.buffer)
-          .resize(cellSize, cellSize, { fit: 'cover' })
+          .resize(cellWidth, cellHeight, {
+            fit: 'contain',
+            background: bgColor
+          })
           .toBuffer();
       } else if (typeof cell.buffer === 'string') {
         // Handle base64 data URI
         const base64Data = cell.buffer.replace(/^data:image\/\w+;base64,/, '');
         cellBuffer = await sharp(Buffer.from(base64Data, 'base64'))
-          .resize(cellSize, cellSize, { fit: 'cover' })
+          .resize(cellWidth, cellHeight, {
+            fit: 'contain',
+            background: bgColor
+          })
           .toBuffer();
       } else {
         console.error(`  Invalid cell buffer type for cell ${i}`);
@@ -780,20 +888,20 @@ async function createLabeledGrid(cells, options = {}) {
       // Add letter label with optional page info
       const letter = cell.letter || String.fromCharCode(65 + i);
       const pageInfo = showPageInfo ? cell.pageInfo : null;
-      const labelSvg = createCellLabel(letter, cellSize, labelHeight, pageInfo);
+      const labelSvg = createCellLabel(letter, cellWidth, labelHeight, pageInfo);
 
       composites.push({
         input: labelSvg,
         left: x,
-        top: y + cellSize
+        top: y + cellHeight
       });
 
       // Record cell position
       cellMap[letter] = {
         x,
         y,
-        width: cellSize,
-        height: cellSize,
+        width: cellWidth,
+        height: cellHeight,
         metadata: cell.metadata || {}
       };
     } catch (err) {
@@ -807,7 +915,7 @@ async function createLabeledGrid(cells, options = {}) {
       width: gridWidth,
       height: gridHeight,
       channels: 4,
-      background: { r: 255, g: 255, b: 255, alpha: 1 }
+      background: bgColor
     }
   })
     .composite(composites)
@@ -819,10 +927,13 @@ async function createLabeledGrid(cells, options = {}) {
     createdAt: new Date().toISOString(),
     title,
     dimensions: { width: gridWidth, height: gridHeight },
-    cellSize,
+    cellWidth,
+    cellHeight,
+    avgInputRatio: avgRatio,
     cols,
     rows,
     cellCount: count,
+    padColor,
     cells: cells.slice(0, count).map((cell, i) => ({
       letter: cell.letter || String.fromCharCode(65 + i),
       pageNumber: cell.metadata?.pageNumber,
@@ -848,9 +959,10 @@ module.exports = {
   // Grid creation
   createIssueGrid,
   batchIssuesForGrids,
-  createLabeledGrid,  // Generic grid creation for reuse
-  createCellLabel,    // Cell label creation for reuse
-  escapeXml,          // XML escaping for SVG
+  createLabeledGrid,      // Generic grid creation for reuse
+  analyzeCellDimensions,  // Analyze input aspect ratios for smart sizing
+  createCellLabel,        // Cell label creation for reuse
+  escapeXml,              // XML escaping for SVG
 
   // Gemini aspect ratio helpers
   GEMINI_RATIOS,
