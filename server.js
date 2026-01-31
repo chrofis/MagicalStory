@@ -4052,9 +4052,12 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from separate table (required for entity appearance collection)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Find the character
     const character = storyData.characters?.find(c => c.name === entityName);
