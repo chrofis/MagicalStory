@@ -1155,13 +1155,16 @@ async function getRetryHistoryImages(storyId, pageNumber) {
 
   if (rows.length === 0) return [];
 
-  // Reconstruct retryHistory structure
-  const retryMap = new Map();
+  // Reconstruct retryHistory structure preserving original indices
+  // Important: retry_index must be preserved because the UI looks up images by index
+  // e.g., if entries exist at indices 0 and 2 (but not 1), we need result[2] to work
+  const result = [];
   for (const row of rows) {
-    if (!retryMap.has(row.retry_index)) {
-      retryMap.set(row.retry_index, { grids: [] });
+    const idx = row.retry_index;
+    if (!result[idx]) {
+      result[idx] = { grids: [] };
     }
-    const entry = retryMap.get(row.retry_index);
+    const entry = result[idx];
 
     switch (row.image_type) {
       case 'attempt': entry.imageData = row.image_data; break;
@@ -1183,7 +1186,7 @@ async function getRetryHistoryImages(storyId, pageNumber) {
     }
   }
 
-  return Array.from(retryMap.values());
+  return result;
 }
 
 module.exports = {
