@@ -2458,7 +2458,7 @@ export function StoryDisplay({
                                           <span className="text-[10px] font-medium text-gray-500">Difference</span>
                                           <div className="bg-gray-900 rounded p-1">
                                             <img
-                                              src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff}
+                                              src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ?? undefined}
                                               alt="Difference"
                                               className="w-full h-auto rounded"
                                             />
