@@ -2325,6 +2325,55 @@ export function StoryDisplay({
                                   </p>
                                 </div>
                               )}
+
+                              {/* Repair Grids - Show before/after/diff if repair was done */}
+                              {finalChecksReport.entityRepairs?.[grid.entityName] && (
+                                <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-green-600">✓ Repaired</span>
+                                    <span className="text-[10px] text-gray-400">
+                                      {finalChecksReport.entityRepairs[grid.entityName].cellsRepaired} pages updated
+                                    </span>
+                                  </div>
+                                  <div className={`grid gap-3 ${finalChecksReport.entityRepairs[grid.entityName].gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                    {/* Before */}
+                                    <div className="space-y-1">
+                                      <span className="text-[10px] font-medium text-gray-500">Before Repair</span>
+                                      <div className="bg-gray-50 rounded p-1">
+                                        <img
+                                          src={finalChecksReport.entityRepairs[grid.entityName].gridBeforeRepair}
+                                          alt="Before repair"
+                                          className="w-full h-auto rounded"
+                                        />
+                                      </div>
+                                    </div>
+                                    {/* After */}
+                                    <div className="space-y-1">
+                                      <span className="text-[10px] font-medium text-gray-500">After Repair</span>
+                                      <div className="bg-gray-50 rounded p-1">
+                                        <img
+                                          src={finalChecksReport.entityRepairs[grid.entityName].gridAfterRepair}
+                                          alt="After repair"
+                                          className="w-full h-auto rounded"
+                                        />
+                                      </div>
+                                    </div>
+                                    {/* Diff */}
+                                    {finalChecksReport.entityRepairs[grid.entityName].gridDiff && (
+                                      <div className="space-y-1">
+                                        <span className="text-[10px] font-medium text-gray-500">Difference</span>
+                                        <div className="bg-gray-900 rounded p-1">
+                                          <img
+                                            src={finalChecksReport.entityRepairs[grid.entityName].gridDiff}
+                                            alt="Difference"
+                                            className="w-full h-auto rounded"
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </details>
                         );

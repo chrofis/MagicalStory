@@ -4126,6 +4126,7 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       cellsRepaired: repairResult.cellsRepaired,
       gridBeforeRepair: repairResult.gridBeforeRepair,
       gridAfterRepair: repairResult.gridAfterRepair,
+      gridDiff: repairResult.gridDiff,
       usage: repairResult.usage
     };
 

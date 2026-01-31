@@ -1022,6 +1022,37 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
       }
     }
 
+    // Generate diff image (absolute difference between before and after)
+    let gridDiff = null;
+    try {
+      // Get metadata for both images
+      const beforeMeta = await sharp(gridResult.buffer).metadata();
+      const afterMeta = await sharp(repairedGridBuffer).metadata();
+
+      // Resize after to match before if needed (Gemini may change size)
+      let afterResized = repairedGridBuffer;
+      if (beforeMeta.width !== afterMeta.width || beforeMeta.height !== afterMeta.height) {
+        afterResized = await sharp(repairedGridBuffer)
+          .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
+          .toBuffer();
+      }
+
+      // Create difference image
+      const diffBuffer = await sharp(gridResult.buffer)
+        .composite([{
+          input: afterResized,
+          blend: 'difference'
+        }])
+        .modulate({ brightness: 3 })  // Amplify differences to make them visible
+        .jpeg({ quality: 90 })
+        .toBuffer();
+
+      gridDiff = `data:image/jpeg;base64,${diffBuffer.toString('base64')}`;
+      log.info(`🔧 [ENTITY-REPAIR] Generated diff image (${beforeMeta.width}x${beforeMeta.height})`);
+    } catch (diffErr) {
+      log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate diff: ${diffErr.message}`);
+    }
+
     // Build result
     const repairResult = {
       success: true,
@@ -1032,6 +1063,7 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
       updatedImages,
       gridBeforeRepair: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
       gridAfterRepair: `data:image/jpeg;base64,${repairedGridBuffer.toString('base64')}`,
+      gridDiff,
       usage: response.usageMetadata
     };
 

@@ -443,6 +443,20 @@ export interface FinalChecksReport {
   entity?: EntityConsistencyReport;
   // Legacy full-image consistency report
   legacy?: LegacyConsistencyReport;
+  // Entity repair results (from "Repair Consistency" button)
+  entityRepairs?: Record<string, {
+    timestamp: string;
+    originalScore: number;
+    cellsRepaired: number;
+    gridBeforeRepair: string;
+    gridAfterRepair: string;
+    gridDiff?: string | null;
+    usage?: {
+      promptTokenCount?: number;
+      candidatesTokenCount?: number;
+      totalTokenCount?: number;
+    };
+  }>;
   // Token usage for all consistency checks
   tokenUsage?: {
     inputTokens: number;
