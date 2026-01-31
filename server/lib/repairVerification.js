@@ -474,9 +474,25 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
     }
 
     try {
+      // Check actual dimensions of repair buffer vs target
+      const repairMeta = await sharp(repair.buffer).metadata();
+      const targetAspect = width / height;
+      const repairAspect = repairMeta.width / repairMeta.height;
+      const aspectDiff = Math.abs(targetAspect - repairAspect) / targetAspect;
+
+      // Log dimension info for debugging
+      console.log(`  [REPAIR] Applying fix: target=${width}x${height} (aspect=${targetAspect.toFixed(2)}), repair=${repairMeta.width}x${repairMeta.height} (aspect=${repairAspect.toFixed(2)}), diff=${(aspectDiff * 100).toFixed(1)}%`);
+
+      // Warn if aspect ratio differs significantly (>20% difference)
+      if (aspectDiff > 0.2) {
+        console.warn(`  ⚠️ [REPAIR] Aspect ratio mismatch: ${(aspectDiff * 100).toFixed(1)}% difference - using cover mode to avoid distortion`);
+      }
+
       // Resize repaired region to match the original extraction size
+      // Use 'cover' instead of 'fill' to avoid stretching/distortion when aspect ratios differ
+      // (grid cells are square but original regions may not be)
       const resizedRepair = await sharp(repair.buffer)
-        .resize(width, height, { fit: 'fill' })
+        .resize(width, height, { fit: 'cover', position: 'center' })
         .toBuffer();
 
       composites.push({
