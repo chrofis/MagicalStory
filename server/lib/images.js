@@ -8,6 +8,7 @@ const path = require('path');
 const os = require('os');
 const sharp = require('sharp');
 const crypto = require('crypto');
+const pLimit = require('p-limit');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
@@ -2217,6 +2218,892 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   log.error('❌ [IMAGE GEN] No image data found in any part');
   log.error(`❌ [IMAGE GEN] Failed prompt (first 1000 chars): "${prompt.substring(0, 1000)}..."`);
   throw new Error('No image data in response - check logs for API response structure');
+}
+
+/**
+ * Generate image without quality evaluation
+ * Used by the separated evaluation pipeline to generate all images first, then evaluate in batch
+ * This is a streamlined version of callGeminiAPIForImage that skips evaluation
+ *
+ * @param {string} prompt - The image generation prompt
+ * @param {Array} characterPhotos - Array of character photos (URLs or {name, photoUrl} objects)
+ * @param {Object} options - Generation options
+ * @param {string|null} options.previousImage - Previous image for sequential mode
+ * @param {string|null} options.imageModelOverride - Model override for image generation
+ * @param {string|null} options.imageBackendOverride - Backend override ('gemini' or 'runware')
+ * @param {Array} options.landmarkPhotos - Landmark reference photos
+ * @param {Buffer|null} options.visualBibleGrid - Visual Bible grid buffer
+ * @param {number|null} options.pageNumber - Page number for cache key
+ * @param {Function|null} options.onImageReady - Callback for progressive display
+ * @returns {Promise<{imageData: string, modelId: string, usage: Object}>}
+ */
+async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
+  const {
+    previousImage = null,
+    imageModelOverride = null,
+    imageBackendOverride = null,
+    landmarkPhotos = [],
+    visualBibleGrid = null,
+    pageNumber = null,
+    onImageReady = null
+  } = options;
+
+  // Check cache first (include previousImage presence and page number in cache key)
+  const cacheKey = generateImageCacheKey(prompt, characterPhotos, previousImage ? 'seq' : null, pageNumber);
+
+  // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
+  const genOnlyCacheKey = `genonly_${cacheKey}`;
+
+  if (imageCache.has(genOnlyCacheKey)) {
+    log.debug(`💾 [IMAGE GEN-ONLY] Cache HIT (${imageCache.size} cached)`);
+    const cachedResult = imageCache.get(genOnlyCacheKey);
+    if (onImageReady && cachedResult.imageData) {
+      try {
+        await onImageReady(cachedResult.imageData, cachedResult.modelId);
+      } catch (callbackError) {
+        log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+      }
+    }
+    return cachedResult;
+  }
+
+  log.debug(`🆕 [IMAGE GEN-ONLY] Cache MISS - key: ${genOnlyCacheKey.substring(0, 24)}...`);
+
+  // Check if we should use Runware backend
+  const imageBackend = imageBackendOverride || CONFIG_DEFAULTS?.imageBackend || 'gemini';
+  log.info(`🎨 [IMAGE GEN-ONLY] Backend: ${imageBackend}`);
+
+  if (imageBackend === 'runware' && isRunwareConfigured()) {
+    log.info(`🎨 [IMAGE GEN-ONLY] Using Runware FLUX Schnell backend`);
+
+    try {
+      const referenceImages = [];
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            referenceImages.push(photoUrl);
+          }
+        }
+      }
+
+      const result = await generateWithRunware(prompt, {
+        model: RUNWARE_MODELS.FLUX_SCHNELL,
+        width: 1024,
+        height: 1024,
+        steps: 4,
+        referenceImages: referenceImages
+      });
+
+      if (onImageReady && result.imageData) {
+        try {
+          await onImageReady(result.imageData, result.modelId);
+        } catch (callbackError) {
+          log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+        }
+      }
+
+      const finalResult = {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        usage: result.usage
+      };
+
+      imageCache.set(genOnlyCacheKey, finalResult);
+      return finalResult;
+    } catch (runwareError) {
+      log.error(`❌ [IMAGE GEN-ONLY] Runware failed, falling back to Gemini: ${runwareError.message}`);
+    }
+  }
+
+  // Gemini path
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  // Determine if we have a previous scene image (for sequential mode)
+  const hasSequentialImage = previousImage && previousImage.startsWith('data:image');
+
+  // Build parts array: PROMPT FIRST, then images in order
+  const parts = [{ text: prompt }];
+  let currentImageIndex = 1;
+
+  // For sequential mode: Add PREVIOUS scene image FIRST
+  if (hasSequentialImage) {
+    const croppedImage = await cropImageForSequential(previousImage);
+    const base64Data = croppedImage.replace(/^data:image\/\w+;base64,/, '');
+    const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
+      croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
+
+    parts.push({ text: `[Image ${currentImageIndex} - Previous scene]:` });
+    parts.push({
+      inline_data: {
+        mime_type: mimeType,
+        data: base64Data
+      }
+    });
+    currentImageIndex++;
+    log.debug(`🖼️  [IMAGE GEN-ONLY] Added cropped previous scene image (SEQUENTIAL MODE)`);
+  }
+
+  // Add character photos as reference images
+  if (characterPhotos && characterPhotos.length > 0) {
+    let addedCount = 0;
+    let cacheHits = 0;
+    const characterNames = [];
+
+    for (const photoData of characterPhotos) {
+      let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+      if (photoUrl && typeof photoUrl === 'object') {
+        if (Array.isArray(photoUrl)) {
+          photoUrl = photoUrl[0];
+        } else if (photoUrl.data) {
+          photoUrl = photoUrl.data;
+        } else if (photoUrl.imageData) {
+          photoUrl = photoUrl.imageData;
+        }
+      }
+      const characterName = typeof photoData === 'object' ? photoData?.name : null;
+
+      if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
+        const imageHash = hashImageData(photoUrl);
+        let compressedBase64 = compressedRefCache.get(imageHash);
+
+        if (compressedBase64) {
+          cacheHits++;
+        } else {
+          const compressed = await compressImageToJPEG(photoUrl, 85, 768);
+          compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
+          compressedRefCache.set(imageHash, compressedBase64);
+        }
+
+        const labelName = characterName || `Character ${addedCount + 1}`;
+        parts.push({ text: `[Image ${currentImageIndex} - ${labelName}]:` });
+        if (characterName) {
+          characterNames.push(characterName);
+        }
+
+        parts.push({
+          inline_data: {
+            mime_type: 'image/jpeg',
+            data: compressedBase64
+          }
+        });
+        currentImageIndex++;
+        addedCount++;
+      }
+    }
+
+    if (characterNames.length > 0) {
+      log.debug(`🖼️  [IMAGE GEN-ONLY] Added ${addedCount} LABELED reference images: ${characterNames.join(', ')} (${cacheHits} cached)`);
+    }
+  }
+
+  // Add PRIMARY landmark reference photo only
+  if (landmarkPhotos && landmarkPhotos.length > 0) {
+    const primaryLandmark = landmarkPhotos[0];
+    if (primaryLandmark.photoData && primaryLandmark.photoData.startsWith('data:image')) {
+      const base64Data = primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '');
+      const mimeType = primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) ?
+        primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+      parts.push({ text: `[Image ${currentImageIndex} - ${primaryLandmark.name} (landmark)]:` });
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      });
+      currentImageIndex++;
+      log.info(`🌍 [IMAGE GEN-ONLY] Added primary landmark reference: ${primaryLandmark.name}`);
+    }
+  }
+
+  // Add Visual Bible reference grid
+  if (visualBibleGrid) {
+    parts.push({ text: `[Image ${currentImageIndex} - Reference Grid (objects, secondary characters, locations)]:` });
+    parts.push({
+      inline_data: {
+        mime_type: 'image/jpeg',
+        data: visualBibleGrid.toString('base64')
+      }
+    });
+    currentImageIndex++;
+    log.info(`🔲 [IMAGE GEN-ONLY] Added Visual Bible reference grid`);
+  }
+
+  // Use model override if provided
+  const defaultModel = MODEL_DEFAULTS.pageImage;
+  const modelId = imageModelOverride || defaultModel;
+
+  // Check if the selected model is a Runware model
+  const modelConfig = IMAGE_MODELS[modelId];
+
+  // Truncate prompt if needed
+  const maxPromptLength = modelConfig?.maxPromptLength || 30000;
+  let effectivePrompt = prompt;
+  if (prompt.length > maxPromptLength) {
+    log.warn(`✂️ [IMAGE GEN-ONLY] Prompt too long (${prompt.length} chars), truncating to ${maxPromptLength}`);
+    effectivePrompt = prompt.substring(0, maxPromptLength - 3) + '...';
+    parts[0] = { text: effectivePrompt };
+  }
+
+  if (modelConfig?.backend === 'runware' && isRunwareConfigured()) {
+    log.info(`🎨 [IMAGE GEN-ONLY] Model ${modelId} uses Runware backend`);
+
+    try {
+      const runwareModel = modelId === 'flux-dev' ? RUNWARE_MODELS.FLUX_DEV : RUNWARE_MODELS.FLUX_SCHNELL;
+      const referenceImages = [];
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            referenceImages.push(photoUrl);
+          }
+        }
+      }
+
+      const result = await generateWithRunware(effectivePrompt, {
+        model: runwareModel,
+        width: 1024,
+        height: 1024,
+        steps: modelId === 'flux-dev' ? 30 : 4,
+        referenceImages: referenceImages
+      });
+
+      if (onImageReady && result.imageData) {
+        try {
+          await onImageReady(result.imageData, result.modelId);
+        } catch (callbackError) {
+          log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+        }
+      }
+
+      const finalResult = {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        usage: result.usage
+      };
+
+      imageCache.set(genOnlyCacheKey, finalResult);
+      return finalResult;
+    } catch (runwareError) {
+      log.error('❌ [IMAGE GEN-ONLY] Runware generation failed:', runwareError.message);
+      throw runwareError;
+    }
+  }
+
+  // Gemini API call
+  const requestBody = {
+    contents: [{
+      parts: parts
+    }],
+    generationConfig: {
+      responseModalities: ["TEXT", "IMAGE"],
+      temperature: 0.8,
+      imageConfig: {
+        aspectRatio: "1:1"
+      }
+    }
+  };
+
+  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars)`);
+
+  const data = await withRetry(async () => {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error('❌ [IMAGE GEN-ONLY] Gemini API error response:', error);
+      const err = new Error(`Gemini API error (${response.status}): ${error}`);
+      err.status = response.status;
+      throw err;
+    }
+
+    return response.json();
+  }, { maxRetries: 2, baseDelay: 2000 });
+
+  // Extract token usage
+  const usage = {
+    input_tokens: data.usageMetadata?.promptTokenCount || 0,
+    output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+    thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
+  };
+
+  if (!data.candidates || data.candidates.length === 0) {
+    log.error('❌ [IMAGE GEN-ONLY] No candidates in response');
+    throw new Error('No image generated - no candidates in response');
+  }
+
+  // Extract image data
+  const candidate = data.candidates[0];
+
+  if (candidate.content && candidate.content.parts) {
+    for (const part of candidate.content.parts) {
+      const inlineData = part.inlineData || part.inline_data;
+      if (inlineData && inlineData.data) {
+        const pngImageData = `data:image/png;base64,${inlineData.data}`;
+
+        // Compress PNG to JPEG
+        const compressedImageData = await compressImageToJPEG(pngImageData);
+
+        // Call onImageReady callback immediately
+        if (onImageReady) {
+          try {
+            await onImageReady(compressedImageData, modelId);
+          } catch (callbackError) {
+            log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+          }
+        }
+
+        const result = {
+          imageData: compressedImageData,
+          modelId,
+          usage
+        };
+
+        imageCache.set(genOnlyCacheKey, result);
+        log.info(`✅ [IMAGE GEN-ONLY] Image generated successfully`);
+        return result;
+      }
+    }
+  } else {
+    const reason = candidate.finishReason || 'unknown';
+    const message = candidate.finishMessage || 'no message';
+    log.error(`❌ [IMAGE GEN-ONLY] Image blocked: reason=${reason}`);
+    throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
+  }
+
+  log.error('❌ [IMAGE GEN-ONLY] No image data found in response');
+  throw new Error('No image data in response');
+}
+
+// =============================================================================
+// SEPARATED EVALUATION PIPELINE FUNCTIONS
+// These functions support the new architecture:
+// 1. Generate ALL images first (generateImageOnly or generateAllImages)
+// 2. Evaluate ALL images in parallel (evaluateImageBatch)
+// 3. Build a repair plan based on all results (buildRepairPlan)
+// 4. Execute repairs/regenerations (executeRepairPlan)
+// =============================================================================
+
+/**
+ * Evaluate multiple images in parallel for quality and issues
+ * This is used by the separated evaluation pipeline to evaluate all generated images at once
+ *
+ * @param {Array<Object>} images - Array of image objects
+ * @param {string} images[].imageData - Base64 image data
+ * @param {number} images[].pageNumber - Page number
+ * @param {string} images[].prompt - The prompt used to generate the image
+ * @param {Array} images[].characterPhotos - Character reference photos
+ * @param {string} images[].sceneDescription - Scene description for metadata extraction
+ * @param {Object} options - Evaluation options
+ * @param {number} options.concurrency - Max concurrent evaluations (default: 10)
+ * @param {string|null} options.qualityModelOverride - Model override for quality evaluation
+ * @returns {Promise<Array<Object>>} Array of evaluation results per page
+ */
+async function evaluateImageBatch(images, options = {}) {
+  const {
+    concurrency = 10,
+    qualityModelOverride = null
+  } = options;
+
+  if (!images || images.length === 0) {
+    return [];
+  }
+
+  log.info(`🔍 [BATCH EVAL] Evaluating ${images.length} images (concurrency: ${concurrency})...`);
+  const startTime = Date.now();
+
+  const evalLimit = pLimit(concurrency);
+
+  const results = await Promise.all(images.map(img => evalLimit(async () => {
+    const pageLabel = `PAGE ${img.pageNumber}`;
+    try {
+      // Skip if no image data
+      if (!img.imageData) {
+        log.warn(`⚠️  [BATCH EVAL] ${pageLabel}: No image data, skipping evaluation`);
+        return {
+          pageNumber: img.pageNumber,
+          evaluated: false,
+          error: 'No image data'
+        };
+      }
+
+      // Run quality evaluation
+      const qualityResult = await evaluateImageQuality(
+        img.imageData,
+        img.prompt || '',
+        img.characterPhotos || [],
+        'scene',
+        qualityModelOverride,
+        pageLabel
+      );
+
+      // Extract scene metadata for character positions and clothing
+      const sceneMetadata = img.sceneDescription
+        ? getStoryHelpers().extractSceneMetadata(img.sceneDescription)
+        : null;
+      const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
+      const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
+      const expectedObjects = sceneMetadata?.objects || [];
+
+      // Parse character descriptions from prompt
+      const characterDescriptions = img.prompt
+        ? getStoryHelpers().parseCharacterDescriptions(img.prompt)
+        : {};
+
+      // Parse Visual Bible objects from prompt
+      const vbObjects = parseVisualBibleObjects(img.prompt || '');
+      const allExpectedObjects = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
+
+      // Run bounding box detection for all figures/objects
+      const fixableIssues = qualityResult?.fixableIssues || [];
+      const qualityMatches = qualityResult?.matches || [];
+      const objectMatches = qualityResult?.object_matches || [];
+
+      let bboxDetection = null;
+      let enrichedFixTargets = [];
+
+      if (qualityResult) {
+        const enrichResult = await enrichWithBoundingBoxes(
+          img.imageData,
+          fixableIssues,
+          qualityMatches,
+          objectMatches,
+          expectedCharacterPositions,
+          allExpectedObjects,
+          characterDescriptions,
+          expectedCharacterClothing
+        );
+        bboxDetection = enrichResult.detectionHistory;
+        enrichedFixTargets = enrichResult.targets || [];
+      }
+
+      // Create bbox overlay image for dev mode display
+      let bboxOverlayImage = null;
+      if (bboxDetection) {
+        bboxOverlayImage = await createBboxOverlayImage(img.imageData, bboxDetection);
+      }
+
+      const evalResult = {
+        pageNumber: img.pageNumber,
+        evaluated: true,
+        qualityScore: qualityResult?.score ?? null,
+        reasoning: qualityResult?.reasoning || null,
+        fixableIssues: qualityResult?.fixableIssues || [],
+        fixTargets: qualityResult?.fixTargets || [],
+        enrichedFixTargets,
+        figures: qualityResult?.figures || [],
+        matches: qualityResult?.matches || [],
+        objectMatches: qualityResult?.object_matches || [],
+        bboxDetection,
+        bboxOverlayImage,
+        usage: qualityResult?.usage || null,
+        modelId: qualityResult?.modelId || null,
+        // Text error info for covers
+        textIssue: qualityResult?.textIssue || null,
+        expectedText: qualityResult?.expectedText || null,
+        actualText: qualityResult?.actualText || null
+      };
+
+      log.debug(`✅ [BATCH EVAL] ${pageLabel}: Score ${evalResult.qualityScore ?? 'N/A'}%, ${enrichedFixTargets.length} fix targets`);
+      return evalResult;
+    } catch (error) {
+      log.error(`❌ [BATCH EVAL] ${pageLabel}: Evaluation failed - ${error.message}`);
+      return {
+        pageNumber: img.pageNumber,
+        evaluated: false,
+        error: error.message
+      };
+    }
+  })));
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  const successCount = results.filter(r => r.evaluated).length;
+  log.info(`✅ [BATCH EVAL] Completed ${successCount}/${images.length} evaluations in ${elapsed}s`);
+
+  return results;
+}
+
+/**
+ * Build a repair plan based on evaluation results
+ * Analyzes all page evaluations and consistency reports to decide which pages need:
+ * - Regeneration (score too low or generation failed)
+ * - Repair (fixable issues detected)
+ * - Keeping (score good enough)
+ *
+ * @param {Array<Object>} pageEvaluations - Evaluation results from evaluateImageBatch
+ * @param {Object} options - Plan options
+ * @param {Object|null} options.consistencyReport - Results from runFinalConsistencyChecks
+ * @param {Object|null} options.entityReport - Results from runEntityConsistencyChecks
+ * @param {number} options.regenerateThreshold - Score below which to regenerate (default: 30)
+ * @param {number} options.repairThreshold - Score below which to repair if fixable (default: 70)
+ * @param {number} options.keepThreshold - Score at or above which to keep (default: 50)
+ * @returns {Object} Repair plan with pagesToRegenerate, pagesToRepair, pagesToKeep
+ */
+function buildRepairPlan(pageEvaluations, options = {}) {
+  const {
+    consistencyReport = null,
+    entityReport = null,
+    regenerateThreshold = 30,
+    repairThreshold = 70,
+    keepThreshold = 50
+  } = options;
+
+  const plan = {
+    pagesToRegenerate: [],
+    pagesToRepair: [],
+    pagesToKeep: [],
+    reasoning: {},
+    stats: {
+      totalPages: pageEvaluations.length,
+      evaluated: 0,
+      avgScore: 0
+    }
+  };
+
+  // Build a map of consistency issues by page
+  const consistencyIssuesByPage = new Map();
+  if (consistencyReport?.issues) {
+    for (const issue of consistencyReport.issues) {
+      if (issue.pageNumber) {
+        if (!consistencyIssuesByPage.has(issue.pageNumber)) {
+          consistencyIssuesByPage.set(issue.pageNumber, []);
+        }
+        consistencyIssuesByPage.get(issue.pageNumber).push(issue);
+      }
+    }
+  }
+
+  // Build a map of entity issues by page
+  const entityIssuesByPage = new Map();
+  if (entityReport?.issues) {
+    for (const issue of entityReport.issues) {
+      if (issue.pageNumber) {
+        if (!entityIssuesByPage.has(issue.pageNumber)) {
+          entityIssuesByPage.set(issue.pageNumber, []);
+        }
+        entityIssuesByPage.get(issue.pageNumber).push(issue);
+      }
+    }
+  }
+
+  let totalScore = 0;
+  let scoredCount = 0;
+
+  for (const evaluation of pageEvaluations) {
+    const pageNum = evaluation.pageNumber;
+    const score = evaluation.qualityScore;
+    const hasFixable = (evaluation.enrichedFixTargets?.length > 0) ||
+                       (evaluation.fixableIssues?.length > 0);
+    const evaluationFailed = !evaluation.evaluated;
+    const consistencyIssues = consistencyIssuesByPage.get(pageNum) || [];
+    const entityIssues = entityIssuesByPage.get(pageNum) || [];
+
+    // Track stats
+    if (score !== null && score !== undefined) {
+      totalScore += score;
+      scoredCount++;
+      plan.stats.evaluated++;
+    }
+
+    // Decision logic
+    if (evaluationFailed || score === null) {
+      // Evaluation failed - keep the image as-is (it was generated, just couldn't evaluate)
+      plan.pagesToKeep.push(pageNum);
+      plan.reasoning[pageNum] = `Evaluation failed: ${evaluation.error || 'unknown error'}`;
+    } else if (score < regenerateThreshold) {
+      // Score too low - regenerate
+      plan.pagesToRegenerate.push(pageNum);
+      plan.reasoning[pageNum] = `Score ${score}% < ${regenerateThreshold}% threshold`;
+    } else if (score < repairThreshold && hasFixable) {
+      // Below repair threshold with fixable issues
+      plan.pagesToRepair.push(pageNum);
+      const fixCount = (evaluation.enrichedFixTargets?.length || 0) +
+                       consistencyIssues.length + entityIssues.length;
+      plan.reasoning[pageNum] = `Score ${score}% < ${repairThreshold}% with ${fixCount} fixable issues`;
+    } else if (score < keepThreshold) {
+      // Between regenerate and keep threshold, no fixable issues - regenerate
+      plan.pagesToRegenerate.push(pageNum);
+      plan.reasoning[pageNum] = `Score ${score}% < ${keepThreshold}% without fixable issues`;
+    } else {
+      // Score good enough
+      plan.pagesToKeep.push(pageNum);
+      plan.reasoning[pageNum] = `Score ${score}% >= ${keepThreshold}% threshold`;
+    }
+  }
+
+  plan.stats.avgScore = scoredCount > 0 ? Math.round(totalScore / scoredCount) : 0;
+
+  log.info(`📋 [REPAIR PLAN] Built plan: ${plan.pagesToRegenerate.length} regenerate, ${plan.pagesToRepair.length} repair, ${plan.pagesToKeep.length} keep (avg score: ${plan.stats.avgScore}%)`);
+
+  return plan;
+}
+
+/**
+ * Execute a repair plan - regenerate or repair pages as specified
+ *
+ * @param {Object} plan - Repair plan from buildRepairPlan
+ * @param {Map<number, Object>} pageData - Map of page number to page data (imageData, prompt, etc.)
+ * @param {Map<number, Object>} evaluations - Map of page number to evaluation results
+ * @param {Object} context - Generation context
+ * @param {Object} context.modelOverrides - Model overrides for generation
+ * @param {Function} context.usageTracker - Usage tracking callback
+ * @param {Object} context.visualBible - Visual Bible data
+ * @param {boolean} context.isAdmin - Whether user is admin (for debug output)
+ * @param {Object} options - Execution options
+ * @param {boolean} options.repairFirst - Run repairs before regenerations (default: true)
+ * @param {boolean} options.useGridRepair - Use grid-based repair (default: true)
+ * @returns {Promise<Object>} Results with updated images and repair history
+ */
+async function executeRepairPlan(plan, pageData, evaluations, context, options = {}) {
+  const {
+    repairFirst = true,
+    useGridRepair = true
+  } = options;
+
+  const {
+    modelOverrides = {},
+    usageTracker = null,
+    visualBible = null,
+    isAdmin = false
+  } = context;
+
+  const results = {
+    repaired: new Map(),
+    regenerated: new Map(),
+    failed: new Map(),
+    history: []
+  };
+
+  const startTime = Date.now();
+
+  // Execute repairs first (faster, more likely to succeed)
+  if (repairFirst && plan.pagesToRepair.length > 0) {
+    log.info(`🔧 [REPAIR EXEC] Repairing ${plan.pagesToRepair.length} pages...`);
+
+    for (const pageNum of plan.pagesToRepair) {
+      const page = pageData.get(pageNum);
+      const evaluation = evaluations.get(pageNum);
+
+      if (!page || !page.imageData) {
+        log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: No image data, skipping repair`);
+        results.failed.set(pageNum, { error: 'No image data' });
+        continue;
+      }
+
+      try {
+        let repairResult;
+
+        if (useGridRepair) {
+          const { gridBasedRepair } = getGridBasedRepair();
+
+          const evalResults = {
+            quality: {
+              score: evaluation?.qualityScore,
+              fixTargets: evaluation?.enrichedFixTargets || evaluation?.fixTargets || [],
+              reasoning: evaluation?.reasoning,
+              matches: evaluation?.matches || []
+            },
+            incremental: null,
+            final: null
+          };
+
+          const gridRepairOutputDir = path.join(os.tmpdir(), 'grid-repair', `repair-${Date.now()}`);
+
+          const gridResult = await gridBasedRepair(
+            page.imageData,
+            pageNum,
+            evalResults,
+            {
+              outputDir: gridRepairOutputDir,
+              skipVerification: false,
+              saveIntermediates: isAdmin,
+              bboxDetection: evaluation?.bboxDetection,
+              onProgress: (step, msg) => log.debug(`  [GRID] Page ${pageNum} ${step}: ${msg}`)
+            }
+          );
+
+          if (gridResult.repaired && gridResult.imageData) {
+            repairResult = {
+              imageData: gridResult.imageData,
+              repaired: true,
+              method: 'grid',
+              fixedCount: gridResult.fixedCount,
+              totalIssues: gridResult.totalIssues
+            };
+            results.repaired.set(pageNum, repairResult);
+            log.info(`✅ [REPAIR EXEC] Page ${pageNum}: ${gridResult.fixedCount}/${gridResult.totalIssues} issues fixed`);
+          } else {
+            results.failed.set(pageNum, { error: 'Grid repair failed', result: gridResult });
+            log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Grid repair failed`);
+          }
+        } else {
+          // Legacy inpainting repair
+          const fixTargets = evaluation?.enrichedFixTargets || evaluation?.fixTargets || [];
+          const inpaintResult = await autoRepairWithTargets(
+            page.imageData,
+            fixTargets,
+            0,
+            { includeDebugImages: isAdmin }
+          );
+
+          if (inpaintResult.repaired && inpaintResult.imageData) {
+            repairResult = {
+              imageData: inpaintResult.imageData,
+              repaired: true,
+              method: 'inpaint'
+            };
+            results.repaired.set(pageNum, repairResult);
+            log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Inpaint repair completed`);
+          } else {
+            results.failed.set(pageNum, { error: 'Inpaint repair failed' });
+          }
+        }
+
+        results.history.push({
+          pageNumber: pageNum,
+          action: 'repair',
+          success: results.repaired.has(pageNum),
+          method: useGridRepair ? 'grid' : 'inpaint'
+        });
+      } catch (error) {
+        log.error(`❌ [REPAIR EXEC] Page ${pageNum}: Repair error - ${error.message}`);
+        results.failed.set(pageNum, { error: error.message });
+        results.history.push({
+          pageNumber: pageNum,
+          action: 'repair',
+          success: false,
+          error: error.message
+        });
+      }
+    }
+  }
+
+  // Execute regenerations
+  if (plan.pagesToRegenerate.length > 0) {
+    log.info(`🔄 [REPAIR EXEC] Regenerating ${plan.pagesToRegenerate.length} pages...`);
+
+    for (const pageNum of plan.pagesToRegenerate) {
+      const page = pageData.get(pageNum);
+
+      if (!page || !page.prompt) {
+        log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: No prompt data, skipping regeneration`);
+        results.failed.set(pageNum, { error: 'No prompt data' });
+        continue;
+      }
+
+      try {
+        // Use generateImageOnly to regenerate
+        const genResult = await generateImageOnly(
+          page.prompt,
+          page.characterPhotos || [],
+          {
+            imageModelOverride: modelOverrides?.imageModel,
+            imageBackendOverride: modelOverrides?.imageBackend,
+            landmarkPhotos: page.landmarkPhotos || [],
+            visualBibleGrid: page.visualBibleGrid,
+            pageNumber: pageNum
+          }
+        );
+
+        if (genResult.imageData) {
+          results.regenerated.set(pageNum, {
+            imageData: genResult.imageData,
+            modelId: genResult.modelId,
+            usage: genResult.usage
+          });
+          log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Regenerated successfully`);
+
+          // Track usage
+          if (usageTracker && genResult.usage) {
+            usageTracker(genResult.usage, null, genResult.modelId, null, false);
+          }
+        } else {
+          results.failed.set(pageNum, { error: 'No image data returned' });
+        }
+
+        results.history.push({
+          pageNumber: pageNum,
+          action: 'regenerate',
+          success: results.regenerated.has(pageNum)
+        });
+      } catch (error) {
+        log.error(`❌ [REPAIR EXEC] Page ${pageNum}: Regeneration error - ${error.message}`);
+        results.failed.set(pageNum, { error: error.message });
+        results.history.push({
+          pageNumber: pageNum,
+          action: 'regenerate',
+          success: false,
+          error: error.message
+        });
+      }
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  log.info(`✅ [REPAIR EXEC] Completed in ${elapsed}s: ${results.repaired.size} repaired, ${results.regenerated.size} regenerated, ${results.failed.size} failed`);
+
+  return results;
+}
+
+/**
+ * Merge repair execution results back into the original image array
+ *
+ * @param {Array<Object>} originalImages - Original page images array
+ * @param {Array<Object>} evaluations - Evaluation results from evaluateImageBatch
+ * @param {Object} repairResults - Results from executeRepairPlan
+ * @returns {Array<Object>} Merged array with updated images and evaluation data
+ */
+function mergeRepairResults(originalImages, evaluations, repairResults) {
+  // Build lookup maps
+  const evalMap = new Map();
+  for (const eval of evaluations) {
+    evalMap.set(eval.pageNumber, eval);
+  }
+
+  return originalImages.map(img => {
+    const pageNum = img.pageNumber;
+    const evaluation = evalMap.get(pageNum);
+    const repaired = repairResults.repaired.get(pageNum);
+    const regenerated = repairResults.regenerated.get(pageNum);
+
+    // Start with original image data
+    let mergedImage = { ...img };
+
+    // Apply repair or regeneration if available
+    if (repaired?.imageData) {
+      mergedImage.imageData = repaired.imageData;
+      mergedImage.wasRepaired = true;
+      mergedImage.repairMethod = repaired.method;
+    } else if (regenerated?.imageData) {
+      mergedImage.imageData = regenerated.imageData;
+      mergedImage.wasRegenerated = true;
+      mergedImage.modelId = regenerated.modelId;
+    }
+
+    // Add evaluation data
+    if (evaluation) {
+      mergedImage.qualityScore = evaluation.qualityScore;
+      mergedImage.qualityReasoning = evaluation.reasoning;
+      mergedImage.bboxDetection = evaluation.bboxDetection;
+      mergedImage.bboxOverlayImage = evaluation.bboxOverlayImage;
+      mergedImage.fixableIssues = evaluation.fixableIssues;
+      mergedImage.figures = evaluation.figures;
+      mergedImage.matches = evaluation.matches;
+    }
+
+    return mergedImage;
+  });
 }
 
 /**
@@ -5580,6 +6467,13 @@ module.exports = {
   generateImageWithQualityRetry,
   rewriteBlockedScene,
   buildVisualBibleGrid,
+
+  // Separated evaluation pipeline functions (new architecture)
+  generateImageOnly,
+  evaluateImageBatch,
+  buildRepairPlan,
+  executeRepairPlan,
+  mergeRepairResults,
 
   // Cache management
   clearImageCache,

@@ -51,6 +51,10 @@ interface DeveloperModeState {
   // Scene validation: generate cheap preview, analyze geometry, repair composition issues
   enableSceneValidation: boolean;
   setEnableSceneValidation: (enable: boolean) => void;
+  // Separated evaluation: generate all images first, then batch evaluate and repair
+  // Reduces latency and allows smarter repair decisions across all pages
+  separatedEvaluation: boolean;
+  setSeparatedEvaluation: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -84,6 +88,7 @@ const FEATURE_DEFAULTS = {
   useGridRepair: true,        // Grid-based repair: use grid extraction instead of legacy inpainting
   forceRepairThreshold: null as number | null, // Force repair: null = standard logic, 100 = always repair
   enableSceneValidation: false, // Scene validation: cheap preview + geometry check + repair
+  separatedEvaluation: false, // Separated evaluation: generate all images first, then batch evaluate
 };
 
 /**
@@ -137,6 +142,9 @@ export function useDeveloperMode(): DeveloperModeState {
 
   // Scene validation: generate cheap preview, analyze geometry, repair composition issues
   const [enableSceneValidation, setEnableSceneValidation] = useState(FEATURE_DEFAULTS.enableSceneValidation);
+
+  // Separated evaluation: generate all images first, then batch evaluate and repair
+  const [separatedEvaluation, setSeparatedEvaluation] = useState(FEATURE_DEFAULTS.separatedEvaluation);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -202,6 +210,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setForceRepairThreshold,
     enableSceneValidation,
     setEnableSceneValidation,
+    separatedEvaluation,
+    setSeparatedEvaluation,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

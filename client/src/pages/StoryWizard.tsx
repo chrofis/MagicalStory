@@ -102,6 +102,7 @@ export default function StoryWizard() {
     lookbackCount, setLookbackCount,
     checkOnlyMode, setCheckOnlyMode,
     enableSceneValidation, setEnableSceneValidation,
+    separatedEvaluation, setSeparatedEvaluation,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
@@ -3199,6 +3200,7 @@ export default function StoryWizard() {
         enableFinalChecks: enableFinalChecks,
         checkOnlyMode: checkOnlyMode,  // Skip all regeneration, only run checks
         enableSceneValidation: enableSceneValidation,  // Cheap preview + geometry check
+        separatedEvaluation: separatedEvaluation,  // Generate all images first, then batch evaluate
         // Incremental consistency check (check each image against previous images)
         incrementalConsistency: incrementalConsistency ? {
           enabled: true,
@@ -4549,6 +4551,19 @@ export default function StoryWizard() {
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Erzeugt günstige Vorschau, prüft Geometrie, repariert Kompositionsprobleme' : language === 'fr' ? 'Génère un aperçu économique, vérifie la géométrie, répare les problèmes de composition' : 'Generates cheap preview, checks geometry, repairs composition issues'}
+                      </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={separatedEvaluation}
+                          onChange={(e) => setSeparatedEvaluation(e.target.checked)}
+                          className="rounded border-violet-300 text-violet-600 focus:ring-violet-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Getrennte Auswertung' : language === 'fr' ? 'Évaluation séparée' : 'Separated evaluation'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Erzeugt alle Bilder zuerst, dann wertet alle parallel aus und repariert' : language === 'fr' ? 'Génère toutes les images d\'abord, puis évalue et répare en parallèle' : 'Generates all images first, then evaluates and repairs in batch'}
                       </p>
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">

@@ -1220,6 +1220,7 @@ export const storyService = {
     enableFinalChecks?: boolean;
     checkOnlyMode?: boolean;  // Skip all regeneration, only run checks
     enableSceneValidation?: boolean;  // Cheap preview + geometry check
+    separatedEvaluation?: boolean;  // Generate all images first, then batch evaluate
     // Incremental consistency check (check each image against previous images)
     incrementalConsistency?: {
       enabled: boolean;
@@ -1296,6 +1297,7 @@ export const storyService = {
       enableFinalChecks: data.enableFinalChecks,
       checkOnlyMode: data.checkOnlyMode,  // Skip all regeneration, only run checks
       enableSceneValidation: data.enableSceneValidation,  // Cheap preview + geometry check
+      separatedEvaluation: data.separatedEvaluation,  // Generate all images first, then batch evaluate
       // Incremental consistency check
       incrementalConsistency: data.incrementalConsistency,
       // Developer model overrides

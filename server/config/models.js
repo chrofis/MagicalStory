@@ -75,7 +75,16 @@ const MODEL_DEFAULTS = {
   enableAutoRepair: false,             // Auto-repair: fix detected issues in generated images
   useGridRepair: true,                 // Grid-based repair (new system) - default ON when autoRepair enabled
   enableFinalChecks: true,             // Final checks: run consistency checks at end of generation
-  checkOnlyMode: false                 // Check-only mode: run checks but skip all regeneration
+  checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
+
+  // Separated Evaluation Pipeline (new architecture)
+  // When enabled, separates image generation from evaluation:
+  // 1. Generate ALL images first (no automatic retry)
+  // 2. Evaluate ALL images in parallel
+  // 3. Build a repair plan based on all results
+  // 4. Execute repairs/regenerations
+  // This reduces latency and allows smarter repair decisions across all pages
+  separatedEvaluation: false           // Default: false (use legacy per-image retry)
 };
 
 // Available inpaint backends
