@@ -5,6 +5,8 @@ client/node_modules/
 
 # Python virtual environment
 venv311/
+__pycache__/
+*.pyc
 
 # OS files
 .DS_Store
