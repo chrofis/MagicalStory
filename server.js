@@ -13447,6 +13447,18 @@ async function getSharedStory(shareToken) {
   return { id: rows[0].id, data };
 }
 
+// Helper: Get shared story ID only (fast path for image endpoints)
+async function getSharedStoryId(shareToken) {
+  if (!shareToken || shareToken.length !== 64) {
+    return null;
+  }
+  const rows = await dbQuery(
+    'SELECT id FROM stories WHERE share_token = $1 AND is_shared = true',
+    [shareToken]
+  );
+  return rows.length > 0 ? rows[0].id : null;
+}
+
 // GET /api/shared/:shareToken - Get shared story data (public, no auth)
 app.get('/api/shared/:shareToken', async (req, res) => {
   try {
@@ -13492,13 +13504,13 @@ app.get('/api/shared/:shareToken/image/:pageNumber', async (req, res) => {
     const { shareToken, pageNumber } = req.params;
     const pageNum = parseInt(pageNumber, 10);
 
-    const story = await getSharedStory(shareToken);
-    if (!story) {
+    // Fast path: get only story ID, then fetch image from separate table
+    const storyId = await getSharedStoryId(shareToken);
+    if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    // Try separate images table first
-    const separateImage = await getStoryImage(story.id, 'scene', pageNum, 0);
+    const separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(base64, 'base64');
@@ -13507,7 +13519,11 @@ app.get('/api/shared/:shareToken/image/:pageNumber', async (req, res) => {
       return res.send(imageBuffer);
     }
 
-    // Fallback to data blob (sceneImages array)
+    // Fallback: fetch full story data for legacy sceneImages array
+    const story = await getSharedStory(shareToken);
+    if (!story) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
     const sceneImage = story.data.sceneImages?.find(img => img.pageNumber === pageNum);
     const imageData = sceneImage?.imageData;
     if (!imageData) {
@@ -13530,13 +13546,13 @@ app.get('/api/shared/:shareToken/cover-image/:coverType', async (req, res) => {
   try {
     const { shareToken, coverType } = req.params;
 
-    const story = await getSharedStory(shareToken);
-    if (!story) {
+    // Fast path: get only story ID, then fetch cover from separate table
+    const storyId = await getSharedStoryId(shareToken);
+    if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    // Try separate images table first
-    const separateImage = await getStoryImage(story.id, coverType, null, 0);
+    const separateImage = await getStoryImage(storyId, coverType, null, 0);
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(base64, 'base64');
@@ -13545,7 +13561,11 @@ app.get('/api/shared/:shareToken/cover-image/:coverType', async (req, res) => {
       return res.send(imageBuffer);
     }
 
-    // Fallback to data blob (coverImages object)
+    // Fallback: fetch full story data for legacy coverImages
+    const story = await getSharedStory(shareToken);
+    if (!story) {
+      return res.status(404).json({ error: 'Cover not found' });
+    }
     const coverObj = story.data.coverImages?.[coverType];
     const coverImageData = typeof coverObj === 'string' ? coverObj : coverObj?.imageData;
     if (!coverImageData) {
@@ -13568,21 +13588,24 @@ app.get('/api/shared/:shareToken/og-image', async (req, res) => {
   try {
     const { shareToken } = req.params;
 
-    const story = await getSharedStory(shareToken);
-    if (!story) {
+    // Fast path: get only story ID, then fetch cover from separate table
+    const storyId = await getSharedStoryId(shareToken);
+    if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    // Try to get front cover from separate images table
-    const coverImageResult = await getStoryImage(story.id, 'frontCover', null, 0);
+    const coverImageResult = await getStoryImage(storyId, 'frontCover', null, 0);
     let coverImage = coverImageResult?.imageData?.replace(/^data:image\/\w+;base64,/, '') || null;
 
-    // Fallback to data blob (coverImages object)
-    if (!coverImage && story.data.coverImages?.frontCover) {
-      const fc = story.data.coverImages.frontCover;
-      const fcData = typeof fc === 'string' ? fc : fc?.imageData;
-      if (fcData) {
-        coverImage = fcData.replace(/^data:image\/\w+;base64,/, '');
+    // Fallback: fetch full story data for legacy coverImages
+    if (!coverImage) {
+      const story = await getSharedStory(shareToken);
+      if (story?.data.coverImages?.frontCover) {
+        const fc = story.data.coverImages.frontCover;
+        const fcData = typeof fc === 'string' ? fc : fc?.imageData;
+        if (fcData) {
+          coverImage = fcData.replace(/^data:image\/\w+;base64,/, '');
+        }
       }
     }
 
