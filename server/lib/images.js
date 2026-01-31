@@ -1226,6 +1226,9 @@ async function detectSubRegion(characterCrop, targetElement) {
  */
 function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions) {
   const chars = [];
+  const addedNames = new Set();
+
+  // First, add characters from characterDescriptions (which have age/gender info)
   for (const [name, desc] of Object.entries(characterDescriptions || {})) {
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
     const descParts = [];
@@ -1238,7 +1241,23 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
       description: descParts.join(', ') || 'character',
       position
     });
+    addedNames.add(name.toLowerCase());
   }
+
+  // Then, add any characters from expectedPositions that weren't in characterDescriptions
+  // These are characters that appear in the scene but didn't have parsed descriptions
+  for (const [name, position] of Object.entries(expectedPositions || {})) {
+    if (!addedNames.has(name.toLowerCase())) {
+      chars.push({
+        name,
+        description: 'character',  // No description available
+        position
+      });
+      addedNames.add(name.toLowerCase());
+      log.debug(`📦 [BBOX-BUILD] Added character "${name}" from expectedPositions (no description available)`);
+    }
+  }
+
   return chars;
 }
 
