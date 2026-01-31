@@ -421,14 +421,18 @@ function extractSceneMetadata(sceneDescription) {
   // Support both "output" (old format), "draft" (unified prompt format) wrappers, or raw JSON (direct format)
   const parsedData = parsed?.output || parsed?.draft || parsed;
   if (parsed && parsedData && parsedData.characters) {
-    // Extract per-character clothing
+    // Extract per-character clothing and positions
     const characterClothing = {};
+    const characterPositions = {};
     const characterNames = [];
     for (const char of parsedData.characters) {
       if (char.name) {
         characterNames.push(char.name);
         if (char.clothing) {
           characterClothing[char.name] = char.clothing;
+        }
+        if (char.position) {
+          characterPositions[char.name] = char.position;
         }
       }
     }
@@ -464,6 +468,7 @@ function extractSceneMetadata(sceneDescription) {
     return {
       characters: characterNames,
       characterClothing: Object.keys(characterClothing).length > 0 ? characterClothing : null,
+      characterPositions: Object.keys(characterPositions).length > 0 ? characterPositions : null,
       clothing: null, // Per-character now, no single value
       objects: objectIds,
       // Store full parsed data for buildTextFromJson
@@ -3236,6 +3241,25 @@ Your "name" can be creative, but "landmarkQuery" MUST match the original name ex
 }
 
 // ============================================================================
+// POSITION NORMALIZATION
+// ============================================================================
+
+/**
+ * Normalize a position string like "bottom-left foreground" to simple L/C/R.
+ * Used to match expected character positions from scene descriptions to detected figures.
+ * @param {string} position - Position string from scene description
+ * @returns {string|null} "left", "center", "right", or null if no match
+ */
+function normalizePositionToLCR(position) {
+  if (!position || typeof position !== 'string') return null;
+  const lower = position.toLowerCase();
+  if (lower.includes('left')) return 'left';
+  if (lower.includes('right')) return 'right';
+  // "center", "middle", "foreground" without left/right = center
+  return 'center';
+}
+
+// ============================================================================
 // EXPORTS
 // ============================================================================
 
@@ -3322,5 +3346,6 @@ module.exports = {
 
   // Position utilities
   expandPositionAbbreviations,
+  normalizePositionToLCR,
   POSITION_ABBREVIATIONS
 };

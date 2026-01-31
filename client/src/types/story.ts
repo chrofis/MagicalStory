@@ -145,6 +145,17 @@ export interface BboxSceneDetection {
   }>;
   usage?: { input_tokens: number; output_tokens: number };
   timestamp?: string;
+  // Expected positions from scene description (e.g., "Luna": "bottom-left foreground")
+  expectedPositions?: Record<string, string>;
+  // Position mismatches: character was expected at one position but detected at another
+  positionMismatches?: Array<{
+    character: string;
+    expected: string;      // Full position string from scene description
+    expectedLCR: string;   // Normalized to "left", "center", "right"
+    actual: string;        // Detected position
+  }>;
+  // Characters expected in scene but not matched to any detected figure
+  missingCharacters?: string[];
 }
 
 // Grid repair manifest issue

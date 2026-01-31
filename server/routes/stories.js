@@ -488,6 +488,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           hasGrids: !!(r.grids && r.grids.length > 0),
           gridsCount: r.grids?.length || 0,
           // Keep small metadata from evaluations
+          bboxDetection: r.bboxDetection || null,  // figures/objects JSON for dev display
           unifiedReport: r.unifiedReport,
           reEvalUsage: r.reEvalUsage,
           repairUsage: r.repairUsage

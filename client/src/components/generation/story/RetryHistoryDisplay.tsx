@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { History, ChevronRight, ChevronDown, Download, Loader2 } from 'lucide-react';
-import type { RetryAttempt, GridRepairData } from '@/types/story';
+import type { RetryAttempt, GridRepairData, BboxSceneDetection } from '@/types/story';
 
 /**
  * Download text content as a file
@@ -1037,6 +1037,82 @@ export function RetryHistoryDisplay({
                       />
                     </div>
                   )}
+
+                  {/* Expected Positions from Scene Description */}
+                  {(() => {
+                    const detection = attempt.bboxDetection as BboxSceneDetection | undefined;
+                    if (!detection?.expectedPositions || Object.keys(detection.expectedPositions).length === 0) return null;
+                    return (
+                      <div className="bg-purple-50 p-3 rounded border border-purple-200">
+                        <div className="font-medium text-purple-800 mb-2">
+                          📍 {language === 'de' ? 'Erwartete Positionen' : 'Expected Positions'}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {Object.entries(detection.expectedPositions).map(([charName, position]) => (
+                            <div key={charName} className="bg-white p-2 rounded border flex justify-between items-center">
+                              <span className="font-medium text-purple-700">{charName}</span>
+                              <span className="text-gray-600 text-xs">{position}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Position Mismatches Warning */}
+                  {(() => {
+                    const detection = attempt.bboxDetection as BboxSceneDetection | undefined;
+                    if (!detection?.positionMismatches || detection.positionMismatches.length === 0) return null;
+                    return (
+                      <div className="bg-yellow-50 p-3 rounded border border-yellow-300">
+                        <div className="font-medium text-yellow-800 mb-2">
+                          ⚠️ {language === 'de' ? 'Positionsabweichungen' : 'Position Mismatches'} ({detection.positionMismatches.length})
+                        </div>
+                        <div className="space-y-2">
+                          {detection.positionMismatches.map((mismatch, mIdx) => (
+                            <div key={mIdx} className="text-sm bg-white p-2 rounded border border-yellow-200">
+                              <div className="font-medium text-yellow-700">{mismatch.character}</div>
+                              <div className="text-xs text-gray-600 mt-1 flex gap-3">
+                                <span>
+                                  {language === 'de' ? 'Erwartet' : 'Expected'}: <span className="font-medium text-purple-600">{mismatch.expected}</span>
+                                  <span className="text-gray-400 ml-1">({mismatch.expectedLCR})</span>
+                                </span>
+                                <span className="text-gray-400">→</span>
+                                <span>
+                                  {language === 'de' ? 'Erkannt' : 'Actual'}: <span className="font-medium text-orange-600">{mismatch.actual}</span>
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Missing Characters Warning */}
+                  {(() => {
+                    const detection = attempt.bboxDetection as BboxSceneDetection | undefined;
+                    if (!detection?.missingCharacters || detection.missingCharacters.length === 0) return null;
+                    return (
+                      <div className="bg-red-50 p-3 rounded border border-red-300">
+                        <div className="font-medium text-red-800 mb-2">
+                          ❌ {language === 'de' ? 'Fehlende Charaktere' : 'Missing Characters'} ({detection.missingCharacters.length})
+                        </div>
+                        <div className="text-sm text-red-700">
+                          {language === 'de'
+                            ? 'Diese Charaktere wurden in der Szene erwartet, aber nicht im Bild gefunden:'
+                            : 'These characters were expected in the scene but not detected in the image:'}
+                        </div>
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {detection.missingCharacters.map((charName, cIdx) => (
+                            <span key={cIdx} className="bg-white px-2 py-1 rounded border border-red-200 text-sm font-medium text-red-700">
+                              {charName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Figures list */}
                   {(attempt.bboxDetection as { figures?: Array<{ label?: string; bodyBox?: number[]; faceBox?: number[]; position?: string }> }).figures && (attempt.bboxDetection as { figures: Array<{ label?: string; bodyBox?: number[]; faceBox?: number[]; position?: string }> }).figures.length > 0 && (

@@ -1,5 +1,5 @@
 // Check where landmark flow fails
-// Run with: railway run node scripts/check-landmark-step.js
+// Run with: DATABASE_URL=... node scripts/check-landmark-step.js
 
 const { Pool } = require('pg');
 
@@ -7,10 +7,10 @@ async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   try {
-    // Find latest story with Ruine Stein
+    // Find latest story with Ruine Stein (title is in data JSON)
     const stories = await pool.query(`
-      SELECT id, title FROM stories
-      WHERE title LIKE '%Ruine Stein%'
+      SELECT id, data->>'title' as title FROM stories
+      WHERE data->>'title' LIKE '%Ruine Stein%'
       ORDER BY created_at DESC LIMIT 1
     `);
 
