@@ -1008,10 +1008,11 @@ export function RetryHistoryDisplay({
                                       )}
                                     </div>
                                   ))}
+                              </div>
                             </div>
                           )}
                         </div>
-                          ))}
+                      ))}
                         </div>
                       </details>
                     );

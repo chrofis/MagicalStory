@@ -2908,8 +2908,13 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
               timestamp: new Date().toISOString()
             });
 
-            // Update result with repaired image if improved
-            if (repairedScore > score) {
+            // Update result with repaired image if:
+            // 1. Score improved, OR
+            // 2. Grid repair had verified fixes (verification is more reliable than score for specific fixes)
+            const hasVerifiedGridFixes = repairResult.gridFixedCount > 0;
+            const shouldUseRepair = repairedScore > score || hasVerifiedGridFixes;
+
+            if (shouldUseRepair) {
               result = {
                 ...result,
                 imageData: repairResult.imageData,
@@ -2922,7 +2927,12 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
                 grids: repairResult.grids
               };
               score = repairedScore;  // Update score for threshold check
-              log.info(`✅ [QUALITY RETRY] Using repaired image (score improved from ${retryHistory[retryHistory.length - 1].preRepairScore}% to ${score}%)`);
+
+              if (repairedScore > retryHistory[retryHistory.length - 1].preRepairScore) {
+                log.info(`✅ [QUALITY RETRY] Using repaired image (score improved from ${retryHistory[retryHistory.length - 1].preRepairScore}% to ${score}%)`);
+              } else if (hasVerifiedGridFixes) {
+                log.info(`✅ [QUALITY RETRY] Using repaired image (${repairResult.gridFixedCount} verified fixes applied, score: ${score}%)`);
+              }
             }
 
             // Update best result if this is now best
