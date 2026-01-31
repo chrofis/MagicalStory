@@ -283,14 +283,14 @@ export function RetryHistoryDisplay({
   pageNumber
 }: RetryHistoryDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
-  const [loadedGridImages, setLoadedGridImages] = useState<Record<number, { annotatedOriginal?: string; grids?: GridRepairData[] }>>({});
-  const [loadingGridImages, setLoadingGridImages] = useState<Set<number>>(new Set());
+  const [loadedRetryImages, setLoadedRetryImages] = useState<Record<number, { annotatedOriginal?: string; grids?: GridRepairData[]; bboxOverlayImage?: string }>>({});
+  const [loadingRetryImages, setLoadingRetryImages] = useState<Set<number>>(new Set());
 
-  // Fetch grid repair images for a specific retry entry
-  const fetchGridImages = async (retryIdx: number) => {
-    if (!storyId || pageNumber === undefined || loadingGridImages.has(retryIdx)) return;
+  // Fetch images for a specific retry entry (grid images, bbox overlay, etc.)
+  const fetchRetryImages = async (retryIdx: number) => {
+    if (!storyId || pageNumber === undefined || loadingRetryImages.has(retryIdx)) return;
 
-    setLoadingGridImages(prev => new Set(prev).add(retryIdx));
+    setLoadingRetryImages(prev => new Set(prev).add(retryIdx));
     try {
       const token = localStorage.getItem('auth_token');
       const params = new URLSearchParams({
@@ -303,18 +303,19 @@ export function RetryHistoryDisplay({
       });
       if (response.ok) {
         const data = await response.json();
-        setLoadedGridImages(prev => ({
+        setLoadedRetryImages(prev => ({
           ...prev,
           [retryIdx]: {
             annotatedOriginal: data.annotatedOriginal,
-            grids: data.grids
+            grids: data.grids,
+            bboxOverlayImage: data.bboxOverlayImage
           }
         }));
       }
     } catch (err) {
-      console.error(`Failed to load grid images for retry ${retryIdx}:`, err);
+      console.error(`Failed to load retry images for retry ${retryIdx}:`, err);
     } finally {
-      setLoadingGridImages(prev => {
+      setLoadingRetryImages(prev => {
         const next = new Set(prev);
         next.delete(retryIdx);
         return next;
@@ -718,7 +719,7 @@ export function RetryHistoryDisplay({
 
                 {/* Step 1: Annotated Original with Bounding Boxes */}
                 {(() => {
-                  const annotatedData = attempt.annotatedOriginal || loadedGridImages[idx]?.annotatedOriginal;
+                  const annotatedData = attempt.annotatedOriginal || loadedRetryImages[idx]?.annotatedOriginal;
                   if (annotatedData) {
                     return (
                       <details className="text-sm" open>
@@ -749,11 +750,11 @@ export function RetryHistoryDisplay({
                   if (attempt.hasAnnotatedOriginal && storyId && pageNumber !== undefined) {
                     return (
                       <button
-                        onClick={() => fetchGridImages(idx)}
-                        disabled={loadingGridImages.has(idx)}
+                        onClick={() => fetchRetryImages(idx)}
+                        disabled={loadingRetryImages.has(idx)}
                         className="text-sm px-3 py-2 bg-violet-100 hover:bg-violet-200 text-violet-700 rounded border border-violet-300 flex items-center gap-2 disabled:opacity-50"
                       >
-                        {loadingGridImages.has(idx) ? (
+                        {loadingRetryImages.has(idx) ? (
                           <><Loader2 size={14} className="animate-spin" /> Loading...</>
                         ) : (
                           <>📍 Load Detected Issues</>
@@ -799,7 +800,7 @@ export function RetryHistoryDisplay({
 
                 {/* Grid images display */}
                 {(() => {
-                  const gridsData = attempt.grids || loadedGridImages[idx]?.grids;
+                  const gridsData = attempt.grids || loadedRetryImages[idx]?.grids;
                   if (gridsData && gridsData.length > 0) {
                     return (
                       <details className="text-sm">
@@ -991,14 +992,14 @@ export function RetryHistoryDisplay({
                     );
                   }
                   // Show load button if hasGrids but not loaded
-                  if (attempt.hasGrids && storyId && pageNumber !== undefined && !loadedGridImages[idx]?.grids) {
+                  if (attempt.hasGrids && storyId && pageNumber !== undefined && !loadedRetryImages[idx]?.grids) {
                     return (
                       <button
-                        onClick={() => fetchGridImages(idx)}
-                        disabled={loadingGridImages.has(idx)}
+                        onClick={() => fetchRetryImages(idx)}
+                        disabled={loadingRetryImages.has(idx)}
                         className="text-sm px-3 py-2 bg-violet-100 hover:bg-violet-200 text-violet-700 rounded border border-violet-300 flex items-center gap-2 disabled:opacity-50"
                       >
-                        {loadingGridImages.has(idx) ? (
+                        {loadingRetryImages.has(idx) ? (
                           <><Loader2 size={14} className="animate-spin" /> Loading...</>
                         ) : (
                           <>🔲 Load Grid Details ({attempt.gridsCount || '?'} grids)</>
@@ -1022,21 +1023,43 @@ export function RetryHistoryDisplay({
                   </span>
                 </summary>
                 <div className="mt-3 space-y-3">
-                  {/* Bbox Overlay Image */}
-                  {attempt.bboxOverlayImage && (
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1 font-medium">
-                        {language === 'de' ? 'Erkannte Regionen' : 'Detected Regions'}
-                        <span className="ml-2 text-gray-400">(🟢 Body, 🔵 Face, 🟠 Object)</span>
-                      </div>
-                      <img
-                        src={attempt.bboxOverlayImage}
-                        alt="Bbox overlay"
-                        className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
-                        onClick={() => setEnlargedImg({ src: attempt.bboxOverlayImage!, title: language === 'de' ? 'Erkannte Regionen' : 'Detected Regions' })}
-                      />
-                    </div>
-                  )}
+                  {/* Bbox Overlay Image - with lazy loading support */}
+                  {(() => {
+                    const overlayImage = attempt.bboxOverlayImage || loadedRetryImages[idx]?.bboxOverlayImage;
+                    if (overlayImage) {
+                      return (
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1 font-medium">
+                            {language === 'de' ? 'Erkannte Regionen' : 'Detected Regions'}
+                            <span className="ml-2 text-gray-400">(🟢 Body, 🔵 Face, 🟠 Object)</span>
+                          </div>
+                          <img
+                            src={overlayImage}
+                            alt="Bbox overlay"
+                            className="max-w-md border rounded cursor-pointer hover:ring-2 hover:ring-blue-400"
+                            onClick={() => setEnlargedImg({ src: overlayImage, title: language === 'de' ? 'Erkannte Regionen' : 'Detected Regions' })}
+                          />
+                        </div>
+                      );
+                    }
+                    // Show load button if hasBboxOverlay flag is true but not loaded yet
+                    if (attempt.hasBboxOverlay && storyId && pageNumber !== undefined) {
+                      return (
+                        <button
+                          onClick={() => fetchRetryImages(idx)}
+                          disabled={loadingRetryImages.has(idx)}
+                          className="text-sm px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border border-blue-300 flex items-center gap-2 disabled:opacity-50"
+                        >
+                          {loadingRetryImages.has(idx) ? (
+                            <><Loader2 size={14} className="animate-spin" /> {language === 'de' ? 'Lädt...' : 'Loading...'}</>
+                          ) : (
+                            <>📦 {language === 'de' ? 'Erkannte Regionen laden' : 'Load Detected Regions'}</>
+                          )}
+                        </button>
+                      );
+                    }
+                    return null;
+                  })()}
 
                   {/* Expected Positions from Scene Description */}
                   {(() => {
