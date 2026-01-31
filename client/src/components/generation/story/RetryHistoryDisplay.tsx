@@ -283,7 +283,7 @@ export function RetryHistoryDisplay({
   pageNumber
 }: RetryHistoryDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
-  const [loadedRetryImages, setLoadedRetryImages] = useState<Record<number, { annotatedOriginal?: string; grids?: GridRepairData[]; bboxOverlayImage?: string }>>({});
+  const [loadedRetryImages, setLoadedRetryImages] = useState<Record<number, { imageData?: string; annotatedOriginal?: string; grids?: GridRepairData[]; bboxOverlayImage?: string }>>({});
   const [loadingRetryImages, setLoadingRetryImages] = useState<Set<number>>(new Set());
 
   // Fetch images for a specific retry entry (grid images, bbox overlay, etc.)
@@ -306,6 +306,7 @@ export function RetryHistoryDisplay({
         setLoadedRetryImages(prev => ({
           ...prev,
           [retryIdx]: {
+            imageData: data.imageData,
             annotatedOriginal: data.annotatedOriginal,
             grids: data.grids,
             bboxOverlayImage: data.bboxOverlayImage
@@ -1070,19 +1071,48 @@ export function RetryHistoryDisplay({
             )}
 
             {/* Image - show directly for regular attempts, not hidden */}
-            {attempt.imageData && attempt.type !== 'auto_repair' && attempt.type !== 'grid_repair' && attempt.type !== 'grid_repair_failed' && (
-              <div className="mt-2">
-                <div className="text-xs text-gray-500 mb-1 font-medium">
-                  {language === 'de' ? 'Generiertes Bild' : 'Generated Image'}
-                </div>
-                <img
-                  src={attempt.imageData}
-                  alt={`Attempt ${attempt.attempt}`}
-                  className={`w-48 h-48 object-contain rounded border cursor-pointer hover:ring-2 ${idx === retryHistory.length - 1 ? 'border-green-300 hover:ring-green-400' : 'border-gray-200 opacity-75 hover:ring-gray-400'}`}
-                  onClick={() => setEnlargedImg({ src: attempt.imageData!, title: `${language === 'de' ? 'Versuch' : 'Attempt'} ${attempt.attempt}` })}
-                />
-              </div>
-            )}
+            {(() => {
+              // Skip for repair types - they show their own images
+              if (attempt.type === 'auto_repair' || attempt.type === 'grid_repair' || attempt.type === 'grid_repair_failed' || attempt.type === 'bbox_detection_only') return null;
+
+              const imgData = attempt.imageData || loadedRetryImages[idx]?.imageData;
+
+              // Show image if available
+              if (imgData) {
+                return (
+                  <div className="mt-2">
+                    <div className="text-xs text-gray-500 mb-1 font-medium">
+                      {language === 'de' ? 'Generiertes Bild' : 'Generated Image'}
+                    </div>
+                    <img
+                      src={imgData}
+                      alt={`Attempt ${attempt.attempt}`}
+                      className={`w-48 h-48 object-contain rounded border cursor-pointer hover:ring-2 ${idx === retryHistory.length - 1 ? 'border-green-300 hover:ring-green-400' : 'border-gray-200 opacity-75 hover:ring-gray-400'}`}
+                      onClick={() => setEnlargedImg({ src: imgData, title: `${language === 'de' ? 'Versuch' : 'Attempt'} ${attempt.attempt}` })}
+                    />
+                  </div>
+                );
+              }
+
+              // Show load button for generation attempts without loaded images
+              if (attempt.type === 'generation' && storyId && pageNumber !== undefined && !loadedRetryImages[idx]) {
+                return (
+                  <button
+                    onClick={() => fetchRetryImages(idx)}
+                    disabled={loadingRetryImages.has(idx)}
+                    className="mt-2 text-sm px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded border border-blue-300 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {loadingRetryImages.has(idx) ? (
+                      <><Loader2 size={14} className="animate-spin" /> Loading...</>
+                    ) : (
+                      <>🖼️ {language === 'de' ? 'Bild laden' : 'Load Image'}</>
+                    )}
+                  </button>
+                );
+              }
+
+              return null;
+            })()}
 
             <div className="text-xs text-gray-400 mt-1">
               {new Date(attempt.timestamp).toLocaleTimeString()}
