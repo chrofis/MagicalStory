@@ -13,6 +13,7 @@ const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+const { createDiffImage } = require('./repairVerification');
 
 // Grid-based repair (lazy-loaded to avoid circular dependencies)
 let gridBasedRepairModule = null;
@@ -989,7 +990,7 @@ async function detectAllBoundingBoxes(imageData) {
 /**
  * Create an overlay image with bounding boxes drawn on it
  * @param {string} imageData - Base64 image data
- * @param {Object} bboxDetection - Result from detectAllBoundingBoxes
+ * @param {Object} bboxDetection - Result from detectAllBoundingBoxes (includes qualityMatches, objectMatches)
  * @returns {Promise<string|null>} Base64 image with boxes drawn, or null on error
  */
 async function createBboxOverlayImage(imageData, bboxDetection) {
@@ -1007,6 +1008,25 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
     const metadata = await sharp(imageBuffer).metadata();
     const { width, height } = metadata;
 
+    // Build figure index → character name mapping from qualityMatches
+    // qualityMatches: [{figure: 1, reference: "Lukas", confidence: 0.8, ...}]
+    const figureToCharName = {};
+    for (const match of (bboxDetection.qualityMatches || [])) {
+      if (match.figure && match.reference && (match.confidence || 0) >= 0.5) {
+        const figIdx = match.figure - 1;  // figure is 1-indexed
+        figureToCharName[figIdx] = match.reference;
+      }
+    }
+
+    // Build object label → reference name mapping from objectMatches
+    // objectMatches: [{reference: "Eli", type: "animal", ...}]
+    const objectToRefName = {};
+    for (const match of (bboxDetection.objectMatches || [])) {
+      if (match.reference) {
+        objectToRefName[match.reference.toLowerCase()] = match.reference;
+      }
+    }
+
     // Build SVG overlay with boxes
     const svgParts = [`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`];
 
@@ -1014,18 +1034,26 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
     for (let i = 0; i < (bboxDetection.figures || []).length; i++) {
       const fig = bboxDetection.figures[i];
 
-      // Body box - green
+      // Body box - green (or purple if matched to character)
       if (fig.bodyBox) {
         const [ymin, xmin, ymax, xmax] = fig.bodyBox;
         const x = Math.round(xmin * width);
         const y = Math.round(ymin * height);
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#00ff00" stroke-width="3"/>`);
-        // Label
-        const label = fig.label ? fig.label.substring(0, 30) : `Figure ${i + 1}`;
-        svgParts.push(`<rect x="${x}" y="${Math.max(0, y - 20)}" width="${Math.min(label.length * 8 + 10, w)}" height="20" fill="#00ff00" opacity="0.8"/>`);
-        svgParts.push(`<text x="${x + 5}" y="${Math.max(15, y - 5)}" font-family="Arial" font-size="12" fill="black">${escapeXml(label)}</text>`);
+
+        // Check if this figure is matched to a character
+        const charName = figureToCharName[i];
+        const boxColor = charName ? '#aa00ff' : '#00ff00';  // Purple if matched, green otherwise
+        const labelBgColor = charName ? '#aa00ff' : '#00ff00';
+
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="3"/>`);
+
+        // Label - show character name if matched, otherwise generic label
+        const label = charName ? `★ ${charName}` : (fig.label ? fig.label.substring(0, 30) : `Figure ${i + 1}`);
+        const labelWidth = Math.min(label.length * 8 + 10, 200);
+        svgParts.push(`<rect x="${x}" y="${Math.max(0, y - 22)}" width="${labelWidth}" height="22" fill="${labelBgColor}" opacity="0.9" rx="3"/>`);
+        svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
       // Face box - blue
@@ -1039,7 +1067,7 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
       }
     }
 
-    // Draw object boxes (orange)
+    // Draw object boxes (orange, or cyan if matched to reference)
     for (let i = 0; i < (bboxDetection.objects || []).length; i++) {
       const obj = bboxDetection.objects[i];
       if (obj.bodyBox) {
@@ -1048,11 +1076,20 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const y = Math.round(ymin * height);
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
-        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#ff8800" stroke-width="2"/>`);
-        // Label
-        const label = obj.label ? obj.label.substring(0, 25) : `Object ${i + 1}`;
-        svgParts.push(`<rect x="${x}" y="${y + h}" width="${Math.min(label.length * 7 + 10, w)}" height="18" fill="#ff8800" opacity="0.8"/>`);
-        svgParts.push(`<text x="${x + 5}" y="${y + h + 13}" font-family="Arial" font-size="11" fill="black">${escapeXml(label)}</text>`);
+
+        // Check if object is matched to a reference
+        const objLabelLower = (obj.label || '').toLowerCase();
+        const refName = objectToRefName[objLabelLower];
+        const boxColor = refName ? '#00cccc' : '#ff8800';  // Cyan if matched, orange otherwise
+        const labelBgColor = refName ? '#00cccc' : '#ff8800';
+
+        svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="2"/>`);
+
+        // Label - show reference name if matched
+        const label = refName ? `★ ${refName}` : (obj.label ? obj.label.substring(0, 25) : `Object ${i + 1}`);
+        const labelWidth = Math.min(label.length * 7 + 10, 180);
+        svgParts.push(`<rect x="${x}" y="${y + h}" width="${labelWidth}" height="20" fill="${labelBgColor}" opacity="0.9" rx="3"/>`);
+        svgParts.push(`<text x="${x + 5}" y="${y + h + 14}" font-family="Arial" font-size="12" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
     }
 
@@ -3852,6 +3889,18 @@ async function autoRepairWithTargets(imageData, fixTargets, maxAdditionalAttempt
           historyEntry.maskImage = mask;
           historyEntry.beforeImage = currentImage;
           historyEntry.afterImage = repaired.imageData;
+
+          // Generate diff image to highlight changes
+          try {
+            const beforeBuffer = Buffer.from(currentImage.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            const afterBuffer = Buffer.from(repaired.imageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
+            const diffBuffer = await createDiffImage(beforeBuffer, afterBuffer);
+            if (diffBuffer) {
+              historyEntry.diffImage = `data:image/jpeg;base64,${diffBuffer.toString('base64')}`;
+            }
+          } catch (diffErr) {
+            log.debug(`[AUTO-REPAIR] Failed to create diff image: ${diffErr.message}`);
+          }
         }
 
         repairHistory.push(historyEntry);
