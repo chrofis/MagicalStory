@@ -356,12 +356,13 @@ async function initializeDatabase() {
         image_type VARCHAR(50) NOT NULL,
         grid_index INT,
         image_data TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_retry_images_story ON story_retry_images(story_id)`);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_retry_images_page ON story_retry_images(story_id, page_number)`);
+    // Unique index with COALESCE (can't use inline UNIQUE constraint with functions)
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_retry_images_unique ON story_retry_images(story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1))`);
 
     // Seed default pricing tiers if table is empty
     const pricingCheck = await dbPool.query('SELECT COUNT(*) as count FROM pricing_tiers');
