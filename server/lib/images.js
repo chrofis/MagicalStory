@@ -1240,6 +1240,12 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   }
 
   // Build attribute-based mapping: charName → detection figure element (by position, hair, clothing)
+  // Non-human keywords to exclude from character matching (monsters, creatures, animals)
+  const nonHumanKeywords = ['creature', 'monster', 'yeti', 'dragon', 'beast', 'alien', 'robot', 'ghost',
+    'demon', 'ogre', 'troll', 'goblin', 'wolf', 'bear', 'lion', 'tiger', 'elephant', 'horse', 'dog',
+    'cat', 'bird', 'snake', 'dinosaur', 'unicorn', 'fairy', 'elf', 'dwarf', 'giant', 'skeleton',
+    'zombie', 'vampire', 'werewolf', 'witch', 'wizard', 'mermaid', 'centaur', 'griffin', 'phoenix'];
+
   const charToDetectionFigure = {};
   for (const [charName, charInfo] of Object.entries(charNameToFigure)) {
     let bestFigure = null;
@@ -1252,6 +1258,13 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     for (const figure of allDetections.figures) {
       let score = 0;
       const label = (figure.label || '').toLowerCase();
+
+      // Skip non-human figures (monsters, creatures, animals) - they can't be main characters
+      const isNonHuman = nonHumanKeywords.some(keyword => label.includes(keyword));
+      if (isNonHuman) {
+        log.debug(`📦 [BBOX-ENRICH] Skipping non-human figure for "${charName}": "${figure.label}"`);
+        continue;
+      }
 
       // Expected position match (strongest signal - from scene description)
       if (expectedLCR && figure.position === expectedLCR) {
