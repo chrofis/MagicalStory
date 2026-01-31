@@ -4063,7 +4063,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     }
 
     // Get or run entity consistency check
-    let entityReport = storyData.finalChecksReport?.entityConsistency;
+    // Note: stored as 'entity' in finalChecksReport, not 'entityConsistency'
+    let entityReport = storyData.finalChecksReport?.entity;
 
     if (!entityReport || !entityReport.characters?.[entityName]) {
       // Run entity consistency check first
