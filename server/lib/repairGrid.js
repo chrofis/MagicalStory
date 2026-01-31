@@ -26,8 +26,8 @@ function getRepairPromptTemplate() {
 
 // Grid configuration
 const CELL_SIZE = 256;      // Default cell size (for legacy createLabeledGrid)
-const MAX_CELL_DIM = 300;   // Maximum dimension for any cell in variable grid
-const MAX_GRID_WIDTH = 1024; // Maximum grid width for row packing
+const MAX_CELL_DIM = 512;   // Maximum dimension for any cell in variable grid (increased from 300)
+const MAX_GRID_WIDTH = 1500; // Maximum grid width for row packing (increased from 1024)
 const MAX_COLS = 4;         // Maximum columns per grid (for legacy fixed grid)
 const MAX_ROWS = 3;         // Maximum rows per grid
 const MAX_PER_GRID = 12;    // MAX_COLS * MAX_ROWS

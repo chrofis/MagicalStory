@@ -13,8 +13,9 @@ const path = require('path');
 const fs = require('fs');
 const { randomUUID } = require('crypto');
 
-// Standard region extraction size (matches face extraction)
-const TARGET_REGION_SIZE = 256;
+// Standard region extraction size - larger to reduce scaling artifacts
+// Previously 256, but this caused tiny grids that Gemini would upscale 3x
+const TARGET_REGION_SIZE = 512;
 
 // Adaptive padding by issue type (percent of region size)
 const PADDING_BY_TYPE = {
