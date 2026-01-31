@@ -335,67 +335,56 @@ function collectEntityAppearances(sceneImages, characters = []) {
       }
     }
 
-    // Get quality matches (character -> figure mapping)
-    const qualityMatches = bboxDetection?.qualityMatches || [];
-
     // Get clothing info for this page
     const characterClothing = img.characterClothing || {};
     const defaultClothing = img.clothing || 'standard';
 
-    // Process quality matches to find character appearances
-    for (const match of qualityMatches) {
-      if (!match.reference || match.confidence < 0.5) continue;
+    // Get figures from bbox detection - now includes direct character identification via figure.name
+    const figures = bboxDetection?.figures || [];
 
-      const charName = match.reference;
-      if (!appearances.has(charName)) {
-        appearances.set(charName, []);
-      }
-
-      // Find the figure with matching bbox
-      const figureIndex = match.figure - 1;  // figure is 1-indexed
-      const figures = bboxDetection?.figures || [];
-      const figure = figures[figureIndex];
-
-      if (!figure) {
-        log.verbose(`[ENTITY-COLLECT] No figure found for ${charName} on page ${pageNumber}`);
-        continue;
-      }
-
-      // Get clothing for this character on this page
-      const clothing = characterClothing[charName] || defaultClothing;
-
-      appearances.get(charName).push({
-        pageNumber,
-        imageData,
-        faceBox: figure.faceBox || null,
-        bodyBox: figure.bodyBox || null,
-        position: figure.position || match.position,
-        label: figure.label,
-        clothing,
-        confidence: match.confidence
-      });
+    // Debug logging for entity collection
+    if (!bboxDetection) {
+      log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: No bboxDetection found in retryHistory (entries: ${img.retryHistory?.length || 0})`);
+    } else {
+      const identifiedFigures = figures.filter(f => f.name && f.name !== 'UNKNOWN');
+      log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: ${figures.length} figures, ${identifiedFigures.length} identified: ${identifiedFigures.map(f => f.name).join(', ')}`);
     }
 
-    // Also check figures by label matching for characters without quality matches
-    const figures = bboxDetection?.figures || [];
+    // Match characters by figure.name (direct AI identification)
     for (const char of characters) {
       const charName = char.name;
       const charApps = appearances.get(charName);
 
       // Skip if we already have an appearance for this page
-      if (charApps.some(a => a.pageNumber === pageNumber)) continue;
+      if (charApps && charApps.some(a => a.pageNumber === pageNumber)) continue;
 
-      // Try to match by label
+      // Find figure by direct name match (new bbox detection includes character name in figure.name)
       const charNameLower = charName.toLowerCase();
-      const matchingFigure = figures.find(f => {
-        const label = (f.label || '').toLowerCase();
-        return label.includes(charNameLower) ||
-               charNameLower.includes(label.split(' ')[0]);  // Match first word
+      let matchingFigure = figures.find(f => {
+        const figureName = (f.name || '').toLowerCase();
+        return figureName === charNameLower;
       });
+
+      // Fallback: try label matching if name didn't match
+      if (!matchingFigure) {
+        matchingFigure = figures.find(f => {
+          const label = (f.label || '').toLowerCase();
+          return label.includes(charNameLower) ||
+                 charNameLower.includes(label.split(' ')[0]);  // Match first word
+        });
+      }
 
       if (matchingFigure) {
         const clothing = characterClothing[charName] || defaultClothing;
-        charApps.push({
+        // Determine confidence based on how we matched
+        const confidence = (matchingFigure.name || '').toLowerCase() === charNameLower
+          ? (matchingFigure.confidence === 'high' ? 0.95 : matchingFigure.confidence === 'medium' ? 0.8 : 0.65)
+          : 0.5;  // Lower confidence for label-based match
+
+        if (!charApps) {
+          appearances.set(charName, []);
+        }
+        appearances.get(charName).push({
           pageNumber,
           imageData,
           faceBox: matchingFigure.faceBox || null,
@@ -403,7 +392,7 @@ function collectEntityAppearances(sceneImages, characters = []) {
           position: matchingFigure.position,
           label: matchingFigure.label,
           clothing,
-          confidence: 0.6  // Lower confidence for label-based match
+          confidence
         });
       }
     }
@@ -412,9 +401,14 @@ function collectEntityAppearances(sceneImages, characters = []) {
   // Filter out entities with too few appearances
   for (const [name, apps] of appearances) {
     if (apps.length < MIN_APPEARANCES) {
+      log.debug(`[ENTITY-COLLECT] Filtering out "${name}" with only ${apps.length} appearances (min: ${MIN_APPEARANCES})`);
       appearances.delete(name);
     }
   }
+
+  // Log summary
+  const totalAppearances = Array.from(appearances.values()).reduce((sum, apps) => sum + apps.length, 0);
+  log.info(`[ENTITY-COLLECT] Found ${appearances.size} characters with ${totalAppearances} total appearances: ${Array.from(appearances.entries()).map(([name, apps]) => `${name}(${apps.length})`).join(', ')}`);
 
   return appearances;
 }
