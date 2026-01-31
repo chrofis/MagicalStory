@@ -767,6 +767,38 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
 }
 
 /**
+ * Parse Visual Bible objects from the image prompt
+ * Looks for REQUIRED OBJECTS section with format:
+ * * **ObjectName** (type): Description
+ *
+ * @param {string} prompt - The full image generation prompt
+ * @returns {string[]} Array of object names found
+ */
+function parseVisualBibleObjects(prompt) {
+  if (!prompt || typeof prompt !== 'string') return [];
+
+  const objects = [];
+
+  // Look for REQUIRED OBJECTS section
+  const requiredSection = prompt.match(/\*\*REQUIRED OBJECTS[^*]*\*\*:?\s*([\s\S]*?)(?=\n\n|\*\*[A-Z]|$)/i);
+  if (requiredSection) {
+    // Match entries like: * **ObjectName** (type): Description
+    const entryPattern = /\*\s*\*\*([^*]+)\*\*\s*\((\w+)\):/g;
+    let match;
+    while ((match = entryPattern.exec(requiredSection[1])) !== null) {
+      const name = match[1].trim();
+      const type = match[2].toLowerCase();
+      // Only include objects and animals, not locations
+      if (type !== 'location') {
+        objects.push(name);
+      }
+    }
+  }
+
+  return objects;
+}
+
+/**
  * Detect bounding boxes for a specific issue using Gemini's native detection
  * This is stage 2 of the two-stage detection approach:
  * Stage 1: Quality evaluation identifies issues (no bboxes needed)
@@ -1174,7 +1206,7 @@ function computeIoU(boxA, boxB) {
   return union > 0 ? intersection / union : 0;
 }
 
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = []) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}) {
   // Always detect all elements for dev mode display
   log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
 
@@ -1239,40 +1271,76 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     log.info(`📦 [BBOX-ENRICH] Character mapping: ${Object.entries(charNameToFigure).map(([name, info]) => `${name} → Figure ${info.figureId} (${info.position || 'no position'})`).join(', ')}`);
   }
 
-  // Build attribute-based mapping: charName → detection figure element (by position, hair, clothing)
+  // Build attribute-based mapping: charName → detection figure element (by position, hair, clothing, age/gender)
   // Non-human keywords to exclude from character matching (monsters, creatures, animals)
   const nonHumanKeywords = ['creature', 'monster', 'yeti', 'dragon', 'beast', 'alien', 'robot', 'ghost',
     'demon', 'ogre', 'troll', 'goblin', 'wolf', 'bear', 'lion', 'tiger', 'elephant', 'horse', 'dog',
     'cat', 'bird', 'snake', 'dinosaur', 'unicorn', 'fairy', 'elf', 'dwarf', 'giant', 'skeleton',
     'zombie', 'vampire', 'werewolf', 'witch', 'wizard', 'mermaid', 'centaur', 'griffin', 'phoenix'];
 
+  // Helper to extract figure type from label
+  const extractFigureType = (label) => {
+    const l = label.toLowerCase();
+    // Order matters: check more specific terms first
+    if (l.includes('boy') || l.includes('young boy')) return { isChild: true, gender: 'male', term: 'boy' };
+    if (l.includes('girl') || l.includes('young girl')) return { isChild: true, gender: 'female', term: 'girl' };
+    if (l.includes('man') || l.includes('father') || l.includes('dad')) return { isChild: false, gender: 'male', term: 'man' };
+    if (l.includes('woman') || l.includes('mother') || l.includes('mom')) return { isChild: false, gender: 'female', term: 'woman' };
+    if (l.includes('child') || l.includes('kid') || l.includes('toddler')) return { isChild: true, gender: null, term: 'child' };
+    if (l.includes('teen')) return { isChild: true, gender: null, term: 'teen' };
+    return { isChild: null, gender: null, term: null };
+  };
+
   const charToDetectionFigure = {};
+  const usedFigures = new Set();  // Prevent same figure matching multiple characters
+
   for (const [charName, charInfo] of Object.entries(charNameToFigure)) {
     let bestFigure = null;
-    let bestScore = 0;
+    let bestScore = -100;  // Allow negative scores to track mismatches
 
-    // Get expected position from scene description (stronger signal than quality eval guess)
+    // Get expected position from scene description
     const expectedPos = expectedPositions[charName] || expectedPositions[charName.charAt(0).toUpperCase() + charName.slice(1)];
     const expectedLCR = getStoryHelpers().normalizePositionToLCR(expectedPos);
 
+    // Get character description (age, gender) if available
+    const charDesc = characterDescriptions[charName] || characterDescriptions[charName.charAt(0).toUpperCase() + charName.slice(1)] || {};
+
     for (const figure of allDetections.figures) {
+      // Skip figures already matched to another character
+      if (usedFigures.has(figure)) continue;
+
       let score = 0;
       const label = (figure.label || '').toLowerCase();
 
-      // Skip non-human figures (monsters, creatures, animals) - they can't be main characters
+      // Skip non-human figures
       const isNonHuman = nonHumanKeywords.some(keyword => label.includes(keyword));
       if (isNonHuman) {
         log.debug(`📦 [BBOX-ENRICH] Skipping non-human figure for "${charName}": "${figure.label}"`);
         continue;
       }
 
-      // Expected position match (strongest signal - from scene description)
-      if (expectedLCR && figure.position === expectedLCR) {
-        score += 5;  // Strong signal: matches expected position from scene
+      // AGE/GENDER MATCHING (strongest signal when we have character descriptions)
+      const figureType = extractFigureType(label);
+      if (charDesc.isChild !== undefined && figureType.isChild !== null) {
+        if (charDesc.isChild === figureType.isChild) {
+          score += 15;  // Strong: age category matches (both children or both adults)
+        } else {
+          score -= 20;  // Strong penalty: age mismatch (don't match child character to adult figure)
+        }
       }
-      // Quality eval guessed position (weaker signal)
-      else if (charInfo.position && figure.position === charInfo.position) {
-        score += 3;
+      if (charDesc.gender && figureType.gender) {
+        if (charDesc.gender === figureType.gender) {
+          score += 10;  // Gender matches
+        } else {
+          score -= 15;  // Gender mismatch penalty
+        }
+      }
+
+      // POSITION MATCHING
+      if (expectedLCR && figure.position === expectedLCR) {
+        score += 5;  // Position matches expected from scene
+      } else if (charInfo.position && figure.position === charInfo.position) {
+        score += 3;  // Quality eval guessed position
       }
 
       // Hair keywords in label
@@ -1295,9 +1363,11 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
 
     if (bestFigure && bestScore > 0) {
       charToDetectionFigure[charName] = bestFigure;
-      log.info(`📦 [BBOX-ENRICH] Match: "${charName}" → "${bestFigure.label}" (score=${bestScore}${expectedLCR ? `, expected=${expectedLCR}` : ''})`);
+      usedFigures.add(bestFigure);  // Mark as used
+      const figureType = extractFigureType(bestFigure.label);
+      log.info(`📦 [BBOX-ENRICH] Match: "${charName}" (${charDesc.genderTerm || 'unknown'}) → "${bestFigure.label}" (${figureType.term || 'unknown'}) score=${bestScore}${expectedLCR ? `, pos=${expectedLCR}` : ''}`);
     } else {
-      log.warn(`⚠️ [BBOX-ENRICH] No match for "${charName}" (position=${charInfo.position}, expected=${expectedPos || 'none'}, hair=${charInfo.hair})`);
+      log.warn(`⚠️ [BBOX-ENRICH] No match for "${charName}" (bestScore=${bestScore}, expected=${expectedPos || 'none'}, charDesc=${JSON.stringify(charDesc)})`);
     }
   }
 
@@ -2594,15 +2664,27 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const sceneMetadata = getStoryHelpers().extractSceneMetadata(currentPrompt);
     const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
     const expectedObjects = sceneMetadata?.objects || [];
+
+    // Parse character descriptions (age, gender) from prompt for smarter matching
+    const characterDescriptions = getStoryHelpers().parseCharacterDescriptions(currentPrompt);
+
+    // Parse Visual Bible objects from prompt (REQUIRED OBJECTS section)
+    const vbObjects = parseVisualBibleObjects(currentPrompt);
+    // Merge VB objects with scene objects
+    const allExpectedObjects = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
+
     if (Object.keys(expectedCharacterPositions).length > 0) {
       log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected character positions: ${Object.entries(expectedCharacterPositions).map(([n, p]) => `${n}=${p}`).join(', ')}`);
     }
-    if (expectedObjects.length > 0) {
-      log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected objects: ${expectedObjects.join(', ')}`);
+    if (Object.keys(characterDescriptions).length > 0) {
+      log.debug(`📦 [QUALITY RETRY] ${pageLabel}Character descriptions: ${Object.entries(characterDescriptions).map(([n, d]) => `${n}=${d.genderTerm || 'unknown'}`).join(', ')}`);
+    }
+    if (allExpectedObjects.length > 0) {
+      log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected objects: ${allExpectedObjects.join(', ')}`);
     }
 
-    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${expectedObjects.length > 0 ? `, ${expectedObjects.length} expected objects` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, expectedObjects);
+    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions);
     bboxDetectionHistory = enrichResult.detectionHistory;
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {

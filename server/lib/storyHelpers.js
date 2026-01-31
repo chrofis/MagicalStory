@@ -422,6 +422,62 @@ function stripSceneMetadata(sceneDescription) {
  * @param {string} sceneDescription - The scene description text
  * @returns {Object|null} Parsed metadata or null if not found/invalid
  */
+/**
+ * Parse character descriptions from image prompt to extract age/gender info
+ * Parses format: "1. Lukas, Looks: school age, 7 years old, boy, Build: ..."
+ * @param {string} prompt - The full image generation prompt
+ * @returns {Object} Map of character names to {age, gender, ageCategory, clothing}
+ */
+function parseCharacterDescriptions(prompt) {
+  if (!prompt || typeof prompt !== 'string') return {};
+
+  const characterInfo = {};
+
+  // Match numbered character entries: "1. Name, Looks: age category, X years old, gender, ..."
+  const charPattern = /^\d+\.\s*([^,]+),\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|child|baby|toddler|teen|teenager)/gmi;
+  let match;
+
+  while ((match = charPattern.exec(prompt)) !== null) {
+    const name = match[1].trim();
+    const ageCategory = match[2].trim();
+    const age = parseInt(match[3], 10);
+    const genderTerm = match[4].toLowerCase();
+
+    // Map gender term to gender
+    let gender = null;
+    if (['boy', 'man'].includes(genderTerm)) gender = 'male';
+    else if (['girl', 'woman'].includes(genderTerm)) gender = 'female';
+
+    // Determine if child or adult
+    const isChild = age < 18 || ['boy', 'girl', 'child', 'baby', 'toddler', 'teen', 'teenager'].includes(genderTerm);
+
+    characterInfo[name] = {
+      age,
+      ageCategory,
+      gender,
+      isChild,
+      genderTerm
+    };
+  }
+
+  // If pattern didn't match, try simpler pattern for older formats
+  if (Object.keys(characterInfo).length === 0) {
+    // Try: "Name (7 years old, boy)" or "Name, 7 years old, boy"
+    const simplePattern = /([A-Z][a-z]+)[\s,]+(\d+)\s*years?\s*old,?\s*(boy|girl|man|woman)/gi;
+    while ((match = simplePattern.exec(prompt)) !== null) {
+      const name = match[1].trim();
+      const age = parseInt(match[2], 10);
+      const genderTerm = match[3].toLowerCase();
+      const gender = ['boy', 'man'].includes(genderTerm) ? 'male' : 'female';
+      const isChild = age < 18 || ['boy', 'girl'].includes(genderTerm);
+
+      characterInfo[name] = { age, gender, isChild, genderTerm };
+    }
+  }
+
+  return characterInfo;
+}
+
 function extractSceneMetadata(sceneDescription) {
   if (!sceneDescription || typeof sceneDescription !== 'string') return null;
 
@@ -3356,5 +3412,8 @@ module.exports = {
   // Position utilities
   expandPositionAbbreviations,
   normalizePositionToLCR,
-  POSITION_ABBREVIATIONS
+  POSITION_ABBREVIATIONS,
+
+  // Character parsing for bbox matching
+  parseCharacterDescriptions
 };
