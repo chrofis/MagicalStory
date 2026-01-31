@@ -467,10 +467,29 @@ export interface FinalChecksReport {
     cellComparisons?: Array<{
       letter: string;
       pageNumber: number;
+      clothingCategory?: string;
       before: string;
       after: string;
       diff: string;
     }>;
+    // NEW: Per-clothing-group results
+    gridsByClothing?: Array<{
+      clothingCategory: string;
+      cropCount: number;
+      gridBefore: string;
+      gridAfter: string;
+      gridDiff?: string | null;
+      referenceUsed: 'styled' | 'original';
+      cellComparisons: Array<{
+        letter: string;
+        pageNumber: number;
+        clothingCategory: string;
+        before: string;
+        after: string;
+        diff: string;
+      }>;
+    }>;
+    clothingGroupCount?: number;
     usage?: {
       promptTokenCount?: number;
       candidatesTokenCount?: number;

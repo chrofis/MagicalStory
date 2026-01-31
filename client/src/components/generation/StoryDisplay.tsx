@@ -2326,18 +2326,90 @@ export function StoryDisplay({
                                 </div>
                               )}
 
-                              {/* Repair Results - Show per-cell before/after/diff */}
+                              {/* Repair Results - Show per-cell before/after/diff grouped by clothing */}
                               {finalChecksReport.entityRepairs?.[grid.entityName] && (
                                 <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium text-green-600">✓ Repaired</span>
                                     <span className="text-[10px] text-gray-400">
                                       {finalChecksReport.entityRepairs[grid.entityName].cellsRepaired} pages updated
+                                      {finalChecksReport.entityRepairs[grid.entityName].clothingGroupCount &&
+                                       finalChecksReport.entityRepairs[grid.entityName].clothingGroupCount > 1 &&
+                                        ` (${finalChecksReport.entityRepairs[grid.entityName].clothingGroupCount} clothing groups)`}
                                     </span>
                                   </div>
 
-                                  {/* Per-cell comparisons (if available) */}
-                                  {finalChecksReport.entityRepairs[grid.entityName].cellComparisons?.length ? (
+                                  {/* NEW: Grouped by clothing category */}
+                                  {finalChecksReport.entityRepairs[grid.entityName].gridsByClothing?.length ? (
+                                    <div className="space-y-4">
+                                      {finalChecksReport.entityRepairs[grid.entityName].gridsByClothing!.map((clothingGroup) => (
+                                        <div key={clothingGroup.clothingCategory} className="space-y-2">
+                                          {/* Clothing category header */}
+                                          <div className="flex items-center gap-2 border-b border-gray-100 pb-1">
+                                            <span className="text-[10px] font-semibold text-gray-600 uppercase">
+                                              {clothingGroup.clothingCategory}
+                                            </span>
+                                            <span className="text-[9px] text-gray-400">
+                                              ({clothingGroup.cropCount} pages)
+                                            </span>
+                                            <span className="text-[9px] text-gray-400 ml-auto">
+                                              ref: {clothingGroup.referenceUsed}
+                                            </span>
+                                          </div>
+
+                                          {/* Per-cell comparisons within this clothing group */}
+                                          {clothingGroup.cellComparisons?.length ? (
+                                            <div className="space-y-1">
+                                              <div className="grid grid-cols-4 gap-1 text-[9px] font-medium text-gray-500 px-1">
+                                                <span>Cell</span>
+                                                <span>Before</span>
+                                                <span>After</span>
+                                                <span>Diff</span>
+                                              </div>
+                                              {clothingGroup.cellComparisons.map((cell) => (
+                                                <div key={`${clothingGroup.clothingCategory}-${cell.letter}`} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
+                                                  <div className="text-center">
+                                                    <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
+                                                    <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
+                                                  </div>
+                                                  <img src={cell.before} alt={`${cell.letter} before`} className="w-full h-auto rounded" />
+                                                  <img src={cell.after} alt={`${cell.letter} after`} className="w-full h-auto rounded" />
+                                                  <div className="bg-gray-900 rounded">
+                                                    <img src={cell.diff} alt={`${cell.letter} diff`} className="w-full h-auto rounded" />
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ) : (
+                                            /* Fallback to grid comparison for this clothing group */
+                                            <div className={`grid gap-2 ${clothingGroup.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                              <div className="space-y-0.5">
+                                                <span className="text-[9px] font-medium text-gray-500">Before</span>
+                                                <div className="bg-gray-50 rounded p-0.5">
+                                                  <img src={clothingGroup.gridBefore} alt="Before repair" className="w-full h-auto rounded" />
+                                                </div>
+                                              </div>
+                                              <div className="space-y-0.5">
+                                                <span className="text-[9px] font-medium text-gray-500">After</span>
+                                                <div className="bg-gray-50 rounded p-0.5">
+                                                  <img src={clothingGroup.gridAfter} alt="After repair" className="w-full h-auto rounded" />
+                                                </div>
+                                              </div>
+                                              {clothingGroup.gridDiff && (
+                                                <div className="space-y-0.5">
+                                                  <span className="text-[9px] font-medium text-gray-500">Diff</span>
+                                                  <div className="bg-gray-900 rounded p-0.5">
+                                                    <img src={clothingGroup.gridDiff} alt="Difference" className="w-full h-auto rounded" />
+                                                  </div>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : finalChecksReport.entityRepairs[grid.entityName].cellComparisons?.length ? (
+                                    /* Backward compatible: flat cell comparisons (old format) */
                                     <div className="space-y-2">
                                       <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
                                         <span>Cell</span>
@@ -2360,7 +2432,7 @@ export function StoryDisplay({
                                       ))}
                                     </div>
                                   ) : (
-                                    /* Fallback to full grid comparison for older repairs */
+                                    /* Fallback to full grid comparison for oldest repairs */
                                     <div className={`grid gap-3 ${finalChecksReport.entityRepairs[grid.entityName].gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
                                       <div className="space-y-1">
                                         <span className="text-[10px] font-medium text-gray-500">Before Repair</span>

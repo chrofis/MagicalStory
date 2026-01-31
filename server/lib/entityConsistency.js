@@ -26,6 +26,40 @@ const MIN_APPEARANCES = 2;    // Minimum appearances to check consistency
 const MAX_GRID_CELLS = 12;    // Maximum cells per grid (4x3)
 
 /**
+ * Get the appropriate styled avatar for a character based on clothing category
+ *
+ * @param {object} character - Character object with avatars
+ * @param {string} artStyle - Art style (e.g., 'pixar', 'watercolor')
+ * @param {string} clothingCategory - Clothing category (e.g., 'standard', 'winter', 'costumed:pirate')
+ * @returns {string|null} Styled avatar URL/data URI, or null if not found
+ */
+function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
+  const avatars = character.avatars;
+  if (!avatars?.styledAvatars?.[artStyle]) {
+    // Fallback to original photo if no styled avatars
+    return character.photoUrl || character.photo || null;
+  }
+
+  const styledForArt = avatars.styledAvatars[artStyle];
+
+  // Handle costumed categories (e.g., "costumed:pirate")
+  if (clothingCategory.startsWith('costumed:')) {
+    const costumeType = clothingCategory.replace('costumed:', '');
+    const costumedAvatar = styledForArt.costumed?.[costumeType];
+    if (costumedAvatar) return costumedAvatar;
+    // Fallback to standard styled if costume not found
+    return styledForArt.standard || character.photoUrl || character.photo || null;
+  }
+
+  // Handle standard categories (standard, winter, summer)
+  const styledAvatar = styledForArt[clothingCategory];
+  if (styledAvatar) return styledAvatar;
+
+  // Fallback chain: requested → standard → original
+  return styledForArt.standard || character.photoUrl || character.photo || null;
+}
+
+/**
  * Run entity-grouped consistency checks on a completed story
  *
  * @param {object} storyData - Story data with sceneImages
@@ -816,12 +850,13 @@ const REPAIR_MODEL = 'gemini-2.5-flash-image';
 
 /**
  * Repair entity consistency by regenerating problematic cells to match reference
+ * Groups crops by clothing category and uses appropriate styled avatar for each group
  *
- * @param {object} storyData - Story data with sceneImages
- * @param {object} character - Character object with name and photoUrl
+ * @param {object} storyData - Story data with sceneImages and artStyle
+ * @param {object} character - Character object with name, photoUrl, and avatars
  * @param {object} entityReport - Entity consistency report from runEntityConsistencyChecks
  * @param {object} options - Repair options
- * @returns {Promise<object>} Repair result with updated images
+ * @returns {Promise<object>} Repair result with updated images grouped by clothing
  */
 async function repairEntityConsistency(storyData, character, entityReport, options = {}) {
   const charName = character.name;
@@ -838,6 +873,9 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
   log.info(`🔧 [ENTITY-REPAIR] Starting repair for ${charName} (current score: ${charReport.score})`);
 
   try {
+    // Get artStyle from storyData
+    const artStyle = storyData.artStyle || 'pixar';
+
     // Step 1: Collect entity appearances with forRegeneration=true
     const sceneImages = storyData.sceneImages || [];
     const entityAppearances = collectEntityAppearances(sceneImages, [character]);
@@ -850,268 +888,300 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
     // Step 2: Extract crops with paddedBox and originalImageData for compositing
     const crops = await extractEntityCrops(appearances, { forRegeneration: true });
 
-    if (crops.length < 2) {
+    if (crops.length < 1) {
       return { success: false, error: `Not enough valid crops for ${charName}` };
     }
 
-    // Step 3: Create repair grid with reference photo
-    const referencePhoto = character.photoUrl || character.photo;
-    const gridResult = await createEntityGrid(crops, charName, referencePhoto);
+    // Step 3: Group crops by clothing category
+    const cropsByClothing = new Map();
+    for (const crop of crops) {
+      const clothing = crop.clothing || 'standard';
+      if (!cropsByClothing.has(clothing)) {
+        cropsByClothing.set(clothing, []);
+      }
+      cropsByClothing.get(clothing).push(crop);
+    }
 
-    // Step 4: Build repair prompt
+    log.info(`🔧 [ENTITY-REPAIR] Grouped into ${cropsByClothing.size} clothing categories: ${[...cropsByClothing.keys()].join(', ')}`);
+
+    // Step 4: Load repair prompt template
     const promptTemplate = PROMPT_TEMPLATES.entityConsistencyRepair;
     if (!promptTemplate) {
       log.error('❌ [ENTITY-REPAIR] Missing prompt template: entity-consistency-repair.txt');
       return { success: false, error: 'Missing repair prompt template' };
     }
 
-    // Build cell info for prompt
-    const cellLetters = crops.map((_, i) => String.fromCharCode(65 + i));
-    const lastLetter = cellLetters[cellLetters.length - 1];
+    // Step 5: Process each clothing group separately
+    const allUpdatedImages = [];
+    const allCellComparisons = [];
+    const gridsByClothing = [];
+    let totalUsage = { promptTokenCount: 0, candidatesTokenCount: 0, totalTokenCount: 0 };
 
-    const cellInfo = crops.map((crop, i) => ({
-      cell: cellLetters[i],
-      page: crop.pageNumber,
-      clothing: crop.clothing || 'standard',
-      cropType: crop.cropType
-    }));
-
-    // Determine clothing instructions based on cell clothing variations
-    const clothingTypes = [...new Set(crops.map(c => c.clothing || 'standard'))];
-    const clothingInstructions = clothingTypes.length > 1
-      ? `Different clothing is EXPECTED between cells with different clothing categories (${clothingTypes.join(', ')}). Only match the character's physical appearance, not their outfit.`
-      : `All cells show the character in "${clothingTypes[0]}" clothing. Match both physical appearance and clothing style.`;
-
-    const prompt = promptTemplate
-      .replace(/\{ENTITY_TYPE\}/g, 'character')
-      .replace(/\{ENTITY_NAME\}/g, charName)
-      .replace(/\{LAST_LETTER\}/g, lastLetter)
-      .replace(/\{CELL_INFO\}/g, JSON.stringify(cellInfo, null, 2))
-      .replace(/\{CLOTHING_INSTRUCTIONS\}/g, clothingInstructions);
-
-    // Step 5: Send to Gemini for repair
-    log.info(`🔧 [ENTITY-REPAIR] Sending grid to Gemini for repair (${crops.length} cells)`);
-
-    const model = genAI.getGenerativeModel({
-      model: REPAIR_MODEL,
-      generationConfig: {
-        responseModalities: ['IMAGE', 'TEXT'],
-        temperature: 0.5
-      }
-    });
-
-    const result = await model.generateContent([
-      prompt,
-      {
-        inlineData: {
-          mimeType: 'image/jpeg',
-          data: gridResult.buffer.toString('base64')
-        }
-      }
-    ]);
-
-    const response = result.response;
-    const parts = response.candidates?.[0]?.content?.parts || [];
-
-    let repairedGridBuffer = null;
-    let textResponse = '';
-
-    for (const part of parts) {
-      if (part.inlineData?.data) {
-        repairedGridBuffer = Buffer.from(part.inlineData.data, 'base64');
-      } else if (part.text) {
-        textResponse = part.text;
-      }
-    }
-
-    if (!repairedGridBuffer) {
-      log.warn(`⚠️  [ENTITY-REPAIR] Gemini returned text instead of image: ${textResponse.substring(0, 100)}`);
-      return { success: false, error: 'Gemini did not return repaired image' };
-    }
-
-    // Step 6: Extract repaired regions from grid
-    log.info(`🔧 [ENTITY-REPAIR] Extracting repaired regions from grid`);
-
-    const repairedMeta = await sharp(repairedGridBuffer).metadata();
-    const originalMeta = gridResult.manifest.dimensions;
-
-    // Calculate scale factors
-    const scaleX = repairedMeta.width / originalMeta.width;
-    const scaleY = repairedMeta.height / originalMeta.height;
-
-    const repairedCells = [];
-    const cellSize = gridResult.manifest.cellSize;
-    const hasReference = !!referencePhoto;
-
-    for (let i = 0; i < crops.length; i++) {
-      const crop = crops[i];
-      const letter = cellLetters[i];
-      const cellPos = gridResult.cellMap[letter];
-
-      if (!cellPos) {
-        log.warn(`⚠️  [ENTITY-REPAIR] No cell position found for ${letter}`);
-        continue;
-      }
-
-      // Scale cell position to repaired grid dimensions
-      const scaledX = Math.round(cellPos.x * scaleX);
-      const scaledY = Math.round(cellPos.y * scaleY);
-      const scaledWidth = Math.round(cellPos.width * scaleX);
-      const scaledHeight = Math.round(cellPos.height * scaleY);
-
-      // Clamp to image bounds
-      const left = Math.max(0, Math.min(scaledX, repairedMeta.width - 1));
-      const top = Math.max(0, Math.min(scaledY, repairedMeta.height - 1));
-      const width = Math.min(scaledWidth, repairedMeta.width - left);
-      const height = Math.min(scaledHeight, repairedMeta.height - top);
-
-      try {
-        const cellBuffer = await sharp(repairedGridBuffer)
-          .extract({ left, top, width, height })
-          .png()  // Keep lossless for compositing
-          .toBuffer();
-
-        repairedCells.push({
-          letter,
-          pageNumber: crop.pageNumber,
-          buffer: cellBuffer,
-          paddedBox: crop.paddedBox,
-          originalImageData: crop.originalImageData
-        });
-      } catch (err) {
-        log.error(`❌ [ENTITY-REPAIR] Failed to extract cell ${letter}: ${err.message}`);
-      }
-    }
-
-    // Step 7: Composite repaired cells back onto original pages
-    log.info(`🔧 [ENTITY-REPAIR] Compositing ${repairedCells.length} repaired cells back to pages`);
-
-    const updatedImages = [];
     const { applyVerifiedRepairs } = require('./repairVerification');
 
-    for (const cell of repairedCells) {
-      if (!cell.originalImageData || !cell.paddedBox) {
-        log.warn(`⚠️  [ENTITY-REPAIR] Missing data for page ${cell.pageNumber}`);
-        continue;
-      }
+    for (const [clothingCategory, clothingCrops] of cropsByClothing) {
+      if (clothingCrops.length < 1) continue;
 
-      try {
-        // Create repair object for applyVerifiedRepairs
-        const repair = {
-          accepted: true,
-          buffer: cell.buffer,
-          issue: {
-            extraction: {
-              paddedBox: cell.paddedBox
-            }
+      // Get appropriate styled avatar as reference for this clothing category
+      const referencePhoto = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+      log.info(`🔧 [ENTITY-REPAIR] Processing "${clothingCategory}" (${clothingCrops.length} crops) with ${referencePhoto ? 'styled' : 'no'} reference`);
+
+      // Create grid for this clothing group
+      const gridResult = await createEntityGrid(clothingCrops, `${charName} (${clothingCategory})`, referencePhoto);
+
+      // Build cell info for prompt
+      const cellLetters = clothingCrops.map((_, i) => String.fromCharCode(65 + i));
+      const lastLetter = cellLetters[cellLetters.length - 1];
+
+      const cellInfo = clothingCrops.map((crop, i) => ({
+        cell: cellLetters[i],
+        page: crop.pageNumber,
+        clothing: clothingCategory,
+        cropType: crop.cropType
+      }));
+
+      // Since all cells in this group have the same clothing, we match both appearance and clothing
+      const clothingInstructions = `All cells show the character in "${clothingCategory}" clothing. Match both physical appearance and clothing style.`;
+
+      const prompt = promptTemplate
+        .replace(/\{ENTITY_TYPE\}/g, 'character')
+        .replace(/\{ENTITY_NAME\}/g, charName)
+        .replace(/\{LAST_LETTER\}/g, lastLetter)
+        .replace(/\{CELL_INFO\}/g, JSON.stringify(cellInfo, null, 2))
+        .replace(/\{CLOTHING_INSTRUCTIONS\}/g, clothingInstructions);
+
+      // Send to Gemini for repair
+      log.info(`🔧 [ENTITY-REPAIR] Sending ${clothingCategory} grid to Gemini for repair (${clothingCrops.length} cells)`);
+
+      const model = genAI.getGenerativeModel({
+        model: REPAIR_MODEL,
+        generationConfig: {
+          responseModalities: ['IMAGE', 'TEXT'],
+          temperature: 0.5
+        }
+      });
+
+      const result = await model.generateContent([
+        prompt,
+        {
+          inlineData: {
+            mimeType: 'image/jpeg',
+            data: gridResult.buffer.toString('base64')
           }
-        };
+        }
+      ]);
 
-        const repairedImageBuffer = await applyVerifiedRepairs(cell.originalImageData, [repair]);
-        const repairedImageData = `data:image/jpeg;base64,${repairedImageBuffer.toString('base64')}`;
+      const response = result.response;
+      const parts = response.candidates?.[0]?.content?.parts || [];
 
-        updatedImages.push({
-          pageNumber: cell.pageNumber,
-          imageData: repairedImageData,
-          letter: cell.letter
-        });
+      let repairedGridBuffer = null;
+      let textResponse = '';
 
-        log.info(`✅ [ENTITY-REPAIR] Page ${cell.pageNumber} repaired`);
-      } catch (err) {
-        log.error(`❌ [ENTITY-REPAIR] Failed to composite page ${cell.pageNumber}: ${err.message}`);
-      }
-    }
-
-    // Generate diff image (absolute difference between before and after)
-    let gridDiff = null;
-    try {
-      // Get metadata for both images
-      const beforeMeta = await sharp(gridResult.buffer).metadata();
-      const afterMeta = await sharp(repairedGridBuffer).metadata();
-
-      // Resize after to match before if needed (Gemini may change size)
-      let afterResized = repairedGridBuffer;
-      if (beforeMeta.width !== afterMeta.width || beforeMeta.height !== afterMeta.height) {
-        afterResized = await sharp(repairedGridBuffer)
-          .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
-          .toBuffer();
+      for (const part of parts) {
+        if (part.inlineData?.data) {
+          repairedGridBuffer = Buffer.from(part.inlineData.data, 'base64');
+        } else if (part.text) {
+          textResponse = part.text;
+        }
       }
 
-      // Create difference image
-      const diffBuffer = await sharp(gridResult.buffer)
-        .composite([{
-          input: afterResized,
-          blend: 'difference'
-        }])
-        .modulate({ brightness: 3 })  // Amplify differences to make them visible
-        .jpeg({ quality: 90 })
-        .toBuffer();
+      if (!repairedGridBuffer) {
+        log.warn(`⚠️  [ENTITY-REPAIR] Gemini returned text instead of image for ${clothingCategory}: ${textResponse.substring(0, 100)}`);
+        continue;  // Skip this clothing group but continue with others
+      }
 
-      gridDiff = `data:image/jpeg;base64,${diffBuffer.toString('base64')}`;
-      log.info(`🔧 [ENTITY-REPAIR] Generated diff image (${beforeMeta.width}x${beforeMeta.height})`);
-    } catch (diffErr) {
-      log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate diff: ${diffErr.message}`);
-    }
+      // Track usage
+      if (response.usageMetadata) {
+        totalUsage.promptTokenCount += response.usageMetadata.promptTokenCount || 0;
+        totalUsage.candidatesTokenCount += response.usageMetadata.candidatesTokenCount || 0;
+        totalUsage.totalTokenCount += response.usageMetadata.totalTokenCount || 0;
+      }
 
-    // Generate per-cell comparisons (before/after/diff for each cell)
-    const cellComparisons = [];
-    for (let i = 0; i < crops.length; i++) {
-      const crop = crops[i];
-      const repairedCell = repairedCells.find(c => c.letter === cellLetters[i]);
-      if (!repairedCell) continue;
+      // Extract repaired regions from grid
+      const repairedMeta = await sharp(repairedGridBuffer).metadata();
+      const originalMeta = gridResult.manifest.dimensions;
 
+      const scaleX = repairedMeta.width / originalMeta.width;
+      const scaleY = repairedMeta.height / originalMeta.height;
+
+      const repairedCells = [];
+
+      for (let i = 0; i < clothingCrops.length; i++) {
+        const crop = clothingCrops[i];
+        const letter = cellLetters[i];
+        const cellPos = gridResult.cellMap[letter];
+
+        if (!cellPos) {
+          log.warn(`⚠️  [ENTITY-REPAIR] No cell position found for ${letter}`);
+          continue;
+        }
+
+        const scaledX = Math.round(cellPos.x * scaleX);
+        const scaledY = Math.round(cellPos.y * scaleY);
+        const scaledWidth = Math.round(cellPos.width * scaleX);
+        const scaledHeight = Math.round(cellPos.height * scaleY);
+
+        const left = Math.max(0, Math.min(scaledX, repairedMeta.width - 1));
+        const top = Math.max(0, Math.min(scaledY, repairedMeta.height - 1));
+        const width = Math.min(scaledWidth, repairedMeta.width - left);
+        const height = Math.min(scaledHeight, repairedMeta.height - top);
+
+        try {
+          const cellBuffer = await sharp(repairedGridBuffer)
+            .extract({ left, top, width, height })
+            .png()
+            .toBuffer();
+
+          repairedCells.push({
+            letter,
+            pageNumber: crop.pageNumber,
+            buffer: cellBuffer,
+            paddedBox: crop.paddedBox,
+            originalImageData: crop.originalImageData
+          });
+        } catch (err) {
+          log.error(`❌ [ENTITY-REPAIR] Failed to extract cell ${letter}: ${err.message}`);
+        }
+      }
+
+      // Composite repaired cells back onto original pages
+      for (const cell of repairedCells) {
+        if (!cell.originalImageData || !cell.paddedBox) {
+          log.warn(`⚠️  [ENTITY-REPAIR] Missing data for page ${cell.pageNumber}`);
+          continue;
+        }
+
+        try {
+          const repair = {
+            accepted: true,
+            buffer: cell.buffer,
+            issue: {
+              extraction: {
+                paddedBox: cell.paddedBox
+              }
+            }
+          };
+
+          const repairedImageBuffer = await applyVerifiedRepairs(cell.originalImageData, [repair]);
+          const repairedImageData = `data:image/jpeg;base64,${repairedImageBuffer.toString('base64')}`;
+
+          allUpdatedImages.push({
+            pageNumber: cell.pageNumber,
+            imageData: repairedImageData,
+            letter: cell.letter,
+            clothingCategory
+          });
+
+          log.info(`✅ [ENTITY-REPAIR] Page ${cell.pageNumber} (${clothingCategory}) repaired`);
+        } catch (err) {
+          log.error(`❌ [ENTITY-REPAIR] Failed to composite page ${cell.pageNumber}: ${err.message}`);
+        }
+      }
+
+      // Generate per-cell comparisons for this clothing group
+      const groupCellComparisons = [];
+      for (let i = 0; i < clothingCrops.length; i++) {
+        const crop = clothingCrops[i];
+        const repairedCell = repairedCells.find(c => c.letter === cellLetters[i]);
+        if (!repairedCell) continue;
+
+        try {
+          const beforeBuffer = crop.buffer;
+          const afterBuffer = repairedCell.buffer;
+
+          const beforeMeta = await sharp(beforeBuffer).metadata();
+          const afterMeta = await sharp(afterBuffer).metadata();
+
+          let afterResized = afterBuffer;
+          if (beforeMeta.width !== afterMeta.width || beforeMeta.height !== afterMeta.height) {
+            afterResized = await sharp(afterBuffer)
+              .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
+              .toBuffer();
+          }
+
+          const cellDiffBuffer = await sharp(beforeBuffer)
+            .composite([{ input: afterResized, blend: 'difference' }])
+            .modulate({ brightness: 3 })
+            .jpeg({ quality: 90 })
+            .toBuffer();
+
+          const comparison = {
+            letter: cellLetters[i],
+            pageNumber: crop.pageNumber,
+            clothingCategory,
+            before: `data:image/jpeg;base64,${beforeBuffer.toString('base64')}`,
+            after: `data:image/jpeg;base64,${afterBuffer.toString('base64')}`,
+            diff: `data:image/jpeg;base64,${cellDiffBuffer.toString('base64')}`
+          };
+
+          groupCellComparisons.push(comparison);
+          allCellComparisons.push(comparison);
+        } catch (cellErr) {
+          log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate cell comparison for ${cellLetters[i]}: ${cellErr.message}`);
+        }
+      }
+
+      // Generate grid diff
+      let gridDiff = null;
       try {
-        // Get the original crop buffer
-        const beforeBuffer = crop.buffer;
-        const afterBuffer = repairedCell.buffer;
+        const beforeMeta = await sharp(gridResult.buffer).metadata();
+        const afterMeta = await sharp(repairedGridBuffer).metadata();
 
-        // Resize after to match before dimensions for diff
-        const beforeMeta = await sharp(beforeBuffer).metadata();
-        const afterMeta = await sharp(afterBuffer).metadata();
-
-        let afterResized = afterBuffer;
+        let afterResized = repairedGridBuffer;
         if (beforeMeta.width !== afterMeta.width || beforeMeta.height !== afterMeta.height) {
-          afterResized = await sharp(afterBuffer)
+          afterResized = await sharp(repairedGridBuffer)
             .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
             .toBuffer();
         }
 
-        // Create cell diff
-        const cellDiffBuffer = await sharp(beforeBuffer)
+        const diffBuffer = await sharp(gridResult.buffer)
           .composite([{ input: afterResized, blend: 'difference' }])
           .modulate({ brightness: 3 })
           .jpeg({ quality: 90 })
           .toBuffer();
 
-        cellComparisons.push({
-          letter: cellLetters[i],
-          pageNumber: crop.pageNumber,
-          before: `data:image/jpeg;base64,${beforeBuffer.toString('base64')}`,
-          after: `data:image/jpeg;base64,${afterBuffer.toString('base64')}`,
-          diff: `data:image/jpeg;base64,${cellDiffBuffer.toString('base64')}`
-        });
-      } catch (cellErr) {
-        log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate cell comparison for ${cellLetters[i]}: ${cellErr.message}`);
+        gridDiff = `data:image/jpeg;base64,${diffBuffer.toString('base64')}`;
+      } catch (diffErr) {
+        log.warn(`⚠️ [ENTITY-REPAIR] Failed to generate diff for ${clothingCategory}: ${diffErr.message}`);
       }
-    }
-    log.info(`🔧 [ENTITY-REPAIR] Generated ${cellComparisons.length} cell comparisons`);
 
-    // Build result
+      // Store this clothing group's results
+      gridsByClothing.push({
+        clothingCategory,
+        cropCount: clothingCrops.length,
+        gridBefore: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+        gridAfter: `data:image/jpeg;base64,${repairedGridBuffer.toString('base64')}`,
+        gridDiff,
+        referenceUsed: referencePhoto ? 'styled' : 'original',
+        cellComparisons: groupCellComparisons
+      });
+    }
+
+    log.info(`🔧 [ENTITY-REPAIR] Generated ${allCellComparisons.length} total cell comparisons across ${gridsByClothing.length} clothing groups`);
+
+    // Build combined result
+    // For backward compatibility, use the first grid's before/after as the main grid
+    const firstGrid = gridsByClothing[0] || {};
+
     const repairResult = {
       success: true,
       entityName: charName,
       entityType: 'character',
       originalScore: charReport.score,
-      cellsRepaired: updatedImages.length,
-      updatedImages,
-      gridBeforeRepair: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-      gridAfterRepair: `data:image/jpeg;base64,${repairedGridBuffer.toString('base64')}`,
-      gridDiff,
-      cellComparisons,  // Per-cell before/after/diff
-      usage: response.usageMetadata
+      cellsRepaired: allUpdatedImages.length,
+      updatedImages: allUpdatedImages,
+      // Backward compatible fields (from first/only clothing group)
+      gridBeforeRepair: firstGrid.gridBefore || null,
+      gridAfterRepair: firstGrid.gridAfter || null,
+      gridDiff: firstGrid.gridDiff || null,
+      cellComparisons: allCellComparisons,
+      // NEW: Per-clothing-group results
+      gridsByClothing,
+      clothingGroupCount: gridsByClothing.length,
+      usage: totalUsage
     };
 
-    log.info(`✅ [ENTITY-REPAIR] Repair complete for ${charName}: ${updatedImages.length} pages updated`);
+    log.info(`✅ [ENTITY-REPAIR] Repair complete for ${charName}: ${allUpdatedImages.length} pages updated across ${gridsByClothing.length} clothing groups`);
 
     return repairResult;
 
@@ -1194,6 +1264,7 @@ module.exports = {
   extractCropFromImage,
   createEntityGrid,
   evaluateEntityConsistency,
+  getStyledAvatarForClothing,
   saveEntityGrid,
   saveEntityGrids,
 
