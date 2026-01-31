@@ -2934,15 +2934,49 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
           );
 
           if (gridResult.repaired && gridResult.imageData) {
-            repairResult = {
-              imageData: gridResult.imageData,
-              repaired: true,
-              method: 'grid',
-              fixedCount: gridResult.fixedCount,
-              totalIssues: gridResult.totalIssues
-            };
-            results.repaired.set(pageNum, repairResult);
-            log.info(`✅ [REPAIR EXEC] Page ${pageNum}: ${gridResult.fixedCount}/${gridResult.totalIssues} issues fixed`);
+            // Re-evaluate repaired image to compare with original
+            const originalScore = evaluation?.qualityScore ?? 0;
+            const reEvalResult = await evaluateImageQuality(
+              gridResult.imageData,
+              page.prompt || '',
+              page.characterPhotos || [],
+              'scene',
+              modelOverrides?.qualityModel,
+              `PAGE ${pageNum} (post-repair)`
+            );
+            const repairedScore = reEvalResult?.score ?? 0;
+
+            // Track quality eval usage
+            if (usageTracker && reEvalResult?.usage) {
+              usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+            }
+
+            // Use repaired only if score improved OR grid repair verified fixes
+            const hasVerifiedFixes = gridResult.fixedCount > 0;
+            const scoreImproved = repairedScore > originalScore;
+
+            if (scoreImproved || hasVerifiedFixes) {
+              repairResult = {
+                imageData: gridResult.imageData,
+                repaired: true,
+                method: 'grid',
+                fixedCount: gridResult.fixedCount,
+                totalIssues: gridResult.totalIssues,
+                originalScore,
+                repairedScore
+              };
+              results.repaired.set(pageNum, repairResult);
+              log.info(`✅ [REPAIR EXEC] Page ${pageNum}: ${gridResult.fixedCount}/${gridResult.totalIssues} issues fixed (score: ${originalScore}% → ${repairedScore}%)`);
+            } else {
+              // Repair made it worse or no improvement - keep original
+              results.failed.set(pageNum, {
+                error: 'Repair did not improve score',
+                originalScore,
+                repairedScore,
+                keptOriginal: true
+              });
+              log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Repair rejected (score: ${originalScore}% → ${repairedScore}%), keeping original`);
+            }
           } else {
             results.failed.set(pageNum, { error: 'Grid repair failed', result: gridResult });
             log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Grid repair failed`);
@@ -2958,13 +2992,43 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
           );
 
           if (inpaintResult.repaired && inpaintResult.imageData) {
-            repairResult = {
-              imageData: inpaintResult.imageData,
-              repaired: true,
-              method: 'inpaint'
-            };
-            results.repaired.set(pageNum, repairResult);
-            log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Inpaint repair completed`);
+            // Re-evaluate repaired image to compare with original
+            const originalScore = evaluation?.qualityScore ?? 0;
+            const reEvalResult = await evaluateImageQuality(
+              inpaintResult.imageData,
+              page.prompt || '',
+              page.characterPhotos || [],
+              'scene',
+              modelOverrides?.qualityModel,
+              `PAGE ${pageNum} (post-repair)`
+            );
+            const repairedScore = reEvalResult?.score ?? 0;
+
+            // Track quality eval usage
+            if (usageTracker && reEvalResult?.usage) {
+              usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+            }
+
+            if (repairedScore > originalScore) {
+              repairResult = {
+                imageData: inpaintResult.imageData,
+                repaired: true,
+                method: 'inpaint',
+                originalScore,
+                repairedScore
+              };
+              results.repaired.set(pageNum, repairResult);
+              log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Inpaint repair completed (score: ${originalScore}% → ${repairedScore}%)`);
+            } else {
+              // Repair made it worse - keep original
+              results.failed.set(pageNum, {
+                error: 'Repair did not improve score',
+                originalScore,
+                repairedScore,
+                keptOriginal: true
+              });
+              log.warn(`⚠️  [REPAIR EXEC] Page ${pageNum}: Inpaint rejected (score: ${originalScore}% → ${repairedScore}%), keeping original`);
+            }
           } else {
             results.failed.set(pageNum, { error: 'Inpaint repair failed' });
           }
