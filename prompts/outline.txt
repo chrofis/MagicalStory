@@ -141,7 +141,7 @@ Beyond color differences, each character must have a **structurally different ou
 
 # Part 2: Visual Bible (for Illustration Consistency)
 
-List ALL recurring visual elements that appear in MORE THAN ONE scene. This ensures consistent illustrations throughout the book.
+List ONLY recurring visual elements that appear in 2 or more scenes. Skip one-time elements. This ensures consistent illustrations throughout the book.
 
 **Why this matters:** Each illustration is generated independently. Without detailed descriptions, a white cat in scene 3 might become a brown cat in scene 8. The Visual Bible ensures consistency.
 
@@ -216,7 +216,7 @@ For famous buildings, monuments, or natural wonders that exist in reality:
 2. **One signature element** - Unique and easy to recognize
 3. **Self-contained description** - Works without seeing other scenes
 
-**NOTE:** Only include elements appearing in 2+ scenes. Never include {CHARACTER_NAMES} - they are main characters with reference photos.
+**NOTE:** Skip elements that appear on only 1 page. If `pages` array has only 1 entry, don't include it. Never include {CHARACTER_NAMES} - they are main characters with reference photos.
 
 ---
 
@@ -455,7 +455,7 @@ For EACH of the {PAGES} story pages, provide:
 }
 ```
 
-(Use empty arrays `[]` for categories with no elements. Include ONLY elements appearing in 2+ scenes.)
+(Use empty arrays `[]` for categories. Skip any element with only 1 page appearance.)
 
 ## Cover Scenes
 
