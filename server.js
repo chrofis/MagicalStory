@@ -6869,6 +6869,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           originalReasoning: imageResult.originalReasoning || null,
           referencePhotos,  // Dev mode: which character photos were used
           landmarkPhotos: pageLandmarkPhotos,  // Dev mode: which landmark photos were used
+          visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,  // Dev mode: VB grid used
           modelId: imageResult.modelId || null
         };
 
@@ -7545,6 +7546,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalScore: imageResult.originalScore || null,
             originalReasoning: imageResult.originalReasoning || null,
             referencePhotos,
+            landmarkPhotos: pageLandmarkPhotos,
+            visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
             sceneCharacters,  // Include for incremental consistency tracking
             sceneCharacterClothing: perCharClothing  // Per-character clothing for this scene
           };
@@ -7557,6 +7560,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             prompt: null,
             error: error.message,
             referencePhotos: [],
+            landmarkPhotos: [],
+            visualBibleGrid: null,
             sceneCharacters: [],
             sceneCharacterClothing: {}
           };
@@ -7989,12 +7994,16 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
               sceneSummary = lines[0]?.substring(0, 150) || '';
             }
 
+            // Prefer stored sceneCharacterClothing (from page generation) over metadata extraction
+            // sceneCharacterClothing has the actual clothing used, e.g., {"Lukas": "costumed:pirate", "Sophie": "winter"}
+            const perCharClothing = img.sceneCharacterClothing || metadata.characterClothing || {};
+
             return {
               imageData: img.imageData,
               pageNumber: img.pageNumber || idx + 1,
               characters: metadata.characters || [],  // Which characters appear in this scene
               clothing: metadata.clothing || 'standard',  // Clothing category for this scene (legacy)
-              characterClothing: metadata.characterClothing || null,  // Per-character clothing (new JSON format)
+              characterClothing: perCharClothing,  // Per-character clothing for entity grouping
               sceneSummary,  // Brief description of what's in the scene
               // Also include character names from reference photos as fallback
               referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
@@ -9649,6 +9658,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         referencePhotos: allReferencePhotos,
         // Landmark photos (separate for frontend display)
         landmarkPhotos: pageLandmarkPhotos,
+        // Visual Bible grid (combined VB elements + secondary landmarks)
+        visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
         // Include characters info for incremental consistency tracking
         sceneCharacters,
         // Per-character clothing selections for this scene (e.g., {"Lukas": "costumed:pirate", "Franziska": "standard"})
@@ -9844,12 +9855,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneSummary = lines[0]?.substring(0, 150) || '';
             }
 
+            // Prefer stored sceneCharacterClothing (from page generation) over metadata extraction
+            // sceneCharacterClothing has the actual clothing used, e.g., {"Lukas": "costumed:pirate", "Sophie": "winter"}
+            const perCharClothing = img.sceneCharacterClothing || metadata.characterClothing || {};
+
             return {
               imageData: img.imageData,
               pageNumber: img.pageNumber || idx + 1,
               characters: metadata.characters || [],  // Which characters appear in this scene
               clothing: metadata.clothing || 'standard',  // Clothing category for this scene (legacy)
-              characterClothing: metadata.characterClothing || null,  // Per-character clothing (new JSON format)
+              characterClothing: perCharClothing,  // Per-character clothing for entity grouping
               sceneSummary,  // Brief description of what's in the scene
               // Also include character names from reference photos as fallback
               referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
@@ -11567,6 +11582,7 @@ Output Format:
               originalReasoning: imageResult.originalReasoning || null,
               referencePhotos: referencePhotos,
               landmarkPhotos: pageLandmarkPhotos,  // Dev mode: which landmark photos were used
+              visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
               modelId: imageResult.modelId || null
             };
 
@@ -12155,6 +12171,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
               originalScore: imageResult.originalScore || null,
               originalReasoning: imageResult.originalReasoning || null,
               referencePhotos: referencePhotos,  // Dev mode: which photos were used
+              landmarkPhotos: pageLandmarkPhotos,
+              visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
               modelId: imageResult.modelId || null
             };
 

@@ -339,6 +339,11 @@ function collectEntityAppearances(sceneImages, characters = []) {
     const characterClothing = img.characterClothing || {};
     const defaultClothing = img.clothing || 'standard';
 
+    // Debug: log clothing info for this page
+    if (Object.keys(characterClothing).length > 0) {
+      log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Per-char clothing: ${JSON.stringify(characterClothing)}`);
+    }
+
     // Get figures from bbox detection - now includes direct character identification via figure.name
     const figures = bboxDetection?.figures || [];
 
