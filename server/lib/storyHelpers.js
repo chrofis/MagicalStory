@@ -418,8 +418,8 @@ function extractSceneMetadata(sceneDescription) {
 
   // Try NEW JSON format first using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
-  // Support both "output" (old format) and "draft" (unified prompt format) wrappers
-  const parsedData = parsed?.output || parsed?.draft;
+  // Support both "output" (old format), "draft" (unified prompt format) wrappers, or raw JSON (direct format)
+  const parsedData = parsed?.output || parsed?.draft || parsed;
   if (parsed && parsedData && parsedData.characters) {
     // Extract per-character clothing
     const characterClothing = {};
@@ -2153,7 +2153,7 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
  * @param {string} availableAvatars - Pre-built string of available avatars per character
  * @param {Object} rawOutlineContext - Optional: raw outline blocks {previousPages: string, currentPage: string} - skips complex parsing
  */
-function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null) {
+function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortSceneDesc = '', language = 'en', visualBible = null, previousScenes = [], characterClothing = {}, correctionNotes = '', availableAvatars = '', rawOutlineContext = null, previewFeedback = null) {
   // Track Visual Bible matches for consolidated logging
   const vbMatches = [];
   const vbMisses = [];
@@ -2343,8 +2343,23 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
       sceneSummary = `Scene Summary: ${shortSceneDesc}\n\n`;
     }
 
+    // Build preview feedback section (from cheap preview before scene expansion)
+    let previewFeedbackText = '';
+    if (previewFeedback && previewFeedback.composition) {
+      previewFeedbackText = `**COMPOSITION PREVIEW:**
+A quick preview was rendered from the scene hint. Here's what it showed:
+${previewFeedback.composition}
+
+Use this as a starting point. Keep what works, fix any issues:
+- If characters are positioned well, maintain those positions
+- If pointing/gaze direction is wrong, correct it
+- If camera angle doesn't match the action, adjust it
+`;
+    }
+
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       PREVIOUS_SCENES: previousScenesText,
+      PREVIEW_FEEDBACK: previewFeedbackText,
       SCENE_SUMMARY: sceneSummary,
       SCENE_CONTEXT: sceneContextText,
       PAGE_NUMBER: pageNumber.toString(),
