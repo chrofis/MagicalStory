@@ -439,7 +439,7 @@ Examples:
 Output raw JSON (no markdown code fences, no explanation text).
 Start your response directly with the opening `{` brace.
 
-**CRITICAL: Include `previewMismatches` array** - even if empty, this field must exist.
+**CRITICAL: You MUST complete ALL fields including the `checks` object with all 17 checks.**
 
 ```
 {
@@ -447,7 +447,37 @@ Start your response directly with the opening `{` brace.
     "Intent: Manuel in center. Preview: Manuel on right side.",
     "Intent: Lukas visible. Preview: Lukas not detected in frame."
   ],
-  "issues": ["List every problem found from 17 checks - be specific"],
+  "checks": {
+    "check1_scaleFeasibility": "Camera distance: X, Detail needed: Y, Compatible: YES/NO",
+    "check2_objectPlacement": "For EACH object: [name] is VERTICAL/HORIZONTAL, position: [where]. CONSISTENT/INCONSISTENT",
+    "check3_actionCompatibility": "For EACH character-object interaction: [action] + [object orientation] = VALID/INVALID",
+    "check4_characterPositioning": "For EACH: [Name] position:[region] facing:[direction]. Geometry correct? YES/NO",
+    "check5_cameraView": "For EACH character: [Name]: [view type] = expressions compatible? YES/NO",
+    "check6_differentiation": "Each character has UNIQUE pose? YES/NO. Details: ...",
+    "check7_physics": "Ropes taut? Heavy=straining? Materials distinct? Obstacles block? YES/NO/N/A",
+    "check8_weather": "INDOOR/OUTDOOR. Weather: X. Visibility: [how shown]. Compatible: YES/NO",
+    "check9_distanceSeparation": "Distant characters separated? Gap named? What fills space? ADEQUATE/N/A",
+    "check10_locationContinuity": "Previous: X. Current: Y. Travel mentioned? Consistent: YES/NO/N/A",
+    "check11_storyTextFidelity": "Input says: [key terms]. Output shows: [what]. Match? YES/NO",
+    "check12_linearSpace": "Path: [type/none]. Orientation: [X]. Positions match? YES/NO/N/A",
+    "check13_sharedObjects": "Shared objects: [list/NONE]. Grip points defined? YES/NO/N/A",
+    "check14_obstacleLogic": "Blocking obstacles: [list/NONE]. WHY impassable explained? YES/NO/N/A",
+    "check15_holdingInventory": "For EACH: [Name] L:[item] R:[item]. Conflicts? YES/NO",
+    "check16_backgroundFeasibility": "Background elements: [list]. Viewpoint realistic? FEASIBLE/SIMPLIFY/N/A",
+    "check17_characterCount": "Main characters with faces: [count]. If >3: who to hide? PASS/FIX",
+    "pointingGazeValidation": [
+      {
+        "character": "Name",
+        "action": "pointing|looking",
+        "target": "target name",
+        "characterRegion": "bottom-right foreground",
+        "targetRegion": "top-left background",
+        "direction": "up-left",
+        "valid": "YES/NO - geometry explanation"
+      }
+    ]
+  },
+  "issues": ["List ALL problems found - be specific"],
   "corrections": ["How each issue was fixed in the scene"],
   "scene": {
     "landmarkPlacement": {
@@ -490,6 +520,7 @@ Start your response directly with the opening `{` brace.
 
 **Field Notes:**
 - `previewMismatches`: What the preview got wrong vs what was intended (empty array if no preview or no issues)
+- `checks`: **REQUIRED** - You MUST fill in ALL 17 check fields plus pointingGazeValidation. Write "N/A" for checks that don't apply, but NEVER skip a check.
 - `issues`: Problems found during 17-check validation
 - `corrections`: How each issue was fixed
 - `scene`: The final, corrected scene description
@@ -516,6 +547,36 @@ If your scene shows the bridge from across the river, select the wide exterior v
     "Intent: Sophie pointing LEFT toward tower. Preview: Sophie's arm extended RIGHT.",
     "Intent: Manuel in bottom-center. Preview: Manuel in bottom-right, partially cut off."
   ],
+  "checks": {
+    "check1_scaleFeasibility": "Camera: MEDIUM WIDE, Detail: expressions + tower partial, Compatible: YES",
+    "check2_objectPlacement": "Stadtturm: VERTICAL structure, position: top-left background. CONSISTENT",
+    "check3_actionCompatibility": "Sophie pointing at distant tower = arm extended toward it. VALID",
+    "check4_characterPositioning": "Sophie: bottom-right foreground, facing left. Manuel: bottom-left foreground, facing right. Both face inward. YES",
+    "check5_cameraView": "Sophie: three-quarter front = expressions OK. Manuel: three-quarter front = expressions OK. YES",
+    "check6_differentiation": "Sophie: standing, pointing. Manuel: walking, looking up. UNIQUE poses. YES",
+    "check7_physics": "N/A - no ropes, heavy objects, or physical interactions",
+    "check8_weather": "OUTDOOR. Weather: light snow. Visibility: directly on scene. Compatible: YES",
+    "check9_distanceSeparation": "Characters together foreground, tower distant background. Gap: snowy plaza. ADEQUATE",
+    "check10_locationContinuity": "N/A - first scene at this location",
+    "check11_storyTextFidelity": "Story: discovering the tower. Scene: pointing at tower. Match: YES",
+    "check12_linearSpace": "No path/corridor. N/A",
+    "check13_sharedObjects": "NONE - characters not sharing objects. N/A",
+    "check14_obstacleLogic": "NONE - no blocking obstacles. N/A",
+    "check15_holdingInventory": "Sophie L:empty R:pointing. Manuel L:empty R:empty. No conflicts. YES",
+    "check16_backgroundFeasibility": "Tower visible in background, outdoor scene. FEASIBLE",
+    "check17_characterCount": "2 main characters with visible faces. PASS",
+    "pointingGazeValidation": [
+      {
+        "character": "Sophie",
+        "action": "pointing",
+        "target": "Stadtturm",
+        "characterRegion": "bottom-right foreground",
+        "targetRegion": "top-left background",
+        "direction": "up-left",
+        "valid": "YES - bottom-right to top-left requires up-left direction, arm extends up-left"
+      }
+    ]
+  },
   "issues": [
     "1. Pointing geometry wrong: Sophie bottom-right pointing at tower top-left requires arm UP-LEFT, not RIGHT",
     "2. Manuel position causes overlap with Sophie - need more separation"
