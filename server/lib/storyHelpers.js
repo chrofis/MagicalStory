@@ -3303,5 +3303,9 @@ module.exports = {
   // Landmark helpers
   getLandmarkPhotosForPage,
   getLandmarkPhotosForScene,
-  buildAvailableLandmarksSection
+  buildAvailableLandmarksSection,
+
+  // Position utilities
+  expandPositionAbbreviations,
+  POSITION_ABBREVIATIONS
 };

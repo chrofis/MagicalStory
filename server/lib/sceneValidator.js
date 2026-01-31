@@ -18,6 +18,7 @@ const { generateWithRunware, RUNWARE_MODELS, isRunwareConfigured } = require('./
 const { callTextModel } = require('./textModels');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
+const { expandPositionAbbreviations } = require('./storyHelpers');
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -218,21 +219,22 @@ function buildPreviewPrompt(sceneJson) {
     parts.push(sceneJson.imageSummary);
   }
 
-  // Characters with positions
+  // Characters with positions (expand abbreviations like MC -> middle-center midground)
   if (sceneJson.characters && sceneJson.characters.length > 0) {
     for (const char of sceneJson.characters) {
       const charParts = [char.name];
-      if (char.position) charParts.push(`at ${char.position}`);
+      if (char.position) charParts.push(`at ${expandPositionAbbreviations(char.position)}`);
       if (char.pose) charParts.push(char.pose);
       if (char.action) charParts.push(char.action);
       parts.push(charParts.join(', '));
     }
   }
 
-  // Objects
+  // Objects (expand position abbreviations)
   if (sceneJson.objects && sceneJson.objects.length > 0) {
     for (const obj of sceneJson.objects) {
-      parts.push(`${obj.name} at ${obj.position || 'scene'}`);
+      const expandedPos = expandPositionAbbreviations(obj.position) || 'in scene';
+      parts.push(`${obj.name} at ${expandedPos}`);
     }
   }
 
