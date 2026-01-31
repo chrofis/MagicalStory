@@ -2735,6 +2735,147 @@ async function evaluateImageBatch(images, options = {}) {
 }
 
 /**
+ * Classify issues from an evaluation into repair categories
+ * Used by buildRepairPlan to determine the best repair method for each page
+ *
+ * @param {Object} evaluation - Single page evaluation from evaluateImageBatch
+ * @returns {Object} Classified issues: { majorIssues, styleMismatch, characterMismatches, clothingIssues }
+ */
+function classifyIssues(evaluation) {
+  const majorIssues = [];
+  const characterMismatches = [];
+  const clothingIssues = [];
+
+  // Parse the quality JSON from reasoning if available
+  let quality = {};
+  if (evaluation.reasoning) {
+    try {
+      quality = typeof evaluation.reasoning === 'string'
+        ? JSON.parse(evaluation.reasoning)
+        : evaluation.reasoning;
+    } catch (e) {
+      // If reasoning isn't JSON, use individual fields
+    }
+  }
+
+  const matches = quality.matches || evaluation.matches || [];
+  const rendering = quality.rendering || {};
+  const scene = quality.scene || {};
+  const spatial = quality.spatial || {};
+  const fixableIssues = quality.fixable_issues || evaluation.fixableIssues || [];
+
+  // Check for major issues requiring full regeneration (iterate)
+  // 1. Missing characters
+  if (scene.all_present === false || (scene.missing && scene.missing.length > 0)) {
+    majorIssues.push({
+      type: 'missing_character',
+      details: scene.missing || ['unknown'],
+      reason: `Missing character(s): ${(scene.missing || ['unknown']).join(', ')}`
+    });
+  }
+
+  // 2. Extra limbs (3+ arms/hands on a figure)
+  if (rendering.extra_limbs === true) {
+    majorIssues.push({
+      type: 'extra_limbs',
+      reason: 'Extra limbs detected (3+ arms/hands)'
+    });
+  }
+
+  // 3. Physics violations (floating people, impossible poses)
+  if (rendering.physics_ok === false) {
+    majorIssues.push({
+      type: 'physics_violation',
+      details: rendering.issues || [],
+      reason: 'Physics violation (floating, impossible poses)'
+    });
+  }
+
+  // 4. Cross eyes (eyes looking different directions)
+  if (rendering.cross_eyes === true) {
+    majorIssues.push({
+      type: 'cross_eyes',
+      reason: 'Cross-eyed character detected'
+    });
+  }
+
+  // 5. Spatial mismatches (wrong pointing/looking direction)
+  if (spatial.issues && spatial.issues.length > 0) {
+    majorIssues.push({
+      type: 'spatial_mismatch',
+      details: spatial.issues,
+      reason: `Spatial issues: ${spatial.issues.join(', ')}`
+    });
+  }
+
+  // Check for style mismatch
+  const styleMismatch = scene.style_consistent === false;
+
+  // Check for individual character mismatches (candidates for targeted replacement)
+  for (const match of matches) {
+    const issues = [];
+
+    if (match.age_match === false) {
+      issues.push('age mismatch');
+    }
+    if (match.height_order_ok === false) {
+      issues.push('height order wrong');
+    }
+    if (match.hair_match === false) {
+      issues.push('hair mismatch');
+    }
+    if (typeof match.confidence === 'number' && match.confidence < 0.5) {
+      issues.push(`low confidence (${Math.round(match.confidence * 100)}%)`);
+    }
+
+    if (issues.length > 0) {
+      characterMismatches.push({
+        reference: match.reference || `figure_${match.figure}`,
+        figure: match.figure,
+        face_bbox: match.face_bbox,
+        issues,
+        confidence: match.confidence,
+        reason: `${match.reference || 'Unknown'}: ${issues.join(', ')}`
+      });
+    }
+  }
+
+  // Check for clothing/artifact issues (inpaintable)
+  // From fixable_issues array
+  for (const issue of fixableIssues) {
+    if (issue.type === 'clothing' || issue.type === 'object' ||
+        issue.severity === 'MODERATE' || issue.severity === 'MINOR') {
+      clothingIssues.push({
+        type: issue.type || 'clothing',
+        description: issue.description,
+        severity: issue.severity || 'MODERATE',
+        fix: issue.fix || `Fix: ${issue.description}`
+      });
+    }
+  }
+
+  // Also check matches for clothing mismatches
+  for (const match of matches) {
+    if (match.clothing_match === false) {
+      clothingIssues.push({
+        type: 'clothing',
+        description: `${match.reference || 'Character'} clothing mismatch`,
+        reference: match.reference,
+        figure: match.figure,
+        severity: 'MODERATE'
+      });
+    }
+  }
+
+  return {
+    majorIssues,
+    styleMismatch,
+    characterMismatches,
+    clothingIssues
+  };
+}
+
+/**
  * Build a repair plan based on evaluation results
  * Analyzes all page evaluations and consistency reports to decide which pages need:
  * - Regeneration (score too low or generation failed)
@@ -2748,6 +2889,7 @@ async function evaluateImageBatch(images, options = {}) {
  * @param {number} options.regenerateThreshold - Score below which to regenerate (default: 30)
  * @param {number} options.repairThreshold - Score below which to repair if fixable (default: 70)
  * @param {number} options.keepThreshold - Score at or above which to keep (default: 50)
+ * @param {boolean} options.useCategorizedRepairs - Use new categorized repair system (default: false)
  * @returns {Object} Repair plan with pagesToRegenerate, pagesToRepair, pagesToKeep
  */
 function buildRepairPlan(pageEvaluations, options = {}) {
@@ -2756,9 +2898,16 @@ function buildRepairPlan(pageEvaluations, options = {}) {
     entityReport = null,
     regenerateThreshold = 30,
     repairThreshold = 70,
-    keepThreshold = 50
+    keepThreshold = 50,
+    useCategorizedRepairs = false
   } = options;
 
+  // New categorized repair plan structure
+  if (useCategorizedRepairs) {
+    return buildCategorizedRepairPlan(pageEvaluations, options);
+  }
+
+  // Legacy plan structure (backwards compatible)
   const plan = {
     pagesToRegenerate: [],
     pagesToRepair: [],
@@ -2845,6 +2994,135 @@ function buildRepairPlan(pageEvaluations, options = {}) {
   plan.stats.avgScore = scoredCount > 0 ? Math.round(totalScore / scoredCount) : 0;
 
   log.info(`📋 [REPAIR PLAN] Built plan: ${plan.pagesToRegenerate.length} regenerate, ${plan.pagesToRepair.length} repair, ${plan.pagesToKeep.length} keep (avg score: ${plan.stats.avgScore}%)`);
+
+  return plan;
+}
+
+/**
+ * Build a categorized repair plan with different repair methods for different issue types
+ *
+ * Categories:
+ * - iterate: Major issues → full regeneration via image analysis + 17-check scene
+ * - styleRepair: Style mismatch → style transfer with good reference
+ * - charRepair: Single character mismatch → targeted character replacement
+ * - gridRepair: Clothing/artifacts → grid-based inpainting
+ * - keep: Good enough pages
+ *
+ * @param {Array<Object>} pageEvaluations - Evaluation results from evaluateImageBatch
+ * @param {Object} options - Plan options
+ * @returns {Object} Categorized repair plan
+ */
+function buildCategorizedRepairPlan(pageEvaluations, options = {}) {
+  const {
+    regenerateThreshold = 30,
+    keepThreshold = 70
+  } = options;
+
+  const plan = {
+    iterate: [],       // Major issues → full regeneration via iterate
+    styleRepair: [],   // Style mismatch → style transfer
+    charRepair: [],    // Character mismatch → character replacement
+    gridRepair: [],    // Clothing/artifacts → inpainting
+    keep: [],          // Good enough
+    reasoning: {},
+    stats: {
+      totalPages: pageEvaluations.length,
+      evaluated: 0,
+      avgScore: 0
+    },
+    // Flag to indicate this is a categorized plan
+    isCategorized: true
+  };
+
+  let totalScore = 0;
+  let scoredCount = 0;
+
+  for (const evaluation of pageEvaluations) {
+    const pageNum = evaluation.pageNumber;
+    const score = evaluation.qualityScore;
+    const evaluationFailed = !evaluation.evaluated;
+
+    // Track stats
+    if (score !== null && score !== undefined) {
+      totalScore += score;
+      scoredCount++;
+      plan.stats.evaluated++;
+    }
+
+    // Skip failed evaluations
+    if (evaluationFailed || score === null) {
+      plan.keep.push({ pageNumber: pageNum, score: null });
+      plan.reasoning[pageNum] = `Evaluation failed: ${evaluation.error || 'unknown error'}`;
+      continue;
+    }
+
+    // Classify issues for this page
+    const issues = classifyIssues(evaluation);
+
+    // Decision priority: major > multiple character > style > single character > clothing
+    // Very low score always goes to iterate
+    if (score < regenerateThreshold || issues.majorIssues.length > 0) {
+      // Major issues or very low score → full iteration
+      const reasons = issues.majorIssues.map(i => i.reason);
+      if (score < regenerateThreshold) {
+        reasons.unshift(`Score ${score}% < ${regenerateThreshold}%`);
+      }
+      plan.iterate.push({
+        pageNumber: pageNum,
+        score,
+        reasons,
+        majorIssues: issues.majorIssues
+      });
+      plan.reasoning[pageNum] = `Iterate: ${reasons.join('; ')}`;
+    } else if (issues.characterMismatches.length > 1) {
+      // Multiple character mismatches → full iteration (too many to fix individually)
+      plan.iterate.push({
+        pageNumber: pageNum,
+        score,
+        reasons: [`${issues.characterMismatches.length} character mismatches`],
+        characterMismatches: issues.characterMismatches
+      });
+      plan.reasoning[pageNum] = `Iterate: ${issues.characterMismatches.length} character mismatches`;
+    } else if (issues.styleMismatch) {
+      // Style mismatch → style transfer
+      plan.styleRepair.push({
+        pageNumber: pageNum,
+        score,
+        reason: 'Style inconsistent with other pages'
+      });
+      plan.reasoning[pageNum] = 'Style repair: style_consistent=false';
+    } else if (issues.characterMismatches.length === 1) {
+      // Single character mismatch → targeted replacement
+      const charIssue = issues.characterMismatches[0];
+      plan.charRepair.push({
+        pageNumber: pageNum,
+        score,
+        character: charIssue.reference,
+        figure: charIssue.figure,
+        face_bbox: charIssue.face_bbox,
+        issues: charIssue.issues,
+        reason: charIssue.reason
+      });
+      plan.reasoning[pageNum] = `Character repair: ${charIssue.reason}`;
+    } else if (issues.clothingIssues.length > 0 && score < keepThreshold) {
+      // Clothing/artifact issues below keep threshold → grid inpainting
+      plan.gridRepair.push({
+        pageNumber: pageNum,
+        score,
+        issues: issues.clothingIssues,
+        reason: `${issues.clothingIssues.length} clothing/artifact issues`
+      });
+      plan.reasoning[pageNum] = `Grid repair: ${issues.clothingIssues.length} issues`;
+    } else {
+      // Score good enough or no actionable issues
+      plan.keep.push({ pageNumber: pageNum, score });
+      plan.reasoning[pageNum] = `Keep: score ${score}% >= ${keepThreshold}%`;
+    }
+  }
+
+  plan.stats.avgScore = scoredCount > 0 ? Math.round(totalScore / scoredCount) : 0;
+
+  log.info(`📋 [REPAIR PLAN] Categorized: ${plan.iterate.length} iterate, ${plan.styleRepair.length} style, ${plan.charRepair.length} character, ${plan.gridRepair.length} grid, ${plan.keep.length} keep (avg: ${plan.stats.avgScore}%)`);
 
   return plan;
 }
@@ -3168,6 +3446,869 @@ function mergeRepairResults(originalImages, evaluations, repairResults) {
 
     return mergedImage;
   });
+}
+
+// ============================================================================
+// CATEGORIZED REPAIR FUNCTIONS
+// Different repair methods for different issue types
+// ============================================================================
+
+/**
+ * Helper: Get text for a specific page from storyText
+ * @param {string} storyText - Full story text with page markers
+ * @param {number} pageNumber - Page number to extract
+ * @returns {string|null} Page text or null if not found
+ */
+function getPageText(storyText, pageNumber) {
+  if (!storyText) return null;
+
+  // Match page markers like "--- Page X ---" or "## Page X"
+  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Iterate a page using image analysis and 17-check scene description prompt
+ * This is the most comprehensive repair - analyzes what's wrong and regenerates with corrections
+ *
+ * @param {string} imageData - Current image data (base64)
+ * @param {number} pageNumber - Page number being iterated
+ * @param {Object} storyData - Full story data object
+ * @param {Object} options - Options
+ * @param {Object} options.modelOverrides - Model overrides for generation
+ * @param {Function} options.usageTracker - Usage tracking callback
+ * @returns {Promise<Object>} { imageData, newScene, previewMismatches, method: 'iterate' }
+ */
+async function iteratePage(imageData, pageNumber, storyData, options = {}) {
+  const { modelOverrides = {}, usageTracker = null } = options;
+
+  const {
+    describeImage
+  } = require('./sceneValidator');
+
+  const {
+    buildSceneDescriptionPrompt,
+    buildImagePrompt,
+    getCharactersInScene,
+    getCharacterPhotoDetails,
+    buildAvailableAvatarsForPrompt,
+    extractSceneMetadata,
+    parseClothingCategory,
+    getLandmarkPhotosForScene
+  } = getStoryHelpers();
+
+  const { callClaudeAPI } = require('./textModels');
+  const { getElementReferenceImagesForPage } = require('./visualBible');
+
+  // Extract story context
+  const characters = storyData.characters || [];
+  const language = storyData.language || 'en';
+  const visualBible = storyData.visualBible || null;
+  const clothingRequirements = storyData.clothingRequirements || null;
+  const pageClothingData = storyData.pageClothing || null;
+  const sceneDescriptions = storyData.sceneDescriptions || [];
+  const artStyle = storyData.artStyle || 'pixar';
+
+  // Get page text
+  const pageText = getPageText(storyData.storyText, pageNumber);
+  if (!pageText) {
+    throw new Error(`Page ${pageNumber} text not found`);
+  }
+
+  // Get current scene description
+  const currentScene = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+  if (!currentScene) {
+    throw new Error(`No scene description found for page ${pageNumber}`);
+  }
+
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Analyzing current image with vision model...`);
+
+  // Step 1: Analyze the current image using describeImage
+  const imageDescription = await describeImage(imageData);
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
+
+  // Step 2: Build previewFeedback from the image analysis
+  const previewFeedback = {
+    composition: imageDescription.description
+  };
+
+  // Build previous scenes context
+  const previousScenes = [];
+  for (let prevPage = pageNumber - 2; prevPage < pageNumber; prevPage++) {
+    if (prevPage >= 1) {
+      const prevText = getPageText(storyData.storyText, prevPage);
+      if (prevText) {
+        let prevClothing = pageClothingData?.pageClothing?.[prevPage] || null;
+        if (!prevClothing) {
+          const prevSceneDesc = sceneDescriptions.find(s => s.pageNumber === prevPage);
+          prevClothing = prevSceneDesc ? parseClothingCategory(prevSceneDesc.description) : null;
+        }
+        previousScenes.push({
+          pageNumber: prevPage,
+          text: prevText,
+          sceneHint: '',
+          clothing: prevClothing
+        });
+      }
+    }
+  }
+
+  // Get expected clothing for this page
+  const expectedClothing = pageClothingData?.pageClothing?.[pageNumber] || pageClothingData?.primaryClothing || 'standard';
+
+  // Build available avatars
+  const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
+
+  // Extract short scene description from current scene
+  let shortSceneDesc = '';
+  const sceneMetadata = extractSceneMetadata(currentScene.description);
+  if (sceneMetadata?.imageSummary) {
+    shortSceneDesc = sceneMetadata.imageSummary;
+  } else {
+    shortSceneDesc = currentScene.description.substring(0, 500);
+  }
+
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
+
+  // Step 3: Build the scene description prompt with preview feedback
+  const scenePrompt = buildSceneDescriptionPrompt(
+    pageNumber,
+    pageText,
+    characters,
+    shortSceneDesc,
+    language,
+    visualBible,
+    previousScenes,
+    expectedClothing,
+    '',  // No correction notes for iteration
+    availableAvatars,
+    null,  // rawOutlineContext
+    previewFeedback  // The actual image analysis feedback!
+  );
+
+  // Step 4: Call Claude to run 17 checks and generate corrected scene
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
+  const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{"previewMismatches":[' });
+  const newSceneDescription = sceneResult.text;
+
+  // Track usage
+  if (usageTracker && sceneResult.usage) {
+    usageTracker(null, sceneResult.usage, null, sceneResult.modelId || 'claude');
+  }
+
+  // Parse the scene JSON to extract previewMismatches
+  let previewMismatches = [];
+  try {
+    const sceneJson = JSON.parse(newSceneDescription);
+    previewMismatches = sceneJson.previewMismatches || [];
+    log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Found ${previewMismatches.length} mismatches: ${JSON.stringify(previewMismatches)}`);
+  } catch (parseErr) {
+    log.warn(`🔄 [ITERATE PAGE] Could not parse scene JSON for mismatches: ${parseErr.message}`);
+  }
+
+  // Step 5: Prepare for image generation
+  const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
+
+  // Get clothing category
+  let clothingCategory = typeof pageClothingData?.pageClothing?.[pageNumber] === 'string'
+    ? pageClothingData.pageClothing[pageNumber]
+    : parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+
+  let effectiveClothing = clothingCategory;
+  let costumeType = null;
+  if (clothingCategory && clothingCategory.startsWith('costumed:')) {
+    costumeType = clothingCategory.split(':')[1];
+    effectiveClothing = 'costumed';
+  }
+
+  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+
+  // Apply styled avatars if not costumed
+  if (effectiveClothing !== 'costumed') {
+    const { applyStyledAvatars } = require('./styledAvatars');
+    referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
+  }
+
+  // Build landmark photos and VB grid
+  const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+  const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
+
+  let vbGrid = null;
+  if (visualBible) {
+    const elementReferences = getElementReferenceImagesForPage(visualBible, pageNumber, 6);
+    const secondaryLandmarks = pageLandmarkPhotos.slice(1);
+    if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+      vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+    }
+  }
+
+  // Build image prompt
+  const imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+
+  // Clear cache to force new generation
+  const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
+  deleteFromImageCache(cacheKey);
+
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Generating new image with corrected scene description...`);
+
+  // Step 6: Generate new image with corrected scene
+  const imageModelId = modelOverrides?.imageModel || 'gemini-3-pro-image-preview';
+  const imageResult = await generateImageWithQualityRetry(
+    imagePrompt, referencePhotos, null, 'scene', null, usageTracker, null,
+    { imageModel: imageModelId },
+    `PAGE ${pageNumber} ITERATE`,
+    { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
+  );
+
+  log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
+
+  return {
+    imageData: imageResult.imageData,
+    newScene: newSceneDescription,
+    newSceneMetadata,
+    previewMismatches,
+    compositionAnalysis: previewFeedback.composition,
+    score: imageResult.score,
+    reasoning: imageResult.reasoning,
+    totalAttempts: imageResult.totalAttempts,
+    referencePhotos,
+    landmarkPhotos: pageLandmarkPhotos,
+    visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+    method: 'iterate'
+  };
+}
+
+/**
+ * Repair style mismatch by transferring style from a good reference page
+ *
+ * @param {string} imageData - Current image data (base64) that needs style fix
+ * @param {string} referenceImage - Good reference image data (base64) with correct style
+ * @param {string} artStyle - Art style name (e.g., 'pixar', 'watercolor')
+ * @param {Object} options - Options
+ * @returns {Promise<Object>} { imageData, method: 'style_transfer' }
+ */
+async function repairStyleMismatch(imageData, referenceImage, artStyle, options = {}) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  log.info(`🎨 [STYLE REPAIR] Starting style transfer to match ${artStyle} reference...`);
+
+  // Extract base64 from both images
+  const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const referenceBase64 = referenceImage.replace(/^data:image\/\w+;base64,/, '');
+
+  const prompt = `Convert this illustration to match the art style of the reference image.
+
+REFERENCE STYLE: ${artStyle} illustration style
+The reference image shows the CORRECT style including:
+- Color palette and saturation levels
+- Line weight and stroke style
+- Shading technique and lighting approach
+- Overall artistic rendering
+
+CURRENT IMAGE: Has correct composition but inconsistent style
+
+YOUR TASK: Redraw the current image (second image) in the EXACT style of the reference (first image).
+- Match the color palette and saturation
+- Match the line weight and stroke style
+- Match the shading and lighting technique
+- Keep the composition, characters, poses, and actions IDENTICAL to the current image
+- Only change the artistic rendering style to match the reference
+
+OUTPUT: A single image matching the reference style.`;
+
+  // Build parts: prompt, reference image (labeled), current image (labeled)
+  const parts = [
+    { text: prompt },
+    { text: 'REFERENCE (correct style):' },
+    { inline_data: { mime_type: 'image/jpeg', data: referenceBase64 } },
+    { text: 'CURRENT IMAGE (needs style fix):' },
+    { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
+  ];
+
+  const modelId = MODEL_DEFAULTS.pageImage || 'gemini-3-pro-image-preview';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+        temperature: 0.5
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    log.error('❌ [STYLE REPAIR] Gemini API error:', error);
+    throw new Error(`Style repair failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // Extract usage
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  log.debug(`📊 [STYLE REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+
+  // Extract the generated image
+  if (data.candidates && data.candidates[0]?.content?.parts) {
+    for (const part of data.candidates[0].content.parts) {
+      const inlineData = part.inlineData || part.inline_data;
+      if (inlineData && inlineData.data) {
+        const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+        const repairedImageData = `data:${respMimeType};base64,${inlineData.data}`;
+        log.info(`✅ [STYLE REPAIR] Style transfer completed successfully`);
+        return {
+          imageData: repairedImageData,
+          usage: { inputTokens, outputTokens, model: modelId },
+          method: 'style_transfer'
+        };
+      }
+    }
+  }
+
+  log.warn('⚠️ [STYLE REPAIR] No image in response');
+  return { imageData: null, method: 'style_transfer' };
+}
+
+/**
+ * Repair character mismatch by replacing a specific character with their avatar
+ *
+ * @param {string} imageData - Current image data (base64)
+ * @param {string} characterPhoto - Character's avatar photo (base64)
+ * @param {Array<number>} bbox - Bounding box [ymin, xmin, ymax, xmax] in 0-1 normalized coords
+ * @param {string} charName - Character name for the prompt
+ * @param {Object} options - Options
+ * @returns {Promise<Object>} { imageData, character, method: 'character_replacement' }
+ */
+async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName, options = {}) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Gemini API key not configured');
+  }
+
+  if (!bbox || bbox.length !== 4) {
+    throw new Error('Valid bounding box required for character replacement');
+  }
+
+  const [ymin, xmin, ymax, xmax] = bbox;
+  log.info(`👤 [CHAR REPAIR] Starting character replacement for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
+
+  // Extract base64 from both images
+  const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
+
+  const prompt = `Replace the figure in the marked region with this character.
+
+CHARACTER REFERENCE: ${charName}
+- The first image shows exactly how ${charName} should look
+- Match their face, hair color/style, and body proportions
+- This is the AUTHORITATIVE reference for this character's appearance
+
+MARKED REGION: The figure located approximately between coordinates:
+- Left edge: ${Math.round(xmin * 100)}% from left
+- Right edge: ${Math.round(xmax * 100)}% from left
+- Top edge: ${Math.round(ymin * 100)}% from top
+- Bottom edge: ${Math.round(ymax * 100)}% from top
+
+YOUR TASK: Replace ONLY the figure in the marked region.
+- Keep the exact same pose and body position
+- Keep the same action/gesture they are performing
+- Keep the same clothing style but adjust to match character's typical appearance
+- Make the face match ${charName}'s face from the reference photo
+- Keep everything else in the image COMPLETELY unchanged
+- The replacement should blend seamlessly with the rest of the image
+
+OUTPUT: A single image with the replaced character.`;
+
+  // Build parts: prompt, character reference, scene image
+  const parts = [
+    { text: prompt },
+    { text: `${charName} reference photo:` },
+    { inline_data: { mime_type: 'image/jpeg', data: avatarBase64 } },
+    { text: 'Scene to fix:' },
+    { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
+  ];
+
+  const modelId = MODEL_DEFAULTS.pageImage || 'gemini-3-pro-image-preview';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts }],
+      generationConfig: {
+        responseModalities: ["TEXT", "IMAGE"],
+        temperature: 0.4  // Lower temperature for more faithful reproduction
+      }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    log.error('❌ [CHAR REPAIR] Gemini API error:', error);
+    throw new Error(`Character replacement failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  // Extract usage
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  log.debug(`📊 [CHAR REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+
+  // Extract the generated image
+  if (data.candidates && data.candidates[0]?.content?.parts) {
+    for (const part of data.candidates[0].content.parts) {
+      const inlineData = part.inlineData || part.inline_data;
+      if (inlineData && inlineData.data) {
+        const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+        const repairedImageData = `data:${respMimeType};base64,${inlineData.data}`;
+        log.info(`✅ [CHAR REPAIR] Character replacement for ${charName} completed successfully`);
+        return {
+          imageData: repairedImageData,
+          character: charName,
+          usage: { inputTokens, outputTokens, model: modelId },
+          method: 'character_replacement'
+        };
+      }
+    }
+  }
+
+  log.warn('⚠️ [CHAR REPAIR] No image in response');
+  return { imageData: null, character: charName, method: 'character_replacement' };
+}
+
+/**
+ * Execute a categorized repair plan - uses different repair methods for different issues
+ *
+ * @param {Object} plan - Categorized repair plan from buildCategorizedRepairPlan
+ * @param {Map<number, Object>} pageData - Map of page number to page data
+ * @param {Map<number, Object>} evaluations - Map of page number to evaluation results
+ * @param {Object} context - Generation context
+ * @param {Object} context.storyData - Full story data object (required for iterate)
+ * @param {Array} context.characters - Character array with avatarUrl
+ * @param {Object} context.modelOverrides - Model overrides
+ * @param {Function} context.usageTracker - Usage tracking callback
+ * @param {Object} options - Execution options
+ * @returns {Promise<Object>} Results with updated images and repair history
+ */
+async function executeCategorizedRepairPlan(plan, pageData, evaluations, context, options = {}) {
+  const {
+    storyData = null,
+    characters = [],
+    modelOverrides = {},
+    usageTracker = null,
+    isAdmin = false
+  } = context;
+
+  const results = {
+    iterated: new Map(),
+    styleRepaired: new Map(),
+    charRepaired: new Map(),
+    gridRepaired: new Map(),
+    failed: new Map(),
+    history: []
+  };
+
+  const startTime = Date.now();
+
+  // 1. Execute iterations (major issues) - most expensive, highest priority
+  if (plan.iterate.length > 0 && storyData) {
+    log.info(`🔄 [REPAIR EXEC] Iterating ${plan.iterate.length} pages with major issues...`);
+
+    for (const item of plan.iterate) {
+      const page = pageData.get(item.pageNumber);
+      if (!page || !page.imageData) {
+        log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: No image data, skipping iterate`);
+        results.failed.set(item.pageNumber, { error: 'No image data' });
+        continue;
+      }
+
+      try {
+        log.info(`🔄 [REPAIR EXEC] Page ${item.pageNumber}: Full iteration (${item.reasons.join('; ')})`);
+
+        const iterResult = await iteratePage(
+          page.imageData,
+          item.pageNumber,
+          storyData,
+          { modelOverrides, usageTracker }
+        );
+
+        if (iterResult.imageData) {
+          // Re-evaluate to compare scores
+          const originalScore = item.score || 0;
+          const reEvalResult = await evaluateImageQuality(
+            iterResult.imageData,
+            page.prompt || '',
+            page.characterPhotos || [],
+            'scene',
+            modelOverrides?.qualityModel,
+            `PAGE ${item.pageNumber} (post-iterate)`
+          );
+          const newScore = reEvalResult?.score ?? 0;
+
+          if (usageTracker && reEvalResult?.usage) {
+            usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+          }
+
+          // Accept if improved or at least as good (iteration addresses structural issues)
+          if (newScore >= originalScore) {
+            results.iterated.set(item.pageNumber, {
+              imageData: iterResult.imageData,
+              newScene: iterResult.newScene,
+              previewMismatches: iterResult.previewMismatches,
+              originalScore,
+              newScore,
+              method: 'iterate'
+            });
+            log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Iteration accepted (score: ${originalScore}% → ${newScore}%)`);
+          } else {
+            results.failed.set(item.pageNumber, {
+              error: 'Iteration did not improve score',
+              originalScore,
+              newScore,
+              keptOriginal: true
+            });
+            log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: Iteration rejected (score: ${originalScore}% → ${newScore}%), keeping original`);
+          }
+        } else {
+          results.failed.set(item.pageNumber, { error: 'Iteration produced no image' });
+        }
+
+        results.history.push({
+          pageNumber: item.pageNumber,
+          action: 'iterate',
+          success: results.iterated.has(item.pageNumber),
+          reasons: item.reasons
+        });
+      } catch (error) {
+        log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Iteration error - ${error.message}`);
+        results.failed.set(item.pageNumber, { error: error.message });
+        results.history.push({
+          pageNumber: item.pageNumber,
+          action: 'iterate',
+          success: false,
+          error: error.message
+        });
+      }
+    }
+  }
+
+  // 2. Execute style repairs - if we have good reference pages
+  if (plan.styleRepair.length > 0) {
+    // Find a good reference page (score >= 70, not in any repair list)
+    const goodPages = plan.keep.filter(p => p.score >= 70);
+    if (goodPages.length > 0) {
+      const referencePageNum = goodPages[0].pageNumber;
+      const referencePage = pageData.get(referencePageNum);
+      const referenceImage = referencePage?.imageData;
+
+      if (referenceImage) {
+        log.info(`🎨 [REPAIR EXEC] Style repairing ${plan.styleRepair.length} pages using page ${referencePageNum} as reference...`);
+
+        for (const item of plan.styleRepair) {
+          const page = pageData.get(item.pageNumber);
+          if (!page || !page.imageData) {
+            results.failed.set(item.pageNumber, { error: 'No image data' });
+            continue;
+          }
+
+          try {
+            log.info(`🎨 [REPAIR EXEC] Page ${item.pageNumber}: Style transfer`);
+
+            const styleResult = await repairStyleMismatch(
+              page.imageData,
+              referenceImage,
+              storyData?.artStyle || 'pixar'
+            );
+
+            if (styleResult.imageData) {
+              // Re-evaluate
+              const originalScore = item.score || 0;
+              const reEvalResult = await evaluateImageQuality(
+                styleResult.imageData,
+                page.prompt || '',
+                page.characterPhotos || [],
+                'scene',
+                modelOverrides?.qualityModel,
+                `PAGE ${item.pageNumber} (post-style)`
+              );
+              const newScore = reEvalResult?.score ?? 0;
+
+              if (usageTracker && reEvalResult?.usage) {
+                usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+              }
+
+              results.styleRepaired.set(item.pageNumber, {
+                imageData: styleResult.imageData,
+                originalScore,
+                newScore,
+                method: 'style_transfer'
+              });
+              log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Style transfer completed (score: ${originalScore}% → ${newScore}%)`);
+            } else {
+              results.failed.set(item.pageNumber, { error: 'Style transfer produced no image' });
+            }
+
+            results.history.push({
+              pageNumber: item.pageNumber,
+              action: 'style_repair',
+              success: results.styleRepaired.has(item.pageNumber)
+            });
+          } catch (error) {
+            log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Style repair error - ${error.message}`);
+            results.failed.set(item.pageNumber, { error: error.message });
+            results.history.push({
+              pageNumber: item.pageNumber,
+              action: 'style_repair',
+              success: false,
+              error: error.message
+            });
+          }
+        }
+      } else {
+        log.warn(`⚠️ [REPAIR EXEC] No good reference image available for style repair`);
+        for (const item of plan.styleRepair) {
+          results.failed.set(item.pageNumber, { error: 'No reference image for style repair' });
+        }
+      }
+    } else {
+      log.warn(`⚠️ [REPAIR EXEC] No good reference pages (score >= 70) for style repair`);
+      for (const item of plan.styleRepair) {
+        // Fall back to iteration for style issues
+        plan.iterate.push({ ...item, reasons: ['Style mismatch (no reference available)'] });
+      }
+    }
+  }
+
+  // 3. Execute character replacements
+  if (plan.charRepair.length > 0) {
+    log.info(`👤 [REPAIR EXEC] Character replacing ${plan.charRepair.length} pages...`);
+
+    for (const item of plan.charRepair) {
+      const page = pageData.get(item.pageNumber);
+      if (!page || !page.imageData) {
+        results.failed.set(item.pageNumber, { error: 'No image data' });
+        continue;
+      }
+
+      // Find the character's avatar
+      const charName = item.character;
+      const charData = characters.find(c =>
+        c.name?.toLowerCase() === charName?.toLowerCase()
+      );
+
+      if (!charData?.avatarUrl && !charData?.data?.avatarUrl) {
+        log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: No avatar for ${charName}, falling back to grid repair`);
+        plan.gridRepair.push({
+          pageNumber: item.pageNumber,
+          score: item.score,
+          issues: [{ type: 'character', description: `${charName} mismatch`, severity: 'MODERATE' }]
+        });
+        continue;
+      }
+
+      const avatarUrl = charData.avatarUrl || charData.data?.avatarUrl;
+
+      // We need a face bbox - check if we have one from evaluation
+      const faceBbox = item.face_bbox;
+      if (!faceBbox || faceBbox.length !== 4) {
+        log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: No face bbox for ${charName}, falling back to grid repair`);
+        plan.gridRepair.push({
+          pageNumber: item.pageNumber,
+          score: item.score,
+          issues: [{ type: 'character', description: `${charName} mismatch (no bbox)`, severity: 'MODERATE' }]
+        });
+        continue;
+      }
+
+      try {
+        log.info(`👤 [REPAIR EXEC] Page ${item.pageNumber}: Character replacement (${charName})`);
+
+        const charResult = await repairCharacterMismatch(
+          page.imageData,
+          avatarUrl,
+          faceBbox,
+          charName
+        );
+
+        if (charResult.imageData) {
+          // Re-evaluate
+          const originalScore = item.score || 0;
+          const reEvalResult = await evaluateImageQuality(
+            charResult.imageData,
+            page.prompt || '',
+            page.characterPhotos || [],
+            'scene',
+            modelOverrides?.qualityModel,
+            `PAGE ${item.pageNumber} (post-char)`
+          );
+          const newScore = reEvalResult?.score ?? 0;
+
+          if (usageTracker && reEvalResult?.usage) {
+            usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+          }
+
+          if (newScore >= originalScore) {
+            results.charRepaired.set(item.pageNumber, {
+              imageData: charResult.imageData,
+              character: charName,
+              originalScore,
+              newScore,
+              method: 'character_replacement'
+            });
+            log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Character replacement accepted (score: ${originalScore}% → ${newScore}%)`);
+          } else {
+            results.failed.set(item.pageNumber, {
+              error: 'Character replacement did not improve score',
+              originalScore,
+              newScore,
+              keptOriginal: true
+            });
+            log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: Character replacement rejected (score: ${originalScore}% → ${newScore}%)`);
+          }
+        } else {
+          results.failed.set(item.pageNumber, { error: 'Character replacement produced no image' });
+        }
+
+        results.history.push({
+          pageNumber: item.pageNumber,
+          action: 'char_repair',
+          success: results.charRepaired.has(item.pageNumber),
+          character: charName
+        });
+      } catch (error) {
+        log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Character repair error - ${error.message}`);
+        results.failed.set(item.pageNumber, { error: error.message });
+        results.history.push({
+          pageNumber: item.pageNumber,
+          action: 'char_repair',
+          success: false,
+          error: error.message
+        });
+      }
+    }
+  }
+
+  // 4. Execute grid-based repairs (clothing/artifacts)
+  if (plan.gridRepair.length > 0) {
+    log.info(`🔧 [REPAIR EXEC] Grid repairing ${plan.gridRepair.length} pages...`);
+
+    const { gridBasedRepair } = getGridBasedRepair();
+
+    for (const item of plan.gridRepair) {
+      const page = pageData.get(item.pageNumber);
+      const evaluation = evaluations.get(item.pageNumber);
+
+      if (!page || !page.imageData) {
+        results.failed.set(item.pageNumber, { error: 'No image data' });
+        continue;
+      }
+
+      try {
+        log.info(`🔧 [REPAIR EXEC] Page ${item.pageNumber}: Grid inpainting (${item.issues.length} issues)`);
+
+        const evalResults = {
+          quality: {
+            score: evaluation?.qualityScore,
+            fixTargets: evaluation?.enrichedFixTargets || evaluation?.fixTargets || [],
+            reasoning: evaluation?.reasoning,
+            matches: evaluation?.matches || [],
+            fixable_issues: item.issues
+          },
+          incremental: null,
+          final: null
+        };
+
+        const gridRepairOutputDir = path.join(os.tmpdir(), 'grid-repair', `repair-${Date.now()}`);
+
+        const gridResult = await gridBasedRepair(
+          page.imageData,
+          item.pageNumber,
+          evalResults,
+          {
+            outputDir: gridRepairOutputDir,
+            skipVerification: false,
+            saveIntermediates: isAdmin,
+            bboxDetection: evaluation?.bboxDetection,
+            onProgress: (step, msg) => log.debug(`  [GRID] Page ${item.pageNumber} ${step}: ${msg}`)
+          }
+        );
+
+        if (gridResult.repaired && gridResult.imageData) {
+          // Re-evaluate
+          const originalScore = item.score || 0;
+          const reEvalResult = await evaluateImageQuality(
+            gridResult.imageData,
+            page.prompt || '',
+            page.characterPhotos || [],
+            'scene',
+            modelOverrides?.qualityModel,
+            `PAGE ${item.pageNumber} (post-grid)`
+          );
+          const newScore = reEvalResult?.score ?? 0;
+
+          if (usageTracker && reEvalResult?.usage) {
+            usageTracker(null, reEvalResult.usage, null, reEvalResult.modelId);
+          }
+
+          const hasVerifiedFixes = gridResult.fixedCount > 0;
+          if (newScore >= originalScore || hasVerifiedFixes) {
+            results.gridRepaired.set(item.pageNumber, {
+              imageData: gridResult.imageData,
+              fixedCount: gridResult.fixedCount,
+              totalIssues: gridResult.totalIssues,
+              originalScore,
+              newScore,
+              method: 'grid_inpaint'
+            });
+            log.info(`✅ [REPAIR EXEC] Page ${item.pageNumber}: Grid repair completed (${gridResult.fixedCount}/${gridResult.totalIssues} fixed, score: ${originalScore}% → ${newScore}%)`);
+          } else {
+            results.failed.set(item.pageNumber, {
+              error: 'Grid repair did not improve score',
+              originalScore,
+              newScore,
+              keptOriginal: true
+            });
+            log.warn(`⚠️ [REPAIR EXEC] Page ${item.pageNumber}: Grid repair rejected (score: ${originalScore}% → ${newScore}%)`);
+          }
+        } else {
+          results.failed.set(item.pageNumber, { error: 'Grid repair failed', result: gridResult });
+        }
+
+        results.history.push({
+          pageNumber: item.pageNumber,
+          action: 'grid_repair',
+          success: results.gridRepaired.has(item.pageNumber),
+          issueCount: item.issues.length
+        });
+      } catch (error) {
+        log.error(`❌ [REPAIR EXEC] Page ${item.pageNumber}: Grid repair error - ${error.message}`);
+        results.failed.set(item.pageNumber, { error: error.message });
+        results.history.push({
+          pageNumber: item.pageNumber,
+          action: 'grid_repair',
+          success: false,
+          error: error.message
+        });
+      }
+    }
+  }
+
+  const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+  log.info(`✅ [REPAIR EXEC] Categorized repairs completed in ${elapsed}s: ${results.iterated.size} iterated, ${results.styleRepaired.size} style, ${results.charRepaired.size} character, ${results.gridRepaired.size} grid, ${results.failed.size} failed`);
+
+  return results;
 }
 
 /**
@@ -6538,6 +7679,14 @@ module.exports = {
   buildRepairPlan,
   executeRepairPlan,
   mergeRepairResults,
+
+  // Categorized repair system (new)
+  classifyIssues,
+  buildCategorizedRepairPlan,
+  iteratePage,
+  repairStyleMismatch,
+  repairCharacterMismatch,
+  executeCategorizedRepairPlan,
 
   // Cache management
   clearImageCache,
