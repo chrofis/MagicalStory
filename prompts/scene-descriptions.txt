@@ -71,30 +71,29 @@ ALWAYS USE:
 - Relative closeness: shoulder to shoulder, arm's reach, clear gap, far apart, opposite edges
 - Scale: small figures, dominates frame, tiny silhouettes
 
-**9-Region Grid (for positioning and validation):**
+**9-Region Grid (for positioning):**
 
 ```
- TL  |  TC  |  TR     (Top row = background/far)
------+------+-----
- ML  |  MC  |  MR     (Middle row = midground)
------+------+-----
- BL  |  BC  |  BR     (Bottom row = foreground/near)
+ top-left      |  top-center      |  top-right       (background/far)
+---------------+------------------+-----------------
+ middle-left   |  middle-center   |  middle-right    (midground)
+---------------+------------------+-----------------
+ bottom-left   |  bottom-center   |  bottom-right    (foreground/near)
 ```
 
-| Code | Position |
-|------|----------|
-| TL | top-left background |
-| TC | top-center background |
-| TR | top-right background |
-| ML | middle-left midground |
-| MC | middle-center midground |
-| MR | middle-right midground |
-| BL | bottom-left foreground |
-| BC | bottom-center foreground |
-| BR | bottom-right foreground |
+**Position values (use these exact phrases):**
+- top-left background
+- top-center background
+- top-right background
+- middle-left midground
+- middle-center midground
+- middle-right midground
+- bottom-left foreground
+- bottom-center foreground
+- bottom-right foreground
 
-Use region codes for character `position` and object `position` fields.
-Pointing/gaze validation compares character region → target region.
+Use these FULL position phrases for character `position` and object `position` fields.
+DO NOT use abbreviations like TL, MC, BR - always use the full phrase.
 
 **Hand Dominance:**
 - Default to RIGHT hand for pointing, holding, gesturing (most people are right-handed)
@@ -178,10 +177,10 @@ Before drafting the scene, assign a region to EVERY landmark and major object:
 **Format:**
 ```json
 "landmarkPlacement": {
-  "tower": "TL",
-  "bridge": "TC-to-TR",
-  "magical door": "MC",
-  "villain's machine": "TR"
+  "tower": "top-left background",
+  "bridge": "top-center to top-right background",
+  "magical door": "middle-center midground",
+  "villain's machine": "top-right background"
 }
 ```
 
@@ -207,7 +206,7 @@ Output raw JSON (no markdown code fences, no explanation text).
 ```
 {
   "landmarkPlacement": {
-    "landmark_name": "REGION_CODE (TL/TC/TR/ML/MC/MR/BL/BC/BR or range like TC-to-TR)"
+    "landmark_name": "full position (e.g., 'top-left background', 'middle-center midground')"
   },
   "imageSummary": "2-3 sentences: positions, actions, setting. End with: Main characters: Name1, Name2.",
   "setting": {
@@ -224,7 +223,7 @@ Output raw JSON (no markdown code fences, no explanation text).
   "characters": [
     {
       "name": "CharacterName",
-      "position": "Frame region + depth layer",
+      "position": "full position phrase (e.g., 'bottom-center foreground', 'middle-left midground')",
       "pose": "Body position, facing direction (SIMPLE, NATURAL)",
       "action": "Physical action - keep it simple, match source description",
       "holding": {"leftHand": "item or empty", "rightHand": "item or empty"},
@@ -236,7 +235,7 @@ Output raw JSON (no markdown code fences, no explanation text).
     {
       "id": "ART001 (only if from RECURRING ELEMENTS, otherwise omit id)",
       "name": "Object name",
-      "position": "[left|center|right] [foreground|midground|background], relative to [landmark]"
+      "position": "full position phrase (e.g., 'bottom-right foreground, near the tree')"
     }
   ],
   "translatedSummary": "Translation of imageSummary to target language"
