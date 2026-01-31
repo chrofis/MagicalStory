@@ -521,6 +521,9 @@ async function extractEntityCrops(appearances, options = {}) {
       );
 
       if (cropResult && cropResult.buffer) {
+        // Get original crop dimensions for proper resizing after repair
+        const cropMeta = await sharp(cropResult.buffer).metadata();
+
         const cropData = {
           buffer: cropResult.buffer,
           pageNumber: app.pageNumber,
@@ -529,7 +532,10 @@ async function extractEntityCrops(appearances, options = {}) {
           position: app.position,
           confidence: app.confidence,
           // NEW: Store for compositing back
-          paddedBox: cropResult.paddedBox
+          paddedBox: cropResult.paddedBox,
+          // Store original dimensions for resizing repaired cells
+          originalWidth: cropMeta.width,
+          originalHeight: cropMeta.height
         };
 
         // Store original image data reference for regeneration/compositing
@@ -1045,17 +1051,30 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
         const height = Math.min(scaledHeight, repairedMeta.height - top);
 
         try {
-          const cellBuffer = await sharp(repairedGridBuffer)
+          // Extract cell from repaired grid
+          let cellBuffer = await sharp(repairedGridBuffer)
             .extract({ left, top, width, height })
-            .png()
             .toBuffer();
+
+          // Resize to original crop dimensions (grid cells are square, originals may not be)
+          if (crop.originalWidth && crop.originalHeight) {
+            const cellMeta = await sharp(cellBuffer).metadata();
+            if (cellMeta.width !== crop.originalWidth || cellMeta.height !== crop.originalHeight) {
+              log.debug(`🔧 [ENTITY-REPAIR] Resizing cell ${letter}: ${cellMeta.width}x${cellMeta.height} → ${crop.originalWidth}x${crop.originalHeight}`);
+              cellBuffer = await sharp(cellBuffer)
+                .resize(crop.originalWidth, crop.originalHeight, { fit: 'fill' })
+                .toBuffer();
+            }
+          }
 
           repairedCells.push({
             letter,
             pageNumber: crop.pageNumber,
             buffer: cellBuffer,
             paddedBox: crop.paddedBox,
-            originalImageData: crop.originalImageData
+            originalImageData: crop.originalImageData,
+            originalWidth: crop.originalWidth,
+            originalHeight: crop.originalHeight
           });
         } catch (err) {
           log.error(`❌ [ENTITY-REPAIR] Failed to extract cell ${letter}: ${err.message}`);
