@@ -432,7 +432,8 @@ function collectObjectAppearances(sceneImages) {
         bodyBox: obj.bodyBox,
         faceBox: null,  // Objects don't have faces
         label: obj.label,
-        confidence: match?.confidence || 0.7
+        confidence: match?.confidence || 0.7,
+        isObject: true  // Mark as object for 15% padding in crop extraction
       });
     }
   }
@@ -464,7 +465,7 @@ async function extractEntityCrops(appearances, options = {}) {
       // Prefer body crop (more reliable than face detection)
       const bbox = app.bodyBox || app.faceBox;  // Prefer body, fallback to face
       const cropType = 'body';  // Always use body crop
-      const targetSize = BODY_CROP_SIZE;  // Always 512px
+      const isObject = app.isObject || false;
 
       if (!bbox) {
         log.verbose(`[ENTITY-CROP] No bbox for page ${app.pageNumber}`);
@@ -472,11 +473,13 @@ async function extractEntityCrops(appearances, options = {}) {
       }
 
       // Extract crop from image
+      // Figures: 1:1 no padding, no resize, original aspect
+      // Objects: 15% padding, no resize, original aspect
       const cropResult = await extractCropFromImage(
         app.imageData,
         bbox,
-        targetSize,
-        0.1,  // Standard body crop padding
+        null,  // No resize - keep original size
+        isObject ? 0.15 : 0,  // 15% padding for objects, none for figures
         { forRegeneration }
       );
 
@@ -512,13 +515,13 @@ async function extractEntityCrops(appearances, options = {}) {
  *
  * @param {string} imageData - Base64 image data
  * @param {number[]} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized 0-1
- * @param {number} targetSize - Target crop size in pixels
+ * @param {number|null} targetSize - Target crop size in pixels, or null for no resize (keep original)
  * @param {number} padding - Padding ratio to add around bbox (0-0.5)
  * @param {object} options - Additional options
  * @param {boolean} options.forRegeneration - If true, output PNG for lossless quality
  * @returns {Promise<{buffer: Buffer, paddedBox: number[]}|null>} Cropped image buffer and normalized padded box
  */
-async function extractCropFromImage(imageData, bbox, targetSize, padding = 0.1, options = {}) {
+async function extractCropFromImage(imageData, bbox, targetSize, padding = 0, options = {}) {
   const { forRegeneration = false } = options;
 
   try {
@@ -538,29 +541,35 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0.1, 
     let x2 = Math.round(xmax * width);
     let y2 = Math.round(ymax * height);
 
-    // Add padding
-    const bboxWidth = x2 - x1;
-    const bboxHeight = y2 - y1;
-    const padX = Math.round(bboxWidth * padding);
-    const padY = Math.round(bboxHeight * padding);
+    // Add padding if specified
+    if (padding > 0) {
+      const bboxWidth = x2 - x1;
+      const bboxHeight = y2 - y1;
+      const padX = Math.round(bboxWidth * padding);
+      const padY = Math.round(bboxHeight * padding);
 
-    x1 = Math.max(0, x1 - padX);
-    y1 = Math.max(0, y1 - padY);
-    x2 = Math.min(width, x2 + padX);
-    y2 = Math.min(height, y2 + padY);
+      x1 = Math.max(0, x1 - padX);
+      y1 = Math.max(0, y1 - padY);
+      x2 = Math.min(width, x2 + padX);
+      y2 = Math.min(height, y2 + padY);
+    }
 
     // Calculate normalized padded box for later compositing
     const paddedBox = [y1 / height, x1 / width, y2 / height, x2 / width];
 
-    // Extract and resize
+    // Extract crop (no resize if targetSize is null)
     let sharpPipeline = sharp(imgBuffer)
       .extract({
         left: x1,
         top: y1,
         width: x2 - x1,
         height: y2 - y1
-      })
-      .resize(targetSize, targetSize, { fit: 'cover' });
+      });
+
+    // Only resize if targetSize is specified
+    if (targetSize) {
+      sharpPipeline = sharpPipeline.resize(targetSize, targetSize, { fit: 'cover' });
+    }
 
     // Use PNG for regeneration (lossless), JPEG otherwise
     const cropBuffer = forRegeneration
