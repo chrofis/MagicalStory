@@ -376,10 +376,22 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
 
     // Convert normalized paddedBox back to pixels
     const [ymin, xmin, ymax, xmax] = paddedBox;
-    const x = Math.round(xmin * metadata.width);
-    const y = Math.round(ymin * metadata.height);
-    const width = Math.round((xmax - xmin) * metadata.width);
-    const height = Math.round((ymax - ymin) * metadata.height);
+    let x = Math.round(xmin * metadata.width);
+    let y = Math.round(ymin * metadata.height);
+    let width = Math.round((xmax - xmin) * metadata.width);
+    let height = Math.round((ymax - ymin) * metadata.height);
+
+    // Clamp to image bounds to prevent canvas extension
+    if (x < 0) { width += x; x = 0; }
+    if (y < 0) { height += y; y = 0; }
+    if (x + width > metadata.width) { width = metadata.width - x; }
+    if (y + height > metadata.height) { height = metadata.height - y; }
+
+    // Skip if dimensions become invalid
+    if (width <= 0 || height <= 0) {
+      console.warn(`Skipping repair: invalid dimensions after clamping (${width}x${height})`);
+      continue;
+    }
 
     try {
       // Resize repaired region to match the original extraction size
@@ -402,11 +414,18 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
     return imageBuffer;
   }
 
-  // Apply all repairs at once
+  // Apply all repairs at once, ensuring output matches original dimensions
   const result = await sharp(imageBuffer)
     .composite(composites)
+    .resize(metadata.width, metadata.height, { fit: 'cover', position: 'top left' })
     .jpeg({ quality: 95 })
     .toBuffer();
+
+  // Verify dimensions match
+  const resultMeta = await sharp(result).metadata();
+  if (resultMeta.width !== metadata.width || resultMeta.height !== metadata.height) {
+    console.warn(`⚠️ Dimension mismatch after repair: ${resultMeta.width}x${resultMeta.height} vs original ${metadata.width}x${metadata.height}`);
+  }
 
   return result;
 }

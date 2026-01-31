@@ -48,6 +48,9 @@ interface DeveloperModeState {
   // Set to 100 to always repair pages with issues (for testing), null to use standard logic
   forceRepairThreshold: number | null;
   setForceRepairThreshold: (threshold: number | null) => void;
+  // Scene validation: generate cheap preview, analyze geometry, repair composition issues
+  enableSceneValidation: boolean;
+  setEnableSceneValidation: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -80,6 +83,7 @@ const FEATURE_DEFAULTS = {
   checkOnlyMode: false,       // Check-only mode: run checks but skip all regeneration
   useGridRepair: true,        // Grid-based repair: use grid extraction instead of legacy inpainting
   forceRepairThreshold: null as number | null, // Force repair: null = standard logic, 100 = always repair
+  enableSceneValidation: false, // Scene validation: cheap preview + geometry check + repair
 };
 
 /**
@@ -130,6 +134,9 @@ export function useDeveloperMode(): DeveloperModeState {
 
   // Force repair threshold: when set, repair ANY page with fixable issues if score < this value
   const [forceRepairThreshold, setForceRepairThreshold] = useState<number | null>(FEATURE_DEFAULTS.forceRepairThreshold);
+
+  // Scene validation: generate cheap preview, analyze geometry, repair composition issues
+  const [enableSceneValidation, setEnableSceneValidation] = useState(FEATURE_DEFAULTS.enableSceneValidation);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -193,6 +200,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setUseGridRepair,
     forceRepairThreshold,
     setForceRepairThreshold,
+    enableSceneValidation,
+    setEnableSceneValidation,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

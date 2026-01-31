@@ -101,6 +101,7 @@ export default function StoryWizard() {
     incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
     lookbackCount, setLookbackCount,
     checkOnlyMode, setCheckOnlyMode,
+    enableSceneValidation, setEnableSceneValidation,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
@@ -3196,6 +3197,7 @@ export default function StoryWizard() {
         forceRepairThreshold: forceRepairThreshold,
         enableFinalChecks: enableFinalChecks,
         checkOnlyMode: checkOnlyMode,  // Skip all regeneration, only run checks
+        enableSceneValidation: enableSceneValidation,  // Cheap preview + geometry check
         // Incremental consistency check (check each image against previous images)
         incrementalConsistency: incrementalConsistency ? {
           enabled: true,
@@ -4525,6 +4527,19 @@ export default function StoryWizard() {
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Prüft Bilder und Text auf Konsistenz am Ende der Generierung' : language === 'fr' ? 'Vérifie la cohérence des images et du texte à la fin de la génération' : 'Checks images and text for consistency at end of generation'}
+                      </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={enableSceneValidation}
+                          onChange={(e) => setEnableSceneValidation(e.target.checked)}
+                          className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Szenen-Validierung' : language === 'fr' ? 'Validation de scène' : 'Scene validation'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Erzeugt günstige Vorschau, prüft Geometrie, repariert Kompositionsprobleme' : language === 'fr' ? 'Génère un aperçu économique, vérifie la géométrie, répare les problèmes de composition' : 'Generates cheap preview, checks geometry, repairs composition issues'}
                       </p>
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">
