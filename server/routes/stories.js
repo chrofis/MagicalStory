@@ -483,7 +483,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           // Flags for lazy loading images
           hasImageData: !!r.imageData,
           hasOriginalImage: !!r.originalImage,
-          hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage,
+          hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
           hasAnnotatedOriginal: !!r.annotatedOriginal,
           hasGrids: !!(r.grids && r.grids.length > 0),
           gridsCount: r.grids?.length || 0,
@@ -562,7 +562,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             postRepairEval: r.postRepairEval || null,
             bboxDetection: r.bboxDetection || null,
             hasImageData: !!r.imageData,
-            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage,
+            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
             hasAnnotatedOriginal: !!r.annotatedOriginal,
             hasGrids: !!(r.grids && r.grids.length > 0),
             gridsCount: r.grids?.length || 0
@@ -592,7 +592,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             postRepairEval: r.postRepairEval || null,
             bboxDetection: r.bboxDetection || null,
             hasImageData: !!r.imageData,
-            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage,
+            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
             hasAnnotatedOriginal: !!r.annotatedOriginal,
             hasGrids: !!(r.grids && r.grids.length > 0),
             gridsCount: r.grids?.length || 0
@@ -622,7 +622,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             postRepairEval: r.postRepairEval || null,
             bboxDetection: r.bboxDetection || null,
             hasImageData: !!r.imageData,
-            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage,
+            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
             hasAnnotatedOriginal: !!r.annotatedOriginal,
             hasGrids: !!(r.grids && r.grids.length > 0),
             gridsCount: r.grids?.length || 0
