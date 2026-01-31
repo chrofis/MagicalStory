@@ -447,9 +447,12 @@ function collectObjectAppearances(sceneImages) {
  * Extract cropped images for each entity appearance
  *
  * @param {Array<object>} appearances - Entity appearances with bbox info
- * @returns {Promise<Array>} Array of crop objects with buffer
+ * @param {object} options - Extraction options
+ * @param {boolean} options.forRegeneration - If true, output PNG and store original image data for compositing
+ * @returns {Promise<Array>} Array of crop objects with buffer, paddedBox, and optionally originalImageData
  */
-async function extractEntityCrops(appearances) {
+async function extractEntityCrops(appearances, options = {}) {
+  const { forRegeneration = false } = options;
   const crops = [];
 
   for (const app of appearances) {
@@ -465,22 +468,32 @@ async function extractEntityCrops(appearances) {
       }
 
       // Extract crop from image
-      const cropBuffer = await extractCropFromImage(
+      const cropResult = await extractCropFromImage(
         app.imageData,
         bbox,
         targetSize,
-        0.1  // Standard body crop padding
+        0.1,  // Standard body crop padding
+        { forRegeneration }
       );
 
-      if (cropBuffer) {
-        crops.push({
-          buffer: cropBuffer,
+      if (cropResult && cropResult.buffer) {
+        const cropData = {
+          buffer: cropResult.buffer,
           pageNumber: app.pageNumber,
           cropType,
           clothing: app.clothing,
           position: app.position,
-          confidence: app.confidence
-        });
+          confidence: app.confidence,
+          // NEW: Store for compositing back
+          paddedBox: cropResult.paddedBox
+        };
+
+        // Store original image data reference for regeneration/compositing
+        if (forRegeneration) {
+          cropData.originalImageData = app.imageData;
+        }
+
+        crops.push(cropData);
       }
     } catch (err) {
       log.warn(`⚠️  [ENTITY-CROP] Failed to extract crop for page ${app.pageNumber}: ${err.message}`);
@@ -497,9 +510,13 @@ async function extractEntityCrops(appearances) {
  * @param {number[]} bbox - Bounding box [ymin, xmin, ymax, xmax] normalized 0-1
  * @param {number} targetSize - Target crop size in pixels
  * @param {number} padding - Padding ratio to add around bbox (0-0.5)
- * @returns {Promise<Buffer|null>} Cropped image buffer
+ * @param {object} options - Additional options
+ * @param {boolean} options.forRegeneration - If true, output PNG for lossless quality
+ * @returns {Promise<{buffer: Buffer, paddedBox: number[]}|null>} Cropped image buffer and normalized padded box
  */
-async function extractCropFromImage(imageData, bbox, targetSize, padding = 0.1) {
+async function extractCropFromImage(imageData, bbox, targetSize, padding = 0.1, options = {}) {
+  const { forRegeneration = false } = options;
+
   try {
     // Handle data URI prefix
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -528,19 +545,25 @@ async function extractCropFromImage(imageData, bbox, targetSize, padding = 0.1) 
     x2 = Math.min(width, x2 + padX);
     y2 = Math.min(height, y2 + padY);
 
+    // Calculate normalized padded box for later compositing
+    const paddedBox = [y1 / height, x1 / width, y2 / height, x2 / width];
+
     // Extract and resize
-    const cropBuffer = await sharp(imgBuffer)
+    let sharpPipeline = sharp(imgBuffer)
       .extract({
         left: x1,
         top: y1,
         width: x2 - x1,
         height: y2 - y1
       })
-      .resize(targetSize, targetSize, { fit: 'cover' })
-      .jpeg({ quality: 90 })
-      .toBuffer();
+      .resize(targetSize, targetSize, { fit: 'cover' });
 
-    return cropBuffer;
+    // Use PNG for regeneration (lossless), JPEG otherwise
+    const cropBuffer = forRegeneration
+      ? await sharpPipeline.png().toBuffer()
+      : await sharpPipeline.jpeg({ quality: 90 }).toBuffer();
+
+    return { buffer: cropBuffer, paddedBox };
   } catch (err) {
     log.error(`[ENTITY-CROP] Extraction error: ${err.message}`);
     return null;
@@ -769,6 +792,240 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
   }
 }
 
+// Repair model (same as repairGrid.js)
+const REPAIR_MODEL = 'gemini-2.5-flash-image';
+
+/**
+ * Repair entity consistency by regenerating problematic cells to match reference
+ *
+ * @param {object} storyData - Story data with sceneImages
+ * @param {object} character - Character object with name and photoUrl
+ * @param {object} entityReport - Entity consistency report from runEntityConsistencyChecks
+ * @param {object} options - Repair options
+ * @returns {Promise<object>} Repair result with updated images
+ */
+async function repairEntityConsistency(storyData, character, entityReport, options = {}) {
+  const charName = character.name;
+  const charReport = entityReport.characters?.[charName];
+
+  if (!charReport) {
+    return { success: false, error: `No consistency report found for ${charName}` };
+  }
+
+  if (charReport.consistent && charReport.score >= 8) {
+    return { success: true, message: `${charName} is already consistent (score: ${charReport.score})`, noChanges: true };
+  }
+
+  log.info(`🔧 [ENTITY-REPAIR] Starting repair for ${charName} (current score: ${charReport.score})`);
+
+  try {
+    // Step 1: Collect entity appearances with forRegeneration=true
+    const sceneImages = storyData.sceneImages || [];
+    const entityAppearances = collectEntityAppearances(sceneImages, [character]);
+    const appearances = entityAppearances.get(charName);
+
+    if (!appearances || appearances.length < 2) {
+      return { success: false, error: `Not enough appearances for ${charName}` };
+    }
+
+    // Step 2: Extract crops with paddedBox and originalImageData for compositing
+    const crops = await extractEntityCrops(appearances, { forRegeneration: true });
+
+    if (crops.length < 2) {
+      return { success: false, error: `Not enough valid crops for ${charName}` };
+    }
+
+    // Step 3: Create repair grid with reference photo
+    const referencePhoto = character.photoUrl || character.photo;
+    const gridResult = await createEntityGrid(crops, charName, referencePhoto);
+
+    // Step 4: Build repair prompt
+    const promptTemplate = PROMPT_TEMPLATES.entityConsistencyRepair;
+    if (!promptTemplate) {
+      log.error('❌ [ENTITY-REPAIR] Missing prompt template: entity-consistency-repair.txt');
+      return { success: false, error: 'Missing repair prompt template' };
+    }
+
+    // Build cell info for prompt
+    const cellLetters = crops.map((_, i) => String.fromCharCode(65 + i));
+    const lastLetter = cellLetters[cellLetters.length - 1];
+
+    const cellInfo = crops.map((crop, i) => ({
+      cell: cellLetters[i],
+      page: crop.pageNumber,
+      clothing: crop.clothing || 'standard',
+      cropType: crop.cropType
+    }));
+
+    // Determine clothing instructions based on cell clothing variations
+    const clothingTypes = [...new Set(crops.map(c => c.clothing || 'standard'))];
+    const clothingInstructions = clothingTypes.length > 1
+      ? `Different clothing is EXPECTED between cells with different clothing categories (${clothingTypes.join(', ')}). Only match the character's physical appearance, not their outfit.`
+      : `All cells show the character in "${clothingTypes[0]}" clothing. Match both physical appearance and clothing style.`;
+
+    const prompt = promptTemplate
+      .replace(/\{ENTITY_TYPE\}/g, 'character')
+      .replace(/\{ENTITY_NAME\}/g, charName)
+      .replace(/\{LAST_LETTER\}/g, lastLetter)
+      .replace(/\{CELL_INFO\}/g, JSON.stringify(cellInfo, null, 2))
+      .replace(/\{CLOTHING_INSTRUCTIONS\}/g, clothingInstructions);
+
+    // Step 5: Send to Gemini for repair
+    log.info(`🔧 [ENTITY-REPAIR] Sending grid to Gemini for repair (${crops.length} cells)`);
+
+    const model = genAI.getGenerativeModel({
+      model: REPAIR_MODEL,
+      generationConfig: {
+        responseModalities: ['IMAGE', 'TEXT'],
+        temperature: 0.5
+      }
+    });
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: gridResult.buffer.toString('base64')
+        }
+      }
+    ]);
+
+    const response = result.response;
+    const parts = response.candidates?.[0]?.content?.parts || [];
+
+    let repairedGridBuffer = null;
+    let textResponse = '';
+
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        repairedGridBuffer = Buffer.from(part.inlineData.data, 'base64');
+      } else if (part.text) {
+        textResponse = part.text;
+      }
+    }
+
+    if (!repairedGridBuffer) {
+      log.warn(`⚠️  [ENTITY-REPAIR] Gemini returned text instead of image: ${textResponse.substring(0, 100)}`);
+      return { success: false, error: 'Gemini did not return repaired image' };
+    }
+
+    // Step 6: Extract repaired regions from grid
+    log.info(`🔧 [ENTITY-REPAIR] Extracting repaired regions from grid`);
+
+    const repairedMeta = await sharp(repairedGridBuffer).metadata();
+    const originalMeta = gridResult.manifest.dimensions;
+
+    // Calculate scale factors
+    const scaleX = repairedMeta.width / originalMeta.width;
+    const scaleY = repairedMeta.height / originalMeta.height;
+
+    const repairedCells = [];
+    const cellSize = gridResult.manifest.cellSize;
+    const hasReference = !!referencePhoto;
+
+    for (let i = 0; i < crops.length; i++) {
+      const crop = crops[i];
+      const letter = cellLetters[i];
+      const cellPos = gridResult.cellMap[letter];
+
+      if (!cellPos) {
+        log.warn(`⚠️  [ENTITY-REPAIR] No cell position found for ${letter}`);
+        continue;
+      }
+
+      // Scale cell position to repaired grid dimensions
+      const scaledX = Math.round(cellPos.x * scaleX);
+      const scaledY = Math.round(cellPos.y * scaleY);
+      const scaledWidth = Math.round(cellPos.width * scaleX);
+      const scaledHeight = Math.round(cellPos.height * scaleY);
+
+      // Clamp to image bounds
+      const left = Math.max(0, Math.min(scaledX, repairedMeta.width - 1));
+      const top = Math.max(0, Math.min(scaledY, repairedMeta.height - 1));
+      const width = Math.min(scaledWidth, repairedMeta.width - left);
+      const height = Math.min(scaledHeight, repairedMeta.height - top);
+
+      try {
+        const cellBuffer = await sharp(repairedGridBuffer)
+          .extract({ left, top, width, height })
+          .png()  // Keep lossless for compositing
+          .toBuffer();
+
+        repairedCells.push({
+          letter,
+          pageNumber: crop.pageNumber,
+          buffer: cellBuffer,
+          paddedBox: crop.paddedBox,
+          originalImageData: crop.originalImageData
+        });
+      } catch (err) {
+        log.error(`❌ [ENTITY-REPAIR] Failed to extract cell ${letter}: ${err.message}`);
+      }
+    }
+
+    // Step 7: Composite repaired cells back onto original pages
+    log.info(`🔧 [ENTITY-REPAIR] Compositing ${repairedCells.length} repaired cells back to pages`);
+
+    const updatedImages = [];
+    const { applyVerifiedRepairs } = require('./repairVerification');
+
+    for (const cell of repairedCells) {
+      if (!cell.originalImageData || !cell.paddedBox) {
+        log.warn(`⚠️  [ENTITY-REPAIR] Missing data for page ${cell.pageNumber}`);
+        continue;
+      }
+
+      try {
+        // Create repair object for applyVerifiedRepairs
+        const repair = {
+          accepted: true,
+          buffer: cell.buffer,
+          issue: {
+            extraction: {
+              paddedBox: cell.paddedBox
+            }
+          }
+        };
+
+        const repairedImageBuffer = await applyVerifiedRepairs(cell.originalImageData, [repair]);
+        const repairedImageData = `data:image/jpeg;base64,${repairedImageBuffer.toString('base64')}`;
+
+        updatedImages.push({
+          pageNumber: cell.pageNumber,
+          imageData: repairedImageData,
+          letter: cell.letter
+        });
+
+        log.info(`✅ [ENTITY-REPAIR] Page ${cell.pageNumber} repaired`);
+      } catch (err) {
+        log.error(`❌ [ENTITY-REPAIR] Failed to composite page ${cell.pageNumber}: ${err.message}`);
+      }
+    }
+
+    // Build result
+    const repairResult = {
+      success: true,
+      entityName: charName,
+      entityType: 'character',
+      originalScore: charReport.score,
+      cellsRepaired: updatedImages.length,
+      updatedImages,
+      gridBeforeRepair: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+      gridAfterRepair: `data:image/jpeg;base64,${repairedGridBuffer.toString('base64')}`,
+      usage: response.usageMetadata
+    };
+
+    log.info(`✅ [ENTITY-REPAIR] Repair complete for ${charName}: ${updatedImages.length} pages updated`);
+
+    return repairResult;
+
+  } catch (err) {
+    log.error(`❌ [ENTITY-REPAIR] Error repairing ${charName}: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
 /**
  * Save entity grid to disk
  *
@@ -831,8 +1088,9 @@ async function saveEntityGrids(grids, outputDir) {
 }
 
 module.exports = {
-  // Main function
+  // Main functions
   runEntityConsistencyChecks,
+  repairEntityConsistency,
 
   // Helper functions (exported for testing)
   collectEntityAppearances,

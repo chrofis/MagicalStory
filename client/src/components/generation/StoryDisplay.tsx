@@ -233,6 +233,7 @@ export function StoryDisplay({
 
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
+  const [repairingEntity, setRepairingEntity] = useState<string | null>(null);
 
   // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
@@ -482,6 +483,40 @@ export function StoryDisplay({
       console.error('Failed to repair image:', err);
     } finally {
       setRepairingPage(null);
+    }
+  };
+
+  // Handle entity consistency repair (dev mode)
+  const handleRepairEntityConsistency = async (entityName: string) => {
+    if (!storyId || repairingEntity !== null) return;
+    setRepairingEntity(entityName);
+    try {
+      const response = await fetch(`/api/stories/${storyId}/repair-entity-consistency`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ entityName, entityType: 'character' })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Repair failed');
+      }
+
+      const result = await response.json();
+      console.log('Entity repair result:', result);
+
+      // Reload the page to show updated images
+      if (result.success && !result.noChanges) {
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Failed to repair entity consistency:', err);
+      alert(`Failed to repair: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRepairingEntity(null);
     }
   };
 
@@ -2238,6 +2273,36 @@ export function StoryDisplay({
                               {charResult?.summary && (
                                 <p className="text-xs text-gray-500 italic">{charResult.summary}</p>
                               )}
+
+                              {/* Repair Button - Only show if there are issues and score < 8 */}
+                              {storyId && (!isConsistent || score < 8) && grid.entityType === 'character' && (
+                                <div className="mt-3 pt-3 border-t border-gray-100">
+                                  <button
+                                    onClick={() => handleRepairEntityConsistency(grid.entityName)}
+                                    disabled={isGenerating || repairingEntity !== null}
+                                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                                      isGenerating || repairingEntity !== null
+                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        : 'bg-amber-500 text-white hover:bg-amber-600'
+                                    }`}
+                                  >
+                                    {repairingEntity === grid.entityName ? (
+                                      <>
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                        <span>Repairing...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Wrench className="w-3 h-3" />
+                                        <span>Repair Consistency</span>
+                                      </>
+                                    )}
+                                  </button>
+                                  <p className="text-[10px] text-gray-400 mt-1">
+                                    Regenerate appearances to match reference photo
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           </details>
                         );
@@ -2431,11 +2496,34 @@ export function StoryDisplay({
                       <div className="bg-green-50 p-2 rounded text-xs">
                         <span className="font-semibold text-green-700">Scene Description:</span>
                         {scene.textModelId && <span className="ml-2 text-green-600">({scene.textModelId})</span>}
-                        <p className="text-gray-700 mt-1 whitespace-pre-wrap">
-                          {typeof scene.description === 'string'
-                            ? scene.description
-                            : (scene.description as { text?: string })?.text || JSON.stringify(scene.description)}
-                        </p>
+                        <pre className="text-gray-700 mt-1 whitespace-pre-wrap font-mono text-xs overflow-x-auto">
+                          {(() => {
+                            // Pretty-print JSON for readability
+                            if (typeof scene.description === 'string') {
+                              // Try to parse and format if it's a JSON string
+                              try {
+                                const parsed = JSON.parse(scene.description);
+                                return JSON.stringify(parsed, null, 2);
+                              } catch {
+                                return scene.description;
+                              }
+                            }
+                            // If it's an object, format it nicely
+                            if (typeof scene.description === 'object') {
+                              const desc = scene.description as { text?: string };
+                              if (desc?.text) {
+                                try {
+                                  const parsed = JSON.parse(desc.text);
+                                  return JSON.stringify(parsed, null, 2);
+                                } catch {
+                                  return desc.text;
+                                }
+                              }
+                              return JSON.stringify(scene.description, null, 2);
+                            }
+                            return String(scene.description);
+                          })()}
+                        </pre>
                       </div>
                     </div>
                   </details>
@@ -2512,9 +2600,20 @@ export function StoryDisplay({
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {typeof frontCoverObj.description === 'string'
-                        ? frontCoverObj.description
-                        : (frontCoverObj.description as { text?: string })?.text || JSON.stringify(frontCoverObj.description)}
+                      {(() => {
+                        const desc = frontCoverObj.description;
+                        if (typeof desc === 'string') {
+                          try { return JSON.stringify(JSON.parse(desc), null, 2); } catch { return desc; }
+                        }
+                        if (typeof desc === 'object') {
+                          const d = desc as { text?: string };
+                          if (d?.text) {
+                            try { return JSON.stringify(JSON.parse(d.text), null, 2); } catch { return d.text; }
+                          }
+                          return JSON.stringify(desc, null, 2);
+                        }
+                        return String(desc);
+                      })()}
                     </pre>
                   </details>
                 )}
@@ -2682,9 +2781,20 @@ export function StoryDisplay({
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {typeof initialPageObj.description === 'string'
-                        ? initialPageObj.description
-                        : (initialPageObj.description as { text?: string })?.text || JSON.stringify(initialPageObj.description)}
+                      {(() => {
+                        const desc = initialPageObj.description;
+                        if (typeof desc === 'string') {
+                          try { return JSON.stringify(JSON.parse(desc), null, 2); } catch { return desc; }
+                        }
+                        if (typeof desc === 'object') {
+                          const d = desc as { text?: string };
+                          if (d?.text) {
+                            try { return JSON.stringify(JSON.parse(d.text), null, 2); } catch { return d.text; }
+                          }
+                          return JSON.stringify(desc, null, 2);
+                        }
+                        return String(desc);
+                      })()}
                     </pre>
                   </details>
                 )}
@@ -3649,9 +3759,20 @@ export function StoryDisplay({
                       {language === 'de' ? 'Szenenbeschreibung' : language === 'fr' ? 'Description de scène' : 'Scene Description'}
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
-                      {typeof backCoverObj.description === 'string'
-                        ? backCoverObj.description
-                        : (backCoverObj.description as { text?: string })?.text || JSON.stringify(backCoverObj.description)}
+                      {(() => {
+                        const desc = backCoverObj.description;
+                        if (typeof desc === 'string') {
+                          try { return JSON.stringify(JSON.parse(desc), null, 2); } catch { return desc; }
+                        }
+                        if (typeof desc === 'object') {
+                          const d = desc as { text?: string };
+                          if (d?.text) {
+                            try { return JSON.stringify(JSON.parse(d.text), null, 2); } catch { return d.text; }
+                          }
+                          return JSON.stringify(desc, null, 2);
+                        }
+                        return String(desc);
+                      })()}
                     </pre>
                   </details>
                 )}

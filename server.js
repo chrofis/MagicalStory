@@ -4022,6 +4022,128 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
   }
 });
 
+// Repair entity consistency (regenerate character appearances to match reference) - DEV ONLY
+app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageRegenerationLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { entityName, entityType = 'character' } = req.body;
+
+    // Admin-only endpoint (dev mode feature)
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    if (!entityName) {
+      return res.status(400).json({ error: 'entityName is required' });
+    }
+
+    log.info(`🔧 [ENTITY-REPAIR] Starting entity consistency repair for ${entityName} in story ${id}`);
+
+    // Get the story
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string'
+      ? JSON.parse(story.data)
+      : story.data;
+
+    // Find the character
+    const character = storyData.characters?.find(c => c.name === entityName);
+    if (!character) {
+      return res.status(404).json({ error: `Character "${entityName}" not found in story` });
+    }
+
+    // Get or run entity consistency check
+    let entityReport = storyData.finalChecksReport?.entityConsistency;
+
+    if (!entityReport || !entityReport.characters?.[entityName]) {
+      // Run entity consistency check first
+      log.info(`🔧 [ENTITY-REPAIR] Running entity consistency check for ${entityName}`);
+      const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
+      entityReport = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
+        checkCharacters: true,
+        checkObjects: false
+      });
+    }
+
+    // Run the repair
+    const { repairEntityConsistency } = require('./server/lib/entityConsistency');
+    const repairResult = await repairEntityConsistency(storyData, character, entityReport);
+
+    if (!repairResult.success) {
+      return res.status(400).json({ error: repairResult.error || 'Repair failed' });
+    }
+
+    if (repairResult.noChanges) {
+      return res.json({
+        success: true,
+        message: repairResult.message,
+        noChanges: true
+      });
+    }
+
+    // Apply updated images to story
+    const sceneImages = storyData.sceneImages || [];
+    for (const update of repairResult.updatedImages) {
+      const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
+      if (sceneIndex >= 0) {
+        // Store original before repair if not already stored
+        if (!sceneImages[sceneIndex].preEntityRepairImage) {
+          sceneImages[sceneIndex].preEntityRepairImage = sceneImages[sceneIndex].imageData;
+        }
+        sceneImages[sceneIndex].imageData = update.imageData;
+        sceneImages[sceneIndex].entityRepaired = true;
+        sceneImages[sceneIndex].entityRepairedAt = new Date().toISOString();
+        sceneImages[sceneIndex].entityRepairedFor = entityName;
+      }
+    }
+
+    storyData.sceneImages = sceneImages;
+
+    // Store repair grids in finalChecksReport for dev panel
+    if (!storyData.finalChecksReport) {
+      storyData.finalChecksReport = {};
+    }
+    if (!storyData.finalChecksReport.entityRepairs) {
+      storyData.finalChecksReport.entityRepairs = {};
+    }
+    storyData.finalChecksReport.entityRepairs[entityName] = {
+      timestamp: new Date().toISOString(),
+      originalScore: repairResult.originalScore,
+      cellsRepaired: repairResult.cellsRepaired,
+      gridBeforeRepair: repairResult.gridBeforeRepair,
+      gridAfterRepair: repairResult.gridAfterRepair,
+      usage: repairResult.usage
+    };
+
+    // Save updated story
+    await saveStoryData(id, storyData);
+
+    log.info(`✅ [ENTITY-REPAIR] Entity consistency repair complete for ${entityName}: ${repairResult.cellsRepaired} pages updated`);
+
+    res.json({
+      success: true,
+      entityName,
+      originalScore: repairResult.originalScore,
+      cellsRepaired: repairResult.cellsRepaired,
+      updatedPages: repairResult.updatedImages.map(u => u.pageNumber),
+      gridBeforeRepair: repairResult.gridBeforeRepair,
+      gridAfterRepair: repairResult.gridAfterRepair
+    });
+
+  } catch (err) {
+    log.error('Error in entity consistency repair:', err);
+    res.status(500).json({ error: 'Failed to repair entity consistency: ' + err.message });
+  }
+});
+
 // Edit cover image with a user prompt
 app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req, res) => {
   try {

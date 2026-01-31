@@ -68,6 +68,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.sceneRepair = await fs.readFile(path.join(promptsDir, 'scene-repair.txt'), 'utf-8');
     // Entity consistency check prompt (for per-entity grid evaluation)
     PROMPT_TEMPLATES.entityConsistencyCheck = await fs.readFile(path.join(promptsDir, 'entity-consistency-check.txt'), 'utf-8');
+    // Entity consistency repair prompt (for regenerating cells to match reference)
+    PROMPT_TEMPLATES.entityConsistencyRepair = await fs.readFile(path.join(promptsDir, 'entity-consistency-repair.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {

@@ -1,0 +1,59 @@
+# Entity Consistency Repair
+
+You are repairing character consistency issues in a children's picture book illustration.
+
+## Entity Information
+
+**Entity Type:** {ENTITY_TYPE}
+**Entity Name:** {ENTITY_NAME}
+
+## Grid Layout
+
+The image shows a labeled grid:
+- **Cell R (Reference)**: This is the CANONICAL appearance of {ENTITY_NAME}. This is the source of truth.
+- **Cells A-{LAST_LETTER}**: These crops show the same entity from different story pages, but with consistency issues.
+
+**Cell Information:**
+{CELL_INFO}
+
+## Your Task
+
+Regenerate each cell A-{LAST_LETTER} to MATCH the reference (Cell R) while preserving:
+1. The POSE and POSITION from the original cell
+2. The BACKGROUND and CONTEXT from the original cell
+3. The LIGHTING and ART STYLE from the original cell
+
+From the reference (Cell R), match:
+1. FACIAL FEATURES - eyes, nose, mouth, face shape
+2. HAIR - color, style, length, texture
+3. SKIN TONE - consistent complexion
+4. BODY PROPORTIONS - size, build, age appearance
+5. DISTINCTIVE FEATURES - any unique characteristics
+
+## Clothing Rules
+
+{CLOTHING_INSTRUCTIONS}
+
+## Output Requirements
+
+Generate a grid image with the SAME layout as the input:
+- Keep Cell R unchanged (or slightly refined if needed)
+- Replace each cell A-{LAST_LETTER} with a corrected version
+- Each corrected cell should look like {ENTITY_NAME} from the reference
+- Maintain the original pose, position, and background of each cell
+
+## Quality Standards
+
+- No blurry or smeared areas
+- No distorted facial features
+- No floating or disconnected elements
+- Colors should be vibrant and consistent
+- Art style should match the original children's book illustration style
+- All cells should look like they belong to the same story
+
+## Important
+
+- Do NOT change the layout or size of cells
+- Do NOT add new elements or remove existing elements
+- Focus ONLY on making the character look consistent with the reference
+- If a cell shows the character from behind or partially obscured, fix only the visible parts
