@@ -575,6 +575,8 @@ export interface SceneImage {
   referencePhotos?: ReferencePhoto[];
   // Landmark photos used (for dev mode)
   landmarkPhotos?: LandmarkPhoto[];
+  // Visual Bible grid image (combines VB elements + secondary landmarks)
+  visualBibleGrid?: string;  // Base64 data URL
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)
@@ -628,6 +630,8 @@ export interface CoverImageData {
   referencePhotos?: ReferencePhoto[];
   // Landmark photos used (for dev mode)
   landmarkPhotos?: LandmarkPhoto[];
+  // Visual Bible grid image (combines VB elements + secondary landmarks)
+  visualBibleGrid?: string;  // Base64 data URL
   // API model used (for dev mode)
   modelId?: string;
   // Story title (sent with frontCover during streaming for early display transition)

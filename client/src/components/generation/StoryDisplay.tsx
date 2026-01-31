@@ -2798,10 +2798,11 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0) && (
+                {((frontCoverObj.referencePhotos?.length ?? 0) > 0 || (frontCoverObj.landmarkPhotos?.length ?? 0) > 0 || frontCoverObj.visualBibleGrid) && (
                   <ReferencePhotosDisplay
                     referencePhotos={frontCoverObj.referencePhotos || []}
                     landmarkPhotos={frontCoverObj.landmarkPhotos}
+                    visualBibleGrid={frontCoverObj.visualBibleGrid}
                     language={language}
                   />
                 )}
@@ -2979,10 +2980,11 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0) && (
+                {((initialPageObj.referencePhotos?.length ?? 0) > 0 || (initialPageObj.landmarkPhotos?.length ?? 0) > 0 || initialPageObj.visualBibleGrid) && (
                   <ReferencePhotosDisplay
                     referencePhotos={initialPageObj.referencePhotos || []}
                     landmarkPhotos={initialPageObj.landmarkPhotos}
+                    visualBibleGrid={initialPageObj.visualBibleGrid}
                     language={language}
                   />
                 )}
@@ -3363,10 +3365,11 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0) && image && (
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
+                                visualBibleGrid={image.visualBibleGrid}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -3735,10 +3738,11 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0) && (
+                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid) && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
+                                visualBibleGrid={image.visualBibleGrid}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -3973,10 +3977,11 @@ export function StoryDisplay({
                 )}
 
                 {/* Reference Photos */}
-                {((backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0) && (
+                {((backCoverObj.referencePhotos?.length ?? 0) > 0 || (backCoverObj.landmarkPhotos?.length ?? 0) > 0 || backCoverObj.visualBibleGrid) && (
                   <ReferencePhotosDisplay
                     referencePhotos={backCoverObj.referencePhotos || []}
                     landmarkPhotos={backCoverObj.landmarkPhotos}
+                    visualBibleGrid={backCoverObj.visualBibleGrid}
                     language={language}
                   />
                 )}

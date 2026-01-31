@@ -14,6 +14,7 @@ interface LandmarkPhoto {
 interface ReferencePhotosDisplayProps {
   referencePhotos: ReferencePhoto[];
   landmarkPhotos?: LandmarkPhoto[];
+  visualBibleGrid?: string;  // Base64 data URL of combined VB elements grid
   language: string;
   // For lazy loading
   storyId?: string;
@@ -26,6 +27,7 @@ interface ReferencePhotosDisplayProps {
 export function ReferencePhotosDisplay({
   referencePhotos,
   landmarkPhotos,
+  visualBibleGrid,
   language,
   storyId,
   pageNumber
@@ -76,10 +78,11 @@ export function ReferencePhotosDisplay({
 
   const hasCharacterPhotos = displayRefPhotos && displayRefPhotos.length > 0;
   const hasLandmarkPhotos = displayLandmarkPhotos && displayLandmarkPhotos.length > 0;
+  const hasVBGrid = !!visualBibleGrid;
 
-  if (!hasCharacterPhotos && !hasLandmarkPhotos) return null;
+  if (!hasCharacterPhotos && !hasLandmarkPhotos && !hasVBGrid) return null;
 
-  const totalCount = (referencePhotos?.length || 0) + (landmarkPhotos?.length || 0);
+  const totalCount = (referencePhotos?.length || 0) + (landmarkPhotos?.length || 0) + (hasVBGrid ? 1 : 0);
 
   const getPhotoTypeLabel = (photoType: string) => {
     switch (photoType) {
@@ -146,6 +149,11 @@ export function ReferencePhotosDisplay({
         {hasLandmarkPhotos && (
           <span className="ml-2 px-2 py-0.5 bg-amber-200 text-amber-800 text-xs rounded">
             📍 {displayLandmarkPhotos!.length} {language === 'de' ? 'Wahrzeichen' : 'Landmark'}
+          </span>
+        )}
+        {hasVBGrid && (
+          <span className="ml-2 px-2 py-0.5 bg-indigo-200 text-indigo-800 text-xs rounded">
+            🔲 VB Grid
           </span>
         )}
         {isLoading && (
@@ -249,6 +257,39 @@ export function ReferencePhotosDisplay({
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Visual Bible Grid (combined VB elements + secondary landmarks) */}
+      {hasVBGrid && (
+        <div className={hasCharacterPhotos || hasLandmarkPhotos ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
+          <div className="text-xs font-semibold text-indigo-700 mb-2 flex items-center gap-1">
+            🔲 {language === 'de' ? 'Visual Bible Referenzgitter' : language === 'fr' ? 'Grille Visual Bible' : 'Visual Bible Reference Grid'}
+          </div>
+          <div className="bg-indigo-50 rounded-lg p-2 border border-indigo-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-xs text-gray-800">
+                {language === 'de' ? 'Kombinierte Referenzen' : language === 'fr' ? 'Références combinées' : 'Combined References'}
+              </span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border whitespace-nowrap bg-indigo-100 text-indigo-700 border-indigo-300">
+                🔲 VB GRID
+              </span>
+            </div>
+            <div className="text-[10px] text-gray-500 mb-2">
+              {language === 'de'
+                ? 'Sekundäre Charaktere, Tiere, Artefakte, Fahrzeuge und zusätzliche Wahrzeichen'
+                : language === 'fr'
+                ? 'Personnages secondaires, animaux, artefacts, véhicules et monuments supplémentaires'
+                : 'Secondary characters, animals, artifacts, vehicles, and additional landmarks'}
+            </div>
+            <img
+              src={visualBibleGrid}
+              alt="Visual Bible Reference Grid"
+              className="w-full max-h-64 object-contain rounded border border-indigo-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setLightboxImage(visualBibleGrid!)}
+              title="Click to enlarge"
+            />
           </div>
         </div>
       )}
