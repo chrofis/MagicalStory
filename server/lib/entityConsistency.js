@@ -36,7 +36,7 @@ const MAX_GRID_CELLS = 12;    // Maximum cells per grid (4x3)
 async function runEntityConsistencyChecks(storyData, characters = [], options = {}) {
   const {
     checkCharacters = true,
-    checkObjects = false,  // Objects/pets not yet implemented
+    checkObjects = true,  // Enable object consistency checking
     minAppearances = MIN_APPEARANCES,
     saveGrids = false,
     outputDir = null
@@ -154,6 +154,88 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         } catch (err) {
           log.error(`❌ [ENTITY-CHECK] Error checking ${charName}: ${err.message}`);
           report.characters[charName] = {
+            error: err.message,
+            consistent: true,  // Assume consistent on error
+            score: 0,
+            issues: []
+          };
+        }
+      }
+    }
+
+    // Process objects (after character loop)
+    if (checkObjects) {
+      // Collect object appearances from bboxDetection.objects + objectMatches
+      const objectAppearances = collectObjectAppearances(sceneImages);
+
+      for (const [objName, appearances] of objectAppearances) {
+        if (appearances.length < minAppearances) continue;
+
+        log.info(`🔍 [ENTITY-CHECK] Checking object ${objName}: ${appearances.length} appearances`);
+
+        try {
+          // Extract crops (objects only have bodyBox)
+          const crops = await extractEntityCrops(appearances);
+
+          if (crops.length < minAppearances) {
+            log.warn(`⚠️  [ENTITY-CHECK] ${objName}: only ${crops.length} valid crops`);
+            continue;
+          }
+
+          // Create grid (no reference photo for objects)
+          const gridResult = await createEntityGrid(crops, objName, null);
+
+          // Store grid for dev panel
+          report.grids.push({
+            entityName: objName,
+            entityType: 'object',
+            gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+            manifest: gridResult.manifest,
+            cellCount: crops.length
+          });
+
+          // Save grid to disk if requested
+          if (saveGrids && outputDir) {
+            await saveEntityGrid(gridResult.buffer, objName, 'object', outputDir);
+          }
+
+          // Evaluate consistency
+          const evalResult = await evaluateEntityConsistency(
+            gridResult.buffer,
+            gridResult.manifest,
+            {
+              entityType: 'object',
+              entityName: objName,
+              referencePhoto: null,
+              cellCount: crops.length
+            }
+          );
+
+          // Store result
+          report.objects[objName] = {
+            gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+            consistent: evalResult.consistent,
+            score: evalResult.score,
+            issues: evalResult.issues || [],
+            summary: evalResult.summary
+          };
+
+          // Aggregate
+          if (!evalResult.consistent) {
+            report.overallConsistent = false;
+          }
+          report.totalIssues += evalResult.issues?.length || 0;
+
+          // Track token usage
+          if (evalResult.usage) {
+            report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
+            report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
+            report.tokenUsage.calls++;
+          }
+
+        } catch (err) {
+          log.error(`❌ [ENTITY-CHECK] Error checking object ${objName}: ${err.message}`);
+          report.objects[objName] = {
             error: err.message,
             consistent: true,  // Assume consistent on error
             score: 0,
@@ -300,6 +382,68 @@ function collectEntityAppearances(sceneImages, characters = []) {
 }
 
 /**
+ * Collect object appearances from scene images using bbox detection data
+ *
+ * @param {Array<object>} sceneImages - Scene images with retryHistory
+ * @returns {Map<string, Array>} Map of objectName -> appearances
+ */
+function collectObjectAppearances(sceneImages) {
+  const appearances = new Map();
+
+  for (const img of sceneImages) {
+    const pageNumber = img.pageNumber;
+    const imageData = img.imageData;
+
+    if (!imageData) continue;
+
+    // Get bbox detection from retryHistory
+    let bboxDetection = null;
+    if (img.retryHistory && Array.isArray(img.retryHistory)) {
+      // Find the most recent entry with bbox detection
+      for (let i = img.retryHistory.length - 1; i >= 0; i--) {
+        const entry = img.retryHistory[i];
+        if (entry.bboxDetection) {
+          bboxDetection = entry.bboxDetection;
+          break;
+        }
+      }
+    }
+
+    if (!bboxDetection?.objects) continue;
+
+    // Match objects via objectMatches or use labels directly
+    for (const obj of bboxDetection.objects) {
+      const match = bboxDetection.objectMatches?.find(m =>
+        m.label === obj.label
+      );
+      const name = match?.reference || obj.label;
+
+      if (!appearances.has(name)) {
+        appearances.set(name, []);
+      }
+
+      appearances.get(name).push({
+        pageNumber,
+        imageData,
+        bodyBox: obj.bodyBox,
+        faceBox: null,  // Objects don't have faces
+        label: obj.label,
+        confidence: match?.confidence || 0.7
+      });
+    }
+  }
+
+  // Filter out objects with too few appearances
+  for (const [name, apps] of appearances) {
+    if (apps.length < MIN_APPEARANCES) {
+      appearances.delete(name);
+    }
+  }
+
+  return appearances;
+}
+
+/**
  * Extract cropped images for each entity appearance
  *
  * @param {Array<object>} appearances - Entity appearances with bbox info
@@ -310,10 +454,10 @@ async function extractEntityCrops(appearances) {
 
   for (const app of appearances) {
     try {
-      // Prefer face crop if available, otherwise use body
-      const bbox = app.faceBox || app.bodyBox;
-      const cropType = app.faceBox ? 'face' : 'body';
-      const targetSize = cropType === 'face' ? FACE_CROP_SIZE : BODY_CROP_SIZE;
+      // Prefer body crop (more reliable than face detection)
+      const bbox = app.bodyBox || app.faceBox;  // Prefer body, fallback to face
+      const cropType = 'body';  // Always use body crop
+      const targetSize = BODY_CROP_SIZE;  // Always 512px
 
       if (!bbox) {
         log.verbose(`[ENTITY-CROP] No bbox for page ${app.pageNumber}`);
@@ -325,7 +469,7 @@ async function extractEntityCrops(appearances) {
         app.imageData,
         bbox,
         targetSize,
-        cropType === 'face' ? 0.3 : 0.1  // More padding for face crops
+        0.1  // Standard body crop padding
       );
 
       if (cropBuffer) {
@@ -692,6 +836,7 @@ module.exports = {
 
   // Helper functions (exported for testing)
   collectEntityAppearances,
+  collectObjectAppearances,
   extractEntityCrops,
   extractCropFromImage,
   createEntityGrid,
