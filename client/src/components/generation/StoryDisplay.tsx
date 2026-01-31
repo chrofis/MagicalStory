@@ -2332,17 +2332,16 @@ export function StoryDisplay({
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium text-green-600">✓ Repaired</span>
                                     <span className="text-[10px] text-gray-400">
-                                      {finalChecksReport.entityRepairs[grid.entityName].cellsRepaired} pages updated
-                                      {finalChecksReport.entityRepairs[grid.entityName].clothingGroupCount &&
-                                       finalChecksReport.entityRepairs[grid.entityName].clothingGroupCount > 1 &&
-                                        ` (${finalChecksReport.entityRepairs[grid.entityName].clothingGroupCount} clothing groups)`}
+                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.cellsRepaired} pages updated
+                                      {(finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount ?? 0) > 1 &&
+                                        ` (${finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount} clothing groups)`}
                                     </span>
                                   </div>
 
                                   {/* NEW: Grouped by clothing category */}
-                                  {finalChecksReport.entityRepairs[grid.entityName].gridsByClothing?.length ? (
+                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.length ? (
                                     <div className="space-y-4">
-                                      {finalChecksReport.entityRepairs[grid.entityName].gridsByClothing!.map((clothingGroup) => (
+                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.map((clothingGroup) => (
                                         <div key={clothingGroup.clothingCategory} className="space-y-2">
                                           {/* Clothing category header */}
                                           <div className="flex items-center gap-2 border-b border-gray-100 pb-1">
@@ -2408,7 +2407,7 @@ export function StoryDisplay({
                                         </div>
                                       ))}
                                     </div>
-                                  ) : finalChecksReport.entityRepairs[grid.entityName].cellComparisons?.length ? (
+                                  ) : finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.length ? (
                                     /* Backward compatible: flat cell comparisons (old format) */
                                     <div className="space-y-2">
                                       <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
@@ -2417,7 +2416,7 @@ export function StoryDisplay({
                                         <span>After</span>
                                         <span>Diff</span>
                                       </div>
-                                      {finalChecksReport.entityRepairs[grid.entityName].cellComparisons!.map((cell) => (
+                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.map((cell) => (
                                         <div key={cell.letter} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
                                           <div className="text-center">
                                             <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
@@ -2433,12 +2432,12 @@ export function StoryDisplay({
                                     </div>
                                   ) : (
                                     /* Fallback to full grid comparison for oldest repairs */
-                                    <div className={`grid gap-3 ${finalChecksReport.entityRepairs[grid.entityName].gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                    <div className={`grid gap-3 ${finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
                                       <div className="space-y-1">
                                         <span className="text-[10px] font-medium text-gray-500">Before Repair</span>
                                         <div className="bg-gray-50 rounded p-1">
                                           <img
-                                            src={finalChecksReport.entityRepairs[grid.entityName].gridBeforeRepair}
+                                            src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair}
                                             alt="Before repair"
                                             className="w-full h-auto rounded"
                                           />
@@ -2448,18 +2447,18 @@ export function StoryDisplay({
                                         <span className="text-[10px] font-medium text-gray-500">After Repair</span>
                                         <div className="bg-gray-50 rounded p-1">
                                           <img
-                                            src={finalChecksReport.entityRepairs[grid.entityName].gridAfterRepair}
+                                            src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair}
                                             alt="After repair"
                                             className="w-full h-auto rounded"
                                           />
                                         </div>
                                       </div>
-                                      {finalChecksReport.entityRepairs[grid.entityName].gridDiff && (
+                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff && (
                                         <div className="space-y-1">
                                           <span className="text-[10px] font-medium text-gray-500">Difference</span>
                                           <div className="bg-gray-900 rounded p-1">
                                             <img
-                                              src={finalChecksReport.entityRepairs[grid.entityName].gridDiff!}
+                                              src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff}
                                               alt="Difference"
                                               className="w-full h-auto rounded"
                                             />
