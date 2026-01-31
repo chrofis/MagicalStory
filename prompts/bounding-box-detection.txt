@@ -1,72 +1,100 @@
-Detect ALL figures, faces, and notable objects in this storybook illustration.
+Detect figures and objects in this storybook illustration.
 
-Return bounding boxes for EVERY element in the image:
+{{EXPECTED_CHARACTERS}}
+
+{{EXPECTED_OBJECTS}}
 
 COORDINATE SYSTEM:
 - Values are 0-1000 (Gemini native format)
 - Origin is top-left corner
 - Format: [y_min, x_min, y_max, x_max]
 
-FOR EACH FIGURE (character/person):
+FOR EACH FIGURE:
+- If you can identify it as an expected character, set "name" to the character name (EXACTLY as listed above)
+- If not identifiable as any expected character, set "name" to "UNKNOWN"
+- Include "confidence": "high", "medium", or "low" for identification certainty
 - face_box: bounding box around the FACE only (forehead to chin, ear to ear)
-- body_box: bounding box around the FULL BODY (head to feet, or as much as visible)
-- If face is not visible (back view), set face_box to null
+- body_box: bounding box around the FULL BODY (or as much as visible)
+- If face is not visible (back view, non-human creature), set face_box to null
 
-FOR EACH NOTABLE OBJECT:
-- body_box: bounding box around the object
-- face_box: null
-- Include: held items, vehicles, animals, furniture, magical elements
+FOR EXPECTED OBJECTS:
+- Report "found": true/false for each expected object
+- If found, include body_box bounding box and position
 
-Return ONLY valid JSON with no other text:
+Return ONLY valid JSON:
 {
   "figures": [
     {
-      "label": "visual description (e.g., 'boy in blue hoodie on left')",
+      "name": "CharacterName or UNKNOWN",
+      "label": "visual description (e.g., 'boy in blue hoodie')",
       "position": "left|center|right",
-      "face_box": [y_min, x_min, y_max, x_max],
-      "body_box": [y_min, x_min, y_max, x_max]
+      "face_box": [y_min, x_min, y_max, x_max] or null,
+      "body_box": [y_min, x_min, y_max, x_max],
+      "confidence": "high|medium|low"
     }
   ],
   "objects": [
     {
-      "label": "visual description (e.g., 'red bicycle in foreground')",
+      "name": "expected object name",
+      "found": true|false,
+      "label": "visual description if found",
       "position": "left|center|right",
-      "body_box": [y_min, x_min, y_max, x_max]
+      "body_box": [y_min, x_min, y_max, x_max] or null
     }
   ]
 }
 
 EXAMPLE - Scene with two children and a dog:
+Given expected characters: "Lukas (boy, 7 years old, blonde hair)" and "Mia (girl, 3 years old, brown curly hair)"
+Given expected objects: "golden crown", "brown teddy bear"
+
 {
   "figures": [
     {
-      "label": "girl with blonde hair in pink dress",
+      "name": "Lukas",
+      "label": "boy with blonde hair in blue hoodie",
       "position": "left",
       "face_box": [120, 100, 220, 200],
-      "body_box": [100, 50, 650, 300]
+      "body_box": [100, 50, 650, 300],
+      "confidence": "high"
     },
     {
-      "label": "boy with brown hair in blue hoodie",
+      "name": "Mia",
+      "label": "girl with curly brown hair in pink dress",
       "position": "right",
       "face_box": [150, 700, 250, 800],
-      "body_box": [130, 600, 680, 900]
+      "body_box": [130, 600, 680, 900],
+      "confidence": "high"
+    },
+    {
+      "name": "UNKNOWN",
+      "label": "golden retriever dog",
+      "position": "center",
+      "face_box": null,
+      "body_box": [500, 400, 700, 600],
+      "confidence": "n/a"
     }
   ],
   "objects": [
     {
-      "label": "golden retriever dog",
+      "name": "golden crown",
+      "found": true,
+      "label": "golden crown on table",
       "position": "center",
-      "body_box": [500, 400, 700, 600]
+      "body_box": [300, 450, 350, 520]
     },
     {
-      "label": "red ball on grass",
-      "position": "center",
-      "body_box": [650, 450, 720, 520]
+      "name": "brown teddy bear",
+      "found": false,
+      "label": null,
+      "position": null,
+      "body_box": null
     }
   ]
 }
 
 IMPORTANT:
-- Detect ALL visible figures, even if partially visible
-- Detect ALL notable objects that could be relevant to story issues
+- Detect ALL visible figures, even if partially visible or UNKNOWN
 - Be precise with bounding boxes - they will be used for inpainting
+- Match characters based on age, gender, and physical description, not just position
+- For creatures/animals/non-humans that are not expected characters, use "UNKNOWN"

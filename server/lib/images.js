@@ -133,18 +133,6 @@ const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) 
 // Inpainting works best for small, targeted fixes. For large areas, regenerate the image instead.
 const MAX_MASK_COVERAGE_PERCENT = 25;
 
-// Scoring weights for matching issues to detected elements in enrichWithBoundingBoxes
-const MATCH_SCORING = {
-  CHARACTER_NAME: 100,      // Character name found in issue description (via spatial matching)
-  POSITION: 30,             // Position match (left/center/right)
-  KEYWORD: 10,              // Per keyword overlap between issue and element label
-  COLOR: 15,                // Per color match
-  TYPE_AFFINITY_FIGURE: 5,  // Issue type (face/hand/clothing) matches figure element
-  TYPE_AFFINITY_OBJECT: 10, // Issue type matches object element
-  CHARACTER_KEYWORD: 8,     // Character-related keyword in issue boosts figure matches
-  OBJECT_KEYWORD: 8         // Object-related keyword in issue boosts object matches
-};
-
 /**
  * Hash image data for comparison/caching
  * @param {string} imageData - Base64 image data URL
@@ -805,9 +793,14 @@ function parseVisualBibleObjects(prompt) {
  * Stage 2: This function detects ALL figures, faces, and objects in one call
  *
  * @param {string} imageData - Base64 image data
+ * @param {Object} options - Detection options
+ * @param {Array<{name: string, description: string, position: string}>} options.expectedCharacters - Characters to identify
+ * @param {string[]} options.expectedObjects - Objects to check for
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
-async function detectAllBoundingBoxes(imageData) {
+async function detectAllBoundingBoxes(imageData, options = {}) {
+  const { expectedCharacters = [], expectedObjects = [] } = options;
+
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -821,8 +814,28 @@ async function detectAllBoundingBoxes(imageData) {
       return null;
     }
 
-    // New prompt detects everything - no issue substitution needed
-    const prompt = PROMPT_TEMPLATES.boundingBoxDetection;
+    // Build dynamic prompt with expected characters and objects
+    let prompt = PROMPT_TEMPLATES.boundingBoxDetection;
+
+    // Inject expected characters section
+    if (expectedCharacters.length > 0) {
+      const charSection = `EXPECTED CHARACTERS (identify by name if found):\n` +
+        expectedCharacters.map((c, i) =>
+          `${i + 1}. ${c.name} - ${c.description}${c.position ? `\n   Expected position: ${c.position}` : ''}`
+        ).join('\n');
+      prompt = prompt.replace('{{EXPECTED_CHARACTERS}}', charSection);
+    } else {
+      prompt = prompt.replace('{{EXPECTED_CHARACTERS}}', '(No expected characters provided - detect all figures as UNKNOWN)');
+    }
+
+    // Inject expected objects section
+    if (expectedObjects.length > 0) {
+      const objSection = `EXPECTED OBJECTS (check if present):\n` +
+        expectedObjects.map(o => `- ${o}`).join('\n');
+      prompt = prompt.replace('{{EXPECTED_OBJECTS}}', objSection);
+    } else {
+      prompt = prompt.replace('{{EXPECTED_OBJECTS}}', '(No expected objects provided)');
+    }
 
     // Extract base64 and mime type
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
@@ -998,26 +1011,49 @@ async function detectAllBoundingBoxes(imageData) {
       return [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
     };
 
-    // Normalize all figures
+    // Normalize all figures (now includes name and confidence from AI identification)
     const figures = (parsedResult.figures || []).map(fig => ({
+      name: fig.name || 'UNKNOWN',  // Character name or "UNKNOWN"
       label: fig.label,
       position: fig.position,
       faceBox: normalizeBox(fig.face_box),
-      bodyBox: normalizeBox(fig.body_box)
+      bodyBox: normalizeBox(fig.body_box),
+      confidence: fig.confidence || 'low'  // "high", "medium", "low"
     }));
 
-    // Normalize all objects
+    // Normalize all objects (now includes found status and expected name)
     const objects = (parsedResult.objects || []).map(obj => ({
+      name: obj.name,  // Expected object name (from input)
+      found: obj.found !== false,  // Default true for backward compatibility
       label: obj.label,
       position: obj.position,
       bodyBox: normalizeBox(obj.body_box)
     }));
 
+    // Log character identifications
+    const identifiedChars = figures.filter(f => f.name !== 'UNKNOWN');
+    const unknownFigures = figures.filter(f => f.name === 'UNKNOWN');
+    if (identifiedChars.length > 0) {
+      log.info(`📦 [BBOX-DETECT] Identified ${identifiedChars.length} characters: ${identifiedChars.map(f => `${f.name} (${f.confidence})`).join(', ')}`);
+    }
+    if (unknownFigures.length > 0) {
+      log.info(`📦 [BBOX-DETECT] ${unknownFigures.length} UNKNOWN figures: ${unknownFigures.map(f => f.label).join(', ')}`);
+    }
     log.info(`📦 [BBOX-DETECT] Detected ${figures.length} figures, ${objects.length} objects`);
+
+    // Compute found/missing objects from detection results
+    const foundObjects = objects.filter(o => o.found).map(o => o.name);
+    const missingObjects = objects.filter(o => !o.found).map(o => o.name);
 
     return {
       figures,
       objects,
+      // Include expected inputs for dev mode display
+      expectedCharacters,
+      expectedObjects,
+      foundObjects,
+      missingObjects,
+      unknownFigures: figures.filter(f => f.name === 'UNKNOWN').length,
       usage: { input_tokens: inputTokens, output_tokens: outputTokens },
       // Include raw prompt and response for dev mode debugging
       rawPrompt: prompt,
@@ -1028,6 +1064,30 @@ async function detectAllBoundingBoxes(imageData) {
     log.error(`❌ [BBOX-DETECT] Error detecting bounding boxes: ${error.message}`);
     return null;
   }
+}
+
+/**
+ * Build expected characters array for bbox detection from character descriptions and positions
+ * @param {Object} characterDescriptions - Map of charName → {age, gender, isChild, genderTerm}
+ * @param {Object} expectedPositions - Map of charName → position string
+ * @returns {Array<{name: string, description: string, position: string}>}
+ */
+function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions) {
+  const chars = [];
+  for (const [name, desc] of Object.entries(characterDescriptions || {})) {
+    const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
+    const descParts = [];
+    if (desc.genderTerm) descParts.push(desc.genderTerm);
+    if (desc.age) descParts.push(`${desc.age} years old`);
+    if (desc.isChild === true) descParts.push('child');
+    else if (desc.isChild === false) descParts.push('adult');
+    chars.push({
+      name,
+      description: descParts.join(', ') || 'character',
+      position
+    });
+  }
+  return chars;
 }
 
 /**
@@ -1051,33 +1111,21 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
     const metadata = await sharp(imageBuffer).metadata();
     const { width, height } = metadata;
 
-    // Build figure index → character name mapping from qualityMatches
-    // qualityMatches: [{figure: 1, reference: "Lukas", confidence: 0.8, ...}]
-    const figureToCharName = {};
-    for (const match of (bboxDetection.qualityMatches || [])) {
-      if (match.figure && match.reference && (match.confidence || 0) >= 0.5) {
-        const figIdx = match.figure - 1;  // figure is 1-indexed
-        figureToCharName[figIdx] = match.reference;
-      }
-    }
-
-    // Build object label → reference name mapping from objectMatches
-    // objectMatches: [{reference: "Eli", type: "animal", ...}]
-    const objectToRefName = {};
-    for (const match of (bboxDetection.objectMatches || [])) {
-      if (match.reference) {
-        objectToRefName[match.reference.toLowerCase()] = match.reference;
-      }
-    }
-
     // Build SVG overlay with boxes
     const svgParts = [`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`];
 
-    // Draw figure boxes (green for body, blue for face)
+    // Confidence level to color mapping
+    const confidenceColors = {
+      high: '#00cc00',    // Green for high confidence
+      medium: '#ffaa00',  // Yellow/amber for medium confidence
+      low: '#ff6600'      // Orange for low confidence
+    };
+
+    // Draw figure boxes - now uses name directly from detection
     for (let i = 0; i < (bboxDetection.figures || []).length; i++) {
       const fig = bboxDetection.figures[i];
 
-      // Body box - green (or purple if matched to character)
+      // Body box - color based on identification confidence
       if (fig.bodyBox) {
         const [ymin, xmin, ymax, xmax] = fig.bodyBox;
         const x = Math.round(xmin * width);
@@ -1085,21 +1133,28 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
 
-        // Check if this figure is matched to a character
-        const charName = figureToCharName[i];
-        const boxColor = charName ? '#aa00ff' : '#00ff00';  // Purple if matched, green otherwise
-        const labelBgColor = charName ? '#aa00ff' : '#00ff00';
+        // Character name comes directly from figure.name (AI identified)
+        const isIdentified = fig.name && fig.name !== 'UNKNOWN';
+        const confidence = fig.confidence || 'low';
+        const boxColor = isIdentified ? (confidenceColors[confidence] || '#aa00ff') : '#888888';  // Gray for UNKNOWN
+        const labelBgColor = boxColor;
 
         svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="3"/>`);
 
-        // Label - show character name if matched, otherwise generic label
-        const label = charName ? `★ ${charName}` : (fig.label ? fig.label.substring(0, 30) : `Figure ${i + 1}`);
+        // Label - show character name + confidence, or "UNKNOWN" + visual label
+        let label;
+        if (isIdentified) {
+          const confIcon = confidence === 'high' ? '★' : confidence === 'medium' ? '◆' : '○';
+          label = `${confIcon} ${fig.name}`;
+        } else {
+          label = `? ${fig.label ? fig.label.substring(0, 25) : `Figure ${i + 1}`}`;
+        }
         const labelWidth = Math.min(label.length * 8 + 10, 200);
         svgParts.push(`<rect x="${x}" y="${Math.max(0, y - 22)}" width="${labelWidth}" height="22" fill="${labelBgColor}" opacity="0.9" rx="3"/>`);
         svgParts.push(`<text x="${x + 5}" y="${Math.max(16, y - 5)}" font-family="Arial" font-size="13" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
       }
 
-      // Face box - blue
+      // Face box - blue dashed
       if (fig.faceBox) {
         const [ymin, xmin, ymax, xmax] = fig.faceBox;
         const x = Math.round(xmin * width);
@@ -1110,7 +1165,7 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
       }
     }
 
-    // Draw object boxes (orange, or cyan if matched to reference)
+    // Draw object boxes - now uses found status directly
     for (let i = 0; i < (bboxDetection.objects || []).length; i++) {
       const obj = bboxDetection.objects[i];
       if (obj.bodyBox) {
@@ -1120,16 +1175,15 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
         const w = Math.round((xmax - xmin) * width);
         const h = Math.round((ymax - ymin) * height);
 
-        // Check if object is matched to a reference
-        const objLabelLower = (obj.label || '').toLowerCase();
-        const refName = objectToRefName[objLabelLower];
-        const boxColor = refName ? '#00cccc' : '#ff8800';  // Cyan if matched, orange otherwise
-        const labelBgColor = refName ? '#00cccc' : '#ff8800';
+        // Object was found (has bbox) so color indicates it was expected
+        const wasExpected = obj.name && obj.found !== false;
+        const boxColor = wasExpected ? '#00cccc' : '#ff8800';  // Cyan if expected & found, orange otherwise
+        const labelBgColor = boxColor;
 
         svgParts.push(`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${boxColor}" stroke-width="2"/>`);
 
-        // Label - show reference name if matched
-        const label = refName ? `★ ${refName}` : (obj.label ? obj.label.substring(0, 25) : `Object ${i + 1}`);
+        // Label - show expected object name if matched
+        const label = wasExpected ? `✓ ${obj.name}` : (obj.label ? obj.label.substring(0, 25) : `Object ${i + 1}`);
         const labelWidth = Math.min(label.length * 7 + 10, 180);
         svgParts.push(`<rect x="${x}" y="${y + h}" width="${labelWidth}" height="20" fill="${labelBgColor}" opacity="0.9" rx="3"/>`);
         svgParts.push(`<text x="${x + 5}" y="${y + h + 14}" font-family="Arial" font-size="12" font-weight="bold" fill="white">${escapeXml(label)}</text>`);
@@ -1186,208 +1240,56 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  *
  * @param {string} imageData - Base64 image data
  * @param {Array<{description: string, severity: string, type: string, fix: string}>} fixableIssues - Issues from quality eval
- * @param {Array<{figure: number, reference: string, confidence: number, position: string, hair: string, clothing: string}>} qualityMatches - Character→figure mapping from quality eval
- * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval
+ * @param {Array<{figure: number, reference: string, confidence: number, position: string, hair: string, clothing: string}>} qualityMatches - Character→figure mapping from quality eval (legacy, not used)
+ * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-/**
- * Compute Intersection over Union between two bounding boxes.
- * Both boxes in [ymin, xmin, ymax, xmax] format, 0-1 normalized.
- * Returns 0-1 (0 = no overlap, 1 = identical).
- */
-function computeIoU(boxA, boxB) {
-  if (!boxA || !boxB || boxA.length !== 4 || boxB.length !== 4) return 0;
-
-  const yOverlap = Math.max(0, Math.min(boxA[2], boxB[2]) - Math.max(boxA[0], boxB[0]));
-  const xOverlap = Math.max(0, Math.min(boxA[3], boxB[3]) - Math.max(boxA[1], boxB[1]));
-  const intersection = yOverlap * xOverlap;
-
-  const areaA = (boxA[2] - boxA[0]) * (boxA[3] - boxA[1]);
-  const areaB = (boxB[2] - boxB[0]) * (boxB[3] - boxB[1]);
-  const union = areaA + areaB - intersection;
-
-  return union > 0 ? intersection / union : 0;
-}
-
 async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}) {
-  // Always detect all elements for dev mode display
-  log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
+  // Build expected characters for bbox detection (AI will identify by name)
+  const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions);
 
-  const allDetections = await detectAllBoundingBoxes(imageData);
+  log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects...`);
+
+  // Call bbox detection WITH character/object context - AI identifies directly by name
+  const allDetections = await detectAllBoundingBoxes(imageData, {
+    expectedCharacters,
+    expectedObjects
+  });
 
   if (!allDetections) {
     log.warn(`⚠️  [BBOX-ENRICH] Detection failed, no bounding boxes available`);
     return { targets: [], detectionHistory: null };
   }
 
-  // Log expected positions from scene description
-  if (Object.keys(expectedPositions).length > 0) {
-    log.debug(`📦 [BBOX-ENRICH] Expected positions from scene: ${Object.entries(expectedPositions).map(([n, p]) => `${n}="${p}"`).join(', ')}`);
-  }
-
-  // Log expected objects from scene description
-  if (expectedObjects.length > 0) {
-    log.debug(`📦 [BBOX-ENRICH] Expected objects from scene: ${expectedObjects.join(', ')}`);
-  }
-
   log.info(`📦 [BBOX-ENRICH] Found ${allDetections.figures.length} figures, ${allDetections.objects.length} objects`);
 
-  // Helper to build detectionHistory with all the expected data
-  const buildDetectionHistory = (positionMismatches = [], missingCharacters = [], matchedObjects = [], missingObjects = []) => ({
-    figures: allDetections.figures,
-    objects: allDetections.objects,
-    qualityMatches: qualityMatches,  // Include character matches for display
-    objectMatches: objectMatches,    // Include object/animal/landmark matches for display
-    expectedPositions: Object.keys(expectedPositions).length > 0 ? expectedPositions : undefined,
-    positionMismatches: positionMismatches.length > 0 ? positionMismatches : undefined,
-    missingCharacters: missingCharacters.length > 0 ? missingCharacters : undefined,
-    expectedObjects: expectedObjects.length > 0 ? expectedObjects : undefined,
-    matchedObjects: matchedObjects.length > 0 ? matchedObjects : undefined,
-    missingObjects: missingObjects.length > 0 ? missingObjects : undefined,
-    characterDescriptions: Object.keys(characterDescriptions).length > 0 ? characterDescriptions : undefined,
-    usage: allDetections.usage,
-    // Raw prompt and response for dev mode debugging
-    rawPrompt: allDetections.rawPrompt,
-    rawResponse: allDetections.rawResponse,
-    timestamp: new Date().toISOString()
-  });
-
-  // If no issues to fix, just return the detections
-  if (!fixableIssues || fixableIssues.length === 0) {
-    return { targets: [], detectionHistory: buildDetectionHistory() };
-  }
-
-  // Build character name → figure mapping from quality evaluation matches
-  // Example: {"patrick": {figureId: 1, position: "left", hair: "blonde", clothing: "blue hoodie", confidence: 0.8}}
-  const charNameToFigure = {};
-  for (const match of qualityMatches) {
-    if (match.reference && match.figure && Number.isInteger(match.figure) && match.figure > 0) {
-      const confidence = match.confidence || 0;
-      if (confidence < 0.5) continue;  // Skip low-confidence matches
-      const charName = match.reference.toLowerCase();
-      charNameToFigure[charName] = {
-        figureId: match.figure,
-        position: match.position,     // "left", "right", "center"
-        hair: match.hair,             // "blonde, short"
-        clothing: match.clothing,     // "blue hoodie, dark pants"
-        confidence
-      };
-    }
-  }
-  if (Object.keys(charNameToFigure).length > 0) {
-    log.info(`📦 [BBOX-ENRICH] Character mapping: ${Object.entries(charNameToFigure).map(([name, info]) => `${name} → Figure ${info.figureId} (${info.position || 'no position'})`).join(', ')}`);
-  }
-
-  // Build attribute-based mapping: charName → detection figure element (by position, hair, clothing, age/gender)
-  // Non-human keywords to exclude from character matching (monsters, creatures, animals)
-  const nonHumanKeywords = ['creature', 'monster', 'yeti', 'dragon', 'beast', 'alien', 'robot', 'ghost',
-    'demon', 'ogre', 'troll', 'goblin', 'wolf', 'bear', 'lion', 'tiger', 'elephant', 'horse', 'dog',
-    'cat', 'bird', 'snake', 'dinosaur', 'unicorn', 'fairy', 'elf', 'dwarf', 'giant', 'skeleton',
-    'zombie', 'vampire', 'werewolf', 'witch', 'wizard', 'mermaid', 'centaur', 'griffin', 'phoenix'];
-
-  // Helper to extract figure type from label
-  const extractFigureType = (label) => {
-    const l = label.toLowerCase();
-    // Order matters: check more specific terms first
-    if (l.includes('boy') || l.includes('young boy')) return { isChild: true, gender: 'male', term: 'boy' };
-    if (l.includes('girl') || l.includes('young girl')) return { isChild: true, gender: 'female', term: 'girl' };
-    if (l.includes('man') || l.includes('father') || l.includes('dad')) return { isChild: false, gender: 'male', term: 'man' };
-    if (l.includes('woman') || l.includes('mother') || l.includes('mom')) return { isChild: false, gender: 'female', term: 'woman' };
-    if (l.includes('child') || l.includes('kid') || l.includes('toddler')) return { isChild: true, gender: null, term: 'child' };
-    if (l.includes('teen')) return { isChild: true, gender: null, term: 'teen' };
-    return { isChild: null, gender: null, term: null };
-  };
-
+  // Direct mapping - AI already labeled figures with character names
   const charToDetectionFigure = {};
-  const usedFigures = new Set();  // Prevent same figure matching multiple characters
-
-  for (const [charName, charInfo] of Object.entries(charNameToFigure)) {
-    let bestFigure = null;
-    let bestScore = -100;  // Allow negative scores to track mismatches
-
-    // Get expected position from scene description
-    const expectedPos = expectedPositions[charName] || expectedPositions[charName.charAt(0).toUpperCase() + charName.slice(1)];
-    const expectedLCR = getStoryHelpers().normalizePositionToLCR(expectedPos);
-
-    // Get character description (age, gender) if available
-    const charDesc = characterDescriptions[charName] || characterDescriptions[charName.charAt(0).toUpperCase() + charName.slice(1)] || {};
-
-    for (const figure of allDetections.figures) {
-      // Skip figures already matched to another character
-      if (usedFigures.has(figure)) continue;
-
-      let score = 0;
-      const label = (figure.label || '').toLowerCase();
-
-      // Skip non-human figures
-      const isNonHuman = nonHumanKeywords.some(keyword => label.includes(keyword));
-      if (isNonHuman) {
-        log.debug(`📦 [BBOX-ENRICH] Skipping non-human figure for "${charName}": "${figure.label}"`);
-        continue;
-      }
-
-      // AGE/GENDER MATCHING (strongest signal when we have character descriptions)
-      const figureType = extractFigureType(label);
-      if (charDesc.isChild !== undefined && figureType.isChild !== null) {
-        if (charDesc.isChild === figureType.isChild) {
-          score += 15;  // Strong: age category matches (both children or both adults)
-        } else {
-          score -= 20;  // Strong penalty: age mismatch (don't match child character to adult figure)
-        }
-      }
-      if (charDesc.gender && figureType.gender) {
-        if (charDesc.gender === figureType.gender) {
-          score += 10;  // Gender matches
-        } else {
-          score -= 15;  // Gender mismatch penalty
-        }
-      }
-
-      // POSITION MATCHING
-      if (expectedLCR && figure.position === expectedLCR) {
-        score += 5;  // Position matches expected from scene
-      } else if (charInfo.position && figure.position === charInfo.position) {
-        score += 3;  // Quality eval guessed position
-      }
-
-      // Hair keywords in label
-      if (charInfo.hair) {
-        const hairWords = charInfo.hair.toLowerCase().split(/[,\s]+/).filter(w => w.length > 2);
-        score += hairWords.filter(w => label.includes(w)).length * 2;
-      }
-
-      // Clothing keywords in label
-      if (charInfo.clothing) {
-        const clothingWords = charInfo.clothing.toLowerCase().split(/[,\s]+/).filter(w => w.length > 2);
-        score += clothingWords.filter(w => label.includes(w)).length * 2;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestFigure = figure;
-      }
-    }
-
-    if (bestFigure && bestScore > 0) {
-      charToDetectionFigure[charName] = bestFigure;
-      usedFigures.add(bestFigure);  // Mark as used
-      const figureType = extractFigureType(bestFigure.label);
-      log.info(`📦 [BBOX-ENRICH] Match: "${charName}" (${charDesc.genderTerm || 'unknown'}) → "${bestFigure.label}" (${figureType.term || 'unknown'}) score=${bestScore}${expectedLCR ? `, pos=${expectedLCR}` : ''}`);
+  const unknownFigures = [];
+  for (const figure of allDetections.figures) {
+    if (figure.name && figure.name !== 'UNKNOWN') {
+      charToDetectionFigure[figure.name.toLowerCase()] = figure;
+      log.debug(`📦 [BBOX-ENRICH] Character identified: "${figure.name}" (${figure.confidence}) → "${figure.label}"`);
     } else {
-      log.warn(`⚠️ [BBOX-ENRICH] No match for "${charName}" (bestScore=${bestScore}, expected=${expectedPos || 'none'}, charDesc=${JSON.stringify(charDesc)})`);
+      unknownFigures.push(figure);
     }
   }
 
-  // Track position mismatches and missing characters for dev mode display
-  const positionMismatches = [];
-  const foundCharacters = new Set();
+  if (Object.keys(charToDetectionFigure).length > 0) {
+    log.info(`📦 [BBOX-ENRICH] Identified ${Object.keys(charToDetectionFigure).length} characters: ${Object.keys(charToDetectionFigure).join(', ')}`);
+  }
+  if (unknownFigures.length > 0) {
+    log.info(`📦 [BBOX-ENRICH] ${unknownFigures.length} UNKNOWN figures: ${unknownFigures.map(f => f.label).join(', ')}`);
+  }
 
-  // Check for position mismatches between expected and detected
-  for (const [charName, figure] of Object.entries(charToDetectionFigure)) {
-    foundCharacters.add(charName.toLowerCase());
+  // Track position mismatches between expected and detected
+  const positionMismatches = [];
+  const foundCharacters = new Set(Object.keys(charToDetectionFigure).map(n => n.toLowerCase()));
+
+  for (const [charNameLower, figure] of Object.entries(charToDetectionFigure)) {
     // Find expected position (try both lowercase and capitalized versions)
-    const expectedPos = expectedPositions[charName] ||
-      expectedPositions[charName.charAt(0).toUpperCase() + charName.slice(1)];
+    const charName = charNameLower.charAt(0).toUpperCase() + charNameLower.slice(1);
+    const expectedPos = expectedPositions[charName] || expectedPositions[charNameLower];
     if (expectedPos) {
       const expectedLCR = getStoryHelpers().normalizePositionToLCR(expectedPos);
       if (expectedLCR && figure.position && figure.position !== expectedLCR) {
@@ -1402,135 +1304,60 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     }
   }
 
-  // Detect missing characters (expected in scene but not matched to any figure)
+  // Detect missing characters (expected in scene but not identified by AI)
   const missingCharacters = Object.keys(expectedPositions)
     .filter(name => !foundCharacters.has(name.toLowerCase()));
   if (missingCharacters.length > 0) {
-    log.warn(`⚠️ [BBOX-ENRICH] Missing characters (expected but not detected): ${missingCharacters.join(', ')}`);
+    log.warn(`⚠️ [BBOX-ENRICH] Missing characters (expected but not identified): ${missingCharacters.join(', ')}`);
   }
 
-  // Build object/animal/landmark mapping: name → detected object
-  const objectToDetection = {};
-  for (const objMatch of objectMatches) {
-    if (!objMatch.reference) continue;
-    const confidence = objMatch.confidence || 0;
-    if (confidence < 0.5) continue;
+  // Object tracking is now direct from detection results
+  const foundObjects = allDetections.foundObjects || [];
+  const missingObjects = allDetections.missingObjects || [];
+  const matchedExpectedObjects = foundObjects.map(name => ({ expected: name, matched: name }));
 
-    const objName = objMatch.reference.toLowerCase();
-    let bestObject = null;
-    let bestScore = 0;
-
-    for (const obj of allDetections.objects) {
-      let score = 0;
-      const label = (obj.label || '').toLowerCase();
-
-      // Position match
-      if (objMatch.position && obj.position === objMatch.position) {
-        score += 3;
-      }
-
-      // Appearance keywords in label
-      if (objMatch.appearance) {
-        const appearanceWords = objMatch.appearance.toLowerCase().split(/[,\s]+/).filter(w => w.length > 2);
-        score += appearanceWords.filter(w => label.includes(w)).length * 2;
-      }
-
-      // Reference name keywords in label
-      const nameWords = objName.split(/[,\s]+/).filter(w => w.length > 2);
-      score += nameWords.filter(w => label.includes(w)).length * 3;
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestObject = obj;
-      }
-    }
-
-    if (bestObject && bestScore > 0) {
-      objectToDetection[objName] = bestObject;
-      log.info(`📦 [BBOX-ENRICH] Object match: "${objMatch.reference}" → "${bestObject.label}" (score=${bestScore})`);
-    } else {
-      log.warn(`⚠️ [BBOX-ENRICH] No object match for "${objMatch.reference}" (position=${objMatch.position})`);
-    }
+  if (foundObjects.length > 0 || missingObjects.length > 0) {
+    log.info(`📦 [BBOX-ENRICH] Objects: ${foundObjects.length} found, ${missingObjects.length} missing`);
   }
 
-  // Track expected objects from scene description vs detected objects
-  // Expected objects are strings like "star [ART001]" or "LOC001"
-  const matchedExpectedObjects = [];
-  const missingExpectedObjects = [];
+  // Build detection history for dev mode display
+  const detectionHistory = {
+    figures: allDetections.figures,
+    objects: allDetections.objects,
+    expectedCharacters: allDetections.expectedCharacters,
+    expectedObjects: allDetections.expectedObjects,
+    expectedPositions: Object.keys(expectedPositions).length > 0 ? expectedPositions : undefined,
+    positionMismatches: positionMismatches.length > 0 ? positionMismatches : undefined,
+    missingCharacters: missingCharacters.length > 0 ? missingCharacters : undefined,
+    foundObjects: foundObjects.length > 0 ? foundObjects : undefined,
+    missingObjects: missingObjects.length > 0 ? missingObjects : undefined,
+    matchedObjects: matchedExpectedObjects.length > 0 ? matchedExpectedObjects : undefined,
+    unknownFigures: unknownFigures.length,
+    characterDescriptions: Object.keys(characterDescriptions).length > 0 ? characterDescriptions : undefined,
+    usage: allDetections.usage,
+    rawPrompt: allDetections.rawPrompt,
+    rawResponse: allDetections.rawResponse,
+    timestamp: new Date().toISOString()
+  };
 
-  for (const expectedObj of expectedObjects) {
-    // Extract ID (e.g., "ART001" from "star [ART001]") and name
-    const idMatch = expectedObj.match(/\[([A-Z]+\d+)\]/);
-    const objId = idMatch ? idMatch[1] : null;
-    const objName = expectedObj.replace(/\s*\[[A-Z]+\d+\]/, '').trim().toLowerCase();
-
-    // Check if any detected object matches this expected object
-    let found = false;
-    let matchedLabel = null;
-
-    for (const detectedObj of allDetections.objects) {
-      const label = (detectedObj.label || '').toLowerCase();
-
-      // Match by ID in label (e.g., "art001" in label)
-      if (objId && label.includes(objId.toLowerCase())) {
-        found = true;
-        matchedLabel = detectedObj.label;
-        break;
-      }
-
-      // Match by name keywords
-      const nameWords = objName.split(/\s+/).filter(w => w.length >= 3);
-      const matchingWords = nameWords.filter(w => label.includes(w));
-      if (matchingWords.length > 0 && matchingWords.length >= nameWords.length * 0.5) {
-        found = true;
-        matchedLabel = detectedObj.label;
-        break;
-      }
-    }
-
-    if (found) {
-      matchedExpectedObjects.push({ expected: expectedObj, matched: matchedLabel });
-      log.debug(`📦 [BBOX-ENRICH] Expected object found: "${expectedObj}" → "${matchedLabel}"`);
-    } else {
-      missingExpectedObjects.push(expectedObj);
-      log.warn(`⚠️ [BBOX-ENRICH] Expected object NOT found: "${expectedObj}"`);
-    }
+  // If no issues to fix, just return the detections
+  if (!fixableIssues || fixableIssues.length === 0) {
+    return { targets: [], detectionHistory };
   }
 
-  if (matchedExpectedObjects.length > 0 || missingExpectedObjects.length > 0) {
-    log.info(`📦 [BBOX-ENRICH] Expected objects: ${matchedExpectedObjects.length} found, ${missingExpectedObjects.length} missing`);
-  }
-
-  // Match issues to detected elements for repair targets using scored matching
+  // Match issues to detected elements for repair targets
+  // Now uses direct character name matching from AI identification
   const enrichedTargets = [];
   const allElements = [
     ...allDetections.figures.map(f => ({ ...f, elementType: 'figure' })),
     ...allDetections.objects.map(o => ({ ...o, elementType: 'object', faceBox: null }))
   ];
 
-  // Helper: extract meaningful keywords from text (4+ chars, not common words)
-  const commonWords = new Set(['with', 'that', 'this', 'from', 'have', 'been', 'were', 'being', 'their', 'there', 'which', 'would', 'could', 'should', 'about', 'figure', 'image', 'shown', 'visible']);
-  const extractKeywords = (text) => {
-    return (text || '').toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length >= 4 && !commonWords.has(w));
-  };
-
-  // Helper: check for color matches
-  const colors = ['red', 'blue', 'green', 'yellow', 'orange', 'purple', 'pink', 'black', 'white', 'brown', 'gray', 'grey', 'blonde', 'golden', 'silver'];
-  const extractColors = (text) => colors.filter(c => (text || '').toLowerCase().includes(c));
-
-  // Helper: check for position matches
-  const positions = ['left', 'right', 'center', 'middle', 'foreground', 'background'];
-  const extractPositions = (text) => positions.filter(p => (text || '').toLowerCase().includes(p));
-
   // Helper: extract character names mentioned in issue text
   const extractCharacterNames = (text) => {
     const textLower = (text || '').toLowerCase();
     const foundChars = [];
-    for (const charName of Object.keys(charNameToFigure)) {
-      // Match character name with word boundaries (e.g., "patrick's" should match "patrick")
+    for (const charName of Object.keys(charToDetectionFigure)) {
       const escapedName = charName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const regex = new RegExp(`\\b${escapedName}(?:[\u2019']s)?\\b`, 'i');
       if (regex.test(textLower)) {
@@ -1540,113 +1367,65 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     return foundChars;
   };
 
+  // Helper: extract meaningful keywords from text
+  const commonWords = new Set(['with', 'that', 'this', 'from', 'have', 'been', 'were', 'being', 'their', 'there', 'which', 'would', 'could', 'should', 'about', 'figure', 'image', 'shown', 'visible']);
+  const extractKeywords = (text) => {
+    return (text || '').toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 4 && !commonWords.has(w));
+  };
+
   for (const issue of fixableIssues) {
     const issueDesc = (issue.description || '').toLowerCase();
     const issueFix = (issue.fix || '').toLowerCase();
     const issueKeywords = extractKeywords(issueDesc + ' ' + issueFix);
-    const issueColors = extractColors(issueDesc + ' ' + issueFix);
-    const issuePositions = extractPositions(issueDesc);
 
-    // Check if issue mentions a character name we know about
+    // Check if issue mentions a character name we know about (now directly identified)
     const mentionedChars = extractCharacterNames(issueDesc + ' ' + issueFix);
 
-    // Score each element for this issue
     let bestMatch = null;
-    let bestScore = 0;
-    let matchedByCharName = false;
+    let matchedCharacter = null;
 
-    for (const element of allElements) {
-      const label = (element.label || '').toLowerCase();
-      const position = (element.position || '').toLowerCase();
-      const elementKeywords = extractKeywords(label);
-      const elementColors = extractColors(label);
-
-      let score = 0;
-
-      // CHARACTER NAME MATCH (strongest signal)
-      // Uses spatial IoU matching (quality eval and bbox detection number figures independently)
-      if (mentionedChars.length > 0 && element.elementType === 'figure') {
-        for (const charName of mentionedChars) {
-          const matchedFigure = charToDetectionFigure[charName];
-          if (matchedFigure && element === matchedFigure) {
-            score += MATCH_SCORING.CHARACTER_NAME;
-            matchedByCharName = true;
-            log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → spatial match to "${matchedFigure.label}"`);
-          }
+    // DIRECT CHARACTER MATCH (AI already identified by name)
+    if (mentionedChars.length > 0) {
+      for (const charName of mentionedChars) {
+        const figure = charToDetectionFigure[charName];
+        if (figure) {
+          bestMatch = { ...figure, elementType: 'figure' };
+          matchedCharacter = charName;
+          log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → direct match to "${figure.label}"`);
+          break;
         }
-      }
-
-      // Position match (strong signal)
-      if (position && issuePositions.includes(position)) {
-        score += MATCH_SCORING.POSITION;
-      }
-
-      // Keyword overlap
-      for (const keyword of issueKeywords) {
-        if (elementKeywords.includes(keyword) || label.includes(keyword)) {
-          score += MATCH_SCORING.KEYWORD;
-        }
-      }
-
-      // Color match
-      for (const color of issueColors) {
-        if (elementColors.includes(color)) {
-          score += MATCH_SCORING.COLOR;
-        }
-      }
-
-      // Issue type affinity: prefer figures for character issues, objects for object issues
-      if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
-        if (element.elementType === 'figure') score += MATCH_SCORING.TYPE_AFFINITY_FIGURE;
-      } else if (issue.type === 'object') {
-        if (element.elementType === 'object') score += MATCH_SCORING.TYPE_AFFINITY_OBJECT;
-      }
-
-      // Character-related keywords in issue boost figure matches
-      const characterKeywords = ['character', 'person', 'boy', 'girl', 'man', 'woman', 'child', 'kid', 'face', 'hand', 'arm', 'leg', 'hair', 'clothes', 'wearing'];
-      if (characterKeywords.some(k => issueDesc.includes(k)) && element.elementType === 'figure') {
-        score += MATCH_SCORING.CHARACTER_KEYWORD;
-      }
-
-      // Object-related keywords boost object matches
-      const objectKeywords = ['object', 'item', 'thing', 'toy', 'ball', 'sword', 'book', 'bag', 'bicycle', 'car', 'tree', 'flower', 'animal', 'dog', 'cat'];
-      if (objectKeywords.some(k => issueDesc.includes(k)) && element.elementType === 'object') {
-        score += MATCH_SCORING.OBJECT_KEYWORD;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = element;
-        matchedByCharName = score >= MATCH_SCORING.CHARACTER_NAME;  // Track if best match used character name
       }
     }
 
-    // Fallback with smarter logic if no good match found
-    if (!bestMatch || bestScore < 5) {
-      log.debug(`📦 [BBOX-ENRICH] Low match score (${bestScore}), using fallback for: "${issue.description.substring(0, 40)}..."`);
-
-      // For character-related issues, prefer figures with visible faces
+    // Fallback: keyword matching or type-based selection
+    if (!bestMatch) {
       if (issue.type === 'face' || issue.type === 'hand' || issue.type === 'clothing') {
-        // Prefer figure with face visible (for face issues) or largest body (for clothing/hand)
-        const figuresWithFace = allDetections.figures.filter(f => f.faceBox);
-        if (issue.type === 'face' && figuresWithFace.length > 0) {
-          bestMatch = figuresWithFace[0];
+        // For character-related issues, prefer identified characters or largest figure
+        const identifiedFigures = allDetections.figures.filter(f => f.name && f.name !== 'UNKNOWN');
+        if (identifiedFigures.length > 0) {
+          bestMatch = { ...identifiedFigures[0], elementType: 'figure' };
         } else if (allDetections.figures.length > 0) {
-          // Use figure with largest body box (more prominent character)
+          // Use largest figure
           bestMatch = allDetections.figures.reduce((largest, fig) => {
             const getArea = (box) => box ? (box[2] - box[0]) * (box[3] - box[1]) : 0;
             return getArea(fig.bodyBox) > getArea(largest?.bodyBox) ? fig : largest;
           }, allDetections.figures[0]);
+          bestMatch = { ...bestMatch, elementType: 'figure' };
         }
       } else if (issue.type === 'object') {
-        // For object issues, use largest object or fall back to figure
-        if (allDetections.objects.length > 0) {
+        // For object issues, prefer found expected objects or largest object
+        const foundObjs = allDetections.objects.filter(o => o.found !== false);
+        if (foundObjs.length > 0) {
+          bestMatch = { ...foundObjs[0], elementType: 'object', faceBox: null };
+        } else if (allDetections.objects.length > 0) {
           bestMatch = allDetections.objects.reduce((largest, obj) => {
             const getArea = (box) => box ? (box[2] - box[0]) * (box[3] - box[1]) : 0;
             return getArea(obj.bodyBox) > getArea(largest?.bodyBox) ? obj : largest;
           }, allDetections.objects[0]);
-        } else {
-          bestMatch = allDetections.figures[0];
+          bestMatch = { ...bestMatch, elementType: 'object', faceBox: null };
         }
       } else {
         // Generic fallback: largest element in scene
@@ -1663,53 +1442,40 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
       // Choose appropriate box based on issue type
       let boundingBox = bestMatch.bodyBox || bestMatch.faceBox;
       if (issue.type === 'face' && bestMatch.faceBox) {
-        boundingBox = bestMatch.faceBox;  // Use face box for face issues
-      }
-
-      // Find character name if matched by character
-      let matchedCharacter = null;
-      if (matchedByCharName && mentionedChars.length > 0) {
-        matchedCharacter = mentionedChars[0];  // Primary character mentioned in issue
+        boundingBox = bestMatch.faceBox;
       }
 
       enrichedTargets.push({
         faceBox: bestMatch.faceBox,
         bodyBox: bestMatch.bodyBox,
         boundingBox: boundingBox,
-        bounds: boundingBox,  // Alias for issueExtractor.collectAllIssues (expects "bounds")
+        bounds: boundingBox,
         issue: issue.description,
-        fix_instruction: issue.fix || `Fix: ${issue.description}`,  // issueExtractor expects "fix_instruction"
+        fix_instruction: issue.fix || `Fix: ${issue.description}`,
         severity: issue.severity,
         type: issue.type,
-        element: issue.type,  // issueExtractor expects "element"
-        affectedCharacter: matchedCharacter,  // issueExtractor uses this for character lookup
+        element: issue.type,
+        affectedCharacter: matchedCharacter || bestMatch.name,
         fixPrompt: issue.fix || `Fix: ${issue.description}`,
         label: bestMatch.label,
         matchedPosition: bestMatch.position,
-        matchScore: bestScore,
-        matchMethod: matchedByCharName ? 'character' : (bestScore >= 5 ? 'scored' : 'fallback'),
-        matchedCharacter: matchedCharacter  // Character name if matched by character
+        matchMethod: matchedCharacter ? 'character' : 'fallback',
+        matchedCharacter: matchedCharacter || (bestMatch.name !== 'UNKNOWN' ? bestMatch.name : null)
       });
-      const methodStr = matchedByCharName ? `character:${matchedCharacter}` : (bestScore >= 5 ? 'scored' : 'fallback');
-      log.debug(`📦 [BBOX-ENRICH] Matched (score=${bestScore}, ${methodStr}): "${issue.description.substring(0, 30)}..." → "${bestMatch.label}"`);
+      log.debug(`📦 [BBOX-ENRICH] Matched: "${issue.description.substring(0, 30)}..." → "${bestMatch.label}" (${matchedCharacter ? 'character' : 'fallback'})`);
     } else {
-      log.warn(`⚠️  [BBOX-ENRICH] Could not match issue (no elements detected): ${issue.description.substring(0, 50)}...`);
+      log.warn(`⚠️ [BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
     }
   }
 
   // Summarize matching methods used
   const byChar = enrichedTargets.filter(t => t.matchMethod === 'character').length;
-  const byScore = enrichedTargets.filter(t => t.matchMethod === 'scored').length;
   const byFallback = enrichedTargets.filter(t => t.matchMethod === 'fallback').length;
   const methodSummary = [
     byChar > 0 ? `${byChar} by character name` : null,
-    byScore > 0 ? `${byScore} by scoring` : null,
     byFallback > 0 ? `${byFallback} by fallback` : null
   ].filter(Boolean).join(', ');
   log.info(`📦 [BBOX-ENRICH] Matched ${enrichedTargets.length}/${fixableIssues.length} issues to detected elements${methodSummary ? ` (${methodSummary})` : ''}`);
-
-  // Build detection history with position mismatch, missing character, and object tracking data
-  const detectionHistory = buildDetectionHistory(positionMismatches, missingCharacters, matchedExpectedObjects, missingExpectedObjects);
 
   return { targets: enrichedTargets, detectionHistory };
 }

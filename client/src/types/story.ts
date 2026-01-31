@@ -133,18 +133,28 @@ export interface BboxDetectionResult {
 // Full scene bbox detection result (figures + objects)
 export interface BboxSceneDetection {
   figures: Array<{
-    label: string;
+    name?: string;           // Character name (from AI identification) or "UNKNOWN"
+    label: string;           // Visual description (e.g., 'boy in blue hoodie')
     bodyBox?: number[] | null;  // [ymin, xmin, ymax, xmax] normalized 0-1
     faceBox?: number[] | null;
-    position?: string;
+    position?: string;       // "left", "center", "right"
+    confidence?: string;     // "high", "medium", "low" for character identification
   }>;
   objects: Array<{
-    label: string;
+    name?: string;           // Expected object name (if matched)
+    found?: boolean;         // Whether the expected object was found
+    label?: string;          // Visual description
     bodyBox?: number[] | null;
     position?: string;
   }>;
   usage?: { input_tokens: number; output_tokens: number };
   timestamp?: string;
+  // Expected characters passed to bbox detection
+  expectedCharacters?: Array<{
+    name: string;
+    description: string;
+    position: string;
+  }>;
   // Expected positions from scene description (e.g., "Luna": "bottom-left foreground")
   expectedPositions?: Record<string, string>;
   // Position mismatches: character was expected at one position but detected at another
@@ -154,17 +164,20 @@ export interface BboxSceneDetection {
     expectedLCR: string;   // Normalized to "left", "center", "right"
     actual: string;        // Detected position
   }>;
-  // Characters expected in scene but not matched to any detected figure
+  // Characters expected in scene but not identified by AI
   missingCharacters?: string[];
-  // Expected objects from scene description (e.g., "star [ART001]", "LOC001")
+  // Expected objects from scene description
   expectedObjects?: string[];
   // Objects that were expected and found in the image
+  foundObjects?: string[];
   matchedObjects?: Array<{
     expected: string;      // Original expected object string
     matched: string;       // Detected object label that matched
   }>;
   // Objects expected in scene but not detected in image
   missingObjects?: string[];
+  // Number of UNKNOWN figures detected
+  unknownFigures?: number;
   // Character descriptions parsed from prompt (age, gender, isChild)
   characterDescriptions?: Record<string, {
     age?: number;

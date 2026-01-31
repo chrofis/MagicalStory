@@ -203,6 +203,26 @@ export function ObjectDetectionDisplay({
             </button>
           ) : null}
 
+          {/* Expected Characters (passed to bbox detection) */}
+          {bboxDetection.expectedCharacters && bboxDetection.expectedCharacters.length > 0 && (
+            <details className="bg-violet-50 p-3 rounded border border-violet-200">
+              <summary className="cursor-pointer font-medium text-violet-800">
+                👥 {language === 'de' ? 'Erwartete Charaktere' : 'Expected Characters'} ({bboxDetection.expectedCharacters.length})
+              </summary>
+              <div className="mt-2 grid grid-cols-1 gap-2 text-sm">
+                {bboxDetection.expectedCharacters.map((char, cIdx) => (
+                  <div key={cIdx} className="bg-white p-2 rounded border">
+                    <div className="font-medium text-violet-700">{char.name}</div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {char.description}
+                      {char.position && <span className="ml-2 text-violet-500">@ {char.position}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
           {/* Expected Positions from Scene Description */}
           {bboxDetection.expectedPositions && Object.keys(bboxDetection.expectedPositions).length > 0 && (
             <div className="bg-purple-50 p-3 rounded border border-purple-200">
@@ -314,49 +334,99 @@ export function ObjectDetectionDisplay({
             </div>
           )}
 
-          {/* Figures list */}
+          {/* Figures list - now shows character names and confidence */}
           {bboxDetection.figures && bboxDetection.figures.length > 0 && (
             <div className="bg-green-50 p-3 rounded border border-green-200">
               <div className="font-medium text-green-800 mb-2">
                 {language === 'de' ? 'Figuren' : 'Figures'} ({bboxDetection.figures.length})
+                {bboxDetection.unknownFigures !== undefined && bboxDetection.unknownFigures > 0 && (
+                  <span className="ml-2 text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded">
+                    {bboxDetection.unknownFigures} {language === 'de' ? 'unbekannt' : 'unknown'}
+                  </span>
+                )}
               </div>
               <div className="space-y-2">
-                {bboxDetection.figures.map((fig, fIdx) => (
-                  <div key={fIdx} className="text-sm bg-white p-2 rounded border">
-                    <div className="font-medium text-green-700">{fig.label || `Figure ${fIdx + 1}`}</div>
-                    <div className="text-xs text-gray-500 mt-1 grid grid-cols-2 gap-2">
-                      {fig.bodyBox && (
-                        <span>Body: [{fig.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                {bboxDetection.figures.map((fig, fIdx) => {
+                  const isIdentified = fig.name && fig.name !== 'UNKNOWN';
+                  const confidenceColor = fig.confidence === 'high' ? 'text-green-600' :
+                    fig.confidence === 'medium' ? 'text-yellow-600' : 'text-orange-600';
+                  const confidenceIcon = fig.confidence === 'high' ? '★' :
+                    fig.confidence === 'medium' ? '◆' : '○';
+                  return (
+                    <div key={fIdx} className={`text-sm bg-white p-2 rounded border ${isIdentified ? 'border-green-300' : 'border-gray-300'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className={`font-medium ${isIdentified ? 'text-green-700' : 'text-gray-600'}`}>
+                          {isIdentified ? (
+                            <>
+                              <span className={confidenceColor}>{confidenceIcon}</span> {fig.name}
+                            </>
+                          ) : (
+                            <>? {fig.label || `Figure ${fIdx + 1}`}</>
+                          )}
+                        </div>
+                        {isIdentified && fig.confidence && (
+                          <span className={`text-xs ${confidenceColor}`}>
+                            {fig.confidence}
+                          </span>
+                        )}
+                      </div>
+                      {isIdentified && fig.label && (
+                        <div className="text-xs text-gray-500 mt-1">{fig.label}</div>
                       )}
-                      {fig.faceBox && (
-                        <span>Face: [{fig.faceBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
-                      )}
-                      {fig.position && <span>Pos: {fig.position}</span>}
+                      <div className="text-xs text-gray-400 mt-1 grid grid-cols-2 gap-2">
+                        {fig.bodyBox && (
+                          <span>Body: [{fig.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                        )}
+                        {fig.faceBox && (
+                          <span>Face: [{fig.faceBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                        )}
+                        {fig.position && <span>Pos: {fig.position}</span>}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* Objects list */}
+          {/* Objects list - now shows found/missing status */}
           {bboxDetection.objects && bboxDetection.objects.length > 0 && (
             <div className="bg-orange-50 p-3 rounded border border-orange-200">
               <div className="font-medium text-orange-800 mb-2">
                 {language === 'de' ? 'Objekte' : 'Objects'} ({bboxDetection.objects.length})
               </div>
               <div className="space-y-2">
-                {bboxDetection.objects.map((obj, oIdx) => (
-                  <div key={oIdx} className="text-sm bg-white p-2 rounded border">
-                    <div className="font-medium text-orange-700">{obj.label || `Object ${oIdx + 1}`}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {obj.bodyBox && (
-                        <span>Box: [{obj.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                {bboxDetection.objects.map((obj, oIdx) => {
+                  const isExpected = !!obj.name;
+                  const wasFound = obj.found !== false;
+                  return (
+                    <div key={oIdx} className={`text-sm bg-white p-2 rounded border ${isExpected && wasFound ? 'border-green-300' : isExpected && !wasFound ? 'border-red-300' : ''}`}>
+                      <div className="flex items-center justify-between">
+                        <div className={`font-medium ${isExpected && wasFound ? 'text-green-700' : isExpected && !wasFound ? 'text-red-600' : 'text-orange-700'}`}>
+                          {isExpected ? (
+                            <>{wasFound ? '✓' : '✗'} {obj.name}</>
+                          ) : (
+                            obj.label || `Object ${oIdx + 1}`
+                          )}
+                        </div>
+                        {isExpected && (
+                          <span className={`text-xs ${wasFound ? 'text-green-600' : 'text-red-600'}`}>
+                            {wasFound ? (language === 'de' ? 'gefunden' : 'found') : (language === 'de' ? 'fehlt' : 'missing')}
+                          </span>
+                        )}
+                      </div>
+                      {isExpected && obj.label && (
+                        <div className="text-xs text-gray-500 mt-1">{obj.label}</div>
                       )}
-                      {obj.position && <span className="ml-2">Pos: {obj.position}</span>}
+                      <div className="text-xs text-gray-400 mt-1">
+                        {obj.bodyBox && (
+                          <span>Box: [{obj.bodyBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]</span>
+                        )}
+                        {obj.position && <span className="ml-2">Pos: {obj.position}</span>}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
