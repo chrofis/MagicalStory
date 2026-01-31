@@ -158,7 +158,17 @@ export function ObjectDetectionDisplay({
             )}
             {bboxDetection.missingCharacters && bboxDetection.missingCharacters.length > 0 && (
               <span className="text-xs bg-red-200 text-red-800 px-1.5 py-0.5 rounded">
-                ❌ {bboxDetection.missingCharacters.length} {language === 'de' ? 'fehlt' : 'missing'}
+                ❌ {bboxDetection.missingCharacters.length} {language === 'de' ? 'Char fehlt' : 'char missing'}
+              </span>
+            )}
+            {bboxDetection.missingObjects && bboxDetection.missingObjects.length > 0 && (
+              <span className="text-xs bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
+                ⚠️ {bboxDetection.missingObjects.length} {language === 'de' ? 'Obj fehlt' : 'obj missing'}
+              </span>
+            )}
+            {bboxDetection.matchedObjects && bboxDetection.matchedObjects.length > 0 && (
+              <span className="text-xs bg-green-200 text-green-800 px-1.5 py-0.5 rounded">
+                ✓ {bboxDetection.matchedObjects.length} {language === 'de' ? 'Obj gefunden' : 'obj matched'}
               </span>
             )}
           </span>
@@ -251,6 +261,53 @@ export function ObjectDetectionDisplay({
                 {bboxDetection.missingCharacters.map((charName, cIdx) => (
                   <span key={cIdx} className="bg-white px-2 py-1 rounded border border-red-200 text-sm font-medium text-red-700">
                     {charName}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Expected Objects */}
+          {bboxDetection.expectedObjects && bboxDetection.expectedObjects.length > 0 && (
+            <div className="bg-indigo-50 p-3 rounded border border-indigo-200">
+              <div className="font-medium text-indigo-800 mb-2">
+                🎯 {language === 'de' ? 'Erwartete Objekte' : 'Expected Objects'} ({bboxDetection.expectedObjects.length})
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {bboxDetection.expectedObjects.map((obj, oIdx) => {
+                  // Check if this object was matched
+                  const match = bboxDetection.matchedObjects?.find(m => m.expected === obj);
+                  const isMissing = bboxDetection.missingObjects?.includes(obj);
+                  return (
+                    <div key={oIdx} className={`bg-white p-2 rounded border flex justify-between items-center ${isMissing ? 'border-red-300' : match ? 'border-green-300' : ''}`}>
+                      <span className={`font-medium ${isMissing ? 'text-red-600' : match ? 'text-green-600' : 'text-indigo-700'}`}>
+                        {isMissing ? '❌' : match ? '✓' : '•'} {obj}
+                      </span>
+                      {match && (
+                        <span className="text-xs text-gray-500 truncate ml-2">→ {match.matched}</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Missing Objects Warning */}
+          {bboxDetection.missingObjects && bboxDetection.missingObjects.length > 0 && !bboxDetection.expectedObjects && (
+            <div className="bg-amber-50 p-3 rounded border border-amber-300">
+              <div className="font-medium text-amber-800 mb-2">
+                ⚠️ {language === 'de' ? 'Fehlende Objekte' : 'Missing Objects'} ({bboxDetection.missingObjects.length})
+              </div>
+              <div className="text-sm text-amber-700">
+                {language === 'de'
+                  ? 'Diese Objekte wurden in der Szene erwartet, aber nicht im Bild gefunden:'
+                  : 'These objects were expected in the scene but not detected in the image:'}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {bboxDetection.missingObjects.map((objName, oIdx) => (
+                  <span key={oIdx} className="bg-white px-2 py-1 rounded border border-amber-200 text-sm font-medium text-amber-700">
+                    {objName}
                   </span>
                 ))}
               </div>

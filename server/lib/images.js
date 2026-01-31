@@ -1174,7 +1174,7 @@ function computeIoU(boxA, boxB) {
   return union > 0 ? intersection / union : 0;
 }
 
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = []) {
   // Always detect all elements for dev mode display
   log.info(`📦 [BBOX-ENRICH] Detecting all figures and objects in image...`);
 
@@ -1190,10 +1190,15 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     log.debug(`📦 [BBOX-ENRICH] Expected positions from scene: ${Object.entries(expectedPositions).map(([n, p]) => `${n}="${p}"`).join(', ')}`);
   }
 
+  // Log expected objects from scene description
+  if (expectedObjects.length > 0) {
+    log.debug(`📦 [BBOX-ENRICH] Expected objects from scene: ${expectedObjects.join(', ')}`);
+  }
+
   log.info(`📦 [BBOX-ENRICH] Found ${allDetections.figures.length} figures, ${allDetections.objects.length} objects`);
 
   // Helper to build detectionHistory with all the expected data
-  const buildDetectionHistory = (positionMismatches = [], missingCharacters = []) => ({
+  const buildDetectionHistory = (positionMismatches = [], missingCharacters = [], matchedObjects = [], missingObjects = []) => ({
     figures: allDetections.figures,
     objects: allDetections.objects,
     qualityMatches: qualityMatches,  // Include character matches for display
@@ -1201,6 +1206,9 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     expectedPositions: Object.keys(expectedPositions).length > 0 ? expectedPositions : undefined,
     positionMismatches: positionMismatches.length > 0 ? positionMismatches : undefined,
     missingCharacters: missingCharacters.length > 0 ? missingCharacters : undefined,
+    expectedObjects: expectedObjects.length > 0 ? expectedObjects : undefined,
+    matchedObjects: matchedObjects.length > 0 ? matchedObjects : undefined,
+    missingObjects: missingObjects.length > 0 ? missingObjects : undefined,
     usage: allDetections.usage,
     timestamp: new Date().toISOString()
   });
@@ -1353,6 +1361,54 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     } else {
       log.warn(`⚠️ [BBOX-ENRICH] No object match for "${objMatch.reference}" (position=${objMatch.position})`);
     }
+  }
+
+  // Track expected objects from scene description vs detected objects
+  // Expected objects are strings like "star [ART001]" or "LOC001"
+  const matchedExpectedObjects = [];
+  const missingExpectedObjects = [];
+
+  for (const expectedObj of expectedObjects) {
+    // Extract ID (e.g., "ART001" from "star [ART001]") and name
+    const idMatch = expectedObj.match(/\[([A-Z]+\d+)\]/);
+    const objId = idMatch ? idMatch[1] : null;
+    const objName = expectedObj.replace(/\s*\[[A-Z]+\d+\]/, '').trim().toLowerCase();
+
+    // Check if any detected object matches this expected object
+    let found = false;
+    let matchedLabel = null;
+
+    for (const detectedObj of allDetections.objects) {
+      const label = (detectedObj.label || '').toLowerCase();
+
+      // Match by ID in label (e.g., "art001" in label)
+      if (objId && label.includes(objId.toLowerCase())) {
+        found = true;
+        matchedLabel = detectedObj.label;
+        break;
+      }
+
+      // Match by name keywords
+      const nameWords = objName.split(/\s+/).filter(w => w.length >= 3);
+      const matchingWords = nameWords.filter(w => label.includes(w));
+      if (matchingWords.length > 0 && matchingWords.length >= nameWords.length * 0.5) {
+        found = true;
+        matchedLabel = detectedObj.label;
+        break;
+      }
+    }
+
+    if (found) {
+      matchedExpectedObjects.push({ expected: expectedObj, matched: matchedLabel });
+      log.debug(`📦 [BBOX-ENRICH] Expected object found: "${expectedObj}" → "${matchedLabel}"`);
+    } else {
+      missingExpectedObjects.push(expectedObj);
+      log.warn(`⚠️ [BBOX-ENRICH] Expected object NOT found: "${expectedObj}"`);
+    }
+  }
+
+  if (matchedExpectedObjects.length > 0 || missingExpectedObjects.length > 0) {
+    log.info(`📦 [BBOX-ENRICH] Expected objects: ${matchedExpectedObjects.length} found, ${missingExpectedObjects.length} missing`);
   }
 
   // Match issues to detected elements for repair targets using scored matching
@@ -1562,8 +1618,8 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   ].filter(Boolean).join(', ');
   log.info(`📦 [BBOX-ENRICH] Matched ${enrichedTargets.length}/${fixableIssues.length} issues to detected elements${methodSummary ? ` (${methodSummary})` : ''}`);
 
-  // Build detection history with position mismatch and missing character data
-  const detectionHistory = buildDetectionHistory(positionMismatches, missingCharacters);
+  // Build detection history with position mismatch, missing character, and object tracking data
+  const detectionHistory = buildDetectionHistory(positionMismatches, missingCharacters, matchedExpectedObjects, missingExpectedObjects);
 
   return { targets: enrichedTargets, detectionHistory };
 }
@@ -2519,16 +2575,21 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const qualityMatches = result.matches || [];  // Character → figure mapping from quality eval
     const objectMatches = result.objectMatches || [];  // Object/animal/landmark mapping from quality eval
 
-    // Extract expected character positions from scene description in prompt
+    // Extract expected character positions and objects from scene description in prompt
     // Scene descriptions contain structured JSON with character positions like "bottom-left foreground"
+    // and objects like "star [ART001]"
     const sceneMetadata = getStoryHelpers().extractSceneMetadata(currentPrompt);
     const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
+    const expectedObjects = sceneMetadata?.objects || [];
     if (Object.keys(expectedCharacterPositions).length > 0) {
       log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected character positions: ${Object.entries(expectedCharacterPositions).map(([n, p]) => `${n}=${p}`).join(', ')}`);
     }
+    if (expectedObjects.length > 0) {
+      log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected objects: ${expectedObjects.join(', ')}`);
+    }
 
-    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions);
+    log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${expectedObjects.length > 0 ? `, ${expectedObjects.length} expected objects` : ''}...`);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, expectedObjects);
     bboxDetectionHistory = enrichResult.detectionHistory;
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {

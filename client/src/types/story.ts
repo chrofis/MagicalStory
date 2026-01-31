@@ -156,6 +156,15 @@ export interface BboxSceneDetection {
   }>;
   // Characters expected in scene but not matched to any detected figure
   missingCharacters?: string[];
+  // Expected objects from scene description (e.g., "star [ART001]", "LOC001")
+  expectedObjects?: string[];
+  // Objects that were expected and found in the image
+  matchedObjects?: Array<{
+    expected: string;      // Original expected object string
+    matched: string;       // Detected object label that matched
+  }>;
+  // Objects expected in scene but not detected in image
+  missingObjects?: string[];
 }
 
 // Grid repair manifest issue
