@@ -200,11 +200,12 @@ Return JSON only (no other text):
 - `rendering.cross_eyes`: true if any figure has eyes looking different directions
 - `rendering.physics_ok`: false if floating people, impossible poses, detached limbs
 - `rendering.issues`: list specific problems (e.g., "figure on left has three arms", "child in center has cross-eyes")
-- `fixable_issues`: only if score < 9 and issues are fixable by inpainting
-  - `description`: Visual description (position, appearance) - NO character names
+- `fixable_issues`: only if score < 9 and issues are fixable by inpainting. ONE entry per issue.
+  - `description`: What is WRONG in the generated image (visual description only, NO names)
   - `severity`: CRITICAL, MAJOR, MODERATE, MINOR
   - `type`: face, limb, clothing, object, environment, physics
-  - `fix`: What to render (visual description only, NO names)
+  - `fix`: How to fix THIS EXACT issue described above (visual description only, NO names)
+  - CRITICAL: `description` and `fix` MUST refer to the SAME issue. If pants are wrong, fix the pants. If hair clips are missing, add hair clips. Never mix issues between entries.
 - Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting
 - Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration
 - `confidence`: 0.0-1.0 reference match confidence
