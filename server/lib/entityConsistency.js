@@ -135,7 +135,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             consistent: evalResult.consistent,
             score: evalResult.score,
             issues: evalResult.issues || [],
-            summary: evalResult.summary
+            summary: evalResult.summary,
+            // Include debug info for parse failures
+            ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
           };
 
           // Aggregate
@@ -217,7 +219,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             consistent: evalResult.consistent,
             score: evalResult.score,
             issues: evalResult.issues || [],
-            summary: evalResult.summary
+            summary: evalResult.summary,
+            // Include debug info for parse failures
+            ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
           };
 
           // Aggregate
