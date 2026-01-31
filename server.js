@@ -2894,7 +2894,7 @@ app.post('/api/stories/:id/regenerate/scene-description/:pageNum', authenticateT
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
-    const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{' });
+    const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
@@ -3112,7 +3112,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       );
 
       try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, 6000, null, { prefill: '{' });
+        const expansionResult = await callClaudeAPI(expansionPrompt, 6000, null, { prefill: '{"previewMismatches":[' });
         expandedDescription = expansionResult.text;
         console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
@@ -8596,42 +8596,41 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Build available avatars string - only show clothing categories used in this story
         const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters, streamingClothingRequirements);
 
-        // Generate cheap preview feedback (if enabled and Runware configured)
+        // Generate cheap preview feedback for scene critique workflow
+        // Always try to generate preview - it helps the model compare intent vs reality
         let previewFeedback = null;
-        if (enableSceneValidation) {
-          try {
-            const { generatePreviewFeedback, isValidationAvailable } = require('./server/lib/sceneValidator');
+        try {
+          const { generatePreviewFeedback, isValidationAvailable } = require('./server/lib/sceneValidator');
 
-            if (isValidationAvailable()) {
-              log.debug(`🖼️ [STREAM-SCENE] Page ${page.pageNumber} generating preview feedback...`);
+          if (isValidationAvailable()) {
+            log.debug(`🖼️ [STREAM-SCENE] Page ${page.pageNumber} generating preview feedback...`);
 
-              // Get character names for this scene
-              const charNames = (page.characters || []).map(c =>
-                typeof c === 'string' ? c : c.name
-              ).filter(Boolean);
+            // Get character names for this scene
+            const charNames = (page.characters || []).map(c =>
+              typeof c === 'string' ? c : c.name
+            ).filter(Boolean);
 
-              previewFeedback = await generatePreviewFeedback(
-                page.sceneHint || page.text.substring(0, 200),
-                charNames
-              );
+            previewFeedback = await generatePreviewFeedback(
+              page.sceneHint || page.text.substring(0, 200),
+              charNames
+            );
 
-              // Track costs
-              if (previewFeedback.usage) {
-                addUsage('runware', { cost: previewFeedback.usage.previewCost }, 'preview_feedback');
-                addUsage('gemini_text', {
-                  promptTokenCount: 500,
-                  candidatesTokenCount: 200
-                }, 'preview_feedback');
-              }
-
-              log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} preview: ${previewFeedback.composition.substring(0, 100)}...`);
-            } else {
-              log.debug(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview skipped: validation not available`);
+            // Track costs
+            if (previewFeedback?.usage) {
+              addUsage('runware', { cost: previewFeedback.usage.previewCost }, 'preview_feedback');
+              addUsage('gemini_text', {
+                promptTokenCount: 500,
+                candidatesTokenCount: 200
+              }, 'preview_feedback');
             }
-          } catch (err) {
-            log.warn(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview failed: ${err.message}`);
-            // Continue without preview feedback
+
+            log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} preview: ${previewFeedback?.composition?.substring(0, 100) || 'empty'}...`);
+          } else {
+            log.debug(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview skipped: validation not available (Runware not configured)`);
           }
+        } catch (err) {
+          log.warn(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview failed: ${err.message}`);
+          // Continue without preview feedback - the prompt handles this gracefully
         }
 
         const expansionPrompt = buildSceneDescriptionPrompt(
@@ -8649,7 +8648,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           previewFeedback    // pass preview feedback for composition hints
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel, { prefill: '{' });
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"previewMismatches":[' });
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
@@ -10020,7 +10019,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 availableAvatars
               );
 
-              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel, { prefill: '{' });
+              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel, { prefill: '{"previewMismatches":[' });
 
               // Track token usage for scene expansion (Issue #1 fix)
               if (expandedDescriptionResult?.usage) {
@@ -11375,7 +11374,7 @@ Output Format:
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${sceneModelOverride ? ` [model: ${sceneModelOverride}]` : ''}`);
 
             // Generate detailed scene description (non-streaming for reliability with parallel calls)
-            const sceneDescResult = await callTextModel(scenePrompt, 4000, sceneModelOverride, { prefill: '{' });
+            const sceneDescResult = await callTextModel(scenePrompt, 4000, sceneModelOverride, { prefill: '{"previewMismatches":[' });
             let sceneDescription = sceneDescResult.text;
 
             // Fallback to outline extract if scene description is empty or too short
@@ -11925,7 +11924,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             const scenePrompt = buildSceneDescriptionPrompt(pageNum, pageContent, inputData.characters || [], shortSceneDesc, lang, visualBible, previousScenes, currentClothing, '', availableAvatars);
 
             log.debug(`🎨 [PAGE ${pageNum}] Generating scene description...${seqSceneModelOverride ? ` [model: ${seqSceneModelOverride}]` : ''}`);
-            const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride, { prefill: '{' });
+            const sceneDescResult = await callTextModel(scenePrompt, 4000, seqSceneModelOverride, { prefill: '{"previewMismatches":[' });
             let sceneDescription = sceneDescResult.text;
 
             // Fallback to outline extract if scene description is empty or too short
