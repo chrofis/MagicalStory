@@ -71,16 +71,6 @@ ALWAYS USE:
 - Relative closeness: shoulder to shoulder, arm's reach, clear gap, far apart, opposite edges
 - Scale: small figures, dominates frame, tiny silhouettes
 
-**9-Region Grid (for positioning):**
-
-```
- top-left      |  top-center      |  top-right       (background/far)
----------------+------------------+-----------------
- middle-left   |  middle-center   |  middle-right    (midground)
----------------+------------------+-----------------
- bottom-left   |  bottom-center   |  bottom-right    (foreground/near)
-```
-
 **Position values (use these exact phrases):**
 - top-left background
 - top-center background
