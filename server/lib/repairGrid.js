@@ -25,8 +25,10 @@ function getRepairPromptTemplate() {
 }
 
 // Grid configuration
-const CELL_SIZE = 256;      // Size of each cell (matches TARGET_REGION_SIZE)
-const MAX_COLS = 4;         // Maximum columns per grid
+const CELL_SIZE = 256;      // Default cell size (for legacy createLabeledGrid)
+const MAX_CELL_DIM = 300;   // Maximum dimension for any cell in variable grid
+const MAX_GRID_WIDTH = 1024; // Maximum grid width for row packing
+const MAX_COLS = 4;         // Maximum columns per grid (for legacy fixed grid)
 const MAX_ROWS = 3;         // Maximum rows per grid
 const MAX_PER_GRID = 12;    // MAX_COLS * MAX_ROWS
 const PADDING = 10;         // Padding between cells
@@ -38,8 +40,9 @@ const REPAIR_MODEL = 'gemini-2.5-flash-image';
 
 /**
  * Create a labeled grid image from extracted issue thumbnails
+ * Uses variable cell sizes to preserve aspect ratio of original regions.
  *
- * @param {Object[]} issues - Array of issues with extraction.absolutePath
+ * @param {Object[]} issues - Array of issues with extraction.absolutePath and extraction.thumbDimensions
  * @param {Object} options - Grid options
  * @param {string} options.title - Grid title (optional)
  * @returns {Promise<{buffer: Buffer, manifest: Object, cellPositions: Object[]}>}
@@ -54,16 +57,74 @@ async function createIssueGrid(issues, options = {}) {
     throw new Error('No valid issue thumbnails to create grid');
   }
 
-  // Calculate grid dimensions
   const count = Math.min(validIssues.length, MAX_PER_GRID);
-  const cols = Math.min(count, MAX_COLS);
-  const rows = Math.ceil(count / cols);
-
-  const gridWidth = cols * CELL_SIZE + PADDING * (cols + 1);
-  const gridHeight = TITLE_HEIGHT + rows * (CELL_SIZE + LABEL_HEIGHT) + PADDING * (rows + 1);
-
   const composites = [];
   const cellPositions = [];
+
+  // First pass: load all thumbnails and determine their dimensions
+  const cells = [];
+  for (let i = 0; i < count; i++) {
+    const issue = validIssues[i];
+    try {
+      // Get actual thumbnail dimensions (prefer stored thumbDimensions, fallback to reading file)
+      let thumbWidth, thumbHeight;
+      if (issue.extraction.thumbDimensions) {
+        thumbWidth = issue.extraction.thumbDimensions.width;
+        thumbHeight = issue.extraction.thumbDimensions.height;
+      } else {
+        // Fallback: read from file metadata
+        const meta = await sharp(issue.extraction.absolutePath).metadata();
+        thumbWidth = meta.width;
+        thumbHeight = meta.height;
+      }
+
+      // Scale to fit within MAX_CELL_DIM if needed
+      const maxDim = Math.max(thumbWidth, thumbHeight);
+      const scale = maxDim > MAX_CELL_DIM ? MAX_CELL_DIM / maxDim : 1;
+      const cellWidth = Math.round(thumbWidth * scale);
+      const cellHeight = Math.round(thumbHeight * scale);
+
+      cells.push({
+        issue,
+        letter: String.fromCharCode(65 + i),
+        width: cellWidth,
+        height: cellHeight
+      });
+    } catch (err) {
+      console.error(`  Failed to get dimensions for issue ${issue.id}: ${err.message}`);
+    }
+  }
+
+  if (cells.length === 0) {
+    throw new Error('Failed to process any issue thumbnails');
+  }
+
+  // Second pass: row packing layout
+  // Place cells left-to-right, wrap when exceeds MAX_GRID_WIDTH
+  let x = PADDING;
+  let y = TITLE_HEIGHT + PADDING;
+  let rowHeight = 0;
+  let maxX = 0;
+
+  for (const cell of cells) {
+    // Check if cell fits in current row
+    if (x + cell.width + PADDING > MAX_GRID_WIDTH && x > PADDING) {
+      // Wrap to next row
+      x = PADDING;
+      y += rowHeight + LABEL_HEIGHT + PADDING;
+      rowHeight = 0;
+    }
+
+    cell.x = x;
+    cell.y = y;
+    rowHeight = Math.max(rowHeight, cell.height);
+    maxX = Math.max(maxX, x + cell.width);
+    x += cell.width + PADDING;
+  }
+
+  // Calculate final grid dimensions
+  const gridWidth = Math.max(maxX + PADDING, 300); // Minimum width for title
+  const gridHeight = y + rowHeight + LABEL_HEIGHT + PADDING;
 
   // Add title
   const titleSvg = Buffer.from(`
@@ -81,55 +142,47 @@ async function createIssueGrid(issues, options = {}) {
     top: 0
   });
 
-  // Add each issue cell with letter label
-  for (let i = 0; i < count; i++) {
-    const issue = validIssues[i];
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-
-    const x = PADDING + col * (CELL_SIZE + PADDING);
-    const y = TITLE_HEIGHT + PADDING + row * (CELL_SIZE + LABEL_HEIGHT + PADDING);
-
-    // Load and resize thumbnail
+  // Third pass: add each cell to the grid
+  for (const cell of cells) {
     try {
-      const thumbnail = await sharp(issue.extraction.absolutePath)
-        .resize(CELL_SIZE, CELL_SIZE, { fit: 'cover' })
+      // Load and resize thumbnail to cell dimensions
+      const thumbnail = await sharp(cell.issue.extraction.absolutePath)
+        .resize(cell.width, cell.height)
         .toBuffer();
 
       composites.push({
         input: thumbnail,
-        left: x,
-        top: y
+        left: cell.x,
+        top: cell.y
       });
 
-      // Add letter label (A, B, C, ...)
-      const letter = String.fromCharCode(65 + i);
+      // Add letter label below the cell
       const labelSvg = Buffer.from(`
-        <svg width="${CELL_SIZE}" height="${LABEL_HEIGHT}">
+        <svg width="${cell.width}" height="${LABEL_HEIGHT}">
           <rect width="100%" height="100%" fill="#333"/>
           <text x="50%" y="70%" text-anchor="middle" font-size="18" font-family="Arial" font-weight="bold" fill="white">
-            ${letter}
+            ${cell.letter}
           </text>
         </svg>
       `);
 
       composites.push({
         input: labelSvg,
-        left: x,
-        top: y + CELL_SIZE
+        left: cell.x,
+        top: cell.y + cell.height
       });
 
-      // Record cell position for later extraction
+      // Record cell position for later extraction (with actual dimensions)
       cellPositions.push({
-        letter,
-        issueId: issue.id,
-        x,
-        y,
-        width: CELL_SIZE,
-        height: CELL_SIZE
+        letter: cell.letter,
+        issueId: cell.issue.id,
+        x: cell.x,
+        y: cell.y,
+        width: cell.width,
+        height: cell.height
       });
     } catch (err) {
-      console.error(`  Failed to add issue ${issue.id} to grid: ${err.message}`);
+      console.error(`  Failed to add issue ${cell.issue.id} to grid: ${err.message}`);
     }
   }
 
@@ -151,17 +204,17 @@ async function createIssueGrid(issues, options = {}) {
     createdAt: new Date().toISOString(),
     title,
     dimensions: { width: gridWidth, height: gridHeight },
-    cellSize: CELL_SIZE,
-    cols,
-    rows,
-    issues: validIssues.slice(0, count).map((issue, i) => ({
-      letter: String.fromCharCode(65 + i),
-      issueId: issue.id,
-      source: issue.source,
-      type: issue.type,
-      severity: issue.severity,
-      description: issue.description,
-      fixInstruction: issue.fixInstruction
+    variableCells: true,  // Flag indicating variable cell sizes
+    cellCount: cells.length,
+    issues: cells.map(cell => ({
+      letter: cell.letter,
+      issueId: cell.issue.id,
+      source: cell.issue.source,
+      type: cell.issue.type,
+      severity: cell.issue.severity,
+      description: cell.issue.description,
+      fixInstruction: cell.issue.fixInstruction,
+      cellDimensions: { width: cell.width, height: cell.height }
     }))
   };
 
@@ -619,6 +672,8 @@ async function createLabeledGrid(cells, options = {}) {
 module.exports = {
   // Constants
   CELL_SIZE,
+  MAX_CELL_DIM,
+  MAX_GRID_WIDTH,
   MAX_COLS,
   MAX_ROWS,
   MAX_PER_GRID,

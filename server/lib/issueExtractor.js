@@ -537,16 +537,23 @@ async function extractIssueRegion(imageBuffer, issue, imgDimensions) {
   width = Math.min(imgDimensions.width - left, width);
   height = Math.min(imgDimensions.height - top, height);
 
-  // Extract and resize to 256x256
+  // Scale proportionally to preserve aspect ratio
+  // The largest dimension should fit TARGET_REGION_SIZE (don't upscale small regions)
+  const maxDim = Math.max(width, height);
+  const scale = Math.min(1, TARGET_REGION_SIZE / maxDim);
+  const thumbWidth = Math.max(1, Math.round(width * scale));
+  const thumbHeight = Math.max(1, Math.round(height * scale));
+
   const buffer = await sharp(imageBuffer)
     .extract({ left, top, width, height })
-    .resize(TARGET_REGION_SIZE, TARGET_REGION_SIZE, { fit: 'cover' })
+    .resize(thumbWidth, thumbHeight)
     .jpeg({ quality: 90 })
     .toBuffer();
 
   return {
     buffer,
-    paddedBox: { x: left, y: top, width, height }
+    paddedBox: { x: left, y: top, width, height },
+    thumbDimensions: { width: thumbWidth, height: thumbHeight }
   };
 }
 
@@ -590,7 +597,7 @@ async function extractPageIssues(pageNum, imageData, issues, outputDir) {
     }
 
     try {
-      const { buffer, paddedBox } = await extractIssueRegion(imageBuffer, issue, imgDimensions);
+      const { buffer, paddedBox, thumbDimensions } = await extractIssueRegion(imageBuffer, issue, imgDimensions);
 
       // Generate filename based on type
       const filename = `issue_${issueIndex}_${issue.type}.jpg`;
@@ -603,7 +610,8 @@ async function extractPageIssues(pageNum, imageData, issues, outputDir) {
         extraction: {
           thumbnailPath: path.relative(outputDir, thumbnailPath),
           absolutePath: thumbnailPath,
-          paddedBox: pixelBoxToBbox(paddedBox, imgDimensions)
+          paddedBox: pixelBoxToBbox(paddedBox, imgDimensions),
+          thumbDimensions  // Actual thumbnail dimensions (may not be square)
         }
       });
 
