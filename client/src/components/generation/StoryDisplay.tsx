@@ -2136,6 +2136,113 @@ export function StoryDisplay({
                   </div>
                 )}
 
+                {/* Entity Consistency Grids (NEW) */}
+                {finalChecksReport.entity?.grids && finalChecksReport.entity.grids.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="font-semibold text-sm text-gray-800">
+                      {language === 'de' ? 'Entitäts-Konsistenz (Raster)' : language === 'fr' ? 'Cohérence des entités (grilles)' : 'Entity Consistency (Grids)'}
+                    </h4>
+                    <div className="space-y-2">
+                      {finalChecksReport.entity.grids.map((grid, gridIdx) => {
+                        const charResult = finalChecksReport.entity?.characters?.[grid.entityName];
+                        const isConsistent = charResult?.consistent ?? true;
+                        const score = charResult?.score ?? 0;
+                        const issues = charResult?.issues ?? [];
+
+                        return (
+                          <details key={gridIdx} className={`bg-white border rounded-lg overflow-hidden ${
+                            isConsistent ? 'border-green-200' : 'border-amber-200'
+                          }`}>
+                            <summary className="cursor-pointer p-3 flex items-center gap-2 hover:bg-gray-50">
+                              <span className={`text-sm ${isConsistent ? 'text-green-600' : 'text-amber-600'}`}>
+                                {isConsistent ? '✓' : '⚠️'}
+                              </span>
+                              <span className="font-medium text-sm text-gray-800">{grid.entityName}</span>
+                              <span className="text-xs text-gray-500">
+                                ({grid.cellCount} appearances)
+                              </span>
+                              <span className={`ml-auto text-xs px-2 py-0.5 rounded ${
+                                score >= 8 ? 'bg-green-100 text-green-700' :
+                                score >= 5 ? 'bg-amber-100 text-amber-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                Score: {score}/10
+                              </span>
+                            </summary>
+                            <div className="p-3 border-t border-gray-100 space-y-3">
+                              {/* Grid Image */}
+                              <div className="flex justify-center bg-gray-50 rounded p-2">
+                                <img
+                                  src={grid.gridImage}
+                                  alt={`${grid.entityName} consistency grid`}
+                                  className="max-w-full h-auto rounded shadow-sm"
+                                  style={{ maxHeight: '400px' }}
+                                />
+                              </div>
+
+                              {/* Cell Info */}
+                              {grid.manifest?.cells && (
+                                <div className="text-xs text-gray-600">
+                                  <span className="font-medium">Cells: </span>
+                                  {grid.manifest.cells.map((cell, i) => (
+                                    <span key={i} className="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1">
+                                      {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
+                                      {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Issues */}
+                              {issues.length > 0 && (
+                                <div className="space-y-1">
+                                  <span className="text-xs font-medium text-gray-700">Issues:</span>
+                                  {issues.map((issue, issueIdx) => (
+                                    <div key={issueIdx} className={`text-xs p-2 rounded ${
+                                      issue.severity === 'critical' ? 'bg-red-50 border-l-4 border-red-400' :
+                                      issue.severity === 'major' ? 'bg-amber-50 border-l-4 border-amber-400' :
+                                      'bg-gray-50 border-l-4 border-gray-300'
+                                    }`}>
+                                      <div className="flex items-start gap-2">
+                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                          issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                                          issue.severity === 'major' ? 'bg-amber-200 text-amber-800' :
+                                          'bg-gray-200 text-gray-700'
+                                        }`}>
+                                          {issue.subType || issue.type}
+                                        </span>
+                                        {issue.pagesToFix && (
+                                          <span className="text-[10px] text-gray-500">
+                                            Fix page(s): {issue.pagesToFix.join(', ')}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <p className="mt-1 text-gray-700">{issue.description}</p>
+                                      {issue.fixInstruction && (
+                                        <p className="mt-1 text-blue-600 italic">{issue.fixInstruction}</p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Summary */}
+                              {charResult?.summary && (
+                                <p className="text-xs text-gray-500 italic">{charResult.summary}</p>
+                              )}
+                            </div>
+                          </details>
+                        );
+                      })}
+                    </div>
+
+                    {/* Entity check summary */}
+                    <div className="text-xs text-gray-500 mt-2">
+                      {finalChecksReport.entity.summary}
+                    </div>
+                  </div>
+                )}
+
                 {/* Text Check */}
                 {finalChecksReport.textCheck && (
                   <div className="space-y-3">
