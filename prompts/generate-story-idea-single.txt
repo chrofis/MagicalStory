@@ -35,8 +35,17 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 
 {AVAILABLE_LANDMARKS}
 
-OUTPUT LANGUAGE:
-{LANGUAGE_INSTRUCTION}
+## CRITICAL: OUTPUT LANGUAGE REQUIREMENT
+
+**{LANGUAGE_INSTRUCTION}**
+
+⚠️ YOUR ENTIRE OUTPUT MUST BE IN THE LANGUAGE SPECIFIED ABOVE.
+- All text in [DRAFT], [REVIEW], and [FINAL] sections must be in this language
+- Do NOT write in English unless English was specified
+- Do NOT mix languages
+- This is a hard requirement - outputs in the wrong language are unusable
+
+---
 
 Generate a story idea that includes:
 1. LOCATION and TIME: Where and when does the story take place?
@@ -81,8 +90,10 @@ Create your initial story outline following all guidelines above.
 [REVIEW]
 You MUST list exactly 5 improvements, even if the draft seems good. Never say "no issues" - always find ways to make it better.
 
+⚠️ FIRST CHECK - LANGUAGE: Is the ENTIRE draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is a CRITICAL ERROR that MUST be fixed in [FINAL].
+
 Check and critique:
-1. **Language**: Is the output in the correct language as specified? Any mixed languages?
+1. **Language**: Is the ENTIRE output in the correct language (not just terminology)? If wrong language, mark as CRITICAL ERROR.
 2. **Formatting**:
    - No **bold** or *italic* (no asterisks)?
    - Plain paragraphs only (no headers, bullets, or lists)?

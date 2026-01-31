@@ -35,8 +35,17 @@ READING LEVEL: {READING_LEVEL_DESCRIPTION}
 
 {AVAILABLE_LANDMARKS}
 
-OUTPUT LANGUAGE:
-{LANGUAGE_INSTRUCTION}
+## CRITICAL: OUTPUT LANGUAGE REQUIREMENT
+
+**{LANGUAGE_INSTRUCTION}**
+
+⚠️ YOUR ENTIRE OUTPUT MUST BE IN THE LANGUAGE SPECIFIED ABOVE.
+- All text in [DRAFT], [REVIEW], and [FINAL] sections must be in this language
+- Do NOT write in English unless English was specified
+- Do NOT mix languages
+- This is a hard requirement - outputs in the wrong language are unusable
+
+---
 
 STORY LENGTH: {STORY_LENGTH_CATEGORY}
 
@@ -54,7 +63,9 @@ Write your first story idea.
 [REVIEW_1]
 You MUST list exactly 5 improvements. Never say "no issues" - always find ways to make it better.
 
-Check: (1) Language correct? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) ALL characters appear with a role? (5) Complexity matches scene count?
+⚠️ FIRST CHECK - LANGUAGE: Is the ENTIRE draft written in the correct language as specified at the top? If you wrote in English but the language should be German/French/etc, this is a CRITICAL ERROR that MUST be fixed.
+
+Check: (1) Is ENTIRE output in correct language (CRITICAL - not just terminology)? (2) Format: no bold/italic, plain paragraphs, no adjectives, sentence limits? (3) Logic: events follow naturally, no plot holes, timeline coherent? (4) ALL characters appear with a role? (5) Complexity matches scene count?
 
 5 improvements:
 1. [specific improvement]
@@ -70,7 +81,7 @@ Corrected final version of story 1.
 Write a DIFFERENT story idea (different structure and approach).
 
 [REVIEW_2]
-Same process - list exactly 5 improvements:
+Same process - FIRST check language, then list exactly 5 improvements:
 1. [specific improvement]
 2. [specific improvement]
 3. [specific improvement]
