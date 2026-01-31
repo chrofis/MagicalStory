@@ -868,10 +868,10 @@ export function RetryHistoryDisplay({
                                   {language === 'de' ? 'Original-Grid' : 'Input Grid'}
                                 </div>
                                 <img
-                                  src={`data:image/jpeg;base64,${grid.original}`}
+                                  src={grid.original.startsWith('data:') ? grid.original : `data:image/png;base64,${grid.original}`}
                                   alt="Input grid"
                                   className="max-w-xs border rounded cursor-pointer hover:ring-2 hover:ring-violet-400"
-                                  onClick={() => setEnlargedImg({ src: `data:image/jpeg;base64,${grid.original}`, title: language === 'de' ? 'Original-Grid' : 'Input Grid' })}
+                                  onClick={() => setEnlargedImg({ src: grid.original!.startsWith('data:') ? grid.original! : `data:image/png;base64,${grid.original}`, title: language === 'de' ? 'Original-Grid' : 'Input Grid' })}
                                 />
                               </div>
                             )}
@@ -886,10 +886,10 @@ export function RetryHistoryDisplay({
                                   {language === 'de' ? 'Repariertes Grid' : 'Repaired Grid'}
                                 </div>
                                 <img
-                                  src={`data:image/jpeg;base64,${grid.repaired}`}
+                                  src={grid.repaired.startsWith('data:') ? grid.repaired : `data:image/png;base64,${grid.repaired}`}
                                   alt="Repaired grid"
                                   className="max-w-xs border-2 border-green-300 rounded cursor-pointer hover:ring-2 hover:ring-green-400"
-                                  onClick={() => setEnlargedImg({ src: `data:image/jpeg;base64,${grid.repaired}`, title: language === 'de' ? 'Repariertes Grid' : 'Repaired Grid' })}
+                                  onClick={() => setEnlargedImg({ src: grid.repaired!.startsWith('data:') ? grid.repaired! : `data:image/png;base64,${grid.repaired}`, title: language === 'de' ? 'Repariertes Grid' : 'Repaired Grid' })}
                                 />
                               </div>
                             )}
