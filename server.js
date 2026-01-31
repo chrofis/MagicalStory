@@ -8533,11 +8533,55 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
         log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded`);
+
+        // Post-expansion validation: validate and repair scene composition if enabled
+        let finalSceneDescription = expansionResult.text;
+        if (enableSceneValidation) {
+          try {
+            const { validateAndRepairScene, isValidationAvailable } = require('./server/lib/sceneValidator');
+            const { extractSceneMetadata } = require('./server/lib/storyHelpers');
+            const sceneMetadata = extractSceneMetadata(expansionResult.text);
+
+            if (sceneMetadata && isValidationAvailable()) {
+              log.debug(`🔍 [STREAM-SCENE] Page ${page.pageNumber} running composition validation...`);
+              const validationResult = await validateAndRepairScene(sceneMetadata);
+
+              // Track validation costs
+              if (validationResult.usage) {
+                if (validationResult.usage.previewCost) {
+                  addUsage('runware', { cost: validationResult.usage.previewCost }, 'scene_validation_preview');
+                }
+                if (validationResult.usage.visionCost || validationResult.usage.comparisonCost) {
+                  addUsage('gemini_text', {
+                    promptTokenCount: (validationResult.usage.visionTokens || 0) + (validationResult.usage.comparisonTokens || 0),
+                    candidatesTokenCount: 0
+                  }, 'scene_validation_analysis');
+                }
+                if (validationResult.repair?.usage) {
+                  addUsage('anthropic', validationResult.repair.usage, 'scene_validation_repair');
+                }
+              }
+
+              if (validationResult.wasRepaired) {
+                log.info(`🔧 [STREAM-SCENE] Page ${page.pageNumber} scene repaired: ${validationResult.repair.fixes.length} fixes applied`);
+                finalSceneDescription = JSON.stringify(validationResult.finalScene);
+              } else if (!validationResult.validation.passesCompositionCheck) {
+                log.warn(`⚠️  [STREAM-SCENE] Page ${page.pageNumber} has composition issues but repair failed`);
+              } else {
+                log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} passes composition check`);
+              }
+            }
+          } catch (err) {
+            log.warn(`⚠️  [STREAM-SCENE] Page ${page.pageNumber} validation failed: ${err.message}`);
+            // Continue with original scene description
+          }
+        }
+
         return {
           pageNumber: page.pageNumber,
           text: page.text,
           sceneHint: page.sceneHint,
-          sceneDescription: expansionResult.text,
+          sceneDescription: finalSceneDescription,
           sceneDescriptionPrompt: expansionPrompt,
           sceneDescriptionModelId: expansionResult.modelId,
           characterClothing: page.characterClothing,
