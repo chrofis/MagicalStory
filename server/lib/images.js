@@ -2656,8 +2656,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). ${fixTargetsToUse.length} fix targets available.`);
     }
 
-    // Record bbox detection in retryHistory even when auto-repair is disabled (for dev mode)
-    if (bboxDetectionHistory && !enableAutoRepair) {
+    // ALWAYS record bbox detection in retryHistory for dev mode display
+    // This ensures Object Detection section shows for ALL pages, not just repaired ones
+    if (bboxDetectionHistory) {
       retryHistory.push({
         attempt: attempts,
         type: 'bbox_detection_only',
@@ -2666,7 +2667,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
         enrichedTargetsCount: enrichedFixTargets?.length || 0,
         bboxDetection: bboxDetectionHistory,
         bboxOverlayImage: bboxOverlayImage,  // Image with boxes drawn for dev mode
-        autoRepairEnabled: false,
+        hasBboxOverlay: !!bboxOverlayImage,  // Flag for lazy loading
+        autoRepairEnabled: enableAutoRepair,
         timestamp: new Date().toISOString()
       });
     }
