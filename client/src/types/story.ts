@@ -165,6 +165,16 @@ export interface BboxSceneDetection {
   }>;
   // Objects expected in scene but not detected in image
   missingObjects?: string[];
+  // Character descriptions parsed from prompt (age, gender, isChild)
+  characterDescriptions?: Record<string, {
+    age?: number;
+    gender?: string;
+    isChild?: boolean;
+    genderTerm?: string;
+  }>;
+  // Raw prompt and response for dev mode debugging
+  rawPrompt?: string;
+  rawResponse?: string;
 }
 
 // Grid repair manifest issue

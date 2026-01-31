@@ -361,6 +361,50 @@ export function ObjectDetectionDisplay({
             </div>
           )}
 
+          {/* Character Descriptions (parsed from prompt) */}
+          {bboxDetection.characterDescriptions && Object.keys(bboxDetection.characterDescriptions).length > 0 && (
+            <details className="bg-cyan-50 p-3 rounded border border-cyan-200">
+              <summary className="cursor-pointer font-medium text-cyan-800">
+                👤 {language === 'de' ? 'Charakter-Beschreibungen' : 'Character Descriptions'} ({Object.keys(bboxDetection.characterDescriptions).length})
+              </summary>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+                {Object.entries(bboxDetection.characterDescriptions).map(([name, desc]) => (
+                  <div key={name} className="bg-white p-2 rounded border">
+                    <span className="font-medium text-cyan-700">{name}</span>
+                    <span className="text-gray-600 ml-2">
+                      {desc.genderTerm || desc.gender || '?'}, {desc.age ? `${desc.age}y` : '?'}
+                      {desc.isChild ? ' (child)' : desc.isChild === false ? ' (adult)' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+
+          {/* Raw Prompt */}
+          {bboxDetection.rawPrompt && (
+            <details className="bg-gray-50 p-3 rounded border border-gray-200">
+              <summary className="cursor-pointer font-medium text-gray-700">
+                📝 {language === 'de' ? 'Bbox-Prompt' : 'Bbox Prompt'}
+              </summary>
+              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto">
+                {bboxDetection.rawPrompt}
+              </pre>
+            </details>
+          )}
+
+          {/* Raw Response */}
+          {bboxDetection.rawResponse && (
+            <details className="bg-gray-50 p-3 rounded border border-gray-200">
+              <summary className="cursor-pointer font-medium text-gray-700">
+                📤 {language === 'de' ? 'Bbox-Antwort' : 'Bbox Response'}
+              </summary>
+              <pre className="mt-2 text-xs bg-white p-2 rounded border overflow-x-auto whitespace-pre-wrap max-h-64 overflow-y-auto">
+                {bboxDetection.rawResponse}
+              </pre>
+            </details>
+          )}
+
           {/* Raw JSON download */}
           <button
             onClick={() => downloadAsText(JSON.stringify(bboxDetection, null, 2), `object-detection-page-${pageNumber}.json`)}

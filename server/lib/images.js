@@ -1018,7 +1018,10 @@ async function detectAllBoundingBoxes(imageData) {
     return {
       figures,
       objects,
-      usage: { input_tokens: inputTokens, output_tokens: outputTokens }
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+      // Include raw prompt and response for dev mode debugging
+      rawPrompt: prompt,
+      rawResponse: responseText
     };
 
   } catch (error) {
@@ -1241,7 +1244,11 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     expectedObjects: expectedObjects.length > 0 ? expectedObjects : undefined,
     matchedObjects: matchedObjects.length > 0 ? matchedObjects : undefined,
     missingObjects: missingObjects.length > 0 ? missingObjects : undefined,
+    characterDescriptions: Object.keys(characterDescriptions).length > 0 ? characterDescriptions : undefined,
     usage: allDetections.usage,
+    // Raw prompt and response for dev mode debugging
+    rawPrompt: allDetections.rawPrompt,
+    rawResponse: allDetections.rawResponse,
     timestamp: new Date().toISOString()
   });
 
