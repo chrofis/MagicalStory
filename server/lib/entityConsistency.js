@@ -723,15 +723,21 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       // Extract JSON from response (handle markdown code blocks)
       let jsonText = text;
 
-      // Try to extract from ```json ... ``` blocks
+      // Try to extract from ```json ... ``` blocks (with closing backticks)
       const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
       if (jsonBlockMatch) {
         jsonText = jsonBlockMatch[1];
       } else {
-        // Try to extract from ``` ... ``` blocks
+        // Try to extract from ``` ... ``` blocks (with closing backticks)
         const codeBlockMatch = text.match(/```\s*([\s\S]*?)\s*```/);
         if (codeBlockMatch) {
           jsonText = codeBlockMatch[1];
+        } else if (text.trim().startsWith('```json')) {
+          // Handle case where response starts with ```json but has no closing backticks
+          jsonText = text.trim().replace(/^```json\s*/, '').replace(/```\s*$/, '');
+        } else if (text.trim().startsWith('```')) {
+          // Handle case where response starts with ``` but has no closing backticks
+          jsonText = text.trim().replace(/^```\s*/, '').replace(/```\s*$/, '');
         } else {
           // Try to find JSON object directly (starts with {)
           const jsonObjMatch = text.match(/\{[\s\S]*\}/);
