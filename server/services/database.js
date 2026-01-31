@@ -501,8 +501,11 @@ async function saveStoryData(storyId, storyData) {
           delete entry.annotatedOriginal;
           if (entry.grids) {
             for (const grid of entry.grids) {
+              // Handle both property naming conventions
               delete grid.imageData;
               delete grid.repairedImageData;
+              delete grid.original;
+              delete grid.repaired;
             }
           }
         }
@@ -574,8 +577,11 @@ async function updateStoryDataOnly(storyId, storyData) {
           delete entry.annotatedOriginal;
           if (entry.grids) {
             for (const grid of entry.grids) {
+              // Handle both property naming conventions
               delete grid.imageData;
               delete grid.repairedImageData;
+              delete grid.original;
+              delete grid.repaired;
             }
           }
         }
@@ -667,8 +673,11 @@ async function upsertStory(storyId, userId, storyData) {
           delete entry.annotatedOriginal;
           if (entry.grids) {
             for (const grid of entry.grids) {
+              // Handle both property naming conventions
               delete grid.imageData;
               delete grid.repairedImageData;
+              delete grid.original;
+              delete grid.repaired;
             }
           }
         }
@@ -1097,24 +1106,27 @@ async function saveRetryHistoryImages(storyId, pageNumber, retryHistory) {
       );
     }
 
-    // Save grid images
+    // Save grid images (backend uses 'original' and 'repaired' property names)
     if (entry.grids?.length) {
       for (let gridIdx = 0; gridIdx < entry.grids.length; gridIdx++) {
         const grid = entry.grids[gridIdx];
-        if (grid.imageData) {
+        // Handle both naming conventions: original/repaired (backend) and imageData/repairedImageData
+        const originalData = grid.original || grid.imageData;
+        const repairedData = grid.repaired || grid.repairedImageData;
+        if (originalData) {
           await dbQuery(
             `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data)
              VALUES ($1, $2, $3, 'grid', $4, $5)
              ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-            [storyId, pageNumber, retryIdx, gridIdx, grid.imageData]
+            [storyId, pageNumber, retryIdx, gridIdx, originalData]
           );
         }
-        if (grid.repairedImageData) {
+        if (repairedData) {
           await dbQuery(
             `INSERT INTO story_retry_images (story_id, page_number, retry_index, image_type, grid_index, image_data)
              VALUES ($1, $2, $3, 'gridRepaired', $4, $5)
              ON CONFLICT (story_id, page_number, retry_index, image_type, COALESCE(grid_index, -1)) DO UPDATE SET image_data = EXCLUDED.image_data`,
-            [storyId, pageNumber, retryIdx, gridIdx, grid.repairedImageData]
+            [storyId, pageNumber, retryIdx, gridIdx, repairedData]
           );
         }
       }
@@ -1157,10 +1169,14 @@ async function getRetryHistoryImages(storyId, pageNumber) {
       case 'annotatedOriginal': entry.annotatedOriginal = row.image_data; break;
       case 'grid':
         entry.grids[row.grid_index] = entry.grids[row.grid_index] || {};
+        // Use both property names for compatibility
+        entry.grids[row.grid_index].original = row.image_data;
         entry.grids[row.grid_index].imageData = row.image_data;
         break;
       case 'gridRepaired':
         entry.grids[row.grid_index] = entry.grids[row.grid_index] || {};
+        // Use both property names for compatibility
+        entry.grids[row.grid_index].repaired = row.image_data;
         entry.grids[row.grid_index].repairedImageData = row.image_data;
         break;
     }

@@ -718,25 +718,59 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         if (!entry) {
           return res.status(404).json({ error: `Retry history index ${idx} not found` });
         }
+
+        // Check if images are in data blob or need to be loaded from story_retry_images table
+        const hasImagesInBlob = entry.imageData || entry.bboxOverlayImage || entry.originalImage || entry.annotatedOriginal || (entry.grids && entry.grids.some(g => g.imageData || g.repairedImageData));
+
+        // If images stripped from blob, load from separate table
+        let retryImages = null;
+        if (!hasImagesInBlob) {
+          const allRetryImages = await getRetryHistoryImages(id, pageNum);
+          retryImages = allRetryImages[idx];
+        }
+
+        // Merge data blob metadata with images from table
+        // Map grid property names: table uses imageData/repairedImageData, frontend expects original/repaired
+        const mergedEntry = {
+          ...entry,
+          imageData: entry.imageData || retryImages?.imageData || null,
+          bboxOverlayImage: entry.bboxOverlayImage || retryImages?.bboxOverlayImage || null,
+          originalImage: entry.originalImage || retryImages?.originalImage || null,
+          annotatedOriginal: entry.annotatedOriginal || retryImages?.annotatedOriginal || null,
+          grids: entry.grids?.map((g, gIdx) => ({
+            ...g,
+            // Keep both naming conventions for compatibility
+            original: g.original || g.imageData || retryImages?.grids?.[gIdx]?.imageData || null,
+            repaired: g.repaired || g.repairedImageData || retryImages?.grids?.[gIdx]?.repairedImageData || null,
+            imageData: g.imageData || g.original || retryImages?.grids?.[gIdx]?.imageData || null,
+            repairedImageData: g.repairedImageData || g.repaired || retryImages?.grids?.[gIdx]?.repairedImageData || null
+          })) || (retryImages?.grids || []).map(g => ({
+            original: g.imageData,
+            repaired: g.repairedImageData,
+            imageData: g.imageData,
+            repairedImageData: g.repairedImageData
+          }))
+        };
+
         if (field === 'imageData') {
-          result = { imageData: entry.imageData || null };
+          result = { imageData: mergedEntry.imageData };
         } else if (field === 'originalImage') {
-          result = { originalImage: entry.originalImage || null };
+          result = { originalImage: mergedEntry.originalImage };
         } else if (field === 'bboxOverlay') {
-          result = { bboxOverlayImage: entry.bboxOverlayImage || null };
+          result = { bboxOverlayImage: mergedEntry.bboxOverlayImage };
         } else if (field === 'annotatedOriginal') {
-          result = { annotatedOriginal: entry.annotatedOriginal || null };
+          result = { annotatedOriginal: mergedEntry.annotatedOriginal };
         } else if (field === 'grids') {
           // Return grid images for grid-based repair
-          result = { grids: entry.grids || [] };
+          result = { grids: mergedEntry.grids };
         } else {
           // Return all available images for this retry entry
           result = {
-            imageData: entry.imageData || null,
-            originalImage: entry.originalImage || null,
-            bboxOverlayImage: entry.bboxOverlayImage || null,
-            annotatedOriginal: entry.annotatedOriginal || null,
-            grids: entry.grids || []
+            imageData: mergedEntry.imageData,
+            originalImage: mergedEntry.originalImage,
+            bboxOverlayImage: mergedEntry.bboxOverlayImage,
+            annotatedOriginal: mergedEntry.annotatedOriginal,
+            grids: mergedEntry.grids
           };
         }
         break;
