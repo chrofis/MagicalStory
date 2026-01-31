@@ -10585,6 +10585,7 @@ async function processStoryJob(jobId) {
     const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
     const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
     const enableSceneValidation = inputData.enableSceneValidation === true; // Developer mode: validate scene composition with cheap preview (default: OFF)
+    log.debug(`🔧 [PIPELINE] Scene validation input: ${inputData.enableSceneValidation} (type: ${typeof inputData.enableSceneValidation}), resolved: ${enableSceneValidation}`);
 
     // Incremental consistency check options (check each image against previous N images)
     const incrementalConsistencyOptions = inputData.incrementalConsistency || {};
