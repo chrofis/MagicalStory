@@ -8475,6 +8475,44 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Build available avatars string - only show clothing categories used in this story
         const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters, streamingClothingRequirements);
 
+        // Generate cheap preview feedback (if enabled and Runware configured)
+        let previewFeedback = null;
+        if (enableSceneValidation) {
+          try {
+            const { generatePreviewFeedback, isValidationAvailable } = require('./server/lib/sceneValidator');
+
+            if (isValidationAvailable()) {
+              log.debug(`🖼️ [STREAM-SCENE] Page ${page.pageNumber} generating preview feedback...`);
+
+              // Get character names for this scene
+              const charNames = (page.characters || []).map(c =>
+                typeof c === 'string' ? c : c.name
+              ).filter(Boolean);
+
+              previewFeedback = await generatePreviewFeedback(
+                page.sceneHint || page.text.substring(0, 200),
+                charNames
+              );
+
+              // Track costs
+              if (previewFeedback.usage) {
+                addUsage('runware', { cost: previewFeedback.usage.previewCost }, 'preview_feedback');
+                addUsage('gemini_text', {
+                  promptTokenCount: 500,
+                  candidatesTokenCount: 200
+                }, 'preview_feedback');
+              }
+
+              log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} preview: ${previewFeedback.composition.substring(0, 100)}...`);
+            } else {
+              log.debug(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview skipped: validation not available`);
+            }
+          } catch (err) {
+            log.warn(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview failed: ${err.message}`);
+            // Continue without preview feedback
+          }
+        }
+
         const expansionPrompt = buildSceneDescriptionPrompt(
           page.pageNumber,
           page.text,
@@ -8486,7 +8524,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           {}, // pageClothing - not needed, using rawOutlineContext
           '',  // correctionNotes
           availableAvatars,
-          rawOutlineContext // NEW: pass raw outline blocks directly
+          rawOutlineContext, // pass raw outline blocks directly
+          previewFeedback    // pass preview feedback for composition hints
         );
 
         const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel, { prefill: '{' });

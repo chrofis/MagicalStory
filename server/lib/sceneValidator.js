@@ -283,6 +283,69 @@ async function describeImage(imageData) {
 }
 
 /**
+ * Build a simple preview prompt from scene hint (before scene expansion)
+ *
+ * @param {string} sceneHint - Raw scene hint from outline
+ * @param {string[]} characterNames - List of character names in the scene
+ * @returns {string} Simple prompt for preview generation
+ */
+function buildSimplePreviewPrompt(sceneHint, characterNames = []) {
+  let prompt = sceneHint;
+  if (characterNames.length > 0) {
+    prompt += `. Characters: ${characterNames.join(', ')}`;
+  }
+  // Runware has 3000 char limit
+  return prompt.length > 2900 ? prompt.substring(0, 2900) + '...' : prompt;
+}
+
+/**
+ * Generate cheap preview and describe it (no validation/repair)
+ * Used as input to scene expansion prompt to improve composition
+ *
+ * @param {string} sceneHint - Raw scene hint from outline
+ * @param {string[]} characterNames - List of character names in the scene
+ * @returns {Promise<{previewImage: string, previewPrompt: string, composition: string, usage: Object}>}
+ */
+async function generatePreviewFeedback(sceneHint, characterNames = []) {
+  if (!isRunwareConfigured()) {
+    throw new Error('Runware not configured - cannot generate preview');
+  }
+
+  // Build simple prompt from scene hint
+  const prompt = buildSimplePreviewPrompt(sceneHint, characterNames);
+
+  log.debug(`[SCENE-VALIDATOR] Generating preview feedback (${prompt.length} chars): ${prompt.substring(0, 100)}...`);
+
+  // Generate cheap preview with Schnell
+  const startTime = Date.now();
+  const preview = await generateWithRunware(prompt, {
+    model: RUNWARE_MODELS.FLUX_SCHNELL,
+    width: 768,
+    height: 768,
+    steps: 4
+  });
+
+  const previewElapsed = Date.now() - startTime;
+  log.debug(`[SCENE-VALIDATOR] Preview generated in ${previewElapsed}ms, cost: $${preview.usage.cost.toFixed(6)}`);
+
+  // Describe what the image shows (unbiased composition analysis)
+  const description = await describeImage(preview.imageData);
+
+  log.debug(`[SCENE-VALIDATOR] Preview feedback complete: ${description.description.substring(0, 100)}...`);
+
+  return {
+    previewImage: preview.imageData,
+    previewPrompt: prompt,
+    composition: description.description,
+    usage: {
+      previewCost: preview.usage.cost,
+      visionCost: description.usage.estimatedCost,
+      totalCost: preview.usage.cost + description.usage.estimatedCost
+    }
+  };
+}
+
+/**
  * Compare scene JSON vs image description to find composition issues
  *
  * @param {Object|string} sceneJson - Scene description JSON (object or string)
@@ -543,5 +606,7 @@ module.exports = {
   repairScene,
   validateAndRepairScene,
   isValidationAvailable,
-  buildPreviewPrompt
+  buildPreviewPrompt,
+  generatePreviewFeedback,
+  buildSimplePreviewPrompt
 };

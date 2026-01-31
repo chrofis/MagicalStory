@@ -141,6 +141,8 @@ reaching, gripping, leaning, crouching, stretching, pointing, clutching, balanci
 **CONTEXT:**
 {PREVIOUS_SCENES}
 
+{PREVIEW_FEEDBACK}
+
 **CURRENT SCENE (Page {PAGE_NUMBER}):**
 {SCENE_SUMMARY}
 {SCENE_CONTEXT}
