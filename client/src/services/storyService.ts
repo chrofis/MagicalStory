@@ -1288,6 +1288,7 @@ export const storyService = {
       forceRepairThreshold: data.forceRepairThreshold,
       enableFinalChecks: data.enableFinalChecks,
       checkOnlyMode: data.checkOnlyMode,  // Skip all regeneration, only run checks
+      enableSceneValidation: data.enableSceneValidation,  // Cheap preview + geometry check
       // Incremental consistency check
       incrementalConsistency: data.incrementalConsistency,
       // Developer model overrides
