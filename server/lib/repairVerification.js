@@ -14,6 +14,9 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Verification thresholds
 const LLM_CONFIDENCE_THRESHOLD = 0.7; // Min confidence to accept
 
+// Feathering for repair compositing (blend edges to avoid hard seams)
+const DEFAULT_FEATHER_RADIUS = 8;  // Pixels of gradient at edges
+
 // Gemini model for verification (same as quality eval for consistency)
 const VERIFY_MODEL = 'gemini-2.5-flash';
 
@@ -429,7 +432,90 @@ async function verifyRepairedRegion(originalBuffer, repairedBuffer, issue) {
 }
 
 /**
+ * Create a feathered alpha mask for smooth edge blending
+ * Solid in center, gradient to transparent at edges
+ *
+ * @param {number} width - Mask width
+ * @param {number} height - Mask height
+ * @param {number} radius - Feather radius in pixels
+ * @returns {Promise<Buffer>} PNG buffer with alpha mask
+ */
+async function createFeatheredMask(width, height, radius) {
+  const channels = 4;  // RGBA
+  const data = Buffer.alloc(width * height * channels);
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Calculate distance from each edge
+      const distLeft = x;
+      const distRight = width - 1 - x;
+      const distTop = y;
+      const distBottom = height - 1 - y;
+      const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+
+      // Calculate alpha: 0 at edges, 255 past radius
+      let alpha = 255;
+      if (minDist < radius) {
+        alpha = Math.round((minDist / radius) * 255);
+      }
+
+      const idx = (y * width + x) * channels;
+      data[idx] = 255;      // R
+      data[idx + 1] = 255;  // G
+      data[idx + 2] = 255;  // B
+      data[idx + 3] = alpha; // A
+    }
+  }
+
+  return sharp(data, {
+    raw: { width, height, channels }
+  }).png().toBuffer();
+}
+
+/**
+ * Composite a repair onto the base image with feathered edges
+ * Blends edges to avoid hard seams when pasting repair back
+ *
+ * @param {Buffer} baseBuffer - Original full image buffer
+ * @param {Buffer} repairBuffer - Repaired region buffer
+ * @param {Object} targetBox - {x, y, width, height} in pixels
+ * @param {number} featherRadius - Pixels of gradient at edges
+ * @returns {Promise<Buffer>} Base image with feathered repair composited
+ */
+async function compositeWithFeathering(baseBuffer, repairBuffer, targetBox, featherRadius = DEFAULT_FEATHER_RADIUS) {
+  const { x, y, width, height } = targetBox;
+
+  // Resize repair to match target dimensions
+  const resizedRepair = await sharp(repairBuffer)
+    .resize(width, height, { fit: 'fill' })
+    .ensureAlpha()
+    .toBuffer();
+
+  // Create feathered mask - solid in center, gradient at edges
+  const mask = await createFeatheredMask(width, height, featherRadius);
+
+  // Apply mask to repair (makes edges transparent)
+  const maskedRepair = await sharp(resizedRepair)
+    .composite([{
+      input: mask,
+      blend: 'dest-in'  // Use mask as alpha channel
+    }])
+    .toBuffer();
+
+  // Composite masked repair onto base
+  return sharp(baseBuffer)
+    .composite([{
+      input: maskedRepair,
+      left: x,
+      top: y,
+      blend: 'over'
+    }])
+    .toBuffer();
+}
+
+/**
  * Apply verified repairs to the original image
+ * Handles downscaling if regions were upscaled, and uses feathered compositing
  *
  * @param {Buffer|string} originalImage - Original full image (buffer or base64)
  * @param {Object[]} verifiedRepairs - Array of verified repairs with buffer and issue info
@@ -446,7 +532,7 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
   }
 
   const metadata = await sharp(imageBuffer).metadata();
-  const composites = [];
+  let currentImage = imageBuffer;
 
   for (const repair of verifiedRepairs) {
     if (!repair.accepted || !repair.buffer || !repair.issue) continue;
@@ -474,45 +560,51 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
     }
 
     try {
+      let repairBuffer = repair.buffer;
+
+      // Handle downscaling if region was upscaled before sending to Gemini
+      const scaleFactor = repair.issue.extraction?.scaleFactor || 1;
+      if (scaleFactor > 1) {
+        const repairMeta = await sharp(repairBuffer).metadata();
+        const targetWidth = Math.round(repairMeta.width / scaleFactor);
+        const targetHeight = Math.round(repairMeta.height / scaleFactor);
+        repairBuffer = await sharp(repairBuffer)
+          .resize(targetWidth, targetHeight, {
+            kernel: 'lanczos3'  // High quality downscaling
+          })
+          .toBuffer();
+        console.log(`  [REPAIR] Downscaled repair ${repairMeta.width}x${repairMeta.height} → ${targetWidth}x${targetHeight} (was upscaled ${scaleFactor}x)`);
+      }
+
       // Check actual dimensions of repair buffer vs target
-      const repairMeta = await sharp(repair.buffer).metadata();
+      const repairMeta = await sharp(repairBuffer).metadata();
       const targetAspect = width / height;
       const repairAspect = repairMeta.width / repairMeta.height;
       const aspectDiff = Math.abs(targetAspect - repairAspect) / targetAspect;
 
       // Log dimension info for debugging
-      console.log(`  [REPAIR] Applying fix: target=${width}x${height} (aspect=${targetAspect.toFixed(2)}), repair=${repairMeta.width}x${repairMeta.height} (aspect=${repairAspect.toFixed(2)}), diff=${(aspectDiff * 100).toFixed(1)}%`);
+      console.log(`  [REPAIR] Applying fix: target=${width}x${height}, repair=${repairMeta.width}x${repairMeta.height}, feather=${DEFAULT_FEATHER_RADIUS}px`);
 
       // Warn if aspect ratio differs significantly (>20% difference)
       if (aspectDiff > 0.2) {
-        console.warn(`  ⚠️ [REPAIR] Aspect ratio mismatch: ${(aspectDiff * 100).toFixed(1)}% difference - using cover mode to avoid distortion`);
+        console.warn(`  ⚠️ [REPAIR] Aspect ratio mismatch: ${(aspectDiff * 100).toFixed(1)}% difference`);
       }
 
-      // Resize repaired region to match the original extraction size
-      // Use 'cover' instead of 'fill' to avoid stretching/distortion when aspect ratios differ
-      // (grid cells are square but original regions may not be)
-      const resizedRepair = await sharp(repair.buffer)
-        .resize(width, height, { fit: 'cover', position: 'center' })
-        .toBuffer();
-
-      composites.push({
-        input: resizedRepair,
-        left: x,
-        top: y,
-        blend: 'over'
-      });
+      // Use feathered compositing to blend edges smoothly
+      // This avoids hard seams when pasting repairs back
+      currentImage = await compositeWithFeathering(
+        currentImage,
+        repairBuffer,
+        { x, y, width, height },
+        DEFAULT_FEATHER_RADIUS
+      );
     } catch (err) {
-      console.error(`Failed to prepare repair for compositing: ${err.message}`);
+      console.error(`Failed to apply repair: ${err.message}`);
     }
   }
 
-  if (composites.length === 0) {
-    return imageBuffer;
-  }
-
-  // Apply all repairs at once, ensuring output matches original dimensions
-  const result = await sharp(imageBuffer)
-    .composite(composites)
+  // Ensure output is JPEG with correct dimensions
+  const result = await sharp(currentImage)
     .resize(metadata.width, metadata.height, { fit: 'cover', position: 'northwest' })
     .jpeg({ quality: 95 })
     .toBuffer();
@@ -612,6 +704,7 @@ async function createComparisonImage(originalImage, repairedImage, repairs) {
 module.exports = {
   // Thresholds
   LLM_CONFIDENCE_THRESHOLD,
+  DEFAULT_FEATHER_RADIUS,
 
   // Core verification
   verifyRepairWithGemini,
@@ -621,6 +714,10 @@ module.exports = {
   // Helpers
   createVerificationComparison,
   createDiffImage,
+
+  // Feathered compositing
+  createFeatheredMask,
+  compositeWithFeathering,
 
   // Repair application
   applyVerifiedRepairs,

@@ -1,21 +1,25 @@
 You are repairing cropped regions from a children's book illustration. Each labeled cell (A, B, C, etc.) is a SMALL PIECE of a larger image that will be placed back into the original.
 
-CRITICAL CONSTRAINTS:
+CRITICAL CONSTRAINTS - "Keep everything else unchanged":
 - These are CROPS from a bigger picture - items MUST stay in their EXACT positions
 - Do NOT move, resize, or reposition ANY element
 - Do NOT change the art style, colors, lighting, or background
 - Do NOT add new elements or remove existing ones
 - ONLY fix the specific issue described for each cell
 - Everything else MUST remain PIXEL-PERFECT identical
+- Do NOT alter faces, expressions, or poses unless specifically instructed
+- Preserve the exact perspective and composition
 
 CELLS TO FIX ({ISSUE_COUNT} regions labeled {LETTERS}):
 {INSTRUCTIONS}
 
 EXECUTION RULES:
-1. For each cell, make ONLY the change described - nothing more
-2. Preserve exact positions of all elements (they must align when placed back)
-3. Match the existing art style precisely
-4. Keep all colors, textures, and shading identical
-5. Do not "improve" or "enhance" anything beyond the fix instruction
+1. Change ONLY what is described in each fix instruction - nothing more
+2. Keep all other elements in each region EXACTLY the same
+3. Preserve exact positions of all elements (they must align when placed back)
+4. Match the existing art style, colors, textures, and lighting precisely
+5. Do NOT "improve" or "enhance" anything beyond the fix instruction
+6. Do NOT add or remove any objects beyond what's specified
+7. Maintain the same perspective and composition
 
 OUTPUT: Generate the repaired grid IMAGE with all cells fixed. Same layout, same labels visible. Do NOT describe the changes in text - output the edited image directly.

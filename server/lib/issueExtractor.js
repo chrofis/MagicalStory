@@ -17,6 +17,10 @@ const { randomUUID } = require('crypto');
 // Previously 256, but this caused tiny grids that Gemini would upscale 3x
 const TARGET_REGION_SIZE = 512;
 
+// Minimum region size for Gemini to work well
+// Small regions get upscaled 2x before sending to Gemini, then downscaled after
+const MIN_REGION_SIZE = 400;
+
 // Adaptive padding by issue type (percent of region size)
 const PADDING_BY_TYPE = {
   face: 0.6,      // Face needs identity context
@@ -497,12 +501,12 @@ function getAdaptivePadding(issueType) {
 
 /**
  * Extract issue region from image with adaptive padding
- * Returns a 256x256 thumbnail of the issue area
+ * For small regions, upscales 2x to give Gemini more pixels to work with.
  *
  * @param {Buffer} imageBuffer - Image data as buffer
  * @param {UnifiedIssue} issue - Issue with region info
  * @param {{width: number, height: number}} imgDimensions - Image dimensions
- * @returns {Promise<{buffer: Buffer, paddedBox: Object}>} Extracted thumbnail and box used
+ * @returns {Promise<{buffer: Buffer, paddedBox: Object, thumbDimensions: Object, scaleFactor: number}>}
  */
 async function extractIssueRegion(imageBuffer, issue, imgDimensions) {
   const pixelBox = issue.region.pixelBox;
@@ -538,18 +542,37 @@ async function extractIssueRegion(imageBuffer, issue, imgDimensions) {
   width = Math.min(imgDimensions.width - left, width);
   height = Math.min(imgDimensions.height - top, height);
 
-  // Don't scale - keep original region size
-  // This avoids quality loss from scaling down then up
-  // The grid will be larger but Gemini can handle it
-  const buffer = await sharp(imageBuffer)
+  // Extract at original size
+  let buffer = await sharp(imageBuffer)
     .extract({ left, top, width, height })
     .jpeg({ quality: 90 })
     .toBuffer();
 
+  // Smart scaling: upscale 2x if region is too small for Gemini to work well
+  // This gives Gemini more pixels to work with, then we downscale after repair
+  const maxDim = Math.max(width, height);
+  const scaleFactor = maxDim < MIN_REGION_SIZE ? 2 : 1;
+
+  if (scaleFactor > 1) {
+    const scaledWidth = width * scaleFactor;
+    const scaledHeight = height * scaleFactor;
+    buffer = await sharp(buffer)
+      .resize(scaledWidth, scaledHeight, {
+        kernel: 'lanczos3'  // High quality upscaling
+      })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    console.log(`  [EXTRACT] Upscaled small region ${width}x${height} → ${scaledWidth}x${scaledHeight} (2x for Gemini)`);
+  }
+
   return {
     buffer,
-    paddedBox: { x: left, y: top, width, height },
-    thumbDimensions: { width, height }  // Same as extracted region
+    paddedBox: { x: left, y: top, width, height },  // Original coords for compositing
+    thumbDimensions: {
+      width: width * scaleFactor,
+      height: height * scaleFactor
+    },
+    scaleFactor  // Track for downscaling after repair
   };
 }
 
@@ -593,21 +616,22 @@ async function extractPageIssues(pageNum, imageData, issues, outputDir) {
     }
 
     try {
-      const { buffer, paddedBox, thumbDimensions } = await extractIssueRegion(imageBuffer, issue, imgDimensions);
+      const { buffer, paddedBox, thumbDimensions, scaleFactor } = await extractIssueRegion(imageBuffer, issue, imgDimensions);
 
       // Generate filename based on type
       const filename = `issue_${issueIndex}_${issue.type}.jpg`;
       const thumbnailPath = path.join(pageDir, filename);
       fs.writeFileSync(thumbnailPath, buffer);
 
-      // Update issue with extraction info
+      // Update issue with extraction info (including scaleFactor for downscaling after repair)
       extractedIssues.push({
         ...issue,
         extraction: {
           thumbnailPath: path.relative(outputDir, thumbnailPath),
           absolutePath: thumbnailPath,
           paddedBox: pixelBoxToBbox(paddedBox, imgDimensions),
-          thumbDimensions  // Actual thumbnail dimensions (may not be square)
+          thumbDimensions,  // Actual thumbnail dimensions (may be upscaled)
+          scaleFactor       // Track for downscaling after repair (1 = no scaling, 2 = was upscaled 2x)
         }
       });
 
@@ -651,6 +675,7 @@ function loadManifest(outputDir) {
 module.exports = {
   // Constants
   TARGET_REGION_SIZE,
+  MIN_REGION_SIZE,
   PADDING_BY_TYPE,
 
   // Normalization functions
