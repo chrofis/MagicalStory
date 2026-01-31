@@ -35,8 +35,153 @@ const PADDING = 10;         // Padding between cells
 const LABEL_HEIGHT = 30;    // Height for letter labels
 const TITLE_HEIGHT = 40;    // Height for grid title
 
+// Gemini-supported aspect ratios (width/height)
+const GEMINI_RATIOS = [
+  { name: '1:1', ratio: 1.0 },
+  { name: '4:3', ratio: 4/3 },    // 1.333 - landscape
+  { name: '3:4', ratio: 3/4 },    // 0.75 - portrait
+  { name: '16:9', ratio: 16/9 },  // 1.778 - wide
+  { name: '9:16', ratio: 9/16 }   // 0.5625 - tall
+];
+
 // Gemini model for image editing (same as page generation)
 const REPAIR_MODEL = 'gemini-2.5-flash-image';
+
+/**
+ * Find the closest Gemini-supported aspect ratio
+ * @param {number} width - Image width
+ * @param {number} height - Image height
+ * @returns {{name: string, ratio: number, paddedWidth: number, paddedHeight: number}}
+ */
+function findClosestGeminiRatio(width, height) {
+  const currentRatio = width / height;
+
+  let best = null;
+  let bestDiff = Infinity;
+
+  for (const r of GEMINI_RATIOS) {
+    const diff = Math.abs(currentRatio - r.ratio);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = r;
+    }
+  }
+
+  // Calculate padded dimensions to match the target ratio
+  let paddedWidth, paddedHeight;
+  if (currentRatio > best.ratio) {
+    // Image is wider than target - pad height
+    paddedWidth = width;
+    paddedHeight = Math.round(width / best.ratio);
+  } else {
+    // Image is taller than target - pad width
+    paddedHeight = height;
+    paddedWidth = Math.round(height * best.ratio);
+  }
+
+  return {
+    name: best.name,
+    ratio: best.ratio,
+    paddedWidth,
+    paddedHeight
+  };
+}
+
+/**
+ * Pad an image to a Gemini-supported aspect ratio
+ * @param {Buffer} imageBuffer - Original image buffer
+ * @param {number} originalWidth - Original width
+ * @param {number} originalHeight - Original height
+ * @param {string} padColor - Padding color ('white' or 'black')
+ * @returns {Promise<{buffer: Buffer, padding: Object, targetRatio: Object}>}
+ */
+async function padToGeminiRatio(imageBuffer, originalWidth, originalHeight, padColor = 'white') {
+  const target = findClosestGeminiRatio(originalWidth, originalHeight);
+
+  // No padding needed if already at target ratio
+  if (target.paddedWidth === originalWidth && target.paddedHeight === originalHeight) {
+    return {
+      buffer: imageBuffer,
+      padding: { top: 0, left: 0, bottom: 0, right: 0 },
+      targetRatio: target
+    };
+  }
+
+  // Calculate padding (center the original image)
+  const padLeft = Math.floor((target.paddedWidth - originalWidth) / 2);
+  const padTop = Math.floor((target.paddedHeight - originalHeight) / 2);
+  const padRight = target.paddedWidth - originalWidth - padLeft;
+  const padBottom = target.paddedHeight - originalHeight - padTop;
+
+  const bgColor = padColor === 'black'
+    ? { r: 0, g: 0, b: 0, alpha: 1 }
+    : { r: 255, g: 255, b: 255, alpha: 1 };
+
+  const paddedBuffer = await sharp(imageBuffer)
+    .extend({
+      top: padTop,
+      bottom: padBottom,
+      left: padLeft,
+      right: padRight,
+      background: bgColor
+    })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  console.log(`  [GRID] Padded ${originalWidth}x${originalHeight} → ${target.paddedWidth}x${target.paddedHeight} (${target.name}, +${padLeft}/${padRight}/${padTop}/${padBottom})`);
+
+  return {
+    buffer: paddedBuffer,
+    padding: { top: padTop, left: padLeft, bottom: padBottom, right: padRight },
+    targetRatio: target
+  };
+}
+
+/**
+ * Remove padding from a repaired grid image
+ * @param {Buffer} imageBuffer - Padded image buffer
+ * @param {Object} padding - Padding info {top, left, bottom, right}
+ * @param {number} expectedWidth - Expected width after removing padding
+ * @param {number} expectedHeight - Expected height after removing padding
+ * @returns {Promise<Buffer>}
+ */
+async function removePadding(imageBuffer, padding, expectedWidth, expectedHeight) {
+  const meta = await sharp(imageBuffer).metadata();
+
+  // Calculate scale factor (Gemini may have resized)
+  const scaleX = meta.width / (expectedWidth + padding.left + padding.right);
+  const scaleY = meta.height / (expectedHeight + padding.top + padding.bottom);
+
+  // Scale padding values
+  const scaledPadding = {
+    left: Math.round(padding.left * scaleX),
+    top: Math.round(padding.top * scaleY),
+    right: Math.round(padding.right * scaleX),
+    bottom: Math.round(padding.bottom * scaleY)
+  };
+
+  const cropWidth = meta.width - scaledPadding.left - scaledPadding.right;
+  const cropHeight = meta.height - scaledPadding.top - scaledPadding.bottom;
+
+  if (cropWidth <= 0 || cropHeight <= 0) {
+    console.warn(`  [GRID] Invalid crop dimensions after padding removal: ${cropWidth}x${cropHeight}`);
+    return imageBuffer;
+  }
+
+  const croppedBuffer = await sharp(imageBuffer)
+    .extract({
+      left: scaledPadding.left,
+      top: scaledPadding.top,
+      width: cropWidth,
+      height: cropHeight
+    })
+    .jpeg({ quality: 95 })
+    .toBuffer();
+
+  console.log(`  [GRID] Removed padding: ${meta.width}x${meta.height} → ${cropWidth}x${cropHeight}`);
+
+  return croppedBuffer;
+}
 
 /**
  * Create a labeled grid image from extracted issue thumbnails
@@ -187,7 +332,7 @@ async function createIssueGrid(issues, options = {}) {
   }
 
   // Create the grid image
-  const gridBuffer = await sharp({
+  const rawGridBuffer = await sharp({
     create: {
       width: gridWidth,
       height: gridHeight,
@@ -199,11 +344,19 @@ async function createIssueGrid(issues, options = {}) {
     .jpeg({ quality: 95 })
     .toBuffer();
 
+  // Pad to Gemini-supported aspect ratio
+  const { buffer: gridBuffer, padding, targetRatio } = await padToGeminiRatio(
+    rawGridBuffer, gridWidth, gridHeight, 'white'
+  );
+
   // Build manifest
   const manifest = {
     createdAt: new Date().toISOString(),
     title,
     dimensions: { width: gridWidth, height: gridHeight },
+    paddedDimensions: { width: targetRatio.paddedWidth, height: targetRatio.paddedHeight },
+    aspectRatio: targetRatio.name,
+    padding,  // Store padding for removal after repair
     variableCells: true,  // Flag indicating variable cell sizes
     cellCount: cells.length,
     issues: cells.map(cell => ({
@@ -364,27 +517,38 @@ async function repairGridWithGemini(gridBuffer, manifest, retryCount = 0) {
 /**
  * Extract individual repaired regions from the grid
  *
- * @param {Buffer} repairedGrid - Repaired grid image buffer
+ * @param {Buffer} repairedGrid - Repaired grid image buffer (may be padded)
  * @param {Object[]} cellPositions - Cell positions from createIssueGrid
- * @param {Object} originalDimensions - Original grid dimensions {width, height} for scaling
+ * @param {Object} manifest - Grid manifest with dimensions and padding info
  * @returns {Promise<Object[]>} Array of {letter, issueId, buffer}
  */
-async function extractRepairedRegions(repairedGrid, cellPositions, originalDimensions = null) {
+async function extractRepairedRegions(repairedGrid, cellPositions, manifest = null) {
   const regions = [];
 
-  // Get actual dimensions of repaired grid
-  const metadata = await sharp(repairedGrid).metadata();
-  const repairedWidth = metadata.width;
-  const repairedHeight = metadata.height;
+  // Get dimensions from manifest (original grid size without padding)
+  const originalWidth = manifest?.dimensions?.width;
+  const originalHeight = manifest?.dimensions?.height;
+  const padding = manifest?.padding || { top: 0, left: 0, bottom: 0, right: 0 };
 
-  // Calculate scale factors if original dimensions provided
+  // Remove padding from repaired grid if it was padded
+  let unpadedGrid = repairedGrid;
+  if (padding.top > 0 || padding.left > 0 || padding.bottom > 0 || padding.right > 0) {
+    unpadedGrid = await removePadding(repairedGrid, padding, originalWidth, originalHeight);
+  }
+
+  // Get actual dimensions of unpadded grid
+  const metadata = await sharp(unpadedGrid).metadata();
+  const gridWidth = metadata.width;
+  const gridHeight = metadata.height;
+
+  // Calculate scale factors based on original dimensions
   let scaleX = 1;
   let scaleY = 1;
-  if (originalDimensions) {
-    scaleX = repairedWidth / originalDimensions.width;
-    scaleY = repairedHeight / originalDimensions.height;
+  if (originalWidth && originalHeight) {
+    scaleX = gridWidth / originalWidth;
+    scaleY = gridHeight / originalHeight;
     if (Math.abs(scaleX - 1) > 0.01 || Math.abs(scaleY - 1) > 0.01) {
-      console.log(`  [GRID] Scaling cell positions: ${originalDimensions.width}x${originalDimensions.height} → ${repairedWidth}x${repairedHeight} (scale: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)})`);
+      console.log(`  [GRID] Scaling cell positions: ${originalWidth}x${originalHeight} → ${gridWidth}x${gridHeight} (scale: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)})`);
     }
   }
 
@@ -397,12 +561,12 @@ async function extractRepairedRegions(repairedGrid, cellPositions, originalDimen
       const scaledHeight = Math.round(cell.height * scaleY);
 
       // Clamp to image bounds
-      const left = Math.max(0, Math.min(scaledX, repairedWidth - 1));
-      const top = Math.max(0, Math.min(scaledY, repairedHeight - 1));
-      const width = Math.min(scaledWidth, repairedWidth - left);
-      const height = Math.min(scaledHeight, repairedHeight - top);
+      const left = Math.max(0, Math.min(scaledX, gridWidth - 1));
+      const top = Math.max(0, Math.min(scaledY, gridHeight - 1));
+      const width = Math.min(scaledWidth, gridWidth - left);
+      const height = Math.min(scaledHeight, gridHeight - top);
 
-      const buffer = await sharp(repairedGrid)
+      const buffer = await sharp(unpadedGrid)
         .extract({ left, top, width, height })
         .jpeg({ quality: 95 })
         .toBuffer();
@@ -687,6 +851,12 @@ module.exports = {
   createLabeledGrid,  // Generic grid creation for reuse
   createCellLabel,    // Cell label creation for reuse
   escapeXml,          // XML escaping for SVG
+
+  // Gemini aspect ratio helpers
+  GEMINI_RATIOS,
+  findClosestGeminiRatio,
+  padToGeminiRatio,
+  removePadding,
 
   // Repair
   buildGridRepairPrompt,
