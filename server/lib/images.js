@@ -1110,7 +1110,11 @@ async function createBboxOverlayImage(imageData, bboxDetection) {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    return 'data:image/jpeg;base64,' + resultBuffer.toString('base64');
+    const result = 'data:image/jpeg;base64,' + resultBuffer.toString('base64');
+    const figCount = bboxDetection.figures?.length || 0;
+    const objCount = bboxDetection.objects?.length || 0;
+    log.debug(`📦 [BBOX-OVERLAY] Created overlay image: ${figCount} figures, ${objCount} objects (${Math.round(resultBuffer.length / 1024)}KB)`);
+    return result;
 
   } catch (error) {
     log.error(`❌ [BBOX-OVERLAY] Error creating overlay: ${error.message}`);
