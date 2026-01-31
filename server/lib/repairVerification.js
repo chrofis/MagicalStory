@@ -15,7 +15,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const LLM_CONFIDENCE_THRESHOLD = 0.7; // Min confidence to accept
 
 // Feathering for repair compositing (blend edges to avoid hard seams)
-const DEFAULT_FEATHER_RADIUS = 8;  // Pixels of gradient at edges
+const DEFAULT_FEATHER_RADIUS = 12;  // Pixels of gradient at edges (increased from 8 to better blend Gemini artifacts)
 
 // Gemini model for verification (same as quality eval for consistency)
 const VERIFY_MODEL = 'gemini-2.5-flash';

@@ -34,6 +34,7 @@ const MAX_PER_GRID = 12;    // MAX_COLS * MAX_ROWS
 const PADDING = 10;         // Padding between cells
 const LABEL_HEIGHT = 30;    // Height for letter labels
 const TITLE_HEIGHT = 40;    // Height for grid title
+const CELL_INSET = 4;       // Pixels to trim from cell edges when extracting (removes Gemini border artifacts)
 
 // Gemini-supported aspect ratios (width/height)
 const GEMINI_RATIOS = [
@@ -556,16 +557,30 @@ async function extractRepairedRegions(repairedGrid, cellPositions, manifest = nu
       const scaledWidth = Math.round(cell.width * scaleX);
       const scaledHeight = Math.round(cell.height * scaleY);
 
-      // Clamp to image bounds
-      const left = Math.max(0, Math.min(scaledX, gridWidth - 1));
-      const top = Math.max(0, Math.min(scaledY, gridHeight - 1));
-      const width = Math.min(scaledWidth, gridWidth - left);
-      const height = Math.min(scaledHeight, gridHeight - top);
+      // Apply inset to trim potential border artifacts from Gemini
+      // Only apply if cell is large enough (inset on each side)
+      const inset = (scaledWidth > CELL_INSET * 4 && scaledHeight > CELL_INSET * 4) ? CELL_INSET : 0;
 
-      const buffer = await sharp(unpadedGrid)
+      // Clamp to image bounds (with inset applied)
+      const left = Math.max(0, Math.min(scaledX + inset, gridWidth - 1));
+      const top = Math.max(0, Math.min(scaledY + inset, gridHeight - 1));
+      const width = Math.min(scaledWidth - inset * 2, gridWidth - left);
+      const height = Math.min(scaledHeight - inset * 2, gridHeight - top);
+
+      // Extract the cell region (trimmed by inset)
+      let buffer = await sharp(unpadedGrid)
         .extract({ left, top, width, height })
         .jpeg({ quality: 95 })
         .toBuffer();
+
+      // Scale back up to original cell size if we applied inset
+      // This ensures the repair matches the expected dimensions for compositing
+      if (inset > 0) {
+        buffer = await sharp(buffer)
+          .resize(cell.width, cell.height, { fit: 'fill' })
+          .jpeg({ quality: 95 })
+          .toBuffer();
+      }
 
       regions.push({
         letter: cell.letter,
@@ -951,6 +966,7 @@ module.exports = {
   PADDING,
   LABEL_HEIGHT,
   TITLE_HEIGHT,
+  CELL_INSET,
 
   // Grid creation
   createIssueGrid,
