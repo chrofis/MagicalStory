@@ -26,8 +26,8 @@ function getRepairPromptTemplate() {
 
 // Grid configuration
 const CELL_SIZE = 256;      // Default cell size (for legacy createLabeledGrid)
-const MAX_CELL_DIM = 512;   // Maximum dimension for any cell in variable grid (increased from 300)
-const MAX_GRID_WIDTH = 1500; // Maximum grid width for row packing (increased from 1024)
+const MAX_CELL_DIM = 512;   // Maximum dimension for any cell (only used by createLabeledGrid)
+const MAX_GRID_WIDTH = 2000; // Maximum grid width for row packing (cells are original size now)
 const MAX_COLS = 4;         // Maximum columns per grid (for legacy fixed grid)
 const MAX_ROWS = 3;         // Maximum rows per grid
 const MAX_PER_GRID = 12;    // MAX_COLS * MAX_ROWS
@@ -212,23 +212,19 @@ async function createIssueGrid(issues, options = {}) {
     const issue = validIssues[i];
     try {
       // Get actual thumbnail dimensions (prefer stored thumbDimensions, fallback to reading file)
-      let thumbWidth, thumbHeight;
+      let cellWidth, cellHeight;
       if (issue.extraction.thumbDimensions) {
-        thumbWidth = issue.extraction.thumbDimensions.width;
-        thumbHeight = issue.extraction.thumbDimensions.height;
+        cellWidth = issue.extraction.thumbDimensions.width;
+        cellHeight = issue.extraction.thumbDimensions.height;
       } else {
         // Fallback: read from file metadata
         const meta = await sharp(issue.extraction.absolutePath).metadata();
-        thumbWidth = meta.width;
-        thumbHeight = meta.height;
+        cellWidth = meta.width;
+        cellHeight = meta.height;
       }
 
-      // Scale to fit within MAX_CELL_DIM if needed
-      const maxDim = Math.max(thumbWidth, thumbHeight);
-      const scale = maxDim > MAX_CELL_DIM ? MAX_CELL_DIM / maxDim : 1;
-      const cellWidth = Math.round(thumbWidth * scale);
-      const cellHeight = Math.round(thumbHeight * scale);
-
+      // No scaling - use original thumbnail size directly
+      // This preserves quality by avoiding scale-down then scale-up
       cells.push({
         issue,
         letter: String.fromCharCode(65 + i),

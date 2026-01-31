@@ -538,23 +538,18 @@ async function extractIssueRegion(imageBuffer, issue, imgDimensions) {
   width = Math.min(imgDimensions.width - left, width);
   height = Math.min(imgDimensions.height - top, height);
 
-  // Scale proportionally to preserve aspect ratio
-  // The largest dimension should fit TARGET_REGION_SIZE (don't upscale small regions)
-  const maxDim = Math.max(width, height);
-  const scale = Math.min(1, TARGET_REGION_SIZE / maxDim);
-  const thumbWidth = Math.max(1, Math.round(width * scale));
-  const thumbHeight = Math.max(1, Math.round(height * scale));
-
+  // Don't scale - keep original region size
+  // This avoids quality loss from scaling down then up
+  // The grid will be larger but Gemini can handle it
   const buffer = await sharp(imageBuffer)
     .extract({ left, top, width, height })
-    .resize(thumbWidth, thumbHeight)
     .jpeg({ quality: 90 })
     .toBuffer();
 
   return {
     buffer,
     paddedBox: { x: left, y: top, width, height },
-    thumbDimensions: { width: thumbWidth, height: thumbHeight }
+    thumbDimensions: { width, height }  // Same as extracted region
   };
 }
 

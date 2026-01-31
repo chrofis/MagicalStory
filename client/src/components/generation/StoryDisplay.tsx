@@ -137,6 +137,8 @@ interface StoryDisplayProps {
   onSelectImageVersion?: (pageNumber: number, versionIndex: number) => Promise<void>;
   // Generation settings for dev mode
   generationSettings?: GenerationSettings;
+  // Callback to refresh story data (after entity repair, etc.)
+  onRefreshStory?: () => Promise<void>;
 }
 
 export function StoryDisplay({
@@ -194,6 +196,7 @@ export function StoryDisplay({
   isImpersonating = false,
   onSelectImageVersion,
   generationSettings,
+  onRefreshStory,
 }: StoryDisplayProps) {
   const { t, language } = useLanguage();
 
@@ -508,9 +511,14 @@ export function StoryDisplay({
       const result = await response.json();
       console.log('Entity repair result:', result);
 
-      // Reload the page to show updated images
+      // Refresh story data to show updated images
       if (result.success && !result.noChanges) {
-        window.location.reload();
+        if (onRefreshStory) {
+          await onRefreshStory();
+        } else {
+          // Fallback to reload if no refresh callback
+          window.location.reload();
+        }
       }
     } catch (err) {
       console.error('Failed to repair entity consistency:', err);

@@ -292,6 +292,7 @@ export default function StoryWizard() {
   const [sceneImages, setSceneImages] = useState<SceneImage[]>([]);
   const [coverImages, setCoverImages] = useState<CoverImages>({ frontCover: null, initialPage: null, backCover: null });
   const [storyId, setStoryId] = useState<string | null>(null);
+  const [storyRefreshKey, setStoryRefreshKey] = useState(0); // Increment to trigger story reload
   const [jobId, setJobId] = useState<string | null>(null); // Job ID for tracking/cancellation
 
   // Partial story state (for stories that failed during generation)
@@ -795,7 +796,7 @@ export default function StoryWizard() {
     };
 
     loadSavedStory();
-  }, [searchParams, isAuthenticated]);
+  }, [searchParams, isAuthenticated, storyRefreshKey]);
 
   // Clear "Fertig!" notification when viewing story (step 6)
   // This stops the blinking badge in navigation when user is already viewing the story
@@ -4206,6 +4207,10 @@ export default function StoryWizard() {
               generatedPages={generatedPages}
               totalPages={totalPages}
               generationSettings={savedGenerationSettings || undefined}
+              onRefreshStory={storyId ? async () => {
+                log.info('Refreshing story data:', storyId);
+                setStoryRefreshKey(prev => prev + 1);
+              } : undefined}
             />
             </>
           );
