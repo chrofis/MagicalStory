@@ -5,7 +5,7 @@ import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
 import type { LanguageLevel } from '@/types/story';
 import type { VisualBible } from '@/types/character';
-import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, GenerationSettingsPanel } from './story';
+import { RetryHistoryDisplay, ReferencePhotosDisplay, SceneEditModal, ImageHistoryModal, EnlargedImageModal, RepairComparisonModal, GenerationSettingsPanel } from './story';
 import type { GenerationSettings } from './story';
 import { ShareButton } from '@/components/story/ShareButton';
 import storyService from '@/services/storyService';
@@ -234,8 +234,16 @@ export function StoryDisplay({
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
 
-  // Enlarged image modal for repair before/after comparison
+  // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
+
+  // Repair comparison modal for before/after/diff viewing
+  const [repairComparison, setRepairComparison] = useState<{
+    beforeImage: string;
+    afterImage: string;
+    diffImage?: string;
+    title: string;
+  } | null>(null);
 
   // PDF format selection dropdown
   const [pdfFormat, setPdfFormat] = useState<'square' | 'A4'>('square');
@@ -2979,15 +2987,22 @@ export function StoryDisplay({
                                             </div>
                                           )}
                                           {repair.beforeImage && repair.afterImage && (
-                                            <div className="flex gap-4">
+                                            <div
+                                              className="flex gap-4 cursor-pointer p-2 -m-2 rounded-lg hover:bg-amber-100 transition-colors"
+                                              onClick={() => setRepairComparison({
+                                                beforeImage: repair.beforeImage!,
+                                                afterImage: repair.afterImage!,
+                                                diffImage: repair.diffImage,
+                                                title: language === 'de' ? `Reparatur ${repair.attempt}` : `Repair ${repair.attempt}`
+                                              })}
+                                              title={language === 'de' ? 'Klicken für Vergleichsansicht' : 'Click to compare'}
+                                            >
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
                                                 <img
                                                   src={repair.beforeImage}
                                                   alt="Before repair"
-                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
-                                                  onClick={() => setEnlargedImage({ src: repair.beforeImage!, title: language === 'de' ? 'Vorher' : 'Before' })}
-                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                  className="w-32 h-32 object-contain border rounded bg-gray-100"
                                                 />
                                               </div>
                                               <div>
@@ -2995,11 +3010,19 @@ export function StoryDisplay({
                                                 <img
                                                   src={repair.afterImage}
                                                   alt="After repair"
-                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
-                                                  onClick={() => setEnlargedImage({ src: repair.afterImage!, title: language === 'de' ? 'Nachher' : 'After' })}
-                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                  className="w-32 h-32 object-contain border rounded bg-gray-100"
                                                 />
                                               </div>
+                                              {repair.diffImage && (
+                                                <div>
+                                                  <strong className="block mb-1 text-xs">Diff:</strong>
+                                                  <img
+                                                    src={repair.diffImage}
+                                                    alt="Difference"
+                                                    className="w-32 h-32 object-contain border rounded bg-gray-100"
+                                                  />
+                                                </div>
+                                              )}
                                             </div>
                                           )}
                                         </div>
@@ -3328,15 +3351,22 @@ export function StoryDisplay({
                                             </div>
                                           )}
                                           {repair.beforeImage && repair.afterImage && (
-                                            <div className="flex gap-4">
+                                            <div
+                                              className="flex gap-4 cursor-pointer p-2 -m-2 rounded-lg hover:bg-amber-100 transition-colors"
+                                              onClick={() => setRepairComparison({
+                                                beforeImage: repair.beforeImage!,
+                                                afterImage: repair.afterImage!,
+                                                diffImage: repair.diffImage,
+                                                title: language === 'de' ? `Reparatur ${repair.attempt}` : `Repair ${repair.attempt}`
+                                              })}
+                                              title={language === 'de' ? 'Klicken für Vergleichsansicht' : 'Click to compare'}
+                                            >
                                               <div>
                                                 <strong className="block mb-1 text-xs">{language === 'de' ? 'Vorher:' : 'Before:'}</strong>
                                                 <img
                                                   src={repair.beforeImage}
                                                   alt="Before repair"
-                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
-                                                  onClick={() => setEnlargedImage({ src: repair.beforeImage!, title: language === 'de' ? 'Vorher' : 'Before' })}
-                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                  className="w-32 h-32 object-contain border rounded bg-gray-100"
                                                 />
                                               </div>
                                               <div>
@@ -3344,11 +3374,19 @@ export function StoryDisplay({
                                                 <img
                                                   src={repair.afterImage}
                                                   alt="After repair"
-                                                  className="w-48 h-48 object-contain border rounded bg-gray-100 cursor-pointer hover:opacity-80 hover:ring-2 hover:ring-amber-400"
-                                                  onClick={() => setEnlargedImage({ src: repair.afterImage!, title: language === 'de' ? 'Nachher' : 'After' })}
-                                                  title={language === 'de' ? 'Klicken zum Vergrößern' : 'Click to enlarge'}
+                                                  className="w-32 h-32 object-contain border rounded bg-gray-100"
                                                 />
                                               </div>
+                                              {repair.diffImage && (
+                                                <div>
+                                                  <strong className="block mb-1 text-xs">Diff:</strong>
+                                                  <img
+                                                    src={repair.diffImage}
+                                                    alt="Difference"
+                                                    className="w-32 h-32 object-contain border rounded bg-gray-100"
+                                                  />
+                                                </div>
+                                              )}
                                             </div>
                                           )}
                                         </div>
@@ -4077,12 +4115,23 @@ export function StoryDisplay({
         />
       )}
 
-      {/* Enlarged Image Modal for repair before/after comparison */}
+      {/* Enlarged Image Modal for single image viewing */}
       {enlargedImage && (
         <EnlargedImageModal
           src={enlargedImage.src}
           title={enlargedImage.title}
           onClose={() => setEnlargedImage(null)}
+        />
+      )}
+
+      {/* Repair Comparison Modal for before/after/diff viewing */}
+      {repairComparison && (
+        <RepairComparisonModal
+          beforeImage={repairComparison.beforeImage}
+          afterImage={repairComparison.afterImage}
+          diffImage={repairComparison.diffImage}
+          title={repairComparison.title}
+          onClose={() => setRepairComparison(null)}
         />
       )}
     </div>

@@ -70,6 +70,86 @@ async function createVerificationComparison(originalBuffer, repairedBuffer) {
 }
 
 /**
+ * Create a diff image showing the difference between two images
+ * Highlights changes in red/magenta for easy visual comparison
+ *
+ * @param {Buffer} originalBuffer - Original image buffer
+ * @param {Buffer} repairedBuffer - Repaired image buffer
+ * @returns {Promise<Buffer>} Diff image as JPEG buffer
+ */
+async function createDiffImage(originalBuffer, repairedBuffer) {
+  try {
+    // Get dimensions and ensure they match
+    const [origMeta, repairMeta] = await Promise.all([
+      sharp(originalBuffer).metadata(),
+      sharp(repairedBuffer).metadata()
+    ]);
+
+    const width = origMeta.width;
+    const height = origMeta.height;
+
+    // Resize repaired to match original if different
+    let resizedRepaired = repairedBuffer;
+    if (repairMeta.width !== width || repairMeta.height !== height) {
+      resizedRepaired = await sharp(repairedBuffer)
+        .resize(width, height, { fit: 'fill' })
+        .toBuffer();
+    }
+
+    // Get raw pixel data from both images
+    const [origRaw, repairRaw] = await Promise.all([
+      sharp(originalBuffer).ensureAlpha().raw().toBuffer(),
+      sharp(resizedRepaired).ensureAlpha().raw().toBuffer()
+    ]);
+
+    // Create diff buffer - highlight differences
+    const diffBuffer = Buffer.alloc(origRaw.length);
+    let totalDiff = 0;
+    const pixelCount = width * height;
+
+    for (let i = 0; i < origRaw.length; i += 4) {
+      const rDiff = Math.abs(origRaw[i] - repairRaw[i]);
+      const gDiff = Math.abs(origRaw[i + 1] - repairRaw[i + 1]);
+      const bDiff = Math.abs(origRaw[i + 2] - repairRaw[i + 2]);
+      const maxDiff = Math.max(rDiff, gDiff, bDiff);
+
+      if (maxDiff > 10) {
+        // Highlight differences in magenta, intensity based on difference
+        const intensity = Math.min(255, maxDiff * 3);
+        diffBuffer[i] = 255;     // R - red for changes
+        diffBuffer[i + 1] = 0;   // G
+        diffBuffer[i + 2] = intensity; // B - magenta tint
+        diffBuffer[i + 3] = 255; // A
+        totalDiff += maxDiff;
+      } else {
+        // No significant difference - show grayscale version of original
+        const gray = Math.round((origRaw[i] + origRaw[i + 1] + origRaw[i + 2]) / 3);
+        diffBuffer[i] = gray;
+        diffBuffer[i + 1] = gray;
+        diffBuffer[i + 2] = gray;
+        diffBuffer[i + 3] = 255;
+      }
+    }
+
+    // Create diff image from raw buffer
+    const diffImage = await sharp(diffBuffer, {
+      raw: { width, height, channels: 4 }
+    })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Calculate diff percentage
+    const avgDiff = totalDiff / pixelCount;
+    console.log(`  [DIFF] Avg pixel difference: ${avgDiff.toFixed(2)} (${((avgDiff / 255) * 100).toFixed(1)}%)`);
+
+    return diffImage;
+  } catch (err) {
+    console.error(`Failed to create diff image: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Unified repair verification using Gemini
  *
  * Replaces the previous three-stage verification (LPIPS + LLM + artifacts)
@@ -524,6 +604,7 @@ module.exports = {
 
   // Helpers
   createVerificationComparison,
+  createDiffImage,
 
   // Repair application
   applyVerifiedRepairs,

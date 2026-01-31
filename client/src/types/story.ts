@@ -271,6 +271,7 @@ export interface RepairAttempt {
   maskImage?: string;
   beforeImage?: string;
   afterImage?: string | null;
+  diffImage?: string;   // Pixel diff image highlighting changes
   success: boolean;
   timestamp: string;
   verification?: InpaintVerification;  // Targeted verification results (LPIPS + LLM)
