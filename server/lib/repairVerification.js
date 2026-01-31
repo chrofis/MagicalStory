@@ -497,7 +497,7 @@ async function applyVerifiedRepairs(originalImage, verifiedRepairs) {
   // Apply all repairs at once, ensuring output matches original dimensions
   const result = await sharp(imageBuffer)
     .composite(composites)
-    .resize(metadata.width, metadata.height, { fit: 'cover', position: 'top-left' })
+    .resize(metadata.width, metadata.height, { fit: 'cover', position: 'northwest' })
     .jpeg({ quality: 95 })
     .toBuffer();
 
