@@ -5454,6 +5454,10 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
 
   // Max 6 elements in grid (2x3)
   const gridElements = allElements.slice(0, 6);
+  if (allElements.length > 6) {
+    const dropped = allElements.slice(6).map(e => `${e.name} (${e.type})`).join(', ');
+    log.warn(`⚠️ [VB-GRID] Grid overflow: ${allElements.length} elements, keeping first 6, dropping: ${dropped}`);
+  }
   const cellSize = 256;
   const labelHeight = 24;
   const cols = 2;

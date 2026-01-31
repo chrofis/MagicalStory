@@ -10087,17 +10087,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               const sceneMetadata = extractSceneMetadata(expandedDescription);
               const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
 
-              // Get element reference images for this page
-              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 4);
-              const elementRefPhotos = elementReferences.map(el => ({
-                name: `${el.name} (${el.type})`,
-                photoUrl: el.referenceImageData,
-                photoType: 'elementReference',
-                clothingCategory: null,
-                clothingDescription: el.description,
-                hasPhoto: true
-              }));
-              const allReferencePhotos = [...pagePhotos, ...elementRefPhotos];
+              // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
+              // VB elements are NO LONGER added individually to referencePhotos
+              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+              const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
+              let vbGrid = null;
+              if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
+                vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
+                log.debug(`🔲 [CONSISTENCY REGEN] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
+              }
+
+              // Only character photos go in allReferencePhotos (no VB elements)
+              const allReferencePhotos = pagePhotos;
 
               // Build new image prompt
               const imagePrompt = buildImagePrompt(
@@ -10118,6 +10119,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               };
 
               // Regenerate with quality retry
+              // Pass vbGrid for combined reference (instead of individual VB element photos)
               log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Generating new image...`);
               const imageResult = await generateImageWithQualityRetry(
                 imagePrompt,
@@ -10129,7 +10131,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 null,
                 { imageModel: modelOverrides?.imageModel, qualityModel: modelOverrides?.qualityModel },
                 `PAGE ${pageNum} (consistency fix)`,
-                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, sceneCharacterCount: sceneCharacters.length }
+                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length }
               );
 
               // Track scene rewrite usage if a safety block triggered a rewrite
