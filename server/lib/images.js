@@ -1067,6 +1067,158 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
 }
 
 /**
+ * Detect a specific sub-region within a character crop
+ * Stage 2 of targeted repair: refines full body_box to specific element (shoes, shirt, hands, etc.)
+ *
+ * @param {Buffer|string} characterCrop - Cropped image of the character (Buffer or base64)
+ * @param {string} targetElement - What to find (shoes, shirt, hands, etc.)
+ * @returns {Promise<{found: boolean, box: [number,number,number,number]|null, confidence: string, description: string}|null>}
+ */
+async function detectSubRegion(characterCrop, targetElement) {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      log.warn('⚠️  [SUB-REGION] Gemini API key not configured');
+      return null;
+    }
+
+    // Load prompt template
+    if (!PROMPT_TEMPLATES.subRegionDetection) {
+      log.warn('⚠️  [SUB-REGION] Sub-region detection prompt template not loaded');
+      return null;
+    }
+
+    // Build prompt with target element
+    const prompt = fillTemplate(PROMPT_TEMPLATES.subRegionDetection, {
+      TARGET_ELEMENT: targetElement
+    });
+
+    // Convert to base64 if Buffer
+    let base64Data;
+    let mimeType = 'image/jpeg';
+    if (Buffer.isBuffer(characterCrop)) {
+      base64Data = characterCrop.toString('base64');
+    } else if (typeof characterCrop === 'string') {
+      const base64Match = characterCrop.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (base64Match) {
+        mimeType = base64Match[1];
+        base64Data = base64Match[2];
+      } else {
+        base64Data = characterCrop;
+      }
+    } else {
+      log.warn('⚠️  [SUB-REGION] Invalid characterCrop type');
+      return null;
+    }
+
+    const parts = [
+      {
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      },
+      { text: prompt }
+    ];
+
+    // Use same model as quality evaluation for consistent spatial reasoning
+    const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+
+    const response = await withRetry(async () => {
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts }],
+          generationConfig: {
+            maxOutputTokens: 2000,
+            temperature: 0.1,
+            responseMimeType: 'application/json'
+          },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+          ]
+        })
+      });
+    }, { maxRetries: 2, baseDelay: 1000 });
+
+    if (!response.ok) {
+      const error = await response.text();
+      log.error(`❌ [SUB-REGION] Gemini API error: ${error.substring(0, 200)}`);
+      return null;
+    }
+
+    const data = await response.json();
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    log.debug(`📊 [SUB-REGION] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+
+    if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
+      log.warn('⚠️  [SUB-REGION] No response from Gemini');
+      return null;
+    }
+
+    const responseText = data.candidates[0].content.parts[0].text.trim();
+
+    // Parse JSON response
+    let parsedResult;
+    try {
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        let jsonText = jsonMatch[0];
+        jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
+        parsedResult = JSON.parse(jsonText);
+      }
+    } catch (e) {
+      log.warn(`⚠️  [SUB-REGION] Failed to parse response: ${e.message}`);
+      log.debug(`⚠️  [SUB-REGION] Raw response: ${responseText.substring(0, 500)}`);
+      return null;
+    }
+
+    if (!parsedResult) {
+      log.warn(`⚠️  [SUB-REGION] No JSON found in response`);
+      return null;
+    }
+
+    // Normalize coordinates from 0-1000 to 0.0-1.0
+    let normalizedBox = null;
+    if (parsedResult.found && parsedResult.box && Array.isArray(parsedResult.box) && parsedResult.box.length === 4) {
+      const [ymin, xmin, ymax, xmax] = parsedResult.box;
+      // Handle both 0-1000 format (Gemini native) and 0-1 format (already normalized)
+      const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
+      normalizedBox = [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
+    }
+
+    const result = {
+      found: parsedResult.found === true,
+      box: normalizedBox,
+      confidence: parsedResult.confidence || 'low',
+      description: parsedResult.description || '',
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens }
+    };
+
+    if (result.found) {
+      log.info(`🎯 [SUB-REGION] Found "${targetElement}": ${result.description} (${result.confidence})`);
+    } else {
+      log.info(`🎯 [SUB-REGION] "${targetElement}" not found: ${result.description}`);
+    }
+
+    return result;
+
+  } catch (error) {
+    log.error(`❌ [SUB-REGION] Error detecting sub-region: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * Build expected characters array for bbox detection from character descriptions and positions
  * @param {Object} characterDescriptions - Map of charName → {age, gender, isChild, genderTerm}
  * @param {Object} expectedPositions - Map of charName → position string
@@ -1521,10 +1673,12 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {string|null} imageModelOverride - Override image model (e.g., 'gemini-2.5-flash-image' or 'gemini-3-pro-image-preview')
  * @param {string|null} qualityModelOverride - Override quality evaluation model
  * @param {string|null} imageBackendOverride - Override image backend ('gemini' or 'runware')
- * @param {Array<{name: string, photoData: string}>} landmarkPhotos - Landmark reference photos for real-world locations
+ * @param {Array<{name: string, photoData: string}>} landmarkPhotos - Landmark reference photos (only 1st used as separate image)
+ * @param {number} sceneCharacterCount - Number of characters in scene (for determining if >3)
+ * @param {Buffer|null} visualBibleGrid - Combined grid image of VB elements and secondary landmarks
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null) {
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -1567,19 +1721,13 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         }
       }
 
-      // If LLM ignored 3-character limit, provide ALL reference photos
-      const useAllRefs = sceneCharacterCount > 3;
-      const finalReferenceImages = useAllRefs ? referenceImages : referenceImages.slice(0, 3);
-      if (useAllRefs && referenceImages.length > 3) {
-        log.info(`🎭 [IMAGE GEN] Scene has ${sceneCharacterCount} characters (>3), using ALL ${referenceImages.length} reference photos`);
-      }
-
+      // Pass all reference images (prompt already limits character count)
       const result = await generateWithRunware(prompt, {
         model: RUNWARE_MODELS.FLUX_SCHNELL,
         width: 1024,
         height: 1024,
         steps: 4,
-        referenceImages: finalReferenceImages
+        referenceImages: referenceImages
       });
 
       // Call onImageReady callback for progressive display
@@ -1751,31 +1899,42 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   }
 
-  // Add landmark reference photos for real-world locations (e.g., Eiffel Tower, Big Ben)
+  // Add PRIMARY landmark reference photo only (1st landmark as separate image)
+  // Secondary landmarks (2nd+) go into the Visual Bible grid instead
   if (landmarkPhotos && landmarkPhotos.length > 0) {
-    let landmarkAddedCount = 0;
-    for (const landmark of landmarkPhotos) {
-      if (landmark.photoData && landmark.photoData.startsWith('data:image')) {
-        const base64Data = landmark.photoData.replace(/^data:image\/\w+;base64,/, '');
-        const mimeType = landmark.photoData.match(/^data:(image\/\w+);base64,/) ?
-          landmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    const primaryLandmark = landmarkPhotos[0];
+    if (primaryLandmark.photoData && primaryLandmark.photoData.startsWith('data:image')) {
+      const base64Data = primaryLandmark.photoData.replace(/^data:image\/\w+;base64,/, '');
+      const mimeType = primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) ?
+        primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-        // Add numbered label before the image (matches reference map in prompt)
-        parts.push({ text: `[Image ${currentImageIndex} - ${landmark.name} (landmark)]:` });
-        parts.push({
-          inline_data: {
-            mime_type: mimeType,
-            data: base64Data
-          }
-        });
-        currentImageIndex++;
-        landmarkAddedCount++;
-        log.debug(`🌍 [IMAGE GEN] Added landmark reference: ${landmark.name}`);
+      // Add numbered label before the image (matches reference map in prompt)
+      parts.push({ text: `[Image ${currentImageIndex} - ${primaryLandmark.name} (landmark)]:` });
+      parts.push({
+        inline_data: {
+          mime_type: mimeType,
+          data: base64Data
+        }
+      });
+      currentImageIndex++;
+      log.info(`🌍 [IMAGE GEN] Added primary landmark reference: ${primaryLandmark.name}`);
+      if (landmarkPhotos.length > 1) {
+        log.debug(`🌍 [IMAGE GEN] ${landmarkPhotos.length - 1} secondary landmark(s) excluded (should be in VB grid)`);
       }
     }
-    if (landmarkAddedCount > 0) {
-      log.info(`🌍 [IMAGE GEN] Added ${landmarkAddedCount} landmark reference photo(s)`);
-    }
+  }
+
+  // Add Visual Bible reference grid (combines secondary chars, animals, artifacts, vehicles, 2nd+ landmarks)
+  if (visualBibleGrid) {
+    parts.push({ text: `[Image ${currentImageIndex} - Reference Grid (objects, secondary characters, locations)]:` });
+    parts.push({
+      inline_data: {
+        mime_type: 'image/jpeg',
+        data: visualBibleGrid.toString('base64')
+      }
+    });
+    currentImageIndex++;
+    log.info(`🔲 [IMAGE GEN] Added Visual Bible reference grid (${Math.round(visualBibleGrid.length / 1024)}KB)`);
   }
 
   // Log parts array structure for verification (text first, then images)
@@ -1829,7 +1988,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         width: 1024,
         height: 1024,
         steps: modelId === 'flux-dev' ? 30 : 4,
-        referenceImages: referenceImages.slice(0, 3)
+        referenceImages: referenceImages  // No limit - prompt controls character count
       });
 
       // Call onImageReady callback for progressive display
@@ -2144,7 +2303,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
  * @param {Function|null} callTextModel - Function to call text model for scene rewriting
  * @param {Object|null} modelOverrides - Model overrides: { imageModel, qualityModel, imageBackend }
  * @param {string} pageContext - Context label for logging
- * @param {Object} options - Additional options: { isAdmin, landmarkPhotos }
+ * @param {Object} options - Additional options: { isAdmin, landmarkPhotos, visualBibleGrid }
  * @returns {Promise<{imageData, score, reasoning, wasRegenerated, retryHistory, totalAttempts}>}
  */
 async function generateImageWithQualityRetry(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, usageTracker = null, callTextModel = null, modelOverrides = null, pageContext = '', options = {}) {
@@ -2153,6 +2312,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     enableAutoRepair: enableAutoRepairInput = false,
     landmarkPhotos = [],
     sceneCharacterCount = 0,
+    // Visual Bible reference grid (combines secondary chars, objects, 2nd+ landmarks)
+    visualBibleGrid = null,
     // Incremental consistency options
     incrementalConsistency: incrementalConsistencyInput = null,  // { enabled, dryRun, lookbackCount, previousImages, ... }
     // Check-only mode: run all checks but skip regeneration/repair
@@ -2228,7 +2389,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
@@ -4188,9 +4349,9 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
   // Build parts array with all images
   const parts = [];
 
-  // Add reference photos first (if doing character check)
+  // Add reference photos first (if doing character check) - up to 5 characters
   if (checkType === 'character' && options.referencePhotos?.length > 0) {
-    for (const refPhoto of options.referencePhotos.slice(0, 3)) {
+    for (const refPhoto of options.referencePhotos.slice(0, 5)) {
       if (refPhoto && refPhoto.startsWith('data:image')) {
         const imageHash = hashImageData(refPhoto);
         let compressedBase64 = compressedRefCache.get(imageHash);
@@ -4546,7 +4707,7 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
 
     // 2. Character-specific checks (one per main character)
     if (characters?.length > 0 && options.checkCharacters !== false) {
-      for (const character of characters.slice(0, 3)) { // Limit to 3 main characters
+      for (const character of characters.slice(0, 5)) { // Limit to 5 main characters
         const charName = character.name;
         const charPhoto = character.photoUrl || character.photo;
 
@@ -5247,6 +5408,129 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   };
 }
 
+// =============================================================================
+// VISUAL BIBLE GRID BUILDER
+// Combines VB elements and secondary landmarks into a single labeled grid image
+// =============================================================================
+
+/**
+ * Build a labeled grid image combining Visual Bible elements and secondary landmarks
+ * This reduces API image count by combining multiple references into one grid
+ *
+ * @param {Array} vbElements - Elements from getElementReferenceImagesForPage()
+ *   Each element: { name, type, referenceImageData, description }
+ * @param {Array} secondaryLandmarks - Secondary landmark photos (2nd+ landmarks)
+ *   Each landmark: { name, photoData }
+ * @returns {Promise<Buffer|null>} - JPEG buffer of the grid image, or null if no elements
+ */
+async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
+  const allElements = [];
+
+  // Add VB elements (secondary chars, animals, artifacts, vehicles, locations)
+  for (const el of vbElements) {
+    if (el.referenceImageData) {
+      allElements.push({
+        name: el.name,
+        type: el.type,
+        imageData: el.referenceImageData
+      });
+    }
+  }
+
+  // Add secondary landmarks (2nd+ go in grid, 1st stays as separate photo)
+  for (const lm of secondaryLandmarks) {
+    if (lm.photoData && lm.photoData.startsWith('data:image')) {
+      allElements.push({
+        name: lm.name,
+        type: 'landmark',
+        imageData: lm.photoData
+      });
+    }
+  }
+
+  if (allElements.length === 0) {
+    return null;
+  }
+
+  // Max 6 elements in grid (2x3)
+  const gridElements = allElements.slice(0, 6);
+  const cellSize = 256;
+  const labelHeight = 24;
+  const cols = 2;
+  const rows = Math.ceil(gridElements.length / cols);
+
+  const gridWidth = cols * cellSize;
+  const gridHeight = rows * (cellSize + labelHeight);
+
+  log.debug(`🔲 [VB-GRID] Building grid with ${gridElements.length} elements (${cols}x${rows})`);
+
+  try {
+    // Create composite operations for each cell
+    const composites = [];
+
+    for (let i = 0; i < gridElements.length; i++) {
+      const el = gridElements[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const x = col * cellSize;
+      const y = row * (cellSize + labelHeight);
+
+      // Extract base64 data from data URL
+      const base64Data = el.imageData.replace(/^data:image\/\w+;base64,/, '');
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+
+      // Resize image to fit cell (maintaining aspect ratio, cover)
+      const resizedImage = await sharp(imageBuffer)
+        .resize(cellSize, cellSize, { fit: 'cover' })
+        .toBuffer();
+
+      composites.push({
+        input: resizedImage,
+        left: x,
+        top: y
+      });
+
+      // Create label text as SVG
+      const labelText = `${el.name} (${el.type})`;
+      // Truncate if too long
+      const displayText = labelText.length > 28 ? labelText.substring(0, 25) + '...' : labelText;
+      const labelSvg = `
+        <svg width="${cellSize}" height="${labelHeight}">
+          <rect width="${cellSize}" height="${labelHeight}" fill="#333"/>
+          <text x="${cellSize / 2}" y="17" font-family="Arial, sans-serif" font-size="12"
+                fill="white" text-anchor="middle">${displayText}</text>
+        </svg>
+      `;
+
+      composites.push({
+        input: Buffer.from(labelSvg),
+        left: x,
+        top: y + cellSize
+      });
+    }
+
+    // Create base image and composite all elements
+    const gridBuffer = await sharp({
+      create: {
+        width: gridWidth,
+        height: gridHeight,
+        channels: 3,
+        background: { r: 50, g: 50, b: 50 }
+      }
+    })
+      .composite(composites)
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    log.info(`🔲 [VB-GRID] Created grid: ${gridElements.length} elements, ${gridWidth}x${gridHeight}px, ${Math.round(gridBuffer.length / 1024)}KB`);
+
+    return gridBuffer;
+  } catch (error) {
+    log.error(`❌ [VB-GRID] Failed to build grid: ${error.message}`);
+    return null;
+  }
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -5260,6 +5544,7 @@ module.exports = {
   editImageWithPrompt,
   generateImageWithQualityRetry,
   rewriteBlockedScene,
+  buildVisualBibleGrid,
 
   // Cache management
   clearImageCache,
@@ -5281,6 +5566,7 @@ module.exports = {
 
   // Two-stage bounding box detection
   detectAllBoundingBoxes,
+  detectSubRegion,  // Sub-region detection for targeted repairs (shoes, shirt, hands, etc.)
   createBboxOverlayImage,  // Create overlay image with boxes drawn
   detectBoundingBoxesForIssue,  // deprecated, use detectAllBoundingBoxes
   enrichWithBoundingBoxes,

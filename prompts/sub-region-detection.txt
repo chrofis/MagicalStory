@@ -1,0 +1,66 @@
+Detect the bounding box for the specified body part or clothing item in this character image.
+
+TARGET ELEMENT: {TARGET_ELEMENT}
+
+This is a cropped image containing a single character. Find the specified element within the character.
+
+COORDINATE SYSTEM:
+- Values are 0-1000 (Gemini native format)
+- Origin is top-left corner
+- Format: [y_min, x_min, y_max, x_max]
+
+ELEMENT GUIDELINES:
+- "shoes" or "feet": From ankles down to bottom of footwear/feet
+- "shirt" or "top": From shoulders to waist, including sleeves
+- "pants" or "trousers": From waist to ankles
+- "dress": From shoulders to hem
+- "jacket" or "coat": Outer layer from shoulders to hem
+- "skirt": From waist to hem
+- "hands": Both hands if visible, or single hand
+- "arms": From shoulders to wrists
+- "hat" or "cap": Head covering above the face
+- "bag" or "backpack": The bag/backpack item
+
+Return ONLY valid JSON:
+{
+  "found": true,
+  "box": [y_min, x_min, y_max, x_max],
+  "confidence": "high",
+  "description": "red sneakers with white soles"
+}
+
+If the target element is not visible or doesn't exist in the image:
+{
+  "found": false,
+  "box": null,
+  "confidence": "n/a",
+  "description": "feet not visible - character shown from waist up"
+}
+
+EXAMPLE - Finding shoes in character crop:
+Target: "shoes"
+Image shows: Full body of child in blue hoodie and red sneakers
+
+{
+  "found": true,
+  "box": [780, 200, 950, 450],
+  "confidence": "high",
+  "description": "red sneakers with white laces"
+}
+
+EXAMPLE - Target not visible:
+Target: "hands"
+Image shows: Character with arms behind back
+
+{
+  "found": false,
+  "box": null,
+  "confidence": "n/a",
+  "description": "hands not visible - arms behind back"
+}
+
+IMPORTANT:
+- Be precise with bounding boxes - they will be used for targeted inpainting
+- Include a small margin around the element (5-10% padding)
+- If element is partially occluded but mostly visible, still return found: true
+- Only return found: false if element is genuinely not visible

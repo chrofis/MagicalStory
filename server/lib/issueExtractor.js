@@ -37,6 +37,40 @@ const PADDING_BY_TYPE = {
 // Severity ordering for deduplication preference
 const SEVERITY_ORDER = { critical: 0, major: 1, minor: 2 };
 
+// Target element keywords for sub-region detection
+// Maps common keywords in fix instructions to canonical element names
+const TARGET_ELEMENT_KEYWORDS = {
+  // Footwear
+  'shoe': 'shoes', 'shoes': 'shoes', 'feet': 'feet', 'foot': 'feet',
+  'sneaker': 'shoes', 'sneakers': 'shoes', 'boot': 'shoes', 'boots': 'shoes',
+  'sandal': 'shoes', 'sandals': 'shoes', 'slipper': 'shoes', 'slippers': 'shoes',
+
+  // Upper body clothing
+  'shirt': 'shirt', 'blouse': 'shirt', 'top': 'shirt', 'sweater': 'shirt',
+  't-shirt': 'shirt', 'tshirt': 'shirt', 'hoodie': 'shirt', 'pullover': 'shirt',
+  'jacket': 'jacket', 'coat': 'jacket', 'cardigan': 'jacket', 'blazer': 'jacket',
+
+  // Lower body clothing
+  'pants': 'pants', 'trousers': 'pants', 'jeans': 'pants', 'leggings': 'pants',
+  'shorts': 'pants', 'skirt': 'skirt', 'dress': 'dress', 'gown': 'dress',
+
+  // Extremities
+  'hand': 'hands', 'hands': 'hands', 'finger': 'hands', 'fingers': 'hands',
+  'fist': 'hands', 'palm': 'hands', 'wrist': 'hands',
+  'arm': 'arms', 'arms': 'arms', 'elbow': 'arms', 'forearm': 'arms',
+  'leg': 'legs', 'legs': 'legs', 'knee': 'legs', 'thigh': 'legs',
+
+  // Head/face - use existing face_box detection
+  'face': 'face', 'head': 'face', 'glasses': 'face', 'hair': 'face',
+  'eye': 'face', 'eyes': 'face', 'nose': 'face', 'mouth': 'face',
+  'hat': 'hat', 'cap': 'hat', 'helmet': 'hat', 'crown': 'hat',
+
+  // Accessories
+  'bag': 'bag', 'backpack': 'bag', 'purse': 'bag', 'satchel': 'bag',
+  'belt': 'belt', 'watch': 'watch', 'bracelet': 'watch',
+  'necklace': 'necklace', 'scarf': 'scarf', 'tie': 'tie'
+};
+
 /**
  * Generate a unique issue ID using UUID
  * @param {number} pageNumber - Page number
@@ -672,11 +706,203 @@ function loadManifest(outputDir) {
   return null;
 }
 
+/**
+ * Parse a fix instruction to extract target element for sub-region detection
+ * @param {string} fixInstruction - The fix instruction text
+ * @returns {string|null} Canonical element name or null if no specific element found
+ */
+function parseTargetElement(fixInstruction) {
+  if (!fixInstruction) return null;
+
+  const lower = fixInstruction.toLowerCase();
+
+  // Check each keyword - return first match
+  for (const [keyword, element] of Object.entries(TARGET_ELEMENT_KEYWORDS)) {
+    // Use word boundary matching to avoid partial matches
+    // e.g., "shoestring" shouldn't match "shoe"
+    const regex = new RegExp(`\\b${keyword}\\b`, 'i');
+    if (regex.test(lower)) {
+      return element;
+    }
+  }
+
+  return null;  // No specific element found, use full body_box
+}
+
+/**
+ * Convert sub-region box (relative to character crop) to absolute image coordinates
+ * @param {[number,number,number,number]} subBox - Sub-region bbox [ymin, xmin, ymax, xmax] normalized 0-1
+ * @param {[number,number,number,number]} characterBox - Character body_box [ymin, xmin, ymax, xmax] normalized 0-1
+ * @returns {[number,number,number,number]} Absolute bbox in original image coordinates
+ */
+function convertSubRegionToAbsolute(subBox, characterBox) {
+  const [subYmin, subXmin, subYmax, subXmax] = subBox;
+  const [charYmin, charXmin, charYmax, charXmax] = characterBox;
+
+  const charWidth = charXmax - charXmin;
+  const charHeight = charYmax - charYmin;
+
+  return [
+    charYmin + subYmin * charHeight,  // absolute ymin
+    charXmin + subXmin * charWidth,   // absolute xmin
+    charYmin + subYmax * charHeight,  // absolute ymax
+    charXmin + subXmax * charWidth    // absolute xmax
+  ];
+}
+
+/**
+ * Refine an issue's bounding box using sub-region detection
+ * This is the main integration point for targeted repairs
+ *
+ * @param {Buffer} imageBuffer - Full image buffer
+ * @param {UnifiedIssue} issue - Issue to refine
+ * @param {{width: number, height: number}} imgDimensions - Image dimensions
+ * @param {Object} options - Options
+ * @param {[number,number,number,number]} options.characterBox - Character body_box from bbox detection
+ * @param {Function} options.detectSubRegion - The detectSubRegion function from images.js
+ * @returns {Promise<UnifiedIssue>} Issue with potentially refined bbox
+ */
+async function refineIssueWithSubRegion(imageBuffer, issue, imgDimensions, options = {}) {
+  const { characterBox, detectSubRegion } = options;
+
+  // Skip if no character box or detectSubRegion function
+  if (!characterBox || !detectSubRegion) {
+    return issue;
+  }
+
+  // Parse fix instruction to get target element
+  const targetElement = parseTargetElement(issue.fixInstruction);
+
+  // Skip if no specific element found or if it's a face issue (already has face_box)
+  if (!targetElement || targetElement === 'face') {
+    return issue;
+  }
+
+  try {
+    // Extract character crop from full image
+    const [charYmin, charXmin, charYmax, charXmax] = characterBox;
+    const cropBox = {
+      left: Math.round(charXmin * imgDimensions.width),
+      top: Math.round(charYmin * imgDimensions.height),
+      width: Math.round((charXmax - charXmin) * imgDimensions.width),
+      height: Math.round((charYmax - charYmin) * imgDimensions.height)
+    };
+
+    // Clamp to image bounds
+    cropBox.left = Math.max(0, cropBox.left);
+    cropBox.top = Math.max(0, cropBox.top);
+    cropBox.width = Math.min(imgDimensions.width - cropBox.left, cropBox.width);
+    cropBox.height = Math.min(imgDimensions.height - cropBox.top, cropBox.height);
+
+    const characterCrop = await sharp(imageBuffer)
+      .extract(cropBox)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    // Run sub-region detection
+    const subRegion = await detectSubRegion(characterCrop, targetElement);
+
+    if (subRegion && subRegion.found && subRegion.confidence !== 'low' && subRegion.box) {
+      // Convert sub-region coords to absolute image coords
+      const absoluteBox = convertSubRegionToAbsolute(subRegion.box, characterBox);
+
+      // Update issue with refined box
+      const refinedIssue = {
+        ...issue,
+        region: {
+          ...issue.region,
+          bbox: absoluteBox,
+          pixelBox: bboxToPixelBox(absoluteBox, imgDimensions),
+          originalBbox: issue.region.bbox,  // Keep original for reference
+          originalPixelBox: issue.region.pixelBox
+        },
+        subRegionDetected: true,
+        subRegionElement: targetElement,
+        subRegionConfidence: subRegion.confidence,
+        subRegionDescription: subRegion.description
+      };
+
+      console.log(`  [SUB-REGION] Refined ${issue.type} to ${targetElement}: ${JSON.stringify(absoluteBox.map(v => v.toFixed(3)))}`);
+      return refinedIssue;
+    } else {
+      console.log(`  [SUB-REGION] Could not refine "${targetElement}" for ${issue.type}: ${subRegion?.description || 'not found'}`);
+    }
+  } catch (err) {
+    console.error(`  [SUB-REGION] Error refining issue ${issue.id}: ${err.message}`);
+  }
+
+  return issue;
+}
+
+/**
+ * Refine multiple issues with sub-region detection
+ * Batches by character to minimize image extractions
+ *
+ * @param {Buffer} imageBuffer - Full image buffer
+ * @param {UnifiedIssue[]} issues - Issues to refine
+ * @param {{width: number, height: number}} imgDimensions - Image dimensions
+ * @param {Object} options - Options
+ * @param {Object} options.characterBboxes - Map of character name → {faceBbox, bodyBbox}
+ * @param {Function} options.detectSubRegion - The detectSubRegion function from images.js
+ * @returns {Promise<UnifiedIssue[]>} Issues with potentially refined bboxes
+ */
+async function refineIssuesWithSubRegion(imageBuffer, issues, imgDimensions, options = {}) {
+  const { characterBboxes = {}, detectSubRegion } = options;
+
+  if (!detectSubRegion || Object.keys(characterBboxes).length === 0) {
+    return issues;
+  }
+
+  const refinedIssues = [];
+
+  for (const issue of issues) {
+    // Find character box for this issue
+    let characterBox = null;
+
+    if (issue.affectedCharacter) {
+      const charName = issue.affectedCharacter.toLowerCase();
+      const charInfo = characterBboxes[charName];
+      if (charInfo?.bodyBbox) {
+        characterBox = charInfo.bodyBbox;
+      }
+    }
+
+    // If no character-specific box, check if issue already has a body-sized bbox
+    if (!characterBox && issue.region?.bbox) {
+      // Use existing bbox if it's reasonably body-sized (not full image, not tiny)
+      const [ymin, xmin, ymax, xmax] = issue.region.bbox;
+      const bboxArea = (ymax - ymin) * (xmax - xmin);
+      if (bboxArea > 0.05 && bboxArea < 0.9) {  // Between 5% and 90% of image
+        characterBox = issue.region.bbox;
+      }
+    }
+
+    if (characterBox) {
+      const refined = await refineIssueWithSubRegion(imageBuffer, issue, imgDimensions, {
+        characterBox,
+        detectSubRegion
+      });
+      refinedIssues.push(refined);
+    } else {
+      refinedIssues.push(issue);
+    }
+  }
+
+  // Log summary
+  const refinedCount = refinedIssues.filter(i => i.subRegionDetected).length;
+  if (refinedCount > 0) {
+    console.log(`  [SUB-REGION] Refined ${refinedCount}/${issues.length} issues with sub-region detection`);
+  }
+
+  return refinedIssues;
+}
+
 module.exports = {
   // Constants
   TARGET_REGION_SIZE,
   MIN_REGION_SIZE,
   PADDING_BY_TYPE,
+  TARGET_ELEMENT_KEYWORDS,
 
   // Normalization functions
   normalizeQualityIssue,
@@ -688,10 +914,16 @@ module.exports = {
   bboxToPixelBox,
   pixelBoxToBbox,
   calculateIoU,
+  convertSubRegionToAbsolute,
 
   // Collection and deduplication
   collectAllIssues,
   deduplicateIssues,
+
+  // Sub-region detection
+  parseTargetElement,
+  refineIssueWithSubRegion,
+  refineIssuesWithSubRegion,
 
   // Extraction
   getAdaptivePadding,
