@@ -20,7 +20,8 @@ const {
   extractPageIssues,
   saveManifest,
   loadManifest,
-  TARGET_REGION_SIZE
+  TARGET_REGION_SIZE,
+  refineIssuesWithSubRegion
 } = require('./issueExtractor');
 
 const {
@@ -41,6 +42,8 @@ const {
   createVerificationComparison,
   createDiffImage
 } = require('./repairVerification');
+
+const { detectSubRegion } = require('./images');
 
 // Severity colors for annotated image
 const SEVERITY_COLORS = {
@@ -244,19 +247,78 @@ async function gridBasedRepair(imageData, pageNum, evalResults, options = {}) {
   progress('dedupe', `${issues.length} unique issues after dedup`);
 
   // =========================================================================
+  // Step 2.5: Refine issue bounding boxes with sub-region detection
+  // =========================================================================
+  // Build character bboxes map from quality matches and bbox detection
+  const characterBboxes = {};
+  for (const match of qualityMatches) {
+    if (match.reference) {
+      const charName = match.reference.toLowerCase();
+      characterBboxes[charName] = {
+        faceBbox: match.face_bbox || null,
+        bodyBbox: null
+      };
+    }
+  }
+  // Enhance with body boxes from bbox detection
+  if (bboxDetection?.figures) {
+    for (const [charName, charInfo] of Object.entries(characterBboxes)) {
+      if (charInfo.faceBbox) {
+        for (const figure of bboxDetection.figures) {
+          if (!figure.faceBox) continue;
+          // Simple IoU check to match faces
+          const [y1min, x1min, y1max, x1max] = charInfo.faceBbox;
+          const [y2min, x2min, y2max, x2max] = figure.faceBox;
+          const xOverlap = Math.max(0, Math.min(x1max, x2max) - Math.max(x1min, x2min));
+          const yOverlap = Math.max(0, Math.min(y1max, y2max) - Math.max(y1min, y2min));
+          const intersection = xOverlap * yOverlap;
+          const area1 = (x1max - x1min) * (y1max - y1min);
+          const area2 = (x2max - x2min) * (y2max - y2min);
+          const iou = intersection / (area1 + area2 - intersection);
+          if (iou > 0.3 && figure.bodyBox) {
+            charInfo.bodyBbox = figure.bodyBox;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Refine issues with sub-region detection (e.g., "fix shoes" → detect shoes bbox)
+  let refinedIssues = issues;
+  const hasCharacterBboxes = Object.values(characterBboxes).some(c => c.bodyBbox);
+  if (hasCharacterBboxes) {
+    progress('subregion', `Refining ${issues.length} issues with sub-region detection`);
+    refinedIssues = await refineIssuesWithSubRegion(imageBuffer, issues, imgDimensions, {
+      characterBboxes,
+      detectSubRegion
+    });
+    const refinedCount = refinedIssues.filter(i => i.subRegionDetected).length;
+    if (refinedCount > 0) {
+      progress('subregion', `Refined ${refinedCount} issues to smaller sub-regions`);
+    }
+    history.steps.push({
+      step: 'subregion',
+      timestamp: new Date().toISOString(),
+      attempted: issues.length,
+      refined: refinedCount
+    });
+  }
+
+  // =========================================================================
   // Step 3: Extract issue regions to thumbnails
   // =========================================================================
-  progress('extract', `Extracting ${issues.length} regions`);
+  progress('extract', `Extracting ${refinedIssues.length} regions`);
 
-  const extractedIssues = await extractPageIssues(pageNum, imageBuffer, issues, config.outputDir);
+  const extractedIssues = await extractPageIssues(pageNum, imageBuffer, refinedIssues, config.outputDir);
   const extractionSuccesses = extractedIssues.filter(i => i.extraction?.absolutePath).length;
 
   history.steps.push({
     step: 'extract',
     timestamp: new Date().toISOString(),
-    attempted: issues.length,
+    attempted: refinedIssues.length,
     succeeded: extractionSuccesses,
-    failed: issues.length - extractionSuccesses
+    failed: refinedIssues.length - extractionSuccesses
   });
 
   // Filter to only issues with successful extraction
