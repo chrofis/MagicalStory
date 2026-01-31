@@ -406,11 +406,15 @@ function extractSceneMetadata(sceneDescription) {
       const locMatch = parsedData.setting.location.match(/\[LOC\d+\]/i);
       if (locMatch) {
         objectIds.push(parsedData.setting.location);
+        log.debug(`[SCENE META] Found location with LOC ID: "${parsedData.setting.location}"`);
       }
     }
 
     // Extract landmark photo variant selection (1-4, default 1)
     const landmarkVariant = parsedData.setting?.landmarkPhotoVariant || 1;
+    if (landmarkVariant > 1) {
+      log.info(`[SCENE META] landmarkPhotoVariant=${landmarkVariant} selected`);
+    }
 
     return {
       characters: characterNames,
@@ -2155,7 +2159,12 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
             const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
             recurringElements += `    - variant ${variant.variantNumber}: ${variantDesc}\n`;
           }
+          log.info(`[SCENE PROMPT] Added PHOTO OPTIONS for "${loc.name}" with ${loc.photoVariants.length} variants`);
         } else {
+          // Debug: why wasn't PHOTO OPTIONS added?
+          if (loc.isRealLandmark) {
+            log.debug(`[SCENE PROMPT] Landmark "${loc.name}": photoVariants=${loc.photoVariants?.length || 0} (need >1 for PHOTO OPTIONS)`);
+          }
           // Regular location without photo variants
           const locType = loc.isRealLandmark ? 'real landmark' : 'location';
           recurringElements += `* **${loc.name}**${idLabel(loc)} (${locType}): ${description}\n`;
