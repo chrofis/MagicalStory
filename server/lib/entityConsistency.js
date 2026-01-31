@@ -554,12 +554,30 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     let parsed;
     try {
       // Extract JSON from response (handle markdown code blocks)
-      const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/) ||
-                        text.match(/```\s*([\s\S]*?)\s*```/) ||
-                        [null, text];
-      parsed = JSON.parse(jsonMatch[1] || text);
+      let jsonText = text;
+
+      // Try to extract from ```json ... ``` blocks
+      const jsonBlockMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonBlockMatch) {
+        jsonText = jsonBlockMatch[1];
+      } else {
+        // Try to extract from ``` ... ``` blocks
+        const codeBlockMatch = text.match(/```\s*([\s\S]*?)\s*```/);
+        if (codeBlockMatch) {
+          jsonText = codeBlockMatch[1];
+        } else {
+          // Try to find JSON object directly (starts with {)
+          const jsonObjMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonObjMatch) {
+            jsonText = jsonObjMatch[0];
+          }
+        }
+      }
+
+      parsed = JSON.parse(jsonText.trim());
     } catch (parseErr) {
       log.warn(`⚠️  [ENTITY-CHECK] Failed to parse response for ${entityName}: ${parseErr.message}`);
+      log.debug(`[ENTITY-CHECK] Raw response: ${text.substring(0, 200)}...`);
       return {
         consistent: true,
         score: 5,
