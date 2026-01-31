@@ -535,31 +535,98 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         // sceneCharacters - just names, not full character data with avatars
         sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown')
       })) || [],
-      // Cover images dev data - strip image data from retryHistory and reference photos
+      // Cover images dev data - expose full retryHistory like page images (for bbox/repair display)
       coverImages: story.coverImages ? {
         frontCover: story.coverImages.frontCover && typeof story.coverImages.frontCover === 'object' ? {
           prompt: story.coverImages.frontCover.prompt || null,
           qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
-          retryHistoryCount: (story.coverImages.frontCover.retryHistory || []).length,
           totalAttempts: story.coverImages.frontCover.totalAttempts || null,
           referencePhotosCount: (story.coverImages.frontCover.referencePhotos || []).length,
-          landmarkPhotosCount: (story.coverImages.frontCover.landmarkPhotos || []).length
+          landmarkPhotosCount: (story.coverImages.frontCover.landmarkPhotos || []).length,
+          // Full retry history with repair/bbox details (same as page images)
+          retryHistory: (story.coverImages.frontCover.retryHistory || []).map(r => ({
+            type: r.type,
+            score: r.score,
+            attempt: r.attempt,
+            modelId: r.modelId,
+            reasoning: r.reasoning,
+            timestamp: r.timestamp,
+            evalSkipped: r.evalSkipped,
+            gridFixedCount: r.gridFixedCount,
+            gridFailedCount: r.gridFailedCount,
+            gridTotalIssues: r.gridTotalIssues,
+            fixTargetsCount: r.fixTargetsCount,
+            preRepairScore: r.preRepairScore,
+            postRepairScore: r.postRepairScore,
+            preRepairEval: r.preRepairEval || null,
+            postRepairEval: r.postRepairEval || null,
+            bboxDetection: r.bboxDetection || null,
+            hasImageData: !!r.imageData,
+            hasBboxOverlay: !!r.bboxOverlayImage,
+            hasAnnotatedOriginal: !!r.annotatedOriginal,
+            hasGrids: !!(r.grids && r.grids.length > 0),
+            gridsCount: r.grids?.length || 0
+          }))
         } : null,
         initialPage: story.coverImages.initialPage && typeof story.coverImages.initialPage === 'object' ? {
           prompt: story.coverImages.initialPage.prompt || null,
           qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
-          retryHistoryCount: (story.coverImages.initialPage.retryHistory || []).length,
           totalAttempts: story.coverImages.initialPage.totalAttempts || null,
           referencePhotosCount: (story.coverImages.initialPage.referencePhotos || []).length,
-          landmarkPhotosCount: (story.coverImages.initialPage.landmarkPhotos || []).length
+          landmarkPhotosCount: (story.coverImages.initialPage.landmarkPhotos || []).length,
+          retryHistory: (story.coverImages.initialPage.retryHistory || []).map(r => ({
+            type: r.type,
+            score: r.score,
+            attempt: r.attempt,
+            modelId: r.modelId,
+            reasoning: r.reasoning,
+            timestamp: r.timestamp,
+            evalSkipped: r.evalSkipped,
+            gridFixedCount: r.gridFixedCount,
+            gridFailedCount: r.gridFailedCount,
+            gridTotalIssues: r.gridTotalIssues,
+            fixTargetsCount: r.fixTargetsCount,
+            preRepairScore: r.preRepairScore,
+            postRepairScore: r.postRepairScore,
+            preRepairEval: r.preRepairEval || null,
+            postRepairEval: r.postRepairEval || null,
+            bboxDetection: r.bboxDetection || null,
+            hasImageData: !!r.imageData,
+            hasBboxOverlay: !!r.bboxOverlayImage,
+            hasAnnotatedOriginal: !!r.annotatedOriginal,
+            hasGrids: !!(r.grids && r.grids.length > 0),
+            gridsCount: r.grids?.length || 0
+          }))
         } : null,
         backCover: story.coverImages.backCover && typeof story.coverImages.backCover === 'object' ? {
           prompt: story.coverImages.backCover.prompt || null,
           qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
-          retryHistoryCount: (story.coverImages.backCover.retryHistory || []).length,
           totalAttempts: story.coverImages.backCover.totalAttempts || null,
           referencePhotosCount: (story.coverImages.backCover.referencePhotos || []).length,
-          landmarkPhotosCount: (story.coverImages.backCover.landmarkPhotos || []).length
+          landmarkPhotosCount: (story.coverImages.backCover.landmarkPhotos || []).length,
+          retryHistory: (story.coverImages.backCover.retryHistory || []).map(r => ({
+            type: r.type,
+            score: r.score,
+            attempt: r.attempt,
+            modelId: r.modelId,
+            reasoning: r.reasoning,
+            timestamp: r.timestamp,
+            evalSkipped: r.evalSkipped,
+            gridFixedCount: r.gridFixedCount,
+            gridFailedCount: r.gridFailedCount,
+            gridTotalIssues: r.gridTotalIssues,
+            fixTargetsCount: r.fixTargetsCount,
+            preRepairScore: r.preRepairScore,
+            postRepairScore: r.postRepairScore,
+            preRepairEval: r.preRepairEval || null,
+            postRepairEval: r.postRepairEval || null,
+            bboxDetection: r.bboxDetection || null,
+            hasImageData: !!r.imageData,
+            hasBboxOverlay: !!r.bboxOverlayImage,
+            hasAnnotatedOriginal: !!r.annotatedOriginal,
+            hasGrids: !!(r.grids && r.grids.length > 0),
+            gridsCount: r.grids?.length || 0
+          }))
         } : null
       } : null,
       // Scene descriptions (outline extract, scene prompt, scene description text)
