@@ -1780,11 +1780,13 @@ function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
+    log.warn(`🔐 [AUTH] No token provided for ${req.method} ${req.path}`);
     return res.status(401).json({ error: 'Access token required' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
+      log.warn(`🔐 [AUTH] Token verification failed for ${req.method} ${req.path}: ${err.message}`);
       return res.status(403).json({ error: 'Invalid or expired token' });
     }
     req.user = user;
