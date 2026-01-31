@@ -218,6 +218,48 @@ function extractJsonFromText(text) {
 }
 
 /**
+ * 9-region position abbreviation mapping
+ * Used to expand abbreviations from scene descriptions for image generation
+ */
+const POSITION_ABBREVIATIONS = {
+  'TL': 'top-left background',
+  'TC': 'top-center background',
+  'TR': 'top-right background',
+  'ML': 'middle-left midground',
+  'MC': 'middle-center midground',
+  'MR': 'middle-right midground',
+  'BL': 'bottom-left foreground',
+  'BC': 'bottom-center foreground',
+  'BR': 'bottom-right foreground'
+};
+
+/**
+ * Expand position abbreviations to full descriptions
+ * Handles both standalone codes (MC) and codes in text (MC midground)
+ * @param {string} position - Position string that may contain abbreviations
+ * @returns {string} Position with abbreviations expanded
+ */
+function expandPositionAbbreviations(position) {
+  if (!position || typeof position !== 'string') return position;
+
+  // Check if the entire position is just an abbreviation
+  const upperPos = position.trim().toUpperCase();
+  if (POSITION_ABBREVIATIONS[upperPos]) {
+    return POSITION_ABBREVIATIONS[upperPos];
+  }
+
+  // Replace abbreviations found within the position text (e.g., "MC, facing left")
+  let expanded = position;
+  for (const [abbrev, full] of Object.entries(POSITION_ABBREVIATIONS)) {
+    // Match abbreviation as whole word (not part of another word)
+    const regex = new RegExp(`\\b${abbrev}\\b`, 'gi');
+    expanded = expanded.replace(regex, full);
+  }
+
+  return expanded;
+}
+
+/**
  * Build readable text from JSON scene description output
  * Converts the structured JSON to markdown text for image generation prompt
  * @param {Object} output - The output section from JSON scene description
@@ -260,7 +302,8 @@ function buildTextFromJson(output) {
     text += `## 3. Character Composition\n\n`;
     for (const char of output.characters) {
       text += `**${char.name}:**\n`;
-      if (char.position) text += `- POSITION: ${char.position}\n`;
+      // Expand position abbreviations (MC -> middle-center midground, etc.)
+      if (char.position) text += `- POSITION: ${expandPositionAbbreviations(char.position)}\n`;
       if (char.pose) text += `- POSE: ${char.pose}\n`;
       if (char.action) text += `- ACTION: ${char.action}\n`;
       if (char.expression) text += `- EXPRESSION: ${char.expression}\n`;
@@ -286,7 +329,9 @@ function buildTextFromJson(output) {
     text += `## 5. Objects & Animals\n`;
     for (const obj of output.objects) {
       const idPart = obj.id ? ` [${obj.id}]` : '';
-      text += `* ${obj.name}${idPart}: ${obj.position || 'in scene'}\n`;
+      // Expand position abbreviations for objects too
+      const expandedPos = expandPositionAbbreviations(obj.position) || 'in scene';
+      text += `* ${obj.name}${idPart}: ${expandedPos}\n`;
     }
     text += '\n';
   }
