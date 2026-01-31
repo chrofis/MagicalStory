@@ -1110,11 +1110,16 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
           const beforeMeta = await sharp(beforeBuffer).metadata();
           const afterMeta = await sharp(afterBuffer).metadata();
 
+          // Resize after to match before dimensions for consistent display
           let afterResized = afterBuffer;
           if (beforeMeta.width !== afterMeta.width || beforeMeta.height !== afterMeta.height) {
             afterResized = await sharp(afterBuffer)
               .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
+              .jpeg({ quality: 90 })
               .toBuffer();
+          } else {
+            // Ensure JPEG format even if same size
+            afterResized = await sharp(afterBuffer).jpeg({ quality: 90 }).toBuffer();
           }
 
           const cellDiffBuffer = await sharp(beforeBuffer)
@@ -1128,7 +1133,7 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
             pageNumber: crop.pageNumber,
             clothingCategory,
             before: `data:image/jpeg;base64,${beforeBuffer.toString('base64')}`,
-            after: `data:image/jpeg;base64,${afterBuffer.toString('base64')}`,
+            after: `data:image/jpeg;base64,${afterResized.toString('base64')}`,  // Use resized to match before
             diff: `data:image/jpeg;base64,${cellDiffBuffer.toString('base64')}`
           };
 
