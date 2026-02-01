@@ -4999,7 +4999,36 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
       if (!scene) continue;
 
       try {
-        const evaluation = await evaluateImageQuality(scene.imageData, scene.description);
+        // Get image data - check active version first, then fallback to scene.imageData
+        let imageData = scene.imageData;
+        if (scene.imageVersions?.length > 0) {
+          const activeVersion = scene.imageVersions.find(v => v.isActive);
+          if (activeVersion?.imageData) {
+            imageData = activeVersion.imageData;
+          }
+        }
+
+        if (!imageData || !imageData.startsWith('data:image/')) {
+          log.warn(`[REPAIR-WORKFLOW] Page ${pageNumber} has no valid image data, skipping`);
+          pages[pageNumber] = {
+            qualityScore: null,
+            fixableIssues: [],
+            error: 'No valid image data'
+          };
+          continue;
+        }
+
+        const evaluation = await evaluateImageQuality(imageData, scene.description);
+
+        if (!evaluation) {
+          log.warn(`[REPAIR-WORKFLOW] Page ${pageNumber} evaluation returned null`);
+          pages[pageNumber] = {
+            qualityScore: null,
+            fixableIssues: [],
+            error: 'Evaluation returned null'
+          };
+          continue;
+        }
 
         // Update scene with new evaluation
         scene.qualityScore = evaluation.score;
@@ -5007,7 +5036,7 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
 
         pages[pageNumber] = {
           qualityScore: evaluation.score,
-          fixableIssues: evaluation.fixableIssues
+          fixableIssues: evaluation.fixableIssues || []
         };
       } catch (evalErr) {
         log.error(`Error evaluating page ${pageNumber}:`, evalErr);
@@ -5051,8 +5080,8 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
     const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
     // Run entity consistency check
-    const { checkEntityConsistency } = await import('./server/lib/entityConsistency.js');
-    const report = await checkEntityConsistency(storyData, req.user.id);
+    const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
+    const report = await runEntityConsistencyChecks(storyData, req.user.id);
 
     // Save report to story
     if (!storyData.finalChecksReport) {
@@ -5103,7 +5132,7 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
         const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
         // Use existing entity repair function for each page
-        const { repairEntityConsistency } = await import('./server/lib/entityConsistency.js');
+        const { repairEntityConsistency } = require('./server/lib/entityConsistency');
         const pagesRepaired = [];
 
         for (const pageNumber of pages) {
