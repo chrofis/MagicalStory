@@ -3451,9 +3451,14 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
 
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
 
-    // Step 1: Analyze the current image using describeImage
-    const { describeImage } = require('./server/lib/sceneValidator');
-    const imageDescription = await describeImage(currentImage.imageData);
+    // Get context for image analysis
+    const characters = storyData.characters || [];
+    const visualBible = storyData.visualBible || null;
+    const clothingRequirements = storyData.clothingRequirements || null;
+
+    // Step 1: Analyze the current image using analyzeGeneratedImage (identifies characters by name)
+    const { analyzeGeneratedImage } = require('./server/lib/sceneValidator');
+    const imageDescription = await analyzeGeneratedImage(currentImage.imageData, characters, visualBible, clothingRequirements);
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
     log.debug(`🔄 [ITERATE] Composition: ${imageDescription.description.substring(0, 200)}...`);
 
@@ -3468,10 +3473,7 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
       return res.status(404).json({ error: `Page ${pageNumber} text not found` });
     }
 
-    const characters = storyData.characters || [];
     const language = storyData.language || 'en';
-    const visualBible = storyData.visualBible || null;
-    const clothingRequirements = storyData.clothingRequirements || null;
     const pageClothingData = storyData.pageClothing || null;
 
     // Build previous scenes context

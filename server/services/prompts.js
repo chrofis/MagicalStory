@@ -74,6 +74,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.entitySinglePageRepair = await fs.readFile(path.join(promptsDir, 'entity-single-page-repair.txt'), 'utf-8');
     // Sub-region detection prompt (for targeted repairs of specific body parts/clothing)
     PROMPT_TEMPLATES.subRegionDetection = await fs.readFile(path.join(promptsDir, 'sub-region-detection.txt'), 'utf-8');
+    // Generated image analysis prompt (identifies characters by name using traits/clothing)
+    PROMPT_TEMPLATES.generatedImageAnalysis = await fs.readFile(path.join(promptsDir, 'generated-image-analysis.txt'), 'utf-8');
 
     log.info('📝 Prompt templates loaded from prompts/ folder');
   } catch (err) {

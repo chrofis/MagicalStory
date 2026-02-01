@@ -283,6 +283,129 @@ async function describeImage(imageData) {
 }
 
 /**
+ * Format character traits and clothing for the generated image analysis prompt
+ *
+ * @param {Array} characters - Array of character objects with traits
+ * @param {Object} clothingRequirements - Per-character clothing info (optional)
+ * @returns {string} Formatted character info for prompt
+ */
+function formatCharacterContext(characters, clothingRequirements = {}) {
+  if (!characters || characters.length === 0) {
+    return 'No character information provided.';
+  }
+
+  return characters.map(char => {
+    const clothing = clothingRequirements[char.name]?._currentClothing || 'standard';
+    const clothingDesc = char.avatars?.clothing?.[clothing] || 'unknown clothing';
+
+    const traits = [];
+    if (char.hair_color) traits.push(`${char.hair_color} hair`);
+    if (char.hair_style) traits.push(`(${char.hair_style})`);
+    if (char.eye_color) traits.push(`${char.eye_color} eyes`);
+    if (char.build) traits.push(`${char.build} build`);
+    if (char.age) traits.push(`age: ${char.age}`);
+
+    return `- **${char.name}**: ${traits.join(', ')}. Currently wearing: ${clothingDesc}`;
+  }).join('\n');
+}
+
+/**
+ * Format visual bible landmarks/objects for the generated image analysis prompt
+ *
+ * @param {Object} visualBible - Visual bible with landmarks, objects, animals
+ * @returns {string} Formatted landmark info for prompt
+ */
+function formatLandmarkContext(visualBible) {
+  if (!visualBible) {
+    return 'None specified.';
+  }
+
+  const items = [];
+
+  if (visualBible.landmarks) {
+    for (const [id, landmark] of Object.entries(visualBible.landmarks)) {
+      items.push(`- ${landmark.name || id}: ${landmark.description || 'landmark'}`);
+    }
+  }
+
+  if (visualBible.objects) {
+    for (const [id, obj] of Object.entries(visualBible.objects)) {
+      items.push(`- ${obj.name || id}: ${obj.description || 'object'}`);
+    }
+  }
+
+  if (visualBible.animals) {
+    for (const [id, animal] of Object.entries(visualBible.animals)) {
+      items.push(`- ${animal.name || id}: ${animal.description || 'animal'}`);
+    }
+  }
+
+  return items.length > 0 ? items.join('\n') : 'None specified.';
+}
+
+/**
+ * Analyze a generated story image, identifying characters by name using traits/clothing
+ *
+ * @param {string} imageData - Image as data URI or base64
+ * @param {Array} characters - Array of character objects with traits (optional)
+ * @param {Object} visualBible - Visual bible with landmarks/objects (optional)
+ * @param {Object} clothingRequirements - Per-character clothing info (optional)
+ * @returns {Promise<{description: string, usage: Object}>}
+ */
+async function analyzeGeneratedImage(imageData, characters = null, visualBible = null, clothingRequirements = null) {
+  log.debug('[SCENE-VALIDATOR] Analyzing generated image with character context...');
+
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL });
+  const startTime = Date.now();
+
+  // Build character info section
+  const characterInfo = characters
+    ? formatCharacterContext(characters, clothingRequirements || {})
+    : 'No character information provided.';
+
+  // Build landmark info section
+  const landmarkInfo = formatLandmarkContext(visualBible);
+
+  // Fill template
+  const template = PROMPT_TEMPLATES.generatedImageAnalysis;
+  if (!template) {
+    log.warn('[SCENE-VALIDATOR] Generated image analysis prompt not loaded, falling back to basic description');
+    return describeImage(imageData);
+  }
+
+  const prompt = fillTemplate(template, {
+    CHARACTER_INFO: characterInfo,
+    LANDMARK_INFO: landmarkInfo
+  });
+
+  // Convert image to base64 if needed
+  let imageBase64 = imageData;
+  if (imageData.startsWith('data:')) {
+    imageBase64 = imageData.split(',')[1];
+  }
+
+  const result = await model.generateContent([
+    prompt,
+    { inlineData: { mimeType: 'image/png', data: imageBase64 } }
+  ]);
+
+  const elapsed = Date.now() - startTime;
+  const text = result.response.text();
+
+  const usage = result.response.usageMetadata;
+  const tokens = (usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0);
+  // Gemini 2.5 Flash pricing
+  const estimatedCost = ((usage?.promptTokenCount || 0) * 0.15 + (usage?.candidatesTokenCount || 0) * 0.60) / 1000000;
+
+  log.debug(`[SCENE-VALIDATOR] Generated image analysis complete in ${elapsed}ms, tokens: ${tokens}`);
+
+  return {
+    description: text,
+    usage: { tokens, estimatedCost, elapsed }
+  };
+}
+
+/**
  * Build a simple preview prompt from scene hint (before scene expansion)
  *
  * @param {string} sceneHint - Raw scene hint from outline
@@ -601,6 +724,9 @@ async function validateAndRepairScene(sceneJson, options = {}) {
 module.exports = {
   generateCheapPreview,
   describeImage,
+  analyzeGeneratedImage,
+  formatCharacterContext,
+  formatLandmarkContext,
   validateComposition,
   validateScene,
   repairScene,
