@@ -309,6 +309,32 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       // Get active version metadata to set isActive flags correctly
       const activeVersions = await getAllActiveVersions(id);
 
+      // Get version metadata (description, prompt, modelId, type) from data blob
+      // This is needed for dev mode comparison - we extract just the metadata, not imageData
+      const versionMetaQuery = await dbQuery(
+        `SELECT jsonb_path_query_array(
+           data::jsonb->'sceneImages',
+           '$[*].{pageNumber, imageVersions}'
+         ) as version_meta
+         FROM stories WHERE id = $1`,
+        [id]
+      );
+      const versionMetaByPage = new Map();
+      if (versionMetaQuery.length > 0 && versionMetaQuery[0].version_meta) {
+        for (const scene of versionMetaQuery[0].version_meta) {
+          if (scene.pageNumber && scene.imageVersions) {
+            versionMetaByPage.set(scene.pageNumber, scene.imageVersions.map(v => ({
+              description: v.description,
+              prompt: v.prompt,
+              userInput: v.userInput,
+              modelId: v.modelId,
+              type: v.type,
+              createdAt: v.createdAt
+            })));
+          }
+        }
+      }
+
       // Build sceneImages array from image info
       const sceneImagesMap = new Map();
       const coverImages = { frontCover: null, initialPage: null, backCover: null };
@@ -327,13 +353,22 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             });
           }
           // Add all versions (including version 0) to imageVersions array
+          // Merge with metadata from data blob (description, prompt, modelId, type)
           const scene = sceneImagesMap.get(row.page_number);
+          const pageMeta = versionMetaByPage.get(row.page_number) || [];
+          const versionMeta = pageMeta[row.version_index] || {};
           scene.imageVersions.push({
             versionIndex: row.version_index,
             hasImage: true,
             qualityScore: row.quality_score,
-            generatedAt: row.generated_at,
-            isActive: row.version_index === activeVersion
+            generatedAt: row.generated_at || versionMeta.createdAt,
+            isActive: row.version_index === activeVersion,
+            // Dev mode metadata from data blob
+            description: versionMeta.description,
+            prompt: versionMeta.prompt,
+            userInput: versionMeta.userInput,
+            modelId: versionMeta.modelId,
+            type: versionMeta.type
           });
         } else {
           // Cover image
@@ -1316,6 +1351,25 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     // Try to get image with all versions in single query (FAST path)
     const separateImage = await getStoryImageWithVersions(id, 'scene', pageNum);
     if (separateImage) {
+      // Get version metadata (description, prompt, modelId, type) from data blob for dev mode
+      const versionMetaQuery = await dbQuery(
+        `SELECT scene->'imageVersions' as version_meta
+         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+         WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+        [id, pageNum]
+      );
+      let versionMeta = [];
+      if (versionMetaQuery.length > 0 && versionMetaQuery[0].version_meta) {
+        versionMeta = versionMetaQuery[0].version_meta.map(v => ({
+          description: v.description,
+          prompt: v.prompt,
+          userInput: v.userInput,
+          modelId: v.modelId,
+          type: v.type,
+          createdAt: v.createdAt
+        }));
+      }
+
       // Build imageVersions array with ALL versions (including version 0 = main image)
       // Frontend expects imageVersions[0] = original, imageVersions[1] = regeneration 1, etc.
       const allVersions = [
@@ -1323,15 +1377,28 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
         {
           imageData: normalizeImageData(separateImage.imageData),
           qualityScore: separateImage.qualityScore,
-          generatedAt: separateImage.generatedAt,
-          isActive: activeVersion === 0
+          generatedAt: separateImage.generatedAt || versionMeta[0]?.createdAt,
+          isActive: activeVersion === 0,
+          description: versionMeta[0]?.description,
+          prompt: versionMeta[0]?.prompt,
+          userInput: versionMeta[0]?.userInput,
+          modelId: versionMeta[0]?.modelId,
+          type: versionMeta[0]?.type
         },
         // Versions 1, 2, 3... (regenerations)
-        ...(separateImage.versions || []).map((v, i) => ({
-          ...v,
-          imageData: v.imageData ? normalizeImageData(v.imageData) : undefined,
-          isActive: (i + 1) === activeVersion  // i=0 in versions array means version_index=1
-        }))
+        ...(separateImage.versions || []).map((v, i) => {
+          const meta = versionMeta[i + 1] || {};
+          return {
+            ...v,
+            imageData: v.imageData ? normalizeImageData(v.imageData) : undefined,
+            isActive: (i + 1) === activeVersion,
+            description: meta.description,
+            prompt: meta.prompt,
+            userInput: meta.userInput,
+            modelId: meta.modelId,
+            type: meta.type
+          };
+        })
       ];
 
       const imageSize = separateImage.imageData?.length || 0;
