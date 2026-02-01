@@ -1472,24 +1472,68 @@ async function prepareForGeminiRepair(cropBuffer) {
 // Verification model for comparing repairs
 const VERIFICATION_MODEL = 'gemini-2.5-flash';
 
-/**
- * Crop borders from an image to handle potential pixel shifts
- * @param {Buffer} imageBuffer - Image buffer
- * @param {number} borderPercent - Percentage of each edge to crop (default 5%)
- * @returns {Promise<Buffer>} Cropped image buffer
- */
-async function cropBordersForComparison(imageBuffer, borderPercent = 0.05) {
-  const meta = await sharp(imageBuffer).metadata();
-  const cropX = Math.round(meta.width * borderPercent);
-  const cropY = Math.round(meta.height * borderPercent);
+// Maximum allowed background change (mean pixel diff 0-255)
+// JPEG compression can cause ~2-5 difference, so allow some tolerance
+const MAX_BACKGROUND_DIFF = 8;
 
-  return sharp(imageBuffer)
-    .extract({
-      left: cropX,
-      top: cropY,
-      width: meta.width - (cropX * 2),
-      height: meta.height - (cropY * 2)
-    })
+/**
+ * Extract border regions from an image (everything except center)
+ * Used to verify background wasn't changed during repair
+ *
+ * @param {Buffer} imageBuffer - Image buffer
+ * @param {number} borderPercent - How much of each edge to extract (default 15%)
+ * @returns {Promise<Buffer>} Composite of border regions
+ */
+async function extractBorderRegions(imageBuffer, borderPercent = 0.15) {
+  const meta = await sharp(imageBuffer).metadata();
+  const borderX = Math.round(meta.width * borderPercent);
+  const borderY = Math.round(meta.height * borderPercent);
+
+  // Extract 4 border strips and combine them
+  const [top, bottom, left, right] = await Promise.all([
+    // Top strip (full width)
+    sharp(imageBuffer).extract({ left: 0, top: 0, width: meta.width, height: borderY }).toBuffer(),
+    // Bottom strip (full width)
+    sharp(imageBuffer).extract({ left: 0, top: meta.height - borderY, width: meta.width, height: borderY }).toBuffer(),
+    // Left strip (excluding corners already in top/bottom)
+    sharp(imageBuffer).extract({ left: 0, top: borderY, width: borderX, height: meta.height - borderY * 2 }).toBuffer(),
+    // Right strip (excluding corners already in top/bottom)
+    sharp(imageBuffer).extract({ left: meta.width - borderX, top: borderY, width: borderX, height: meta.height - borderY * 2 }).toBuffer()
+  ]);
+
+  // Stack them vertically for comparison
+  const topMeta = await sharp(top).metadata();
+  const leftMeta = await sharp(left).metadata();
+
+  // Resize strips to same width for stacking
+  const targetWidth = Math.max(topMeta.width, leftMeta.width);
+
+  const resizedStrips = await Promise.all([
+    sharp(top).resize(targetWidth, null).toBuffer(),
+    sharp(bottom).resize(targetWidth, null).toBuffer(),
+    sharp(left).resize(targetWidth, null).toBuffer(),
+    sharp(right).resize(targetWidth, null).toBuffer()
+  ]);
+
+  // Stack vertically
+  const stripMetas = await Promise.all(resizedStrips.map(s => sharp(s).metadata()));
+  const totalHeight = stripMetas.reduce((sum, m) => sum + m.height, 0);
+
+  return sharp({
+    create: {
+      width: targetWidth,
+      height: totalHeight,
+      channels: 3,
+      background: { r: 0, g: 0, b: 0 }
+    }
+  })
+    .composite([
+      { input: resizedStrips[0], top: 0, left: 0 },
+      { input: resizedStrips[1], top: stripMetas[0].height, left: 0 },
+      { input: resizedStrips[2], top: stripMetas[0].height + stripMetas[1].height, left: 0 },
+      { input: resizedStrips[3], top: stripMetas[0].height + stripMetas[1].height + stripMetas[2].height, left: 0 }
+    ])
+    .jpeg()
     .toBuffer();
 }
 
@@ -1530,7 +1574,9 @@ async function computeImageDifference(img1, img2) {
 
 /**
  * Verify if the repair improved the character consistency
- * Uses Gemini to compare old vs new against reference
+ * Checks two things:
+ * 1. Background/borders should NOT change (old vs new border regions)
+ * 2. Character should better match reference (Gemini visual comparison)
  *
  * @param {Buffer} referenceBuffer - Styled avatar (source of truth)
  * @param {Buffer} oldBuffer - Original crop before repair
@@ -1540,18 +1586,25 @@ async function computeImageDifference(img1, img2) {
  */
 async function verifyRepairImprovement(referenceBuffer, oldBuffer, newBuffer, entityName) {
   try {
-    // Crop borders to handle potential shifts
-    const refCropped = await cropBordersForComparison(referenceBuffer);
-    const oldCropped = await cropBordersForComparison(oldBuffer);
-    const newCropped = await cropBordersForComparison(newBuffer);
+    // STEP 1: Verify background/borders didn't change
+    // Extract border regions from old and new crops
+    const oldBorders = await extractBorderRegions(oldBuffer);
+    const newBorders = await extractBorderRegions(newBuffer);
 
-    // Compute pixel-level differences
-    const oldDiff = await computeImageDifference(refCropped, oldCropped);
-    const newDiff = await computeImageDifference(refCropped, newCropped);
+    const borderDiff = await computeImageDifference(oldBorders, newBorders);
+    log.info(`🔍 [REPAIR-VERIFY] Border diff (old vs new): ${borderDiff.toFixed(2)} (max allowed: ${MAX_BACKGROUND_DIFF})`);
 
-    log.info(`🔍 [REPAIR-VERIFY] Pixel diff - old: ${oldDiff.toFixed(2)}, new: ${newDiff.toFixed(2)}`);
+    if (borderDiff > MAX_BACKGROUND_DIFF) {
+      log.warn(`⚠️  [REPAIR-VERIFY] Background changed too much! Diff: ${borderDiff.toFixed(2)}`);
+      return {
+        improved: false,
+        confidence: 'high',
+        explanation: `Background/borders changed too much (diff: ${borderDiff.toFixed(2)}, max: ${MAX_BACKGROUND_DIFF}). The repair should only modify the character.`,
+        metrics: { borderDiff, maxAllowed: MAX_BACKGROUND_DIFF, reason: 'background_changed' }
+      };
+    }
 
-    // Use Gemini to verify the improvement visually
+    // STEP 2: Use Gemini to verify the character improvement
     const model = genAI.getGenerativeModel({
       model: VERIFICATION_MODEL,
       generationConfig: {
@@ -1589,9 +1642,9 @@ Respond in JSON format:
 
     const result = await model.generateContent([
       prompt,
-      { inlineData: { mimeType: 'image/png', data: refCropped.toString('base64') } },
-      { inlineData: { mimeType: 'image/png', data: oldCropped.toString('base64') } },
-      { inlineData: { mimeType: 'image/png', data: newCropped.toString('base64') } }
+      { inlineData: { mimeType: 'image/png', data: referenceBuffer.toString('base64') } },
+      { inlineData: { mimeType: 'image/png', data: oldBuffer.toString('base64') } },
+      { inlineData: { mimeType: 'image/png', data: newBuffer.toString('base64') } }
     ]);
 
     const text = result.response.text();
@@ -1607,13 +1660,12 @@ Respond in JSON format:
       }
     } catch (parseErr) {
       log.warn(`⚠️  [REPAIR-VERIFY] Failed to parse response: ${text.substring(0, 200)}`);
-      // Fall back to pixel-based comparison
-      const improved = newDiff < oldDiff * 0.95; // At least 5% improvement
+      // Background check passed, so accept with low confidence
       return {
-        improved,
+        improved: true,
         confidence: 'low',
-        explanation: `Pixel-based fallback: old diff=${oldDiff.toFixed(2)}, new diff=${newDiff.toFixed(2)}`,
-        metrics: { oldDiff, newDiff, pixelImproved: improved }
+        explanation: `Background preserved (diff: ${borderDiff.toFixed(2)}). Gemini response parse failed.`,
+        metrics: { borderDiff, parseError: true }
       };
     }
 
@@ -1624,7 +1676,7 @@ Respond in JSON format:
         improved: false,
         confidence: parsed.confidence || 'medium',
         explanation: `Repair rejected due to artifacts: ${parsed.explanation}`,
-        metrics: { oldDiff, newDiff, geminiResult: parsed }
+        metrics: { borderDiff, geminiResult: parsed }
       };
     }
 
@@ -1632,7 +1684,7 @@ Respond in JSON format:
       improved: parsed.improved,
       confidence: parsed.confidence || 'medium',
       explanation: parsed.explanation || 'No explanation provided',
-      metrics: { oldDiff, newDiff, geminiResult: parsed },
+      metrics: { borderDiff, geminiResult: parsed },
       usage: result.response.usageMetadata
     };
 
@@ -2089,7 +2141,7 @@ module.exports = {
   buildPhysicalTraitsDescription,
   buildClothingDescription,
   verifyRepairImprovement,
-  cropBordersForComparison,
+  extractBorderRegions,
   computeImageDifference,
 
   // Constants
