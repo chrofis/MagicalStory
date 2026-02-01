@@ -1753,19 +1753,30 @@ function buildPhysicalTraitsDescription(character) {
  * Build a clothing description for the character in this scene
  *
  * @param {object} character - Character object
- * @param {string} clothingCategory - Clothing category (standard, winter, etc.)
+ * @param {string} clothingCategory - Clothing category (standard, winter, costumed:wizard, etc.)
  * @param {string} artStyle - Art style being used
  * @returns {string} Clothing description
  */
 function buildClothingDescription(character, clothingCategory, artStyle) {
-  // First, try to get extracted clothing description from the styled avatar
   const avatars = character.avatars;
+
+  // Handle costumed categories (e.g., "costumed:wizard", "costumed:pirate")
+  if (clothingCategory.startsWith('costumed:')) {
+    const costumeType = clothingCategory.replace('costumed:', '');
+
+    // Check avatars.costumed[costumeType].clothing (where costume clothing is stored)
+    if (avatars?.costumed?.[costumeType]?.clothing) {
+      return avatars.costumed[costumeType].clothing;
+    }
+
+    // Fallback: return costume type as description
+    return `${costumeType} costume as shown in reference`;
+  }
+
+  // For standard categories, try to get extracted clothing from styled avatar
   if (avatars?.clothing?.[clothingCategory]) {
     return avatars.clothing[clothingCategory];
   }
-
-  // Try to get from the styledAvatars metadata if available
-  // (Some implementations store clothing info differently)
 
   // Fall back to structured clothing from character definition
   const clothing = character.clothing;
