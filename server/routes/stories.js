@@ -306,28 +306,35 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         [id]
       );
 
+      // Get active version metadata to set isActive flags correctly
+      const activeVersions = await getAllActiveVersions(id);
+
       // Build sceneImages array from image info
       const sceneImagesMap = new Map();
       const coverImages = { frontCover: null, initialPage: null, backCover: null };
 
       for (const row of imageInfoRows) {
         if (row.image_type === 'scene') {
+          const activeVersion = activeVersions[row.page_number]?.activeVersion || 0;
           if (!sceneImagesMap.has(row.page_number)) {
             sceneImagesMap.set(row.page_number, {
               pageNumber: row.page_number,
               hasImage: true,
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
-              imageVersions: []
+              imageVersions: [],
+              activeVersionIndex: activeVersion  // Track which version is active
             });
           }
-          if (row.version_index > 0) {
-            sceneImagesMap.get(row.page_number).imageVersions.push({
-              hasImage: true,
-              qualityScore: row.quality_score,
-              generatedAt: row.generated_at
-            });
-          }
+          // Add all versions (including version 0) to imageVersions array
+          const scene = sceneImagesMap.get(row.page_number);
+          scene.imageVersions.push({
+            versionIndex: row.version_index,
+            hasImage: true,
+            qualityScore: row.quality_score,
+            generatedAt: row.generated_at,
+            isActive: row.version_index === activeVersion
+          });
         } else {
           // Cover image
           coverImages[row.image_type] = {
@@ -1205,23 +1212,39 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     // Try to get image with all versions in single query (FAST path)
     const separateImage = await getStoryImageWithVersions(id, 'scene', pageNum);
     if (separateImage) {
-      // Mark isActive on each version based on image_version_meta
-      const versionsWithActive = separateImage.versions?.map((v, i) => ({
-        ...v,
-        isActive: (i + 1) === activeVersion  // versions are 1-indexed in story_images
-      }));
+      // Build imageVersions array with ALL versions (including version 0 = main image)
+      // Frontend expects imageVersions[0] = original, imageVersions[1] = regeneration 1, etc.
+      const allVersions = [
+        // Version 0 (main/original image)
+        {
+          imageData: normalizeImageData(separateImage.imageData),
+          qualityScore: separateImage.qualityScore,
+          generatedAt: separateImage.generatedAt,
+          isActive: activeVersion === 0
+        },
+        // Versions 1, 2, 3... (regenerations)
+        ...(separateImage.versions || []).map((v, i) => ({
+          ...v,
+          imageData: v.imageData ? normalizeImageData(v.imageData) : undefined,
+          isActive: (i + 1) === activeVersion  // i=0 in versions array means version_index=1
+        }))
+      ];
 
       const imageSize = separateImage.imageData?.length || 0;
-      const versionsCount = separateImage.versions?.length || 0;
-      console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, ${Date.now() - startTime}ms`);
+      const versionsCount = allVersions.length;
+      console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, active=${activeVersion}, ${Date.now() - startTime}ms`);
+
+      // Return active version's imageData as the main imageData
+      const activeImageData = activeVersion === 0
+        ? normalizeImageData(separateImage.imageData)
+        : (allVersions[activeVersion]?.imageData || normalizeImageData(separateImage.imageData));
 
       return res.json({
         pageNumber: pageNum,
-        imageData: normalizeImageData(separateImage.imageData),
+        imageData: activeImageData,
         qualityScore: separateImage.qualityScore,
         generatedAt: separateImage.generatedAt,
-        isActive: activeVersion === 0,  // version 0 is main image
-        imageVersions: versionsWithActive
+        imageVersions: allVersions
       });
     }
 
@@ -1428,6 +1451,21 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
       if (rows.length > 0) {
         story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+        // Sync isActive flags in imageVersions with stored active version metadata
+        if (story.sceneImages && story.sceneImages.length > 0) {
+          const activeVersions = await getAllActiveVersions(id);
+          for (const scene of story.sceneImages) {
+            if (scene.imageVersions && scene.imageVersions.length > 0) {
+              const activeVersion = activeVersions[scene.pageNumber]?.activeVersion || 0;
+              scene.imageVersions.forEach((v, idx) => {
+                v.isActive = idx === activeVersion;
+              });
+              // Track active version index for frontend
+              scene.activeVersionIndex = activeVersion;
+            }
+          }
+        }
       }
     } else {
       return res.status(501).json({ error: 'File storage mode not supported' });
