@@ -759,12 +759,22 @@ export default function StoryWizard() {
           // Step 2: Each image loaded - update state progressively
           (pageNumber, imageData, imageVersions, loadedCount) => {
             if (typeof pageNumber === 'number') {
-              // Page image
-              setSceneImages(prev => prev.map(img =>
-                img.pageNumber === pageNumber
-                  ? { ...img, imageData, imageVersions: imageVersions as typeof img.imageVersions }
-                  : img
-              ));
+              // Page image - merge imageVersions to preserve metadata (prompt, description)
+              // from story metadata while adding imageData from page-image endpoint
+              setSceneImages(prev => prev.map(img => {
+                if (img.pageNumber !== pageNumber) return img;
+
+                // Merge: keep existing metadata, add imageData from response
+                const existingVersions = img.imageVersions || [];
+                const mergedVersions = imageVersions?.map((v, i) => ({
+                  // Keep metadata from existing version (prompt, description, type, modelId, etc.)
+                  ...(existingVersions[i] || {}),
+                  // Add imageData and other fields from page-image response
+                  ...(v as Record<string, unknown>),
+                })) as typeof img.imageVersions;
+
+                return { ...img, imageData, imageVersions: mergedVersions || existingVersions };
+              }));
             } else {
               // Cover image
               const coverType = pageNumber as 'frontCover' | 'initialPage' | 'backCover';
@@ -4135,26 +4145,27 @@ export default function StoryWizard() {
               // Iterate page using 17-check scene description with actual image analysis (dev mode only)
               onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number) => {
                 try {
-                  log.info('Starting iteration for page:', pageNumber);
-                  const result = await storyService.iteratePage(storyId, pageNumber);
+                  log.info('Starting iteration for page:', pageNumber, 'imageModel:', modelSelections.imageModel);
+                  const result = await storyService.iteratePage(storyId, pageNumber, modelSelections.imageModel || undefined);
 
                   if (result.success) {
                     // Update the scene image with the iterated version
                     setSceneImages(prev => prev.map(img => {
                       if (img.pageNumber === pageNumber) {
-                        // Convert server imageVersions to local type (filter out versions without imageData)
-                        const updatedVersions = result.imageVersions
-                          ?.filter(v => v.imageData)
-                          .map(v => ({
-                            imageData: v.imageData!,
-                            description: v.description,
-                            prompt: v.prompt,
-                            modelId: v.modelId,
-                            createdAt: v.createdAt || new Date().toISOString(),
-                            isActive: v.isActive ?? false,
-                            type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
-                            qualityScore: v.qualityScore
-                          }));
+                        // Convert server imageVersions to local type
+                        // Merge with existing versions to preserve imageData for older versions
+                        const existingVersions = img.imageVersions || [];
+                        const updatedVersions = result.imageVersions?.map((v, idx) => ({
+                          // Use existing imageData if server didn't send it (older versions)
+                          imageData: v.imageData || existingVersions[idx]?.imageData || '',
+                          description: v.description,
+                          prompt: v.prompt,
+                          modelId: v.modelId,
+                          createdAt: v.createdAt || new Date().toISOString(),
+                          isActive: v.isActive ?? false,
+                          type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
+                          qualityScore: v.qualityScore
+                        }));
                         return {
                           ...img,
                           imageData: result.imageData,
