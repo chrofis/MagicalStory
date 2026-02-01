@@ -6672,17 +6672,25 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
         // Map batch-local image indices to actual page numbers
         if (result.issues && result.issues.length > 0) {
           result.issues = result.issues.map(issue => {
-            // Convert batch-local indices (1-based) to actual page numbers
+            // Helper to convert batch-local index (1-based) to page number
+            const mapToPageNumber = (localIdx) => {
+              const batchIdx = localIdx - 1;
+              if (batchIdx >= 0 && batchIdx < batch.images.length) {
+                return batch.images[batchIdx].pageNumber;
+              }
+              return localIdx; // Fallback if already a page number
+            };
+
+            // Convert issue.images (involved images)
             if (issue.images && Array.isArray(issue.images)) {
-              issue.images = issue.images.map(localIdx => {
-                // localIdx is 1-based index within the batch
-                const batchIdx = localIdx - 1;
-                if (batchIdx >= 0 && batchIdx < batch.images.length) {
-                  return batch.images[batchIdx].pageNumber;
-                }
-                return localIdx; // Fallback
-              });
+              issue.images = issue.images.map(mapToPageNumber);
             }
+
+            // Also convert issue.pagesToFix (AI might return batch indices instead of page numbers)
+            if (issue.pagesToFix && Array.isArray(issue.pagesToFix)) {
+              issue.pagesToFix = issue.pagesToFix.map(mapToPageNumber);
+            }
+
             return issue;
           });
         }
