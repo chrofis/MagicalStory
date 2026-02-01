@@ -2987,9 +2987,12 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from story_images table (images may be stripped from data blob)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Get scene description
     const sceneDescriptions = storyData.sceneDescriptions || [];
@@ -3425,9 +3428,12 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from story_images table (images may be stripped from data blob)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Get current image
     const sceneImages = storyData.sceneImages || [];
@@ -4123,9 +4129,12 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, imageRegener
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from story_images table (images may be stripped from data blob)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Get the current image
     const sceneImages = storyData.sceneImages || [];
@@ -4233,9 +4242,12 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from story_images table (images may be stripped from data blob)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Get the current image
     const sceneImages = storyData.sceneImages || [];
@@ -4708,9 +4720,15 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string'
+    let storyData = typeof story.data === 'string'
       ? JSON.parse(story.data)
       : story.data;
+
+    // Rehydrate images from story_images table (images may be stripped from data blob)
+    // Needed for imageData updates (reverting repairs)
+    if (imageData !== undefined) {
+      storyData = await rehydrateStoryImages(id, storyData);
+    }
 
     // Update page text if provided
     if (text !== undefined) {
