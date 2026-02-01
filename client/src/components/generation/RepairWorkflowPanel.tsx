@@ -448,14 +448,26 @@ export function RepairWorkflowPanel({
               <div className="p-4 space-y-3 bg-white">
                 <p className="text-sm text-gray-600">{STEP_CONFIG['re-evaluate'].description}</p>
 
-                <button
-                  onClick={() => reEvaluatePages()}
-                  disabled={isRunning || workflowState.redoResults.pagesCompleted.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Re-evaluate {workflowState.redoResults.pagesCompleted.length} Pages
-                </button>
+                <div className="flex gap-2">
+                  {workflowState.redoResults.pagesCompleted.length > 0 ? (
+                    <button
+                      onClick={() => reEvaluatePages()}
+                      disabled={isRunning}
+                      className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Re-evaluate {workflowState.redoResults.pagesCompleted.length} Redone Pages
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => reEvaluatePages(sceneImages.map(s => s.pageNumber))}
+                    disabled={isRunning}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Re-evaluate All {sceneImages.length} Pages
+                  </button>
+                </div>
 
                 {Object.keys(workflowState.reEvaluationResults.pages).length > 0 && (
                   <div className="space-y-2">
