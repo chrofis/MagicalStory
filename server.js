@@ -3388,6 +3388,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
+    const { imageModel } = req.body;  // Optional: developer model override
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
@@ -3618,11 +3619,14 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
     const previousImageData = currentImage.imageData;
     const previousScore = currentImage.qualityScore || null;
 
-    // Generate new image
-    const imageModelId = 'gemini-3-pro-image-preview';
+    // Generate new image - use developer model override if provided, otherwise use default
+    const imageModelOverride = imageModel || null;  // null means use default (gemini-2.5-flash-image for scenes)
+    if (imageModelOverride) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModelOverride}`);
+    }
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
-      { imageModel: imageModelId },
+      { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
       { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
     );
