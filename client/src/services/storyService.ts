@@ -991,6 +991,7 @@ export const storyService = {
     // New content
     sceneDescription: string;
     imageData: string;
+    imagePrompt?: string;
     qualityScore?: number;
     qualityReasoning?: string;
     modelId?: string;
@@ -998,6 +999,17 @@ export const storyService = {
     // Previous version
     previousImage?: string;
     previousScore?: number;
+    // Image versions for history
+    imageVersions?: Array<{
+      description?: string;
+      prompt?: string;
+      modelId?: string;
+      createdAt?: string;
+      isActive?: boolean;
+      type?: string;
+      qualityScore?: number;
+      imageData?: string;
+    }>;
     // Credits
     creditsUsed?: number;
     creditsRemaining?: number;
@@ -1015,12 +1027,23 @@ export const storyService = {
       checksRun: Record<string, unknown>;
       sceneDescription: string;
       imageData: string;
+      imagePrompt?: string;
       qualityScore?: number;
       qualityReasoning?: string;
       modelId?: string;
       totalAttempts?: number;
       previousImage?: string;
       previousScore?: number;
+      imageVersions?: Array<{
+        description?: string;
+        prompt?: string;
+        modelId?: string;
+        createdAt?: string;
+        isActive?: boolean;
+        type?: string;
+        qualityScore?: number;
+        imageData?: string;
+      }>;
       creditsUsed?: number;
       creditsRemaining?: number;
       referencePhotos?: ReferencePhoto[];

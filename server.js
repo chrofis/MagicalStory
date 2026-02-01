@@ -3725,6 +3725,20 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
 
     log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${imageResult.score})`);
 
+    // Get the updated image versions (without imageData to reduce response size)
+    const updatedScene = sceneImages.find(img => img.pageNumber === pageNumber);
+    const imageVersions = updatedScene?.imageVersions?.map((v, idx) => ({
+      description: v.description,
+      prompt: v.prompt,
+      modelId: v.modelId,
+      createdAt: v.createdAt,
+      isActive: v.isActive,
+      type: v.type,
+      qualityScore: v.qualityScore,
+      // Only include imageData for latest versions to keep response small
+      imageData: idx >= (updatedScene.imageVersions.length - 2) ? v.imageData : undefined
+    })) || [];
+
     res.json({
       success: true,
       pageNumber,
@@ -3743,6 +3757,8 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
       // Previous version
       previousImage: previousImageData,
       previousScore: previousScore,
+      // Image versions for history display
+      imageVersions,
       // Credits
       creditsUsed: hasInfiniteCredits ? 0 : creditCost,
       creditsRemaining: newCredits,
@@ -4449,7 +4465,7 @@ app.post('/api/stories/:id/repair/image/:pageNum', authenticateToken, imageRegen
 app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { entityName, entityType = 'character' } = req.body;
+    const { entityName, entityType = 'character', pageNumber } = req.body;
 
     // Admin-only endpoint (dev mode feature)
     if (req.user.role !== 'admin') {
@@ -4460,7 +4476,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       return res.status(400).json({ error: 'entityName is required' });
     }
 
-    log.info(`🔧 [ENTITY-REPAIR] Starting entity consistency repair for ${entityName} in story ${id}`);
+    const isSinglePageMode = typeof pageNumber === 'number';
+    log.info(`🔧 [ENTITY-REPAIR] Starting ${isSinglePageMode ? 'single-page' : 'full'} entity consistency repair for ${entityName}${isSinglePageMode ? ` page ${pageNumber}` : ''} in story ${id}`);
 
     // Get the story
     const storyResult = await dbPool.query(
@@ -4486,6 +4503,62 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       return res.status(404).json({ error: `Character "${entityName}" not found in story` });
     }
 
+    // Single-page mode: repair just one page
+    if (isSinglePageMode) {
+      const { repairSinglePage } = require('./server/lib/entityConsistency');
+      const repairResult = await repairSinglePage(storyData, character, pageNumber);
+
+      if (!repairResult.success) {
+        return res.status(400).json({ error: repairResult.error || 'Single-page repair failed' });
+      }
+
+      // Apply updated image to story
+      const sceneImages = storyData.sceneImages || [];
+      for (const update of repairResult.updatedImages) {
+        const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
+        if (sceneIndex >= 0) {
+          if (!sceneImages[sceneIndex].preEntityRepairImage) {
+            sceneImages[sceneIndex].preEntityRepairImage = sceneImages[sceneIndex].imageData;
+          }
+          sceneImages[sceneIndex].imageData = update.imageData;
+          sceneImages[sceneIndex].entityRepaired = true;
+          sceneImages[sceneIndex].entityRepairedAt = new Date().toISOString();
+          sceneImages[sceneIndex].entityRepairedFor = entityName;
+        }
+      }
+
+      storyData.sceneImages = sceneImages;
+
+      // Store repair result for dev panel
+      if (!storyData.finalChecksReport) storyData.finalChecksReport = {};
+      if (!storyData.finalChecksReport.entityRepairs) storyData.finalChecksReport.entityRepairs = {};
+      if (!storyData.finalChecksReport.entityRepairs[entityName]) {
+        storyData.finalChecksReport.entityRepairs[entityName] = { pages: {} };
+      }
+      storyData.finalChecksReport.entityRepairs[entityName].pages[pageNumber] = {
+        timestamp: new Date().toISOString(),
+        clothingCategory: repairResult.clothingCategory,
+        comparison: repairResult.comparison,
+        referenceGridUsed: repairResult.referenceGridUsed,
+        usage: repairResult.usage
+      };
+
+      await saveStoryData(id, storyData);
+
+      log.info(`✅ [ENTITY-REPAIR] Single-page repair complete for ${entityName} page ${pageNumber}`);
+
+      return res.json({
+        success: true,
+        mode: 'single-page',
+        entityName,
+        pageNumber,
+        clothingCategory: repairResult.clothingCategory,
+        comparison: repairResult.comparison,
+        referenceGridUsed: repairResult.referenceGridUsed
+      });
+    }
+
+    // Full repair mode: repair all pages
     // Get or run entity consistency check
     // Note: stored as 'entity' in finalChecksReport, not 'entityConsistency'
     let entityReport = storyData.finalChecksReport?.entity;

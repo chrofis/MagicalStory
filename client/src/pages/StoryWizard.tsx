@@ -4142,16 +4142,32 @@ export default function StoryWizard() {
                     // Update the scene image with the iterated version
                     setSceneImages(prev => prev.map(img => {
                       if (img.pageNumber === pageNumber) {
+                        // Convert server imageVersions to local type (filter out versions without imageData)
+                        const updatedVersions = result.imageVersions
+                          ?.filter(v => v.imageData)
+                          .map(v => ({
+                            imageData: v.imageData!,
+                            description: v.description,
+                            prompt: v.prompt,
+                            modelId: v.modelId,
+                            createdAt: v.createdAt || new Date().toISOString(),
+                            isActive: v.isActive ?? false,
+                            type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
+                            qualityScore: v.qualityScore
+                          }));
                         return {
                           ...img,
                           imageData: result.imageData,
                           description: result.sceneDescription,
+                          prompt: result.imagePrompt,
                           qualityScore: result.qualityScore,
                           qualityReasoning: result.qualityReasoning,
                           wasIterated: true,
                           iteratedAt: new Date().toISOString(),
                           iterationFeedback: result.composition,
-                          previewMismatches: result.previewMismatches
+                          previewMismatches: result.previewMismatches,
+                          // Update image versions from server response
+                          imageVersions: updatedVersions || img.imageVersions
                         };
                       }
                       return img;
