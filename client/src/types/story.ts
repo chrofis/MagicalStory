@@ -458,11 +458,11 @@ export interface FinalChecksReport {
   legacy?: LegacyConsistencyReport;
   // Entity repair results (from "Repair Consistency" button)
   entityRepairs?: Record<string, {
-    timestamp: string;
-    originalScore: number;
-    cellsRepaired: number;
-    gridBeforeRepair: string;
-    gridAfterRepair: string;
+    timestamp?: string;
+    originalScore?: number;
+    cellsRepaired?: number;
+    gridBeforeRepair?: string;
+    gridAfterRepair?: string;
     gridDiff?: string | null;
     cellComparisons?: Array<{
       letter: string;
@@ -495,6 +495,22 @@ export interface FinalChecksReport {
       candidatesTokenCount?: number;
       totalTokenCount?: number;
     };
+    // Single-page repair results (from individual page repair buttons)
+    pages?: Record<string, {
+      timestamp: string;
+      clothingCategory?: string;
+      comparison?: {
+        before?: string;
+        after?: string;
+        diff?: string;
+      };
+      referenceGridUsed?: string;
+      usage?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
+    }>;
   }>;
   // Token usage for all consistency checks
   tokenUsage?: {

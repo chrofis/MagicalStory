@@ -2484,7 +2484,11 @@ export function StoryDisplay({
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium text-green-600">✓ Repaired</span>
                                     <span className="text-[10px] text-gray-400">
-                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.cellsRepaired} pages updated
+                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.cellsRepaired
+                                        ? `${finalChecksReport.entityRepairs[grid.entityName]?.cellsRepaired} pages updated`
+                                        : finalChecksReport.entityRepairs?.[grid.entityName]?.pages
+                                          ? `${Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length} page(s) repaired individually`
+                                          : 'repair complete'}
                                       {(finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount ?? 0) > 1 &&
                                         ` (${finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount} clothing groups)`}
                                     </span>
@@ -2582,7 +2586,32 @@ export function StoryDisplay({
                                         </div>
                                       ))}
                                     </div>
-                                  ) : (
+                                  ) : finalChecksReport.entityRepairs?.[grid.entityName]?.pages && Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length > 0 ? (
+                                    /* Single-page repairs: show individual page comparisons */
+                                    <div className="space-y-2">
+                                      <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
+                                        <span>Page</span>
+                                        <span>Before</span>
+                                        <span>After</span>
+                                        <span>Diff</span>
+                                      </div>
+                                      {Object.entries(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).map(([pageNum, pageData]) => (
+                                        <div key={pageNum} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
+                                          <div className="text-center">
+                                            <span className="text-xs font-bold text-gray-700">P{pageNum}</span>
+                                            {pageData.clothingCategory && pageData.clothingCategory !== 'standard' && (
+                                              <div className="text-[8px] text-gray-400">{pageData.clothingCategory}</div>
+                                            )}
+                                          </div>
+                                          <img src={pageData.comparison?.before} alt={`P${pageNum} before`} className="w-full h-auto rounded" />
+                                          <img src={pageData.comparison?.after} alt={`P${pageNum} after`} className="w-full h-auto rounded" />
+                                          <div className="bg-gray-900 rounded">
+                                            <img src={pageData.comparison?.diff} alt={`P${pageNum} diff`} className="w-full h-auto rounded" />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair ? (
                                     /* Fallback to full grid comparison for oldest repairs */
                                     <div className={`grid gap-3 ${finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
                                       <div className="space-y-1">
@@ -2618,7 +2647,7 @@ export function StoryDisplay({
                                         </div>
                                       )}
                                     </div>
-                                  )}
+                                  ) : null}
                                 </div>
                               )}
                             </div>
