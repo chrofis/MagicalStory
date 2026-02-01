@@ -489,12 +489,7 @@ export function RepairWorkflowPanel({
                 <p className="text-sm text-gray-600">{STEP_CONFIG['consistency-check'].description}</p>
 
                 <button
-                  onClick={async () => {
-                    await runConsistencyCheck();
-                    if (onRefreshStory) {
-                      await onRefreshStory();
-                    }
-                  }}
+                  onClick={() => runConsistencyCheck()}
                   disabled={isRunning}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
