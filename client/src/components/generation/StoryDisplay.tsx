@@ -2649,10 +2649,25 @@ export function StoryDisplay({
                                                     <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
                                                     <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
                                                   </div>
-                                                  <img src={cell.before} alt={`${cell.letter} before`} className="w-full h-auto rounded" />
-                                                  <img src={cell.after} alt={`${cell.letter} after`} className="w-full h-auto rounded" />
+                                                  <img
+                                                    src={cell.before}
+                                                    alt={`${cell.letter} before`}
+                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                    onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before (${clothingGroup.clothingCategory})` })}
+                                                  />
+                                                  <img
+                                                    src={cell.after}
+                                                    alt={`${cell.letter} after`}
+                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                    onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After (${clothingGroup.clothingCategory})` })}
+                                                  />
                                                   <div className="bg-gray-900 rounded">
-                                                    <img src={cell.diff} alt={`${cell.letter} diff`} className="w-full h-auto rounded" />
+                                                    <img
+                                                      src={cell.diff}
+                                                      alt={`${cell.letter} diff`}
+                                                      className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                      onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff (${clothingGroup.clothingCategory})` })}
+                                                    />
                                                   </div>
                                                 </div>
                                               ))}
@@ -2700,10 +2715,25 @@ export function StoryDisplay({
                                             <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
                                             <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
                                           </div>
-                                          <img src={cell.before} alt={`${cell.letter} before`} className="w-full h-auto rounded" />
-                                          <img src={cell.after} alt={`${cell.letter} after`} className="w-full h-auto rounded" />
+                                          <img
+                                            src={cell.before}
+                                            alt={`${cell.letter} before`}
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before` })}
+                                          />
+                                          <img
+                                            src={cell.after}
+                                            alt={`${cell.letter} after`}
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After` })}
+                                          />
                                           <div className="bg-gray-900 rounded">
-                                            <img src={cell.diff} alt={`${cell.letter} diff`} className="w-full h-auto rounded" />
+                                            <img
+                                              src={cell.diff}
+                                              alt={`${cell.letter} diff`}
+                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                              onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff` })}
+                                            />
                                           </div>
                                         </div>
                                       ))}
@@ -2725,10 +2755,25 @@ export function StoryDisplay({
                                               <div className="text-[8px] text-gray-400">{pageData.clothingCategory}</div>
                                             )}
                                           </div>
-                                          <img src={pageData.comparison?.before} alt={`P${pageNum} before`} className="w-full h-auto rounded" />
-                                          <img src={pageData.comparison?.after} alt={`P${pageNum} after`} className="w-full h-auto rounded" />
+                                          <img
+                                            src={pageData.comparison?.before}
+                                            alt={`P${pageNum} before`}
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${grid.entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                          />
+                                          <img
+                                            src={pageData.comparison?.after}
+                                            alt={`P${pageNum} after`}
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                          />
                                           <div className="bg-gray-900 rounded">
-                                            <img src={pageData.comparison?.diff} alt={`P${pageNum} diff`} className="w-full h-auto rounded" />
+                                            <img
+                                              src={pageData.comparison?.diff}
+                                              alt={`P${pageNum} diff`}
+                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                              onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                            />
                                           </div>
                                         </div>
                                       ))}
@@ -3135,6 +3180,16 @@ export function StoryDisplay({
                   </details>
                 )}
 
+                {/* Object Detection for Cover */}
+                <ObjectDetectionDisplay
+                  retryHistory={frontCoverObj.retryHistory}
+                  bboxDetection={frontCoverObj.bboxDetection}
+                  bboxOverlayImage={frontCoverObj.bboxOverlayImage}
+                  language={language}
+                  storyId={storyId}
+                  pageNumber={0}
+                />
+
                 {/* Retry History */}
                 {frontCoverObj.retryHistory && frontCoverObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
@@ -3316,6 +3371,16 @@ export function StoryDisplay({
                     )}
                   </details>
                 )}
+
+                {/* Object Detection for Cover */}
+                <ObjectDetectionDisplay
+                  retryHistory={initialPageObj.retryHistory}
+                  bboxDetection={initialPageObj.bboxDetection}
+                  bboxOverlayImage={initialPageObj.bboxOverlayImage}
+                  language={language}
+                  storyId={storyId}
+                  pageNumber={-1}
+                />
 
                 {/* Retry History */}
                 {initialPageObj.retryHistory && initialPageObj.retryHistory.length > 0 && (
@@ -4361,6 +4426,16 @@ export function StoryDisplay({
                     )}
                   </details>
                 )}
+
+                {/* Object Detection for Cover */}
+                <ObjectDetectionDisplay
+                  retryHistory={backCoverObj.retryHistory}
+                  bboxDetection={backCoverObj.bboxDetection}
+                  bboxOverlayImage={backCoverObj.bboxOverlayImage}
+                  language={language}
+                  storyId={storyId}
+                  pageNumber={-2}
+                />
 
                 {/* Retry History */}
                 {backCoverObj.retryHistory && backCoverObj.retryHistory.length > 0 && (

@@ -674,6 +674,9 @@ export interface CoverImageData {
   visualBibleGrid?: string;  // Base64 data URL
   // API model used (for dev mode)
   modelId?: string;
+  // Bounding box detection for character identification (for dev mode)
+  bboxDetection?: BboxSceneDetection | null;
+  bboxOverlayImage?: string | null;  // Image with bounding boxes drawn
   // Story title (sent with frontCover during streaming for early display transition)
   storyTitle?: string;
 }

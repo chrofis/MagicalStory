@@ -4,6 +4,9 @@ import type { BboxSceneDetection, RetryAttempt } from '@/types/story';
 
 interface ObjectDetectionDisplayProps {
   retryHistory?: RetryAttempt[];
+  // Direct props for covers (which don't have retryHistory with bbox)
+  bboxDetection?: BboxSceneDetection | null;
+  bboxOverlayImage?: string | null;
   language: string;
   storyId?: string | null;
   pageNumber?: number;
@@ -64,6 +67,8 @@ function downloadAsText(content: string, filename: string) {
  */
 export function ObjectDetectionDisplay({
   retryHistory,
+  bboxDetection: directBboxDetection,
+  bboxOverlayImage: directBboxOverlayImage,
   language,
   storyId,
   pageNumber
@@ -72,7 +77,11 @@ export function ObjectDetectionDisplay({
   const [loadedOverlay, setLoadedOverlay] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { bboxDetection, bboxOverlayImage, hasBboxOverlay } = extractBboxData(retryHistory);
+  // Use direct props if provided (for covers), otherwise extract from retryHistory (for pages)
+  const fromRetryHistory = extractBboxData(retryHistory);
+  const bboxDetection = directBboxDetection || fromRetryHistory.bboxDetection;
+  const bboxOverlayImage = directBboxOverlayImage || fromRetryHistory.bboxOverlayImage;
+  const hasBboxOverlay = !!directBboxOverlayImage || fromRetryHistory.hasBboxOverlay;
 
   // Nothing to show if no detection data
   if (!bboxDetection) {

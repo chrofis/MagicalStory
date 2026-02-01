@@ -404,18 +404,20 @@ function stripSceneMetadata(sceneDescription) {
  */
 /**
  * Parse character descriptions from image prompt to extract age/gender info
- * Parses format: "1. Lukas, Looks: school age, 7 years old, boy, Build: ..."
+ * Parses formats:
+ * - Scene format: "1. Lukas, Looks: school age, 7 years old, boy, Build: ..."
+ * - Cover format: "[Image 1 - Lukas]: Looks: school age, 7 years old, boy, Build: ... Wearing: ..."
  * @param {string} prompt - The full image generation prompt
- * @returns {Object} Map of character names to {age, gender, ageCategory, clothing}
+ * @returns {Object} Map of character names to {age, gender, ageCategory, genderTerm, clothing}
  */
 function parseCharacterDescriptions(prompt) {
   if (!prompt || typeof prompt !== 'string') return {};
 
   const characterInfo = {};
-
-  // Match numbered character entries: "1. Name, Looks: age category, X years old, gender, ..."
-  const charPattern = /^\d+\.\s*([^,]+),\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|child|baby|toddler|teen|teenager)/gmi;
   let match;
+
+  // Match numbered character entries (scene format): "1. Name, Looks: age category, X years old, gender, ..."
+  const charPattern = /^\d+\.\s*([^,]+),\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|child|baby|toddler|teen|teenager)/gmi;
 
   while ((match = charPattern.exec(prompt)) !== null) {
     const name = match[1].trim();
@@ -440,7 +442,54 @@ function parseCharacterDescriptions(prompt) {
     };
   }
 
-  // If pattern didn't match, try simpler pattern for older formats
+  // Match cover/reference format: "[Image N - Name]: Looks: age category, X years old, gender, ..."
+  // This format includes clothing after "Wearing:"
+  const coverPattern = /\[Image\s+\d+\s*-\s*([^\]]+)\]:\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|little boy|little girl|teenage boy|teenage girl|young man|young woman|elderly man|elderly woman|baby boy|baby girl)([^\[]*)/gi;
+
+  while ((match = coverPattern.exec(prompt)) !== null) {
+    const name = match[1].trim();
+    const ageCategory = match[2].trim();
+    const age = parseInt(match[3], 10);
+    const rawGenderTerm = match[4].toLowerCase();
+    const restOfLine = match[5] || '';
+
+    // Normalize gender term (e.g., "teenage boy" -> "boy", "little girl" -> "girl")
+    let genderTerm = rawGenderTerm;
+    if (rawGenderTerm.includes('boy') || rawGenderTerm.includes('man')) {
+      genderTerm = rawGenderTerm.includes('boy') ? 'boy' : 'man';
+    } else if (rawGenderTerm.includes('girl') || rawGenderTerm.includes('woman')) {
+      genderTerm = rawGenderTerm.includes('girl') ? 'girl' : 'woman';
+    }
+
+    // Map gender term to gender
+    let gender = null;
+    if (['boy', 'man'].includes(genderTerm)) gender = 'male';
+    else if (['girl', 'woman'].includes(genderTerm)) gender = 'female';
+
+    // Determine if child or adult
+    const isChild = age < 18 || ['boy', 'girl', 'child', 'baby', 'toddler', 'teen', 'teenager'].includes(genderTerm);
+
+    // Extract clothing from "Wearing:" section
+    let clothing = '';
+    const wearingMatch = restOfLine.match(/Wearing:\s*([^.]+)/i);
+    if (wearingMatch) {
+      clothing = wearingMatch[1].trim();
+    }
+
+    // Only add if not already found (scene format takes precedence)
+    if (!characterInfo[name]) {
+      characterInfo[name] = {
+        age,
+        ageCategory,
+        gender,
+        isChild,
+        genderTerm,
+        clothing
+      };
+    }
+  }
+
+  // If no patterns matched, try simpler pattern for older formats
   if (Object.keys(characterInfo).length === 0) {
     // Try: "Name (7 years old, boy)" or "Name, 7 years old, boy"
     const simplePattern = /([A-Z][a-z]+)[\s,]+(\d+)\s*years?\s*old,?\s*(boy|girl|man|woman)/gi;

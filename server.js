@@ -4131,7 +4131,9 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       originalReasoning: trueOriginalReasoning,
       referencePhotos: coverCharacterPhotos,
       regeneratedAt: new Date().toISOString(),
-      regenerationCount: (previousCover?.regenerationCount || 0) + 1
+      regenerationCount: (previousCover?.regenerationCount || 0) + 1,
+      bboxDetection: coverResult.bboxDetection || null,
+      bboxOverlayImage: coverResult.bboxOverlayImage || null
     };
 
     log.debug(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}`);
@@ -8932,7 +8934,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalScore: frontCoverResult.originalScore || null,
             originalReasoning: frontCoverResult.originalReasoning || null,
             referencePhotos: frontCoverPhotos,
-            modelId: frontCoverResult.modelId || null
+            modelId: frontCoverResult.modelId || null,
+            bboxDetection: frontCoverResult.bboxDetection || null,
+            bboxOverlayImage: frontCoverResult.bboxOverlayImage || null
           };
         } else {
           log.debug(`⚡ [STORYBOOK] Front cover already generated during streaming (skipping)`);
@@ -8995,7 +8999,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalScore: initialResult.originalScore || null,
             originalReasoning: initialResult.originalReasoning || null,
             referencePhotos: initialPagePhotos,
-            modelId: initialResult.modelId || null
+            modelId: initialResult.modelId || null,
+            bboxDetection: initialResult.bboxDetection || null,
+            bboxOverlayImage: initialResult.bboxOverlayImage || null
           };
         } else {
           log.debug(`⚡ [STORYBOOK] Initial page already generated during streaming (skipping)`);
@@ -9049,7 +9055,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             originalScore: backCoverResult.originalScore || null,
             originalReasoning: backCoverResult.originalReasoning || null,
             referencePhotos: backCoverPhotos,
-            modelId: backCoverResult.modelId || null
+            modelId: backCoverResult.modelId || null,
+            bboxDetection: backCoverResult.bboxDetection || null,
+            bboxOverlayImage: backCoverResult.bboxOverlayImage || null
           };
         }
 
@@ -13748,7 +13756,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             originalScore: frontCover.result.originalScore || null,
             originalReasoning: frontCover.result.originalReasoning || null,
             referencePhotos: frontCover.photos,
-            modelId: frontCover.result.modelId || null
+            modelId: frontCover.result.modelId || null,
+            bboxDetection: frontCover.result.bboxDetection || null,
+            bboxOverlayImage: frontCover.result.bboxOverlayImage || null
           },
           initialPage: {
             imageData: initialPage.result.imageData,
@@ -13764,7 +13774,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             originalScore: initialPage.result.originalScore || null,
             originalReasoning: initialPage.result.originalReasoning || null,
             referencePhotos: initialPage.photos,
-            modelId: initialPage.result.modelId || null
+            modelId: initialPage.result.modelId || null,
+            bboxDetection: initialPage.result.bboxDetection || null,
+            bboxOverlayImage: initialPage.result.bboxOverlayImage || null
           },
           backCover: {
             imageData: backCover.result.imageData,
@@ -13780,7 +13792,9 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             originalScore: backCover.result.originalScore || null,
             originalReasoning: backCover.result.originalReasoning || null,
             referencePhotos: backCover.photos,
-            modelId: backCover.result.modelId || null
+            modelId: backCover.result.modelId || null,
+            bboxDetection: backCover.result.bboxDetection || null,
+            bboxOverlayImage: backCover.result.bboxOverlayImage || null
           }
         };
 

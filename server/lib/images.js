@@ -1240,7 +1240,8 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
   // First, add characters from characterDescriptions (which have age/gender info)
   for (const [name, desc] of Object.entries(characterDescriptions || {})) {
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
-    const clothing = getClothing(name);
+    // Use clothing from characterClothing map, or from parsed description (covers), or empty
+    const clothing = getClothing(name) || desc.clothing || '';
     const descParts = [];
     if (desc.genderTerm) descParts.push(desc.genderTerm);
     if (desc.age) descParts.push(`${desc.age} years old`);
