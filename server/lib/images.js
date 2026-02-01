@@ -6434,6 +6434,58 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
     return null;
   }
 
+  // Build character descriptions from characters array
+  let characterDescriptions = 'No character descriptions available.';
+  if (options.characters?.length > 0) {
+    const descriptions = options.characters.map(char => {
+      const parts = [];
+
+      // Name and basic info
+      parts.push(`**${char.name}**`);
+      if (char.gender) parts.push(char.gender);
+      if (char.age) parts.push(`${char.age} years old`);
+      if (char.ageCategory) parts.push(`(${char.ageCategory})`);
+
+      // Physical traits
+      const physical = char.physical || {};
+      const physicalParts = [];
+      if (physical.hairColor) {
+        let hair = physical.hairColor + ' hair';
+        if (physical.hairLength) hair = `${physical.hairLength} ${hair}`;
+        if (physical.hairStyle) hair += ` (${physical.hairStyle})`;
+        physicalParts.push(hair);
+      }
+      if (physical.eyeColor) physicalParts.push(`${physical.eyeColor} eyes`);
+      if (physical.skinTone) physicalParts.push(`${physical.skinTone} skin`);
+      if (physical.build) physicalParts.push(physical.build);
+      if (physical.facialHair && physical.facialHair !== 'none') physicalParts.push(physical.facialHair);
+      if (physical.other) physicalParts.push(physical.other);
+
+      if (physicalParts.length > 0) {
+        parts.push('- Physical: ' + physicalParts.join(', '));
+      }
+
+      // Clothing (from structured clothing or current)
+      const clothing = char.clothing || {};
+      const clothingParts = [];
+      if (clothing.structured) {
+        if (clothing.structured.upperBody) clothingParts.push(clothing.structured.upperBody);
+        if (clothing.structured.lowerBody) clothingParts.push(clothing.structured.lowerBody);
+        if (clothing.structured.shoes) clothingParts.push(clothing.structured.shoes);
+        if (clothing.structured.fullBody) clothingParts.push(clothing.structured.fullBody);
+      } else if (clothing.current) {
+        clothingParts.push(clothing.current);
+      }
+
+      if (clothingParts.length > 0) {
+        parts.push('- Clothing: ' + clothingParts.join(', '));
+      }
+
+      return parts.join('\n');
+    });
+    characterDescriptions = descriptions.join('\n\n');
+  }
+
   // Build image info as JSON array for cleaner parsing
   const imageInfoArray = imagesToCheck.map((img, idx) => {
     const pageNum = img.pageNumber || 'unknown';
@@ -6466,6 +6518,7 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
   const prompt = fillTemplate(promptTemplate, {
     CHECK_TYPE: checkType.toUpperCase(),
     CHARACTER_NAME: options.characterName || 'all characters',
+    CHARACTER_DESCRIPTIONS: characterDescriptions,
     IMAGE_INFO: imageInfo
   });
 
@@ -6817,7 +6870,7 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
 
     // 1. Full consistency check across all images
     log.info('🔍 [FINAL CHECKS] Running full image consistency check...');
-    const fullCheck = await evaluateConsistencyAcrossImages(imagesWithPages, 'full');
+    const fullCheck = await evaluateConsistencyAcrossImages(imagesWithPages, 'full', { characters });
     if (fullCheck) {
       report.imageChecks.push({
         type: 'full',
