@@ -2211,6 +2211,473 @@ export function StoryDisplay({
           )}
 
           {/* Final Checks Report (if available) */}
+          {/* Character Consistency (Entity Grids) - Separate Section */}
+          {finalChecksReport?.entity?.grids && finalChecksReport.entity.grids.length > 0 && (
+            <details className={`border-2 rounded-xl p-4 ${
+              finalChecksReport.entity.overallConsistent !== false
+                ? 'bg-green-50 border-green-200'
+                : 'bg-amber-50 border-amber-200'
+            }`}>
+              <summary className={`cursor-pointer text-lg font-bold flex items-center gap-2 ${
+                finalChecksReport.entity.overallConsistent !== false
+                  ? 'text-green-800 hover:text-green-900'
+                  : 'text-amber-800 hover:text-amber-900'
+              }`}>
+                {finalChecksReport.entity.overallConsistent !== false ? '✓' : '⚠️'}
+                {language === 'de'
+                  ? `Charakterkonsistenz (${finalChecksReport.entity.totalIssues || 0} Probleme)`
+                  : language === 'fr'
+                    ? `Cohérence des personnages (${finalChecksReport.entity.totalIssues || 0} problèmes)`
+                    : `Character Consistency (${finalChecksReport.entity.totalIssues || 0} issues)`}
+              </summary>
+              <div className="mt-4 space-y-4">
+                {/* Entity check summary */}
+                <p className="text-sm text-gray-700">{finalChecksReport.entity.summary}</p>
+
+                {/* Entity Grids */}
+                <div className="space-y-2">
+                  {finalChecksReport.entity.grids.map((grid, gridIdx) => {
+                    const charResult = finalChecksReport.entity?.characters?.[grid.entityName];
+                    // Handle both old (flat) and new (byClothing) structure
+                    const isConsistent = charResult?.overallConsistent ?? charResult?.consistent ?? true;
+                    const score = charResult?.overallScore ?? charResult?.score ?? 0;
+                    const issues = charResult?.issues ?? [];
+                    const clothingCat = (grid as { clothingCategory?: string }).clothingCategory;
+
+                    return (
+                      <details key={gridIdx} className={`bg-white border rounded-lg overflow-hidden ${
+                        isConsistent ? 'border-green-200' : 'border-amber-200'
+                      }`}>
+                        <summary className="cursor-pointer p-3 flex items-center gap-2 hover:bg-gray-50">
+                          <span className={`text-sm ${isConsistent ? 'text-green-600' : 'text-amber-600'}`}>
+                            {isConsistent ? '✓' : '⚠️'}
+                          </span>
+                          <span className="font-medium text-sm text-gray-800">{grid.entityName}</span>
+                          <span className="text-xs text-gray-500">
+                            ({grid.cellCount} appearances{clothingCat ? `, ${clothingCat}` : ''})
+                          </span>
+                          <span className={`ml-auto text-xs px-2 py-0.5 rounded ${
+                            score >= 8 ? 'bg-green-100 text-green-700' :
+                            score >= 5 ? 'bg-amber-100 text-amber-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            Score: {score}/10
+                          </span>
+                        </summary>
+                        <div className="p-3 border-t border-gray-100 space-y-3">
+                          {/* Grid Image - clickable to enlarge, lazy loaded */}
+                          {(() => {
+                            // Use embedded gridImage if available, otherwise use lazy-loaded
+                            const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
+                            const isLoading = loadingEntityGridImages.has(grid.entityName);
+                            const sizeKB = (grid as { gridImageSizeKB?: number }).gridImageSizeKB;
+
+                            if (gridImage) {
+                              return (
+                                <div className="flex justify-center bg-gray-50 rounded p-2">
+                                  <img
+                                    src={gridImage}
+                                    alt={`${grid.entityName} consistency grid`}
+                                    className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                                    style={{ maxHeight: '400px' }}
+                                    onClick={() => setEnlargedImage({
+                                      src: gridImage,
+                                      title: `${grid.entityName} - Entity Consistency Grid`
+                                    })}
+                                    title="Click to enlarge"
+                                  />
+                                </div>
+                              );
+                            } else if (isLoading) {
+                              return (
+                                <div className="flex justify-center items-center bg-gray-100 rounded p-4 h-32">
+                                  <span className="text-sm text-gray-500">Loading grid image...</span>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <div className="flex flex-col items-center bg-gray-100 rounded p-4">
+                                  <span className="text-xs text-gray-500 mb-2">
+                                    Grid image not loaded {sizeKB ? `(${sizeKB} KB)` : ''}
+                                  </span>
+                                  <button
+                                    onClick={() => fetchEntityGridImage(grid.entityName)}
+                                    className="text-xs px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                  >
+                                    Load Grid
+                                  </button>
+                                </div>
+                              );
+                            }
+                          })()}
+
+                          {/* Cell Info with individual repair buttons - clickable to enlarge */}
+                          {grid.manifest?.cells && (
+                            <div className="text-xs text-gray-600">
+                              <span className="font-medium">Cells: </span>
+                              {grid.manifest.cells.map((cell, i) => {
+                                const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
+                                return (
+                                <span key={i} className="inline-flex items-center bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 gap-1">
+                                  <button
+                                    onClick={() => gridImage && handleCellClick({ ...grid, gridImage }, i)}
+                                    className={`${gridImage ? 'hover:text-blue-600 hover:underline cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`}
+                                    title={gridImage ? "Click to enlarge this cell" : "Load grid image first"}
+                                    disabled={!gridImage}
+                                  >
+                                    {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
+                                    {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
+                                  </button>
+                                  {/* Individual repair button for non-reference cells */}
+                                  {!cell.isReference && storyId && typeof cell.pageNumber === 'number' && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRepairSingleEntityPage(grid.entityName, cell.pageNumber as number);
+                                      }}
+                                      disabled={isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null}
+                                      className={`ml-0.5 px-1 py-0 text-[9px] rounded transition-colors ${
+                                        repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
+                                          ? 'bg-amber-300 text-amber-800'
+                                          : isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null
+                                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                            : 'bg-amber-500 text-white hover:bg-amber-600'
+                                      }`}
+                                      title={`Repair page ${cell.pageNumber} for ${grid.entityName}`}
+                                    >
+                                      {repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
+                                        ? '...'
+                                        : '⚡'}
+                                    </button>
+                                  )}
+                                </span>
+                              )})}
+                            </div>
+                          )}
+
+                          {/* Issues */}
+                          {issues.length > 0 && (
+                            <div className="space-y-2">
+                              <h5 className="text-xs font-medium text-gray-700">Issues:</h5>
+                              {issues.map((issue, issueIdx) => (
+                                <div key={issueIdx} className={`text-xs p-2 rounded ${
+                                  issue.severity === 'critical' ? 'bg-red-50 border-l-4 border-red-400' :
+                                  issue.severity === 'major' ? 'bg-amber-50 border-l-4 border-amber-400' :
+                                  'bg-gray-50 border-l-4 border-gray-300'
+                                }`}>
+                                  <div className="flex items-start gap-2 flex-wrap">
+                                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                      issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
+                                      issue.severity === 'major' ? 'bg-amber-200 text-amber-800' :
+                                      'bg-gray-200 text-gray-700'
+                                    }`}>
+                                      {issue.severity}
+                                    </span>
+                                    {issue.cells && (
+                                      <span className="text-gray-500">Cells: {issue.cells.join(', ')}</span>
+                                    )}
+                                    {issue.pagesToFix && issue.pagesToFix.length > 0 && (
+                                      <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px]">
+                                        Fix: Page {issue.pagesToFix.join(', ')}
+                                      </span>
+                                    )}
+                                    {(issue as { clothingCategory?: string }).clothingCategory && (
+                                      <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">
+                                        {(issue as { clothingCategory?: string }).clothingCategory}
+                                      </span>
+                                    )}
+                                    <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
+                                      {issue.subType || issue.type?.replace(/_/g, ' ')}
+                                    </span>
+                                  </div>
+                                  <p className="text-gray-700 mt-1">{issue.description}</p>
+                                  {issue.fixInstruction && (
+                                    <p className="text-green-700 mt-1 text-[10px]">→ {issue.fixInstruction}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Repair Button - Only show if there are issues and score < 8 */}
+                          {storyId && (!isConsistent || score < 8) && grid.entityType === 'character' && (
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <button
+                                onClick={() => handleRepairEntityConsistency(grid.entityName)}
+                                disabled={isGenerating || repairingEntity !== null}
+                                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
+                                  isGenerating || repairingEntity !== null
+                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                    : 'bg-amber-500 text-white hover:bg-amber-600'
+                                }`}
+                              >
+                                {repairingEntity === grid.entityName ? (
+                                  <>
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    <span>Repairing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Wrench className="w-3 h-3" />
+                                    <span>Repair All</span>
+                                  </>
+                                )}
+                              </button>
+                              <p className="text-[10px] text-gray-400 mt-1">
+                                Regenerate all appearances to match reference
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Repair Results - Show per-cell before/after/diff grouped by clothing */}
+                          {finalChecksReport.entityRepairs?.[grid.entityName] && (
+                            <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-medium text-green-700">✓ Repaired</span>
+                                <span className="text-xs text-gray-500">
+                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.cellsRepaired
+                                    ? `${finalChecksReport.entityRepairs[grid.entityName]?.cellsRepaired} pages updated`
+                                    : finalChecksReport.entityRepairs?.[grid.entityName]?.pages
+                                      ? `${Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length} page(s) repaired individually`
+                                      : ''}
+                                  {(finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount ?? 0) > 1 &&
+                                    ` (${finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount} clothing groups)`}
+                                </span>
+                              </div>
+
+                              {/* Display repair results based on available format */}
+                              {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.length ? (
+                                /* NEW: Per-clothing-group repair results */
+                                <div className="space-y-3">
+                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.map((clothingGroup) => (
+                                    <div key={clothingGroup.clothingCategory} className="border border-gray-200 rounded p-2">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <span className="text-xs font-medium text-gray-700">{clothingGroup.clothingCategory}</span>
+                                        <span className="text-[10px] text-gray-400">
+                                          ({clothingGroup.cropCount} crops, ref: {clothingGroup.referenceUsed})
+                                        </span>
+                                      </div>
+
+                                      {/* Per-cell comparisons within this clothing group */}
+                                      {clothingGroup.cellComparisons?.length ? (
+                                        <div className="space-y-1">
+                                          <div className="grid grid-cols-4 gap-1 text-[9px] font-medium text-gray-500 px-1">
+                                            <span>Cell</span>
+                                            <span>Before</span>
+                                            <span>After</span>
+                                            <span>Diff</span>
+                                          </div>
+                                          {clothingGroup.cellComparisons.map((cell) => (
+                                            <div key={`${clothingGroup.clothingCategory}-${cell.letter}`} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
+                                              <div className="text-center">
+                                                <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
+                                                <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
+                                              </div>
+                                              <img
+                                                src={cell.before}
+                                                alt={`${cell.letter} before`}
+                                                className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before (${clothingGroup.clothingCategory})` })}
+                                              />
+                                              <img
+                                                src={cell.after}
+                                                alt={`${cell.letter} after`}
+                                                className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After (${clothingGroup.clothingCategory})` })}
+                                              />
+                                              <div className="bg-gray-900 rounded">
+                                                <img
+                                                  src={cell.diff}
+                                                  alt={`${cell.letter} diff`}
+                                                  className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                  onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff (${clothingGroup.clothingCategory})` })}
+                                                />
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        /* Fallback to grid comparison for this clothing group */
+                                        <div className={`grid gap-2 ${clothingGroup.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                          <div className="space-y-0.5">
+                                            <span className="text-[9px] font-medium text-gray-500">Before</span>
+                                            <div className="bg-gray-50 rounded p-0.5">
+                                              <img
+                                                src={clothingGroup.gridBefore}
+                                                alt="Before repair"
+                                                className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                onClick={() => clothingGroup.gridBefore && setEnlargedImage({ src: clothingGroup.gridBefore, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Before` })}
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="space-y-0.5">
+                                            <span className="text-[9px] font-medium text-gray-500">After</span>
+                                            <div className="bg-gray-50 rounded p-0.5">
+                                              <img
+                                                src={clothingGroup.gridAfter}
+                                                alt="After repair"
+                                                className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                onClick={() => clothingGroup.gridAfter && setEnlargedImage({ src: clothingGroup.gridAfter, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid After` })}
+                                              />
+                                            </div>
+                                          </div>
+                                          {clothingGroup.gridDiff && (
+                                            <div className="space-y-0.5">
+                                              <span className="text-[9px] font-medium text-gray-500">Diff</span>
+                                              <div className="bg-gray-900 rounded p-0.5">
+                                                <img
+                                                  src={clothingGroup.gridDiff}
+                                                  alt="Difference"
+                                                  className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                  onClick={() => setEnlargedImage({ src: clothingGroup.gridDiff!, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Diff` })}
+                                                />
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.length ? (
+                                /* Backward compatible: flat cell comparisons (old format) */
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
+                                    <span>Cell</span>
+                                    <span>Before</span>
+                                    <span>After</span>
+                                    <span>Diff</span>
+                                  </div>
+                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.map((cell) => (
+                                    <div key={cell.letter} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
+                                      <div className="text-center">
+                                        <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
+                                        <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
+                                      </div>
+                                      <img
+                                        src={cell.before}
+                                        alt={`${cell.letter} before`}
+                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                        onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before` })}
+                                      />
+                                      <img
+                                        src={cell.after}
+                                        alt={`${cell.letter} after`}
+                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                        onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After` })}
+                                      />
+                                      <div className="bg-gray-900 rounded">
+                                        <img
+                                          src={cell.diff}
+                                          alt={`${cell.letter} diff`}
+                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                          onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff` })}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : finalChecksReport.entityRepairs?.[grid.entityName]?.pages && Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length > 0 ? (
+                                /* Single-page repairs: show individual page comparisons */
+                                <div className="space-y-2">
+                                  <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
+                                    <span>Page</span>
+                                    <span>Before</span>
+                                    <span>After</span>
+                                    <span>Diff</span>
+                                  </div>
+                                  {Object.entries(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).map(([pageNum, pageData]) => (
+                                    <div key={pageNum} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
+                                      <div className="text-center">
+                                        <span className="text-xs font-bold text-gray-700">P{pageNum}</span>
+                                        {pageData.clothingCategory && pageData.clothingCategory !== 'standard' && (
+                                          <div className="text-[8px] text-gray-400">{pageData.clothingCategory}</div>
+                                        )}
+                                      </div>
+                                      <img
+                                        src={pageData.comparison?.before}
+                                        alt={`P${pageNum} before`}
+                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                        onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${grid.entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                      />
+                                      <img
+                                        src={pageData.comparison?.after}
+                                        alt={`P${pageNum} after`}
+                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                        onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                      />
+                                      <div className="bg-gray-900 rounded">
+                                        <img
+                                          src={pageData.comparison?.diff}
+                                          alt={`P${pageNum} diff`}
+                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                          onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair ? (
+                                /* Fallback to full grid comparison for oldest repairs */
+                                <div className={`grid gap-3 ${finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                                  <div className="space-y-1">
+                                    <span className="text-[10px] font-medium text-gray-500">Before Repair</span>
+                                    <div className="bg-gray-50 rounded p-1">
+                                      <img
+                                        src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair}
+                                        alt="Before repair"
+                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                        onClick={() => {
+                                          const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair;
+                                          if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Before Repair` });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <span className="text-[10px] font-medium text-gray-500">After Repair</span>
+                                    <div className="bg-gray-50 rounded p-1">
+                                      <img
+                                        src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair}
+                                        alt="After repair"
+                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                        onClick={() => {
+                                          const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair;
+                                          if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid After Repair` });
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff && (
+                                    <div className="space-y-1">
+                                      <span className="text-[10px] font-medium text-gray-500">Difference</span>
+                                      <div className="bg-gray-900 rounded p-1">
+                                        <img
+                                          src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ?? undefined}
+                                          alt="Difference"
+                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                          onClick={() => {
+                                            const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff;
+                                            if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Diff` });
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    );
+                  })}
+                </div>
+              </div>
+            </details>
+          )}
+
+          {/* Other Consistency Checks (Image, Text) */}
           {finalChecksReport && (
             <details className={`border-2 rounded-xl p-4 ${
               finalChecksReport.overallConsistent
@@ -2224,10 +2691,10 @@ export function StoryDisplay({
               }`}>
                 {finalChecksReport.overallConsistent ? '✓' : '⚠️'}
                 {language === 'de'
-                  ? `Konsistenzprüfung (${finalChecksReport.totalIssues} Probleme)`
+                  ? `Konsistenzprüfung (${(finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0)} Probleme)`
                   : language === 'fr'
-                    ? `Vérification de cohérence (${finalChecksReport.totalIssues} problèmes)`
-                    : `Final Checks (${finalChecksReport.totalIssues} issues)`}
+                    ? `Vérification de cohérence (${(finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0)} problèmes)`
+                    : `Final Checks (${(finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0)} issues)`}
               </summary>
               <div className="mt-4 space-y-4">
                 {/* Summary */}
@@ -2403,457 +2870,6 @@ export function StoryDisplay({
                         )}
                       </div>
                     ))}
-                  </div>
-                )}
-
-                {/* Entity Consistency Grids (NEW) */}
-                {finalChecksReport.entity?.grids && finalChecksReport.entity.grids.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="font-semibold text-sm text-gray-800">
-                      {language === 'de' ? 'Entitäts-Konsistenz (Raster)' : language === 'fr' ? 'Cohérence des entités (grilles)' : 'Entity Consistency (Grids)'}
-                    </h4>
-                    <div className="space-y-2">
-                      {finalChecksReport.entity.grids.map((grid, gridIdx) => {
-                        const charResult = finalChecksReport.entity?.characters?.[grid.entityName];
-                        const isConsistent = charResult?.consistent ?? true;
-                        const score = charResult?.score ?? 0;
-                        const issues = charResult?.issues ?? [];
-
-                        return (
-                          <details key={gridIdx} className={`bg-white border rounded-lg overflow-hidden ${
-                            isConsistent ? 'border-green-200' : 'border-amber-200'
-                          }`}>
-                            <summary className="cursor-pointer p-3 flex items-center gap-2 hover:bg-gray-50">
-                              <span className={`text-sm ${isConsistent ? 'text-green-600' : 'text-amber-600'}`}>
-                                {isConsistent ? '✓' : '⚠️'}
-                              </span>
-                              <span className="font-medium text-sm text-gray-800">{grid.entityName}</span>
-                              <span className="text-xs text-gray-500">
-                                ({grid.cellCount} appearances)
-                              </span>
-                              <span className={`ml-auto text-xs px-2 py-0.5 rounded ${
-                                score >= 8 ? 'bg-green-100 text-green-700' :
-                                score >= 5 ? 'bg-amber-100 text-amber-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                Score: {score}/10
-                              </span>
-                            </summary>
-                            <div className="p-3 border-t border-gray-100 space-y-3">
-                              {/* Grid Image - clickable to enlarge, lazy loaded */}
-                              {(() => {
-                                // Use embedded gridImage if available, otherwise use lazy-loaded
-                                const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
-                                const isLoading = loadingEntityGridImages.has(grid.entityName);
-                                const sizeKB = (grid as { gridImageSizeKB?: number }).gridImageSizeKB;
-
-                                if (gridImage) {
-                                  return (
-                                    <div className="flex justify-center bg-gray-50 rounded p-2">
-                                      <img
-                                        src={gridImage}
-                                        alt={`${grid.entityName} consistency grid`}
-                                        className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
-                                        style={{ maxHeight: '400px' }}
-                                        onClick={() => setEnlargedImage({
-                                          src: gridImage,
-                                          title: `${grid.entityName} - Entity Consistency Grid`
-                                        })}
-                                        title="Click to enlarge"
-                                      />
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div className="flex justify-center bg-gray-50 rounded p-2">
-                                    <button
-                                      onClick={() => fetchEntityGridImage(grid.entityName)}
-                                      disabled={isLoading}
-                                      className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm text-gray-700 disabled:opacity-50"
-                                    >
-                                      {isLoading ? (
-                                        <>
-                                          <Loader2 className="w-4 h-4 animate-spin" />
-                                          <span>Loading grid...</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Images className="w-4 h-4" />
-                                          <span>Load Grid Image{sizeKB ? ` (${sizeKB} KB)` : ''}</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                );
-                              })()}
-
-                              {/* Cell Info with individual repair buttons - clickable to enlarge */}
-                              {grid.manifest?.cells && (
-                                <div className="text-xs text-gray-600">
-                                  <span className="font-medium">Cells: </span>
-                                  {grid.manifest.cells.map((cell, i) => {
-                                    const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
-                                    return (
-                                    <span key={i} className="inline-flex items-center bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 gap-1">
-                                      <button
-                                        onClick={() => gridImage && handleCellClick({ ...grid, gridImage }, i)}
-                                        className={`${gridImage ? 'hover:text-blue-600 hover:underline cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`}
-                                        title={gridImage ? "Click to enlarge this cell" : "Load grid image first"}
-                                        disabled={!gridImage}
-                                      >
-                                        {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
-                                        {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
-                                      </button>
-                                      {/* Individual repair button for non-reference cells */}
-                                      {!cell.isReference && storyId && typeof cell.pageNumber === 'number' && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleRepairSingleEntityPage(grid.entityName, cell.pageNumber as number);
-                                          }}
-                                          disabled={isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null}
-                                          className={`ml-0.5 px-1 py-0 text-[9px] rounded transition-colors ${
-                                            repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
-                                              ? 'bg-amber-300 text-amber-800'
-                                              : isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null
-                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                                : 'bg-amber-500 text-white hover:bg-amber-600'
-                                          }`}
-                                          title={`Repair page ${cell.pageNumber} for ${grid.entityName}`}
-                                        >
-                                          {repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
-                                            ? '...'
-                                            : '⚡'}
-                                        </button>
-                                      )}
-                                    </span>
-                                  );})}
-                                </div>
-                              )}
-
-                              {/* Issues */}
-                              {issues.length > 0 && (
-                                <div className="space-y-1">
-                                  <span className="text-xs font-medium text-gray-700">Issues:</span>
-                                  {issues.map((issue, issueIdx) => (
-                                    <div key={issueIdx} className={`text-xs p-2 rounded ${
-                                      issue.severity === 'critical' ? 'bg-red-50 border-l-4 border-red-400' :
-                                      issue.severity === 'major' ? 'bg-amber-50 border-l-4 border-amber-400' :
-                                      'bg-gray-50 border-l-4 border-gray-300'
-                                    }`}>
-                                      <div className="flex items-start gap-2">
-                                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                          issue.severity === 'critical' ? 'bg-red-200 text-red-800' :
-                                          issue.severity === 'major' ? 'bg-amber-200 text-amber-800' :
-                                          'bg-gray-200 text-gray-700'
-                                        }`}>
-                                          {issue.subType || issue.type}
-                                        </span>
-                                        {issue.pagesToFix && (
-                                          <span className="text-[10px] text-gray-500">
-                                            Fix page(s): {issue.pagesToFix.join(', ')}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <p className="mt-1 text-gray-700">{issue.description}</p>
-                                      {issue.fixInstruction && (
-                                        <p className="mt-1 text-blue-600 italic">{issue.fixInstruction}</p>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-
-                              {/* Summary */}
-                              {charResult?.summary && (
-                                <p className="text-xs text-gray-500 italic">{charResult.summary}</p>
-                              )}
-
-                              {/* Repair Button - Only show if there are issues and score < 8 */}
-                              {storyId && (!isConsistent || score < 8) && grid.entityType === 'character' && (
-                                <div className="mt-3 pt-3 border-t border-gray-100">
-                                  <button
-                                    onClick={() => handleRepairEntityConsistency(grid.entityName)}
-                                    disabled={isGenerating || repairingEntity !== null}
-                                    className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
-                                      isGenerating || repairingEntity !== null
-                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                        : 'bg-amber-500 text-white hover:bg-amber-600'
-                                    }`}
-                                  >
-                                    {repairingEntity === grid.entityName ? (
-                                      <>
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                        <span>Repairing...</span>
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Wrench className="w-3 h-3" />
-                                        <span>Repair Consistency</span>
-                                      </>
-                                    )}
-                                  </button>
-                                  <p className="text-[10px] text-gray-400 mt-1">
-                                    Regenerate appearances to match reference photo
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Repair Results - Show per-cell before/after/diff grouped by clothing */}
-                              {finalChecksReport.entityRepairs?.[grid.entityName] && (
-                                <div className="mt-3 pt-3 border-t border-gray-100 space-y-3">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-green-600">✓ Repaired</span>
-                                    <span className="text-[10px] text-gray-400">
-                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.cellsRepaired
-                                        ? `${finalChecksReport.entityRepairs[grid.entityName]?.cellsRepaired} pages updated`
-                                        : finalChecksReport.entityRepairs?.[grid.entityName]?.pages
-                                          ? `${Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length} page(s) repaired individually`
-                                          : 'repair complete'}
-                                      {(finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount ?? 0) > 1 &&
-                                        ` (${finalChecksReport.entityRepairs?.[grid.entityName]?.clothingGroupCount} clothing groups)`}
-                                    </span>
-                                  </div>
-
-                                  {/* NEW: Grouped by clothing category */}
-                                  {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.length ? (
-                                    <div className="space-y-4">
-                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.gridsByClothing?.map((clothingGroup) => (
-                                        <div key={clothingGroup.clothingCategory} className="space-y-2">
-                                          {/* Clothing category header */}
-                                          <div className="flex items-center gap-2 border-b border-gray-100 pb-1">
-                                            <span className="text-[10px] font-semibold text-gray-600 uppercase">
-                                              {clothingGroup.clothingCategory}
-                                            </span>
-                                            <span className="text-[9px] text-gray-400">
-                                              ({clothingGroup.cropCount} pages)
-                                            </span>
-                                            <span className="text-[9px] text-gray-400 ml-auto">
-                                              ref: {clothingGroup.referenceUsed}
-                                            </span>
-                                          </div>
-
-                                          {/* Per-cell comparisons within this clothing group */}
-                                          {clothingGroup.cellComparisons?.length ? (
-                                            <div className="space-y-1">
-                                              <div className="grid grid-cols-4 gap-1 text-[9px] font-medium text-gray-500 px-1">
-                                                <span>Cell</span>
-                                                <span>Before</span>
-                                                <span>After</span>
-                                                <span>Diff</span>
-                                              </div>
-                                              {clothingGroup.cellComparisons.map((cell) => (
-                                                <div key={`${clothingGroup.clothingCategory}-${cell.letter}`} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
-                                                  <div className="text-center">
-                                                    <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
-                                                    <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
-                                                  </div>
-                                                  <img
-                                                    src={cell.before}
-                                                    alt={`${cell.letter} before`}
-                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                    onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before (${clothingGroup.clothingCategory})` })}
-                                                  />
-                                                  <img
-                                                    src={cell.after}
-                                                    alt={`${cell.letter} after`}
-                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                    onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After (${clothingGroup.clothingCategory})` })}
-                                                  />
-                                                  <div className="bg-gray-900 rounded">
-                                                    <img
-                                                      src={cell.diff}
-                                                      alt={`${cell.letter} diff`}
-                                                      className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                      onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff (${clothingGroup.clothingCategory})` })}
-                                                    />
-                                                  </div>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          ) : (
-                                            /* Fallback to grid comparison for this clothing group */
-                                            <div className={`grid gap-2 ${clothingGroup.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                                              <div className="space-y-0.5">
-                                                <span className="text-[9px] font-medium text-gray-500">Before</span>
-                                                <div className="bg-gray-50 rounded p-0.5">
-                                                  <img
-                                                    src={clothingGroup.gridBefore}
-                                                    alt="Before repair"
-                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                    onClick={() => clothingGroup.gridBefore && setEnlargedImage({ src: clothingGroup.gridBefore, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Before` })}
-                                                  />
-                                                </div>
-                                              </div>
-                                              <div className="space-y-0.5">
-                                                <span className="text-[9px] font-medium text-gray-500">After</span>
-                                                <div className="bg-gray-50 rounded p-0.5">
-                                                  <img
-                                                    src={clothingGroup.gridAfter}
-                                                    alt="After repair"
-                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                    onClick={() => clothingGroup.gridAfter && setEnlargedImage({ src: clothingGroup.gridAfter, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid After` })}
-                                                  />
-                                                </div>
-                                              </div>
-                                              {clothingGroup.gridDiff && (
-                                                <div className="space-y-0.5">
-                                                  <span className="text-[9px] font-medium text-gray-500">Diff</span>
-                                                  <div className="bg-gray-900 rounded p-0.5">
-                                                    <img
-                                                      src={clothingGroup.gridDiff}
-                                                      alt="Difference"
-                                                      className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                                      onClick={() => setEnlargedImage({ src: clothingGroup.gridDiff!, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Diff` })}
-                                                    />
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.length ? (
-                                    /* Backward compatible: flat cell comparisons (old format) */
-                                    <div className="space-y-2">
-                                      <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
-                                        <span>Cell</span>
-                                        <span>Before</span>
-                                        <span>After</span>
-                                        <span>Diff</span>
-                                      </div>
-                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.cellComparisons?.map((cell) => (
-                                        <div key={cell.letter} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
-                                          <div className="text-center">
-                                            <span className="text-xs font-bold text-gray-700">{cell.letter}</span>
-                                            <div className="text-[9px] text-gray-400">P{cell.pageNumber}</div>
-                                          </div>
-                                          <img
-                                            src={cell.before}
-                                            alt={`${cell.letter} before`}
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => cell.before && setEnlargedImage({ src: cell.before, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Before` })}
-                                          />
-                                          <img
-                                            src={cell.after}
-                                            alt={`${cell.letter} after`}
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => cell.after && setEnlargedImage({ src: cell.after, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} After` })}
-                                          />
-                                          <div className="bg-gray-900 rounded">
-                                            <img
-                                              src={cell.diff}
-                                              alt={`${cell.letter} diff`}
-                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                              onClick={() => cell.diff && setEnlargedImage({ src: cell.diff, title: `${grid.entityName} - Cell ${cell.letter} Page ${cell.pageNumber} Diff` })}
-                                            />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : finalChecksReport.entityRepairs?.[grid.entityName]?.pages && Object.keys(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).length > 0 ? (
-                                    /* Single-page repairs: show individual page comparisons */
-                                    <div className="space-y-2">
-                                      <div className="grid grid-cols-4 gap-1 text-[10px] font-medium text-gray-500 px-1">
-                                        <span>Page</span>
-                                        <span>Before</span>
-                                        <span>After</span>
-                                        <span>Diff</span>
-                                      </div>
-                                      {Object.entries(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).map(([pageNum, pageData]) => (
-                                        <div key={pageNum} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
-                                          <div className="text-center">
-                                            <span className="text-xs font-bold text-gray-700">P{pageNum}</span>
-                                            {pageData.clothingCategory && pageData.clothingCategory !== 'standard' && (
-                                              <div className="text-[8px] text-gray-400">{pageData.clothingCategory}</div>
-                                            )}
-                                          </div>
-                                          <img
-                                            src={pageData.comparison?.before}
-                                            alt={`P${pageNum} before`}
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${grid.entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
-                                          />
-                                          <img
-                                            src={pageData.comparison?.after}
-                                            alt={`P${pageNum} after`}
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
-                                          />
-                                          <div className="bg-gray-900 rounded">
-                                            <img
-                                              src={pageData.comparison?.diff}
-                                              alt={`P${pageNum} diff`}
-                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                              onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
-                                            />
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair ? (
-                                    /* Fallback to full grid comparison for oldest repairs */
-                                    <div className={`grid gap-3 ${finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ? 'grid-cols-3' : 'grid-cols-2'}`}>
-                                      <div className="space-y-1">
-                                        <span className="text-[10px] font-medium text-gray-500">Before Repair</span>
-                                        <div className="bg-gray-50 rounded p-1">
-                                          <img
-                                            src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair}
-                                            alt="Before repair"
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => {
-                                              const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair;
-                                              if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Before Repair` });
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                      <div className="space-y-1">
-                                        <span className="text-[10px] font-medium text-gray-500">After Repair</span>
-                                        <div className="bg-gray-50 rounded p-1">
-                                          <img
-                                            src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair}
-                                            alt="After repair"
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => {
-                                              const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair;
-                                              if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid After Repair` });
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                      {finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff && (
-                                        <div className="space-y-1">
-                                          <span className="text-[10px] font-medium text-gray-500">Difference</span>
-                                          <div className="bg-gray-900 rounded p-1">
-                                            <img
-                                              src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ?? undefined}
-                                              alt="Difference"
-                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                              onClick={() => {
-                                                const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff;
-                                                if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Diff` });
-                                              }}
-                                            />
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ) : null}
-                                </div>
-                              )}
-                            </div>
-                          </details>
-                        );
-                      })}
-                    </div>
-
-                    {/* Entity check summary */}
-                    <div className="text-xs text-gray-500 mt-2">
-                      {finalChecksReport.entity.summary}
-                    </div>
                   </div>
                 )}
 
