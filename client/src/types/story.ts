@@ -556,6 +556,11 @@ export interface ImageVersion {
   modelId?: string;
   createdAt: string;
   isActive: boolean;
+  type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair';
+  qualityScore?: number;
+  // Entity repair specific
+  entityRepairedFor?: string;
+  clothingCategory?: string;
 }
 
 // Landmark reference photo for real-world locations
