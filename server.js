@@ -3134,15 +3134,39 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // Get clothing category - prefer outline pageClothing, then parse from description
     const pageClothingData = storyData.pageClothing || null;
     const clothingRequirements = storyData.clothingRequirements || null;
+
     // pageClothing[pageNumber] can be a string ('standard', 'costumed:Cowboy') or an object (per-character clothing)
-    // Only use it as category if it's a string; objects are per-character data, not a category
-    let clothingCategory = pageClothingData?.pageClothing?.[pageNumber];
-    if (typeof clothingCategory !== 'string') {
-      clothingCategory = null;
-    }
-    if (!clothingCategory) {
+    const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
+    let clothingCategory;
+    let effectiveClothingRequirements = clothingRequirements;
+
+    if (typeof pageClothingEntry === 'string') {
+      // Simple string: 'standard', 'costumed:pirate', etc.
+      clothingCategory = pageClothingEntry;
+    } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
+      // Per-character clothing object: {"Lukas":"costumed:pirate","Manuel":"costumed:pirate"}
+      // Convert to _currentClothing format and merge with clothingRequirements
+      const perPageClothing = convertClothingToCurrentFormat(pageClothingEntry);
+      effectiveClothingRequirements = { ...clothingRequirements };
+      for (const [charName, charClothing] of Object.entries(perPageClothing)) {
+        effectiveClothingRequirements[charName] = {
+          ...effectiveClothingRequirements[charName],
+          ...charClothing
+        };
+      }
+      // Determine predominant clothing category from per-character data
+      const clothingValues = Object.values(pageClothingEntry);
+      const firstClothing = clothingValues[0];
+      if (firstClothing && firstClothing.startsWith('costumed:')) {
+        clothingCategory = firstClothing; // Use first character's costume as category
+      } else {
+        clothingCategory = firstClothing || parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
+      }
+      log.debug(`🔄 [REGEN] Using per-character clothing for page ${pageNumber}: ${JSON.stringify(pageClothingEntry)}`);
+    } else {
       clothingCategory = parseClothingCategory(expandedDescription) || pageClothingData?.primaryClothing || 'standard';
     }
+
     // Handle costumed:type format
     let effectiveClothing = clothingCategory;
     let costumeType = null;
@@ -3152,7 +3176,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     }
     const artStyle = storyData.artStyle || 'pixar';
     // Use detailed photo info (with names) for labeled reference images
-    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, effectiveClothingRequirements);
     // Apply styled avatars for non-costumed characters
     if (effectiveClothing !== 'costumed') {
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
@@ -3577,10 +3601,37 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
     // Determine which characters appear in this scene
     const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
 
-    // Get clothing category
-    let clothingCategory = typeof pageClothingData?.pageClothing?.[pageNumber] === 'string'
-      ? pageClothingData.pageClothing[pageNumber]
-      : parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+    // Get clothing category and handle per-character clothing from pageClothing
+    const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
+    let clothingCategory;
+    let effectiveClothingRequirements = clothingRequirements;
+
+    if (typeof pageClothingEntry === 'string') {
+      // Simple string: 'standard', 'costumed:pirate', etc.
+      clothingCategory = pageClothingEntry;
+    } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
+      // Per-character clothing object: {"Lukas":"costumed:pirate","Manuel":"costumed:pirate"}
+      // Convert to _currentClothing format and merge with clothingRequirements
+      const perPageClothing = convertClothingToCurrentFormat(pageClothingEntry);
+      effectiveClothingRequirements = { ...clothingRequirements };
+      for (const [charName, charClothing] of Object.entries(perPageClothing)) {
+        effectiveClothingRequirements[charName] = {
+          ...effectiveClothingRequirements[charName],
+          ...charClothing
+        };
+      }
+      // Determine predominant clothing category from per-character data
+      const clothingValues = Object.values(pageClothingEntry);
+      const firstClothing = clothingValues[0];
+      if (firstClothing && firstClothing.startsWith('costumed:')) {
+        clothingCategory = firstClothing; // Use first character's costume as category
+      } else {
+        clothingCategory = firstClothing || 'standard';
+      }
+      log.debug(`🔄 [ITERATE] Using per-character clothing for page ${pageNumber}: ${JSON.stringify(pageClothingEntry)}`);
+    } else {
+      clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+    }
 
     let effectiveClothing = clothingCategory;
     let costumeType = null;
@@ -3590,7 +3641,7 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
     }
 
     const artStyle = storyData.artStyle || 'pixar';
-    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+    let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, effectiveClothingRequirements);
     if (effectiveClothing !== 'costumed') {
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
     }
