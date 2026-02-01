@@ -3601,36 +3601,61 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
     // Determine which characters appear in this scene
     const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
 
-    // Get clothing category and handle per-character clothing from pageClothing
-    const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
+    // Extract metadata from the new scene description FIRST to get per-character clothing
+    const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+
+    // Get clothing - PREFER per-character clothing from the new scene description
+    // This ensures we use the clothing the scene prompt just generated (e.g., "costumed:wizard")
+    // rather than stale pageClothing data
     let clothingCategory;
     let effectiveClothingRequirements = clothingRequirements;
 
-    if (typeof pageClothingEntry === 'string') {
-      // Simple string: 'standard', 'costumed:pirate', etc.
-      clothingCategory = pageClothingEntry;
-    } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
-      // Per-character clothing object: {"Lukas":"costumed:pirate","Manuel":"costumed:pirate"}
-      // Convert to _currentClothing format and merge with clothingRequirements
-      const perPageClothing = convertClothingToCurrentFormat(pageClothingEntry);
+    // Priority 1: Per-character clothing from newly generated scene description
+    if (newSceneMetadata?.characterClothing && Object.keys(newSceneMetadata.characterClothing).length > 0) {
+      const sceneClothing = newSceneMetadata.characterClothing;
+      const perCharClothing = convertClothingToCurrentFormat(sceneClothing);
       effectiveClothingRequirements = { ...clothingRequirements };
-      for (const [charName, charClothing] of Object.entries(perPageClothing)) {
+      for (const [charName, charClothing] of Object.entries(perCharClothing)) {
         effectiveClothingRequirements[charName] = {
           ...effectiveClothingRequirements[charName],
           ...charClothing
         };
       }
       // Determine predominant clothing category from per-character data
-      const clothingValues = Object.values(pageClothingEntry);
+      const clothingValues = Object.values(sceneClothing);
       const firstClothing = clothingValues[0];
       if (firstClothing && firstClothing.startsWith('costumed:')) {
-        clothingCategory = firstClothing; // Use first character's costume as category
+        clothingCategory = firstClothing;
       } else {
         clothingCategory = firstClothing || 'standard';
       }
-      log.debug(`🔄 [ITERATE] Using per-character clothing for page ${pageNumber}: ${JSON.stringify(pageClothingEntry)}`);
-    } else {
-      clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+      log.debug(`🔄 [ITERATE] Using per-character clothing from scene description: ${JSON.stringify(sceneClothing)}`);
+    }
+    // Priority 2: Per-character clothing from pageClothing (stored data)
+    else {
+      const pageClothingEntry = pageClothingData?.pageClothing?.[pageNumber];
+      if (typeof pageClothingEntry === 'string') {
+        clothingCategory = pageClothingEntry;
+      } else if (pageClothingEntry && typeof pageClothingEntry === 'object') {
+        const perPageClothing = convertClothingToCurrentFormat(pageClothingEntry);
+        effectiveClothingRequirements = { ...clothingRequirements };
+        for (const [charName, charClothing] of Object.entries(perPageClothing)) {
+          effectiveClothingRequirements[charName] = {
+            ...effectiveClothingRequirements[charName],
+            ...charClothing
+          };
+        }
+        const clothingValues = Object.values(pageClothingEntry);
+        const firstClothing = clothingValues[0];
+        if (firstClothing && firstClothing.startsWith('costumed:')) {
+          clothingCategory = firstClothing;
+        } else {
+          clothingCategory = firstClothing || 'standard';
+        }
+        log.debug(`🔄 [ITERATE] Using per-character clothing from pageClothing: ${JSON.stringify(pageClothingEntry)}`);
+      } else {
+        clothingCategory = parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
+      }
     }
 
     let effectiveClothing = clothingCategory;
@@ -3646,8 +3671,7 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
       referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
     }
 
-    // Build landmark photos and VB grid
-    const newSceneMetadata = extractSceneMetadata(newSceneDescription);
+    // Build landmark photos and VB grid (newSceneMetadata already extracted above)
     const pageLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, newSceneMetadata) : [];
 
     let vbGrid = null;
@@ -4574,13 +4598,45 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       for (const update of repairResult.updatedImages) {
         const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
         if (sceneIndex >= 0) {
-          if (!sceneImages[sceneIndex].preEntityRepairImage) {
-            sceneImages[sceneIndex].preEntityRepairImage = sceneImages[sceneIndex].imageData;
+          const existingImage = sceneImages[sceneIndex];
+
+          // Initialize imageVersions if not present (migrate existing as original)
+          if (!existingImage.imageVersions) {
+            existingImage.imageVersions = [{
+              imageData: existingImage.imageData,
+              description: existingImage.description,
+              prompt: existingImage.prompt,
+              modelId: existingImage.modelId,
+              createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
+              isActive: false,
+              type: 'original'
+            }];
+          } else {
+            // Mark all previous versions as inactive
+            existingImage.imageVersions.forEach(v => v.isActive = false);
           }
-          sceneImages[sceneIndex].imageData = update.imageData;
-          sceneImages[sceneIndex].entityRepaired = true;
-          sceneImages[sceneIndex].entityRepairedAt = new Date().toISOString();
-          sceneImages[sceneIndex].entityRepairedFor = entityName;
+
+          // Add new version for entity repair
+          existingImage.imageVersions.push({
+            imageData: update.imageData,
+            description: existingImage.description,
+            prompt: existingImage.prompt,
+            modelId: 'gemini-2.0-flash-preview-image-generation',
+            createdAt: new Date().toISOString(),
+            isActive: true,
+            type: 'entity-repair',
+            entityRepairedFor: entityName,
+            clothingCategory: repairResult.clothingCategory
+          });
+
+          // Keep preEntityRepairImage for backward compatibility
+          if (!existingImage.preEntityRepairImage) {
+            existingImage.preEntityRepairImage = existingImage.imageData;
+          }
+          existingImage.imageData = update.imageData;
+          existingImage.entityRepaired = true;
+          existingImage.entityRepairedAt = new Date().toISOString();
+          existingImage.entityRepairedFor = entityName;
         }
       }
 
@@ -4651,14 +4707,45 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     for (const update of repairResult.updatedImages) {
       const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
       if (sceneIndex >= 0) {
-        // Store original before repair if not already stored
-        if (!sceneImages[sceneIndex].preEntityRepairImage) {
-          sceneImages[sceneIndex].preEntityRepairImage = sceneImages[sceneIndex].imageData;
+        const existingImage = sceneImages[sceneIndex];
+
+        // Initialize imageVersions if not present (migrate existing as original)
+        if (!existingImage.imageVersions) {
+          existingImage.imageVersions = [{
+            imageData: existingImage.imageData,
+            description: existingImage.description,
+            prompt: existingImage.prompt,
+            modelId: existingImage.modelId,
+            createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
+            isActive: false,
+            type: 'original'
+          }];
+        } else {
+          // Mark all previous versions as inactive
+          existingImage.imageVersions.forEach(v => v.isActive = false);
         }
-        sceneImages[sceneIndex].imageData = update.imageData;
-        sceneImages[sceneIndex].entityRepaired = true;
-        sceneImages[sceneIndex].entityRepairedAt = new Date().toISOString();
-        sceneImages[sceneIndex].entityRepairedFor = entityName;
+
+        // Add new version for entity repair
+        existingImage.imageVersions.push({
+          imageData: update.imageData,
+          description: existingImage.description,
+          prompt: existingImage.prompt,
+          modelId: 'gemini-2.0-flash-preview-image-generation',
+          createdAt: new Date().toISOString(),
+          isActive: true,
+          type: 'entity-repair',
+          entityRepairedFor: entityName,
+          clothingCategory: update.clothingCategory
+        });
+
+        // Keep preEntityRepairImage for backward compatibility
+        if (!existingImage.preEntityRepairImage) {
+          existingImage.preEntityRepairImage = existingImage.imageData;
+        }
+        existingImage.imageData = update.imageData;
+        existingImage.entityRepaired = true;
+        existingImage.entityRepairedAt = new Date().toISOString();
+        existingImage.entityRepairedFor = entityName;
       }
     }
 
