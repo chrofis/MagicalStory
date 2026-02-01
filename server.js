@@ -5097,7 +5097,8 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
 
     // Run entity consistency check
     const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
-    const report = await runEntityConsistencyChecks(storyData, req.user.id);
+    const characters = storyData.characters || [];
+    const report = await runEntityConsistencyChecks(storyData, characters);
 
     // Save report to story
     if (!storyData.finalChecksReport) {
