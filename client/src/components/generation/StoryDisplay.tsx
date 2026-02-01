@@ -2678,20 +2678,35 @@ export function StoryDisplay({
                                               <div className="space-y-0.5">
                                                 <span className="text-[9px] font-medium text-gray-500">Before</span>
                                                 <div className="bg-gray-50 rounded p-0.5">
-                                                  <img src={clothingGroup.gridBefore} alt="Before repair" className="w-full h-auto rounded" />
+                                                  <img
+                                                    src={clothingGroup.gridBefore}
+                                                    alt="Before repair"
+                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                    onClick={() => clothingGroup.gridBefore && setEnlargedImage({ src: clothingGroup.gridBefore, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Before` })}
+                                                  />
                                                 </div>
                                               </div>
                                               <div className="space-y-0.5">
                                                 <span className="text-[9px] font-medium text-gray-500">After</span>
                                                 <div className="bg-gray-50 rounded p-0.5">
-                                                  <img src={clothingGroup.gridAfter} alt="After repair" className="w-full h-auto rounded" />
+                                                  <img
+                                                    src={clothingGroup.gridAfter}
+                                                    alt="After repair"
+                                                    className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                    onClick={() => clothingGroup.gridAfter && setEnlargedImage({ src: clothingGroup.gridAfter, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid After` })}
+                                                  />
                                                 </div>
                                               </div>
                                               {clothingGroup.gridDiff && (
                                                 <div className="space-y-0.5">
                                                   <span className="text-[9px] font-medium text-gray-500">Diff</span>
                                                   <div className="bg-gray-900 rounded p-0.5">
-                                                    <img src={clothingGroup.gridDiff} alt="Difference" className="w-full h-auto rounded" />
+                                                    <img
+                                                      src={clothingGroup.gridDiff}
+                                                      alt="Difference"
+                                                      className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                                      onClick={() => setEnlargedImage({ src: clothingGroup.gridDiff!, title: `${grid.entityName} - ${clothingGroup.clothingCategory} Grid Diff` })}
+                                                    />
                                                   </div>
                                                 </div>
                                               )}
@@ -2787,7 +2802,11 @@ export function StoryDisplay({
                                           <img
                                             src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair}
                                             alt="Before repair"
-                                            className="w-full h-auto rounded"
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => {
+                                              const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridBeforeRepair;
+                                              if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Before Repair` });
+                                            }}
                                           />
                                         </div>
                                       </div>
@@ -2797,7 +2816,11 @@ export function StoryDisplay({
                                           <img
                                             src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair}
                                             alt="After repair"
-                                            className="w-full h-auto rounded"
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => {
+                                              const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridAfterRepair;
+                                              if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid After Repair` });
+                                            }}
                                           />
                                         </div>
                                       </div>
@@ -2808,7 +2831,11 @@ export function StoryDisplay({
                                             <img
                                               src={finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff ?? undefined}
                                               alt="Difference"
-                                              className="w-full h-auto rounded"
+                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                              onClick={() => {
+                                                const src = finalChecksReport.entityRepairs?.[grid.entityName]?.gridDiff;
+                                                if (src) setEnlargedImage({ src, title: `${grid.entityName} - Grid Diff` });
+                                              }}
                                             />
                                           </div>
                                         </div>
