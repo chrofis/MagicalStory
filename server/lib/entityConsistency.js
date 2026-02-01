@@ -27,6 +27,26 @@ const MIN_APPEARANCES = 2;    // Minimum appearances to check consistency
 const MAX_GRID_CELLS = 12;    // Maximum cells per grid (4x3)
 
 /**
+ * Group appearances by clothing category
+ *
+ * @param {Array} appearances - Array of appearance objects with clothing field
+ * @returns {Map<string, Array>} Map of clothingCategory -> appearances
+ */
+function groupAppearancesByClothing(appearances) {
+  const groups = new Map();
+
+  for (const app of appearances) {
+    const clothing = app.clothing || 'standard';
+    if (!groups.has(clothing)) {
+      groups.set(clothing, []);
+    }
+    groups.get(clothing).push(app);
+  }
+
+  return groups;
+}
+
+/**
  * Get the appropriate styled avatar for a character based on clothing category
  *
  * @param {object} character - Character object with avatars
@@ -113,89 +133,137 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
     log.info(`🔍 [ENTITY-CHECK] Found ${entityAppearances.size} entities with appearances`);
 
-    // Process each character entity
+    // Process each character entity - group by clothing for accurate evaluation
+    const artStyle = storyData.artStyle || 'pixar';
+
     if (checkCharacters) {
       for (const character of characters) {
         const charName = character.name;
         const appearances = entityAppearances.get(charName);
 
-        if (!appearances || appearances.length < minAppearances) {
-          log.verbose(`[ENTITY-CHECK] Skipping ${charName}: only ${appearances?.length || 0} appearances (need ${minAppearances})`);
+        if (!appearances || appearances.length === 0) {
+          log.verbose(`[ENTITY-CHECK] Skipping ${charName}: no appearances found`);
           continue;
         }
 
-        log.info(`🔍 [ENTITY-CHECK] Checking ${charName}: ${appearances.length} appearances`);
+        log.info(`🔍 [ENTITY-CHECK] Checking ${charName}: ${appearances.length} total appearances`);
+
+        // Initialize character report with new structure
+        report.characters[charName] = {
+          byClothing: {},
+          overallConsistent: true,
+          overallScore: 10,
+          totalIssues: 0
+        };
 
         try {
-          // Extract crops for each appearance
-          const crops = await extractEntityCrops(appearances);
+          // Group appearances by clothing category
+          const byClothing = groupAppearancesByClothing(appearances);
+          log.info(`🔍 [ENTITY-CHECK] ${charName} has ${byClothing.size} clothing categories: ${[...byClothing.keys()].join(', ')}`);
 
-          if (crops.length < minAppearances) {
-            log.warn(`⚠️  [ENTITY-CHECK] ${charName}: only ${crops.length} valid crops`);
-            continue;
-          }
+          // Evaluate each clothing group separately
+          for (const [clothingCategory, groupAppearances] of byClothing) {
+            // For costumed categories, allow single appearances (compare to avatar)
+            // For standard categories, still require minAppearances
+            const isCostumed = clothingCategory.startsWith('costumed:');
+            const minRequired = isCostumed ? 1 : minAppearances;
 
-          // Create entity grid
-          const referencePhoto = character.photoUrl || character.photo;
-          const gridResult = await createEntityGrid(crops, charName, referencePhoto);
-
-          // Store grid for dev panel
-          report.grids.push({
-            entityName: charName,
-            entityType: 'character',
-            gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-            manifest: gridResult.manifest,
-            cellCount: crops.length
-          });
-
-          // Save grid to disk if requested
-          if (saveGrids && outputDir) {
-            await saveEntityGrid(gridResult.buffer, charName, 'character', outputDir);
-          }
-
-          // Evaluate consistency
-          const evalResult = await evaluateEntityConsistency(
-            gridResult.buffer,
-            gridResult.manifest,
-            {
-              entityType: 'character',
-              entityName: charName,
-              referencePhoto,
-              cellCount: crops.length
+            if (groupAppearances.length < minRequired) {
+              log.verbose(`[ENTITY-CHECK] Skipping ${charName} (${clothingCategory}): only ${groupAppearances.length} appearances (need ${minRequired})`);
+              continue;
             }
-          );
 
-          // Store result
-          report.characters[charName] = {
-            gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-            consistent: evalResult.consistent,
-            score: evalResult.score,
-            issues: evalResult.issues || [],
-            summary: evalResult.summary,
-            // Include debug info for parse failures
-            ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
-          };
+            log.info(`🔍 [ENTITY-CHECK] Checking ${charName} (${clothingCategory}): ${groupAppearances.length} appearances`);
 
-          // Aggregate
-          if (!evalResult.consistent) {
-            report.overallConsistent = false;
+            // Extract crops for this clothing group
+            const crops = await extractEntityCrops(groupAppearances);
+
+            if (crops.length < minRequired) {
+              log.warn(`⚠️  [ENTITY-CHECK] ${charName} (${clothingCategory}): only ${crops.length} valid crops`);
+              continue;
+            }
+
+            // Get styled avatar for this specific clothing category
+            const refAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+
+            // Create grid with appropriate reference
+            const gridLabel = `${charName} (${clothingCategory})`;
+            const gridResult = await createEntityGrid(crops, gridLabel, refAvatar);
+
+            // Store grid for dev panel
+            report.grids.push({
+              entityName: charName,
+              entityType: 'character',
+              clothingCategory,
+              gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+              manifest: gridResult.manifest,
+              cellCount: crops.length
+            });
+
+            // Save grid to disk if requested
+            if (saveGrids && outputDir) {
+              await saveEntityGrid(gridResult.buffer, `${charName}_${clothingCategory}`, 'character', outputDir);
+            }
+
+            // Evaluate consistency with clothing context
+            const evalResult = await evaluateEntityConsistency(
+              gridResult.buffer,
+              gridResult.manifest,
+              {
+                entityType: 'character',
+                entityName: charName,
+                clothingCategory,
+                referencePhoto: refAvatar,
+                cellCount: crops.length
+              }
+            );
+
+            // Store per-clothing result
+            report.characters[charName].byClothing[clothingCategory] = {
+              gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+              consistent: evalResult.consistent,
+              score: evalResult.score,
+              issues: evalResult.issues || [],
+              summary: evalResult.summary,
+              cellCount: crops.length,
+              ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
+            };
+
+            // Aggregate into character-level stats
+            if (!evalResult.consistent) {
+              report.characters[charName].overallConsistent = false;
+              report.overallConsistent = false;
+            }
+            const issueCount = evalResult.issues?.length || 0;
+            report.characters[charName].totalIssues += issueCount;
+            report.totalIssues += issueCount;
+
+            // Update overall score (use minimum across clothing categories)
+            if (evalResult.score < report.characters[charName].overallScore) {
+              report.characters[charName].overallScore = evalResult.score;
+            }
+
+            // Track token usage
+            if (evalResult.usage) {
+              report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
+              report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
+              report.tokenUsage.calls++;
+            }
           }
-          report.totalIssues += evalResult.issues?.length || 0;
 
-          // Track token usage
-          if (evalResult.usage) {
-            report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
-            report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
-            report.tokenUsage.calls++;
+          // If no clothing categories were evaluated, remove the empty entry
+          if (Object.keys(report.characters[charName].byClothing).length === 0) {
+            delete report.characters[charName];
           }
 
         } catch (err) {
           log.error(`❌ [ENTITY-CHECK] Error checking ${charName}: ${err.message}`);
           report.characters[charName] = {
-            error: err.message,
-            consistent: true,  // Assume consistent on error
-            score: 0,
-            issues: []
+            byClothing: {},
+            overallConsistent: true,
+            overallScore: 0,
+            totalIssues: 0,
+            error: err.message
           };
         }
       }
@@ -755,7 +823,7 @@ async function createEntityGrid(crops, entityName, referencePhoto = null) {
  * @returns {Promise<Object>} Evaluation result
  */
 async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
-  const { entityType, entityName, referencePhoto, cellCount } = entityInfo;
+  const { entityType, entityName, referencePhoto, cellCount, clothingCategory } = entityInfo;
 
   // Build prompt from template
   const promptTemplate = PROMPT_TEMPLATES.entityConsistencyCheck;
@@ -774,7 +842,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
   const cellInfo = manifest.cells.map(cell => ({
     cell: cell.letter,
     page: cell.isReference ? 'Reference Photo' : cell.pageNumber,
-    clothing: cell.clothing || 'standard',
+    clothing: cell.clothing || clothingCategory || 'standard',
     cropType: cell.cropType || 'face'
   }));
 
@@ -783,12 +851,43 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
     ? 'A reference photo of this character is provided as cell R.'
     : 'No reference photo available.';
 
+  // Build clothing context info (new for per-clothing evaluation)
+  let clothingContextInfo = '';
+  if (clothingCategory) {
+    if (clothingCategory.startsWith('costumed:')) {
+      const costumeType = clothingCategory.replace('costumed:', '');
+      clothingContextInfo = `
+## Clothing Context
+
+This evaluation is for **${clothingCategory}** (costume: ${costumeType}).
+All cells show the character in their ${costumeType} costume.
+Cell R shows the reference avatar with the correct costumed appearance.
+
+Compare each cell to the reference avatar (Cell R) for:
+- Face, hair, skin tone consistency
+- Costume matches the ${costumeType} style shown in Cell R
+- Even if only one appearance exists, compare it to the reference avatar`;
+    } else {
+      clothingContextInfo = `
+## Clothing Context
+
+This evaluation is for **${clothingCategory}** clothing category.
+All cells should show the character in ${clothingCategory} attire.
+Cell R shows the reference avatar with the correct ${clothingCategory} appearance.
+
+Compare each cell to the reference avatar (Cell R) for:
+- Face, hair, skin tone consistency
+- Clothing matches the ${clothingCategory} style shown in Cell R`;
+    }
+  }
+
   // Fill template
   const prompt = promptTemplate
     .replace('{ENTITY_TYPE}', entityType)
     .replace('{ENTITY_NAME}', entityName)
     .replace(/\{ENTITY_NAME\}/g, entityName)  // Replace all occurrences
     .replace('{REFERENCE_PHOTO_INFO}', refPhotoInfo)
+    .replace('{CLOTHING_CONTEXT}', clothingContextInfo)
     .replace('{CELL_INFO}', JSON.stringify(cellInfo, null, 2))
     .replace('{CELL_COUNT}', cellCount.toString());
 
@@ -2137,6 +2236,7 @@ module.exports = {
   repairSinglePage,
 
   // Helper functions (exported for testing)
+  groupAppearancesByClothing,
   collectEntityAppearances,
   collectObjectAppearances,
   extractEntityCrops,

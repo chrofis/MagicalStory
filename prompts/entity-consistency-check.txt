@@ -7,6 +7,7 @@ You are reviewing cropped images of a single entity (character or object) across
 **Entity Type:** {ENTITY_TYPE}
 **Entity Name:** {ENTITY_NAME}
 {REFERENCE_PHOTO_INFO}
+{CLOTHING_CONTEXT}
 
 ## Grid Layout
 
