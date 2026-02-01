@@ -70,6 +70,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.entityConsistencyCheck = await fs.readFile(path.join(promptsDir, 'entity-consistency-check.txt'), 'utf-8');
     // Entity consistency repair prompt (for regenerating cells to match reference)
     PROMPT_TEMPLATES.entityConsistencyRepair = await fs.readFile(path.join(promptsDir, 'entity-consistency-repair.txt'), 'utf-8');
+    // Single-page entity repair prompt (for repairing one page at a time)
+    PROMPT_TEMPLATES.entitySinglePageRepair = await fs.readFile(path.join(promptsDir, 'entity-single-page-repair.txt'), 'utf-8');
     // Sub-region detection prompt (for targeted repairs of specific body parts/clothing)
     PROMPT_TEMPLATES.subRegionDetection = await fs.readFile(path.join(promptsDir, 'sub-region-detection.txt'), 'utf-8');
 

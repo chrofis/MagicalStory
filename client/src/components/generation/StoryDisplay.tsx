@@ -239,6 +239,7 @@ export function StoryDisplay({
   // Auto-repair state (dev mode only)
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
   const [repairingEntity, setRepairingEntity] = useState<string | null>(null);
+  const [repairingIssuePage, setRepairingIssuePage] = useState<number | null>(null);
 
   // Iterative improvement state (dev mode only)
   const [iteratingPage, setIteratingPage] = useState<number | null>(null);
@@ -543,6 +544,45 @@ export function StoryDisplay({
       alert(`Failed to repair: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setRepairingEntity(null);
+    }
+  };
+
+  // Handle image issue repair (dev mode) - repairs a specific page based on consistency issue
+  const handleRepairImageIssue = async (pageNumber: number, issue: { type?: string; description?: string; canonicalVersion?: string; recommendation?: string }) => {
+    if (!storyId || repairingIssuePage !== null) return;
+    setRepairingIssuePage(pageNumber);
+    try {
+      const response = await fetch(`/api/stories/${storyId}/repair/image/${pageNumber}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({
+          correctionNotes: `${issue.type || ''}: ${issue.description || ''}\nTarget: ${issue.canonicalVersion || ''}\nFix: ${issue.recommendation || ''}`
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Repair failed');
+      }
+
+      const result = await response.json();
+      console.log('Image issue repair result:', result);
+
+      if (result.success) {
+        if (onRefreshStory) {
+          await onRefreshStory();
+        } else {
+          window.location.reload();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to repair image issue:', err);
+      alert(`Failed to repair: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRepairingIssuePage(null);
     }
   };
 
@@ -2150,6 +2190,37 @@ export function StoryDisplay({
                                   <p className="text-green-700 mt-1 font-medium">
                                     💡 {issue.recommendation}
                                   </p>
+                                )}
+                                {/* Repair button for each page in pagesToFix */}
+                                {storyId && issue.pagesToFix && issue.pagesToFix.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {issue.pagesToFix.map((pageNum: number) => (
+                                      <button
+                                        key={pageNum}
+                                        onClick={() => handleRepairImageIssue(pageNum, issue)}
+                                        disabled={isGenerating || repairingIssuePage !== null}
+                                        className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded transition-colors ${
+                                          repairingIssuePage === pageNum
+                                            ? 'bg-amber-300 text-amber-800'
+                                            : isGenerating || repairingIssuePage !== null
+                                              ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                              : 'bg-amber-500 text-white hover:bg-amber-600'
+                                        }`}
+                                      >
+                                        {repairingIssuePage === pageNum ? (
+                                          <>
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            <span>Repairing P{pageNum}...</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <Wrench className="w-3 h-3" />
+                                            <span>Repair P{pageNum}</span>
+                                          </>
+                                        )}
+                                      </button>
+                                    ))}
+                                  </div>
                                 )}
                               </div>
                             ))}

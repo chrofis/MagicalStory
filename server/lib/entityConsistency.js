@@ -15,6 +15,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
+const { extractSceneMetadata } = require('./storyHelpers');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -94,6 +95,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
   try {
     const sceneImages = storyData.sceneImages || [];
+    const sceneDescriptions = storyData.sceneDescriptions || [];
 
     if (sceneImages.length < 2) {
       report.summary = 'Not enough images for entity consistency check';
@@ -102,7 +104,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
     // Collect entity appearances from bbox detection data
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
-    const entityAppearances = collectEntityAppearances(sceneImages, characters);
+    const entityAppearances = collectEntityAppearances(sceneImages, characters, sceneDescriptions);
 
     if (entityAppearances.size === 0) {
       report.summary = 'No entity appearances found with bounding boxes';
@@ -306,9 +308,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  *
  * @param {Array<object>} sceneImages - Scene images with retryHistory
  * @param {Array<object>} characters - Characters to look for
+ * @param {Array<object>} sceneDescriptions - Scene descriptions for extracting clothing metadata
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
-function collectEntityAppearances(sceneImages, characters = []) {
+function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = []) {
   const appearances = new Map();
 
   // Initialize for each character
@@ -335,9 +338,29 @@ function collectEntityAppearances(sceneImages, characters = []) {
       }
     }
 
-    // Get clothing info for this page
-    const characterClothing = img.characterClothing || {};
-    const defaultClothing = img.clothing || 'standard';
+    // Get clothing info for this page - try multiple sources
+    // Priority: img.characterClothing > scene description metadata > img.clothing > 'standard'
+    let characterClothing = img.characterClothing || img.sceneCharacterClothing || {};
+    let defaultClothing = img.clothing || 'standard';
+
+    // If no per-character clothing found, try to extract from scene description metadata
+    if (Object.keys(characterClothing).length === 0 && sceneDescriptions.length > 0) {
+      const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+      if (sceneDesc?.description) {
+        const metadata = extractSceneMetadata(sceneDesc.description);
+        if (metadata) {
+          // Extract per-character clothing from metadata
+          if (metadata.characterClothing && Object.keys(metadata.characterClothing).length > 0) {
+            characterClothing = metadata.characterClothing;
+            log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Extracted clothing from scene metadata: ${JSON.stringify(characterClothing)}`);
+          }
+          // Also check for global clothing in metadata
+          if (metadata.clothing && !defaultClothing) {
+            defaultClothing = metadata.clothing;
+          }
+        }
+      }
+    }
 
     // Debug: log clothing info for this page
     if (Object.keys(characterClothing).length > 0) {
@@ -905,7 +928,8 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
 
     // Step 1: Collect entity appearances with forRegeneration=true
     const sceneImages = storyData.sceneImages || [];
-    const entityAppearances = collectEntityAppearances(sceneImages, [character]);
+    const sceneDescriptions = storyData.sceneDescriptions || [];
+    const entityAppearances = collectEntityAppearances(sceneImages, [character], sceneDescriptions);
     const appearances = entityAppearances.get(charName);
 
     if (!appearances || appearances.length < 2) {
@@ -1297,10 +1321,457 @@ async function saveEntityGrids(grids, outputDir) {
   return paths;
 }
 
+// Gemini's minimum recommended size for good repair results
+const GEMINI_MIN_SIZE = 512;
+
+// Gemini-supported aspect ratios for image generation
+const GEMINI_ASPECT_RATIOS = [
+  { ratio: '1:1', width: 1024, height: 1024 },
+  { ratio: '3:4', width: 896, height: 1120 },
+  { ratio: '4:3', width: 1120, height: 896 },
+  { ratio: '9:16', width: 768, height: 1360 },
+  { ratio: '16:9', width: 1360, height: 768 }
+];
+
+/**
+ * Pad an image to a Gemini-supported aspect ratio
+ * @param {Buffer} imageBuffer - Image buffer
+ * @returns {Promise<{buffer: Buffer, paddingInfo: object}>}
+ */
+async function padToGeminiRatio(imageBuffer) {
+  const meta = await sharp(imageBuffer).metadata();
+  const currentRatio = meta.width / meta.height;
+
+  // Find the closest Gemini aspect ratio
+  let bestRatio = GEMINI_ASPECT_RATIOS[0];
+  let bestDiff = Infinity;
+
+  for (const ar of GEMINI_ASPECT_RATIOS) {
+    const targetRatio = ar.width / ar.height;
+    const diff = Math.abs(currentRatio - targetRatio);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      bestRatio = ar;
+    }
+  }
+
+  const targetRatio = bestRatio.width / bestRatio.height;
+
+  // Calculate new dimensions to fit the target ratio
+  let newWidth, newHeight;
+  if (currentRatio > targetRatio) {
+    // Image is wider, add padding on top/bottom
+    newWidth = meta.width;
+    newHeight = Math.round(meta.width / targetRatio);
+  } else {
+    // Image is taller, add padding on left/right
+    newHeight = meta.height;
+    newWidth = Math.round(meta.height * targetRatio);
+  }
+
+  // Calculate padding
+  const padX = Math.max(0, newWidth - meta.width);
+  const padY = Math.max(0, newHeight - meta.height);
+  const padLeft = Math.floor(padX / 2);
+  const padRight = padX - padLeft;
+  const padTop = Math.floor(padY / 2);
+  const padBottom = padY - padTop;
+
+  // Apply padding with edge extension (more natural than solid color)
+  const paddedBuffer = await sharp(imageBuffer)
+    .extend({
+      top: padTop,
+      bottom: padBottom,
+      left: padLeft,
+      right: padRight,
+      extendWith: 'mirror'  // Mirror edges for more natural blending
+    })
+    .toBuffer();
+
+  return {
+    buffer: paddedBuffer,
+    paddingInfo: {
+      padTop,
+      padBottom,
+      padLeft,
+      padRight,
+      originalWidth: meta.width,
+      originalHeight: meta.height,
+      paddedWidth: newWidth,
+      paddedHeight: newHeight,
+      aspectRatio: bestRatio.ratio
+    }
+  };
+}
+
+/**
+ * Remove padding from a repaired image
+ * @param {Buffer} imageBuffer - Padded repaired image
+ * @param {object} paddingInfo - Padding info from padToGeminiRatio
+ * @returns {Promise<Buffer>}
+ */
+async function removePadding(imageBuffer, paddingInfo) {
+  const meta = await sharp(imageBuffer).metadata();
+
+  // Calculate scale factors (Gemini might have changed the size)
+  const scaleX = meta.width / paddingInfo.paddedWidth;
+  const scaleY = meta.height / paddingInfo.paddedHeight;
+
+  // Scale padding values
+  const left = Math.round(paddingInfo.padLeft * scaleX);
+  const top = Math.round(paddingInfo.padTop * scaleY);
+  const extractWidth = Math.round(paddingInfo.originalWidth * scaleX);
+  const extractHeight = Math.round(paddingInfo.originalHeight * scaleY);
+
+  // Extract the original region
+  return sharp(imageBuffer)
+    .extract({
+      left: Math.max(0, left),
+      top: Math.max(0, top),
+      width: Math.min(extractWidth, meta.width - left),
+      height: Math.min(extractHeight, meta.height - top)
+    })
+    .toBuffer();
+}
+
+/**
+ * Prepare an image for Gemini repair (dynamic upscale + pad)
+ * @param {Buffer} cropBuffer - Original crop buffer
+ * @returns {Promise<object>} Prepared image data
+ */
+async function prepareForGeminiRepair(cropBuffer) {
+  const meta = await sharp(cropBuffer).metadata();
+  const minDim = Math.min(meta.width, meta.height);
+
+  let buffer = cropBuffer;
+  let upscaleFactor = 1;
+
+  // Only upscale if image is too small
+  if (minDim < GEMINI_MIN_SIZE) {
+    upscaleFactor = Math.ceil(GEMINI_MIN_SIZE / minDim);
+    buffer = await sharp(cropBuffer)
+      .resize(meta.width * upscaleFactor, meta.height * upscaleFactor, {
+        kernel: sharp.kernel.lanczos3
+      })
+      .toBuffer();
+    log.debug(`[SINGLE-PAGE-REPAIR] Upscaled ${meta.width}x${meta.height} by ${upscaleFactor}x`);
+  }
+
+  // Pad to Gemini-supported aspect ratio
+  const { buffer: padded, paddingInfo } = await padToGeminiRatio(buffer);
+
+  return {
+    buffer: padded,
+    paddingInfo,
+    upscaleFactor,
+    originalWidth: meta.width,
+    originalHeight: meta.height
+  };
+}
+
+/**
+ * Create a reference grid for single-page repair
+ * Contains: avatar + other crops from same clothing group (as reference only)
+ *
+ * @param {Array<object>} referenceCrops - Other crops from same clothing category
+ * @param {string} referenceAvatar - Styled avatar URL/data
+ * @param {string} entityName - Entity name
+ * @returns {Promise<{buffer: Buffer, manifest: object}>}
+ */
+async function createReferenceGrid(referenceCrops, referenceAvatar, entityName) {
+  const cells = [];
+
+  // Add avatar as first cell (Reference)
+  if (referenceAvatar) {
+    try {
+      let refBuffer;
+      if (referenceAvatar.startsWith('data:')) {
+        const base64Data = referenceAvatar.replace(/^data:image\/\w+;base64,/, '');
+        refBuffer = Buffer.from(base64Data, 'base64');
+      } else {
+        refBuffer = Buffer.from(referenceAvatar, 'base64');
+      }
+
+      cells.push({
+        buffer: refBuffer,
+        letter: 'R',
+        pageInfo: 'Avatar',
+        metadata: { isReference: true, entityName }
+      });
+    } catch (err) {
+      log.warn(`⚠️  [SINGLE-PAGE-REPAIR] Failed to add avatar: ${err.message}`);
+    }
+  }
+
+  // Add reference crops (other pages in same clothing group)
+  for (let i = 0; i < Math.min(referenceCrops.length, MAX_GRID_CELLS - 1); i++) {
+    const crop = referenceCrops[i];
+    cells.push({
+      buffer: crop.buffer,
+      letter: String.fromCharCode(65 + i),  // A, B, C...
+      pageInfo: `P${crop.pageNumber}`,
+      metadata: {
+        pageNumber: crop.pageNumber,
+        clothing: crop.clothing,
+        isReferenceOnly: true  // These are reference, not targets for repair
+      }
+    });
+  }
+
+  // Create grid
+  return createLabeledGrid(cells, {
+    title: `${entityName} Reference`,
+    cellSize: FACE_CROP_SIZE,
+    showPageInfo: true,
+    maxCols: 4,
+    maxRows: 3
+  });
+}
+
+/**
+ * Repair a single page's entity appearance
+ *
+ * @param {object} storyData - Story data with sceneImages, sceneDescriptions, artStyle
+ * @param {object} character - Character object with name, photoUrl, avatars
+ * @param {number} pageNumber - Page number to repair
+ * @param {object} options - Repair options
+ * @returns {Promise<object>} Repair result
+ */
+async function repairSinglePage(storyData, character, pageNumber, options = {}) {
+  const charName = character.name;
+  const artStyle = storyData.artStyle || 'pixar';
+
+  log.info(`🔧 [SINGLE-PAGE-REPAIR] Starting repair for ${charName} on page ${pageNumber}`);
+
+  try {
+    // Collect all appearances for this character
+    const sceneImages = storyData.sceneImages || [];
+    const sceneDescriptions = storyData.sceneDescriptions || [];
+    const entityAppearances = collectEntityAppearances(sceneImages, [character], sceneDescriptions);
+    const appearances = entityAppearances.get(charName);
+
+    if (!appearances || appearances.length < 1) {
+      return { success: false, error: `No appearances found for ${charName}` };
+    }
+
+    // Find the specific page's appearance
+    const targetAppearance = appearances.find(a => a.pageNumber === pageNumber);
+    if (!targetAppearance) {
+      return { success: false, error: `${charName} not found on page ${pageNumber}` };
+    }
+
+    // Extract all crops for grouping
+    const allCrops = await extractEntityCrops(appearances, { forRegeneration: true });
+    const targetCrop = allCrops.find(c => c.pageNumber === pageNumber);
+
+    if (!targetCrop) {
+      return { success: false, error: `Failed to extract crop for page ${pageNumber}` };
+    }
+
+    // Determine clothing category for target page
+    const clothingCategory = targetCrop.clothing || 'standard';
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Target page ${pageNumber} has clothing: ${clothingCategory}`);
+
+    // Get all OTHER crops in the same clothing category (for reference)
+    const referenceCrops = allCrops.filter(c =>
+      c.pageNumber !== pageNumber &&
+      (c.clothing || 'standard') === clothingCategory
+    );
+
+    // Get styled avatar for this clothing category
+    const referenceAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Using ${referenceAvatar ? 'styled' : 'no'} avatar for ${clothingCategory}`);
+
+    // Create reference grid (avatar + other crops from same clothing group)
+    const referenceGrid = await createReferenceGrid(referenceCrops, referenceAvatar, charName);
+
+    // Prepare the target image for repair (dynamic upscale + pad)
+    const preparedTarget = await prepareForGeminiRepair(targetCrop.buffer);
+
+    // Load the single-page repair prompt
+    const promptTemplate = PROMPT_TEMPLATES.entitySinglePageRepair;
+    if (!promptTemplate) {
+      // Fallback to a built-in prompt if template doesn't exist
+      log.warn('⚠️  [SINGLE-PAGE-REPAIR] Using fallback prompt (entity-single-page-repair.txt not found)');
+    }
+
+    const prompt = promptTemplate
+      ? promptTemplate
+          .replace(/\{ENTITY_NAME\}/g, charName)
+          .replace(/\{PAGE_NUMBER\}/g, pageNumber.toString())
+          .replace(/\{CLOTHING_CATEGORY\}/g, clothingCategory)
+          .replace(/\{REFERENCE_COUNT\}/g, referenceCrops.length.toString())
+      : buildFallbackSinglePagePrompt(charName, pageNumber, clothingCategory, referenceCrops.length);
+
+    // Send to Gemini: reference grid + target image
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Sending to Gemini: reference grid + page ${pageNumber} image`);
+
+    const model = genAI.getGenerativeModel({
+      model: REPAIR_MODEL,
+      generationConfig: {
+        responseModalities: ['IMAGE', 'TEXT'],
+        temperature: 0.5
+      }
+    });
+
+    const result = await model.generateContent([
+      prompt,
+      {
+        inlineData: {
+          mimeType: 'image/jpeg',
+          data: referenceGrid.buffer.toString('base64')
+        }
+      },
+      {
+        inlineData: {
+          mimeType: 'image/png',
+          data: preparedTarget.buffer.toString('base64')
+        }
+      }
+    ]);
+
+    const response = result.response;
+    const parts = response.candidates?.[0]?.content?.parts || [];
+
+    let repairedBuffer = null;
+    let textResponse = '';
+
+    for (const part of parts) {
+      if (part.inlineData?.data) {
+        repairedBuffer = Buffer.from(part.inlineData.data, 'base64');
+      } else if (part.text) {
+        textResponse = part.text;
+      }
+    }
+
+    if (!repairedBuffer) {
+      log.warn(`⚠️  [SINGLE-PAGE-REPAIR] Gemini returned text instead of image: ${textResponse.substring(0, 200)}`);
+      return { success: false, error: 'Gemini did not return an image', textResponse };
+    }
+
+    // Post-process: remove padding
+    let processedBuffer = await removePadding(repairedBuffer, preparedTarget.paddingInfo);
+
+    // Downscale to original dimensions if we upscaled
+    if (preparedTarget.upscaleFactor > 1) {
+      processedBuffer = await sharp(processedBuffer)
+        .resize(preparedTarget.originalWidth, preparedTarget.originalHeight, {
+          kernel: sharp.kernel.lanczos3
+        })
+        .toBuffer();
+      log.debug(`[SINGLE-PAGE-REPAIR] Downscaled back to ${preparedTarget.originalWidth}x${preparedTarget.originalHeight}`);
+    }
+
+    // Composite repaired cell back onto original page
+    const { applyVerifiedRepairs } = require('./repairVerification');
+    const repair = {
+      accepted: true,
+      buffer: processedBuffer,
+      issue: {
+        extraction: {
+          paddedBox: targetCrop.paddedBox
+        }
+      }
+    };
+
+    const repairedPageBuffer = await applyVerifiedRepairs(targetCrop.originalImageData, [repair]);
+    const repairedPageData = `data:image/jpeg;base64,${repairedPageBuffer.toString('base64')}`;
+
+    // Generate comparison images
+    const beforeBuffer = targetCrop.buffer;
+    const afterBuffer = processedBuffer;
+
+    // Ensure same dimensions for comparison
+    const beforeMeta = await sharp(beforeBuffer).metadata();
+    let afterResized = await sharp(afterBuffer)
+      .resize(beforeMeta.width, beforeMeta.height, { fit: 'fill' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const diffBuffer = await sharp(beforeBuffer)
+      .composite([{ input: afterResized, blend: 'difference' }])
+      .modulate({ brightness: 3 })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    log.info(`✅ [SINGLE-PAGE-REPAIR] Page ${pageNumber} repaired for ${charName}`);
+
+    return {
+      success: true,
+      entityName: charName,
+      entityType: 'character',
+      pageNumber,
+      clothingCategory,
+      updatedImages: [{
+        pageNumber,
+        imageData: repairedPageData,
+        clothingCategory
+      }],
+      cellsRepaired: 1,
+      comparison: {
+        before: `data:image/jpeg;base64,${beforeBuffer.toString('base64')}`,
+        after: `data:image/jpeg;base64,${afterResized.toString('base64')}`,
+        diff: `data:image/jpeg;base64,${diffBuffer.toString('base64')}`
+      },
+      referenceGridUsed: `data:image/jpeg;base64,${referenceGrid.buffer.toString('base64')}`,
+      referenceCount: referenceCrops.length,
+      usage: response.usageMetadata
+    };
+
+  } catch (err) {
+    log.error(`❌ [SINGLE-PAGE-REPAIR] Error repairing ${charName} page ${pageNumber}: ${err.message}`);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Fallback prompt for single-page repair if template file doesn't exist
+ */
+function buildFallbackSinglePagePrompt(entityName, pageNumber, clothingCategory, referenceCount) {
+  return `# Single Page Entity Repair
+
+You are repairing character consistency in a children's picture book illustration.
+
+## Input Images
+
+**IMAGE 1 - REFERENCE GRID:**
+Shows the correct appearance of "${entityName}":
+- Cell R: The character's styled avatar (source of truth)
+- Cells A-${String.fromCharCode(65 + Math.min(referenceCount - 1, 10))}: Other appearances from the same story with "${clothingCategory}" clothing
+
+**IMAGE 2 - REPAIR TARGET:**
+The image from page ${pageNumber} that needs to be fixed.
+
+## Your Task
+
+Generate a repaired version of IMAGE 2 where "${entityName}" matches the reference appearance:
+
+From the REFERENCE (Cell R and other cells):
+1. FACIAL FEATURES - eyes, nose, mouth, face shape
+2. HAIR - color, style, length, texture
+3. SKIN TONE - consistent complexion
+4. BODY PROPORTIONS - size, build, age appearance
+
+From the REPAIR TARGET, PRESERVE:
+1. POSE and POSITION of the character
+2. BACKGROUND and CONTEXT
+3. LIGHTING and ART STYLE
+4. Other characters or objects
+
+## Clothing
+The character should wear "${clothingCategory}" clothing as shown in the reference images.
+
+## Output
+Generate ONLY the repaired version of IMAGE 2. Match the exact dimensions and layout of IMAGE 2.
+
+Do NOT output a grid. Output a single image that is the repaired version of IMAGE 2.`;
+}
+
 module.exports = {
   // Main functions
   runEntityConsistencyChecks,
   repairEntityConsistency,
+  repairSinglePage,
 
   // Helper functions (exported for testing)
   collectEntityAppearances,
@@ -1312,10 +1783,15 @@ module.exports = {
   getStyledAvatarForClothing,
   saveEntityGrid,
   saveEntityGrids,
+  prepareForGeminiRepair,
+  padToGeminiRatio,
+  removePadding,
+  createReferenceGrid,
 
   // Constants
   FACE_CROP_SIZE,
   BODY_CROP_SIZE,
   MIN_APPEARANCES,
-  MAX_GRID_CELLS
+  MAX_GRID_CELLS,
+  GEMINI_MIN_SIZE
 };

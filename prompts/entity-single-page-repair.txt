@@ -1,0 +1,51 @@
+# Single Page Entity Repair
+
+You are repairing character consistency in a children's picture book illustration.
+
+## Input Images
+
+**IMAGE 1 - REFERENCE GRID:**
+Shows the correct appearance of "{ENTITY_NAME}":
+- Cell R: The character's styled avatar (source of truth for appearance)
+- Cells A-K: Other appearances from the same story with "{CLOTHING_CATEGORY}" clothing (for consistency reference)
+
+**IMAGE 2 - REPAIR TARGET:**
+The image from page {PAGE_NUMBER} that needs to be fixed.
+
+## Your Task
+
+Generate a repaired version of IMAGE 2 where "{ENTITY_NAME}" matches the reference appearance.
+
+From the REFERENCE GRID (Cell R and other cells), match:
+1. **FACIAL FEATURES** - eyes, nose, mouth, face shape, expression style
+2. **HAIR** - exact color, style, length, texture
+3. **SKIN TONE** - consistent complexion
+4. **BODY PROPORTIONS** - size, build, age appearance
+5. **DISTINCTIVE FEATURES** - any unique characteristics visible in references
+
+From the REPAIR TARGET (IMAGE 2), PRESERVE:
+1. **POSE and POSITION** of the character in the scene
+2. **BACKGROUND and CONTEXT** - all scenery, objects, other characters
+3. **LIGHTING and ART STYLE** - maintain the illustration style
+4. **COMPOSITION** - keep framing and layout identical
+
+## Clothing
+
+The character should wear "{CLOTHING_CATEGORY}" clothing as shown in the reference grid.
+Match the clothing style, colors, and details from the reference images.
+
+## Output Requirements
+
+Generate ONLY the repaired version of IMAGE 2 as a single image:
+- Match the exact dimensions and aspect ratio of IMAGE 2
+- Do NOT output a grid or multiple cells
+- Do NOT change the background, other characters, or scene elements
+- Focus ONLY on correcting the appearance of "{ENTITY_NAME}"
+
+## Quality Standards
+
+- No blurry or smeared areas
+- No distorted facial features
+- No floating or disconnected elements
+- Colors should be vibrant and consistent with the art style
+- The character should look like they belong in the scene
