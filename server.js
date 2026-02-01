@@ -4622,7 +4622,9 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       gridAfterRepair: repairResult.gridAfterRepair,
       gridDiff: repairResult.gridDiff,
       cellComparisons: repairResult.cellComparisons,
-      usage: repairResult.usage
+      usage: repairResult.usage,
+      gridsByClothing: repairResult.gridsByClothing,
+      clothingGroupCount: repairResult.clothingGroupCount
     };
 
     // Save updated story
