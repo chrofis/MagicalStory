@@ -4589,7 +4589,21 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       const { repairSinglePage } = require('./server/lib/entityConsistency');
       const repairResult = await repairSinglePage(storyData, character, pageNumber);
 
+      // Handle rejected repairs - still return the data so frontend can show it
       if (!repairResult.success) {
+        if (repairResult.rejected) {
+          // Repair was generated but rejected during verification
+          // Return the comparison data so user can see what was rejected
+          return res.status(200).json({
+            success: false,
+            rejected: true,
+            reason: repairResult.reason,
+            entityName: repairResult.entityName,
+            pageNumber: repairResult.pageNumber,
+            comparison: repairResult.comparison,
+            verification: repairResult.verification
+          });
+        }
         return res.status(400).json({ error: repairResult.error || 'Single-page repair failed' });
       }
 

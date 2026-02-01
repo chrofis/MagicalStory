@@ -149,8 +149,10 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
         log.info(`🔍 [ENTITY-CHECK] Checking ${charName}: ${appearances.length} total appearances`);
 
         // Initialize character report with new structure
+        // Note: `issues` array is for backward compatibility (flattened from all byClothing)
         report.characters[charName] = {
           byClothing: {},
+          issues: [],  // Flattened issues for backward compatibility
           overallConsistent: true,
           overallScore: 10,
           totalIssues: 0
@@ -238,6 +240,15 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             report.characters[charName].totalIssues += issueCount;
             report.totalIssues += issueCount;
 
+            // Add issues to flattened array for backward compatibility
+            // Tag each issue with its clothing category
+            for (const issue of (evalResult.issues || [])) {
+              report.characters[charName].issues.push({
+                ...issue,
+                clothingCategory
+              });
+            }
+
             // Update overall score (use minimum across clothing categories)
             if (evalResult.score < report.characters[charName].overallScore) {
               report.characters[charName].overallScore = evalResult.score;
@@ -260,6 +271,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
           log.error(`❌ [ENTITY-CHECK] Error checking ${charName}: ${err.message}`);
           report.characters[charName] = {
             byClothing: {},
+            issues: [],  // Empty for backward compatibility
             overallConsistent: true,
             overallScore: 0,
             totalIssues: 0,
@@ -1572,8 +1584,9 @@ async function prepareForGeminiRepair(cropBuffer) {
 const VERIFICATION_MODEL = 'gemini-2.5-flash';
 
 // Maximum allowed background change (mean pixel diff 0-255)
-// JPEG compression can cause ~2-5 difference, so allow some tolerance
-const MAX_BACKGROUND_DIFF = 8;
+// JPEG compression can cause ~2-5 difference, Gemini repairs can cause ~5-15
+// Allow reasonable tolerance while still catching major background changes
+const MAX_BACKGROUND_DIFF = 20;
 
 /**
  * Extract border regions from an image (everything except center)
