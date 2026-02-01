@@ -770,3 +770,69 @@ export interface StoryGenerationProgress {
   message: string;
   stage: 'outline' | 'story' | 'scenes' | 'images' | 'covers' | 'complete';
 }
+
+// =============================================================================
+// Repair Workflow Types
+// =============================================================================
+
+export type RepairWorkflowStep =
+  | 'idle'
+  | 'collect-feedback'
+  | 'identify-redo-pages'
+  | 'redo-pages'
+  | 're-evaluate'
+  | 'consistency-check'
+  | 'character-repair'
+  | 'artifact-repair';
+
+export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
+
+export interface PageFeedback {
+  pageNumber: number;
+  qualityScore?: number;
+  fixableIssues: Array<{
+    description: string;
+    severity: string;
+    type: string;
+    fix: string;
+  }>;
+  entityIssues: Array<{
+    character: string;
+    issue: string;
+    severity: string;
+  }>;
+  manualNotes: string;
+  needsFullRedo: boolean;
+}
+
+export interface RepairWorkflowState {
+  currentStep: RepairWorkflowStep;
+  stepStatus: Record<RepairWorkflowStep, StepStatus>;
+  collectedFeedback: {
+    pages: Record<number, PageFeedback>;
+    totalIssues: number;
+  };
+  redoPages: {
+    pageNumbers: number[];
+    reasons: Record<number, string>;
+  };
+  redoResults: {
+    pagesCompleted: number[];
+    newVersions: Record<number, number>;
+  };
+  reEvaluationResults: {
+    pages: Record<number, { qualityScore: number; fixableIssues: EvaluationData['fixableIssues'] }>;
+  };
+  consistencyResults: {
+    report?: EntityConsistencyReport;
+  };
+  characterRepairResults: {
+    charactersProcessed: string[];
+    pagesRepaired: Record<string, number[]>;
+  };
+  artifactRepairResults: {
+    pagesProcessed: number[];
+    issuesFixed: number;
+  };
+  sessionId: string;
+}

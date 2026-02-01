@@ -4792,6 +4792,445 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
   }
 });
 
+// =============================================================================
+// Repair Workflow Endpoints (Manual Multi-Step Repair)
+// =============================================================================
+
+// Step 1: Collect feedback from existing evaluation data
+app.post('/api/stories/:id/repair-workflow/collect-feedback', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get story data
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    const pages = {};
+    let totalIssues = 0;
+
+    // Process each scene image
+    for (const scene of (storyData.sceneImages || [])) {
+      const feedback = {
+        pageNumber: scene.pageNumber,
+        qualityScore: scene.qualityScore,
+        fixableIssues: [],
+        entityIssues: [],
+        manualNotes: '',
+        needsFullRedo: false
+      };
+
+      // Get fixable issues from retry history
+      const latestRetry = scene.retryHistory?.slice(-1)[0];
+      if (latestRetry?.postRepairEval?.fixableIssues) {
+        feedback.fixableIssues = latestRetry.postRepairEval.fixableIssues;
+      } else if (latestRetry?.preRepairEval?.fixableIssues) {
+        feedback.fixableIssues = latestRetry.preRepairEval.fixableIssues;
+      }
+
+      // Get entity issues from finalChecksReport
+      if (storyData.finalChecksReport?.entity?.characters) {
+        for (const [charName, charResult] of Object.entries(storyData.finalChecksReport.entity.characters)) {
+          const charIssues = (charResult.issues || []).filter(i =>
+            i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
+          );
+
+          for (const issue of charIssues) {
+            feedback.entityIssues.push({
+              character: charName,
+              issue: issue.description,
+              severity: issue.severity
+            });
+          }
+        }
+      }
+
+      totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length;
+      pages[scene.pageNumber] = feedback;
+    }
+
+    res.json({ pages, totalIssues });
+  } catch (err) {
+    log.error('Error collecting repair feedback:', err);
+    res.status(500).json({ error: 'Failed to collect feedback: ' + err.message });
+  }
+});
+
+// Step 3: Redo pages (complete regeneration via iterate)
+app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerationLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pageNumbers } = req.body;
+
+    if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
+      return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+
+    log.info(`🔄 [REPAIR-WORKFLOW] Starting redo for pages ${pageNumbers.join(', ')} in story ${id}`);
+
+    const pagesCompleted = [];
+    const newVersions = {};
+
+    // Process each page using the iterate endpoint logic
+    for (const pageNumber of pageNumbers) {
+      try {
+        // Get current story data (refresh on each iteration)
+        const storyResult = await dbPool.query(
+          'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+          [id, req.user.id]
+        );
+
+        if (storyResult.rows.length === 0) {
+          continue;
+        }
+
+        const story = storyResult.rows[0];
+        const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+        // Find the scene
+        const sceneIndex = storyData.sceneImages?.findIndex(s => s.pageNumber === pageNumber);
+        if (sceneIndex === -1) {
+          log.warn(`Page ${pageNumber} not found in story ${id}`);
+          continue;
+        }
+
+        const scene = storyData.sceneImages[sceneIndex];
+
+        // Generate new image using existing iterate logic
+        const { iteratePageImage } = await import('./server/lib/images.js');
+        const result = await iteratePageImage(storyData, pageNumber, req.user.id);
+
+        if (result.success) {
+          // Add to image versions
+          if (!scene.imageVersions) {
+            scene.imageVersions = [{
+              imageData: scene.imageData,
+              description: scene.description,
+              prompt: scene.prompt,
+              createdAt: new Date().toISOString(),
+              isActive: false,
+              type: 'original',
+              qualityScore: scene.qualityScore
+            }];
+          }
+
+          const newVersionIndex = scene.imageVersions.length;
+          scene.imageVersions.push({
+            imageData: result.imageData,
+            description: result.sceneDescription,
+            prompt: result.imagePrompt,
+            modelId: result.modelId,
+            createdAt: new Date().toISOString(),
+            isActive: true,
+            type: 'iteration',
+            qualityScore: result.qualityScore
+          });
+
+          // Mark all other versions as inactive
+          scene.imageVersions.forEach((v, i) => {
+            v.isActive = i === newVersionIndex;
+          });
+
+          // Update scene with new image
+          scene.imageData = result.imageData;
+          scene.description = result.sceneDescription;
+          scene.prompt = result.imagePrompt;
+          scene.qualityScore = result.qualityScore;
+          scene.modelId = result.modelId;
+
+          storyData.sceneImages[sceneIndex] = scene;
+
+          // Save story
+          await saveStoryData(id, storyData);
+
+          pagesCompleted.push(pageNumber);
+          newVersions[pageNumber] = newVersionIndex;
+        }
+      } catch (pageErr) {
+        log.error(`Error redoing page ${pageNumber}:`, pageErr);
+      }
+    }
+
+    log.info(`✅ [REPAIR-WORKFLOW] Redo complete: ${pagesCompleted.length}/${pageNumbers.length} pages`);
+    res.json({ pagesCompleted, newVersions });
+  } catch (err) {
+    log.error('Error in redo pages:', err);
+    res.status(500).json({ error: 'Failed to redo pages: ' + err.message });
+  }
+});
+
+// Step 4: Re-evaluate pages
+app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pageNumbers } = req.body;
+
+    if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
+      return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+
+    log.info(`📊 [REPAIR-WORKFLOW] Re-evaluating pages ${pageNumbers.join(', ')} in story ${id}`);
+
+    // Get story data
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    const pages = {};
+
+    for (const pageNumber of pageNumbers) {
+      const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      if (!scene) continue;
+
+      try {
+        const evaluation = await evaluateImageQuality(scene.imageData, scene.description);
+
+        // Update scene with new evaluation
+        scene.qualityScore = evaluation.score;
+        scene.qualityReasoning = evaluation.reasoning;
+
+        pages[pageNumber] = {
+          qualityScore: evaluation.score,
+          fixableIssues: evaluation.fixableIssues
+        };
+      } catch (evalErr) {
+        log.error(`Error evaluating page ${pageNumber}:`, evalErr);
+        pages[pageNumber] = {
+          qualityScore: null,
+          fixableIssues: [],
+          error: evalErr.message
+        };
+      }
+    }
+
+    // Save updated story
+    await saveStoryData(id, storyData);
+
+    log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
+    res.json({ pages });
+  } catch (err) {
+    log.error('Error in re-evaluate:', err);
+    res.status(500).json({ error: 'Failed to re-evaluate: ' + err.message });
+  }
+});
+
+// Step 5: Run entity consistency check
+app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    log.info(`🔍 [REPAIR-WORKFLOW] Running consistency check for story ${id}`);
+
+    // Get story data
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // Run entity consistency check
+    const { checkEntityConsistency } = await import('./server/lib/entityConsistency.js');
+    const report = await checkEntityConsistency(storyData, req.user.id);
+
+    // Save report to story
+    if (!storyData.finalChecksReport) {
+      storyData.finalChecksReport = {};
+    }
+    storyData.finalChecksReport.entity = report;
+
+    await saveStoryData(id, storyData);
+
+    log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
+    res.json({ report });
+  } catch (err) {
+    log.error('Error in consistency check:', err);
+    res.status(500).json({ error: 'Failed to run consistency check: ' + err.message });
+  }
+});
+
+// Step 6: Repair characters
+app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { repairs } = req.body;
+
+    if (!repairs || !Array.isArray(repairs) || repairs.length === 0) {
+      return res.status(400).json({ error: 'repairs array is required' });
+    }
+
+    log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id}`);
+
+    const results = [];
+
+    for (const repair of repairs) {
+      const { character, pages } = repair;
+
+      try {
+        // Get fresh story data
+        const storyResult = await dbPool.query(
+          'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+          [id, req.user.id]
+        );
+
+        if (storyResult.rows.length === 0) {
+          results.push({ character, pagesRepaired: [], error: 'Story not found' });
+          continue;
+        }
+
+        const story = storyResult.rows[0];
+        const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+        // Use existing entity repair function for each page
+        const { repairEntityConsistency } = await import('./server/lib/entityConsistency.js');
+        const pagesRepaired = [];
+
+        for (const pageNumber of pages) {
+          try {
+            const repairResult = await repairEntityConsistency(
+              storyData,
+              character,
+              req.user.id,
+              pageNumber // Single page mode
+            );
+
+            if (repairResult.success || repairResult.cellsRepaired > 0) {
+              pagesRepaired.push(pageNumber);
+            }
+          } catch (pageErr) {
+            log.error(`Error repairing ${character} on page ${pageNumber}:`, pageErr);
+          }
+        }
+
+        results.push({ character, pagesRepaired });
+      } catch (repairErr) {
+        log.error(`Error repairing character ${character}:`, repairErr);
+        results.push({ character, pagesRepaired: [], error: repairErr.message });
+      }
+    }
+
+    log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
+    res.json({ results });
+  } catch (err) {
+    log.error('Error in character repair:', err);
+    res.status(500).json({ error: 'Failed to repair characters: ' + err.message });
+  }
+});
+
+// Step 7: Repair artifacts via grid repair
+app.post('/api/stories/:id/repair-workflow/artifact-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pageNumbers } = req.body;
+
+    if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
+      return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+
+    log.info(`🔧 [REPAIR-WORKFLOW] Starting artifact repair for pages ${pageNumbers.join(', ')} in story ${id}`);
+
+    // Get story data
+    const storyResult = await dbPool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    const pagesProcessed = [];
+    let issuesFixed = 0;
+
+    // Process each page with grid repair
+    const { gridBasedRepair } = await import('./server/lib/images.js');
+
+    for (const pageNumber of pageNumbers) {
+      const sceneIndex = storyData.sceneImages?.findIndex(s => s.pageNumber === pageNumber);
+      if (sceneIndex === -1) continue;
+
+      const scene = storyData.sceneImages[sceneIndex];
+
+      try {
+        // Run grid repair on the scene
+        const repairResult = await gridBasedRepair(scene, { retryHistory: scene.retryHistory || [] });
+
+        if (repairResult.repaired && repairResult.imageData) {
+          // Add to image versions
+          if (!scene.imageVersions) {
+            scene.imageVersions = [{
+              imageData: scene.imageData,
+              description: scene.description,
+              prompt: scene.prompt,
+              createdAt: new Date().toISOString(),
+              isActive: false,
+              type: 'original',
+              qualityScore: scene.qualityScore
+            }];
+          }
+
+          const newVersionIndex = scene.imageVersions.length;
+          scene.imageVersions.push({
+            imageData: repairResult.imageData,
+            description: scene.description,
+            createdAt: new Date().toISOString(),
+            isActive: true,
+            type: 'repair',
+            qualityScore: repairResult.score
+          });
+
+          // Mark all other versions as inactive
+          scene.imageVersions.forEach((v, i) => {
+            v.isActive = i === newVersionIndex;
+          });
+
+          // Update scene with repaired image
+          scene.imageData = repairResult.imageData;
+          scene.qualityScore = repairResult.score;
+
+          pagesProcessed.push(pageNumber);
+          issuesFixed += repairResult.fixedCount || 1;
+        }
+      } catch (pageErr) {
+        log.error(`Error repairing artifacts on page ${pageNumber}:`, pageErr);
+      }
+    }
+
+    // Save updated story
+    await saveStoryData(id, storyData);
+
+    log.info(`✅ [REPAIR-WORKFLOW] Artifact repair complete: ${pagesProcessed.length} pages, ${issuesFixed} issues fixed`);
+    res.json({ pagesProcessed, issuesFixed });
+  } catch (err) {
+    log.error('Error in artifact repair:', err);
+    res.status(500).json({ error: 'Failed to repair artifacts: ' + err.message });
+  }
+});
+
 // Edit cover image with a user prompt
 app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req, res) => {
   try {

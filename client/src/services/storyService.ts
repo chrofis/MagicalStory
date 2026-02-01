@@ -1863,6 +1863,186 @@ export const storyService = {
     });
   },
 
+  // =============================================================================
+  // Repair Workflow Methods
+  // =============================================================================
+
+  // Step 1: Collect feedback from existing evaluation data
+  async collectRepairFeedback(storyId: string): Promise<{
+    pages: Record<number, {
+      pageNumber: number;
+      qualityScore?: number;
+      fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }>;
+      entityIssues: Array<{ character: string; issue: string; severity: string }>;
+      manualNotes: string;
+      needsFullRedo: boolean;
+    }>;
+    totalIssues: number;
+  }> {
+    const response = await api.post<{
+      pages: Record<number, {
+        pageNumber: number;
+        qualityScore?: number;
+        fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }>;
+        entityIssues: Array<{ character: string; issue: string; severity: string }>;
+        manualNotes: string;
+        needsFullRedo: boolean;
+      }>;
+      totalIssues: number;
+    }>(`/api/stories/${storyId}/repair-workflow/collect-feedback`, {});
+    return response;
+  },
+
+  // Step 3: Redo pages (complete regeneration)
+  async redoPages(storyId: string, pageNumbers: number[]): Promise<{
+    pagesCompleted: number[];
+    newVersions: Record<number, number>;
+  }> {
+    const response = await api.post<{
+      pagesCompleted: number[];
+      newVersions: Record<number, number>;
+    }>(`/api/stories/${storyId}/repair-workflow/redo-pages`, { pageNumbers });
+    return response;
+  },
+
+  // Step 4: Re-evaluate pages
+  async reEvaluatePages(storyId: string, pageNumbers: number[]): Promise<{
+    pages: Record<number, { qualityScore: number; fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }> | undefined }>;
+  }> {
+    const response = await api.post<{
+      pages: Record<number, { qualityScore: number; fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }> | undefined }>;
+    }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers });
+    return response;
+  },
+
+  // Step 5: Run entity consistency check
+  async runEntityConsistency(storyId: string): Promise<{
+    report?: {
+      timestamp: string;
+      characters: Record<string, {
+        gridImage?: string;
+        consistent: boolean;
+        score: number;
+        issues: Array<{
+          id: string;
+          source: 'entity';
+          pageNumber: number | null;
+          type: string;
+          subType: string;
+          severity: string;
+          description: string;
+          fixInstruction: string;
+          affectedCharacter: string;
+          cells?: string[];
+          pagesToFix?: number[];
+        }>;
+        summary?: string;
+        error?: string;
+      }>;
+      objects: Record<string, unknown>;
+      grids: Array<{
+        entityName: string;
+        entityType: 'character' | 'object';
+        gridImage: string;
+        manifest: {
+          createdAt: string;
+          title: string;
+          dimensions: { width: number; height: number };
+          cellSize: number;
+          cols: number;
+          rows: number;
+          cellCount: number;
+          cells: Array<{
+            letter: string;
+            pageNumber?: number;
+            isReference?: boolean;
+            clothing?: string;
+            cropType?: string;
+          }>;
+        };
+        cellCount: number;
+      }>;
+      totalIssues: number;
+      overallConsistent: boolean;
+      summary: string;
+    };
+  }> {
+    const response = await api.post<{
+      report?: {
+        timestamp: string;
+        characters: Record<string, {
+          gridImage?: string;
+          consistent: boolean;
+          score: number;
+          issues: Array<{
+            id: string;
+            source: 'entity';
+            pageNumber: number | null;
+            type: string;
+            subType: string;
+            severity: string;
+            description: string;
+            fixInstruction: string;
+            affectedCharacter: string;
+            cells?: string[];
+            pagesToFix?: number[];
+          }>;
+          summary?: string;
+          error?: string;
+        }>;
+        objects: Record<string, unknown>;
+        grids: Array<{
+          entityName: string;
+          entityType: 'character' | 'object';
+          gridImage: string;
+          manifest: {
+            createdAt: string;
+            title: string;
+            dimensions: { width: number; height: number };
+            cellSize: number;
+            cols: number;
+            rows: number;
+            cellCount: number;
+            cells: Array<{
+              letter: string;
+              pageNumber?: number;
+              isReference?: boolean;
+              clothing?: string;
+              cropType?: string;
+            }>;
+          };
+          cellCount: number;
+        }>;
+        totalIssues: number;
+        overallConsistent: boolean;
+        summary: string;
+      };
+    }>(`/api/stories/${storyId}/repair-workflow/consistency-check`, {});
+    return response;
+  },
+
+  // Step 6: Repair characters
+  async repairCharacters(storyId: string, repairs: Array<{ character: string; pages: number[] }>): Promise<{
+    results: Array<{ character: string; pagesRepaired: number[]; error?: string }>;
+  }> {
+    const response = await api.post<{
+      results: Array<{ character: string; pagesRepaired: number[]; error?: string }>;
+    }>(`/api/stories/${storyId}/repair-workflow/character-repair`, { repairs });
+    return response;
+  },
+
+  // Step 7: Repair artifacts via grid repair
+  async repairArtifacts(storyId: string, pageNumbers: number[]): Promise<{
+    pagesProcessed: number[];
+    issuesFixed: number;
+  }> {
+    const response = await api.post<{
+      pagesProcessed: number[];
+      issuesFixed: number;
+    }>(`/api/stories/${storyId}/repair-workflow/artifact-repair`, { pageNumbers });
+    return response;
+  },
+
 };
 
 export default storyService;

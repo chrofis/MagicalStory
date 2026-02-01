@@ -8,7 +8,7 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
-import { GenerationProgress, StoryDisplay, ModelSelector } from '@/components/generation';
+import { GenerationProgress, StoryDisplay, ModelSelector, RepairWorkflowPanel } from '@/components/generation';
 import type { GenerationSettings } from '@/components/generation/story';
 // Lazy load wizard steps for faster initial load when viewing stories
 const WizardStep2Characters = lazy(() => import('./wizard/WizardStep2Characters').then(m => ({ default: m.WizardStep2Characters })));
@@ -3745,6 +3745,50 @@ export default function StoryWizard() {
                     }
                   </span>
                 </div>
+              )}
+              {/* Developer Mode: Manual Repair Workflow */}
+              {developerMode && storyId && !isGenerating && (
+                <RepairWorkflowPanel
+                  storyId={storyId}
+                  sceneImages={displaySceneImages}
+                  characters={characters.filter(c => !excludedCharacters.includes(c.id))}
+                  finalChecksReport={finalChecksReport}
+                  imageModel={modelSelections.imageModel || undefined}
+                  onImageUpdate={(pageNumber, imageData, _versionIndex) => {
+                    // Update local state with new image version
+                    setSceneImages(prev => prev.map(img => {
+                      if (img.pageNumber === pageNumber) {
+                        return {
+                          ...img,
+                          imageData,
+                          imageVersions: [
+                            ...(img.imageVersions || []),
+                            {
+                              imageData,
+                              createdAt: new Date().toISOString(),
+                              isActive: true,
+                              type: 'repair' as const
+                            }
+                          ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }))
+                        };
+                      }
+                      return img;
+                    }));
+                  }}
+                  onRefreshStory={storyId ? async () => {
+                    try {
+                      log.info('Refreshing story data after repair...');
+                      const story = await storyService.getStory(storyId);
+                      if (story) {
+                        setSceneImages(story.sceneImages || []);
+                        setFinalChecksReport(story.finalChecksReport || null);
+                        log.success('Story data refreshed');
+                      }
+                    } catch (error) {
+                      log.error('Failed to refresh story:', error);
+                    }
+                  } : undefined}
+                />
               )}
               <StoryDisplay
               title={storyTitle}
