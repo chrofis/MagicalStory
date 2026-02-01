@@ -553,12 +553,20 @@ export function useRepairWorkflow({
   }, [workflowState.collectedFeedback.pages]);
 
   // Get characters with issues from consistency results
+  // Supports new per-clothing structure (overallConsistent, totalIssues, byClothing)
   const getCharactersWithIssues = useCallback((): string[] => {
     const report = workflowState.consistencyResults.report;
     if (!report?.characters) return [];
 
     return Object.entries(report.characters)
-      .filter(([_, result]) => !result.consistent || (result.issues?.length ?? 0) > 0)
+      .filter(([_, result]) => {
+        // New structure uses overallConsistent and totalIssues
+        if ('overallConsistent' in result) {
+          return !result.overallConsistent || (result.totalIssues ?? 0) > 0;
+        }
+        // Legacy fallback
+        return !result.consistent || (result.issues?.length ?? 0) > 0;
+      })
       .map(([name]) => name);
   }, [workflowState.consistencyResults.report]);
 

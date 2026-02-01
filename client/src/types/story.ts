@@ -386,12 +386,31 @@ export interface EntityConsistencyIssue {
   canonicalVersion?: string;
 }
 
-// Entity check result (per character or object)
-export interface EntityCheckResult {
+// Entity check result per clothing category
+export interface EntityClothingResult {
   gridImage?: string;  // Base64 data URI of the grid
   consistent: boolean;
   score: number;
   issues: EntityConsistencyIssue[];
+  summary?: string;
+  cellCount?: number;
+  error?: string;
+}
+
+// Entity check result (per character or object)
+// Supports both legacy (flat) and new (byClothing) structures
+export interface EntityCheckResult {
+  // New per-clothing structure
+  byClothing?: Record<string, EntityClothingResult>;
+  overallConsistent?: boolean;
+  overallScore?: number;
+  totalIssues?: number;
+
+  // Legacy flat structure (still supported for backward compat)
+  gridImage?: string;  // Base64 data URI of the grid
+  consistent?: boolean;
+  score?: number;
+  issues?: EntityConsistencyIssue[];
   summary?: string;
   error?: string;
 }
