@@ -4288,7 +4288,21 @@ export default function StoryWizard() {
               generationSettings={savedGenerationSettings || undefined}
               onRefreshStory={storyId ? async () => {
                 log.info('Refreshing story data:', storyId);
+                // Reset dev metadata loaded flag so it gets re-fetched
+                devMetadataLoadedRef.current = false;
+                // Trigger story reload
                 setStoryRefreshKey(prev => prev + 1);
+                // Also explicitly reload dev metadata if in developer mode
+                if (developerMode) {
+                  try {
+                    const devMetadata = await storyService.getStoryDevMetadata(storyId);
+                    mergeDevMetadata(devMetadata);
+                    devMetadataLoadedRef.current = true;
+                    log.info('Dev metadata refreshed after repair');
+                  } catch (err) {
+                    log.warn('Failed to refresh dev metadata:', err);
+                  }
+                }
               } : undefined}
             />
             </>
