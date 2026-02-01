@@ -371,11 +371,14 @@ function collectEntityAppearances(sceneImages, characters = []) {
       });
 
       // Fallback: try label matching if name didn't match
+      // NOTE: Be strict - only match if character name appears as a word in label
+      // Don't use substring matching (e.g., "man" in "manuel") as this causes false matches
       if (!matchingFigure) {
         matchingFigure = figures.find(f => {
           const label = (f.label || '').toLowerCase();
-          return label.includes(charNameLower) ||
-                 charNameLower.includes(label.split(' ')[0]);  // Match first word
+          // Match if character name appears as a complete word in the label
+          const namePattern = new RegExp(`\\b${charNameLower}\\b`, 'i');
+          return namePattern.test(label);
         });
       }
 
