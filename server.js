@@ -5099,7 +5099,7 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
   }
 });
 
-// Step 6: Repair characters
+// Step 6: Repair characters using repairSinglePage
 app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
@@ -5111,51 +5111,106 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
 
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id}`);
 
+    const { repairSinglePage } = require('./server/lib/entityConsistency');
     const results = [];
 
     for (const repair of repairs) {
-      const { character, pages } = repair;
+      const { character: characterName, pages } = repair;
 
       try {
-        // Get fresh story data
+        // Get fresh story data for each character (in case previous repairs updated it)
         const storyResult = await dbPool.query(
           'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
           [id, req.user.id]
         );
 
         if (storyResult.rows.length === 0) {
-          results.push({ character, pagesRepaired: [], error: 'Story not found' });
+          results.push({ character: characterName, pagesRepaired: [], error: 'Story not found' });
           continue;
         }
 
         const story = storyResult.rows[0];
-        const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+        let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
-        // Use existing entity repair function for each page
-        const { repairEntityConsistency } = require('./server/lib/entityConsistency');
+        // Rehydrate images (required for entity appearance collection)
+        storyData = await rehydrateStoryImages(id, storyData);
+
+        // Find the character object
+        const character = storyData.characters?.find(c => c.name === characterName);
+        if (!character) {
+          results.push({ character: characterName, pagesRepaired: [], error: `Character "${characterName}" not found` });
+          continue;
+        }
+
         const pagesRepaired = [];
 
         for (const pageNumber of pages) {
           try {
-            const repairResult = await repairEntityConsistency(
-              storyData,
-              character,
-              req.user.id,
-              pageNumber // Single page mode
-            );
+            log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber}`);
+            const repairResult = await repairSinglePage(storyData, character, pageNumber);
 
-            if (repairResult.success || repairResult.cellsRepaired > 0) {
-              pagesRepaired.push(pageNumber);
+            if (!repairResult.success) {
+              log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${repairResult.error}`);
+              continue;
             }
+
+            // Apply updated image to story
+            const sceneImages = storyData.sceneImages || [];
+            for (const update of repairResult.updatedImages || []) {
+              const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
+              if (sceneIndex >= 0) {
+                const existingImage = sceneImages[sceneIndex];
+
+                // Initialize imageVersions if not present
+                if (!existingImage.imageVersions) {
+                  existingImage.imageVersions = [{
+                    imageData: existingImage.imageData,
+                    description: existingImage.description,
+                    prompt: existingImage.prompt,
+                    modelId: existingImage.modelId,
+                    createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
+                    isActive: false,
+                    type: 'original'
+                  }];
+                } else {
+                  existingImage.imageVersions.forEach(v => v.isActive = false);
+                }
+
+                // Add new version
+                existingImage.imageVersions.push({
+                  imageData: update.imageData,
+                  description: existingImage.description,
+                  prompt: existingImage.prompt,
+                  modelId: 'gemini-2.0-flash-preview-image-generation',
+                  createdAt: new Date().toISOString(),
+                  isActive: true,
+                  type: 'entity-repair',
+                  entityRepairedFor: characterName,
+                  clothingCategory: repairResult.clothingCategory
+                });
+
+                existingImage.imageData = update.imageData;
+                existingImage.entityRepaired = true;
+                existingImage.entityRepairedAt = new Date().toISOString();
+                existingImage.entityRepairedFor = characterName;
+              }
+            }
+
+            storyData.sceneImages = sceneImages;
+            pagesRepaired.push(pageNumber);
+
+            // Save after each page repair
+            await saveStoryData(id, storyData);
+
           } catch (pageErr) {
-            log.error(`Error repairing ${character} on page ${pageNumber}:`, pageErr);
+            log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
           }
         }
 
-        results.push({ character, pagesRepaired });
+        results.push({ character: characterName, pagesRepaired });
       } catch (repairErr) {
-        log.error(`Error repairing character ${character}:`, repairErr);
-        results.push({ character, pagesRepaired: [], error: repairErr.message });
+        log.error(`Error repairing character ${characterName}:`, repairErr);
+        results.push({ character: characterName, pagesRepaired: [], error: repairErr.message });
       }
     }
 
