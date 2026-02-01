@@ -1469,6 +1469,185 @@ async function prepareForGeminiRepair(cropBuffer) {
   };
 }
 
+// Verification model for comparing repairs
+const VERIFICATION_MODEL = 'gemini-2.5-flash';
+
+/**
+ * Crop borders from an image to handle potential pixel shifts
+ * @param {Buffer} imageBuffer - Image buffer
+ * @param {number} borderPercent - Percentage of each edge to crop (default 5%)
+ * @returns {Promise<Buffer>} Cropped image buffer
+ */
+async function cropBordersForComparison(imageBuffer, borderPercent = 0.05) {
+  const meta = await sharp(imageBuffer).metadata();
+  const cropX = Math.round(meta.width * borderPercent);
+  const cropY = Math.round(meta.height * borderPercent);
+
+  return sharp(imageBuffer)
+    .extract({
+      left: cropX,
+      top: cropY,
+      width: meta.width - (cropX * 2),
+      height: meta.height - (cropY * 2)
+    })
+    .toBuffer();
+}
+
+/**
+ * Compute mean absolute difference between two images
+ * @param {Buffer} img1 - First image buffer
+ * @param {Buffer} img2 - Second image buffer
+ * @returns {Promise<number>} Mean absolute difference (0-255)
+ */
+async function computeImageDifference(img1, img2) {
+  const meta1 = await sharp(img1).metadata();
+  const meta2 = await sharp(img2).metadata();
+
+  // Resize to same dimensions if needed
+  let buf1 = img1;
+  let buf2 = img2;
+
+  if (meta1.width !== meta2.width || meta1.height !== meta2.height) {
+    const targetWidth = Math.min(meta1.width, meta2.width);
+    const targetHeight = Math.min(meta1.height, meta2.height);
+    buf1 = await sharp(img1).resize(targetWidth, targetHeight, { fit: 'fill' }).toBuffer();
+    buf2 = await sharp(img2).resize(targetWidth, targetHeight, { fit: 'fill' }).toBuffer();
+  }
+
+  // Get raw pixel data
+  const raw1 = await sharp(buf1).raw().toBuffer();
+  const raw2 = await sharp(buf2).raw().toBuffer();
+
+  // Compute mean absolute difference
+  let totalDiff = 0;
+  const pixelCount = Math.min(raw1.length, raw2.length);
+  for (let i = 0; i < pixelCount; i++) {
+    totalDiff += Math.abs(raw1[i] - raw2[i]);
+  }
+
+  return totalDiff / pixelCount;
+}
+
+/**
+ * Verify if the repair improved the character consistency
+ * Uses Gemini to compare old vs new against reference
+ *
+ * @param {Buffer} referenceBuffer - Styled avatar (source of truth)
+ * @param {Buffer} oldBuffer - Original crop before repair
+ * @param {Buffer} newBuffer - Repaired crop
+ * @param {string} entityName - Character name
+ * @returns {Promise<{improved: boolean, confidence: string, explanation: string, metrics: object}>}
+ */
+async function verifyRepairImprovement(referenceBuffer, oldBuffer, newBuffer, entityName) {
+  try {
+    // Crop borders to handle potential shifts
+    const refCropped = await cropBordersForComparison(referenceBuffer);
+    const oldCropped = await cropBordersForComparison(oldBuffer);
+    const newCropped = await cropBordersForComparison(newBuffer);
+
+    // Compute pixel-level differences
+    const oldDiff = await computeImageDifference(refCropped, oldCropped);
+    const newDiff = await computeImageDifference(refCropped, newCropped);
+
+    log.info(`🔍 [REPAIR-VERIFY] Pixel diff - old: ${oldDiff.toFixed(2)}, new: ${newDiff.toFixed(2)}`);
+
+    // Use Gemini to verify the improvement visually
+    const model = genAI.getGenerativeModel({
+      model: VERIFICATION_MODEL,
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 1024
+      }
+    });
+
+    const prompt = `You are evaluating a character repair in a children's picture book.
+
+**IMAGE 1 - REFERENCE:** The correct appearance of "${entityName}" (styled avatar - source of truth)
+**IMAGE 2 - BEFORE:** The original illustration crop (before repair)
+**IMAGE 3 - AFTER:** The repaired illustration crop (after repair)
+
+Compare the character's appearance in BEFORE and AFTER against the REFERENCE.
+
+Evaluate:
+1. FACE MATCH - Does the face better match the reference in AFTER vs BEFORE?
+2. HAIR MATCH - Does the hair color/style better match?
+3. SKIN TONE MATCH - Is skin tone more consistent with reference?
+4. OVERALL CONSISTENCY - Which is closer to the reference overall?
+
+CRITICAL: Also check if the AFTER image has any artifacts, blur, or degradation compared to BEFORE.
+
+Respond in JSON format:
+{
+  "improved": true/false,
+  "confidence": "high" | "medium" | "low",
+  "face_better": true/false,
+  "hair_better": true/false,
+  "skin_better": true/false,
+  "has_artifacts": true/false,
+  "explanation": "Brief explanation of your assessment"
+}`;
+
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { mimeType: 'image/png', data: refCropped.toString('base64') } },
+      { inlineData: { mimeType: 'image/png', data: oldCropped.toString('base64') } },
+      { inlineData: { mimeType: 'image/png', data: newCropped.toString('base64') } }
+    ]);
+
+    const text = result.response.text();
+
+    // Parse JSON response
+    let parsed;
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsed = JSON.parse(jsonMatch[0]);
+      } else {
+        throw new Error('No JSON found');
+      }
+    } catch (parseErr) {
+      log.warn(`⚠️  [REPAIR-VERIFY] Failed to parse response: ${text.substring(0, 200)}`);
+      // Fall back to pixel-based comparison
+      const improved = newDiff < oldDiff * 0.95; // At least 5% improvement
+      return {
+        improved,
+        confidence: 'low',
+        explanation: `Pixel-based fallback: old diff=${oldDiff.toFixed(2)}, new diff=${newDiff.toFixed(2)}`,
+        metrics: { oldDiff, newDiff, pixelImproved: improved }
+      };
+    }
+
+    // If there are artifacts, don't accept the repair
+    if (parsed.has_artifacts) {
+      log.warn(`⚠️  [REPAIR-VERIFY] Repair has artifacts, rejecting`);
+      return {
+        improved: false,
+        confidence: parsed.confidence || 'medium',
+        explanation: `Repair rejected due to artifacts: ${parsed.explanation}`,
+        metrics: { oldDiff, newDiff, geminiResult: parsed }
+      };
+    }
+
+    return {
+      improved: parsed.improved,
+      confidence: parsed.confidence || 'medium',
+      explanation: parsed.explanation || 'No explanation provided',
+      metrics: { oldDiff, newDiff, geminiResult: parsed },
+      usage: result.response.usageMetadata
+    };
+
+  } catch (err) {
+    log.error(`❌ [REPAIR-VERIFY] Verification failed: ${err.message}`);
+    // On error, accept the repair but flag low confidence
+    return {
+      improved: true,
+      confidence: 'low',
+      explanation: `Verification error: ${err.message}`,
+      metrics: { error: err.message }
+    };
+  }
+}
+
 /**
  * Build a human-readable description of character's physical traits
  *
@@ -1720,6 +1899,35 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       log.debug(`[SINGLE-PAGE-REPAIR] Downscaled back to ${preparedTarget.originalWidth}x${preparedTarget.originalHeight}`);
     }
 
+    // Verify the repair actually improved things
+    log.info(`🔍 [SINGLE-PAGE-REPAIR] Verifying repair improvement...`);
+    const verification = await verifyRepairImprovement(
+      avatarBuffer,
+      targetCrop.buffer,
+      processedBuffer,
+      charName
+    );
+
+    log.info(`🔍 [SINGLE-PAGE-REPAIR] Verification: improved=${verification.improved}, confidence=${verification.confidence}`);
+    log.info(`🔍 [SINGLE-PAGE-REPAIR] Explanation: ${verification.explanation}`);
+
+    if (!verification.improved) {
+      log.warn(`⚠️  [SINGLE-PAGE-REPAIR] Repair did not improve consistency, rejecting`);
+      return {
+        success: false,
+        rejected: true,
+        entityName: charName,
+        pageNumber,
+        reason: verification.explanation,
+        verification,
+        comparison: {
+          before: `data:image/jpeg;base64,${targetCrop.buffer.toString('base64')}`,
+          after: `data:image/png;base64,${processedBuffer.toString('base64')}`,
+          reference: `data:image/png;base64,${avatarBuffer.toString('base64')}`
+        }
+      };
+    }
+
     // Composite repaired cell back onto original page
     const { applyVerifiedRepairs } = require('./repairVerification');
     const repair = {
@@ -1752,7 +1960,14 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       .jpeg({ quality: 90 })
       .toBuffer();
 
-    log.info(`✅ [SINGLE-PAGE-REPAIR] Page ${pageNumber} repaired for ${charName}`);
+    log.info(`✅ [SINGLE-PAGE-REPAIR] Page ${pageNumber} repaired for ${charName} (confidence: ${verification.confidence})`);
+
+    // Combine usage from repair + verification
+    const totalUsage = {
+      promptTokenCount: (response.usageMetadata?.promptTokenCount || 0) + (verification.usage?.promptTokenCount || 0),
+      candidatesTokenCount: (response.usageMetadata?.candidatesTokenCount || 0) + (verification.usage?.candidatesTokenCount || 0),
+      totalTokenCount: (response.usageMetadata?.totalTokenCount || 0) + (verification.usage?.totalTokenCount || 0)
+    };
 
     return {
       success: true,
@@ -1769,10 +1984,17 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       comparison: {
         before: `data:image/jpeg;base64,${beforeBuffer.toString('base64')}`,
         after: `data:image/jpeg;base64,${afterResized.toString('base64')}`,
-        diff: `data:image/jpeg;base64,${diffBuffer.toString('base64')}`
+        diff: `data:image/jpeg;base64,${diffBuffer.toString('base64')}`,
+        reference: `data:image/png;base64,${avatarBuffer.toString('base64')}`
+      },
+      verification: {
+        improved: verification.improved,
+        confidence: verification.confidence,
+        explanation: verification.explanation,
+        metrics: verification.metrics
       },
       avatarUsed: `data:image/png;base64,${avatarBuffer.toString('base64')}`,
-      usage: response.usageMetadata
+      usage: totalUsage
     };
 
   } catch (err) {
@@ -1866,6 +2088,9 @@ module.exports = {
   removePadding,
   buildPhysicalTraitsDescription,
   buildClothingDescription,
+  verifyRepairImprovement,
+  cropBordersForComparison,
+  computeImageDifference,
 
   // Constants
   FACE_CROP_SIZE,
