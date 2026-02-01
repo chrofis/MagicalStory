@@ -1609,7 +1609,7 @@ async function verifyRepairImprovement(referenceBuffer, oldBuffer, newBuffer, en
       model: VERIFICATION_MODEL,
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 1024
+        maxOutputTokens: 2048
       }
     });
 
