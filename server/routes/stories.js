@@ -730,7 +730,56 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         output: entry.output ? { identifier: entry.output?.identifier, sizeKB: entry.output?.sizeKB } : null
       })),
       // Final consistency checks report (if final checks were enabled)
-      finalChecksReport: story.finalChecksReport || null
+      // Strip gridImage data for lazy loading - only include metadata
+      finalChecksReport: story.finalChecksReport ? {
+        ...story.finalChecksReport,
+        entity: story.finalChecksReport.entity ? {
+          ...story.finalChecksReport.entity,
+          // Strip gridImage from grids, keep manifest and metadata for lazy loading
+          grids: (story.finalChecksReport.entity.grids || []).map((grid, idx) => ({
+            entityName: grid.entityName,
+            entityType: grid.entityType,
+            cellCount: grid.cellCount,
+            manifest: grid.manifest,
+            // Indicate that image needs to be loaded separately
+            hasGridImage: !!grid.gridImage,
+            gridImageSizeKB: grid.gridImage ? Math.round(grid.gridImage.length * 0.75 / 1024) : 0,
+            gridIndex: idx
+          }))
+        } : undefined,
+        // Strip gridImages from entityRepairs too
+        entityRepairs: story.finalChecksReport.entityRepairs ? Object.fromEntries(
+          Object.entries(story.finalChecksReport.entityRepairs).map(([name, repair]) => [
+            name,
+            {
+              ...repair,
+              // Strip large image fields, keep metadata
+              gridBeforeRepair: undefined,
+              gridAfterRepair: undefined,
+              gridDiff: undefined,
+              hasGridBeforeRepair: !!repair.gridBeforeRepair,
+              hasGridAfterRepair: !!repair.gridAfterRepair,
+              hasGridDiff: !!repair.gridDiff,
+              // Strip cell comparison images
+              cellComparisons: (repair.cellComparisons || []).map(c => ({
+                letter: c.letter,
+                pageNumber: c.pageNumber,
+                clothingCategory: c.clothingCategory,
+                hasBefore: !!c.before,
+                hasAfter: !!c.after,
+                hasDiff: !!c.diff
+              })),
+              // Strip gridsByClothing images
+              gridsByClothing: (repair.gridsByClothing || []).map(g => ({
+                clothingCategory: g.clothingCategory,
+                cropCount: g.cropCount,
+                hasGridBefore: !!g.gridBefore,
+                hasGridAfter: !!g.gridAfter
+              }))
+            }
+          ])
+        ) : undefined
+      } : null
     };
 
     console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries, styledAvatars: ${devMetadata.styledAvatarGeneration?.length || 0}, costumedAvatars: ${devMetadata.costumedAvatarGeneration?.length || 0}`);
@@ -738,6 +787,61 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('❌ Error fetching dev metadata:', err);
     res.status(500).json({ error: 'Failed to fetch dev metadata', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/entity-grid-image - Lazy load entity consistency grid images
+// Query params:
+//   entityName: character name (required)
+//   OR gridIndex: index of grid in entity.grids array (required)
+router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { entityName, gridIndex } = req.query;
+
+    if (!entityName && gridIndex === undefined) {
+      return res.status(400).json({ error: 'entityName or gridIndex query parameter required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const grids = story.finalChecksReport?.entity?.grids || [];
+
+    let grid;
+    if (gridIndex !== undefined) {
+      const idx = parseInt(gridIndex, 10);
+      grid = grids[idx];
+    } else {
+      grid = grids.find(g => g.entityName === entityName);
+    }
+
+    if (!grid) {
+      return res.status(404).json({ error: 'Grid not found for specified entity' });
+    }
+
+    res.json({
+      entityName: grid.entityName,
+      gridImage: grid.gridImage,
+      manifest: grid.manifest
+    });
+  } catch (err) {
+    console.error('❌ Error fetching entity grid image:', err);
+    res.status(500).json({ error: 'Failed to fetch entity grid image', details: err.message });
   }
 });
 

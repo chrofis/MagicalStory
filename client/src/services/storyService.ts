@@ -512,6 +512,44 @@ export const storyService = {
     }
   },
 
+  // Lazy load entity grid image (dev mode)
+  async getEntityGridImage(
+    storyId: string,
+    entityName: string
+  ): Promise<{
+    entityName: string;
+    gridImage: string;
+    manifest: {
+      cellSize: number;
+      cols: number;
+      rows: number;
+      cells: Array<{
+        letter: string;
+        pageNumber?: number;
+        isReference?: boolean;
+        clothing?: string;
+      }>;
+    };
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const params = new URLSearchParams({ entityName });
+      const response = await fetch(`/api/stories/${storyId}/entity-grid-image?${params}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch entity grid image: HTTP ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (err) {
+      console.warn('Failed to fetch entity grid image:', err);
+      return null;
+    }
+  },
+
   // Lazy load retry history images for a page (dev mode)
   async getRetryHistoryImages(
     storyId: string,

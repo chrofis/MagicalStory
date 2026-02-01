@@ -352,6 +352,83 @@ export function StoryDisplay({
     }
   };
 
+  // Entity grid images (lazy-loaded)
+  const [loadedEntityGridImages, setLoadedEntityGridImages] = useState<Record<string, string>>({});
+  const [loadingEntityGridImages, setLoadingEntityGridImages] = useState<Set<string>>(new Set());
+
+  // Fetch entity grid image on demand
+  const fetchEntityGridImage = async (entityName: string) => {
+    if (!storyId || loadedEntityGridImages[entityName] || loadingEntityGridImages.has(entityName)) return;
+
+    setLoadingEntityGridImages(prev => new Set(prev).add(entityName));
+    try {
+      const data = await storyService.getEntityGridImage(storyId, entityName);
+      if (data?.gridImage) {
+        setLoadedEntityGridImages(prev => ({ ...prev, [entityName]: data.gridImage }));
+      }
+    } catch (err) {
+      console.error(`Failed to load entity grid image for ${entityName}:`, err);
+    } finally {
+      setLoadingEntityGridImages(prev => {
+        const next = new Set(prev);
+        next.delete(entityName);
+        return next;
+      });
+    }
+  };
+
+  // Helper to crop a cell from an entity consistency grid image
+  const cropGridCell = async (
+    gridImage: string,
+    cellIndex: number,
+    manifest: { cellSize: number; cols: number; rows: number }
+  ): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+
+        const { cellSize, cols } = manifest;
+        const row = Math.floor(cellIndex / cols);
+        const col = cellIndex % cols;
+        const x = col * cellSize;
+        const y = row * cellSize;
+
+        canvas.width = cellSize;
+        canvas.height = cellSize;
+        ctx.drawImage(img, x, y, cellSize, cellSize, 0, 0, cellSize, cellSize);
+
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = () => reject(new Error('Failed to load grid image'));
+      img.src = gridImage;
+    });
+  };
+
+  // Handle clicking on an individual grid cell to enlarge it
+  const handleCellClick = async (
+    grid: { gridImage: string; entityName: string; manifest: { cellSize: number; cols: number; rows: number; cells: Array<{ letter: string; pageNumber?: number; isReference?: boolean; clothing?: string }> } },
+    cellIndex: number
+  ) => {
+    try {
+      const cell = grid.manifest.cells[cellIndex];
+      const croppedImage = await cropGridCell(grid.gridImage, cellIndex, grid.manifest);
+      const cellLabel = cell.isReference ? 'Reference' : `Page ${cell.pageNumber}`;
+      const clothingLabel = cell.clothing && cell.clothing !== 'standard' ? ` (${cell.clothing})` : '';
+      setEnlargedImage({
+        src: croppedImage,
+        title: `${grid.entityName} - ${cellLabel}${clothingLabel}`
+      });
+    } catch (err) {
+      console.error('Failed to crop cell:', err);
+    }
+  };
+
   // Helper to get avatar image - checks both entry and loaded state
   const getAvatarImage = (
     type: 'styled' | 'costumed',
@@ -2363,26 +2440,71 @@ export function StoryDisplay({
                               </span>
                             </summary>
                             <div className="p-3 border-t border-gray-100 space-y-3">
-                              {/* Grid Image */}
-                              <div className="flex justify-center bg-gray-50 rounded p-2">
-                                <img
-                                  src={grid.gridImage}
-                                  alt={`${grid.entityName} consistency grid`}
-                                  className="max-w-full h-auto rounded shadow-sm"
-                                  style={{ maxHeight: '400px' }}
-                                />
-                              </div>
+                              {/* Grid Image - clickable to enlarge, lazy loaded */}
+                              {(() => {
+                                // Use embedded gridImage if available, otherwise use lazy-loaded
+                                const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
+                                const isLoading = loadingEntityGridImages.has(grid.entityName);
+                                const sizeKB = (grid as { gridImageSizeKB?: number }).gridImageSizeKB;
 
-                              {/* Cell Info with individual repair buttons */}
+                                if (gridImage) {
+                                  return (
+                                    <div className="flex justify-center bg-gray-50 rounded p-2">
+                                      <img
+                                        src={gridImage}
+                                        alt={`${grid.entityName} consistency grid`}
+                                        className="max-w-full h-auto rounded shadow-sm cursor-pointer hover:opacity-90 transition-opacity"
+                                        style={{ maxHeight: '400px' }}
+                                        onClick={() => setEnlargedImage({
+                                          src: gridImage,
+                                          title: `${grid.entityName} - Entity Consistency Grid`
+                                        })}
+                                        title="Click to enlarge"
+                                      />
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div className="flex justify-center bg-gray-50 rounded p-2">
+                                    <button
+                                      onClick={() => fetchEntityGridImage(grid.entityName)}
+                                      disabled={isLoading}
+                                      className="flex items-center gap-2 px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm text-gray-700 disabled:opacity-50"
+                                    >
+                                      {isLoading ? (
+                                        <>
+                                          <Loader2 className="w-4 h-4 animate-spin" />
+                                          <span>Loading grid...</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Images className="w-4 h-4" />
+                                          <span>Load Grid Image{sizeKB ? ` (${sizeKB} KB)` : ''}</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                );
+                              })()}
+
+                              {/* Cell Info with individual repair buttons - clickable to enlarge */}
                               {grid.manifest?.cells && (
                                 <div className="text-xs text-gray-600">
                                   <span className="font-medium">Cells: </span>
-                                  {grid.manifest.cells.map((cell, i) => (
+                                  {grid.manifest.cells.map((cell, i) => {
+                                    const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
+                                    return (
                                     <span key={i} className="inline-flex items-center bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 gap-1">
-                                      <span>
+                                      <button
+                                        onClick={() => gridImage && handleCellClick({ ...grid, gridImage }, i)}
+                                        className={`${gridImage ? 'hover:text-blue-600 hover:underline cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`}
+                                        title={gridImage ? "Click to enlarge this cell" : "Load grid image first"}
+                                        disabled={!gridImage}
+                                      >
                                         {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
                                         {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
-                                      </span>
+                                      </button>
                                       {/* Individual repair button for non-reference cells */}
                                       {!cell.isReference && storyId && typeof cell.pageNumber === 'number' && (
                                         <button
@@ -2406,7 +2528,7 @@ export function StoryDisplay({
                                         </button>
                                       )}
                                     </span>
-                                  ))}
+                                  );})}
                                 </div>
                               )}
 
