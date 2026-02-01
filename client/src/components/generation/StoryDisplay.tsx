@@ -240,6 +240,7 @@ export function StoryDisplay({
   const [repairingPage, setRepairingPage] = useState<number | null>(null);
   const [repairingEntity, setRepairingEntity] = useState<string | null>(null);
   const [repairingIssuePage, setRepairingIssuePage] = useState<number | null>(null);
+  const [repairingSingleEntityPage, setRepairingSingleEntityPage] = useState<{ entity: string; page: number } | null>(null);
 
   // Iterative improvement state (dev mode only)
   const [iteratingPage, setIteratingPage] = useState<number | null>(null);
@@ -544,6 +545,44 @@ export function StoryDisplay({
       alert(`Failed to repair: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setRepairingEntity(null);
+    }
+  };
+
+  // Handle single-page entity repair (dev mode) - repairs one specific page for a character
+  const handleRepairSingleEntityPage = async (entityName: string, pageNumber: number) => {
+    if (!storyId || repairingSingleEntityPage !== null) return;
+    setRepairingSingleEntityPage({ entity: entityName, page: pageNumber });
+    try {
+      const response = await fetch(`/api/stories/${storyId}/repair-entity-consistency`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({ entityName, entityType: 'character', pageNumber })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Repair failed');
+      }
+
+      const result = await response.json();
+      console.log('Single-page entity repair result:', result);
+
+      // Refresh story data to show updated image
+      if (result.success) {
+        if (onRefreshStory) {
+          await onRefreshStory();
+        } else {
+          window.location.reload();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to repair single page:', err);
+      alert(`Failed to repair page ${pageNumber}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRepairingSingleEntityPage(null);
     }
   };
 
@@ -2334,14 +2373,38 @@ export function StoryDisplay({
                                 />
                               </div>
 
-                              {/* Cell Info */}
+                              {/* Cell Info with individual repair buttons */}
                               {grid.manifest?.cells && (
                                 <div className="text-xs text-gray-600">
                                   <span className="font-medium">Cells: </span>
                                   {grid.manifest.cells.map((cell, i) => (
-                                    <span key={i} className="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1">
-                                      {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
-                                      {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
+                                    <span key={i} className="inline-flex items-center bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 gap-1">
+                                      <span>
+                                        {cell.letter}: {cell.isReference ? 'Ref' : `P${cell.pageNumber}`}
+                                        {cell.clothing && cell.clothing !== 'standard' && ` (${cell.clothing})`}
+                                      </span>
+                                      {/* Individual repair button for non-reference cells */}
+                                      {!cell.isReference && storyId && typeof cell.pageNumber === 'number' && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRepairSingleEntityPage(grid.entityName, cell.pageNumber as number);
+                                          }}
+                                          disabled={isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null}
+                                          className={`ml-0.5 px-1 py-0 text-[9px] rounded transition-colors ${
+                                            repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
+                                              ? 'bg-amber-300 text-amber-800'
+                                              : isGenerating || repairingSingleEntityPage !== null || repairingEntity !== null
+                                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                                : 'bg-amber-500 text-white hover:bg-amber-600'
+                                          }`}
+                                          title={`Repair page ${cell.pageNumber} for ${grid.entityName}`}
+                                        >
+                                          {repairingSingleEntityPage?.entity === grid.entityName && repairingSingleEntityPage?.page === cell.pageNumber
+                                            ? '...'
+                                            : '⚡'}
+                                        </button>
+                                      )}
                                     </span>
                                   ))}
                                 </div>
