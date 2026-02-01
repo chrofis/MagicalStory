@@ -797,7 +797,7 @@ async function evaluateEntityConsistency(gridBuffer, manifest, entityInfo) {
       model: ENTITY_CHECK_MODEL,
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 2048
+        maxOutputTokens: 8192  // Increased from 2048 to handle complex responses with many issues
       }
     });
 
@@ -1470,66 +1470,109 @@ async function prepareForGeminiRepair(cropBuffer) {
 }
 
 /**
- * Create a reference grid for single-page repair
- * Contains: avatar + other crops from same clothing group (as reference only)
+ * Build a human-readable description of character's physical traits
  *
- * @param {Array<object>} referenceCrops - Other crops from same clothing category
- * @param {string} referenceAvatar - Styled avatar URL/data
- * @param {string} entityName - Entity name
- * @returns {Promise<{buffer: Buffer, manifest: object}>}
+ * @param {object} character - Character object with physical traits
+ * @returns {string} Physical traits description
  */
-async function createReferenceGrid(referenceCrops, referenceAvatar, entityName) {
-  const cells = [];
+function buildPhysicalTraitsDescription(character) {
+  const p = character.physical || {};
+  const parts = [];
 
-  // Add avatar as first cell (Reference)
-  if (referenceAvatar) {
-    try {
-      let refBuffer;
-      if (referenceAvatar.startsWith('data:')) {
-        const base64Data = referenceAvatar.replace(/^data:image\/\w+;base64,/, '');
-        refBuffer = Buffer.from(base64Data, 'base64');
-      } else {
-        refBuffer = Buffer.from(referenceAvatar, 'base64');
-      }
+  // Age and gender
+  if (character.age) parts.push(`${character.age} year old`);
+  if (character.gender) parts.push(character.gender);
 
-      cells.push({
-        buffer: refBuffer,
-        letter: 'R',
-        pageInfo: 'Avatar',
-        metadata: { isReference: true, entityName }
-      });
-    } catch (err) {
-      log.warn(`⚠️  [SINGLE-PAGE-REPAIR] Failed to add avatar: ${err.message}`);
+  // Hair
+  const hairParts = [];
+  if (p.hairColor) hairParts.push(p.hairColor);
+  if (p.hairLength) hairParts.push(p.hairLength);
+  if (p.hairStyle) hairParts.push(p.hairStyle);
+  if (hairParts.length > 0) {
+    parts.push(`${hairParts.join(' ')} hair`);
+  } else if (p.hair) {
+    parts.push(`${p.hair} hair`);
+  }
+
+  // Eyes
+  if (p.eyeColor) parts.push(`${p.eyeColor} eyes`);
+
+  // Skin
+  if (p.skinTone) {
+    const skinDesc = p.skinUndertone ? `${p.skinTone} skin with ${p.skinUndertone} undertone` : `${p.skinTone} skin`;
+    parts.push(skinDesc);
+  }
+
+  // Build
+  if (p.build) parts.push(`${p.build} build`);
+
+  // Face shape
+  if (p.face) parts.push(`${p.face} face`);
+
+  // Facial hair (for males)
+  if (p.facialHair && p.facialHair !== 'none') parts.push(p.facialHair);
+
+  // Other distinctive features
+  if (p.other) parts.push(p.other);
+
+  return parts.length > 0 ? parts.join(', ') : 'See reference image for physical traits';
+}
+
+/**
+ * Build a clothing description for the character in this scene
+ *
+ * @param {object} character - Character object
+ * @param {string} clothingCategory - Clothing category (standard, winter, etc.)
+ * @param {string} artStyle - Art style being used
+ * @returns {string} Clothing description
+ */
+function buildClothingDescription(character, clothingCategory, artStyle) {
+  // First, try to get extracted clothing description from the styled avatar
+  const avatars = character.avatars;
+  if (avatars?.clothing?.[clothingCategory]) {
+    return avatars.clothing[clothingCategory];
+  }
+
+  // Try to get from the styledAvatars metadata if available
+  // (Some implementations store clothing info differently)
+
+  // Fall back to structured clothing from character definition
+  const clothing = character.clothing;
+  if (clothing?.structured) {
+    const s = clothing.structured;
+    if (s.fullBody) {
+      return s.fullBody;
+    }
+    const parts = [];
+    if (s.upperBody) parts.push(s.upperBody);
+    if (s.lowerBody) parts.push(s.lowerBody);
+    if (s.shoes) parts.push(s.shoes);
+    if (parts.length > 0) {
+      return parts.join(', ');
     }
   }
 
-  // Add reference crops (other pages in same clothing group)
-  for (let i = 0; i < Math.min(referenceCrops.length, MAX_GRID_CELLS - 1); i++) {
-    const crop = referenceCrops[i];
-    cells.push({
-      buffer: crop.buffer,
-      letter: String.fromCharCode(65 + i),  // A, B, C...
-      pageInfo: `P${crop.pageNumber}`,
-      metadata: {
-        pageNumber: crop.pageNumber,
-        clothing: crop.clothing,
-        isReferenceOnly: true  // These are reference, not targets for repair
-      }
-    });
+  // Fall back to legacy current clothing
+  if (clothing?.current) {
+    return clothing.current;
   }
 
-  // Create grid
-  return createLabeledGrid(cells, {
-    title: `${entityName} Reference`,
-    cellSize: FACE_CROP_SIZE,
-    showPageInfo: true,
-    maxCols: 4,
-    maxRows: 3
-  });
+  // Default based on category
+  const categoryDefaults = {
+    winter: 'Warm winter clothing as shown in reference',
+    summer: 'Light summer clothing as shown in reference',
+    formal: 'Formal attire as shown in reference',
+    standard: 'Casual everyday clothing as shown in reference'
+  };
+
+  return categoryDefaults[clothingCategory] || 'Clothing as shown in reference image';
 }
 
 /**
  * Repair a single page's entity appearance
+ *
+ * Simplified approach: Just send styled avatar + target page
+ * The avatar already shows the correct appearance in the right style/clothing.
  *
  * @param {object} storyData - Story data with sceneImages, sceneDescriptions, artStyle
  * @param {object} character - Character object with name, photoUrl, avatars
@@ -1560,9 +1603,8 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       return { success: false, error: `${charName} not found on page ${pageNumber}` };
     }
 
-    // Extract all crops for grouping
-    const allCrops = await extractEntityCrops(appearances, { forRegeneration: true });
-    const targetCrop = allCrops.find(c => c.pageNumber === pageNumber);
+    // Extract crop for the target page only
+    const [targetCrop] = await extractEntityCrops([targetAppearance], { forRegeneration: true });
 
     if (!targetCrop) {
       return { success: false, error: `Failed to extract crop for page ${pageNumber}` };
@@ -1572,26 +1614,40 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     const clothingCategory = targetCrop.clothing || 'standard';
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Target page ${pageNumber} has clothing: ${clothingCategory}`);
 
-    // Get all OTHER crops in the same clothing category (for reference)
-    const referenceCrops = allCrops.filter(c =>
-      c.pageNumber !== pageNumber &&
-      (c.clothing || 'standard') === clothingCategory
-    );
-
     // Get styled avatar for this clothing category
-    const referenceAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
-    log.info(`🔧 [SINGLE-PAGE-REPAIR] Using ${referenceAvatar ? 'styled' : 'no'} avatar for ${clothingCategory}`);
+    const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
 
-    // Create reference grid (avatar + other crops from same clothing group)
-    const referenceGrid = await createReferenceGrid(referenceCrops, referenceAvatar, charName);
+    if (!styledAvatar) {
+      return { success: false, error: `No styled avatar found for ${charName} with ${clothingCategory} clothing` };
+    }
+
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Using styled avatar for ${clothingCategory}`);
+
+    // Prepare avatar image
+    let avatarBuffer;
+    if (styledAvatar.startsWith('data:')) {
+      const base64Data = styledAvatar.replace(/^data:image\/\w+;base64,/, '');
+      avatarBuffer = Buffer.from(base64Data, 'base64');
+    } else {
+      avatarBuffer = Buffer.from(styledAvatar, 'base64');
+    }
 
     // Prepare the target image for repair (dynamic upscale + pad)
     const preparedTarget = await prepareForGeminiRepair(targetCrop.buffer);
 
+    // Build physical traits description
+    const physicalTraits = buildPhysicalTraitsDescription(character);
+    const hairColor = character.physical?.hairColor || 'as shown in reference';
+
+    // Build clothing description for this scene
+    const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle);
+
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Physical traits: ${physicalTraits.substring(0, 100)}...`);
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Clothing: ${clothingDescription}`);
+
     // Load the single-page repair prompt
     const promptTemplate = PROMPT_TEMPLATES.entitySinglePageRepair;
     if (!promptTemplate) {
-      // Fallback to a built-in prompt if template doesn't exist
       log.warn('⚠️  [SINGLE-PAGE-REPAIR] Using fallback prompt (entity-single-page-repair.txt not found)');
     }
 
@@ -1600,11 +1656,13 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
           .replace(/\{ENTITY_NAME\}/g, charName)
           .replace(/\{PAGE_NUMBER\}/g, pageNumber.toString())
           .replace(/\{CLOTHING_CATEGORY\}/g, clothingCategory)
-          .replace(/\{REFERENCE_COUNT\}/g, referenceCrops.length.toString())
-      : buildFallbackSinglePagePrompt(charName, pageNumber, clothingCategory, referenceCrops.length);
+          .replace(/\{PHYSICAL_TRAITS\}/g, physicalTraits)
+          .replace(/\{HAIR_COLOR\}/g, hairColor)
+          .replace(/\{CLOTHING_DESCRIPTION\}/g, clothingDescription)
+      : buildFallbackSinglePagePrompt(charName, pageNumber, clothingCategory, physicalTraits, clothingDescription);
 
-    // Send to Gemini: reference grid + target image
-    log.info(`🔧 [SINGLE-PAGE-REPAIR] Sending to Gemini: reference grid + page ${pageNumber} image`);
+    // Send to Gemini: avatar + target (simplified - just 2 images)
+    log.info(`🔧 [SINGLE-PAGE-REPAIR] Sending to Gemini: styled avatar + page ${pageNumber} target`);
 
     const model = genAI.getGenerativeModel({
       model: REPAIR_MODEL,
@@ -1618,8 +1676,8 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
       prompt,
       {
         inlineData: {
-          mimeType: 'image/jpeg',
-          data: referenceGrid.buffer.toString('base64')
+          mimeType: 'image/png',
+          data: avatarBuffer.toString('base64')
         }
       },
       {
@@ -1713,8 +1771,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         after: `data:image/jpeg;base64,${afterResized.toString('base64')}`,
         diff: `data:image/jpeg;base64,${diffBuffer.toString('base64')}`
       },
-      referenceGridUsed: `data:image/jpeg;base64,${referenceGrid.buffer.toString('base64')}`,
-      referenceCount: referenceCrops.length,
+      avatarUsed: `data:image/png;base64,${avatarBuffer.toString('base64')}`,
       usage: response.usageMetadata
     };
 
@@ -1727,44 +1784,65 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
 /**
  * Fallback prompt for single-page repair if template file doesn't exist
  */
-function buildFallbackSinglePagePrompt(entityName, pageNumber, clothingCategory, referenceCount) {
+function buildFallbackSinglePagePrompt(entityName, pageNumber, clothingCategory, physicalTraits, clothingDescription) {
   return `# Single Page Entity Repair
 
 You are repairing character consistency in a children's picture book illustration.
 
 ## Input Images
 
-**IMAGE 1 - REFERENCE GRID:**
-Shows the correct appearance of "${entityName}":
-- Cell R: The character's styled avatar (source of truth)
-- Cells A-${String.fromCharCode(65 + Math.min(referenceCount - 1, 10))}: Other appearances from the same story with "${clothingCategory}" clothing
+**IMAGE 1 - CHARACTER REFERENCE:**
+Shows the correct appearance of "${entityName}" in the art style of this book.
+This is the ONLY source of truth for how the character should look.
 
-**IMAGE 2 - REPAIR TARGET:**
-The image from page ${pageNumber} that needs to be fixed.
+**IMAGE 2 - PAGE TO REPAIR:**
+The illustration from page ${pageNumber} where "${entityName}" needs to be fixed.
+
+## Character Details
+
+**Physical Traits:**
+${physicalTraits || 'See reference image'}
+
+**Clothing for this scene:**
+${clothingDescription || 'As shown in reference image'}
 
 ## Your Task
 
-Generate a repaired version of IMAGE 2 where "${entityName}" matches the reference appearance:
+Regenerate IMAGE 2 with "${entityName}" corrected to match IMAGE 1.
 
-From the REFERENCE (Cell R and other cells):
-1. FACIAL FEATURES - eyes, nose, mouth, face shape
-2. HAIR - color, style, length, texture
-3. SKIN TONE - consistent complexion
-4. BODY PROPORTIONS - size, build, age appearance
+### MUST MATCH from IMAGE 1 (reference):
+- FACE - exact facial features, eye shape, nose, mouth, face shape as shown
+- HAIR - exact color, style, length, texture
+- SKIN TONE - exact complexion as shown
+- CLOTHING - match the outfit shown in IMAGE 1
+- BODY PROPORTIONS - size, build, posture style
 
-From the REPAIR TARGET, PRESERVE:
-1. POSE and POSITION of the character
-2. BACKGROUND and CONTEXT
-3. LIGHTING and ART STYLE
-4. Other characters or objects
+### PIXEL-PERFECT PRESERVATION (CRITICAL):
+Everything EXCEPT "${entityName}" must be IDENTICAL to IMAGE 2:
+- BACKGROUND - every single pixel of scenery, sky, ground, walls, furniture
+- OTHER CHARACTERS - do not change any other person or creature
+- OBJECTS - every item, prop, and detail stays exactly the same
+- LIGHTING - same light direction, shadows, highlights
+- COLORS - same color palette for everything except the target character
+- COMPOSITION - exact same framing, no cropping, no shifting
+- ART STYLE - maintain the exact illustration style
 
-## Clothing
-The character should wear "${clothingCategory}" clothing as shown in the reference images.
+Think of it as: surgically replacing ONLY "${entityName}" while the rest of the image is a protected layer that cannot be modified.
 
 ## Output
-Generate ONLY the repaired version of IMAGE 2. Match the exact dimensions and layout of IMAGE 2.
 
-Do NOT output a grid. Output a single image that is the repaired version of IMAGE 2.`;
+Generate the repaired version of IMAGE 2:
+- EXACT same dimensions as IMAGE 2
+- EXACT same aspect ratio as IMAGE 2
+- Single image (not a grid or collage)
+- The ONLY difference should be "${entityName}" now matching IMAGE 1
+
+## Quality Standards
+
+- Sharp, clean edges on the character
+- No blur, smearing, or artifacts
+- Character blends naturally with preserved background
+- Vibrant colors consistent with the art style`;
 }
 
 module.exports = {
@@ -1786,7 +1864,8 @@ module.exports = {
   prepareForGeminiRepair,
   padToGeminiRatio,
   removePadding,
-  createReferenceGrid,
+  buildPhysicalTraitsDescription,
+  buildClothingDescription,
 
   // Constants
   FACE_CROP_SIZE,
