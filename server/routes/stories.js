@@ -884,18 +884,21 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
 
 // GET /api/stories/:id/dev-image - Lazy load images for dev mode
 // Query params:
-//   page: page number (required)
+//   page: page number (required for scene images)
+//   cover: cover type ('front', 'initial', 'back') - alternative to page for cover images
 //   type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency'
 //   index: index in array (for retry/repair history)
 //   field: specific field like 'imageData', 'originalImage', 'bboxOverlay'
 router.get('/:id/dev-image', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { page, type, index, field } = req.query;
+    const { page, cover, type, index, field } = req.query;
     const pageNum = parseInt(page, 10);
 
-    if (!page || isNaN(pageNum)) {
-      return res.status(400).json({ error: 'page query parameter required' });
+    // Either page or cover must be provided
+    const isCoverRequest = cover && ['front', 'initial', 'back'].includes(cover);
+    if (!isCoverRequest && (!page || isNaN(pageNum))) {
+      return res.status(400).json({ error: 'page or cover query parameter required' });
     }
 
     if (!isDatabaseMode()) {
@@ -915,6 +918,32 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
     }
 
     const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+    // Handle cover image requests
+    if (isCoverRequest) {
+      const coverKey = cover === 'front' ? 'frontCover' : cover === 'initial' ? 'initialPage' : 'backCover';
+      const coverImage = story.coverImages?.[coverKey];
+
+      if (!coverImage) {
+        return res.status(404).json({ error: `Cover ${cover} not found` });
+      }
+
+      // For covers, we support bboxOverlay field
+      if (field === 'bboxOverlay') {
+        return res.json({ bboxOverlayImage: coverImage.bboxOverlayImage || null });
+      }
+      if (field === 'imageData') {
+        const imageData = typeof coverImage === 'string' ? coverImage : coverImage.imageData;
+        return res.json({ imageData: imageData || null });
+      }
+      // Return all cover data
+      return res.json({
+        imageData: typeof coverImage === 'string' ? coverImage : coverImage.imageData,
+        bboxOverlayImage: coverImage.bboxOverlayImage || null,
+        bboxDetection: coverImage.bboxDetection || null
+      });
+    }
+
     const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
 
     if (!sceneImage) {

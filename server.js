@@ -4815,6 +4815,10 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
 
       await saveStoryData(id, storyData);
 
+      // Set version 0 as active (the repaired image is saved as version_index=0)
+      // This ensures rehydrateStoryImages loads the correct version on refresh
+      await setActiveVersion(id, pageNumber, 0);
+
       log.info(`✅ [ENTITY-REPAIR] Single-page repair complete for ${entityName} page ${pageNumber}`);
 
       return res.json({
@@ -4931,6 +4935,12 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
 
     // Save updated story
     await saveStoryData(id, storyData);
+
+    // Set version 0 as active for all repaired pages
+    // This ensures rehydrateStoryImages loads the correct version on refresh
+    for (const update of repairResult.updatedImages) {
+      await setActiveVersion(id, update.pageNumber, 0);
+    }
 
     log.info(`✅ [ENTITY-REPAIR] Entity consistency repair complete for ${entityName}: ${repairResult.cellsRepaired} pages updated`);
 
@@ -5392,6 +5402,9 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
 
             // Save after each page repair
             await saveStoryData(id, storyData);
+
+            // Set version 0 as active for the repaired page
+            await setActiveVersion(id, pageNumber, 0);
 
           } catch (pageErr) {
             log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);

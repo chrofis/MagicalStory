@@ -10,6 +10,8 @@ interface ObjectDetectionDisplayProps {
   language: string;
   storyId?: string | null;
   pageNumber?: number;
+  // For cover images, specify the cover type to use /dev-image?cover=front|initial|back
+  coverType?: 'front' | 'initial' | 'back';
 }
 
 /**
@@ -71,7 +73,8 @@ export function ObjectDetectionDisplay({
   bboxOverlayImage: directBboxOverlayImage,
   language,
   storyId,
-  pageNumber
+  pageNumber,
+  coverType
 }: ObjectDetectionDisplayProps) {
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
   const [loadedOverlay, setLoadedOverlay] = useState<string | null>(null);
@@ -93,22 +96,29 @@ export function ObjectDetectionDisplay({
 
   // Fetch overlay image from server
   const fetchOverlay = async () => {
-    if (!storyId || pageNumber === undefined || isLoading) return;
-
-    // Find the retry index that has bbox data
-    const retryIdx = retryHistory?.findIndex(r =>
-      (r.type === 'bbox_detection_only' && r.bboxDetection) || r.bboxDetection
-    ) ?? 0;
+    // For covers, use coverType; for pages, use pageNumber
+    if (!storyId || isLoading) return;
+    if (!coverType && pageNumber === undefined) return;
 
     setIsLoading(true);
     try {
       const token = localStorage.getItem('auth_token');
-      const params = new URLSearchParams({
-        page: String(pageNumber),
-        type: 'retry',
-        index: String(retryIdx),
-        field: 'bboxOverlay'
-      });
+      const params = new URLSearchParams({ field: 'bboxOverlay' });
+
+      if (coverType) {
+        // Cover image - use cover query param
+        params.set('cover', coverType);
+      } else {
+        // Regular page - use page and retry index
+        params.set('page', String(pageNumber));
+        params.set('type', 'retry');
+        // Find the retry index that has bbox data
+        const retryIdx = retryHistory?.findIndex(r =>
+          (r.type === 'bbox_detection_only' && r.bboxDetection) || r.bboxDetection
+        ) ?? 0;
+        params.set('index', String(retryIdx));
+      }
+
       const response = await fetch(`/api/stories/${storyId}/dev-image?${params}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
