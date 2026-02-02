@@ -4725,32 +4725,46 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       return res.status(404).json({ error: `Character "${entityName}" not found in story` });
     }
 
-    // Check if character has avatar data - if not, try to enrich from characters table
+    // Always try to enrich character with full data from characters table
+    // Story data often has stripped/minimal character info
     const artStyle = storyData.artStyle || 'pixar';
-    if (!character.avatars?.styledAvatars?.[artStyle] && !character.photoUrl && !character.photo) {
-      log.info(`🔧 [ENTITY-REPAIR] Character ${entityName} missing avatar data, fetching from database...`);
+    const characterSetId = storyData.characterSetId;
+    if (characterSetId) {
       try {
-        const characterSetId = storyData.characterSetId;
-        if (characterSetId) {
-          const charSetResult = await dbPool.query(
-            'SELECT data FROM characters WHERE id = $1',
-            [characterSetId]
-          );
-          if (charSetResult.rows.length > 0) {
-            const charSetData = typeof charSetResult.rows[0].data === 'string'
-              ? JSON.parse(charSetResult.rows[0].data)
-              : charSetResult.rows[0].data;
-            const fullChar = charSetData.characters?.find(c => c.name === entityName);
-            if (fullChar) {
-              character = { ...character, ...fullChar, avatars: fullChar.avatars || character.avatars };
-              log.info(`🔧 [ENTITY-REPAIR] Enriched ${entityName} with avatar data from character set`);
-            }
+        const charSetResult = await dbPool.query(
+          'SELECT data FROM characters WHERE id = $1',
+          [characterSetId]
+        );
+        if (charSetResult.rows.length > 0) {
+          const charSetData = typeof charSetResult.rows[0].data === 'string'
+            ? JSON.parse(charSetResult.rows[0].data)
+            : charSetResult.rows[0].data;
+          const fullChar = charSetData.characters?.find(c => c.name === entityName);
+          if (fullChar) {
+            // Merge: prefer fullChar data but keep story-specific overrides
+            character = { ...fullChar, ...character, avatars: fullChar.avatars || character.avatars };
+            log.info(`🔧 [ENTITY-REPAIR] Enriched ${entityName} with avatar data from character set`);
+
+            // Log what avatars we have
+            const styledKeys = Object.keys(fullChar.avatars?.styledAvatars?.[artStyle] || {});
+            log.info(`🔧 [ENTITY-REPAIR] ${entityName} styledAvatars[${artStyle}] keys: [${styledKeys.join(', ')}]`);
+          } else {
+            log.warn(`🔧 [ENTITY-REPAIR] Character ${entityName} not found in character set ${characterSetId}`);
           }
+        } else {
+          log.warn(`🔧 [ENTITY-REPAIR] Character set ${characterSetId} not found in database`);
         }
       } catch (enrichErr) {
         log.warn(`[ENTITY-REPAIR] Failed to enrich character data: ${enrichErr.message}`);
       }
+    } else {
+      log.warn(`🔧 [ENTITY-REPAIR] No characterSetId in story data, cannot enrich ${entityName}`);
     }
+
+    // Log current character avatar state for debugging
+    const hasPhoto = !!(character.photoUrl || character.photo);
+    const hasStyledAvatar = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
+    log.info(`🔧 [ENTITY-REPAIR] ${entityName} avatar state: hasPhoto=${hasPhoto}, hasStyledAvatar[${artStyle}].standard=${hasStyledAvatar}`);
 
     // Single-page mode: repair just one page
     if (isSinglePageMode) {
