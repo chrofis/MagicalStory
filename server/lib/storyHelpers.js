@@ -879,7 +879,8 @@ function getSceneComplexityGuide(sceneCount) {
  * Art styles definitions (matches index.html)
  */
 const ART_STYLES = {
-  // NOTE: All styles include "NOT photorealistic, NOT live-action" to prevent realistic drift
+  // NOTE: Most styles include "NOT photorealistic" to prevent realistic drift
+  // Exceptions: watercolor, oil, concept - these are meant to look more realistic
   pixar: '3D animated film style like Pixar/Disney, stylized cartoon characters with smooth plastic-like skin, slightly larger eyes than real humans, simplified facial features, NO skin pores or wrinkles, NOT photorealistic, NOT live-action, vibrant colors, soft volumetric lighting, family-friendly animation',
   cartoon: '2D cartoon style, bold black outlines, vibrant flat colors (minimal shading/cel-shading), smooth vector quality, classic Saturday morning animation aesthetic, NOT realistic, NOT photorealistic, stylized animated characters',
   anime: 'Modern digital anime art, stylized animated characters, expressive large eyes, simplified facial features, detailed cel-shading, vibrant palette, style of Makoto Shinkai, NOT photorealistic, NOT live-action',
@@ -887,10 +888,10 @@ const ART_STYLES = {
   steampunk: 'Steampunk graphic novel illustration, stylized characters, Victorian aesthetic, intricate gears, brass and copper mechanisms, leather textures, sepia/muted color palette, detailed linework, NOT photorealistic',
   comic: 'Classic American comic book art, heavy black ink lines, stylized characters, dynamic composition, visible halftone/Ben-Day dots, vibrant CMYK colors, style of Jack Kirby/Jim Lee, NOT photorealistic',
   manga: 'Traditional manga style, Japanese comic art, stylized characters, intricate detailed linework, black and white/monochrome, atmospheric screentones, dramatic lighting and composition, NOT photorealistic',
-  watercolor: 'Traditional watercolor painting, stylized artistic interpretation, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, transparent and flowing colors, NOT photorealistic',
-  oil: 'Classic oil painting style, stylized artistic interpretation, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, canvas texture, museum quality art, NOT photorealistic',
+  watercolor: 'Traditional watercolor painting, realistic human proportions and features, textured paper, delicate color washes (wet-on-wet technique), soft edges, visible artistic brushstrokes, transparent and flowing colors, fine art quality',
+  oil: 'Classic oil painting style, realistic human proportions like classical portraiture, visible impasto brushstrokes, rich texture, heavy pigment, chiaroscuro lighting, canvas texture, museum quality fine art, style of John Singer Sargent',
   lowpoly: 'Low poly 3D model, stylized geometric characters, isometric perspective, minimalist geometric shapes, vibrant solid colors, clear edges, retro video game aesthetic, style of Monument Valley, NOT realistic',
-  concept: 'Highly detailed digital concept art, stylized characters, dramatic lighting, epic composition, smooth rendering, focus on mood and atmosphere, wide-angle lens, matte painting aesthetic',
+  concept: 'Highly detailed digital concept art, realistic human proportions and anatomy, dramatic lighting, epic composition, smooth rendering, focus on mood and atmosphere, wide-angle lens, matte painting aesthetic, style of Craig Mullins',
   pixel: '16-bit pixel art style, stylized pixel characters, low resolution, limited color palette, detailed sprite work, retro video game aesthetic, style of Final Fantasy VI, NOT realistic',
   cyber: 'Cyberpunk graphic novel illustration, stylized characters, neon reflections, rainy streets, chrome, dense complexity, high contrast, dark atmosphere, volumetric fog, NOT photorealistic'
 };
