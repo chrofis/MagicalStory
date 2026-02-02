@@ -297,6 +297,67 @@ function convertClothingToCurrentFormat(clothingRequirements) {
   return converted;
 }
 
+/**
+ * Build scene image objects for cover images to include in consistency checks.
+ * Covers are assigned page numbers beyond the story pages:
+ * - frontCover: totalPages + 1
+ * - initialPage: totalPages + 2
+ * - backCover: totalPages + 3
+ *
+ * @param {Object} coverImages - Cover images object with frontCover, initialPage, backCover
+ * @param {Array} characters - Array of character objects from the story
+ * @param {number} totalStoryPages - Number of story pages (to calculate cover page numbers)
+ * @returns {Array} Array of scene image objects for covers
+ */
+function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
+  const coverSceneImages = [];
+
+  const coverTypes = [
+    { key: 'frontCover', offset: 1, label: 'Front Cover' },
+    { key: 'initialPage', offset: 2, label: 'Initial Page' },
+    { key: 'backCover', offset: 3, label: 'Back Cover' }
+  ];
+
+  for (const { key, offset, label } of coverTypes) {
+    const cover = coverImages?.[key];
+    if (!cover) continue;
+
+    const imageData = typeof cover === 'string' ? cover : cover.imageData;
+    if (!imageData) continue;
+
+    // Build retryHistory with bboxDetection if available (for entity consistency cropping)
+    const retryHistory = [];
+    if (cover.bboxDetection) {
+      retryHistory.push({
+        type: 'bbox_detection_only',
+        bboxDetection: cover.bboxDetection,
+        bboxOverlayImage: cover.bboxOverlayImage
+      });
+    }
+
+    // Extract character names from the cover's reference photos if available
+    const coverCharacters = cover.referencePhotos?.map(p => p.name).filter(Boolean) ||
+                           characters.map(c => c.name);
+
+    coverSceneImages.push({
+      pageNumber: totalStoryPages + offset,
+      imageData: imageData,
+      characters: coverCharacters,
+      clothing: 'standard',  // Covers use standard or costumed clothing
+      characterClothing: {},  // Could be parsed from cover description if needed
+      sceneSummary: `${label} - group scene with characters`,
+      referenceCharacters: coverCharacters,
+      referenceClothing: cover.referencePhotos?.reduce((acc, p) => {
+        if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
+        return acc;
+      }, {}) || {},
+      retryHistory
+    });
+  }
+
+  return coverSceneImages;
+}
+
 // Initialize Firebase Admin SDK
 // Supports: FIREBASE_SERVICE_ACCOUNT_BASE64 (base64), FIREBASE_SERVICE_ACCOUNT (JSON string), or FIREBASE_SERVICE_ACCOUNT_PATH (file path)
 let firebaseInitialized = false;
@@ -4267,9 +4328,13 @@ app.post('/api/stories/:id/edit/image/:pageNum', authenticateToken, imageRegener
     let qualityReasoning = null;
     try {
       const evaluation = await evaluateImageQuality(editResult.imageData, 'scene');
-      qualityScore = evaluation.score;
-      qualityReasoning = evaluation.reasoning;
-      log.debug(`⭐ [EDIT] Edited image score: ${qualityScore}%`);
+      if (evaluation) {
+        qualityScore = evaluation.score;
+        qualityReasoning = evaluation.reasoning;
+        log.debug(`⭐ [EDIT] Edited image score: ${qualityScore}%`);
+      } else {
+        log.warn(`⚠️ [EDIT] Quality evaluation returned null`);
+      }
     } catch (evalErr) {
       log.error(`⚠️ [EDIT] Quality evaluation failed:`, evalErr.message);
     }
@@ -5406,9 +5471,13 @@ app.post('/api/stories/:id/edit/cover/:coverType', authenticateToken, async (req
     let qualityReasoning = null;
     try {
       const evaluation = await evaluateImageQuality(editResult.imageData, 'cover');
-      qualityScore = evaluation.score;
-      qualityReasoning = evaluation.reasoning;
-      log.debug(`⭐ [COVER EDIT] Edited cover score: ${qualityScore}%`);
+      if (evaluation) {
+        qualityScore = evaluation.score;
+        qualityReasoning = evaluation.reasoning;
+        log.debug(`⭐ [COVER EDIT] Edited cover score: ${qualityScore}%`);
+      } else {
+        log.warn(`⚠️ [COVER EDIT] Quality evaluation returned null`);
+      }
     } catch (evalErr) {
       log.error(`⚠️ [COVER EDIT] Quality evaluation failed:`, evalErr.message);
     }
@@ -9208,6 +9277,18 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             };
           })
         };
+
+        // Add cover images to consistency check (use page numbers after story pages)
+        const coverSceneImages = buildCoverSceneImages(
+          coverImages,
+          inputData.characters || [],
+          allImages.length  // Base: frontCover = length+1, initialPage = length+2, backCover = length+3
+        );
+        if (coverSceneImages.length > 0) {
+          imageCheckData.sceneImages.push(...coverSceneImages);
+          log.debug(`📊 [STORYBOOK FINAL CHECKS] Added ${coverSceneImages.length} cover images to consistency check (pages ${coverSceneImages.map(c => c.pageNumber).join(', ')})`);
+        }
+
         // LEGACY: Full-image consistency check
         const legacyReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true
@@ -11361,6 +11442,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             };
           })
         };
+
+        // Add cover images to consistency check (use page numbers after story pages)
+        const coverSceneImages = buildCoverSceneImages(
+          coverImages,
+          inputData.characters || [],
+          allImages.length  // Base: frontCover = length+1, initialPage = length+2, backCover = length+3
+        );
+        if (coverSceneImages.length > 0) {
+          imageCheckData.sceneImages.push(...coverSceneImages);
+          log.debug(`📊 [UNIFIED FINAL CHECKS] Added ${coverSceneImages.length} cover images to consistency check (pages ${coverSceneImages.map(c => c.pageNumber).join(', ')})`);
+        }
+
         // LEGACY: Full-image consistency check
         const legacyReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
           checkCharacters: true

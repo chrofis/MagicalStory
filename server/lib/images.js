@@ -301,6 +301,12 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
  */
 async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '') {
   try {
+    // Guard against undefined/invalid imageData
+    if (!imageData || typeof imageData !== 'string') {
+      log.warn(`⚠️ [QUALITY] Invalid imageData passed to evaluateImageQuality: ${typeof imageData}`);
+      return null;
+    }
+
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {

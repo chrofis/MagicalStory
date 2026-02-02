@@ -112,7 +112,8 @@ async function inpaintWithRunware(seedImage, maskImage, prompt, options = {}) {
         'Authorization': `Bearer ${RUNWARE_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
     });
 
     if (!response.ok) {
@@ -229,7 +230,8 @@ async function generateWithRunware(prompt, options = {}) {
         'Authorization': `Bearer ${RUNWARE_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
     });
 
     if (!response.ok) {
@@ -353,7 +355,8 @@ async function generateAvatarWithACE(referenceImage, prompt, options = {}) {
         'Authorization': `Bearer ${RUNWARE_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
     });
 
     if (!response.ok) {
@@ -508,7 +511,8 @@ async function generateWithPuLID(referenceImage, prompt, options = {}) {
         'Authorization': `Bearer ${RUNWARE_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000)  // 60 second timeout to prevent hanging forever
     });
 
     if (!response.ok) {
