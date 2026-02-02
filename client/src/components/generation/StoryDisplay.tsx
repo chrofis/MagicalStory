@@ -1163,20 +1163,29 @@ export function StoryDisplay({
 
     if (!rawDesc) return undefined;
 
-    // Pretty-print JSON for readability
-    if (typeof rawDesc === 'string') {
+    // Helper to recursively parse JSON strings that might be double-escaped
+    // e.g., '"{\"key\":\"value\"}"' -> parse to '{"key":"value"}' -> parse to {key: "value"}
+    const parseDeep = (value: unknown): unknown => {
+      if (typeof value !== 'string') return value;
       try {
-        const parsed = JSON.parse(rawDesc);
-        return JSON.stringify(parsed, null, 2);
+        const parsed = JSON.parse(value);
+        // If we parsed a string that looks like JSON, try parsing again
+        if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
+          return parseDeep(parsed);
+        }
+        return parsed;
       } catch {
-        return rawDesc;
+        return value;
       }
+    };
+
+    // Pretty-print JSON for readability
+    const parsed = parseDeep(rawDesc);
+    if (typeof parsed === 'object' && parsed !== null) {
+      return JSON.stringify(parsed, null, 2);
     }
-    // If it's an object, format it nicely
-    if (typeof rawDesc === 'object') {
-      return JSON.stringify(rawDesc, null, 2);
-    }
-    return String(rawDesc);
+    // If it's still a string after parsing attempts, return as-is
+    return String(parsed);
   };
 
   // Helper to get outline extract for a page
@@ -3197,30 +3206,30 @@ export function StoryDisplay({
                         {scene.textModelId && <span className="ml-2 text-green-600">({scene.textModelId})</span>}
                         <pre className="text-gray-700 mt-1 whitespace-pre-wrap font-mono text-xs overflow-x-auto">
                           {(() => {
-                            // Pretty-print JSON for readability
-                            if (typeof scene.description === 'string') {
-                              // Try to parse and format if it's a JSON string
+                            // Helper to recursively parse JSON strings that might be double-escaped
+                            const parseDeep = (value: unknown): unknown => {
+                              if (typeof value !== 'string') return value;
                               try {
-                                const parsed = JSON.parse(scene.description);
-                                return JSON.stringify(parsed, null, 2);
-                              } catch {
-                                return scene.description;
-                              }
-                            }
-                            // If it's an object, format it nicely
-                            if (typeof scene.description === 'object') {
-                              const desc = scene.description as { text?: string };
-                              if (desc?.text) {
-                                try {
-                                  const parsed = JSON.parse(desc.text);
-                                  return JSON.stringify(parsed, null, 2);
-                                } catch {
-                                  return desc.text;
+                                const parsed = JSON.parse(value);
+                                // If we parsed a string that looks like JSON, try parsing again
+                                if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
+                                  return parseDeep(parsed);
                                 }
+                                return parsed;
+                              } catch {
+                                return value;
                               }
-                              return JSON.stringify(scene.description, null, 2);
+                            };
+
+                            // Pretty-print JSON for readability
+                            const rawDesc = typeof scene.description === 'object' && (scene.description as { text?: string })?.text
+                              ? (scene.description as { text: string }).text
+                              : scene.description;
+                            const parsed = parseDeep(rawDesc);
+                            if (typeof parsed === 'object' && parsed !== null) {
+                              return JSON.stringify(parsed, null, 2);
                             }
-                            return String(scene.description);
+                            return String(parsed);
                           })()}
                         </pre>
                       </div>
@@ -3300,18 +3309,25 @@ export function StoryDisplay({
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                       {(() => {
+                        // Helper to recursively parse JSON strings that might be double-escaped
+                        const parseDeep = (value: unknown): unknown => {
+                          if (typeof value !== 'string') return value;
+                          try {
+                            const parsed = JSON.parse(value);
+                            if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
+                              return parseDeep(parsed);
+                            }
+                            return parsed;
+                          } catch { return value; }
+                        };
                         const desc = frontCoverObj.description;
-                        if (typeof desc === 'string') {
-                          try { return JSON.stringify(JSON.parse(desc), null, 2); } catch { return desc; }
+                        const rawDesc = typeof desc === 'object' && (desc as { text?: string })?.text
+                          ? (desc as { text: string }).text : desc;
+                        const parsed = parseDeep(rawDesc);
+                        if (typeof parsed === 'object' && parsed !== null) {
+                          return JSON.stringify(parsed, null, 2);
                         }
-                        if (typeof desc === 'object') {
-                          const d = desc as { text?: string };
-                          if (d?.text) {
-                            try { return JSON.stringify(JSON.parse(d.text), null, 2); } catch { return d.text; }
-                          }
-                          return JSON.stringify(desc, null, 2);
-                        }
-                        return String(desc);
+                        return String(parsed);
                       })()}
                     </pre>
                   </details>
@@ -3492,18 +3508,25 @@ export function StoryDisplay({
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                       {(() => {
+                        // Helper to recursively parse JSON strings that might be double-escaped
+                        const parseDeep = (value: unknown): unknown => {
+                          if (typeof value !== 'string') return value;
+                          try {
+                            const parsed = JSON.parse(value);
+                            if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
+                              return parseDeep(parsed);
+                            }
+                            return parsed;
+                          } catch { return value; }
+                        };
                         const desc = initialPageObj.description;
-                        if (typeof desc === 'string') {
-                          try { return JSON.stringify(JSON.parse(desc), null, 2); } catch { return desc; }
+                        const rawDesc = typeof desc === 'object' && (desc as { text?: string })?.text
+                          ? (desc as { text: string }).text : desc;
+                        const parsed = parseDeep(rawDesc);
+                        if (typeof parsed === 'object' && parsed !== null) {
+                          return JSON.stringify(parsed, null, 2);
                         }
-                        if (typeof desc === 'object') {
-                          const d = desc as { text?: string };
-                          if (d?.text) {
-                            try { return JSON.stringify(JSON.parse(d.text), null, 2); } catch { return d.text; }
-                          }
-                          return JSON.stringify(desc, null, 2);
-                        }
-                        return String(desc);
+                        return String(parsed);
                       })()}
                     </pre>
                   </details>
@@ -4547,18 +4570,25 @@ export function StoryDisplay({
                     </summary>
                     <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto">
                       {(() => {
+                        // Helper to recursively parse JSON strings that might be double-escaped
+                        const parseDeep = (value: unknown): unknown => {
+                          if (typeof value !== 'string') return value;
+                          try {
+                            const parsed = JSON.parse(value);
+                            if (typeof parsed === 'string' && (parsed.startsWith('{') || parsed.startsWith('['))) {
+                              return parseDeep(parsed);
+                            }
+                            return parsed;
+                          } catch { return value; }
+                        };
                         const desc = backCoverObj.description;
-                        if (typeof desc === 'string') {
-                          try { return JSON.stringify(JSON.parse(desc), null, 2); } catch { return desc; }
+                        const rawDesc = typeof desc === 'object' && (desc as { text?: string })?.text
+                          ? (desc as { text: string }).text : desc;
+                        const parsed = parseDeep(rawDesc);
+                        if (typeof parsed === 'object' && parsed !== null) {
+                          return JSON.stringify(parsed, null, 2);
                         }
-                        if (typeof desc === 'object') {
-                          const d = desc as { text?: string };
-                          if (d?.text) {
-                            try { return JSON.stringify(JSON.parse(d.text), null, 2); } catch { return d.text; }
-                          }
-                          return JSON.stringify(desc, null, 2);
-                        }
-                        return String(desc);
+                        return String(parsed);
                       })()}
                     </pre>
                   </details>
