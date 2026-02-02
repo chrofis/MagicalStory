@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getRetryHistoryImages } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getRetryHistoryImages, rehydrateStoryImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -1653,6 +1653,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
       if (rows.length > 0) {
         story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+        // Rehydrate images from story_images table (images may be stripped from data blob)
+        story = await rehydrateStoryImages(id, story);
 
         // Sync isActive flags in imageVersions with stored active version metadata
         if (story.sceneImages && story.sceneImages.length > 0) {

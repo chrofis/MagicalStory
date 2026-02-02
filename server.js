@@ -4854,11 +4854,16 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         promptUsed: repairResult.promptUsed
       };
 
+      // Calculate the new version index (new version is at the end of imageVersions array)
+      const newVersionIndex = existingImage.imageVersions.length - 1;
+
       await saveStoryData(id, storyData);
 
-      // Set version 0 as active (the repaired image is saved as version_index=0)
-      // This ensures rehydrateStoryImages loads the correct version on refresh
-      await setActiveVersion(id, pageNumber, 0);
+      // Save the repaired image to story_images table with correct version index
+      await saveStoryImage(id, 'scene', pageNumber, existingImage.imageData, newVersionIndex);
+
+      // Set the new version as active
+      await setActiveVersion(id, pageNumber, newVersionIndex);
 
       log.info(`✅ [ENTITY-REPAIR] Single-page repair complete for ${entityName} page ${pageNumber}`);
 
@@ -4977,10 +4982,14 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     // Save updated story
     await saveStoryData(id, storyData);
 
-    // Set version 0 as active for all repaired pages
-    // This ensures rehydrateStoryImages loads the correct version on refresh
+    // Save repaired images to story_images table and set correct active version
     for (const update of repairResult.updatedImages) {
-      await setActiveVersion(id, update.pageNumber, 0);
+      const existingImage = sceneImages.find(s => s.pageNumber === update.pageNumber);
+      if (existingImage && existingImage.imageVersions) {
+        const newVersionIndex = existingImage.imageVersions.length - 1;
+        await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, newVersionIndex);
+        await setActiveVersion(id, update.pageNumber, newVersionIndex);
+      }
     }
 
     log.info(`✅ [ENTITY-REPAIR] Entity consistency repair complete for ${entityName}: ${repairResult.cellsRepaired} pages updated`);
@@ -5454,11 +5463,17 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
             storyData.sceneImages = sceneImages;
             pagesRepaired.push(pageNumber);
 
+            // Calculate the version index (new version is at the end of imageVersions array)
+            const newVersionIndex = existingImage.imageVersions.length - 1;
+
             // Save after each page repair
             await saveStoryData(id, storyData);
 
-            // Set version 0 as active for the repaired page
-            await setActiveVersion(id, pageNumber, 0);
+            // Save the repaired image to story_images table with correct version index
+            await saveStoryImage(id, 'scene', pageNumber, update.imageData, newVersionIndex);
+
+            // Set the new version as active
+            await setActiveVersion(id, pageNumber, newVersionIndex);
 
           } catch (pageErr) {
             log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
