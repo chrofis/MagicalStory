@@ -5164,17 +5164,17 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
     }
 
     const story = storyResult.rows[0];
-    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
-    // Rehydrate image data from separate table (needed for crop extraction)
-    storyData = await rehydrateStoryImages(id, storyData);
+    // Rehydrate image data into a COPY for crop extraction (don't modify original)
+    const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
 
-    // Run entity consistency check
+    // Run entity consistency check with rehydrated data
     const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
-    const characters = storyData.characters || [];
-    const report = await runEntityConsistencyChecks(storyData, characters);
+    const characters = rehydratedData.characters || [];
+    const report = await runEntityConsistencyChecks(rehydratedData, characters);
 
-    // Save report to story
+    // Save report to ORIGINAL story data (without image data) to avoid re-saving images
     if (!storyData.finalChecksReport) {
       storyData.finalChecksReport = {};
     }
