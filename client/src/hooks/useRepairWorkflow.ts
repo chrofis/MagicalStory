@@ -5,6 +5,7 @@ import type {
   PageFeedback,
   SceneImage,
   EntityConsistencyReport,
+  EntityCheckResult,
   EvaluationData,
 } from '../types/story';
 import type { Character } from '../types/character';
@@ -125,6 +126,7 @@ export interface UseRepairWorkflowReturn {
   getStepNumber: (step: RepairWorkflowStep) => number;
   getPagesNeedingAttention: () => number[];
   getCharactersWithIssues: () => string[];
+  getPagesWithSevereIssuesForCharacter: (characterName: string) => number[];
 }
 
 export function useRepairWorkflow({
@@ -657,6 +659,7 @@ export function useRepairWorkflow({
   }, [workflowState.consistencyResults.report]);
 
   // Full automated workflow - runs all steps in sequence
+  // Note: We use local tracking instead of relying on React state updates (stale closure issue)
   const runFullWorkflow = useCallback(async (options: {
     scoreThreshold?: number;
     issueThreshold?: number;
@@ -674,28 +677,52 @@ export function useRepairWorkflow({
 
       // Step 4 first: Re-evaluate ALL pages to get current state
       onProgress?.('re-evaluate', 'Evaluating all pages...');
-      await reEvaluatePages(sceneImages.map(s => s.pageNumber));
+      const evalResult = await storyService.reEvaluatePages(storyId, sceneImages.map(s => s.pageNumber));
 
-      // Step 2: Auto-identify redo pages based on re-evaluation results
+      // Build local evaluation results map
+      const evalPages: Record<number, { qualityScore: number; rawScore?: number; fixableIssues?: Array<{ type: string }> }> = {};
+      for (const [pageNum, pageResult] of Object.entries(evalResult.pages || {})) {
+        const pr = pageResult as { qualityScore: number; rawScore?: number; fixableIssues?: Array<{ type: string }> };
+        evalPages[parseInt(pageNum)] = pr;
+      }
+
+      // Step 2: Auto-identify redo pages based on evaluation results (compute locally)
       onProgress?.('identify-redo-pages', 'Identifying pages needing redo...');
-      autoIdentifyRedoPages(scoreThreshold, issueThreshold);
+      const pagesToRedo: number[] = [];
+      for (const [pageNumStr, result] of Object.entries(evalPages)) {
+        const pageNum = parseInt(pageNumStr);
+        const rawScore = result.rawScore ?? Math.round(result.qualityScore / 10);
+        const issueCount = result.fixableIssues?.length ?? 0;
+        if (rawScore < scoreThreshold || issueCount >= issueThreshold) {
+          pagesToRedo.push(pageNum);
+        }
+      }
+      pagesToRedo.sort((a, b) => a - b);
+
+      // Update state for UI
+      setWorkflowState(prev => ({
+        ...prev,
+        redoPages: { pageNumbers: pagesToRedo, reasons: {} },
+        stepStatus: { ...prev.stepStatus, 'identify-redo-pages': 'completed' },
+      }));
 
       // Step 3: Redo pages with retry logic (up to maxRetries, keep best)
-      const pagesToRedo = workflowState.redoPages.pageNumbers;
+      const pagesCompleted: number[] = [];
       if (pagesToRedo.length > 0) {
         onProgress?.('redo-pages', `Redoing ${pagesToRedo.length} pages...`);
         startStep('redo-pages');
 
         const bestResults: Record<number, { score: number; imageData: string; versionIndex: number }> = {};
 
-        for (const pageNumber of pagesToRedo) {
+        for (let i = 0; i < pagesToRedo.length; i++) {
+          const pageNumber = pagesToRedo[i];
           let bestScore = 0;
           let bestImageData = '';
           let bestVersionIndex = 0;
 
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
             onProgress?.('redo-pages', `Page ${pageNumber}: attempt ${attempt}/${maxRetries}`);
-            setRedoProgress({ current: pagesToRedo.indexOf(pageNumber), total: pagesToRedo.length, currentPage: pageNumber });
+            setRedoProgress({ current: i, total: pagesToRedo.length, currentPage: pageNumber });
 
             try {
               const result = await storyService.iteratePage(storyId, pageNumber, imageModel);
@@ -721,6 +748,7 @@ export function useRepairWorkflow({
 
           if (bestImageData) {
             bestResults[pageNumber] = { score: bestScore, imageData: bestImageData, versionIndex: bestVersionIndex };
+            pagesCompleted.push(pageNumber);
             onImageUpdate?.(pageNumber, bestImageData, bestVersionIndex);
           }
         }
@@ -728,7 +756,7 @@ export function useRepairWorkflow({
         setWorkflowState(prev => ({
           ...prev,
           redoResults: {
-            pagesCompleted: Object.keys(bestResults).map(p => parseInt(p)),
+            pagesCompleted,
             newVersions: Object.fromEntries(Object.entries(bestResults).map(([p, r]) => [p, r.versionIndex])),
           },
           stepStatus: { ...prev.stepStatus, 'redo-pages': 'completed' },
@@ -736,34 +764,73 @@ export function useRepairWorkflow({
       }
 
       // Step 4 again: Re-evaluate redone pages
-      if (workflowState.redoResults.pagesCompleted.length > 0) {
+      if (pagesCompleted.length > 0) {
         onProgress?.('re-evaluate', 'Re-evaluating redone pages...');
-        await reEvaluatePages(workflowState.redoResults.pagesCompleted);
+        await reEvaluatePages(pagesCompleted);
       }
 
       // Step 5: Consistency check
       onProgress?.('consistency-check', 'Running consistency check...');
-      await runConsistencyCheck();
+      const consistencyResult = await storyService.runEntityConsistency(storyId);
+      const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
 
-      // Step 6: Auto-repair characters with severe issues
-      const charsWithIssues = getCharactersWithIssues();
-      if (charsWithIssues.length > 0) {
-        onProgress?.('character-repair', `Repairing ${charsWithIssues.length} characters...`);
-        for (const charName of charsWithIssues) {
-          const pages = getPagesWithSevereIssuesForCharacter(charName);
-          if (pages.length > 0) {
-            onProgress?.('character-repair', `Repairing ${charName} on ${pages.length} pages...`);
-            await repairCharacter(charName, pages);
+      // Update state with consistency results
+      setWorkflowState(prev => ({
+        ...prev,
+        consistencyResults: { report: consistencyReport },
+        stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
+      }));
+
+      // Step 6: Auto-repair characters with severe issues (use local consistency result)
+      if (consistencyReport?.characters) {
+        const charsWithIssues = Object.entries(consistencyReport.characters)
+          .filter(([_, result]) => {
+            if ('overallConsistent' in result) {
+              return !result.overallConsistent || (result.totalIssues ?? 0) > 0;
+            }
+            return !result.consistent || (result.issues?.length ?? 0) > 0;
+          })
+          .map(([name]) => name);
+
+        if (charsWithIssues.length > 0) {
+          onProgress?.('character-repair', `Repairing ${charsWithIssues.length} characters...`);
+          for (const charName of charsWithIssues) {
+            // Compute severe pages locally from consistency report
+            const charResult = consistencyReport.characters[charName] as EntityCheckResult;
+            const severePages = new Set<number>();
+            if (charResult.byClothing) {
+              for (const clothingResult of Object.values(charResult.byClothing)) {
+                for (const issue of clothingResult.issues || []) {
+                  if (issue.severity === 'major' || issue.severity === 'critical') {
+                    for (const page of issue.pagesToFix || []) severePages.add(page);
+                    if (issue.pageNumber) severePages.add(issue.pageNumber);
+                  }
+                }
+              }
+            }
+            if (charResult.issues) {
+              for (const issue of charResult.issues) {
+                if (issue.severity === 'major' || issue.severity === 'critical') {
+                  for (const page of issue.pagesToFix || []) severePages.add(page);
+                  if (issue.pageNumber) severePages.add(issue.pageNumber);
+                }
+              }
+            }
+            const pages = Array.from(severePages).sort((a, b) => a - b);
+            if (pages.length > 0) {
+              onProgress?.('character-repair', `Repairing ${charName} on ${pages.length} pages...`);
+              await repairCharacter(charName, pages);
+            }
           }
         }
       }
 
       // Step 7: Auto-repair artifacts
-      // Get pages with artifact/distortion issues from re-evaluation results
+      // Get pages with artifact/distortion issues from evaluation results
       const artifactPages: number[] = [];
-      for (const [page, result] of Object.entries(workflowState.reEvaluationResults.pages)) {
+      for (const [pageStr, result] of Object.entries(evalPages)) {
         if (result.fixableIssues?.some(i => i.type === 'artifact' || i.type === 'distortion')) {
-          artifactPages.push(parseInt(page));
+          artifactPages.push(parseInt(pageStr));
         }
       }
       if (artifactPages.length > 0) {
@@ -778,10 +845,8 @@ export function useRepairWorkflow({
     }
   }, [
     storyId, sceneImages, imageModel, onImageUpdate,
-    collectFeedback, reEvaluatePages, autoIdentifyRedoPages, startStep, setRedoProgress,
-    workflowState.redoPages.pageNumbers, workflowState.redoResults.pagesCompleted,
-    workflowState.reEvaluationResults.pages, runConsistencyCheck, getCharactersWithIssues,
-    getPagesWithSevereIssuesForCharacter, repairCharacter, repairArtifacts
+    collectFeedback, reEvaluatePages, startStep, setRedoProgress,
+    runConsistencyCheck, repairCharacter, repairArtifacts
   ]);
 
   return {
@@ -818,5 +883,6 @@ export function useRepairWorkflow({
     getStepNumber,
     getPagesNeedingAttention,
     getCharactersWithIssues,
+    getPagesWithSevereIssuesForCharacter,
   };
 }

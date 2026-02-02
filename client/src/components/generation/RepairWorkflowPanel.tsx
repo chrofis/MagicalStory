@@ -195,6 +195,7 @@ export function RepairWorkflowPanel({
     runFullWorkflow,
     getStepNumber,
     getCharactersWithIssues,
+    getPagesWithSevereIssuesForCharacter,
   } = useRepairWorkflow({
     storyId,
     sceneImages,
@@ -275,49 +276,6 @@ export function RepairWorkflowPanel({
 
     return Array.from(artifactPages).sort((a, b) => a - b);
   }, [workflowState.collectedFeedback.pages, workflowState.reEvaluationResults.pages]);
-
-  // Get pages with severe (major/critical) issues for a specific character
-  const getPagesWithSevereIssuesForCharacter = (characterName: string): number[] => {
-    const report = workflowState.consistencyResults.report;
-    if (!report?.characters?.[characterName]) return [];
-
-    const charResult = report.characters[characterName];
-    const severePages = new Set<number>();
-
-    // Check byClothing structure (new format)
-    if (charResult.byClothing) {
-      for (const clothingResult of Object.values(charResult.byClothing)) {
-        for (const issue of clothingResult.issues || []) {
-          if (issue.severity === 'major' || issue.severity === 'critical') {
-            // Add all pages from pagesToFix
-            for (const page of issue.pagesToFix || []) {
-              severePages.add(page);
-            }
-            // Also add the specific page if set
-            if (issue.pageNumber) {
-              severePages.add(issue.pageNumber);
-            }
-          }
-        }
-      }
-    }
-
-    // Check legacy flat structure
-    if (charResult.issues) {
-      for (const issue of charResult.issues) {
-        if (issue.severity === 'major' || issue.severity === 'critical') {
-          for (const page of issue.pagesToFix || []) {
-            severePages.add(page);
-          }
-          if (issue.pageNumber) {
-            severePages.add(issue.pageNumber);
-          }
-        }
-      }
-    }
-
-    return Array.from(severePages).sort((a, b) => a - b);
-  };
 
   // Render step header
   const renderStepHeader = (step: RepairWorkflowStep) => {
