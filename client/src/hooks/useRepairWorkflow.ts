@@ -404,12 +404,31 @@ export function useRepairWorkflow({
     try {
       const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate);
 
-      const evalResults: Record<number, { qualityScore: number; fixableIssues: EvaluationData['fixableIssues'] }> = {};
+      const evalResults: Record<number, {
+        qualityScore: number;
+        rawScore?: number;
+        verdict?: string;
+        issuesSummary?: string;
+        reasoning?: string;
+        fixableIssues: EvaluationData['fixableIssues'];
+      }> = {};
 
       for (const [pageNum, pageResult] of Object.entries(result.pages || {})) {
+        const pr = pageResult as {
+          qualityScore: number;
+          rawScore?: number;
+          verdict?: string;
+          issuesSummary?: string;
+          reasoning?: string;
+          fixableIssues: EvaluationData['fixableIssues'];
+        };
         evalResults[parseInt(pageNum)] = {
-          qualityScore: pageResult.qualityScore,
-          fixableIssues: pageResult.fixableIssues,
+          qualityScore: pr.qualityScore,
+          rawScore: pr.rawScore,
+          verdict: pr.verdict,
+          issuesSummary: pr.issuesSummary,
+          reasoning: pr.reasoning,
+          fixableIssues: pr.fixableIssues,
         };
       }
 

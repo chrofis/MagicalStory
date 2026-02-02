@@ -5198,12 +5198,22 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           continue;
         }
 
+        // Log the raw score and reasoning for debugging
+        log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - rawScore: ${evaluation.rawScore}/10, score: ${evaluation.score}/100, verdict: ${evaluation.verdict}`);
+        if (evaluation.issuesSummary) {
+          log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - issues: ${evaluation.issuesSummary}`);
+        }
+
         // Update scene with new evaluation
         scene.qualityScore = evaluation.score;
         scene.qualityReasoning = evaluation.reasoning;
 
         pages[pageNumber] = {
           qualityScore: evaluation.score,
+          rawScore: evaluation.rawScore,
+          verdict: evaluation.verdict,
+          issuesSummary: evaluation.issuesSummary || '',
+          reasoning: evaluation.reasoning,
           fixableIssues: evaluation.fixableIssues || []
         };
       } catch (evalErr) {

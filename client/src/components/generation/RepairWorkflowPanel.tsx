@@ -472,20 +472,40 @@ export function RepairWorkflowPanel({
                 {Object.keys(workflowState.reEvaluationResults.pages).length > 0 && (
                   <div className="space-y-2">
                     <h5 className="text-sm font-medium">Evaluation Results:</h5>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.entries(workflowState.reEvaluationResults.pages).map(([page, result]) => (
-                        <div key={page} className="p-2 bg-gray-50 rounded border text-sm">
-                          <span className="font-medium">Page {page}:</span>{' '}
-                          <span className={result.qualityScore >= 7 ? 'text-green-600' : 'text-amber-600'}>
-                            {result.qualityScore}/10
-                          </span>
-                          {result.fixableIssues && result.fixableIssues.length > 0 && (
-                            <span className="text-gray-500 text-xs ml-1">
-                              ({result.fixableIssues.length} issues)
-                            </span>
-                          )}
-                        </div>
-                      ))}
+                    <div className="space-y-2">
+                      {Object.entries(workflowState.reEvaluationResults.pages).map(([page, result]) => {
+                        const displayScore = result.rawScore ?? Math.round(result.qualityScore / 10);
+                        const scoreClass = displayScore >= 7 ? 'text-green-600' : displayScore >= 5 ? 'text-amber-600' : 'text-red-600';
+                        return (
+                          <div key={page} className="p-2 bg-gray-50 rounded border text-sm space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">Page {page}:</span>
+                              <span className={scoreClass}>
+                                {displayScore}/10
+                              </span>
+                              {result.verdict && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                  result.verdict === 'PASS' ? 'bg-green-100 text-green-700' :
+                                  result.verdict === 'SOFT_FAIL' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {result.verdict}
+                                </span>
+                              )}
+                              {result.fixableIssues && result.fixableIssues.length > 0 && (
+                                <span className="text-gray-500 text-xs">
+                                  ({result.fixableIssues.length} fixable issues)
+                                </span>
+                              )}
+                            </div>
+                            {result.issuesSummary && result.issuesSummary !== 'none' && (
+                              <p className="text-xs text-gray-600 pl-2 border-l-2 border-gray-300">
+                                {result.issuesSummary}
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

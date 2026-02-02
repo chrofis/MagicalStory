@@ -844,7 +844,14 @@ export interface RepairWorkflowState {
     newVersions: Record<number, number>;
   };
   reEvaluationResults: {
-    pages: Record<number, { qualityScore: number; fixableIssues: EvaluationData['fixableIssues'] }>;
+    pages: Record<number, {
+      qualityScore: number;
+      rawScore?: number;
+      verdict?: string;
+      issuesSummary?: string;
+      reasoning?: string;
+      fixableIssues: EvaluationData['fixableIssues'];
+    }>;
   };
   consistencyResults: {
     report?: EntityConsistencyReport;
