@@ -2538,13 +2538,49 @@ export function StoryDisplay({
                                       {issue.severity}
                                     </span>
                                     {issue.cells && (
-                                      <span className="text-gray-500">Cells: {issue.cells.join(', ')}</span>
-                                    )}
-                                    {issue.pagesToFix && issue.pagesToFix.length > 0 && (
-                                      <span className="px-1.5 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px]">
-                                        Fix: Page {issue.pagesToFix.join(', ')}
+                                      <span className="text-gray-500">
+                                        Cells: {issue.cells.map((cell, cellIdx) => {
+                                          // Check if this cell is in the current grid
+                                          const gridCells = grid.manifest?.cells || [];
+                                          const isInGrid = gridCells.some(c => c.letter === cell && !c.isReference);
+                                          return (
+                                            <span key={cellIdx} className={isInGrid ? 'font-semibold text-gray-800' : 'text-gray-400'}>
+                                              {cellIdx > 0 ? ', ' : ''}{cell}
+                                            </span>
+                                          );
+                                        })}
                                       </span>
                                     )}
+                                    {issue.pagesToFix && issue.pagesToFix.length > 0 && (() => {
+                                      // Get page numbers that are visible in this grid
+                                      const gridPageNumbers = new Set(
+                                        (grid.manifest?.cells || [])
+                                          .filter(c => !c.isReference && c.pageNumber != null)
+                                          .map(c => c.pageNumber)
+                                      );
+
+                                      return (
+                                        <span className="text-[10px]">
+                                          Fix: Page{' '}
+                                          {issue.pagesToFix.map((page, pageIdx) => {
+                                            const isVisible = gridPageNumbers.has(page);
+                                            return (
+                                              <span
+                                                key={pageIdx}
+                                                className={`px-1 py-0.5 rounded ${
+                                                  isVisible
+                                                    ? 'bg-orange-200 text-orange-800 font-semibold'
+                                                    : 'bg-gray-200 text-gray-500'
+                                                }`}
+                                                title={isVisible ? 'Visible in grid above' : 'Not in this grid'}
+                                              >
+                                                {pageIdx > 0 ? ' ' : ''}{page}
+                                              </span>
+                                            );
+                                          })}
+                                        </span>
+                                      );
+                                    })()}
                                     {(issue as { clothingCategory?: string }).clothingCategory && (
                                       <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">
                                         {(issue as { clothingCategory?: string }).clothingCategory}
