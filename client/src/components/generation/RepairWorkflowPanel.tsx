@@ -192,6 +192,7 @@ export function RepairWorkflowPanel({
     runConsistencyCheck,
     repairCharacter,
     repairArtifacts,
+    runFullWorkflow,
     getStepNumber,
     getCharactersWithIssues,
   } = useRepairWorkflow({
@@ -202,6 +203,32 @@ export function RepairWorkflowPanel({
     imageModel,
     onImageUpdate,
   });
+
+  // Full workflow progress state
+  const [fullWorkflowProgress, setFullWorkflowProgress] = useState<{ step: string; detail: string } | null>(null);
+  const [isRunningFullWorkflow, setIsRunningFullWorkflow] = useState(false);
+
+  const handleRunFullWorkflow = async () => {
+    setIsRunningFullWorkflow(true);
+    try {
+      await runFullWorkflow({
+        scoreThreshold: 6,
+        issueThreshold: 3,
+        maxRetries: 4,
+        onProgress: (step, detail) => {
+          setFullWorkflowProgress({ step, detail });
+        },
+      });
+      if (onRefreshStory) {
+        await onRefreshStory();
+      }
+    } catch (error) {
+      console.error('Full workflow failed:', error);
+    } finally {
+      setIsRunningFullWorkflow(false);
+      setFullWorkflowProgress(null);
+    }
+  };
 
   // Selected character for repair
   const [selectedCharacter, setSelectedCharacter] = useState<string>('');
@@ -228,12 +255,26 @@ export function RepairWorkflowPanel({
     return getCharactersWithIssues();
   }, [getCharactersWithIssues]);
 
-  // Get pages with artifact issues
+  // Get pages with artifact issues (from both collected feedback AND re-evaluation results)
   const pagesWithArtifacts = useMemo(() => {
-    return Object.entries(workflowState.collectedFeedback.pages)
-      .filter(([_, fb]) => fb.fixableIssues.some(i => i.type === 'artifact' || i.type === 'distortion'))
-      .map(([page]) => parseInt(page));
-  }, [workflowState.collectedFeedback.pages]);
+    const artifactPages = new Set<number>();
+
+    // Check collected feedback (from retryHistory)
+    for (const [page, fb] of Object.entries(workflowState.collectedFeedback.pages)) {
+      if (fb.fixableIssues.some(i => i.type === 'artifact' || i.type === 'distortion')) {
+        artifactPages.add(parseInt(page));
+      }
+    }
+
+    // Also check re-evaluation results (from Step 4)
+    for (const [page, result] of Object.entries(workflowState.reEvaluationResults.pages)) {
+      if (result.fixableIssues?.some(i => i.type === 'artifact' || i.type === 'distortion')) {
+        artifactPages.add(parseInt(page));
+      }
+    }
+
+    return Array.from(artifactPages).sort((a, b) => a - b);
+  }, [workflowState.collectedFeedback.pages, workflowState.reEvaluationResults.pages]);
 
   // Get pages with severe (major/critical) issues for a specific character
   const getPagesWithSevereIssuesForCharacter = (characterName: string): number[] => {
@@ -352,6 +393,48 @@ export function RepairWorkflowPanel({
 
       {isExpanded && (
         <div className="p-4 space-y-3">
+          {/* Full Automated Workflow Button */}
+          <div className="p-4 bg-gradient-to-r from-purple-50 to-amber-50 border border-purple-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-bold text-purple-800">Automated Full Repair</h4>
+                <p className="text-sm text-purple-600">
+                  Runs all steps automatically. Pages retry up to 4 times, keeping the best result.
+                </p>
+              </div>
+              <button
+                onClick={handleRunFullWorkflow}
+                disabled={isRunning || isRunningFullWorkflow}
+                className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+              >
+                {isRunningFullWorkflow ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5" />
+                    Run Full Workflow
+                  </>
+                )}
+              </button>
+            </div>
+            {fullWorkflowProgress && (
+              <div className="mt-3 p-2 bg-white/50 rounded border border-purple-100">
+                <div className="flex items-center gap-2 text-sm">
+                  <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
+                  <span className="font-medium text-purple-700">{fullWorkflowProgress.step}:</span>
+                  <span className="text-purple-600">{fullWorkflowProgress.detail}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-gray-200 pt-3">
+            <h4 className="text-sm font-medium text-gray-500 mb-3">Or run steps manually:</h4>
+          </div>
+
           {/* Step 1: Collect Feedback */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             {renderStepHeader('collect-feedback')}
