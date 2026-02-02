@@ -133,7 +133,10 @@ const {
   evaluateImageBatch,
   buildRepairPlan,
   executeRepairPlan,
-  mergeRepairResults
+  mergeRepairResults,
+  // Bbox detection for covers
+  detectAllBoundingBoxes,
+  createBboxOverlayImage
 } = require('./server/lib/images');
 const {
   runEntityConsistencyChecks
@@ -356,6 +359,71 @@ function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
   }
 
   return coverSceneImages;
+}
+
+/**
+ * Run bbox detection on cover images to identify character positions.
+ * This enables entity consistency checks to include covers.
+ *
+ * @param {Object} coverImages - Cover images object with frontCover, initialPage, backCover
+ * @param {Array} characters - Array of character objects from the story
+ * @returns {Promise<Object>} Updated coverImages with bboxDetection and bboxOverlayImage
+ */
+async function detectBboxOnCovers(coverImages, characters) {
+  if (!coverImages) return coverImages;
+
+  // Build expected characters for bbox detection
+  const expectedCharacters = (characters || []).map(c => ({
+    name: c.name,
+    description: `${c.age || ''} ${c.gender || ''} ${c.hairColor || ''} hair`.trim(),
+    position: null  // Covers don't have expected positions
+  }));
+
+  const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+
+  for (const coverType of coverTypes) {
+    const cover = coverImages[coverType];
+    if (!cover) continue;
+
+    const imageData = typeof cover === 'string' ? cover : cover.imageData;
+    if (!imageData) continue;
+
+    // Skip if already has bbox detection
+    if (cover.bboxDetection) continue;
+
+    try {
+      log.debug(`📦 [COVER BBOX] Running bbox detection on ${coverType}...`);
+
+      const bboxDetection = await detectAllBoundingBoxes(imageData, {
+        expectedCharacters,
+        expectedObjects: []
+      });
+
+      if (bboxDetection) {
+        const bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
+
+        // Update cover with bbox data
+        if (typeof cover === 'string') {
+          // Old format - convert to object
+          coverImages[coverType] = {
+            imageData: cover,
+            bboxDetection,
+            bboxOverlayImage
+          };
+        } else {
+          cover.bboxDetection = bboxDetection;
+          cover.bboxOverlayImage = bboxOverlayImage;
+        }
+
+        const figCount = bboxDetection.figures?.length || 0;
+        log.debug(`📦 [COVER BBOX] ${coverType}: detected ${figCount} figures`);
+      }
+    } catch (err) {
+      log.warn(`⚠️ [COVER BBOX] Failed to detect bbox on ${coverType}: ${err.message}`);
+    }
+  }
+
+  return coverImages;
 }
 
 // Initialize Firebase Admin SDK
@@ -9173,6 +9241,13 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         }
 
         log.debug(`✅ [STORYBOOK] Cover images complete (${coversFromStreaming} from streaming, ${3 - coversFromStreaming} generated after)`);
+
+        // Run bbox detection on covers for entity consistency checks
+        try {
+          await detectBboxOnCovers(coverImages, inputData.characters);
+        } catch (bboxErr) {
+          log.warn(`⚠️ [STORYBOOK] Cover bbox detection failed: ${bboxErr.message}`);
+        }
       } catch (error) {
         log.error(`❌ [STORYBOOK] Cover generation failed:`, error.message);
       }
@@ -11344,6 +11419,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         );
       }
       await coverAwaitPromise;
+
+      // Run bbox detection on covers for entity consistency checks
+      try {
+        await detectBboxOnCovers(coverImages, inputData.characters);
+      } catch (bboxErr) {
+        log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
+      }
     }
 
     timing.end = Date.now();
@@ -12028,12 +12110,25 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`📚 [UNIFIED] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
     }
 
-    // Persist styled avatars to the characters table (so they show in character editor)
+    // Persist styled avatars to BOTH story data AND characters table
     if (artStyle !== 'realistic' && inputData.characters) {
       try {
         const styledAvatarsMap = exportStyledAvatarsForPersistence(inputData.characters, artStyle);
         if (styledAvatarsMap.size > 0) {
-          log.debug(`💾 [UNIFIED] Persisting ${styledAvatarsMap.size} styled avatar sets to characters table...`);
+          log.debug(`💾 [UNIFIED] Persisting ${styledAvatarsMap.size} styled avatar sets...`);
+
+          // 1. Save to story data (inputData.characters) - IMPORTANT for repair workflow
+          for (const char of inputData.characters) {
+            const styledAvatars = styledAvatarsMap.get(char.name) || styledAvatarsMap.get(char.name?.trim());
+            if (styledAvatars) {
+              if (!char.avatars) char.avatars = {};
+              if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+              char.avatars.styledAvatars[artStyle] = styledAvatars;
+              log.debug(`   ✓ Story data: ${Object.keys(styledAvatars).length} ${artStyle} avatars for "${char.name}"`);
+            }
+          }
+
+          // 2. Also save to characters table (for character editor)
           const characterId = `characters_${userId}`;
           const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
           if (charResult.rows.length > 0) {
@@ -12050,7 +12145,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 if (!dbChar.avatars.styledAvatars) dbChar.avatars.styledAvatars = {};
                 dbChar.avatars.styledAvatars[artStyle] = styledAvatars;
                 updatedCount++;
-                log.debug(`   ✓ Saved ${Object.keys(styledAvatars).length} ${artStyle} avatars for "${dbChar.name}"`);
               }
             }
             if (updatedCount > 0) {
@@ -12061,7 +12155,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
       } catch (persistErr) {
-        log.error('❌ [UNIFIED] Failed to persist styled avatars to characters table:', persistErr.message);
+        log.error('❌ [UNIFIED] Failed to persist styled avatars:', persistErr.message);
         // Non-fatal - story generation continues
       }
     }
