@@ -5160,6 +5160,9 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
     const story = storyResult.rows[0];
     const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
 
+    // Rehydrate images from story_images table (they're stripped from JSON on save)
+    await rehydrateStoryImages(id, storyData);
+
     const pages = {};
 
     for (const pageNumber of pageNumbers) {
