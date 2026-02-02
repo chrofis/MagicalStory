@@ -372,12 +372,18 @@ function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
 async function detectBboxOnCovers(coverImages, characters) {
   if (!coverImages) return coverImages;
 
-  // Build expected characters for bbox detection
-  const expectedCharacters = (characters || []).map(c => ({
-    name: c.name,
-    description: `${c.age || ''} ${c.gender || ''} ${c.hairColor || ''} hair`.trim(),
-    position: null  // Covers don't have expected positions
-  }));
+  // Build detailed expected characters for bbox detection using the same helper as page-level
+  const expectedCharacters = (characters || []).map(c => {
+    // Use buildCharacterPhysicalDescription for full, consistent descriptions
+    const physicalDesc = buildCharacterPhysicalDescription(c);
+    return {
+      name: c.name,
+      description: physicalDesc || 'character',
+      position: null  // Covers don't have expected positions
+    };
+  });
+
+  log.debug(`📦 [COVER BBOX] Expected characters: ${expectedCharacters.map(c => `${c.name}: ${c.description.substring(0, 60)}...`).join(' | ')}`);
 
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
 
@@ -402,6 +408,28 @@ async function detectBboxOnCovers(coverImages, characters) {
       if (bboxDetection) {
         const bboxOverlayImage = await createBboxOverlayImage(imageData, bboxDetection);
 
+        // Calculate missing characters (expected but not identified)
+        const foundNames = new Set(
+          (bboxDetection.figures || [])
+            .map(f => f.name?.toLowerCase())
+            .filter(n => n && n !== 'unknown')
+        );
+        const missingCharacters = expectedCharacters
+          .filter(c => !foundNames.has(c.name.toLowerCase()))
+          .map(c => c.name);
+
+        // Add missing info to detection result
+        bboxDetection.missingCharacters = missingCharacters;
+
+        // Log results with warnings for missing characters
+        const figCount = bboxDetection.figures?.length || 0;
+        const identifiedCount = bboxDetection.figures?.filter(f => f.name && f.name !== 'UNKNOWN').length || 0;
+        log.debug(`📦 [COVER BBOX] ${coverType}: detected ${figCount} figures, ${identifiedCount} identified`);
+
+        if (missingCharacters.length > 0) {
+          log.warn(`⚠️ [COVER BBOX] ${coverType}: MISSING CHARACTERS - ${missingCharacters.join(', ')}`);
+        }
+
         // Update cover with bbox data
         if (typeof cover === 'string') {
           // Old format - convert to object
@@ -414,9 +442,6 @@ async function detectBboxOnCovers(coverImages, characters) {
           cover.bboxDetection = bboxDetection;
           cover.bboxOverlayImage = bboxOverlayImage;
         }
-
-        const figCount = bboxDetection.figures?.length || 0;
-        log.debug(`📦 [COVER BBOX] ${coverType}: detected ${figCount} figures`);
       }
     } catch (err) {
       log.warn(`⚠️ [COVER BBOX] Failed to detect bbox on ${coverType}: ${err.message}`);
