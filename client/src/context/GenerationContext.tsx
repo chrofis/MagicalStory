@@ -168,8 +168,17 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
           pollingRef.current = null;
         }
       } else if (status.status === 'failed') {
-        logger.error('[GenerationContext] Job failed:', status.error);
-        setError(status.error || 'Generation failed');
+        const errorMsg = status.error || 'Generation failed';
+
+        // Check if this is an old abandoned job (silently clean up, don't show error)
+        const isAbandoned = errorMsg.toLowerCase().includes('abandoned');
+        if (isAbandoned) {
+          logger.info('[GenerationContext] Old job was cleaned up (abandoned):', status.error);
+        } else {
+          logger.error('[GenerationContext] Job failed:', status.error);
+          setError(errorMsg);
+        }
+
         setActiveJob(null);
         storage.removeItem(ACTIVE_JOB_KEY);
 

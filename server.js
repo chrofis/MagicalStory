@@ -14694,10 +14694,10 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
         const activeJob = activeJobResult.rows[0];
         const jobAgeMinutes = (Date.now() - new Date(activeJob.created_at).getTime()) / (1000 * 60);
 
-        // If job is older than 30 minutes, consider it stale and mark as failed
-        const STALE_JOB_TIMEOUT_MINUTES = 30;
+        // If job is older than 60 minutes, consider it stale and mark as failed
+        const STALE_JOB_TIMEOUT_MINUTES = 60;
         if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
-          log.error(`⏰ Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), marking as failed`);
+          log.info(`🧹 Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), cleaning up silently`);
 
           // Refund reserved credits for stale job
           try {
@@ -14740,13 +14740,20 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
             log.error(`❌ Failed to refund credits for stale job ${activeJob.id}:`, refundErr.message);
           }
 
+          // Mark as failed with special flag so frontend knows it's a silent cleanup, not active timeout
+          // Jobs over 2 hours old are "abandoned", not "timed out" - user won't see popup
+          const isAbandoned = jobAgeMinutes > 120;
+          const errorMessage = isAbandoned
+            ? 'Job was abandoned (cleaned up automatically)'
+            : `Job timed out after ${STALE_JOB_TIMEOUT_MINUTES} minutes`;
+
           await dbPool.query(
             `UPDATE story_jobs
              SET status = 'failed',
-                 error_message = 'Job timed out after 30 minutes',
+                 error_message = $2,
                  updated_at = NOW()
              WHERE id = $1`,
-            [activeJob.id]
+            [activeJob.id, errorMessage]
           );
           // Continue with creating new job
         } else {
@@ -14901,6 +14908,28 @@ app.get('/api/jobs/:jobId/status', jobStatusLimiter, authenticateToken, async (r
       }
 
       const job = result.rows[0];
+
+      // Detect stale jobs during polling - mark as failed if processing for too long
+      const STALE_JOB_TIMEOUT_MINUTES = 60;
+      if (job.status === 'processing' || job.status === 'pending') {
+        const jobAgeMinutes = (Date.now() - new Date(job.created_at).getTime()) / (1000 * 60);
+        if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
+          log.warn(`⏰ [STATUS] Job ${jobId} is stale (${Math.round(jobAgeMinutes)} minutes), marking as failed`);
+
+          const errorMessage = jobAgeMinutes > 120
+            ? 'Job was abandoned (server may have restarted)'
+            : `Job timed out after ${Math.round(jobAgeMinutes)} minutes - please try again`;
+
+          await dbPool.query(
+            `UPDATE story_jobs SET status = 'failed', error_message = $2, updated_at = NOW() WHERE id = $1`,
+            [jobId, errorMessage]
+          );
+
+          // Update local job object to return correct status
+          job.status = 'failed';
+          job.error_message = errorMessage;
+        }
+      }
 
       // Fetch user's current credits when job is completed
       let currentCredits = null;
