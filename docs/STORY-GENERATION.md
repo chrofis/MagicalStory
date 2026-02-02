@@ -1,6 +1,6 @@
 # MagicalStory Story Generation Pipeline
 
-**Last Updated:** January 2025
+**Last Updated:** February 2026
 
 ## Table of Contents
 
@@ -705,6 +705,113 @@ When enabled, admins can:
 | **Incremental Consistency** | Per page (vs previous) | Character drift, clothing changes, style shifts |
 | **Final Consistency** | After all pages | Cross-story inconsistencies missed earlier |
 
+### Final Consistency Check Systems (Detailed)
+
+After all images are generated, TWO consistency check systems run in sequence:
+
+#### 1. Legacy Full-Image Check (`runFinalConsistencyChecks`)
+
+**Location:** `server/lib/images.js`
+**Prompt:** `prompts/final-consistency-check.txt`
+**Model:** Gemini 2.5 Flash
+
+Sends ALL scene images (compressed to 768px) to Gemini for cross-image analysis.
+
+| Check Type | What It Evaluates |
+|------------|-------------------|
+| `full` | Art style consistency, color palette unity, overall visual coherence |
+| `character` | Per-character appearance across all pages (up to 5 characters) |
+
+**Issue Types Detected:**
+- `style_drift` - Art style varies between images
+- `character_appearance` - Character looks different across pages
+- `clothing_mismatch` - Wrong clothing for the scene
+- `prop_inconsistency` - Objects change unexpectedly
+- `position_swap` - Character positions illogical
+
+**Cost:** ~$0.01-0.03 per story (10-20 images × ~1000 tokens each)
+
+#### 2. Entity-Grouped Check (`runEntityConsistencyChecks`)
+
+**Location:** `server/lib/entityConsistency.js`
+**Prompt:** `prompts/entity-consistency-check.txt`
+**Model:** Gemini 2.5 Flash
+
+Creates cropped grids per character using bounding box data, providing focused evaluation.
+
+| Component | Description |
+|-----------|-------------|
+| **Input** | Cropped character appearances from bbox detection |
+| **Grid** | Max 12 cells per character (R=reference, A-K=pages) |
+| **Reference** | Styled avatar matching clothing category |
+
+**What It Checks:**
+- Facial features consistency (eyes, nose, mouth)
+- Hair color, style, length
+- Skin tone
+- Age appearance
+- Body proportions
+
+**Cost:** ~$0.003-0.01 per story (1 call per character)
+
+#### Combined Report Structure
+
+```javascript
+finalChecksReport = {
+  // Entity check results (primary)
+  entity: {
+    characters: { [name]: { consistent, score, issues[], gridImage } },
+    objects: { ... },
+    grids: [],
+    totalIssues: number,
+    overallConsistent: boolean
+  },
+
+  // Legacy check results
+  legacy: {
+    imageChecks: [{ type, issues[], consistent, overallScore }],
+    summary: string
+  },
+
+  // Merged
+  imageChecks: [],  // From legacy (used for auto-regen)
+  totalIssues: number,
+  overallConsistent: boolean
+}
+```
+
+#### Auto-Regeneration Behavior
+
+**Current:** Only full image regeneration (no repair routing)
+
+```
+Final Check Issue Found
+        ↓
+severity === 'high'?  ──No──→  Skip (logged only)
+        ↓ Yes
+Full Image Regeneration
+  1. Re-expand scene description with correction notes
+  2. Regenerate entire image from scratch
+  3. Re-evaluate quality
+```
+
+**Severity Thresholds:**
+- `high` → Auto-regenerate (obvious issues readers notice)
+- `medium` → Log only (noticeable on inspection)
+- `low` → Log only (minor variations)
+
+**Issue Type → Ideal Approach (Future Enhancement):**
+
+| Issue Type | Current | Ideal |
+|------------|---------|-------|
+| `style_drift` | Full regen | Full regen (style is global) |
+| `character_appearance` | Full regen | Entity repair (has bbox) |
+| `clothing_mismatch` | Full regen | Targeted inpaint |
+| `prop_inconsistency` | Full regen | Targeted inpaint |
+| `position_swap` | Full regen | Full regen (layout change) |
+
+**Note:** Entity check issues have bbox info and could route to repair system. Legacy check issues lack bboxes so require full regeneration.
+
 ### Configuration
 
 | Setting | Default | Description |
@@ -723,6 +830,71 @@ When enabled, admins can:
 |--------|-------|-----------|----------|
 | **Grid-based** (default) | Gemini 2.5 Flash Image | `useGridRepair: true` | Most repairs, batch efficiency |
 | **Direct inpainting** | Runware SDXL/FLUX | `useGridRepair: false` | Legacy fallback |
+
+### Categorized Repair System
+
+The categorized repair system provides specialized repair methods for different issue types instead of a one-size-fits-all approach.
+
+**Enable with:** `buildRepairPlan(evaluations, { useCategorizedRepairs: true })`
+
+#### Issue Categories & Repair Methods
+
+| Category | Repair Method | Cost | When Triggered |
+|----------|---------------|------|----------------|
+| **Major issues** | `iteratePage()` | High | Missing characters, extra limbs, physics violations, cross eyes, spatial mismatches, score < 30, multiple character issues |
+| **Style mismatch** | `repairStyleMismatch()` | Medium | `scene.style_consistent: false` |
+| **Character mismatch** | `repairCharacterMismatch()` | Medium | Single character with age/height/hair/confidence issues |
+| **Clothing/artifacts** | `gridBasedRepair()` | Low | Clothing mismatches, object issues, minor artifacts |
+
+#### Categorized Plan Structure
+
+```javascript
+const plan = buildRepairPlan(evaluations, { useCategorizedRepairs: true });
+// Returns:
+{
+  iterate: [],       // Pages needing full regeneration
+  styleRepair: [],   // Pages needing style transfer
+  charRepair: [],    // Pages needing character replacement
+  gridRepair: [],    // Pages needing inpainting
+  keep: [],          // Pages that are good enough
+  isCategorized: true
+}
+```
+
+#### Repair Functions
+
+**`iteratePage(imageData, pageNumber, storyData, options)`**
+- Analyzes current image with vision model (`describeImage`)
+- Builds preview feedback with composition analysis
+- Generates corrected scene description with 17-check prompt
+- Regenerates entire image with new scene
+
+**`repairStyleMismatch(imageData, referenceImage, artStyle)`**
+- Sends current image + good reference image to Gemini
+- Prompts to match style while preserving composition
+- Requires a reference page with score >= 70
+
+**`repairCharacterMismatch(imageData, characterPhoto, bbox, charName)`**
+- Sends current image + character avatar + bounding box
+- Prompts to replace figure at bbox with character
+- Preserves pose and action, fixes identity
+- Requires avatar URL and face bbox from evaluation
+
+#### Execution Order
+
+```
+1. Iterate (major issues) - most expensive, highest priority
+2. Style repair - requires good reference page
+3. Character replacement - requires avatar + bbox
+4. Grid inpainting - cheapest, minor issues
+```
+
+Each repair is re-evaluated. Only accepted if score improves (or stays same for iterations).
+
+#### Fallback Behavior
+
+- Style repair without reference → falls back to iterate
+- Character repair without avatar/bbox → falls back to grid repair
 
 ### Key Files
 
@@ -805,3 +977,10 @@ All prompts located in `/prompts/` folder:
 | `gridBasedRepair()` | server/lib/gridBasedRepair.js | Orchestrate grid-based Gemini repair |
 | `collectAllIssues()` | server/lib/issueExtractor.js | Normalize issues from all eval sources |
 | `autoRepairWithTargets()` | server/lib/images.js | Legacy Runware inpainting repair |
+| **Categorized Repair** | | |
+| `classifyIssues()` | server/lib/images.js | Categorize evaluation issues |
+| `buildCategorizedRepairPlan()` | server/lib/images.js | Build categorized repair plan |
+| `iteratePage()` | server/lib/images.js | Full regeneration via 17-check scene |
+| `repairStyleMismatch()` | server/lib/images.js | Style transfer with reference page |
+| `repairCharacterMismatch()` | server/lib/images.js | Targeted character replacement |
+| `executeCategorizedRepairPlan()` | server/lib/images.js | Execute categorized repairs |
