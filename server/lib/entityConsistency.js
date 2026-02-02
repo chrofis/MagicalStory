@@ -77,9 +77,29 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
       log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found costumed avatar for ${costumeType}`);
       return costumedAvatar;
     }
-    // Fallback to standard styled if costume not found
-    const fallback = styledForArt.standard || character.photoUrl || character.photo || null;
-    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed[${costumeType}], fallback=${fallback ? 'found' : 'null'}`);
+    // Try any other costumed avatar
+    if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
+      const availableCostumes = Object.entries(styledForArt.costumed);
+      if (availableCostumes.length > 0) {
+        log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed[${costumeType}], using costumed[${availableCostumes[0][0]}] as fallback`);
+        return availableCostumes[0][1];
+      }
+    }
+    // Fallback to standard styled if no costume found
+    if (styledForArt.standard) {
+      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed avatars, using standard as fallback`);
+      return styledForArt.standard;
+    }
+    // Try any other styled avatar
+    for (const [key, value] of Object.entries(styledForArt)) {
+      if (key !== 'costumed' && value && typeof value === 'string') {
+        log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed/standard, using ${key} as fallback`);
+        return value;
+      }
+    }
+    // Final fallback to original photo
+    const fallback = character.photoUrl || character.photo || null;
+    log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars found for costume, photo fallback=${fallback ? 'found' : 'null'}`);
     return fallback;
   }
 
@@ -90,9 +110,32 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
     return styledAvatar;
   }
 
-  // Fallback chain: requested → standard → original
-  const fallback = styledForArt.standard || character.photoUrl || character.photo || null;
-  log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}, trying fallback=${fallback ? 'found' : 'null'}`);
+  // Fallback chain: requested → standard → any other styled avatar → original photo
+  if (styledForArt.standard) {
+    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}, using standard`);
+    return styledForArt.standard;
+  }
+
+  // Try any other available styled avatar (winter, summer, or first costumed)
+  for (const [key, value] of Object.entries(styledForArt)) {
+    if (key !== 'costumed' && value && typeof value === 'string') {
+      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}/standard, using ${key} as fallback`);
+      return value;
+    }
+  }
+
+  // Try first costumed avatar if available
+  if (styledForArt.costumed && typeof styledForArt.costumed === 'object') {
+    const firstCostume = Object.values(styledForArt.costumed)[0];
+    if (firstCostume) {
+      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}/standard, using first costumed avatar as fallback`);
+      return firstCostume;
+    }
+  }
+
+  // Final fallback to original photo
+  const fallback = character.photoUrl || character.photo || null;
+  log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars found, photo fallback=${fallback ? 'found' : 'null'}`);
   return fallback;
 }
 
