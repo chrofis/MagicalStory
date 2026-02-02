@@ -12827,22 +12827,29 @@ async function processStoryJob(jobId) {
         // Use clothing requirements from outline for per-character avatars
         if (clothingRequirements && Object.keys(clothingRequirements).length > 0) {
           for (const [charName, reqs] of Object.entries(clothingRequirements)) {
-            // Find which clothing category this character uses
-            let usedCategory = 'standard';
+            // Collect ALL used clothing categories for this character (not just the first!)
+            const usedCategories = new Set();
+
             for (const [category, config] of Object.entries(reqs)) {
               if (config && config.used) {
                 if (category === 'costumed' && config.costume) {
-                  usedCategory = `costumed:${config.costume.toLowerCase()}`;
+                  usedCategories.add(`costumed:${config.costume.toLowerCase()}`);
                 } else {
-                  usedCategory = category;
+                  usedCategories.add(category);
                 }
-                break;
+                // NO break here - collect ALL categories
               }
             }
-            // Add for cover and all pages
-            avatarRequirements.push({ pageNumber: 'cover', clothingCategory: usedCategory, characterNames: [charName] });
-            for (let i = 1; i <= sceneCount; i++) {
-              avatarRequirements.push({ pageNumber: i, clothingCategory: usedCategory, characterNames: [charName] });
+
+            // Always include standard as fallback for covers
+            usedCategories.add('standard');
+
+            // Add avatar requirements for each used category
+            for (const clothingCategory of usedCategories) {
+              avatarRequirements.push({ pageNumber: 'cover', clothingCategory, characterNames: [charName] });
+              for (let i = 1; i <= sceneCount; i++) {
+                avatarRequirements.push({ pageNumber: i, clothingCategory, characterNames: [charName] });
+              }
             }
           }
           log.debug(`🎨 [PIPELINE] Built ${avatarRequirements.length} avatar requirements from clothing requirements`);
