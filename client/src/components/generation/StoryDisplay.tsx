@@ -352,26 +352,28 @@ export function StoryDisplay({
     }
   };
 
-  // Entity grid images (lazy-loaded)
+  // Entity grid images (lazy-loaded) - keyed by entityName or entityName:clothingCategory
   const [loadedEntityGridImages, setLoadedEntityGridImages] = useState<Record<string, string>>({});
   const [loadingEntityGridImages, setLoadingEntityGridImages] = useState<Set<string>>(new Set());
 
   // Fetch entity grid image on demand
-  const fetchEntityGridImage = async (entityName: string) => {
-    if (!storyId || loadedEntityGridImages[entityName] || loadingEntityGridImages.has(entityName)) return;
+  const fetchEntityGridImage = async (entityName: string, clothingCategory?: string) => {
+    // Use composite key for per-clothing grids
+    const key = clothingCategory ? `${entityName}:${clothingCategory}` : entityName;
+    if (!storyId || loadedEntityGridImages[key] || loadingEntityGridImages.has(key)) return;
 
-    setLoadingEntityGridImages(prev => new Set(prev).add(entityName));
+    setLoadingEntityGridImages(prev => new Set(prev).add(key));
     try {
-      const data = await storyService.getEntityGridImage(storyId, entityName);
+      const data = await storyService.getEntityGridImage(storyId, entityName, clothingCategory);
       if (data?.gridImage) {
-        setLoadedEntityGridImages(prev => ({ ...prev, [entityName]: data.gridImage }));
+        setLoadedEntityGridImages(prev => ({ ...prev, [key]: data.gridImage }));
       }
     } catch (err) {
-      console.error(`Failed to load entity grid image for ${entityName}:`, err);
+      console.error(`Failed to load entity grid image for ${key}:`, err);
     } finally {
       setLoadingEntityGridImages(prev => {
         const next = new Set(prev);
-        next.delete(entityName);
+        next.delete(key);
         return next;
       });
     }
@@ -2267,9 +2269,11 @@ export function StoryDisplay({
                         <div className="p-3 border-t border-gray-100 space-y-3">
                           {/* Grid Image - clickable to enlarge, lazy loaded */}
                           {(() => {
+                            // Use composite key for per-clothing grids
+                            const gridKey = clothingCat ? `${grid.entityName}:${clothingCat}` : grid.entityName;
                             // Use embedded gridImage if available, otherwise use lazy-loaded
-                            const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
-                            const isLoading = loadingEntityGridImages.has(grid.entityName);
+                            const gridImage = grid.gridImage || loadedEntityGridImages[gridKey];
+                            const isLoading = loadingEntityGridImages.has(gridKey);
                             const sizeKB = (grid as { gridImageSizeKB?: number }).gridImageSizeKB;
 
                             if (gridImage) {
@@ -2282,7 +2286,7 @@ export function StoryDisplay({
                                     style={{ maxHeight: '400px' }}
                                     onClick={() => setEnlargedImage({
                                       src: gridImage,
-                                      title: `${grid.entityName} - Entity Consistency Grid`
+                                      title: `${grid.entityName}${clothingCat ? ` (${clothingCat})` : ''} - Entity Consistency Grid`
                                     })}
                                     title="Click to enlarge"
                                   />
@@ -2301,7 +2305,7 @@ export function StoryDisplay({
                                     Grid image not loaded {sizeKB ? `(${sizeKB} KB)` : ''}
                                   </span>
                                   <button
-                                    onClick={() => fetchEntityGridImage(grid.entityName)}
+                                    onClick={() => fetchEntityGridImage(grid.entityName, clothingCat)}
                                     className="text-xs px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
                                   >
                                     Load Grid
@@ -2316,7 +2320,8 @@ export function StoryDisplay({
                             <div className="text-xs text-gray-600">
                               <span className="font-medium">Cells: </span>
                               {grid.manifest.cells.map((cell, i) => {
-                                const gridImage = grid.gridImage || loadedEntityGridImages[grid.entityName];
+                                const gridKey = clothingCat ? `${grid.entityName}:${clothingCat}` : grid.entityName;
+                                const gridImage = grid.gridImage || loadedEntityGridImages[gridKey];
                                 return (
                                 <span key={i} className="inline-flex items-center bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 gap-1">
                                   <button

@@ -406,7 +406,7 @@ function stripSceneMetadata(sceneDescription) {
  * Parse character descriptions from image prompt to extract age/gender info
  * Parses formats:
  * - Scene format: "1. Lukas, Looks: school age, 7 years old, boy, Build: ..."
- * - Cover format: "[Image 1 - Lukas]: Looks: school age, 7 years old, boy, Build: ... Wearing: ..."
+ * - Cover format: "[Lukas]: Looks: school age, 7 years old, boy, Build: ... Wearing: ..."
  * @param {string} prompt - The full image generation prompt
  * @returns {Object} Map of character names to {age, gender, ageCategory, genderTerm, clothing}
  */
@@ -442,9 +442,10 @@ function parseCharacterDescriptions(prompt) {
     };
   }
 
-  // Match cover/reference format: "[Image N - Name]: Looks: age category, X years old, gender, ..."
+  // Match cover/reference format: "[Name]: Looks: age category, X years old, gender, ..."
   // This format includes clothing after "Wearing:"
-  const coverPattern = /\[Image\s+\d+\s*-\s*([^\]]+)\]:\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|little boy|little girl|teenage boy|teenage girl|young man|young woman|elderly man|elderly woman|baby boy|baby girl)([^\[]*)/gi;
+  // Note: Pattern also matches legacy "[Image N - Name]:" format for backwards compatibility
+  const coverPattern = /\[(?:Image\s+\d+\s*-\s*)?([^\]]+)\]:\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|little boy|little girl|teenage boy|teenage girl|young man|young woman|elderly man|elderly woman|baby boy|baby girl)([^\[]*)/gi;
 
   while ((match = coverPattern.exec(prompt)) !== null) {
     const name = match[1].trim();
@@ -1794,12 +1795,13 @@ function buildCharacterReferenceList(photos, characters = null) {
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
     ].filter(Boolean);
     const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-    // Format: [Image N - Name] to match exactly the label we put before each image in parts array
+    // Format: [Name] to match the label we put before each image in parts array
+    // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
     const description = [visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
-    return `[Image ${index + 1} - ${photo.name}]: ${description}`;
+    return `[${photo.name}]: ${description}`;
   });
 
-  let result = `\n**CHARACTER REFERENCE PHOTOS (match each label to the image below it):**\n${charDescriptions.join('\n')}\n`;
+  let result = `\n**CHARACTER REFERENCE PHOTOS (match each name to the labeled image below):**\n${charDescriptions.join('\n')}\n`;
 
   // Add relative height description if characters data is available
   if (characters && characters.length >= 2) {

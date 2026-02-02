@@ -515,9 +515,11 @@ export const storyService = {
   // Lazy load entity grid image (dev mode)
   async getEntityGridImage(
     storyId: string,
-    entityName: string
+    entityName: string,
+    clothingCategory?: string
   ): Promise<{
     entityName: string;
+    clothingCategory?: string;
     gridImage: string;
     manifest: {
       cellSize: number;
@@ -534,6 +536,9 @@ export const storyService = {
     try {
       const token = localStorage.getItem('auth_token');
       const params = new URLSearchParams({ entityName });
+      if (clothingCategory) {
+        params.append('clothingCategory', clothingCategory);
+      }
       const response = await fetch(`/api/stories/${storyId}/entity-grid-image?${params}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });

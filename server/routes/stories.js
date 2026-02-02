@@ -828,7 +828,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
 router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { entityName, gridIndex } = req.query;
+    const { entityName, gridIndex, clothingCategory } = req.query;
 
     if (!entityName && gridIndex === undefined) {
       return res.status(400).json({ error: 'entityName or gridIndex query parameter required' });
@@ -858,7 +858,12 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
       const idx = parseInt(gridIndex, 10);
       grid = grids[idx];
     } else {
-      grid = grids.find(g => g.entityName === entityName);
+      // Find by entityName, optionally filtered by clothingCategory
+      grid = grids.find(g => {
+        if (g.entityName !== entityName) return false;
+        if (clothingCategory && g.clothingCategory !== clothingCategory) return false;
+        return true;
+      });
     }
 
     if (!grid) {
@@ -867,6 +872,7 @@ router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
 
     res.json({
       entityName: grid.entityName,
+      clothingCategory: grid.clothingCategory,
       gridImage: grid.gridImage,
       manifest: grid.manifest
     });

@@ -5164,7 +5164,10 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
     }
 
     const story = storyResult.rows[0];
-    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // Rehydrate image data from separate table (needed for crop extraction)
+    storyData = await rehydrateStoryImages(id, storyData);
 
     // Run entity consistency check
     const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');

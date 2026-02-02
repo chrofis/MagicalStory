@@ -1838,8 +1838,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
       croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
-    // Add numbered label for clarity
-    parts.push({ text: `[Image ${currentImageIndex} - Previous scene]:` });
+    // Add label for sequential mode (avoid numbered format)
+    parts.push({ text: `[Previous scene]:` });
     parts.push({
       inline_data: {
         mime_type: mimeType,
@@ -1896,9 +1896,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           matchesProvided: providedHash ? imageHash === providedHash : null
         });
 
-        // Add numbered label BEFORE the image (matches reference map in prompt)
+        // Add name label BEFORE the image (matches reference map in prompt)
+        // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
         const labelName = characterName || `Character ${addedCount + 1}`;
-        parts.push({ text: `[Image ${currentImageIndex} - ${labelName}]:` });
+        parts.push({ text: `[${labelName}]:` });
         if (characterName) {
           characterNames.push(characterName);
         }
@@ -1946,8 +1947,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
       const mimeType = primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) ?
         primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-      // Add numbered label before the image (matches reference map in prompt)
-      parts.push({ text: `[Image ${currentImageIndex} - ${primaryLandmark.name} (landmark)]:` });
+      // Add name label before the image (avoid numbered format to prevent "character sheet" generation)
+      parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
       parts.push({
         inline_data: {
           mime_type: mimeType,
@@ -1964,7 +1965,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Add Visual Bible reference grid (combines secondary chars, animals, artifacts, vehicles, 2nd+ landmarks)
   if (visualBibleGrid) {
-    parts.push({ text: `[Image ${currentImageIndex} - Reference Grid (objects, secondary characters, locations)]:` });
+    parts.push({ text: `[Reference Grid (objects, secondary characters, locations)]:` });
     parts.push({
       inline_data: {
         mime_type: 'image/jpeg',
@@ -2343,7 +2344,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     const mimeType = croppedImage.match(/^data:(image\/\w+);base64,/) ?
       croppedImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/png';
 
-    parts.push({ text: `[Image ${currentImageIndex} - Previous scene]:` });
+    parts.push({ text: `[Previous scene]:` });
     parts.push({
       inline_data: {
         mime_type: mimeType,
@@ -2385,8 +2386,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
           compressedRefCache.set(imageHash, compressedBase64);
         }
 
+        // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
         const labelName = characterName || `Character ${addedCount + 1}`;
-        parts.push({ text: `[Image ${currentImageIndex} - ${labelName}]:` });
+        parts.push({ text: `[${labelName}]:` });
         if (characterName) {
           characterNames.push(characterName);
         }
@@ -2415,7 +2417,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
       const mimeType = primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/) ?
         primaryLandmark.photoData.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-      parts.push({ text: `[Image ${currentImageIndex} - ${primaryLandmark.name} (landmark)]:` });
+      parts.push({ text: `[${primaryLandmark.name} (landmark)]:` });
       parts.push({
         inline_data: {
           mime_type: mimeType,
@@ -2429,7 +2431,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Add Visual Bible reference grid
   if (visualBibleGrid) {
-    parts.push({ text: `[Image ${currentImageIndex} - Reference Grid (objects, secondary characters, locations)]:` });
+    parts.push({ text: `[Reference Grid (objects, secondary characters, locations)]:` });
     parts.push({
       inline_data: {
         mime_type: 'image/jpeg',
