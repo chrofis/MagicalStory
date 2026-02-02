@@ -556,12 +556,12 @@ export function RepairWorkflowPanel({
                                   {clothingResult.issues.map((issue, i) => (
                                     <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
                                       <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                                        issue.severity === 'high' ? 'bg-red-400' :
-                                        issue.severity === 'medium' ? 'bg-amber-400' : 'bg-gray-400'
+                                        issue.severity === 'critical' ? 'bg-red-400' :
+                                        issue.severity === 'major' ? 'bg-amber-400' : 'bg-gray-400'
                                       }`} />
                                       <span>
                                         {issue.description}
-                                        {issue.pagesToFix?.length > 0 && (
+                                        {issue.pagesToFix && issue.pagesToFix.length > 0 && (
                                           <span className="text-gray-400 ml-1">(pages {issue.pagesToFix.join(', ')})</span>
                                         )}
                                       </span>
@@ -577,8 +577,8 @@ export function RepairWorkflowPanel({
                               {charResult.issues.map((issue, i) => (
                                 <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
                                   <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                                    issue.severity === 'high' ? 'bg-red-400' :
-                                    issue.severity === 'medium' ? 'bg-amber-400' : 'bg-gray-400'
+                                    issue.severity === 'critical' ? 'bg-red-400' :
+                                    issue.severity === 'major' ? 'bg-amber-400' : 'bg-gray-400'
                                   }`} />
                                   <span>{issue.description}</span>
                                 </li>
