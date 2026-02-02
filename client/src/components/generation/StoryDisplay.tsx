@@ -695,6 +695,16 @@ export function StoryDisplay({
       const result = await response.json();
       console.log('Single-page entity repair result:', result);
 
+      // Handle rejected repairs - show comparison so user can see what was rejected
+      if (result.rejected && result.comparison) {
+        setRepairComparison({
+          beforeImage: result.comparison.before,
+          afterImage: result.comparison.after,
+          title: `Repair rejected for ${entityName} on page ${pageNumber}: ${result.reason || 'Did not improve consistency'}`
+        });
+        return;
+      }
+
       // Refresh story data to show updated image
       if (result.success) {
         if (onRefreshStory) {
@@ -702,6 +712,9 @@ export function StoryDisplay({
         } else {
           window.location.reload();
         }
+      } else if (!result.rejected) {
+        // Other failures (not rejections)
+        alert(`Repair failed: ${result.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error('Failed to repair single page:', err);
@@ -2738,33 +2751,41 @@ export function StoryDisplay({
                                     <span>Diff</span>
                                   </div>
                                   {Object.entries(finalChecksReport.entityRepairs[grid.entityName]?.pages || {}).map(([pageNum, pageData]) => (
-                                    <div key={pageNum} className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
-                                      <div className="text-center">
-                                        <span className="text-xs font-bold text-gray-700">P{pageNum}</span>
-                                        {pageData.clothingCategory && pageData.clothingCategory !== 'standard' && (
-                                          <div className="text-[8px] text-gray-400">{pageData.clothingCategory}</div>
-                                        )}
-                                      </div>
-                                      <img
-                                        src={pageData.comparison?.before}
-                                        alt={`P${pageNum} before`}
-                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                        onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${grid.entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
-                                      />
-                                      <img
-                                        src={pageData.comparison?.after}
-                                        alt={`P${pageNum} after`}
-                                        className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                        onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
-                                      />
-                                      <div className="bg-gray-900 rounded">
+                                    <div key={pageNum} className="space-y-1">
+                                      <div className="grid grid-cols-4 gap-1 items-center bg-gray-50 rounded p-1">
+                                        <div className="text-center">
+                                          <span className="text-xs font-bold text-gray-700">P{pageNum}</span>
+                                          {pageData.clothingCategory && pageData.clothingCategory !== 'standard' && (
+                                            <div className="text-[8px] text-gray-400">{pageData.clothingCategory}</div>
+                                          )}
+                                        </div>
                                         <img
-                                          src={pageData.comparison?.diff}
-                                          alt={`P${pageNum} diff`}
+                                          src={pageData.comparison?.before}
+                                          alt={`P${pageNum} before`}
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                          onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                          onClick={() => pageData.comparison?.before && setEnlargedImage({ src: pageData.comparison.before, title: `${grid.entityName} - Page ${pageNum} Before${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
                                         />
+                                        <img
+                                          src={pageData.comparison?.after}
+                                          alt={`P${pageNum} after`}
+                                          className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                          onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                        />
+                                        <div className="bg-gray-900 rounded">
+                                          <img
+                                            src={pageData.comparison?.diff}
+                                            alt={`P${pageNum} diff`}
+                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                            onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                          />
+                                        </div>
                                       </div>
+                                      {pageData.promptUsed && (
+                                        <details className="text-[10px]">
+                                          <summary className="cursor-pointer text-blue-600 hover:text-blue-800">Show Prompt</summary>
+                                          <pre className="mt-1 p-2 bg-gray-100 rounded text-gray-700 whitespace-pre-wrap overflow-x-auto max-h-48 text-[9px]">{pageData.promptUsed}</pre>
+                                        </details>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
