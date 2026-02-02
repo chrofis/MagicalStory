@@ -2766,7 +2766,13 @@ ${landmarkEntries}`;
     // Helper function to parse [FINAL] from streaming text
     const parseFinal = (text) => {
       const match = text.match(/\[FINAL\]\s*([\s\S]*?)$/i);
-      if (match) return match[1].trim();
+      if (match) {
+        let result = match[1].trim();
+        // Strip Claude extended thinking artifacts that may leak into output
+        result = result.replace(/<budget:[^>]*>[\s\S]*?<\/budget:[^>]*>/gi, '').trim();
+        result = result.replace(/<[a-z_]+:[^>]*>[\s\S]*?<\/[a-z_]+:[^>]*>/gi, '').trim();
+        return result;
+      }
       return null; // Return null if [FINAL] not yet reached
     };
 
