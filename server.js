@@ -4674,7 +4674,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
             entityName: repairResult.entityName,
             pageNumber: repairResult.pageNumber,
             comparison: repairResult.comparison,
-            verification: repairResult.verification
+            verification: repairResult.verification,
+            promptUsed: repairResult.promptUsed
           });
         }
         return res.status(400).json({ error: repairResult.error || 'Single-page repair failed' });
@@ -4740,7 +4741,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         clothingCategory: repairResult.clothingCategory,
         comparison: repairResult.comparison,
         referenceGridUsed: repairResult.referenceGridUsed,
-        usage: repairResult.usage
+        usage: repairResult.usage,
+        promptUsed: repairResult.promptUsed
       };
 
       await saveStoryData(id, storyData);
@@ -4754,7 +4756,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         pageNumber,
         clothingCategory: repairResult.clothingCategory,
         comparison: repairResult.comparison,
-        referenceGridUsed: repairResult.referenceGridUsed
+        referenceGridUsed: repairResult.referenceGridUsed,
+        promptUsed: repairResult.promptUsed
       });
     }
 

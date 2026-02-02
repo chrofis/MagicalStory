@@ -2099,7 +2099,8 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
           before: `data:image/jpeg;base64,${targetCrop.buffer.toString('base64')}`,
           after: `data:image/png;base64,${processedBuffer.toString('base64')}`,
           reference: `data:image/png;base64,${avatarBuffer.toString('base64')}`
-        }
+        },
+        promptUsed: prompt
       };
     }
 
@@ -2169,7 +2170,8 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
         metrics: verification.metrics
       },
       avatarUsed: `data:image/png;base64,${avatarBuffer.toString('base64')}`,
-      usage: totalUsage
+      usage: totalUsage,
+      promptUsed: prompt
     };
 
   } catch (err) {
