@@ -510,7 +510,7 @@ export function RepairWorkflowPanel({
                 </button>
 
                 {workflowState.consistencyResults.report && (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className={`p-3 rounded-lg border ${
                       workflowState.consistencyResults.report.overallConsistent
                         ? 'bg-green-50 border-green-200'
@@ -524,8 +524,78 @@ export function RepairWorkflowPanel({
                       <p className="text-xs text-gray-600">{workflowState.consistencyResults.report.summary}</p>
                     </div>
 
+                    {/* Detailed per-character breakdown */}
+                    {Object.entries(workflowState.consistencyResults.report.characters || {}).map(([charName, charResult]) => (
+                      <details key={charName} className="border rounded-lg overflow-hidden">
+                        <summary className={`px-3 py-2 cursor-pointer text-sm font-medium flex items-center justify-between ${
+                          charResult.overallConsistent ? 'bg-green-50' : 'bg-amber-50'
+                        }`}>
+                          <span>{charName}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded ${
+                            charResult.overallConsistent
+                              ? 'bg-green-200 text-green-800'
+                              : 'bg-amber-200 text-amber-800'
+                          }`}>
+                            Score: {charResult.overallScore ?? charResult.score ?? '?'}/10
+                            {(charResult.totalIssues ?? charResult.issues?.length ?? 0) > 0 &&
+                              ` • ${charResult.totalIssues ?? charResult.issues?.length} issues`}
+                          </span>
+                        </summary>
+                        <div className="p-3 bg-white space-y-2 text-sm">
+                          {/* Per-clothing breakdown (new structure) */}
+                          {charResult.byClothing && Object.entries(charResult.byClothing).map(([clothing, clothingResult]) => (
+                            <div key={clothing} className="border-l-2 border-gray-200 pl-3">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-gray-700">{clothing}</span>
+                                <span className={`text-xs ${clothingResult.score >= 7 ? 'text-green-600' : 'text-amber-600'}`}>
+                                  {clothingResult.score}/10
+                                </span>
+                              </div>
+                              {clothingResult.issues && clothingResult.issues.length > 0 && (
+                                <ul className="mt-1 space-y-1">
+                                  {clothingResult.issues.map((issue, i) => (
+                                    <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                                      <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                                        issue.severity === 'high' ? 'bg-red-400' :
+                                        issue.severity === 'medium' ? 'bg-amber-400' : 'bg-gray-400'
+                                      }`} />
+                                      <span>
+                                        {issue.description}
+                                        {issue.pagesToFix?.length > 0 && (
+                                          <span className="text-gray-400 ml-1">(pages {issue.pagesToFix.join(', ')})</span>
+                                        )}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                          {/* Legacy flat issues (backward compat) */}
+                          {!charResult.byClothing && charResult.issues && charResult.issues.length > 0 && (
+                            <ul className="space-y-1">
+                              {charResult.issues.map((issue, i) => (
+                                <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                                  <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                                    issue.severity === 'high' ? 'bg-red-400' :
+                                    issue.severity === 'medium' ? 'bg-amber-400' : 'bg-gray-400'
+                                  }`} />
+                                  <span>{issue.description}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {/* No issues */}
+                          {(!charResult.byClothing || Object.values(charResult.byClothing).every(c => !c.issues?.length)) &&
+                           (!charResult.issues || charResult.issues.length === 0) && (
+                            <p className="text-xs text-green-600">No issues found</p>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+
                     {charactersWithIssues.length > 0 && (
-                      <div className="text-sm">
+                      <div className="text-sm pt-2 border-t">
                         <span className="font-medium">Characters needing repair:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {charactersWithIssues.map(name => (
