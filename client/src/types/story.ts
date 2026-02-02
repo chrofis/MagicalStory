@@ -529,6 +529,7 @@ export interface FinalChecksReport {
         candidatesTokenCount?: number;
         totalTokenCount?: number;
       };
+      promptUsed?: string;
     }>;
   }>;
   // Token usage for all consistency checks
