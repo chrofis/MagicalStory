@@ -824,6 +824,20 @@ export interface PageFeedback {
     issue: string;
     severity: string;
   }>;
+  // Object consistency issues (from entity.objects)
+  objectIssues: Array<{
+    object: string;
+    issue: string;
+    severity: string;
+  }>;
+  // Semantic/legacy image check issues (character_appearance, position_swap, etc.)
+  semanticIssues: Array<{
+    type: 'character_appearance' | 'position_swap' | 'clothing_mismatch' | 'prop_inconsistency' | 'style_drift';
+    description: string;
+    severity: string;
+    characterInvolved?: string;
+    recommendation?: string;
+  }>;
   manualNotes: string;
   needsFullRedo: boolean;
 }

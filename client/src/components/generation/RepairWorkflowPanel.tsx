@@ -79,7 +79,8 @@ function PageFeedbackCard({
   onUpdateNotes: (notes: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length;
+  const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length +
+                      (feedback.objectIssues?.length || 0) + (feedback.semanticIssues?.length || 0);
   const hasIssues = totalIssues > 0 || (feedback.qualityScore !== undefined && feedback.qualityScore < 7);
 
   return (
@@ -122,7 +123,7 @@ function PageFeedbackCard({
         <div className="mt-3 space-y-2 pl-7">
           {feedback.fixableIssues.length > 0 && (
             <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Quality Issues:</h5>
+              <h5 className="text-xs font-medium text-gray-600 mb-1">Quality Issues ({feedback.fixableIssues.length}):</h5>
               <ul className="text-xs text-gray-600 space-y-1">
                 {feedback.fixableIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-1">
@@ -131,7 +132,7 @@ function PageFeedbackCard({
                       issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
                       'bg-yellow-100 text-yellow-700'
                     }`}>{issue.severity}</span>
-                    <span>{issue.description}</span>
+                    <span>[{issue.type}] {issue.description}</span>
                   </li>
                 ))}
               </ul>
@@ -140,12 +141,58 @@ function PageFeedbackCard({
 
           {feedback.entityIssues.length > 0 && (
             <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Entity Issues:</h5>
+              <h5 className="text-xs font-medium text-gray-600 mb-1">Character Consistency ({feedback.entityIssues.length}):</h5>
               <ul className="text-xs text-gray-600 space-y-1">
                 {feedback.entityIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-1">
                     <span className="px-1 rounded bg-purple-100 text-purple-700">{issue.character}</span>
+                    <span className={`px-1 rounded ${
+                      issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                      issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>{issue.severity}</span>
                     <span>{issue.issue}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {feedback.objectIssues && feedback.objectIssues.length > 0 && (
+            <div>
+              <h5 className="text-xs font-medium text-gray-600 mb-1">Object Consistency ({feedback.objectIssues.length}):</h5>
+              <ul className="text-xs text-gray-600 space-y-1">
+                {feedback.objectIssues.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-1">
+                    <span className="px-1 rounded bg-blue-100 text-blue-700">{issue.object}</span>
+                    <span className={`px-1 rounded ${
+                      issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
+                      issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>{issue.severity}</span>
+                    <span>{issue.issue}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {feedback.semanticIssues && feedback.semanticIssues.length > 0 && (
+            <div>
+              <h5 className="text-xs font-medium text-gray-600 mb-1">Semantic Issues ({feedback.semanticIssues.length}):</h5>
+              <ul className="text-xs text-gray-600 space-y-1">
+                {feedback.semanticIssues.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-1">
+                    <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.type.replace(/_/g, ' ')}</span>
+                    {issue.characterInvolved && (
+                      <span className="px-1 rounded bg-purple-100 text-purple-700">{issue.characterInvolved}</span>
+                    )}
+                    <span className={`px-1 rounded ${
+                      issue.severity === 'high' ? 'bg-red-100 text-red-700' :
+                      issue.severity === 'medium' ? 'bg-orange-100 text-orange-700' :
+                      'bg-yellow-100 text-yellow-700'
+                    }`}>{issue.severity}</span>
+                    <span>{issue.description}</span>
                   </li>
                 ))}
               </ul>
@@ -430,21 +477,83 @@ export function RepairWorkflowPanel({
                   Collect Feedback
                 </button>
 
-                {Object.keys(workflowState.collectedFeedback.pages).length > 0 && (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {Object.values(workflowState.collectedFeedback.pages)
-                      .sort((a, b) => a.pageNumber - b.pageNumber)
-                      .map(feedback => (
-                        <PageFeedbackCard
-                          key={feedback.pageNumber}
-                          feedback={feedback}
-                          isMarkedForRedo={workflowState.redoPages.pageNumbers.includes(feedback.pageNumber)}
-                          onToggleRedo={() => toggleRedoPage(feedback.pageNumber)}
-                          onUpdateNotes={(notes) => updatePageFeedback(feedback.pageNumber, { manualNotes: notes })}
-                        />
-                      ))}
-                  </div>
-                )}
+                {Object.keys(workflowState.collectedFeedback.pages).length > 0 && (() => {
+                  // Calculate summary statistics from collected feedback
+                  const pages = Object.values(workflowState.collectedFeedback.pages);
+                  const qualityIssues = pages.reduce((sum, p) => sum + p.fixableIssues.length, 0);
+                  const characterIssues = pages.reduce((sum, p) => sum + p.entityIssues.length, 0);
+                  const objectIssues = pages.reduce((sum, p) => sum + (p.objectIssues?.length || 0), 0);
+                  const semanticIssues = pages.reduce((sum, p) => sum + (p.semanticIssues?.length || 0), 0);
+                  const collectedTotal = qualityIssues + characterIssues + objectIssues + semanticIssues;
+
+                  // Also count issues from re-evaluation if available
+                  const reEvalPages = Object.values(workflowState.reEvaluationResults.pages);
+                  const reEvalIssues = reEvalPages.reduce((sum, p) => sum + (p.fixableIssues?.length || 0), 0);
+                  const hasReEvalData = reEvalPages.length > 0;
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Summary Statistics */}
+                      <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                        <h5 className="text-sm font-medium text-gray-800 mb-2">
+                          Feedback Summary: {collectedTotal} issues from generation + {hasReEvalData ? `${reEvalIssues} from re-evaluation` : 're-evaluate for fresh data'}
+                        </h5>
+                        <div className="flex flex-wrap gap-3 text-xs">
+                          {qualityIssues > 0 && (
+                            <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">
+                              Quality: {qualityIssues}
+                            </span>
+                          )}
+                          {characterIssues > 0 && (
+                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                              Character Consistency: {characterIssues}
+                            </span>
+                          )}
+                          {objectIssues > 0 && (
+                            <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                              Object Consistency: {objectIssues}
+                            </span>
+                          )}
+                          {semanticIssues > 0 && (
+                            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">
+                              Semantic: {semanticIssues}
+                            </span>
+                          )}
+                          {hasReEvalData && reEvalIssues > 0 && (
+                            <span className="px-2 py-1 bg-cyan-100 text-cyan-700 rounded">
+                              Re-eval Issues: {reEvalIssues}
+                            </span>
+                          )}
+                          {collectedTotal === 0 && !hasReEvalData && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                              No issues detected (run re-evaluate for fresh assessment)
+                            </span>
+                          )}
+                          {collectedTotal === 0 && hasReEvalData && reEvalIssues === 0 && (
+                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                              All pages pass quality checks
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Page Cards */}
+                      <div className="space-y-2 max-h-96 overflow-y-auto">
+                        {pages
+                          .sort((a, b) => a.pageNumber - b.pageNumber)
+                          .map(feedback => (
+                            <PageFeedbackCard
+                              key={feedback.pageNumber}
+                              feedback={feedback}
+                              isMarkedForRedo={workflowState.redoPages.pageNumbers.includes(feedback.pageNumber)}
+                              onToggleRedo={() => toggleRedoPage(feedback.pageNumber)}
+                              onUpdateNotes={(notes) => updatePageFeedback(feedback.pageNumber, { manualNotes: notes })}
+                            />
+                          ))}
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>

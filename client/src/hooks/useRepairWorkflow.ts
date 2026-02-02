@@ -7,6 +7,7 @@ import type {
   EntityConsistencyReport,
   EntityCheckResult,
   EvaluationData,
+  FinalChecksImageCheck,
 } from '../types/story';
 import type { Character } from '../types/character';
 import { storyService } from '../services/storyService';
@@ -71,6 +72,7 @@ export interface UseRepairWorkflowProps {
   characters: Character[];
   finalChecksReport?: {
     entity?: EntityConsistencyReport;
+    imageChecks?: FinalChecksImageCheck[];
   } | null;
   imageModel?: string;
   onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number) => void;
@@ -219,6 +221,8 @@ export function useRepairWorkflow({
           qualityScore: scene.qualityScore,
           fixableIssues: [],
           entityIssues: [],
+          objectIssues: [],
+          semanticIssues: [],
           manualNotes: '',
           needsFullRedo: false,
         };
@@ -231,7 +235,7 @@ export function useRepairWorkflow({
           feedback.fixableIssues = latestRetry.preRepairEval.fixableIssues;
         }
 
-        // Get entity issues from finalChecksReport
+        // Get entity issues from finalChecksReport - CHARACTERS
         if (finalChecksReport?.entity) {
           for (const [charName, charResult] of Object.entries(finalChecksReport.entity.characters || {})) {
             // Collect issues from both new byClothing structure and legacy flat structure
@@ -264,9 +268,63 @@ export function useRepairWorkflow({
               });
             }
           }
+
+          // Get entity issues from finalChecksReport - OBJECTS
+          for (const [objectName, objectResult] of Object.entries(finalChecksReport.entity.objects || {})) {
+            // Collect issues from both new byClothing structure and legacy flat structure
+            const allIssues: typeof objectResult.issues = [];
+
+            // New structure: byClothing[category].issues (objects may have this too)
+            if (objectResult.byClothing) {
+              for (const clothingResult of Object.values(objectResult.byClothing)) {
+                if (clothingResult.issues) {
+                  allIssues.push(...clothingResult.issues);
+                }
+              }
+            }
+
+            // Legacy structure: issues at root level
+            if (objectResult.issues) {
+              allIssues.push(...objectResult.issues);
+            }
+
+            // Filter to issues affecting this page
+            const objectIssues = allIssues.filter(i =>
+              i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
+            );
+
+            for (const issue of objectIssues) {
+              feedback.objectIssues.push({
+                object: objectName,
+                issue: issue.description,
+                severity: issue.severity,
+              });
+            }
+          }
         }
 
-        totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length;
+        // Get semantic/legacy image check issues from finalChecksReport.imageChecks
+        if (finalChecksReport?.imageChecks) {
+          for (const imageCheck of finalChecksReport.imageChecks) {
+            for (const issue of imageCheck.issues || []) {
+              // Check if this issue affects this page
+              const affectsPage = issue.pagesToFix?.includes(scene.pageNumber) ||
+                                  issue.images?.includes(scene.pageNumber);
+              if (affectsPage) {
+                feedback.semanticIssues.push({
+                  type: issue.type,
+                  description: issue.description,
+                  severity: issue.severity,
+                  characterInvolved: issue.characterInvolved,
+                  recommendation: issue.recommendation,
+                });
+              }
+            }
+          }
+        }
+
+        totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
+                       feedback.objectIssues.length + feedback.semanticIssues.length;
         pages[scene.pageNumber] = feedback;
       }
 
