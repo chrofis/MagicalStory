@@ -6,53 +6,36 @@ You are repairing character consistency in a children's picture book illustratio
 
 **IMAGE 1 - CHARACTER REFERENCE:**
 Shows the correct appearance of "{ENTITY_NAME}" in the art style of this book.
-This is the ONLY source of truth for how the character should look.
 
 **IMAGE 2 - PAGE TO REPAIR:**
-The illustration from page {PAGE_NUMBER} where "{ENTITY_NAME}" needs to be fixed.
+The illustration from page {PAGE_NUMBER} where "{ENTITY_NAME}" needs correction.
 
 ## Character Details
 
-**Physical Traits:**
-{PHYSICAL_TRAITS}
+**Physical Traits:** {PHYSICAL_TRAITS}
+**Clothing for this scene:** {CLOTHING_DESCRIPTION}
 
-**Clothing for this scene:**
-{CLOTHING_DESCRIPTION}
+## CRITICAL: What You MUST Change
 
-## Your Task
+You MUST redraw "{ENTITY_NAME}" in IMAGE 2 to match IMAGE 1. The output MUST show visible differences from IMAGE 2 - specifically, the character's appearance MUST be corrected.
 
-Regenerate IMAGE 2 with "{ENTITY_NAME}" corrected to match IMAGE 1.
+**REQUIRED CHANGES to "{ENTITY_NAME}":**
+- FACE: Replace with the exact facial features from IMAGE 1 (eye shape, nose, mouth, face shape)
+- HAIR: Change to exact color ({HAIR_COLOR}), style, and texture from IMAGE 1
+- SKIN TONE: Correct to match the complexion in IMAGE 1
+- BODY: Match the proportions and build shown in IMAGE 1
 
-### MUST MATCH from IMAGE 1 (reference):
-- FACE - exact facial features, eye shape, nose, mouth, face shape as shown
-- HAIR - exact color ({HAIR_COLOR}), style, length, texture
-- SKIN TONE - exact complexion as shown
-- CLOTHING - match the outfit shown in IMAGE 1
-- BODY PROPORTIONS - size, build, posture style
+If the character in IMAGE 2 already looks identical to IMAGE 1, still regenerate the character to ensure consistency.
 
-### PIXEL-PERFECT PRESERVATION (CRITICAL):
-Everything EXCEPT "{ENTITY_NAME}" must be IDENTICAL to IMAGE 2:
-- BACKGROUND - every single pixel of scenery, sky, ground, walls, furniture
-- OTHER CHARACTERS - do not change any other person or creature
-- OBJECTS - every item, prop, and detail stays exactly the same
-- LIGHTING - same light direction, shadows, highlights
-- COLORS - same color palette for everything except the target character
-- COMPOSITION - exact same framing, no cropping, no shifting
-- ART STYLE - maintain the exact illustration style
+## What to Preserve
 
-Think of it as: surgically replacing ONLY "{ENTITY_NAME}" while the rest of the image is a protected layer that cannot be modified.
+Keep the background, other characters, objects, lighting, and composition from IMAGE 2.
+Do not crop or change the aspect ratio.
 
-## Output
+## Output Requirements
 
-Generate the repaired version of IMAGE 2:
-- EXACT same dimensions as IMAGE 2
-- EXACT same aspect ratio as IMAGE 2
-- Single image (not a grid or collage)
-- The ONLY difference should be "{ENTITY_NAME}" now matching IMAGE 1
-
-## Quality Standards
-
-- Sharp, clean edges on the character
-- No blur, smearing, or artifacts
-- Character blends naturally with preserved background
-- Vibrant colors consistent with the art style
+- Single image, same dimensions as IMAGE 2
+- "{ENTITY_NAME}" MUST look noticeably different (corrected) compared to IMAGE 2
+- Character should blend naturally with the preserved background
+- Sharp edges, no blur or artifacts
+- Maintain the children's book art style
