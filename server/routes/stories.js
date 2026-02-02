@@ -312,26 +312,22 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       // Get version metadata (description, prompt, modelId, type) from data blob
       // This is needed for dev mode comparison - we extract just the metadata, not imageData
       const versionMetaQuery = await dbQuery(
-        `SELECT jsonb_path_query_array(
-           data::jsonb->'sceneImages',
-           '$[*].{pageNumber, imageVersions}'
-         ) as version_meta
-         FROM stories WHERE id = $1`,
+        `SELECT scene->>'pageNumber' as page_number, scene->'imageVersions' as image_versions
+         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+         WHERE id = $1`,
         [id]
       );
       const versionMetaByPage = new Map();
-      if (versionMetaQuery.length > 0 && versionMetaQuery[0].version_meta) {
-        for (const scene of versionMetaQuery[0].version_meta) {
-          if (scene.pageNumber && scene.imageVersions) {
-            versionMetaByPage.set(scene.pageNumber, scene.imageVersions.map(v => ({
-              description: v.description,
-              prompt: v.prompt,
-              userInput: v.userInput,
-              modelId: v.modelId,
-              type: v.type,
-              createdAt: v.createdAt
-            })));
-          }
+      for (const row of versionMetaQuery) {
+        if (row.page_number && row.image_versions) {
+          versionMetaByPage.set(parseInt(row.page_number), row.image_versions.map(v => ({
+            description: v.description,
+            prompt: v.prompt,
+            userInput: v.userInput,
+            modelId: v.modelId,
+            type: v.type,
+            createdAt: v.createdAt
+          })));
         }
       }
 
