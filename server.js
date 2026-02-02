@@ -5230,10 +5230,39 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
         storyData = await rehydrateStoryImages(id, storyData);
 
         // Find the character object
-        const character = storyData.characters?.find(c => c.name === characterName);
+        let character = storyData.characters?.find(c => c.name === characterName);
         if (!character) {
           results.push({ character: characterName, pagesRepaired: [], error: `Character "${characterName}" not found` });
           continue;
+        }
+
+        // Check if character has avatar data - if not, try to enrich from characters table
+        const artStyle = storyData.artStyle || 'pixar';
+        if (!character.avatars?.styledAvatars?.[artStyle] && !character.photoUrl && !character.photo) {
+          log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing avatar data, fetching from database...`);
+          try {
+            // Get the character set ID from story data
+            const characterSetId = storyData.characterSetId;
+            if (characterSetId) {
+              const charSetResult = await dbPool.query(
+                'SELECT data FROM characters WHERE id = $1',
+                [characterSetId]
+              );
+              if (charSetResult.rows.length > 0) {
+                const charSetData = typeof charSetResult.rows[0].data === 'string'
+                  ? JSON.parse(charSetResult.rows[0].data)
+                  : charSetResult.rows[0].data;
+                const fullChar = charSetData.characters?.find(c => c.name === characterName);
+                if (fullChar) {
+                  // Merge avatar data from full character
+                  character = { ...character, ...fullChar, avatars: fullChar.avatars || character.avatars };
+                  log.info(`🔧 [REPAIR-WORKFLOW] Enriched ${characterName} with avatar data from character set`);
+                }
+              }
+            }
+          } catch (enrichErr) {
+            log.warn(`[REPAIR-WORKFLOW] Failed to enrich character data: ${enrichErr.message}`);
+          }
         }
 
         const pagesRepaired = [];
