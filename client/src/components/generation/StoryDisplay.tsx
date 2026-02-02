@@ -352,6 +352,40 @@ export function StoryDisplay({
     }
   };
 
+  // Load all styled avatar images at once
+  const fetchAllStyledAvatarImages = async () => {
+    if (!storyId || !styledAvatarGeneration) return;
+    const indicesToLoad = styledAvatarGeneration
+      .map((_, idx) => idx)
+      .filter(idx => !loadedAvatarGenImages[`styled-${idx}`] && !loadingAvatarGenImages.has(`styled-${idx}`));
+    await Promise.all(indicesToLoad.map(idx => fetchAvatarGenImages('styled', idx)));
+  };
+
+  // Load all costumed avatar images at once
+  const fetchAllCostumedAvatarImages = async () => {
+    if (!storyId || !costumedAvatarGeneration) return;
+    const indicesToLoad = costumedAvatarGeneration
+      .map((_, idx) => idx)
+      .filter(idx => !loadedAvatarGenImages[`costumed-${idx}`] && !loadingAvatarGenImages.has(`costumed-${idx}`));
+    await Promise.all(indicesToLoad.map(idx => fetchAvatarGenImages('costumed', idx)));
+  };
+
+  // Load all Visual Bible reference images at once
+  const fetchAllVisualBibleImages = async () => {
+    if (!storyId || !visualBible) return;
+    const allElements: { id: string; hasReferenceImage?: boolean }[] = [
+      ...(visualBible.secondaryCharacters || []),
+      ...(visualBible.animals || []),
+      ...(visualBible.artifacts || []),
+      ...(visualBible.locations || []),
+      ...(visualBible.vehicles || []),
+    ];
+    const idsToLoad = allElements
+      .filter(el => el.hasReferenceImage && !loadedRefImages[el.id] && !loadingRefImages.has(el.id))
+      .map(el => el.id);
+    await Promise.all(idsToLoad.map(id => fetchReferenceImage(id)));
+  };
+
   // Entity grid images (lazy-loaded) - keyed by grid index
   const [loadedEntityGridImages, setLoadedEntityGridImages] = useState<Record<number, string>>({});
   const [loadingEntityGridImages, setLoadingEntityGridImages] = useState<Set<number>>(new Set());
@@ -1472,6 +1506,31 @@ export function StoryDisplay({
                 )}
               </summary>
               <div className="mt-4 space-y-4">
+                {/* Load All Reference Images button */}
+                {(() => {
+                  const allElements = [
+                    ...(visualBible.secondaryCharacters || []),
+                    ...(visualBible.animals || []),
+                    ...(visualBible.artifacts || []),
+                    ...(visualBible.locations || []),
+                    ...(visualBible.vehicles || []),
+                  ];
+                  const unloadedCount = allElements.filter(el => el.hasReferenceImage && !loadedRefImages[el.id]).length;
+                  if (unloadedCount === 0) return null;
+                  return (
+                    <button
+                      onClick={fetchAllVisualBibleImages}
+                      disabled={loadingRefImages.size > 0}
+                      className="text-xs px-3 py-1.5 bg-rose-500 text-white rounded hover:bg-rose-600 disabled:bg-rose-300"
+                    >
+                      {loadingRefImages.size > 0
+                        ? `Loading ${loadingRefImages.size} images...`
+                        : `Load All Reference Images (${unloadedCount})`
+                      }
+                    </button>
+                  );
+                })()}
+
                 {/* Main Characters - Style Analysis */}
                 {visualBible.mainCharacters && visualBible.mainCharacters.length > 0 && (
                   <div className="bg-white border border-purple-300 rounded-lg p-3">
@@ -2021,6 +2080,23 @@ export function StoryDisplay({
                     : `Styled Avatars (${styledAvatarGeneration.length})`}
               </summary>
               <div className="mt-4 space-y-4">
+                {/* Load All button */}
+                {(() => {
+                  const unloadedCount = styledAvatarGeneration.filter((_, idx) => !loadedAvatarGenImages[`styled-${idx}`]).length;
+                  if (unloadedCount === 0) return null;
+                  return (
+                    <button
+                      onClick={fetchAllStyledAvatarImages}
+                      disabled={loadingAvatarGenImages.size > 0}
+                      className="text-xs px-3 py-1.5 bg-pink-500 text-white rounded hover:bg-pink-600 disabled:bg-pink-300"
+                    >
+                      {loadingAvatarGenImages.size > 0
+                        ? `Loading...`
+                        : `Load All Images (${unloadedCount})`
+                      }
+                    </button>
+                  );
+                })()}
                 {styledAvatarGeneration.map((entry, index) => (
                   <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-pink-200' : 'bg-red-50 border-red-300'}`}>
                     <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-800 flex items-center gap-2">
@@ -2094,6 +2170,23 @@ export function StoryDisplay({
                     : `Costumed Avatars (${costumedAvatarGeneration.length})`}
               </summary>
               <div className="mt-4 space-y-4">
+                {/* Load All button */}
+                {(() => {
+                  const unloadedCount = costumedAvatarGeneration.filter((_, idx) => !loadedAvatarGenImages[`costumed-${idx}`]).length;
+                  if (unloadedCount === 0) return null;
+                  return (
+                    <button
+                      onClick={fetchAllCostumedAvatarImages}
+                      disabled={loadingAvatarGenImages.size > 0}
+                      className="text-xs px-3 py-1.5 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-orange-300"
+                    >
+                      {loadingAvatarGenImages.size > 0
+                        ? `Loading...`
+                        : `Load All Images (${unloadedCount})`
+                      }
+                    </button>
+                  );
+                })()}
                 {costumedAvatarGeneration.map((entry, index) => (
                   <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-orange-200' : 'bg-red-50 border-red-300'}`}>
                     <summary className="cursor-pointer text-sm font-semibold text-orange-700 hover:text-orange-800 flex items-center gap-2">
