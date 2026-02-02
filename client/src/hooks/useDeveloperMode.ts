@@ -55,6 +55,10 @@ interface DeveloperModeState {
   // Reduces latency and allows smarter repair decisions across all pages
   separatedEvaluation: boolean;
   setSeparatedEvaluation: (enable: boolean) => void;
+  // Full repair after generation: run the complete repair workflow after story generation
+  // Includes: re-evaluate all pages, redo low-score pages (up to 4 retries), consistency check, character/artifact repair
+  enableFullRepairAfterGeneration: boolean;
+  setEnableFullRepairAfterGeneration: (enable: boolean) => void;
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
@@ -89,6 +93,7 @@ const FEATURE_DEFAULTS = {
   forceRepairThreshold: null as number | null, // Force repair: null = standard logic, 100 = always repair
   enableSceneValidation: false, // Scene validation: cheap preview + geometry check + repair
   separatedEvaluation: false, // Separated evaluation: generate all images first, then batch evaluate
+  enableFullRepairAfterGeneration: false, // Full repair: run complete repair workflow after generation
 };
 
 /**
@@ -145,6 +150,9 @@ export function useDeveloperMode(): DeveloperModeState {
 
   // Separated evaluation: generate all images first, then batch evaluate and repair
   const [separatedEvaluation, setSeparatedEvaluation] = useState(FEATURE_DEFAULTS.separatedEvaluation);
+
+  // Full repair after generation: run complete repair workflow after story generation
+  const [enableFullRepairAfterGeneration, setEnableFullRepairAfterGeneration] = useState(FEATURE_DEFAULTS.enableFullRepairAfterGeneration);
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
@@ -212,6 +220,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setEnableSceneValidation,
     separatedEvaluation,
     setSeparatedEvaluation,
+    enableFullRepairAfterGeneration,
+    setEnableFullRepairAfterGeneration,
     loadAllAvatars,
     setLoadAllAvatars,
     modelSelections,

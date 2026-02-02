@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Wrench,
   RotateCcw,
@@ -29,6 +29,8 @@ interface RepairWorkflowPanelProps {
   imageModel?: string;
   onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number) => void;
   onRefreshStory?: () => Promise<void>;
+  // Auto-trigger full workflow on mount (for post-generation repair)
+  autoRunFullWorkflow?: boolean;
 }
 
 // Step configuration
@@ -174,6 +176,7 @@ export function RepairWorkflowPanel({
   imageModel,
   onImageUpdate,
   onRefreshStory,
+  autoRunFullWorkflow = false,
 }: RepairWorkflowPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
@@ -208,6 +211,24 @@ export function RepairWorkflowPanel({
   // Full workflow progress state
   const [fullWorkflowProgress, setFullWorkflowProgress] = useState<{ step: string; detail: string } | null>(null);
   const [isRunningFullWorkflow, setIsRunningFullWorkflow] = useState(false);
+
+  // Track if we've already auto-run for this story
+  const autoRunTriggeredRef = useRef<string | null>(null);
+
+  // Auto-run full workflow when triggered by parent (e.g., after story generation)
+  useEffect(() => {
+    if (autoRunFullWorkflow && storyId && sceneImages.length > 0 && !isRunning && !isRunningFullWorkflow) {
+      // Only run once per storyId
+      if (autoRunTriggeredRef.current !== storyId) {
+        autoRunTriggeredRef.current = storyId;
+        console.log('[RepairWorkflowPanel] Auto-triggering full repair workflow for story:', storyId);
+        // Delay slightly to ensure component is fully mounted
+        setTimeout(() => {
+          handleRunFullWorkflow();
+        }, 500);
+      }
+    }
+  }, [autoRunFullWorkflow, storyId, sceneImages.length, isRunning, isRunningFullWorkflow]);
 
   const handleRunFullWorkflow = async () => {
     setIsRunningFullWorkflow(true);

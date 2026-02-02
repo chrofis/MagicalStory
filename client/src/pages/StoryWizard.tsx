@@ -103,6 +103,7 @@ export default function StoryWizard() {
     checkOnlyMode, setCheckOnlyMode,
     enableSceneValidation, setEnableSceneValidation,
     separatedEvaluation, setSeparatedEvaluation,
+    enableFullRepairAfterGeneration, setEnableFullRepairAfterGeneration,
     loadAllAvatars, setLoadAllAvatars,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
@@ -306,6 +307,8 @@ export default function StoryWizard() {
   const [savedGenerationSettings, setSavedGenerationSettings] = useState<GenerationSettings | null>(null);
   // Flag to skip server reload when we just finished generating (data is already in state)
   const justFinishedGenerating = useRef(false);
+  // Track which story should auto-run the full repair workflow (set when generation completes with enableFullRepairAfterGeneration)
+  const [autoRunRepairForStoryId, setAutoRunRepairForStoryId] = useState<string | null>(null);
   // Flag to track if dev metadata has been loaded (prevents duplicate fetches)
   const devMetadataLoadedRef = useRef(false);
 
@@ -3432,6 +3435,11 @@ export default function StoryWizard() {
           // Mark that we just finished generating (skip server reload since data is in state)
           justFinishedGenerating.current = true;
 
+          // If full repair after generation is enabled, mark this story for auto-repair
+          if (enableFullRepairAfterGeneration) {
+            setAutoRunRepairForStoryId(status.result.storyId);
+          }
+
           // Stop tracking in global context
           stopTracking();
         } else if (status.status === 'failed') {
@@ -3788,6 +3796,7 @@ export default function StoryWizard() {
                       log.error('Failed to refresh story:', error);
                     }
                   } : undefined}
+                  autoRunFullWorkflow={autoRunRepairForStoryId === storyId}
                 />
               )}
               <StoryDisplay
@@ -4695,6 +4704,19 @@ export default function StoryWizard() {
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
                         {language === 'de' ? 'Erzeugt alle Bilder zuerst, dann wertet alle parallel aus und repariert' : language === 'fr' ? 'Génère toutes les images d\'abord, puis évalue et répare en parallèle' : 'Generates all images first, then evaluates and repairs in batch'}
+                      </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
+                        <input
+                          type="checkbox"
+                          checked={enableFullRepairAfterGeneration}
+                          onChange={(e) => setEnableFullRepairAfterGeneration(e.target.checked)}
+                          className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Volle Reparatur nach Generierung' : language === 'fr' ? 'Réparation complète après génération' : 'Full repair after generation'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Führt nach der Generierung den kompletten Reparatur-Workflow aus (bis zu 4 Versuche pro Seite)' : language === 'fr' ? 'Exécute le workflow de réparation complet après la génération (jusqu\'à 4 tentatives par page)' : 'Runs the full repair workflow after generation (up to 4 retries per page)'}
                       </p>
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">
