@@ -2254,9 +2254,24 @@ export function StoryDisplay({
                           <span className={`text-sm ${isConsistent ? 'text-green-600' : 'text-amber-600'}`}>
                             {isConsistent ? '✓' : '⚠️'}
                           </span>
-                          <span className="font-medium text-sm text-gray-800">{grid.entityName}</span>
+                          <span className="font-medium text-sm text-gray-800">
+                            {grid.entityName}
+                            {clothingCat && (
+                              <span className={`ml-1.5 text-xs font-normal px-1.5 py-0.5 rounded ${
+                                clothingCat.startsWith('costumed:')
+                                  ? 'bg-purple-100 text-purple-700'
+                                  : clothingCat === 'winter'
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : clothingCat === 'summer'
+                                      ? 'bg-yellow-100 text-yellow-700'
+                                      : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {clothingCat}
+                              </span>
+                            )}
+                          </span>
                           <span className="text-xs text-gray-500">
-                            ({grid.cellCount} appearances{clothingCat ? `, ${clothingCat}` : ''})
+                            ({grid.cellCount} appearance{grid.cellCount !== 1 ? 's' : ''})
                           </span>
                           <span className={`ml-auto text-xs px-2 py-0.5 rounded ${
                             score >= 8 ? 'bg-green-100 text-green-700' :
