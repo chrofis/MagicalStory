@@ -224,9 +224,27 @@ export function useRepairWorkflow({
         // Get entity issues from finalChecksReport
         if (finalChecksReport?.entity) {
           for (const [charName, charResult] of Object.entries(finalChecksReport.entity.characters || {})) {
-            const charIssues = charResult.issues?.filter(i =>
+            // Collect issues from both new byClothing structure and legacy flat structure
+            const allIssues: typeof charResult.issues = [];
+
+            // New structure: byClothing[category].issues
+            if (charResult.byClothing) {
+              for (const clothingResult of Object.values(charResult.byClothing)) {
+                if (clothingResult.issues) {
+                  allIssues.push(...clothingResult.issues);
+                }
+              }
+            }
+
+            // Legacy structure: issues at root level
+            if (charResult.issues) {
+              allIssues.push(...charResult.issues);
+            }
+
+            // Filter to issues affecting this page
+            const charIssues = allIssues.filter(i =>
               i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
-            ) || [];
+            );
 
             for (const issue of charIssues) {
               feedback.entityIssues.push({

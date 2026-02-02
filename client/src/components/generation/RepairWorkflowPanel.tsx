@@ -235,6 +235,49 @@ export function RepairWorkflowPanel({
       .map(([page]) => parseInt(page));
   }, [workflowState.collectedFeedback.pages]);
 
+  // Get pages with severe (major/critical) issues for a specific character
+  const getPagesWithSevereIssuesForCharacter = (characterName: string): number[] => {
+    const report = workflowState.consistencyResults.report;
+    if (!report?.characters?.[characterName]) return [];
+
+    const charResult = report.characters[characterName];
+    const severePages = new Set<number>();
+
+    // Check byClothing structure (new format)
+    if (charResult.byClothing) {
+      for (const clothingResult of Object.values(charResult.byClothing)) {
+        for (const issue of clothingResult.issues || []) {
+          if (issue.severity === 'major' || issue.severity === 'critical') {
+            // Add all pages from pagesToFix
+            for (const page of issue.pagesToFix || []) {
+              severePages.add(page);
+            }
+            // Also add the specific page if set
+            if (issue.pageNumber) {
+              severePages.add(issue.pageNumber);
+            }
+          }
+        }
+      }
+    }
+
+    // Check legacy flat structure
+    if (charResult.issues) {
+      for (const issue of charResult.issues) {
+        if (issue.severity === 'major' || issue.severity === 'critical') {
+          for (const page of issue.pagesToFix || []) {
+            severePages.add(page);
+          }
+          if (issue.pageNumber) {
+            severePages.add(issue.pageNumber);
+          }
+        }
+      }
+    }
+
+    return Array.from(severePages).sort((a, b) => a - b);
+  };
+
   // Render step header
   const renderStepHeader = (step: RepairWorkflowStep) => {
     const config = STEP_CONFIG[step];
@@ -662,7 +705,21 @@ export function RepairWorkflowPanel({
 
                 {selectedCharacter && (
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Select Pages to Repair:</label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium">Select Pages to Repair:</label>
+                      <button
+                        onClick={() => {
+                          const severePages = getPagesWithSevereIssuesForCharacter(selectedCharacter);
+                          setSelectedCharacterPages(severePages);
+                        }}
+                        disabled={isRunning || workflowState.stepStatus['consistency-check'] !== 'completed'}
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                        title="Auto-select pages with major/critical issues"
+                      >
+                        <Zap className="w-3 h-3" />
+                        Auto-Identify Severe
+                      </button>
+                    </div>
                     <div className="flex flex-wrap gap-2">
                       {sceneImages.map(scene => (
                         <button
@@ -725,7 +782,18 @@ export function RepairWorkflowPanel({
                 <p className="text-sm text-gray-600">{STEP_CONFIG['artifact-repair'].description}</p>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Pages for Grid Repair:</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium">Select Pages for Grid Repair:</label>
+                    <button
+                      onClick={() => setSelectedArtifactPages(pagesWithArtifacts)}
+                      disabled={isRunning || pagesWithArtifacts.length === 0}
+                      className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+                      title="Auto-select all pages with artifact issues"
+                    >
+                      <Zap className="w-3 h-3" />
+                      Auto-Identify ({pagesWithArtifacts.length})
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {pagesWithArtifacts.length > 0 ? (
                       pagesWithArtifacts.map(page => (
