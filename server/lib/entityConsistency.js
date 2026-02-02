@@ -56,28 +56,44 @@ function groupAppearancesByClothing(appearances) {
  */
 function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const avatars = character.avatars;
+  const charName = character.name || 'Unknown';
+
   if (!avatars?.styledAvatars?.[artStyle]) {
     // Fallback to original photo if no styled avatars
-    return character.photoUrl || character.photo || null;
+    const fallback = character.photoUrl || character.photo || null;
+    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, fallback=${fallback ? 'photo' : 'null'}`);
+    return fallback;
   }
 
   const styledForArt = avatars.styledAvatars[artStyle];
+  const availableKeys = Object.keys(styledForArt || {});
+  log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: styledAvatars[${artStyle}] has keys: [${availableKeys.join(', ')}]`);
 
   // Handle costumed categories (e.g., "costumed:pirate")
   if (clothingCategory.startsWith('costumed:')) {
     const costumeType = clothingCategory.replace('costumed:', '');
     const costumedAvatar = styledForArt.costumed?.[costumeType];
-    if (costumedAvatar) return costumedAvatar;
+    if (costumedAvatar) {
+      log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found costumed avatar for ${costumeType}`);
+      return costumedAvatar;
+    }
     // Fallback to standard styled if costume not found
-    return styledForArt.standard || character.photoUrl || character.photo || null;
+    const fallback = styledForArt.standard || character.photoUrl || character.photo || null;
+    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No costumed[${costumeType}], fallback=${fallback ? 'found' : 'null'}`);
+    return fallback;
   }
 
   // Handle standard categories (standard, winter, summer)
   const styledAvatar = styledForArt[clothingCategory];
-  if (styledAvatar) return styledAvatar;
+  if (styledAvatar) {
+    log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: Found ${clothingCategory} avatar`);
+    return styledAvatar;
+  }
 
   // Fallback chain: requested → standard → original
-  return styledForArt.standard || character.photoUrl || character.photo || null;
+  const fallback = styledForArt.standard || character.photoUrl || character.photo || null;
+  log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No ${clothingCategory}, trying fallback=${fallback ? 'found' : 'null'}`);
+  return fallback;
 }
 
 /**
