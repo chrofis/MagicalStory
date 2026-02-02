@@ -1,41 +1,40 @@
 # Single Page Entity Repair
 
-You are repairing character consistency in a children's picture book illustration.
+You are repairing a cropped character region for a children's picture book. The repaired output will be composited back onto the original page.
 
 ## Input Images
 
 **IMAGE 1 - CHARACTER REFERENCE:**
-Shows the correct appearance of "{ENTITY_NAME}" in the art style of this book.
+The correct appearance of "{ENTITY_NAME}" - this is how the character MUST look.
 
-**IMAGE 2 - PAGE TO REPAIR:**
-The illustration from page {PAGE_NUMBER} where "{ENTITY_NAME}" needs correction.
+**IMAGE 2 - CROP TO REPAIR:**
+A cropped region from page {PAGE_NUMBER} showing "{ENTITY_NAME}" who needs correction.
 
 ## Character Details
 
 **Physical Traits:** {PHYSICAL_TRAITS}
-**Clothing for this scene:** {CLOTHING_DESCRIPTION}
+**Clothing:** {CLOTHING_DESCRIPTION}
 
-## CRITICAL: What You MUST Change
+## Your Task
 
-You MUST redraw "{ENTITY_NAME}" in IMAGE 2 to match IMAGE 1. The output MUST show visible differences from IMAGE 2 - specifically, the character's appearance MUST be corrected.
+Redraw the character in IMAGE 2 so their face, hair, and features match IMAGE 1.
 
-**REQUIRED CHANGES to "{ENTITY_NAME}":**
-- FACE: Replace with the exact facial features from IMAGE 1 (eye shape, nose, mouth, face shape)
-- HAIR: Change to exact color ({HAIR_COLOR}), style, and texture from IMAGE 1
-- SKIN TONE: Correct to match the complexion in IMAGE 1
-- BODY: Match the proportions and build shown in IMAGE 1
+**Copy from IMAGE 1 (reference):**
+- Face shape, eyes, nose, mouth - exact match
+- Hair color ({HAIR_COLOR}), style, and texture - exact match
+- Skin tone - exact match
 
-If the character in IMAGE 2 already looks identical to IMAGE 1, still regenerate the character to ensure consistency.
+**Keep from IMAGE 2 (crop to repair):**
+- Pose and body position - must stay the same for compositing
+- Clothing style shown - same outfit
+- Any visible background elements - preserve for seamless blending
+- Lighting direction and shadows - match the scene
 
-## What to Preserve
+## Output
 
-Keep the background, other characters, objects, lighting, and composition from IMAGE 2.
-Do not crop or change the aspect ratio.
-
-## Output Requirements
-
-- Single image, same dimensions as IMAGE 2
-- "{ENTITY_NAME}" MUST look noticeably different (corrected) compared to IMAGE 2
-- Character should blend naturally with the preserved background
-- Sharp edges, no blur or artifacts
-- Maintain the children's book art style
+Generate a corrected version of IMAGE 2:
+- Same dimensions and aspect ratio as IMAGE 2
+- Character's face/hair/features now match IMAGE 1
+- Pose and position unchanged (critical for compositing)
+- Clean edges, no artifacts, ready for seamless compositing
+- Same art style as IMAGE 2
