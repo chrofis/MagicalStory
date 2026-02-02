@@ -15666,9 +15666,11 @@ app.get('/s/:shareToken', async (req, res) => {
 // This is the URL users copy from browser, needs OG tags for WhatsApp/Facebook
 app.get('/shared/:shareToken', async (req, res) => {
   const { shareToken } = req.params;
+  log.debug(`🔗 [SHARED] Request for /shared/${shareToken.substring(0, 8)}...`);
 
   try {
     const story = await getSharedStory(shareToken);
+    log.debug(`🔗 [SHARED] Story found: ${!!story}, hasDistFolder: ${hasDistFolder}`);
 
     if (story && hasDistFolder) {
       // Read the index.html
