@@ -14684,7 +14684,7 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
     // Check if user already has a story generation in progress
     if (STORAGE_MODE === 'database') {
       const activeJobResult = await dbPool.query(
-        `SELECT id, status, created_at FROM story_jobs
+        `SELECT id, status, created_at, updated_at, progress FROM story_jobs
          WHERE user_id = $1 AND status IN ('pending', 'processing')
          ORDER BY created_at DESC LIMIT 1`,
         [userId]
@@ -14693,11 +14693,23 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
       if (activeJobResult.rows.length > 0) {
         const activeJob = activeJobResult.rows[0];
         const jobAgeMinutes = (Date.now() - new Date(activeJob.created_at).getTime()) / (1000 * 60);
+        const minutesSinceUpdate = activeJob.updated_at
+          ? (Date.now() - new Date(activeJob.updated_at).getTime()) / (1000 * 60)
+          : jobAgeMinutes;
 
-        // If job is older than 60 minutes, consider it stale and mark as failed
-        const STALE_JOB_TIMEOUT_MINUTES = 60;
-        if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
-          log.info(`🧹 Job ${activeJob.id} is stale (${Math.round(jobAgeMinutes)} minutes old), cleaning up silently`);
+        // Two failure modes:
+        // 1. Total timeout: Job running for more than 60 minutes total
+        // 2. Heartbeat timeout: No progress update for 15 minutes (something is stuck)
+        const TOTAL_TIMEOUT_MINUTES = 60;
+        const HEARTBEAT_TIMEOUT_MINUTES = 15;
+
+        const isStale = jobAgeMinutes > TOTAL_TIMEOUT_MINUTES ||
+          (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES && activeJob.progress > 0);
+
+        if (isStale) {
+          const reason = jobAgeMinutes > 120 ? 'abandoned' :
+            minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
+          log.info(`🧹 Job ${activeJob.id} is stale (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago), cleaning up`);
 
           // Refund reserved credits for stale job
           try {
@@ -14740,12 +14752,12 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
             log.error(`❌ Failed to refund credits for stale job ${activeJob.id}:`, refundErr.message);
           }
 
-          // Mark as failed with special flag so frontend knows it's a silent cleanup, not active timeout
-          // Jobs over 2 hours old are "abandoned", not "timed out" - user won't see popup
-          const isAbandoned = jobAgeMinutes > 120;
-          const errorMessage = isAbandoned
+          // Mark as failed with appropriate message based on failure reason
+          const errorMessage = jobAgeMinutes > 120
             ? 'Job was abandoned (cleaned up automatically)'
-            : `Job timed out after ${STALE_JOB_TIMEOUT_MINUTES} minutes`;
+            : minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES
+              ? `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes)`
+              : `Job timed out after ${Math.round(jobAgeMinutes)} minutes`;
 
           await dbPool.query(
             `UPDATE story_jobs
@@ -14897,7 +14909,7 @@ app.get('/api/jobs/:jobId/status', jobStatusLimiter, authenticateToken, async (r
 
     if (STORAGE_MODE === 'database') {
       const result = await dbPool.query(
-        `SELECT id, status, progress, progress_message, result_data, error_message, created_at, completed_at
+        `SELECT id, status, progress, progress_message, result_data, error_message, created_at, completed_at, updated_at
          FROM story_jobs
          WHERE id = $1 AND user_id = $2`,
         [jobId, userId]
@@ -14909,17 +14921,36 @@ app.get('/api/jobs/:jobId/status', jobStatusLimiter, authenticateToken, async (r
 
       const job = result.rows[0];
 
-      // Detect stale jobs during polling - mark as failed if processing for too long
-      const STALE_JOB_TIMEOUT_MINUTES = 60;
+      // Detect stale/stuck jobs during polling
       if (job.status === 'processing' || job.status === 'pending') {
         const jobAgeMinutes = (Date.now() - new Date(job.created_at).getTime()) / (1000 * 60);
-        if (jobAgeMinutes > STALE_JOB_TIMEOUT_MINUTES) {
-          log.warn(`⏰ [STATUS] Job ${jobId} is stale (${Math.round(jobAgeMinutes)} minutes), marking as failed`);
+        const minutesSinceUpdate = job.updated_at
+          ? (Date.now() - new Date(job.updated_at).getTime()) / (1000 * 60)
+          : jobAgeMinutes;
 
-          const errorMessage = jobAgeMinutes > 120
-            ? 'Job was abandoned (server may have restarted)'
-            : `Job timed out after ${Math.round(jobAgeMinutes)} minutes - please try again`;
+        // Two failure modes:
+        // 1. Total timeout: Job running for more than 60 minutes total
+        // 2. Heartbeat timeout: No progress update for 15 minutes (something is stuck)
+        const TOTAL_TIMEOUT_MINUTES = 60;
+        const HEARTBEAT_TIMEOUT_MINUTES = 15;
 
+        let errorMessage = null;
+
+        if (jobAgeMinutes > 120) {
+          // Very old job - was abandoned (server restart, browser closed, etc.)
+          errorMessage = 'Job was abandoned (server may have restarted)';
+          log.info(`🧹 [STATUS] Job ${jobId} is abandoned (${Math.round(jobAgeMinutes)} minutes old), cleaning up`);
+        } else if (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES && job.progress > 0) {
+          // Job started but stopped making progress - something is stuck
+          errorMessage = `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes) - please try again`;
+          log.warn(`💔 [STATUS] Job ${jobId} heartbeat timeout: no progress for ${Math.round(minutesSinceUpdate)} minutes (last progress: ${job.progress}%)`);
+        } else if (jobAgeMinutes > TOTAL_TIMEOUT_MINUTES) {
+          // Job running too long overall
+          errorMessage = `Job timed out after ${Math.round(jobAgeMinutes)} minutes - please try again`;
+          log.warn(`⏰ [STATUS] Job ${jobId} total timeout: ${Math.round(jobAgeMinutes)} minutes`);
+        }
+
+        if (errorMessage) {
           await dbPool.query(
             `UPDATE story_jobs SET status = 'failed', error_message = $2, updated_at = NOW() WHERE id = $1`,
             [jobId, errorMessage]
