@@ -37,6 +37,7 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 - Adult + child: child looks UP, adult looks DOWN
 - Distant characters: name the empty space between them
 - Same location across scenes: maintain established left/right positions
+- **Moving characters: ALWAYS specify facing direction** (❌ "running" ✅ "running away from camera" or "running toward camera")
 
 **Camera Angles:**
 - Character acting heroic → Low Angle (camera looking up)
@@ -131,7 +132,7 @@ The scene hint is a STARTING IDEA - change it freely if composition doesn't work
 | 9 | Distance Separation | Name what fills the gap between distant characters (plaza, snow, empty space) |
 | 10 | Location Continuity | Same location as previous scene unless story explicitly says they moved |
 | 11 | Story Fidelity | Match spatial terms exactly: "vor" = in front of, "neben" = beside, not behind |
-| 12 | Linear Space | Path orientation (lengthwise/crosswise) determines character positioning along it |
+| 12 | Linear Space | Path orientation (lengthwise/crosswise) determines positioning. Characters moving along path MUST have explicit facing direction in pose (e.g., "running away from camera", "back view moving into distance", "sprinting toward camera") |
 | 13 | Shared Objects | When 2+ characters hold same object, define each character's grip point |
 | 14 | Obstacle Logic | If object blocks passage, explain WHY (spans width, wedged, too large) |
 | 15 | Holding Inventory | Track leftHand/rightHand per character, no conflicts, include signature items |
@@ -158,7 +159,7 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
     "check9_distanceSeparation": "Characters together foreground, tower distant. Gap: snowy plaza. ADEQUATE",
     "check10_locationContinuity": "N/A - first scene at this location",
     "check11_storyFidelity": "Story: discovering tower. Scene: pointing at tower. YES",
-    "check12_linearSpace": "N/A - no path",
+    "check12_linearSpace": "N/A - no path with moving characters",
     "check13_sharedObjects": "N/A - no shared objects",
     "check14_obstacleLogic": "N/A - no obstacles",
     "check15_holdingInventory": "Sophie L:empty R:pointing. Manuel L:empty R:empty. NO CONFLICTS",
