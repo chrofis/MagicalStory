@@ -16,6 +16,7 @@ const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { extractSceneMetadata } = require('./storyHelpers');
+const { getFacePhoto } = require('./characterPhotos');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -58,15 +59,8 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const avatars = character.avatars;
   const charName = character.name || 'Unknown';
 
-  // Helper to get fallback photo from various possible locations
-  const getFallbackPhoto = () => {
-    return character.photoUrl
-      || character.photo
-      || character.photo_url
-      || character.photos?.face
-      || character.photos?.original
-      || null;
-  };
+  // Helper to get fallback photo - uses centralized helper
+  const getFallbackPhoto = () => getFacePhoto(character);
 
   if (!avatars?.styledAvatars?.[artStyle]) {
     // Fallback to original photo if no styled avatars
@@ -2067,9 +2061,48 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     // Build physical traits description
     const physicalTraits = buildPhysicalTraitsDescription(character);
     const hairColor = character.physical?.hairColor || 'as shown in reference';
+    const hairStyle = character.physical?.hairStyle || character.physical?.hairLength || 'as shown in reference';
 
     // Build clothing description for this scene
     const clothingDescription = buildClothingDescription(character, clothingCategory, artStyle);
+
+    // Format issues found for this page (if provided in options)
+    let issuesFoundText = '';
+    if (options.issues && options.issues.length > 0) {
+      const pageIssues = options.issues.filter(issue =>
+        issue.pagesToFix?.includes(pageNumber)
+      );
+      if (pageIssues.length > 0) {
+        issuesFoundText = '\n## Issues to Fix\n\nThe consistency check found these specific problems on this page:\n';
+        for (const issue of pageIssues) {
+          issuesFoundText += `\n**${issue.type}** (${issue.severity}):\n`;
+
+          // Use canonicalVersion and fixInstruction which don't have cell references
+          // The description often has cell references which won't make sense here
+          if (issue.canonicalVersion) {
+            issuesFoundText += `- Correct appearance (match IMAGE 1): ${issue.canonicalVersion}\n`;
+          }
+          if (issue.fixInstruction) {
+            // Clean up fix instructions - replace cell references with IMAGE 1
+            let fix = issue.fixInstruction;
+            fix = fix.replace(/cell [A-Z]/gi, 'IMAGE 1');
+            fix = fix.replace(/to match cell [A-Z]/gi, 'to match IMAGE 1');
+            issuesFoundText += `- Required fix: ${fix}\n`;
+          }
+          // Add details if available (shows what's wrong vs what's correct)
+          if (issue.details) {
+            if (issue.details.cellA) {
+              issuesFoundText += `- What it should look like: ${issue.details.cellA}\n`;
+            }
+            if (issue.details.cellB) {
+              issuesFoundText += `- What's wrong on this page: ${issue.details.cellB}\n`;
+            }
+          }
+        }
+        issuesFoundText += '\n';
+        log.info(`🔧 [SINGLE-PAGE-REPAIR] Including ${pageIssues.length} specific issues in prompt`);
+      }
+    }
 
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Physical traits: ${physicalTraits.substring(0, 100)}...`);
     log.info(`🔧 [SINGLE-PAGE-REPAIR] Clothing: ${clothingDescription}`);
@@ -2087,7 +2120,9 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
           .replace(/\{CLOTHING_CATEGORY\}/g, clothingCategory)
           .replace(/\{PHYSICAL_TRAITS\}/g, physicalTraits)
           .replace(/\{HAIR_COLOR\}/g, hairColor)
+          .replace(/\{HAIR_STYLE\}/g, hairStyle)
           .replace(/\{CLOTHING_DESCRIPTION\}/g, clothingDescription)
+          .replace(/\{ISSUES_FOUND\}/g, issuesFoundText)
       : buildFallbackSinglePagePrompt(charName, pageNumber, clothingCategory, physicalTraits, clothingDescription);
 
     // Send to Gemini: avatar + target (simplified - just 2 images)

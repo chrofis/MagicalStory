@@ -9,24 +9,20 @@ The correct appearance of "{ENTITY_NAME}" - this is how the character MUST look.
 
 **IMAGE 2 - CROP TO REPAIR:**
 A cropped region from page {PAGE_NUMBER} showing "{ENTITY_NAME}" who needs correction.
-
-## Character Details
-
-**Physical Traits:** {PHYSICAL_TRAITS}
-**Clothing:** {CLOTHING_DESCRIPTION}
-
+{ISSUES_FOUND}
 ## Your Task
 
 Redraw the character in IMAGE 2 so their face, hair, and features match IMAGE 1.
 
-**Copy from IMAGE 1 (reference):**
+**Copy EXACTLY from IMAGE 1 (reference):**
 - Face shape, eyes, nose, mouth - exact match
-- Hair color ({HAIR_COLOR}), style, and texture - exact match
-- Skin tone - exact match
+- Hair: {HAIR_COLOR}, {HAIR_STYLE} - exact match to IMAGE 1
+- Skin tone - exact match to IMAGE 1
+- Physical traits: {PHYSICAL_TRAITS}
+- Clothing: {CLOTHING_DESCRIPTION}
 
 **Keep from IMAGE 2 (crop to repair):**
 - Pose and body position - must stay the same for compositing
-- Clothing style shown - same outfit
 - Any visible background elements - preserve for seamless blending
 - Lighting direction and shadows - match the scene
 

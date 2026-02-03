@@ -254,6 +254,7 @@ const {
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { GenerationLogger } = require('./server/lib/generationLogger');
+const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -4875,7 +4876,7 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         for (const row of userCharSetsResult.rows) {
           const charSetData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
           const fullChar = charSetData.characters?.find(c => c.name === entityName);
-          const hasPhoto = fullChar?.photoUrl || fullChar?.photo || fullChar?.photo_url || fullChar?.photos?.face || fullChar?.photos?.original;
+          const hasPhoto = hasCharacterPhotos(fullChar);
           const hasAvatars = fullChar?.avatars?.styledAvatars;
           if (fullChar && (hasPhoto || hasAvatars)) {
             character = { ...fullChar, ...character, avatars: fullChar.avatars || character.avatars };
@@ -4892,7 +4893,7 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     }
 
     // Log current character avatar state for debugging
-    const hasPhoto = !!(character.photoUrl || character.photo || character.photo_url || character.photos?.face || character.photos?.original);
+    const hasPhoto = hasCharacterPhotos(character);
     const hasStyledAvatar = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
     const allArtStyles = Object.keys(character.avatars?.styledAvatars || {});
     log.info(`🔧 [ENTITY-REPAIR] ${entityName} avatar state: hasPhoto=${hasPhoto}, hasStyledAvatar[${artStyle}].standard=${hasStyledAvatar}, availableArtStyles=[${allArtStyles.join(', ')}]`);
@@ -4900,7 +4901,15 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     // Single-page mode: repair just one page
     if (isSinglePageMode) {
       const { repairSinglePage } = require('./server/lib/entityConsistency');
-      const repairResult = await repairSinglePage(storyData, character, pageNumber);
+
+      // Get issues for this character from the consistency report
+      const entityReport = storyData.finalChecksReport?.entity;
+      const charIssues = entityReport?.characters?.[entityName]?.issues || [];
+      if (charIssues.length > 0) {
+        log.info(`🔧 [ENTITY-REPAIR] Found ${charIssues.length} consistency issues for ${entityName}`);
+      }
+
+      const repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
 
       // Handle rejected repairs - still return the data so frontend can show it
       if (!repairResult.success) {
@@ -5539,10 +5548,17 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
 
         const pagesRepaired = [];
 
+        // Get issues for this character from the consistency report
+        const entityReport = storyData.finalChecksReport?.entity;
+        const charIssues = entityReport?.characters?.[characterName]?.issues || [];
+        if (charIssues.length > 0) {
+          log.info(`🔧 [REPAIR-WORKFLOW] Found ${charIssues.length} consistency issues for ${characterName}`);
+        }
+
         for (const pageNumber of pages) {
           try {
             log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber}`);
-            const repairResult = await repairSinglePage(storyData, character, pageNumber);
+            const repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
 
             if (!repairResult.success) {
               log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${repairResult.error}`);
