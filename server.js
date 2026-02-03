@@ -4327,7 +4327,17 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     // Mark all existing versions as inactive and add new version
     const updatedVersions = (existingCover.imageVersions || []).map(v => ({ ...v, isActive: false }));
     updatedVersions.push(newVersion);
-    const newVersionIndex = updatedVersions.length - 1;
+
+    // Query database for actual max version_index (blob data may have stripped imageData)
+    // This ensures we don't overwrite existing versions when the blob's imageVersions is incomplete
+    const maxVersionResult = await dbQuery(
+      `SELECT COALESCE(MAX(version_index), -1) as max_version
+       FROM story_images
+       WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
+      [id, coverKey]
+    );
+    const currentMaxVersion = maxVersionResult[0]?.max_version ?? -1;
+    const newVersionIndex = currentMaxVersion + 1;
 
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
@@ -11873,6 +11883,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   pageIssueMap.get(pageNum).push(issue);
                 }
               }
+            }
+          }
+
+          // Filter out cover pages (those beyond story pages) - covers use different generation flow
+          const totalStoryPages = allImages.length;
+          const coverPageNumbers = [...pagesToRegenerate].filter(p => p > totalStoryPages);
+          if (coverPageNumbers.length > 0) {
+            log.info(`📋 [CONSISTENCY REGEN] Skipping ${coverPageNumbers.length} cover page(s) (${coverPageNumbers.join(', ')}) - covers require separate regeneration`);
+            for (const coverPage of coverPageNumbers) {
+              pagesToRegenerate.delete(coverPage);
             }
           }
 
