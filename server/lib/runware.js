@@ -481,13 +481,13 @@ async function generateWithPuLID(referenceImage, prompt, options = {}) {
     refDataUri = `data:image/png;base64,${referenceImage.toString('base64')}`;
   }
 
-  // PuLID uses SDXL model with puLID configuration
+  // PuLID requires FLUX models: runware:101@1 (Dev), runware:100@1 (Schnell), or runware:107@1
   const payload = [{
     taskType: 'imageInference',
     taskUUID: taskUUID,
     positivePrompt: prompt,
     negativePrompt: 'blurry, low quality, distorted, disfigured, bad anatomy, naked, nude, nsfw',
-    model: RUNWARE_MODELS.SDXL,  // SDXL base - required for PuLID
+    model: RUNWARE_MODELS.FLUX_DEV,  // FLUX Dev - required for PuLID
     width: width,
     height: height,
     steps: steps,
