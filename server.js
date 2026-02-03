@@ -5404,7 +5404,7 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
 
         // Check if character has avatar data - if not, try to enrich from characters table
         const artStyle = storyData.artStyle || 'pixar';
-        if (!character.avatars?.styledAvatars?.[artStyle] && !character.photoUrl && !character.photo) {
+        if (!character.avatars?.styledAvatars?.[artStyle]) {
           log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing avatar data, fetching from database...`);
           try {
             // Get the character set ID from story data

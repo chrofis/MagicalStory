@@ -618,7 +618,13 @@ function collectObjectAppearances(sceneImages) {
       const match = bboxDetection.objectMatches?.find(m =>
         m.label === obj.label
       );
-      const name = match?.reference || obj.label;
+      const name = match?.reference || obj.label || obj.name;
+
+      // Skip objects without a valid name
+      if (!name) {
+        log.debug(`[ENTITY-COLLECT] Skipping object without name on page ${pageNumber}`);
+        continue;
+      }
 
       if (!appearances.has(name)) {
         appearances.set(name, []);
