@@ -10,6 +10,9 @@ const path = require('path');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildVisualBiblePrompt } = require('./visualBible');
+const { getPrimaryPhoto, getFacePhoto } = require('./characterPhotos');
+const { getPhysical } = require('./characterPhysical');
+const { getTraits } = require('./characterTraits');
 
 // Lazy-load images module to avoid circular dependency
 // (images.js imports storyHelpers.js, so we can't import at top level)
@@ -30,25 +33,14 @@ const { loadLandmarkPhotoVariant } = require('./landmarkPhotos');
 // ============================================================================
 
 /**
- * Build physical traits object from flat snake_case fields
- * Avatar generation saves traits as flat fields (char.hair_color, etc.)
- * This function reads those fields for use in image prompts
- * @param {Object} char - Character object with flat snake_case fields
+ * Build physical traits object from character
+ * Uses the characterPhysical helper to read from canonical or legacy fields
+ * @param {Object} char - Character object
  * @returns {Object} Physical traits object with camelCase keys
+ * @deprecated Use getPhysical() from characterPhysical.js directly
  */
 function getPhysicalFromChar(char) {
-  if (!char) return {};
-  return {
-    build: char.build,
-    eyeColor: char.eye_color,
-    hairColor: char.hair_color,
-    hairStyle: char.hair_style,
-    hairLength: char.hair_length,
-    facialHair: char.facial_hair,
-    other: char.other || char.other_features,
-    apparentAge: char.apparent_age,
-    detailedHairAnalysis: char.detailed_hair_analysis,
-  };
+  return getPhysical(char);
 }
 
 /**
@@ -1121,10 +1113,8 @@ function getCharacterPhotos(characters, clothingCategory = null) {
       }
 
       // Fall back to body without background > body crop > face photo
-      // Support both camelCase and snake_case (legacy DB fields)
-      return char.bodyNoBgUrl || char.body_no_bg_url ||
-             char.bodyPhotoUrl || char.body_photo_url ||
-             char.photoUrl || char.photo_url;
+      // Uses centralized helper (supports both legacy and normalized formats)
+      return getPrimaryPhoto(char);
     })
     .filter(url => url); // Remove nulls
 }
@@ -1552,17 +1542,24 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
       }
 
       // If still no avatar, fall back to body photos
-      // Support both camelCase (photos object) and snake_case (char fields from DB)
+      // Uses centralized helper (supports both legacy and normalized formats)
       if (!photoUrl) {
-        if (photos.bodyNoBg || char.bodyNoBgUrl || char.body_no_bg_url) {
+        if (photos.bodyNoBg) {
           photoType = 'bodyNoBg';
-          photoUrl = photos.bodyNoBg || char.bodyNoBgUrl || char.body_no_bg_url;
-        } else if (photos.body || char.bodyPhotoUrl || char.body_photo_url) {
+          photoUrl = photos.bodyNoBg;
+        } else if (photos.body) {
           photoType = 'body';
-          photoUrl = photos.body || char.bodyPhotoUrl || char.body_photo_url;
-        } else if (photos.face || photos.original || char.photoUrl || char.photo_url) {
+          photoUrl = photos.body;
+        } else if (photos.face || photos.original) {
           photoType = 'face';
-          photoUrl = photos.face || photos.original || char.photoUrl || char.photo_url;
+          photoUrl = photos.face || photos.original;
+        } else {
+          // Final fallback using helper for any remaining legacy formats
+          const fallbackPhoto = getPrimaryPhoto(char);
+          if (fallbackPhoto) {
+            photoType = 'fallback';
+            photoUrl = fallbackPhoto;
+          }
         }
       }
 
@@ -1947,16 +1944,15 @@ function buildBasePrompt(inputData, textPageCount = null) {
 
   // For story text generation, we use BASIC character info (no strengths/weaknesses)
   // Strengths/weaknesses are only used in outline generation to avoid repetitive trait mentions
-  // Support both new structure (char.traits.*) and legacy (char.specialDetails)
   const characterSummary = (inputData.characters || []).map(char => {
     const isMain = mainCharacterIds.includes(char.id);
-    const traits = char.traits || {};
+    const traits = getTraits(char);
     return {
       name: char.name,
       isMainCharacter: isMain,
       gender: char.gender,
       age: char.age,
-      specialDetails: traits.specialDetails || char.specialDetails || char.special_details || ''  // Includes hobbies, hopes, fears, favorite animals
+      specialDetails: traits.specialDetails || ''  // Includes hobbies, hopes, fears, favorite animals
     };
   });
 
@@ -2013,19 +2009,18 @@ function buildStoryPrompt(inputData, sceneCount = null) {
   const mainCharacterIds = inputData.mainCharacters || [];
 
   // Extract only essential character info (NO PHOTOS to avoid token limit)
-  // Support both new structure (char.traits.*) and legacy (char.strengths, etc.)
   const characterSummary = (inputData.characters || []).map(char => {
-    const traits = char.traits || {};
+    const traits = getTraits(char);
     return {
       name: char.name,
       isMainCharacter: mainCharacterIds.includes(char.id),
       gender: char.gender,
       age: char.age,
       personality: char.personality,
-      strengths: traits.strengths || char.strengths || [],
-      flaws: traits.flaws || char.weaknesses || [],
-      challenges: traits.challenges || char.fears || [],
-      specialDetails: traits.specialDetails || char.specialDetails || char.special_details || ''
+      strengths: traits.strengths,
+      flaws: traits.flaws,
+      challenges: traits.challenges,
+      specialDetails: traits.specialDetails
       // Explicitly exclude photoUrl and other large fields
     };
   });
@@ -2612,7 +2607,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       }
       // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
       const hairDescText = buildHairDescription(physical, char.physical_traits_source);
-      const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
+      const hairDesc = hairDescText ? `Hair (MUST MATCH EXACTLY - color, length, style): ${hairDescText}` : '';
 
       const physicalParts = [
         physical.build ? `Build: ${physical.build}` : '',
@@ -2984,17 +2979,17 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
 
   // Extract character info with strengths/flaws for character arcs
   const characterSummary = (inputData.characters || []).map(char => {
-    const traits = char.traits || {};
+    const traits = getTraits(char);
     return {
       name: char.name,
       isMainCharacter: mainCharacterIds.includes(char.id),
       gender: char.gender,
       age: char.age,
       personality: char.personality,
-      strengths: traits.strengths || char.strengths || [],
-      flaws: traits.flaws || char.weaknesses || [],
-      challenges: traits.challenges || char.fears || [],
-      specialDetails: traits.specialDetails || char.specialDetails || char.special_details || ''
+      strengths: traits.strengths,
+      flaws: traits.flaws,
+      challenges: traits.challenges,
+      specialDetails: traits.specialDetails
     };
   });
 

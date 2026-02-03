@@ -33,6 +33,9 @@ function getStoryHelpers() {
   return storyHelpersModule;
 }
 
+// Character photo helpers
+const { getFacePhoto } = require('./characterPhotos');
+
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
@@ -6902,7 +6905,7 @@ async function runFinalConsistencyChecks(storyData, characters = [], options = {
     if (characters?.length > 0 && options.checkCharacters !== false) {
       for (const character of characters.slice(0, 5)) { // Limit to 5 main characters
         const charName = character.name;
-        const charPhoto = character.photoUrl || character.photo;
+        const charPhoto = getFacePhoto(character);
 
         // Find images where this character appears (based on scene hints or all images)
         const charImages = imagesWithPages; // For now, check all images

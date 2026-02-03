@@ -10,6 +10,7 @@
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS } = require('./textModels');
+const { getPhysical } = require('./characterPhysical');
 
 // ============================================================================
 // PARSING FUNCTIONS
@@ -497,20 +498,19 @@ function initializeVisualBibleMainCharacters(visualBible, characters) {
   log.debug(`[VISUAL BIBLE] Initializing ${characters.length} main characters...`);
 
   visualBible.mainCharacters = characters.map(char => {
-    // Build physical description from character data
-    // Support both new structure (char.physical.*) and legacy (char.height, char.build, etc.)
-    const physical = char.physical || {};
+    // Build physical description from character data using helper
+    const physical = getPhysical(char);
     const mainChar = {
       id: char.id,
       name: char.name,
       physical: {
         age: char.age || 'Unknown',
         gender: char.gender || 'Unknown',
-        height: physical.height || char.height || 'Unknown',
-        build: physical.build || char.build || 'Unknown',
-        face: physical.face || char.other_features || char.otherFeatures || 'Not analyzed',
-        hair: physical.hair || char.hair_color || char.hairColor || 'Not analyzed',
-        other: physical.other || char.other || ''
+        height: physical.height || 'Unknown',
+        build: physical.build || 'Unknown',
+        face: physical.other || 'Not analyzed',
+        hair: physical.hairColor || 'Not analyzed',
+        other: physical.other || ''
       },
       referenceOutfit: char.referenceOutfit || char.reference_outfit || null,
       generatedOutfits: char.generatedOutfits || char.generated_outfits || {}

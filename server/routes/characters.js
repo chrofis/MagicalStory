@@ -9,6 +9,9 @@ const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
+const { normalizePhotos, stripLegacyPhotoFields } = require('../lib/characterPhotos');
+const { normalizePhysical, stripLegacyPhysicalFields } = require('../lib/characterPhysical');
+const { normalizeTraits, stripLegacyTraitFields } = require('../lib/characterTraits');
 
 // GET /api/characters - Get user's characters (lightweight, for list view)
 // Returns stripped metadata only - use /:characterId/avatars for full avatar data
@@ -258,10 +261,12 @@ router.get('/:characterId/full', authenticateToken, async (req, res) => {
     }
 
     const char = result[0].character;
+    // Normalize legacy photo fields on read (migration helper)
+    normalizePhotos(char);
     const hasAvatars = char?.avatars && Object.keys(char.avatars).length > 0;
     const hasPhotos = char?.photos && Object.keys(char.photos).length > 0;
-    const hasPhotoUrl = !!char?.photo_url;
-    console.log(`[Characters] GET /${characterId}/full - Loaded: avatars=${hasAvatars}, photos=${hasPhotos}, photo_url=${hasPhotoUrl}, avatarKeys=[${hasAvatars ? Object.keys(char.avatars).join(',') : ''}]`);
+    const photoKeys = char?.photos ? Object.keys(char.photos).filter(k => char.photos[k]) : [];
+    console.log(`[Characters] GET /${characterId}/full - Loaded: avatars=${hasAvatars}, photos=${hasPhotos} [${photoKeys.join(',')}], avatarKeys=[${hasAvatars ? Object.keys(char.avatars).join(',') : ''}]`);
     res.json({ character: char });
   } catch (err) {
     console.error('Error fetching full character data:', err);
@@ -326,102 +331,68 @@ router.post('/', authenticateToken, async (req, res) => {
         let hasChanges = false;
         let mergedChar = { ...newChar };
 
-        // Preserve character-level fields that may be missing from frontend
-        // These are fields that get lost if frontend doesn't explicitly send them
-
+        // Preserve and normalize character fields from DB
         const preservedFields = [];
 
-        // Preserve height from physical traits if not in new data
-        if (existingChar.height && !newChar.height) {
-          mergedChar.height = existingChar.height;
-          preservedFields.push('height');
-          hasChanges = true;
+        // --- PHYSICAL TRAITS ---
+        // First normalize both existing and new to ensure legacy fields are migrated
+        normalizePhysical(existingChar);
+        normalizePhysical(mergedChar);
+
+        // Merge physical traits - keep existing values for any missing/empty fields in new
+        const existingPhysical = existingChar.physical || {};
+        const newPhysical = mergedChar.physical || {};
+
+        if (Object.keys(existingPhysical).length > 0) {
+          const merged = { ...existingPhysical };
+          for (const [key, value] of Object.entries(newPhysical)) {
+            // Only use new value if it's truthy (not null, undefined, or empty string)
+            if (value !== null && value !== undefined && value !== '') {
+              merged[key] = value;
+            }
+          }
+          mergedChar.physical = merged;
+          if (Object.keys(existingPhysical).some(k => !newPhysical[k])) {
+            preservedFields.push('physical');
+            hasChanges = true;
+          }
         }
 
-        // Preserve apparent_age if not in new data
-        if (existingChar.apparent_age && !newChar.apparent_age) {
-          mergedChar.apparent_age = existingChar.apparent_age;
-          preservedFields.push('apparent_age');
-          hasChanges = true;
+        // Strip legacy physical fields - physical.* is the single source of truth
+        stripLegacyPhysicalFields(mergedChar);
+
+        // --- CHARACTER TRAITS ---
+        // Normalize both to ensure legacy fields are migrated
+        normalizeTraits(existingChar);
+        normalizeTraits(mergedChar);
+
+        // Merge traits - keep existing values for any missing fields in new
+        const existingTraits = existingChar.traits || {};
+        const newTraits = mergedChar.traits || {};
+
+        if (Object.keys(existingTraits).length > 0) {
+          const merged = { ...newTraits };
+          // For arrays, merge keeping existing if new is empty
+          if (existingTraits.strengths?.length > 0 && (!merged.strengths || merged.strengths.length === 0)) {
+            merged.strengths = existingTraits.strengths;
+          }
+          if (existingTraits.flaws?.length > 0 && (!merged.flaws || merged.flaws.length === 0)) {
+            merged.flaws = existingTraits.flaws;
+          }
+          if (existingTraits.challenges?.length > 0 && (!merged.challenges || merged.challenges.length === 0)) {
+            merged.challenges = existingTraits.challenges;
+          }
+          // For strings, keep existing if new is empty
+          if (existingTraits.specialDetails && !merged.specialDetails) {
+            merged.specialDetails = existingTraits.specialDetails;
+          }
+          mergedChar.traits = merged;
         }
 
-        // Preserve physical traits that may be missing
-        if (existingChar.build && !newChar.build) {
-          mergedChar.build = existingChar.build;
-          preservedFields.push('build');
-          hasChanges = true;
-        }
+        // Strip legacy trait fields - traits.* is the single source of truth
+        stripLegacyTraitFields(mergedChar);
 
-        // Preserve eye_color if not in new data
-        if (existingChar.eye_color && !newChar.eye_color) {
-          mergedChar.eye_color = existingChar.eye_color;
-          preservedFields.push('eye_color');
-          hasChanges = true;
-        }
-
-        // Preserve hair_color if not in new data
-        if (existingChar.hair_color && !newChar.hair_color) {
-          mergedChar.hair_color = existingChar.hair_color;
-          preservedFields.push('hair_color');
-          hasChanges = true;
-        }
-
-        // Preserve hair_style if not in new data
-        if (existingChar.hair_style && !newChar.hair_style) {
-          mergedChar.hair_style = existingChar.hair_style;
-          preservedFields.push('hair_style');
-          hasChanges = true;
-        }
-
-        // Preserve other_features if not in new data
-        if (existingChar.other_features && !newChar.other_features) {
-          mergedChar.other_features = existingChar.other_features;
-          preservedFields.push('other_features');
-          hasChanges = true;
-        }
-
-        // Preserve 'other' field (glasses, etc.) if not in new data
-        if (existingChar.other && !newChar.other) {
-          mergedChar.other = existingChar.other;
-          preservedFields.push('other');
-          hasChanges = true;
-        }
-
-        // Preserve hair_length (extracted from photo analysis)
-        if (existingChar.hair_length && !newChar.hair_length) {
-          mergedChar.hair_length = existingChar.hair_length;
-          preservedFields.push('hair_length');
-          hasChanges = true;
-        }
-
-        // Preserve skin_tone (extracted from photo analysis)
-        if (existingChar.skin_tone && !newChar.skin_tone) {
-          mergedChar.skin_tone = existingChar.skin_tone;
-          preservedFields.push('skin_tone');
-          hasChanges = true;
-        }
-
-        // Preserve skin_tone_hex (extracted from photo analysis)
-        if (existingChar.skin_tone_hex && !newChar.skin_tone_hex) {
-          mergedChar.skin_tone_hex = existingChar.skin_tone_hex;
-          preservedFields.push('skin_tone_hex');
-          hasChanges = true;
-        }
-
-        // Preserve facial_hair (extracted from photo analysis)
-        if (existingChar.facial_hair && !newChar.facial_hair) {
-          mergedChar.facial_hair = existingChar.facial_hair;
-          preservedFields.push('facial_hair');
-          hasChanges = true;
-        }
-
-        // Preserve detailed_hair_analysis (extracted from photo analysis)
-        if (existingChar.detailed_hair_analysis && !newChar.detailed_hair_analysis) {
-          mergedChar.detailed_hair_analysis = existingChar.detailed_hair_analysis;
-          preservedFields.push('detailed_hair_analysis');
-          hasChanges = true;
-        }
-
+        // --- CLOTHING ---
         // Preserve clothing data (legacy text field)
         if (existingChar.clothing && !newChar.clothing) {
           mergedChar.clothing = existingChar.clothing;
@@ -455,39 +426,20 @@ router.post('/', authenticateToken, async (req, res) => {
           }
         }
 
-        // Preserve physical traits object (contains height, skinTone, eyeColor, hairColor, etc.)
-        const existingPhysical = existingChar.physical || {};
-        const newPhysical = newChar.physical || {};
-        const newPhysicalEmpty = Object.keys(newPhysical).length === 0 ||
-          !Object.values(newPhysical).some(v => v !== null && v !== undefined && v !== '');
-
-        if (Object.keys(existingPhysical).length > 0 && newPhysicalEmpty) {
-          // Frontend sent empty physical - preserve from DB
-          mergedChar.physical = existingPhysical;
-          preservedFields.push('physical');
-          hasChanges = true;
-        } else if (Object.keys(existingPhysical).length > 0) {
-          // Merge physical traits - keep existing values for any missing/empty fields in new
-          const merged = { ...existingPhysical };
-          for (const [key, value] of Object.entries(newPhysical)) {
-            // Only use new value if it's truthy (not null, undefined, or empty string)
-            if (value !== null && value !== undefined && value !== '') {
-              merged[key] = value;
-            }
-          }
-          mergedChar.physical = merged;
-        }
+        // --- PHOTOS ---
+        // Normalize legacy photo fields first
+        normalizePhotos(existingChar);
+        normalizePhotos(mergedChar);
 
         // Preserve photos object (contains face, original, bodyNoBg URLs)
-        if (existingChar.photos && !newChar.photos) {
+        if (existingChar.photos && !mergedChar.photos) {
           mergedChar.photos = existingChar.photos;
           preservedFields.push('photos');
           hasChanges = true;
-        } else if (existingChar.photos && newChar.photos) {
+        } else if (existingChar.photos && mergedChar.photos) {
           // Merge photos - keep existing values, only overwrite with non-null new values
-          // This prevents failed photo analysis from wiping out existing photos
           const mergedPhotos = { ...existingChar.photos };
-          for (const [key, value] of Object.entries(newChar.photos)) {
+          for (const [key, value] of Object.entries(mergedChar.photos)) {
             if (value !== null && value !== undefined) {
               mergedPhotos[key] = value;
             }
@@ -495,28 +447,8 @@ router.post('/', authenticateToken, async (req, res) => {
           mergedChar.photos = mergedPhotos;
         }
 
-        // Preserve photo data if not sent (reduces payload by 10-15MB)
-        // Photos are large base64 data URLs that don't need to be re-uploaded every save
-        if (existingChar.photo_url && !newChar.photo_url) {
-          mergedChar.photo_url = existingChar.photo_url;
-          preservedFields.push('photo_url');
-          hasChanges = true;
-        }
-        if (existingChar.thumbnail_url && !newChar.thumbnail_url) {
-          mergedChar.thumbnail_url = existingChar.thumbnail_url;
-          preservedFields.push('thumbnail_url');
-          hasChanges = true;
-        }
-        if (existingChar.body_photo_url && !newChar.body_photo_url) {
-          mergedChar.body_photo_url = existingChar.body_photo_url;
-          preservedFields.push('body_photo_url');
-          hasChanges = true;
-        }
-        if (existingChar.body_no_bg_url && !newChar.body_no_bg_url) {
-          mergedChar.body_no_bg_url = existingChar.body_no_bg_url;
-          preservedFields.push('body_no_bg_url');
-          hasChanges = true;
-        }
+        // Strip legacy photo fields - photos.* is the single source of truth
+        stripLegacyPhotoFields(mergedChar);
 
         // Preserve storyRole if not in new data (set via PUT /roles endpoint)
         if (existingChar.storyRole && !newChar.storyRole) {
@@ -599,8 +531,8 @@ router.post('/', authenticateToken, async (req, res) => {
       for (const char of characterData.characters) {
         const avatarKeys = char.avatars ? Object.keys(char.avatars) : [];
         const hasPhotos = char.photos && Object.keys(char.photos).length > 0;
-        const hasPhotoUrl = !!char.photo_url;
-        console.log(`[Characters] POST - Final ${char.name}: avatarKeys=[${avatarKeys.join(',')}], photos=${hasPhotos}, photo_url=${hasPhotoUrl}`);
+        const photoKeys = char.photos ? Object.keys(char.photos).filter(k => char.photos[k]) : [];
+        console.log(`[Characters] POST - Final ${char.name}: avatarKeys=[${avatarKeys.join(',')}], photos=${hasPhotos} [${photoKeys.join(',')}]`);
       }
 
       const jsonData = JSON.stringify(characterData);

@@ -313,9 +313,23 @@ const final = await sharp(sceneBuffer)
 
 ## Final Conclusion
 
-### Best Approach: Replicate Face Swap
+### Best Approach by Use Case
 
-For face replacement in existing scenes:
+| Use Case | Best Tool | Cost | Notes |
+|----------|-----------|------|-------|
+| **Face swap in photo** | codeplugtech/face-swap | $0.003 | Face only, hair unchanged |
+| **New illustration with face** | IP-Adapter FaceID | $0.03 | Generates new scene |
+| **Replace with text description** | FLUX Fill Inpaint | $0.002 | No face/hair reference |
+| **Multi-character scene (5+)** | Gemini | $0.05 | Only option for 5+ chars |
+
+### Key Limitation: No Cheap Hair Transfer
+
+There is currently **no cost-effective solution** for transferring both face AND hair from a reference image into an existing scene. Options are:
+- Accept face-only swap (hair stays original)
+- Regenerate entire scene with IP-Adapter (loses exact composition)
+- Use expensive models ($0.05-$0.29 per image)
+
+### For Replicate Face Swap:
 
 ```javascript
 // Using Replicate API
@@ -360,8 +374,12 @@ const output = await replicate.run(
 | File | Description |
 |------|-------------|
 | `tests/manual/test-face-swap.js` | **Face swap test script (BEST)** |
+| `tests/manual/test-face-swap-variations.js` | Face swap optimization tests |
+| `tests/manual/test-lukas-three-methods.js` | Compare 3 methods on Lukas illustration |
 | `tests/manual/test-character-replacement.js` | Inpainting test script |
 | `tests/manual/test-flux-kontext.js` | FLUX Kontext test script |
+| `tests/manual/test-hair-v2-api.js` | Hair V2 API test script |
+| `tests/manual/test-magicapi-faceswap.js` | MagicAPI face swap test script |
 | `tests/fixtures/test-faceswap-replicate.png` | **Replicate face swap result ✅ BEST** |
 | `tests/fixtures/test-faceswap-comparison.png` | Face swap comparison |
 | `tests/fixtures/test-inpaint-flux-result.png` | FLUX Fill inpaint result |
@@ -421,6 +439,174 @@ Use **IP-Adapter FaceID** to generate scene illustrations with consistent charac
 
 ---
 
+## Hair Transfer Testing (February 2025)
+
+### The Problem
+
+Face swap tools (codeplugtech, inswapper) only swap the **face**, NOT the hair. For character consistency in illustrations, we need both face AND hair to match.
+
+### Tools Researched
+
+| Tool | Cost | Status | Notes |
+|------|------|--------|-------|
+| **Stable-Hair** | Free/self-host | ❌ Requires GPU | Research paper, no hosted API |
+| **HairFastGAN** | Free/self-host | ❌ Requires GPU | Academic, no hosted API |
+| **style-your-hair (Replicate)** | $0.29/image | ❌ Too expensive | 10x cost of face swap |
+| **Easel advanced-face-swap** | $0.05/image | ❌ Deprecated | Has `workflow_type: "user_hair"` but deprecated |
+| **Hair V2 (api.market)** | ~$0.02/image | ⚠️ Limited | Text-based only, URL restrictions |
+
+### Hair V2 API Testing ✅ WORKING
+
+**Provider:** api.market (MagicAPI)
+**Endpoint:** `https://api.magicapi.dev/api/v1/magicapi/hair-v2` (NOT api.market!)
+**Cost:** ~$0.003/image (1 API unit)
+**Speed:** ~40 seconds
+**What it does:** Changes hair color/style based on text description
+
+```javascript
+// Submit job
+const resp = await fetch('https://api.magicapi.dev/api/v1/magicapi/hair-v2/run', {
+  method: 'POST',
+  headers: { 'x-magicapi-key': API_KEY, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    input: {
+      image: imageUrl,
+      haircolor: 'blonde',
+      hairstyle: 'pixie cut',
+      hairproperty: 'straight'  // optional
+    }
+  })
+});
+
+// Poll for result
+const status = await fetch(`https://api.magicapi.dev/api/v1/magicapi/hair-v2/status/${jobId}`, {
+  headers: { 'x-magicapi-key': API_KEY }
+});
+```
+
+**IMPORTANT:** Use `api.magicapi.dev` NOT `api.market` - the latter has Redis issues!
+
+**URL Hosting:**
+- ✅ freeimage.host works
+- ✅ Unsplash works
+- ❌ catbox.moe blocked
+
+**Result:** ✅ Works well for text-based hair changes on photos
+**Limitation:** Text description only - can't use reference hair image
+
+### Inpainting Hair Test
+
+Attempted to inpaint hair region using FLUX Fill with text prompt:
+
+| Aspect | Result |
+|--------|--------|
+| Scene preserved | ✅ Yes |
+| Hair matches prompt | ❌ Poor - generic results |
+| Hair matches reference | N/A - text prompt only |
+
+**Conclusion:** Text-based inpainting doesn't produce specific enough hair styles to match a character reference.
+
+### Summary: Hair Transfer Options
+
+| Approach | Works? | Cost | Notes |
+|----------|--------|------|-------|
+| Face Swap only | ⚠️ | $0.003 | Keeps original hair |
+| **Hair V2 API** | ✅ | $0.003 | Text-based, works well |
+| Face Swap + Hair V2 | ✅ | $0.006 | Combine both for full change |
+| IP-Adapter FaceID | ✅ | $0.03 | Generates new scene |
+| Dedicated hair models | ❌ | $0.05-$0.29 | Too expensive |
+
+**Best Approach for Character Replacement:**
+1. **Face Swap** (codeplugtech or MagicAPI) - $0.003 - swap face
+2. **Hair V2 API** - $0.003 - change hair style/color
+3. **Total: ~$0.006** for face + hair changes on photos
+
+---
+
+## Lukas Three Methods Test (February 2025)
+
+### Test Setup
+
+Compared three methods on illustration character replacement:
+- **Source:** Lukas face from story (cropped with hair, Panel B v3)
+- **Target:** Lukas Panel C illustration (full scene)
+
+### Methods Tested
+
+| Method | Cost | Scene Preserved | Face Match | Hair Match |
+|--------|------|-----------------|------------|------------|
+| Face Swap (codeplugtech) | $0.003 | ✅ Perfect | ⚠️ Subtle | ❌ Original |
+| IP-Adapter FaceID | $0.03 | ❌ New scene | ✅ Good | ✅ From prompt |
+| FLUX Fill Inpaint | $0.002 | ✅ Good | ❌ Text only | ❌ Text only |
+
+### Key Findings
+
+1. **Face Swap:** Best for scene preservation but face changes are subtle on illustrations
+2. **IP-Adapter:** Best face match but generates entirely new scene
+3. **Inpainting:** Good scene preservation but can't match specific face/hair
+
+### Test Script
+`tests/manual/test-lukas-three-methods.js`
+
+---
+
+## MagicAPI Face Swap (February 2025)
+
+**Provider:** api.market (MagicAPI)
+**Endpoint:** `https://api.magicapi.dev/api/v1/magicapi/faceswap`
+**Cost:** ~$0.003/image (1 API unit)
+**Speed:** 7-12 seconds
+
+### How to Use
+
+```javascript
+// 1. Submit job
+const submitResp = await fetch(API_BASE + '/faceswap-image', {
+  method: 'POST',
+  headers: { 'x-magicapi-key': API_KEY, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    input: {
+      swap_image: sourceUrl,  // Face to swap IN
+      target_image: targetUrl // Image to swap face INTO
+    }
+  })
+});
+
+// 2. Poll for result
+const resultResp = await fetch(API_BASE + '/result', {
+  method: 'POST',
+  headers: { 'x-magicapi-key': API_KEY, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ request_id: requestId })
+});
+```
+
+### URL Requirements
+
+- **Must have file extension** (.jpg, .png, .webp)
+- **Blocked domains:** catbox.moe
+- **Working hosts:** freeimage.host, Wikipedia Commons, Unsplash (with extension)
+
+### Test Results
+
+| Test Case | Result | Notes |
+|-----------|--------|-------|
+| Photo → Art (Mona Lisa) | ✅ Excellent | Face clearly transferred |
+| Sophie → Lukas photo | ⚠️ Subtle | Minor changes |
+| Lukas → Sophie photo | ✅ Good | Visible face blend |
+| Photo → Illustration | ❌ None | Same as Replicate |
+
+### Key Findings
+
+- Works similar to Replicate codeplugtech
+- **Does NOT work on illustrations** - face detection fails
+- Photo→photo works with varying quality
+- Cheaper alternative to Replicate at same quality
+
+### Test Script
+`tests/manual/test-magicapi-faceswap.js`
+
+---
+
 ## Environment Variables
 
 ```bash
@@ -429,4 +615,7 @@ REPLICATE_API_TOKEN=your_token_here
 
 # Optional (for fal.ai testing)
 FAL_KEY=your_key_here
+
+# Optional (for api.market APIs)
+MAGICAPI_KEY=your_key_here
 ```

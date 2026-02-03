@@ -5,6 +5,7 @@ CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 **REFERENCE HANDLING:**
 - Transform real photos into the art style (NOT photo-realistic)
 - Characters must remain RECOGNIZABLE (same face, hair color, age, build)
+- HAIR IS CRITICAL: Match EXACT color, length, style, and texture from reference - never simplify, straighten, or change hairstyles
 - Use EXACTLY the clothing shown in reference images
 - ALL characters in consistent style
 - For element references (animals, objects): match EXACT appearance from reference

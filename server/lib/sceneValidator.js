@@ -19,6 +19,7 @@ const { callTextModel } = require('./textModels');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { log } = require('../utils/logger');
 const { expandPositionAbbreviations } = require('./storyHelpers');
+const { getPhysical } = require('./characterPhysical');
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -297,12 +298,13 @@ function formatCharacterContext(characters, clothingRequirements = {}) {
   return characters.map(char => {
     const clothing = clothingRequirements[char.name]?._currentClothing || 'standard';
     const clothingDesc = char.avatars?.clothing?.[clothing] || 'unknown clothing';
+    const physical = getPhysical(char);
 
     const traits = [];
-    if (char.hair_color) traits.push(`${char.hair_color} hair`);
-    if (char.hair_style) traits.push(`(${char.hair_style})`);
-    if (char.eye_color) traits.push(`${char.eye_color} eyes`);
-    if (char.build) traits.push(`${char.build} build`);
+    if (physical.hairColor) traits.push(`${physical.hairColor} hair`);
+    if (physical.hairStyle) traits.push(`(${physical.hairStyle})`);
+    if (physical.eyeColor) traits.push(`${physical.eyeColor} eyes`);
+    if (physical.build) traits.push(`${physical.build} build`);
     if (char.age) traits.push(`age: ${char.age}`);
 
     return `- **${char.name}**: ${traits.join(', ')}. Currently wearing: ${clothingDesc}`;

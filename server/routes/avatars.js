@@ -15,6 +15,7 @@ const { compressImageToJPEG } = require('../lib/images');
 const { IMAGE_MODELS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
 const { buildHairDescription, getAgeCategory } = require('../lib/storyHelpers');
+const { getFacePhoto } = require('../lib/characterPhotos');
 
 // ============================================================================
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
@@ -705,7 +706,7 @@ async function generateDynamicAvatar(character, category, config) {
     return { success: false, error: 'Avatar generation service unavailable' };
   }
 
-  const facePhoto = character.photoUrl || character.photos?.face || character.photos?.original;
+  const facePhoto = getFacePhoto(character);
   if (!facePhoto) {
     log.error(`[DYNAMIC AVATAR] No face photo for ${character.name}`);
     return { success: false, error: 'No face photo available' };
@@ -980,11 +981,8 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
   const hasAvatars = !!character.avatars;
   const hasStandard = !!character.avatars?.standard;
   const hasPhotos = !!character.photos;
-  const hasFace = !!character.photos?.face;
-  const hasOriginal = !!character.photos?.original;
-  const hasPhotoUrl = !!character.photoUrl;
 
-  log.debug(`[STYLED COSTUME] ${character.name} data check: avatars=${hasAvatars}, standard=${hasStandard}, photos=${hasPhotos}, face=${hasFace}, original=${hasOriginal}, photoUrl=${hasPhotoUrl}`);
+  log.debug(`[STYLED COSTUME] ${character.name} data check: avatars=${hasAvatars}, standard=${hasStandard}, photos=${hasPhotos}`);
 
   let standardAvatar = character.avatars?.standard;
 
@@ -996,7 +994,7 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
   // Check if it's a valid string
   if (!standardAvatar || typeof standardAvatar !== 'string') {
     // Fallback: use face photo if standard avatar doesn't exist or isn't a string
-    let facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
+    let facePhoto = getFacePhoto(character);
 
     // Handle object format for photos too
     if (facePhoto && typeof facePhoto === 'object' && facePhoto.data) {
@@ -1247,7 +1245,7 @@ async function generateStyledAvatarWithSignature(character, category, config, ar
     }
   }
   if (!baseAvatar) {
-    const facePhoto = character.photos?.face || character.photos?.original || character.photoUrl;
+    const facePhoto = getFacePhoto(character);
     if (facePhoto) {
       log.warn(`[STYLED SIGNATURE] ${character.name}: No ${category} or standard avatar found, using face photo as fallback`);
       baseAvatar = facePhoto;
@@ -1594,13 +1592,13 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
           // Update existing character's photo data (don't create new)
           const charIndex = characters.findIndex(c => c.id === characterId);
           if (charIndex >= 0) {
-            // Legacy flat fields (for backwards compatibility)
-            characters[charIndex].photo_url = imageData;
-            characters[charIndex].thumbnail_url = faceThumbnail;
-            characters[charIndex].body_photo_url = bodyCrop;
-            characters[charIndex].body_no_bg_url = bodyNoBg;
-            // New photos object structure (used by frontend)
+            // Write only to canonical photos.* structure (normalized format)
             characters[charIndex].photos = photosObj;
+            // Remove legacy fields if they exist (cleanup)
+            delete characters[charIndex].photo_url;
+            delete characters[charIndex].thumbnail_url;
+            delete characters[charIndex].body_photo_url;
+            delete characters[charIndex].body_no_bg_url;
             // Mark avatars as stale, but PRESERVE existing avatar images
             // This prevents data loss if avatar generation fails
             if (characters[charIndex].avatars) {
@@ -1615,20 +1613,16 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
           }
         } else {
           // Create new character with photo data
+          // Write only to canonical photos.* and traits.* structure (normalized format)
           const newCharacter = {
             id: characterId,
             name: '',  // User will fill in later
             gender: undefined,
             age: '',
-            // Legacy flat fields (for backwards compatibility)
-            photo_url: imageData,
-            thumbnail_url: faceThumbnail,
-            body_photo_url: bodyCrop,
-            body_no_bg_url: bodyNoBg,
-            // New photos object structure (used by frontend)
             photos: photosObj,
+            physical: {},  // Will be populated during avatar evaluation
             avatars: { status: 'pending' },
-            traits: { strengths: [], flaws: [], challenges: [] }
+            traits: { strengths: [], flaws: [], challenges: [], specialDetails: '' }
           };
 
           characters.push(newCharacter);
@@ -2353,32 +2347,29 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               paramIndex += 2;
             }
 
-            // Extracted traits - atomically update each field
+            // Extracted traits - write to canonical physical.* structure
             if (results.extractedTraits) {
               const t = results.extractedTraits;
-              const traitFields = [
-                ['apparent_age', t.apparentAge],
-                ['build', t.build],
-                ['eye_color', t.eyeColor],
-                ['hair_color', t.hairColor],
-                ['hair_length', t.hairLength],
-                ['hair_style', t.hairStyle],
-                ['skin_tone', t.skinTone],
-                ['skin_tone_hex', t.skinToneHex],
-                ['facial_hair', t.facialHair],
-                ['other_features', t.face],
-                ['other', t.other],
-                ['detailed_hair_analysis', t.detailedHairAnalysis],
-              ];
+              // Build physical object with only non-null values
+              const physical = {};
+              if (t.apparentAge) physical.apparentAge = t.apparentAge;
+              if (t.build) physical.build = t.build;
+              if (t.eyeColor) physical.eyeColor = t.eyeColor;
+              if (t.hairColor) physical.hairColor = t.hairColor;
+              if (t.hairLength) physical.hairLength = t.hairLength;
+              if (t.hairStyle) physical.hairStyle = t.hairStyle;
+              if (t.skinTone) physical.skinTone = t.skinTone;
+              if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
+              if (t.facialHair) physical.facialHair = t.facialHair;
+              if (t.face) physical.other = t.face;
+              if (t.other) physical.other = t.other;
+              if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
 
-              for (const [field, value] of traitFields) {
-                if (value) {
-                  dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},${field}}', $${paramIndex}::jsonb, true)`;
-                  metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},${field}}', $${paramIndex}::jsonb, true)`;
-                  params.push(JSON.stringify(value));
-                  paramIndex += 1;
-                }
-              }
+              // Merge with existing physical object
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(data->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(meta->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              params.push(JSON.stringify(physical));
+              paramIndex += 1;
             }
 
             // Structured clothing
@@ -3232,33 +3223,30 @@ These corrections OVERRIDE what is visible in the reference photo.
               log.debug(`💾 [CLOTHING AVATARS] Applied avatar data including faceThumbnails`);
             }
 
-            // Extracted traits - atomically update each field
+            // Extracted traits - write to canonical physical.* structure
             if (results.extractedTraits) {
               const t = results.extractedTraits;
-              const traitFields = [
-                ['apparent_age', t.apparentAge],
-                ['build', t.build],
-                ['eye_color', t.eyeColor],
-                ['hair_color', t.hairColor],
-                ['hair_length', t.hairLength],
-                ['hair_style', t.hairStyle],
-                ['skin_tone', t.skinTone],
-                ['skin_tone_hex', t.skinToneHex],
-                ['facial_hair', t.facialHair],
-                ['other_features', t.face],
-                ['other', t.other],
-                ['detailed_hair_analysis', t.detailedHairAnalysis],
-              ];
+              // Build physical object with only non-null values
+              const physical = {};
+              if (t.apparentAge) physical.apparentAge = t.apparentAge;
+              if (t.build) physical.build = t.build;
+              if (t.eyeColor) physical.eyeColor = t.eyeColor;
+              if (t.hairColor) physical.hairColor = t.hairColor;
+              if (t.hairLength) physical.hairLength = t.hairLength;
+              if (t.hairStyle) physical.hairStyle = t.hairStyle;
+              if (t.skinTone) physical.skinTone = t.skinTone;
+              if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
+              if (t.facialHair) physical.facialHair = t.facialHair;
+              if (t.face) physical.other = t.face;
+              if (t.other) physical.other = t.other;
+              if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
 
-              for (const [field, value] of traitFields) {
-                if (value) {
-                  dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
-                  metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},${field}}', $${paramIndex}::jsonb, true)`;
-                  params.push(JSON.stringify(value));
-                  paramIndex += 1;
-                }
-              }
-              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character (flat): apparent_age=${t.apparentAge}`);
+              // Merge with existing physical object
+              dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physical}', COALESCE(data->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', COALESCE(meta->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              params.push(JSON.stringify(physical));
+              paramIndex += 1;
+              log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character.physical: apparentAge=${t.apparentAge}`);
             }
 
             // Structured clothing
