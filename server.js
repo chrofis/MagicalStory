@@ -1097,14 +1097,15 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
       }
 
       // Update order status in database
+      // Note: Cast $1 to text in CASE comparisons to avoid PostgreSQL type inference error (42P08)
       if (trackingNumber) {
         await dbPool.query(`
           UPDATE orders
           SET gelato_status = $1,
               tracking_number = $2,
               tracking_url = $3,
-              shipped_at = CASE WHEN $1 = 'shipped' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
-              delivered_at = CASE WHEN $1 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+              shipped_at = CASE WHEN $1::text = 'shipped' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
+              delivered_at = CASE WHEN $1::text = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
               updated_at = NOW()
           WHERE gelato_order_id = $4
         `, [newStatus, trackingNumber, trackingUrl, orderId]);
@@ -1112,7 +1113,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
         await dbPool.query(`
           UPDATE orders
           SET gelato_status = $1,
-              delivered_at = CASE WHEN $1 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+              delivered_at = CASE WHEN $1::text = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
               updated_at = NOW()
           WHERE gelato_order_id = $2
         `, [newStatus, orderId]);
