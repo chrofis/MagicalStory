@@ -1015,19 +1015,22 @@ export function StoryDisplay({
     if (coverType === 'front' && coverImages?.frontCover) {
       const frontCover = coverImages.frontCover;
       if (typeof frontCover === 'object') {
-        coverDescription = (frontCover as CoverImageData).description || '';
+        // Use translatedDescription for display (in story language), fall back to description (English)
+        coverDescription = (frontCover as CoverImageData).translatedDescription || (frontCover as CoverImageData).description || '';
         referencePhotos = (frontCover as CoverImageData).referencePhotos || [];
       }
     } else if (coverType === 'initial' && coverImages?.initialPage) {
       const initialPage = coverImages.initialPage;
       if (typeof initialPage === 'object') {
-        coverDescription = (initialPage as CoverImageData).description || '';
+        // Use translatedDescription for display (in story language), fall back to description (English)
+        coverDescription = (initialPage as CoverImageData).translatedDescription || (initialPage as CoverImageData).description || '';
         referencePhotos = (initialPage as CoverImageData).referencePhotos || [];
       }
     } else if (coverType === 'back' && coverImages?.backCover) {
       const backCover = coverImages.backCover;
       if (typeof backCover === 'object') {
-        coverDescription = (backCover as CoverImageData).description || '';
+        // Use translatedDescription for display (in story language), fall back to description (English)
+        coverDescription = (backCover as CoverImageData).translatedDescription || (backCover as CoverImageData).description || '';
         referencePhotos = (backCover as CoverImageData).referencePhotos || [];
       }
     }

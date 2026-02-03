@@ -3241,7 +3241,9 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // First, convert JSON format to text if needed (scene descriptions from initial generation are JSON)
     // This ensures we have readable text for the image prompt and display
     let textDescription = inputDescription;
-    const isJsonFormat = inputDescription.trim().startsWith('{') && inputDescription.includes('"output"');
+    // Check for JSON format - supports "output" (initial gen), "scene" (iterate), or "draft" wrappers
+    const isJsonFormat = inputDescription.trim().startsWith('{') &&
+      (inputDescription.includes('"output"') || inputDescription.includes('"scene"') || inputDescription.includes('"draft"'));
     if (isJsonFormat) {
       const converted = stripSceneMetadata(inputDescription);
       if (converted && converted !== inputDescription) {
@@ -3367,7 +3369,19 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
     // Build image prompt with scene-specific characters and visual bible
     // Use isStorybook=true to include Visual Bible section in prompt
     // Note: We don't build originalPrompt separately to avoid duplicate logging - originalDescription is stored for comparison
-    const imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+    let imagePrompt = customPrompt || buildImagePrompt(expandedDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+
+    // If user selected specific characters, add explicit restriction to prompt
+    if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
+      const selectedNames = sceneCharacters.map(c => c.name);
+      const allNames = (storyData.characters || []).map(c => c.name);
+      const excludedNames = allNames.filter(n => !selectedNames.includes(n));
+
+      if (excludedNames.length > 0) {
+        imagePrompt += `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${selectedNames.join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
+        log.debug(`📸 [REGEN] Added character restriction: show ${selectedNames.join(', ')}, exclude ${excludedNames.join(', ')}`);
+      }
+    }
 
     // Log prompt changes for debugging
     if (sceneWasEdited) {
@@ -4232,6 +4246,18 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
           CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
           VISUAL_BIBLE: visualBiblePrompt
         });
+      }
+
+      // If user selected specific characters, add explicit restriction to prompt
+      if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
+        const selectedNames = coverCharacterPhotos.map(p => p.name);
+        const allNames = (storyData.characters || []).map(c => c.name);
+        const excludedNames = allNames.filter(n => !selectedNames.includes(n));
+
+        if (excludedNames.length > 0) {
+          coverPrompt += `\n\n**CRITICAL CHARACTER RESTRICTION:**\nONLY show these characters: ${selectedNames.join(', ')}\nDo NOT include: ${excludedNames.join(', ')}\nIf the scene description mentions excluded characters, IGNORE those mentions and show ONLY the specified characters.`;
+          log.debug(`📕 [COVER REGEN] Added character restriction: show ${selectedNames.join(', ')}, exclude ${excludedNames.join(', ')}`);
+        }
       }
     }
 
@@ -5614,23 +5640,23 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
                 existingImage.entityRepaired = true;
                 existingImage.entityRepairedAt = new Date().toISOString();
                 existingImage.entityRepairedFor = characterName;
+
+                // Calculate the version index (new version is at the end of imageVersions array)
+                const newVersionIndex = existingImage.imageVersions.length - 1;
+
+                // Save the story data with updated sceneImages
+                storyData.sceneImages = sceneImages;
+                await saveStoryData(id, storyData);
+
+                // Save the repaired image to story_images table with correct version index
+                await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, newVersionIndex);
+
+                // Set the new version as active
+                await setActiveVersion(id, update.pageNumber, newVersionIndex);
+
+                pagesRepaired.push(update.pageNumber);
               }
             }
-
-            storyData.sceneImages = sceneImages;
-            pagesRepaired.push(pageNumber);
-
-            // Calculate the version index (new version is at the end of imageVersions array)
-            const newVersionIndex = existingImage.imageVersions.length - 1;
-
-            // Save after each page repair
-            await saveStoryData(id, storyData);
-
-            // Save the repaired image to story_images table with correct version index
-            await saveStoryImage(id, 'scene', pageNumber, update.imageData, newVersionIndex);
-
-            // Set the new version as active
-            await setActiveVersion(id, pageNumber, newVersionIndex);
 
           } catch (pageErr) {
             log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
@@ -13066,6 +13092,38 @@ async function processStoryJob(jobId) {
       const initialPageScene = coverScenes.initialPage?.scene || `A warm, inviting dedication/introduction page that sets the mood and welcomes readers.`;
       const backCoverScene = coverScenes.backCover?.scene || `A satisfying, conclusive ending scene that provides closure and leaves readers with a warm feeling.`;
 
+      // Translate cover scenes for non-English stories (for display in edit modal)
+      let translatedTitlePageScene = titlePageScene;
+      let translatedInitialPageScene = initialPageScene;
+      let translatedBackCoverScene = backCoverScene;
+
+      if (lang && !lang.startsWith('en')) {
+        const { getLanguageInstruction } = require('./server/lib/languages');
+        const langInstruction = getLanguageInstruction(lang);
+
+        const translateScene = async (scene) => {
+          if (!scene) return scene;
+          try {
+            const result = await callTextModel(
+              `Translate this image scene description to the target language. Keep it concise (1-2 sentences). Output ONLY the translation, nothing else.\n\n${langInstruction}\n\nScene: ${scene}`,
+              { maxTokens: 300 }
+            );
+            return result.text?.trim() || scene;
+          } catch (err) {
+            log.warn(`⚠️ [COVER] Failed to translate scene: ${err.message}`);
+            return scene;
+          }
+        };
+
+        log.debug(`🌐 [COVER] Translating cover scenes to ${lang}...`);
+        [translatedTitlePageScene, translatedInitialPageScene, translatedBackCoverScene] = await Promise.all([
+          translateScene(titlePageScene),
+          translateScene(initialPageScene),
+          translateScene(backCoverScene)
+        ]);
+        log.debug(`🌐 [COVER] Cover scene translations complete`);
+      }
+
       // Build visual bible prompt for covers
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
@@ -13169,7 +13227,7 @@ async function processStoryJob(jobId) {
             addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
           }
           await saveCheckpoint(jobId, 'partial_cover', { type: 'frontCover', imageData: result.imageData, storyTitle, modelId: result.modelId || null }, 0);
-          return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, prompt: frontCoverPrompt };
+          return { type: 'frontCover', result, photos: frontCoverPhotos, scene: titlePageScene, translatedScene: translatedTitlePageScene, prompt: frontCoverPrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
@@ -13180,7 +13238,7 @@ async function processStoryJob(jobId) {
             addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
           }
           await saveCheckpoint(jobId, 'partial_cover', { type: 'initialPage', imageData: result.imageData, modelId: result.modelId || null }, 1);
-          return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, prompt: initialPagePrompt };
+          return { type: 'initialPage', result, photos: initialPagePhotos, scene: initialPageScene, translatedScene: translatedInitialPageScene, prompt: initialPagePrompt };
         })(),
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
@@ -13191,7 +13249,7 @@ async function processStoryJob(jobId) {
             addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
           }
           await saveCheckpoint(jobId, 'partial_cover', { type: 'backCover', imageData: result.imageData, modelId: result.modelId || null }, 2);
-          return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, prompt: backCoverPrompt };
+          return { type: 'backCover', result, photos: backCoverPhotos, scene: backCoverScene, translatedScene: translatedBackCoverScene, prompt: backCoverPrompt };
         })()
       ]);
 
@@ -14230,6 +14288,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           frontCover: {
             imageData: frontCover.result.imageData,
             description: frontCover.scene,
+            translatedDescription: frontCover.translatedScene,
             prompt: frontCover.prompt,
             qualityScore: frontCover.result.score,
             qualityReasoning: frontCover.result.reasoning || null,
@@ -14248,6 +14307,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           initialPage: {
             imageData: initialPage.result.imageData,
             description: initialPage.scene,
+            translatedDescription: initialPage.translatedScene,
             prompt: initialPage.prompt,
             qualityScore: initialPage.result.score,
             qualityReasoning: initialPage.result.reasoning || null,
@@ -14266,6 +14326,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           backCover: {
             imageData: backCover.result.imageData,
             description: backCover.scene,
+            translatedDescription: backCover.translatedScene,
             prompt: backCover.prompt,
             qualityScore: backCover.result.score,
             qualityReasoning: backCover.result.reasoning || null,

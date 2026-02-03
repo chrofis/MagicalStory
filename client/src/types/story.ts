@@ -651,7 +651,8 @@ export interface SceneImage {
 
 export interface CoverImageData {
   imageData?: string;
-  description?: string;  // Scene description for the cover
+  description?: string;  // Scene description for the cover (English, for image generation)
+  translatedDescription?: string;  // Scene description in story's language (for display in edit modal)
   prompt?: string;       // The actual prompt sent to image generation API
   qualityScore?: number;
   qualityReasoning?: string;
