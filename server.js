@@ -15840,11 +15840,40 @@ app.get('/api/shared/:shareToken/og-image', async (req, res) => {
       return res.status(404).json({ error: 'Cover image not found' });
     }
 
-    // Return the cover image as-is for OG (WhatsApp will resize)
+    // Create proper 1200x630 OG image (WhatsApp is strict about dimension matching)
     const imageBuffer = Buffer.from(coverImage, 'base64');
-    res.set('Content-Type', 'image/png');
+
+    // Get original dimensions
+    const metadata = await sharp(imageBuffer).metadata();
+
+    // Create blurred, darkened background (stretch to fill 1200x630)
+    const background = await sharp(imageBuffer)
+      .resize(1200, 630, { fit: 'cover' })
+      .blur(30)
+      .modulate({ brightness: 0.5 })
+      .toBuffer();
+
+    // Scale cover to fit within canvas with padding
+    const maxCoverHeight = 550;
+    const coverHeight = Math.min(metadata.height, maxCoverHeight);
+    const coverWidth = Math.round((metadata.width / metadata.height) * coverHeight);
+
+    const scaledCover = await sharp(imageBuffer)
+      .resize(coverWidth, coverHeight, { fit: 'inside' })
+      .toBuffer();
+
+    // Composite: blurred background + centered cover
+    const ogImage = await sharp(background)
+      .composite([{
+        input: scaledCover,
+        gravity: 'center'
+      }])
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    res.set('Content-Type', 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=86400');
-    res.send(imageBuffer);
+    res.send(ogImage);
   } catch (err) {
     log.error('Error generating OG image:', err);
     res.status(500).json({ error: 'Failed to generate preview image' });
