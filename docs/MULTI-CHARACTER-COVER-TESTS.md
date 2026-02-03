@@ -17,7 +17,8 @@ This document tracks experiments for generating cover images with many character
 |----------|--------|------------|
 | Single-shot 10 chars | ❌ Failed | Characters blend together, identity loss |
 | Iterative add (3→6→10) | ❌ Failed | Identity drift - characters "mix" together |
-| Ghost placeholders + inpaint | ❌ Failed | Inpainted figures don't match style |
+| Ghost + external inpaint (FLUX/ACE++) | ❌ Failed | Inpainted figures don't match style |
+| Ghost + Gemini edit | ❌ Failed | Gemini re-interprets whole scene, ignores ghost |
 | Multi-turn conversation | ❌ Failed | No better than single-shot |
 | Stitching separate parts | ❌ Failed | Scene elements (table, background) change between generations |
 
@@ -114,11 +115,13 @@ Step 3: For each ghost: mask region → inpaint with character reference
 | Detect ghost bboxes | ✅ Works |
 | Inpaint with FLUX Fill (text) | ⚠️ Generic faces, don't match characters |
 | Inpaint with ACE++ (reference) | ❌ Style mismatch - inpainted figures look different |
+| **Gemini edit own image** | ❌ Re-interprets whole scene, ignores ghost |
 
-### Key Finding
-Inpainting tools (FLUX Fill, ACE++) produce figures that don't match the illustration style of the base image. The inpainted characters look "pasted in" rather than natural.
+### Key Findings
 
-ACE++ prioritizes face identity over style matching, resulting in realistic-looking faces in a cartoon scene.
+**External inpainting (FLUX/ACE++):** Style mismatch - inpainted figures look "pasted in" rather than natural. ACE++ prioritizes face identity over style matching, resulting in realistic-looking faces in a cartoon scene.
+
+**Gemini editing its own output:** Even when using Gemini to edit a Gemini-generated image, asking it to "replace this ghost with this character" causes it to **re-interpret the entire scene** rather than doing a localized edit. This is the same failure mode as the iterative approach - the model can't preserve the existing image while making targeted changes.
 
 ---
 
