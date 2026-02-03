@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import type {
   RepairWorkflowStep,
   RepairWorkflowState,
@@ -123,6 +123,10 @@ export interface UseRepairWorkflowReturn {
     onProgress?: (step: string, detail: string) => void;
   }) => Promise<void>;
 
+  // Abort running workflow
+  abortWorkflow: () => void;
+  isAborted: boolean;
+
   // Computed helpers
   canProceedToStep: (step: RepairWorkflowStep) => boolean;
   getStepNumber: (step: RepairWorkflowStep) => number;
@@ -141,6 +145,10 @@ export function useRepairWorkflow({
 }: UseRepairWorkflowProps): UseRepairWorkflowReturn {
   const [workflowState, setWorkflowState] = useState<RepairWorkflowState>(createInitialState);
   const [redoProgress, setRedoProgress] = useState({ current: 0, total: 0, currentPage: undefined as number | undefined });
+
+  // Abort mechanism for stopping runaway workflows
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const [isAborted, setIsAborted] = useState(false);
 
   // Computed: is any step running
   const isRunning = useMemo(() => {
@@ -201,6 +209,15 @@ export function useRepairWorkflow({
   const resetWorkflow = useCallback(() => {
     setWorkflowState(createInitialState());
     setRedoProgress({ current: 0, total: 0, currentPage: undefined });
+    setIsAborted(false);
+    abortControllerRef.current = null;
+  }, []);
+
+  // Abort a running workflow
+  const abortWorkflow = useCallback(() => {
+    console.log('[useRepairWorkflow] Aborting workflow');
+    abortControllerRef.current?.abort();
+    setIsAborted(true);
   }, []);
 
   // Step 1: Collect feedback from existing evaluation data
@@ -728,12 +745,27 @@ export function useRepairWorkflow({
 
     const { scoreThreshold = 6, issueThreshold = 3, maxRetries = 4, onProgress } = options;
 
+    // Create abort controller for this workflow run
+    abortControllerRef.current = new AbortController();
+    setIsAborted(false);
+    const signal = abortControllerRef.current.signal;
+
+    // Helper to check if workflow should stop
+    const checkAborted = () => {
+      if (signal.aborted) {
+        console.log('[useRepairWorkflow] Workflow aborted');
+        throw new Error('Workflow aborted');
+      }
+    };
+
     try {
       // Step 1: Collect feedback
+      checkAborted();
       onProgress?.('collect-feedback', 'Collecting existing issues...');
       await collectFeedback();
 
       // Step 4 first: Re-evaluate ALL pages to get current state
+      checkAborted();
       onProgress?.('re-evaluate', 'Evaluating all pages...');
       const evalResult = await storyService.reEvaluatePages(storyId, sceneImages.map(s => s.pageNumber));
 
@@ -745,6 +777,7 @@ export function useRepairWorkflow({
       }
 
       // Step 2: Auto-identify redo pages based on evaluation results (compute locally)
+      checkAborted();
       onProgress?.('identify-redo-pages', 'Identifying pages needing redo...');
       const pagesToRedo: number[] = [];
       for (const [pageNumStr, result] of Object.entries(evalPages)) {
@@ -765,6 +798,7 @@ export function useRepairWorkflow({
       }));
 
       // Step 3: Redo pages with retry logic (up to maxRetries, keep best)
+      checkAborted();
       const pagesCompleted: number[] = [];
       if (pagesToRedo.length > 0) {
         onProgress?.('redo-pages', `Redoing ${pagesToRedo.length} pages...`);
@@ -773,12 +807,18 @@ export function useRepairWorkflow({
         const bestResults: Record<number, { score: number; imageData: string; versionIndex: number }> = {};
 
         for (let i = 0; i < pagesToRedo.length; i++) {
+          // Check abort before each page
+          checkAborted();
+
           const pageNumber = pagesToRedo[i];
           let bestScore = 0;
           let bestImageData = '';
           let bestVersionIndex = 0;
 
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            // Check abort before each attempt
+            checkAborted();
+
             onProgress?.('redo-pages', `Page ${pageNumber}: attempt ${attempt}/${maxRetries}`);
             setRedoProgress({ current: i, total: pagesToRedo.length, currentPage: pageNumber });
 
@@ -823,11 +863,13 @@ export function useRepairWorkflow({
 
       // Step 4 again: Re-evaluate redone pages
       if (pagesCompleted.length > 0) {
+        checkAborted();
         onProgress?.('re-evaluate', 'Re-evaluating redone pages...');
         await reEvaluatePages(pagesCompleted);
       }
 
       // Step 5: Consistency check
+      checkAborted();
       onProgress?.('consistency-check', 'Running consistency check...');
       const consistencyResult = await storyService.runEntityConsistency(storyId);
       const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
@@ -840,6 +882,7 @@ export function useRepairWorkflow({
       }));
 
       // Step 6: Auto-repair characters with severe issues (use local consistency result)
+      checkAborted();
       if (consistencyReport?.characters) {
         const charsWithIssues = Object.entries(consistencyReport.characters)
           .filter(([_, result]) => {
@@ -853,6 +896,7 @@ export function useRepairWorkflow({
         if (charsWithIssues.length > 0) {
           onProgress?.('character-repair', `Repairing ${charsWithIssues.length} characters...`);
           for (const charName of charsWithIssues) {
+            checkAborted();
             // Compute severe pages locally from consistency report
             const charResult = consistencyReport.characters[charName] as EntityCheckResult;
             const severePages = new Set<number>();
@@ -884,6 +928,7 @@ export function useRepairWorkflow({
       }
 
       // Step 7: Auto-repair artifacts
+      checkAborted();
       // Get pages with artifact/distortion issues from evaluation results
       const artifactPages: number[] = [];
       for (const [pageStr, result] of Object.entries(evalPages)) {
@@ -898,8 +943,15 @@ export function useRepairWorkflow({
 
       onProgress?.('complete', 'Workflow complete!');
     } catch (error) {
+      // Don't log abort as an error
+      if (error instanceof Error && error.message === 'Workflow aborted') {
+        console.log('[useRepairWorkflow] Workflow was aborted by user');
+        return;
+      }
       console.error('Full workflow failed:', error);
       throw error;
+    } finally {
+      abortControllerRef.current = null;
     }
   }, [
     storyId, sceneImages, imageModel, onImageUpdate,
@@ -936,6 +988,8 @@ export function useRepairWorkflow({
     repairArtifacts,
 
     runFullWorkflow,
+    abortWorkflow,
+    isAborted,
 
     canProceedToStep,
     getStepNumber,

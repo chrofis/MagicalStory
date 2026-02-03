@@ -16,6 +16,7 @@ import {
   XCircle,
   Play,
   SkipForward,
+  Square,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback } from '@/types/story';
@@ -31,6 +32,8 @@ interface RepairWorkflowPanelProps {
   onRefreshStory?: () => Promise<void>;
   // Auto-trigger full workflow on mount (for post-generation repair)
   autoRunFullWorkflow?: boolean;
+  // Callback when auto-run completes (to clear the trigger state in parent)
+  onAutoRunComplete?: () => void;
 }
 
 // Step configuration
@@ -215,6 +218,9 @@ function PageFeedbackCard({
   );
 }
 
+// localStorage key for tracking completed auto-runs (persists across remounts/refreshes)
+const AUTORUN_COMPLETED_KEY = 'repair-workflow-autorun-completed';
+
 export function RepairWorkflowPanel({
   storyId,
   sceneImages,
@@ -224,6 +230,7 @@ export function RepairWorkflowPanel({
   onImageUpdate,
   onRefreshStory,
   autoRunFullWorkflow = false,
+  onAutoRunComplete,
 }: RepairWorkflowPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
@@ -243,6 +250,8 @@ export function RepairWorkflowPanel({
     repairCharacter,
     repairArtifacts,
     runFullWorkflow,
+    abortWorkflow,
+    isAborted,
     getStepNumber,
     getCharactersWithIssues,
     getPagesWithSevereIssuesForCharacter,
@@ -259,20 +268,53 @@ export function RepairWorkflowPanel({
   const [fullWorkflowProgress, setFullWorkflowProgress] = useState<{ step: string; detail: string } | null>(null);
   const [isRunningFullWorkflow, setIsRunningFullWorkflow] = useState(false);
 
-  // Track if we've already auto-run for this story
+  // Track if we've already auto-run for this story (ref for current session)
   const autoRunTriggeredRef = useRef<string | null>(null);
+
+  // Check if auto-run has already completed for this story (persisted in localStorage)
+  const hasCompletedAutoRun = (checkStoryId: string): boolean => {
+    try {
+      const completedStories = JSON.parse(localStorage.getItem(AUTORUN_COMPLETED_KEY) || '[]');
+      return completedStories.includes(checkStoryId);
+    } catch {
+      return false;
+    }
+  };
+
+  // Mark auto-run as completed for this story (persist to localStorage)
+  const markAutoRunCompleted = (completedStoryId: string) => {
+    try {
+      const completedStories = JSON.parse(localStorage.getItem(AUTORUN_COMPLETED_KEY) || '[]');
+      if (!completedStories.includes(completedStoryId)) {
+        completedStories.push(completedStoryId);
+        // Keep only last 10 to prevent unbounded growth
+        const trimmed = completedStories.slice(-10);
+        localStorage.setItem(AUTORUN_COMPLETED_KEY, JSON.stringify(trimmed));
+      }
+    } catch (e) {
+      console.error('[RepairWorkflowPanel] Failed to save auto-run completion:', e);
+    }
+  };
 
   // Auto-run full workflow when triggered by parent (e.g., after story generation)
   useEffect(() => {
     if (autoRunFullWorkflow && storyId && sceneImages.length > 0 && !isRunning && !isRunningFullWorkflow) {
-      // Only run once per storyId
-      if (autoRunTriggeredRef.current !== storyId) {
+      // Check both ref (current session) and localStorage (persisted)
+      const alreadyRunThisSession = autoRunTriggeredRef.current === storyId;
+      const alreadyCompletedPreviously = hasCompletedAutoRun(storyId);
+
+      if (!alreadyRunThisSession && !alreadyCompletedPreviously) {
         autoRunTriggeredRef.current = storyId;
         console.log('[RepairWorkflowPanel] Auto-triggering full repair workflow for story:', storyId);
         // Delay slightly to ensure component is fully mounted
-        setTimeout(() => {
-          handleRunFullWorkflow();
+        setTimeout(async () => {
+          await handleRunFullWorkflow();
+          // After completion, mark as completed and notify parent
+          markAutoRunCompleted(storyId);
+          onAutoRunComplete?.();
         }, 500);
+      } else {
+        console.log('[RepairWorkflowPanel] Skipping auto-run - already completed for story:', storyId, { alreadyRunThisSession, alreadyCompletedPreviously });
       }
     }
   }, [autoRunFullWorkflow, storyId, sceneImages.length, isRunning, isRunningFullWorkflow]);
@@ -428,23 +470,39 @@ export function RepairWorkflowPanel({
                   Runs all steps automatically. Pages retry up to 4 times, keeping the best result.
                 </p>
               </div>
-              <button
-                onClick={handleRunFullWorkflow}
-                disabled={isRunning || isRunningFullWorkflow}
-                className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
-              >
-                {isRunningFullWorkflow ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Running...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-5 h-5" />
-                    Run Full Workflow
-                  </>
+              <div className="flex items-center gap-2">
+                {isRunningFullWorkflow && (
+                  <button
+                    onClick={() => {
+                      abortWorkflow();
+                      setIsRunningFullWorkflow(false);
+                      setFullWorkflowProgress(null);
+                    }}
+                    className="flex items-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                    title="Stop the workflow"
+                  >
+                    <Square className="w-5 h-5" />
+                    Stop
+                  </button>
                 )}
-              </button>
+                <button
+                  onClick={handleRunFullWorkflow}
+                  disabled={isRunning || isRunningFullWorkflow}
+                  className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+                >
+                  {isRunningFullWorkflow ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-5 h-5" />
+                      Run Full Workflow
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
             {fullWorkflowProgress && (
               <div className="mt-3 p-2 bg-white/50 rounded border border-purple-100">
@@ -452,6 +510,14 @@ export function RepairWorkflowPanel({
                   <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
                   <span className="font-medium text-purple-700">{fullWorkflowProgress.step}:</span>
                   <span className="text-purple-600">{fullWorkflowProgress.detail}</span>
+                </div>
+              </div>
+            )}
+            {isAborted && !isRunningFullWorkflow && (
+              <div className="mt-3 p-2 bg-red-50 rounded border border-red-200">
+                <div className="flex items-center gap-2 text-sm text-red-700">
+                  <Square className="w-4 h-4" />
+                  <span className="font-medium">Workflow stopped</span>
                 </div>
               </div>
             )}

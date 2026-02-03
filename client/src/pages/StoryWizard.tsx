@@ -3797,6 +3797,7 @@ export default function StoryWizard() {
                     }
                   } : undefined}
                   autoRunFullWorkflow={autoRunRepairForStoryId === storyId}
+                  onAutoRunComplete={() => setAutoRunRepairForStoryId(null)}
                 />
               )}
               <StoryDisplay
