@@ -1237,6 +1237,12 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
     const separateImages = await getAllStoryImages(id);
 
     if (separateImages && separateImages.length > 0) {
+      // Load story data blob for cover metadata (regeneration history, etc.)
+      const storyDataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+      const storyData = storyDataRows.length > 0
+        ? (typeof storyDataRows[0].data === 'string' ? JSON.parse(storyDataRows[0].data) : storyDataRows[0].data)
+        : {};
+
       // Group images by page/cover type
       const sceneImagesMap = new Map();
       const covers = {};
@@ -1277,6 +1283,23 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               qualityScore: row.quality_score,
               generatedAt: row.generated_at
             };
+          }
+        }
+      }
+
+      // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
+      const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
+        'regenerationCount', 'previousImage', 'previousScore', 'previousReasoning',
+        'originalImage', 'originalScore', 'originalReasoning', 'referencePhotos',
+        'regeneratedAt', 'bboxDetection', 'bboxOverlayImage', 'retryHistory'];
+
+      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+        if (covers[coverType] && storyData.coverImages?.[coverType]) {
+          const blobCover = storyData.coverImages[coverType];
+          for (const field of coverMetadataFields) {
+            if (blobCover[field] !== undefined) {
+              covers[coverType][field] = blobCover[field];
+            }
           }
         }
       }
