@@ -4089,7 +4089,7 @@ export default function StoryWizard() {
                   log.info('Regenerating cover:', coverType, editedScene ? `with scene: "${editedScene.substring(0, 50)}..."` : '', characterIds ? `with ${characterIds.length} characters` : '');
                   setRegeneratingCovers(prev => new Set(prev).add(coverKey));
                   const result = await storyService.regenerateCover(storyId, coverType, editedScene, characterIds, editedTitle, editedDedication);
-                  // Update the cover images with all metadata (including quality evaluation)
+                  // Update the cover images with all metadata (including quality evaluation and versions)
                   setCoverImages(prev => {
                     if (!prev) return prev;
                     const key = coverType === 'front' ? 'frontCover' : coverType === 'back' ? 'backCover' : 'initialPage';
@@ -4109,6 +4109,8 @@ export default function StoryWizard() {
                       originalImage: result.originalImage,
                       originalScore: result.originalScore,
                       modelId: result.modelId,
+                      // Include imageVersions for version history feature
+                      imageVersions: result.imageVersions,
                     } };
                   });
                   // Update user credits if we got the new balance
@@ -4331,6 +4333,36 @@ export default function StoryWizard() {
                   log.info('Image version selected:', result);
                 } catch (error) {
                   log.error('Failed to select image version:', error);
+                  throw error;
+                }
+              } : undefined}
+              onSelectCoverVersion={storyId ? async (coverType: 'frontCover' | 'initialPage' | 'backCover', versionIndex: number) => {
+                try {
+                  log.info('Selecting cover version:', { coverType, versionIndex });
+                  const result = await storyService.setActiveCoverImage(storyId, coverType, versionIndex);
+                  // Update local state with the active version's image data
+                  setCoverImages(prev => {
+                    if (!prev) return prev;
+                    const cover = prev[coverType];
+                    if (!cover || typeof cover === 'string') return prev;
+                    const coverObj = cover as import('@/types/story').CoverImageData;
+                    if (!coverObj.imageVersions) return prev;
+                    const activeVersion = coverObj.imageVersions[versionIndex];
+                    return {
+                      ...prev,
+                      [coverType]: {
+                        ...coverObj,
+                        imageData: activeVersion?.imageData || coverObj.imageData,
+                        imageVersions: coverObj.imageVersions.map((v, i) => ({
+                          ...v,
+                          isActive: i === versionIndex
+                        }))
+                      }
+                    };
+                  });
+                  log.info('Cover version selected:', result);
+                } catch (error) {
+                  log.error('Failed to select cover version:', error);
                   throw error;
                 }
               } : undefined}

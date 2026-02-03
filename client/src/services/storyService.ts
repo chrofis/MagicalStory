@@ -874,6 +874,9 @@ export const storyService = {
     modelId?: string;
     creditsUsed?: number;
     creditsRemaining?: number;
+    // Version tracking (for cover version history)
+    versionIndex?: number;
+    imageVersions?: ImageVersion[];
   }> {
     const body: { editedScene?: string; characterIds?: number[]; editedTitle?: string; editedDedication?: string } = {};
     if (editedScene) body.editedScene = editedScene;
@@ -899,6 +902,8 @@ export const storyService = {
       modelId?: string;
       creditsUsed?: number;
       creditsRemaining?: number;
+      versionIndex?: number;
+      imageVersions?: ImageVersion[];
     }>(
       `/api/stories/${storyId}/regenerate/cover/${coverType}`,
       Object.keys(body).length > 0 ? body : undefined
@@ -1830,7 +1835,7 @@ export const storyService = {
     return response;
   },
 
-  // Select which image version is active
+  // Select which image version is active (for scene images)
   async setActiveImage(storyId: string, pageNumber: number, versionIndex: number): Promise<{
     success: boolean;
     activeVersion: number;
@@ -1841,6 +1846,24 @@ export const storyService = {
       activeVersion: number;
       pageNumber: number;
     }>(`/api/stories/${storyId}/pages/${pageNumber}/active-image`, { versionIndex });
+    return response;
+  },
+
+  // Select which cover image version is active
+  async setActiveCoverImage(
+    storyId: string,
+    coverType: 'frontCover' | 'initialPage' | 'backCover',
+    versionIndex: number
+  ): Promise<{
+    success: boolean;
+    activeVersion: number;
+    coverType: string;
+  }> {
+    const response = await api.put<{
+      success: boolean;
+      activeVersion: number;
+      coverType: string;
+    }>(`/api/stories/${storyId}/covers/${coverType}/active-image`, { versionIndex });
     return response;
   },
 

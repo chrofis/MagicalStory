@@ -337,7 +337,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
 
       for (const row of imageInfoRows) {
         if (row.image_type === 'scene') {
-          const activeVersion = activeVersions[row.page_number]?.activeVersion || 0;
+          const activeVersion = activeVersions[row.page_number] ?? 0;
           if (!sceneImagesMap.has(row.page_number)) {
             sceneImagesMap.set(row.page_number, {
               pageNumber: row.page_number,
@@ -1276,14 +1276,43 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             });
           }
         } else {
-          // Cover image (frontCover, initialPage, backCover)
-          if (row.version_index === 0) {
-            covers[row.image_type] = {
-              imageData: normalizeImageData(row.image_data),
-              qualityScore: row.quality_score,
-              generatedAt: row.generated_at
+          // Cover image (frontCover, initialPage, backCover) - now supports versions
+          const coverType = row.image_type;
+          if (!covers[coverType]) {
+            covers[coverType] = {
+              imageData: null,
+              qualityScore: null,
+              generatedAt: null,
+              imageVersions: []
             };
           }
+
+          const coverData = covers[coverType];
+          const activeCoverVersion = activeVersions[coverType] ?? 0;
+
+          // Add to imageVersions array
+          coverData.imageVersions.push({
+            imageData: normalizeImageData(row.image_data),
+            qualityScore: row.quality_score,
+            generatedAt: row.generated_at,
+            isActive: row.version_index === activeCoverVersion
+          });
+
+          // If this is the active version, set as main imageData
+          if (row.version_index === activeCoverVersion) {
+            coverData.imageData = normalizeImageData(row.image_data);
+            coverData.qualityScore = row.quality_score;
+            coverData.generatedAt = row.generated_at;
+          }
+        }
+      }
+
+      // Sort cover imageVersions by version_index (rows may not be in order)
+      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+        if (covers[coverType]?.imageVersions?.length > 0) {
+          // imageVersions were added in row order, but version_index determines actual order
+          // Since we don't have version_index in the version object, rely on insertion order
+          // (getAllStoryImages returns them ordered by version_index ASC)
         }
       }
 
@@ -1301,6 +1330,21 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               covers[coverType][field] = blobCover[field];
             }
           }
+          // Also merge imageVersions metadata (description, type, createdAt) from blob
+          if (blobCover.imageVersions && covers[coverType].imageVersions) {
+            for (let i = 0; i < covers[coverType].imageVersions.length && i < blobCover.imageVersions.length; i++) {
+              const blobVersion = blobCover.imageVersions[i];
+              if (blobVersion) {
+                covers[coverType].imageVersions[i].description = blobVersion.description;
+                covers[coverType].imageVersions[i].type = blobVersion.type;
+                covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt;
+              }
+            }
+          }
+        }
+        // Strip imageVersions if only one version (original, no regenerations)
+        if (covers[coverType]?.imageVersions?.length <= 1) {
+          delete covers[coverType].imageVersions;
         }
       }
 
@@ -1352,10 +1396,22 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         if (coverData) {
           const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
           if (imageData) {
+            const activeCoverIdx = activeVersions[coverType] ?? 0;
             covers[coverType] = {
               imageData: normalizeImageData(imageData),
               qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null
             };
+            // Include imageVersions if available in blob (more than 1 version)
+            if (typeof coverData === 'object' && coverData.imageVersions && coverData.imageVersions.length > 1) {
+              covers[coverType].imageVersions = coverData.imageVersions.map((v, i) => ({
+                imageData: normalizeImageData(v.imageData),
+                qualityScore: v.qualityScore,
+                description: v.description,
+                type: v.type,
+                createdAt: v.createdAt,
+                isActive: i === activeCoverIdx
+              }));
+            }
           }
         }
       }
@@ -1685,7 +1741,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
           const activeVersions = await getAllActiveVersions(id);
           for (const scene of story.sceneImages) {
             if (scene.imageVersions && scene.imageVersions.length > 0) {
-              const activeVersion = activeVersions[scene.pageNumber]?.activeVersion || 0;
+              const activeVersion = activeVersions[scene.pageNumber] ?? 0;
               scene.imageVersions.forEach((v, idx) => {
                 v.isActive = idx === activeVersion;
               });
@@ -2160,6 +2216,86 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
   } catch (err) {
     console.error('Error setting active image:', err);
     res.status(500).json({ error: 'Failed to set active image: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/covers/:coverType/active-image - Select which cover version is active
+// OPTIMIZED: Uses image_version_meta column for O(1) update instead of rewriting entire data blob
+router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req, res) => {
+  try {
+    const { id, coverType } = req.params;
+    const { versionIndex } = req.body;
+
+    // Validate cover type
+    if (!['frontCover', 'initialPage', 'backCover'].includes(coverType)) {
+      return res.status(400).json({ error: 'Invalid cover type. Must be: frontCover, initialPage, or backCover' });
+    }
+
+    if (typeof versionIndex !== 'number' || versionIndex < 0) {
+      return res.status(400).json({ error: 'Valid versionIndex is required' });
+    }
+
+    console.log(`🖼️ PUT /api/stories/${id}/covers/${coverType}/active-image - Selecting version ${versionIndex}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+
+    // Verify story ownership (fast query, no data loading)
+    const ownerCheck = await pool.query(
+      `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Validate version exists in story_images table
+    const versionCheck = await pool.query(
+      `SELECT 1 FROM story_images
+       WHERE story_id = $1 AND image_type = $2 AND version_index = $3`,
+      [id, coverType, versionIndex]
+    );
+
+    if (versionCheck.rows.length === 0) {
+      // Fallback: check data blob for legacy stories without story_images entries
+      const dataCheck = await pool.query(
+        `SELECT jsonb_array_length(data->'coverImages'->'${coverType}'->'imageVersions') as version_count
+         FROM stories WHERE id = $1`,
+        [id]
+      );
+
+      const versionCount = dataCheck.rows[0]?.version_count || 0;
+      if (versionIndex >= versionCount) {
+        return res.status(400).json({ error: 'Invalid version index' });
+      }
+    }
+
+    // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
+    await setActiveVersion(id, coverType, versionIndex);
+
+    // Also update metadata timestamp
+    await pool.query(
+      `UPDATE stories
+       SET metadata = jsonb_set(COALESCE(metadata::jsonb, '{}'), '{updatedAt}', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(new Date().toISOString()), id]
+    );
+
+    console.log(`✅ Active cover image set to version ${versionIndex} for ${coverType} (fast path)`);
+
+    res.json({
+      success: true,
+      activeVersion: versionIndex,
+      coverType
+    });
+
+  } catch (err) {
+    console.error('Error setting active cover image:', err);
+    res.status(500).json({ error: 'Failed to set active cover image: ' + err.message });
   }
 });
 

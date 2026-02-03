@@ -4237,7 +4237,49 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     // Get the current cover image before regenerating (to store as previous version)
     storyData.coverImages = storyData.coverImages || {};
     const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
-    const previousCover = storyData.coverImages[coverKey];
+    const existingCover = storyData.coverImages[coverKey] || {};
+
+    // Initialize imageVersions array if missing (lazy migration from legacy format)
+    if (!existingCover.imageVersions) {
+      existingCover.imageVersions = [];
+
+      // Migrate originalImage as version 0 if exists
+      if (existingCover.originalImage) {
+        existingCover.imageVersions.push({
+          imageData: existingCover.originalImage,
+          qualityScore: existingCover.originalScore,
+          description: existingCover.description,
+          createdAt: storyData.createdAt || new Date().toISOString(),
+          type: 'original',
+          isActive: false
+        });
+      }
+
+      // Current image as next version (if different from original or no original)
+      const currentImageData = existingCover.imageData || (typeof existingCover === 'string' ? existingCover : null);
+      if (currentImageData && (!existingCover.originalImage || currentImageData !== existingCover.originalImage)) {
+        existingCover.imageVersions.push({
+          imageData: currentImageData,
+          qualityScore: existingCover.qualityScore,
+          description: existingCover.description,
+          prompt: existingCover.prompt,
+          modelId: existingCover.modelId,
+          createdAt: existingCover.regeneratedAt || existingCover.generatedAt || new Date().toISOString(),
+          type: existingCover.wasRegenerated ? 'regeneration' : 'original',
+          isActive: true
+        });
+      } else if (currentImageData) {
+        // originalImage exists and equals currentImageData - mark version 0 as active
+        if (existingCover.imageVersions.length > 0) {
+          existingCover.imageVersions[0].isActive = true;
+        }
+      }
+
+      log.debug(`📸 [COVER REGEN] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
+    }
+
+    // For backwards compatibility, also capture previous version info
+    const previousCover = existingCover;
     const previousImageData = previousCover?.imageData || (typeof previousCover === 'string' ? previousCover : null);
     const previousScore = previousCover?.qualityScore || null;
     const previousReasoning = previousCover?.qualityReasoning || null;
@@ -4247,7 +4289,7 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     const trueOriginalScore = previousCover?.originalScore || previousScore;
     const trueOriginalReasoning = previousCover?.originalReasoning || previousReasoning;
 
-    log.debug(`📸 [COVER REGEN] Capturing previous ${normalizedCoverType} cover (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, already regenerated: ${!!previousCover?.originalImage})`);
+    log.debug(`📸 [COVER REGEN] Capturing previous ${normalizedCoverType} cover (${previousImageData ? 'has data' : 'none'}, score: ${previousScore}, versions: ${existingCover.imageVersions?.length || 0})`);
 
     // Clear the image cache for this prompt to force a new generation
     const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
@@ -4269,6 +4311,23 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     const coverImageCost = calculateImageCost(coverImageModelId, coverResult.totalAttempts || 1);
     console.log(`💰 [COVER REGEN] API Cost: ${formatCostSummary(coverImageModelId, { imageCount: coverResult.totalAttempts || 1 }, coverImageCost)} (${coverResult.totalAttempts || 1} attempt(s))`);
 
+    // Create new version entry
+    const newVersion = {
+      imageData: coverResult.imageData,
+      qualityScore: coverResult.score,
+      description: sceneDescription,
+      prompt: coverPrompt,
+      modelId: coverResult.modelId || coverImageModelId,
+      createdAt: new Date().toISOString(),
+      type: 'regeneration',
+      isActive: true
+    };
+
+    // Mark all existing versions as inactive and add new version
+    const updatedVersions = (existingCover.imageVersions || []).map(v => ({ ...v, isActive: false }));
+    updatedVersions.push(newVersion);
+    const newVersionIndex = updatedVersions.length - 1;
+
     // Update the cover in story data with new structure including quality, description, prompt, and previous version
     const coverData = {
       imageData: coverResult.imageData,
@@ -4281,12 +4340,12 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       wasRegenerated: true,
       totalAttempts: coverResult.totalAttempts || 1,
       retryHistory: coverResult.retryHistory || [],
-      // Store previous version (for undo/comparison)
+      // Store previous version (for undo/comparison) - kept for backwards compatibility
       previousImage: previousImageData,
       previousScore: previousScore,
       previousReasoning: previousReasoning,
       previousPrompt: previousPrompt,
-      // Keep the true original across multiple regenerations
+      // Keep the true original across multiple regenerations - kept for backwards compatibility
       originalImage: trueOriginalImage,
       originalScore: trueOriginalScore,
       originalReasoning: trueOriginalReasoning,
@@ -4294,10 +4353,12 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       regeneratedAt: new Date().toISOString(),
       regenerationCount: (previousCover?.regenerationCount || 0) + 1,
       bboxDetection: coverResult.bboxDetection || null,
-      bboxOverlayImage: coverResult.bboxOverlayImage || null
+      bboxOverlayImage: coverResult.bboxOverlayImage || null,
+      // NEW: imageVersions array for unified versioning
+      imageVersions: updatedVersions
     };
 
-    log.debug(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}`);
+    log.debug(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}, version: ${newVersionIndex}`);
 
     if (normalizedCoverType === 'front') {
       storyData.coverImages.frontCover = coverData;
@@ -4307,7 +4368,17 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       storyData.coverImages.backCover = coverData;
     }
 
-    // Save updated story with metadata
+    // Save new version to story_images table with incrementing version_index
+    await saveStoryImage(id, coverKey, null, coverResult.imageData, {
+      qualityScore: coverResult.score,
+      generatedAt: new Date().toISOString(),
+      versionIndex: newVersionIndex
+    });
+
+    // Update active version in image_version_meta (same mechanism as scenes)
+    await setActiveVersion(id, coverKey, newVersionIndex);
+
+    // Save updated story with metadata (imageData will be stripped by saveStoryData)
     await saveStoryData(id, storyData);
 
     // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
@@ -4355,7 +4426,17 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
       referencePhotos: coverCharacterPhotos,
       // API cost tracking
       apiCost: coverImageCost,
-      apiCostModel: coverImageModelId
+      apiCostModel: coverImageModelId,
+      // Version info (for version history UI)
+      versionIndex: newVersionIndex,
+      imageVersions: updatedVersions.map(v => ({
+        imageData: v.imageData,
+        qualityScore: v.qualityScore,
+        description: v.description,
+        createdAt: v.createdAt,
+        type: v.type,
+        isActive: v.isActive
+      }))
     });
 
   } catch (err) {

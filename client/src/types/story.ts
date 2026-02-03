@@ -661,10 +661,10 @@ export interface CoverImageData {
   totalAttempts?: number;
   retryHistory?: RetryAttempt[];
   regenerationCount?: number;
-  // Previous version (immediate predecessor)
+  // Previous version (immediate predecessor) - legacy, kept for backwards compatibility
   previousImage?: string;
   previousScore?: number;
-  // Original version (from initial generation)
+  // Original version (from initial generation) - legacy, kept for backwards compatibility
   originalImage?: string;
   originalScore?: number;
   // Reference photos used (for dev mode)
@@ -680,6 +680,8 @@ export interface CoverImageData {
   bboxOverlayImage?: string | null;  // Image with bounding boxes drawn
   // Story title (sent with frontCover during streaming for early display transition)
   storyTitle?: string;
+  // User-initiated image versions (same pattern as scene images)
+  imageVersions?: ImageVersion[];
 }
 
 export interface CoverImages {

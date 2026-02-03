@@ -515,11 +515,12 @@ async function saveStoryData(storyId, storyData) {
     }
   }
 
-  // Extract and save cover images
+  // Extract and save cover images (including versions)
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
   for (const coverType of coverTypes) {
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
+      // Save main imageData as version 0 (for backwards compatibility)
       const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
       if (imageData) {
         await saveStoryImage(storyId, coverType, null, imageData, {
@@ -532,6 +533,27 @@ async function saveStoryData(storyId, storyData) {
           delete coverData.imageData;
         } else {
           dataForStorage.coverImages[coverType] = { stripped: true };
+        }
+      }
+
+      // Also save additional cover versions (imageVersions array)
+      if (typeof coverData === 'object' && coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
+        for (let i = 0; i < coverData.imageVersions.length; i++) {
+          const version = coverData.imageVersions[i];
+          if (version.imageData) {
+            // Save each version with its index
+            // Note: version 0 is the main image (already saved above), versions 1+ are regenerations
+            // However, the regeneration endpoint saves new versions separately with setActiveVersion
+            // Here we just strip the imageData from blob while ensuring versions are in story_images
+            await saveStoryImage(storyId, coverType, null, version.imageData, {
+              qualityScore: version.qualityScore,
+              generatedAt: version.createdAt || version.generatedAt,
+              versionIndex: i
+            });
+            imagesSaved++;
+            // Strip imageData from version but keep metadata
+            delete version.imageData;
+          }
         }
       }
     }

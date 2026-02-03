@@ -2,16 +2,25 @@ import { Images, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import type { ImageVersion } from '@/types/story';
 
+// Cover type names for display
+const COVER_LABELS = {
+  frontCover: { en: 'Front Cover', de: 'Titelseite', fr: 'Couverture' },
+  initialPage: { en: 'Dedication Page', de: 'Widmungsseite', fr: 'Page de dédicace' },
+  backCover: { en: 'Back Cover', de: 'Rückseite', fr: 'Quatrième de couverture' },
+};
+
 interface ImageHistoryModalProps {
-  pageNumber: number;
+  pageNumber?: number;
+  coverType?: 'frontCover' | 'initialPage' | 'backCover';
   versions: ImageVersion[];
   onClose: () => void;
-  onSelectVersion: (pageNumber: number, versionIndex: number) => void;
+  onSelectVersion: (pageNumberOrCoverType: number | string, versionIndex: number) => void;
   developerMode?: boolean;
 }
 
 export function ImageHistoryModal({
   pageNumber,
+  coverType,
   versions,
   onClose,
   onSelectVersion,
@@ -19,15 +28,35 @@ export function ImageHistoryModal({
 }: ImageHistoryModalProps) {
   const { language } = useLanguage();
 
+  // Determine title based on whether this is a page or cover
+  const getTitle = () => {
+    if (coverType) {
+      const labels = COVER_LABELS[coverType];
+      const label = language === 'de' ? labels.de : language === 'fr' ? labels.fr : labels.en;
+      return language === 'de' ? `Bildversionen - ${label}` :
+             language === 'fr' ? `Versions d'image - ${label}` :
+             `Image Versions - ${label}`;
+    }
+    return language === 'de' ? `Bildversionen - Seite ${pageNumber}` :
+           language === 'fr' ? `Versions d'image - Page ${pageNumber}` :
+           `Image Versions - Page ${pageNumber}`;
+  };
+
+  const handleSelect = (versionIndex: number) => {
+    if (coverType) {
+      onSelectVersion(coverType, versionIndex);
+    } else if (pageNumber !== undefined) {
+      onSelectVersion(pageNumber, versionIndex);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
         <div className="p-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
             <Images size={20} />
-            {language === 'de' ? `Bildversionen - Seite ${pageNumber}` :
-             language === 'fr' ? `Versions d'image - Page ${pageNumber}` :
-             `Image Versions - Page ${pageNumber}`}
+            {getTitle()}
           </h3>
           <button
             onClick={onClose}
@@ -46,7 +75,7 @@ export function ImageHistoryModal({
                     ? 'border-green-500 ring-2 ring-green-200'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
-                onClick={() => onSelectVersion(pageNumber, idx)}
+                onClick={() => handleSelect(idx)}
               >
                 <img
                   src={version.imageData}

@@ -136,6 +136,7 @@ interface StoryDisplayProps {
   imageRegenerationCost?: number;
   isImpersonating?: boolean;
   onSelectImageVersion?: (pageNumber: number, versionIndex: number) => Promise<void>;
+  onSelectCoverVersion?: (coverType: 'frontCover' | 'initialPage' | 'backCover', versionIndex: number) => Promise<void>;
   // Generation settings for dev mode
   generationSettings?: GenerationSettings;
   // Callback to refresh story data (after entity repair, etc.)
@@ -197,6 +198,7 @@ export function StoryDisplay({
   imageRegenerationCost = 5,
   isImpersonating = false,
   onSelectImageVersion,
+  onSelectCoverVersion,
   generationSettings,
   onRefreshStory,
 }: StoryDisplayProps) {
@@ -227,6 +229,9 @@ export function StoryDisplay({
 
   // Image history modal state
   const [imageHistoryModal, setImageHistoryModal] = useState<{ pageNumber: number; versions: ImageVersion[] } | null>(null);
+
+  // Cover image history modal state
+  const [coverHistoryModal, setCoverHistoryModal] = useState<{ coverType: 'frontCover' | 'initialPage' | 'backCover'; versions: ImageVersion[] } | null>(null);
 
   // Scene edit modal state (for editing scene before regenerating)
   const [sceneEditModal, setSceneEditModal] = useState<{ pageNumber: number; scene: string; selectedCharacterIds: number[] } | null>(null);
@@ -805,6 +810,24 @@ export function StoryDisplay({
     } catch (err) {
       console.error('Failed to select image version:', err);
     }
+  };
+
+  // Handle selecting a different cover image version
+  const handleSelectCoverVersion = async (coverType: 'frontCover' | 'initialPage' | 'backCover', versionIndex: number) => {
+    if (!onSelectCoverVersion) return;
+    try {
+      await onSelectCoverVersion(coverType, versionIndex);
+      setCoverHistoryModal(null);
+    } catch (err) {
+      console.error('Failed to select cover image version:', err);
+    }
+  };
+
+  // Get cover image versions
+  const getCoverVersions = (coverType: 'frontCover' | 'initialPage' | 'backCover'): ImageVersion[] => {
+    const cover = coverImages?.[coverType];
+    if (!cover || typeof cover === 'string') return [];
+    return (cover as CoverImageData).imageVersions || [];
   };
 
   // Extract just the Image Summary from a full scene description
@@ -3320,13 +3343,13 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Regenerate Cover - visible to all users */}
+            {/* Regenerate Cover and History - visible to all users */}
             {_onRegenerateCover && (
-              <div className="mt-3">
+              <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => openCoverEditModal('front')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
-                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                     isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                   title={!hasEnoughCredits
@@ -3340,6 +3363,15 @@ export function StoryDisplay({
                     ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
+                {getCoverVersions('frontCover').length > 1 && (
+                  <button
+                    onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                  >
+                    <Images size={14} />
+                    {getCoverVersions('frontCover').length}
+                  </button>
+                )}
               </div>
             )}
             {/* Developer Mode Features for Front Cover */}
@@ -3519,13 +3551,13 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Regenerate Cover - visible to all users */}
+            {/* Regenerate Cover and History - visible to all users */}
             {_onRegenerateCover && (
-              <div className="mt-3">
+              <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => openCoverEditModal('initial')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
-                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                     isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                   title={!hasEnoughCredits
@@ -3539,6 +3571,15 @@ export function StoryDisplay({
                     ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
+                {getCoverVersions('initialPage').length > 1 && (
+                  <button
+                    onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                  >
+                    <Images size={14} />
+                    {getCoverVersions('initialPage').length}
+                  </button>
+                )}
               </div>
             )}
             {/* Developer Mode Features for Initial Page */}
@@ -4581,13 +4622,13 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Regenerate Cover - visible to all users */}
+            {/* Regenerate Cover and History - visible to all users */}
             {_onRegenerateCover && (
-              <div className="mt-3">
+              <div className="mt-3 flex gap-2">
                 <button
                   onClick={() => openCoverEditModal('back')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
-                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
                     isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                   }`}
                   title={!hasEnoughCredits
@@ -4601,6 +4642,15 @@ export function StoryDisplay({
                     ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
                   </span>
                 </button>
+                {getCoverVersions('backCover').length > 1 && (
+                  <button
+                    onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
+                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                  >
+                    <Images size={14} />
+                    {getCoverVersions('backCover').length}
+                  </button>
+                )}
               </div>
             )}
             {/* Developer Mode Features for Back Cover */}
@@ -5110,13 +5160,24 @@ export function StoryDisplay({
         </div>
       )}
 
-      {/* Image History Modal */}
+      {/* Image History Modal (for scene images) */}
       {imageHistoryModal && (
         <ImageHistoryModal
           pageNumber={imageHistoryModal.pageNumber}
           versions={imageHistoryModal.versions}
           onClose={() => setImageHistoryModal(null)}
-          onSelectVersion={handleSelectVersion}
+          onSelectVersion={(pageNumber, versionIndex) => handleSelectVersion(pageNumber as number, versionIndex)}
+          developerMode={developerMode}
+        />
+      )}
+
+      {/* Cover History Modal (for cover images) */}
+      {coverHistoryModal && (
+        <ImageHistoryModal
+          coverType={coverHistoryModal.coverType}
+          versions={coverHistoryModal.versions}
+          onClose={() => setCoverHistoryModal(null)}
+          onSelectVersion={(coverType, versionIndex) => handleSelectCoverVersion(coverType as 'frontCover' | 'initialPage' | 'backCover', versionIndex)}
           developerMode={developerMode}
         />
       )}
