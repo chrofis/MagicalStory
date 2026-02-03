@@ -15947,7 +15947,7 @@ app.get('/shared/:shareToken', async (req, res) => {
     if (story && hasDistFolder) {
       // Read the index.html
       const indexPath = path.join(distPath, 'index.html');
-      let html = fs.readFileSync(indexPath, 'utf8');
+      let html = await fs.readFile(indexPath, 'utf8');
 
       const title = story.data.title || 'Eine magische Geschichte';
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
