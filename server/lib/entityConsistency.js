@@ -58,9 +58,19 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   const avatars = character.avatars;
   const charName = character.name || 'Unknown';
 
+  // Helper to get fallback photo from various possible locations
+  const getFallbackPhoto = () => {
+    return character.photoUrl
+      || character.photo
+      || character.photo_url
+      || character.photos?.face
+      || character.photos?.original
+      || null;
+  };
+
   if (!avatars?.styledAvatars?.[artStyle]) {
     // Fallback to original photo if no styled avatars
-    const fallback = character.photoUrl || character.photo || null;
+    const fallback = getFallbackPhoto();
     log.debug(`🔍 [AVATAR-LOOKUP] ${charName}: No styledAvatars for ${artStyle}, fallback=${fallback ? 'photo' : 'null'}`);
     return fallback;
   }
@@ -98,7 +108,7 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
       }
     }
     // Final fallback to original photo
-    const fallback = character.photoUrl || character.photo || null;
+    const fallback = getFallbackPhoto();
     log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars found for costume, photo fallback=${fallback ? 'found' : 'null'}`);
     return fallback;
   }
@@ -134,7 +144,7 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
   }
 
   // Final fallback to original photo
-  const fallback = character.photoUrl || character.photo || null;
+  const fallback = getFallbackPhoto();
   log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars found, photo fallback=${fallback ? 'found' : 'null'}`);
   return fallback;
 }

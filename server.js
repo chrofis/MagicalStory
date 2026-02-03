@@ -4865,13 +4865,37 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         log.warn(`[ENTITY-REPAIR] Failed to enrich character data: ${enrichErr.message}`);
       }
     } else {
-      log.warn(`🔧 [ENTITY-REPAIR] No characterSetId in story data, cannot enrich ${entityName}`);
+      // Fallback: search all user's character sets for matching character by name
+      log.info(`🔧 [ENTITY-REPAIR] No characterSetId, searching user's character sets for ${entityName}...`);
+      try {
+        const userCharSetsResult = await dbPool.query(
+          'SELECT id, data FROM characters WHERE user_id = $1',
+          [req.user.id]
+        );
+        for (const row of userCharSetsResult.rows) {
+          const charSetData = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+          const fullChar = charSetData.characters?.find(c => c.name === entityName);
+          const hasPhoto = fullChar?.photoUrl || fullChar?.photo || fullChar?.photo_url || fullChar?.photos?.face || fullChar?.photos?.original;
+          const hasAvatars = fullChar?.avatars?.styledAvatars;
+          if (fullChar && (hasPhoto || hasAvatars)) {
+            character = { ...fullChar, ...character, avatars: fullChar.avatars || character.avatars };
+            log.info(`🔧 [ENTITY-REPAIR] Found ${entityName} in character set ${row.id} (fallback lookup)`);
+            const styledKeys = Object.keys(fullChar.avatars?.styledAvatars?.[artStyle] || {});
+            const allArtStyles = Object.keys(fullChar.avatars?.styledAvatars || {});
+            log.info(`🔧 [ENTITY-REPAIR] ${entityName} styledAvatars[${artStyle}] keys: [${styledKeys.join(', ')}], all art styles: [${allArtStyles.join(', ')}]`);
+            break;
+          }
+        }
+      } catch (fallbackErr) {
+        log.warn(`[ENTITY-REPAIR] Fallback character lookup failed: ${fallbackErr.message}`);
+      }
     }
 
     // Log current character avatar state for debugging
-    const hasPhoto = !!(character.photoUrl || character.photo);
+    const hasPhoto = !!(character.photoUrl || character.photo || character.photo_url || character.photos?.face || character.photos?.original);
     const hasStyledAvatar = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
-    log.info(`🔧 [ENTITY-REPAIR] ${entityName} avatar state: hasPhoto=${hasPhoto}, hasStyledAvatar[${artStyle}].standard=${hasStyledAvatar}`);
+    const allArtStyles = Object.keys(character.avatars?.styledAvatars || {});
+    log.info(`🔧 [ENTITY-REPAIR] ${entityName} avatar state: hasPhoto=${hasPhoto}, hasStyledAvatar[${artStyle}].standard=${hasStyledAvatar}, availableArtStyles=[${allArtStyles.join(', ')}]`);
 
     // Single-page mode: repair just one page
     if (isSinglePageMode) {
