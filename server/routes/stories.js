@@ -2391,7 +2391,14 @@ router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req,
       );
 
       const versionCount = dataCheck.rows[0]?.version_count || 0;
+      console.log(`🖼️ [COVER-VERSION] ${coverType} v${versionIndex}: story_images not found, blob has ${versionCount} versions`);
       if (versionIndex >= versionCount) {
+        // Also check story_images count for this cover type
+        const imgCount = await pool.query(
+          `SELECT COUNT(*) as cnt FROM story_images WHERE story_id = $1 AND image_type = $2`,
+          [id, coverType]
+        );
+        console.log(`🖼️ [COVER-VERSION] story_images count for ${coverType}: ${imgCount.rows[0]?.cnt}`);
         return res.status(400).json({ error: 'Invalid version index' });
       }
     }
