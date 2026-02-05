@@ -62,6 +62,9 @@ interface DeveloperModeState {
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
+  // MagicAPI repair: use face swap + hair fix pipeline instead of Gemini for character repair
+  useMagicApiRepair: boolean;
+  setUseMagicApiRepair: (use: boolean) => void;
   // Model selections
   modelSelections: ModelSelections;
   setModelSelections: React.Dispatch<React.SetStateAction<ModelSelections>>;
@@ -157,6 +160,9 @@ export function useDeveloperMode(): DeveloperModeState {
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
 
+  // MagicAPI repair: use face swap + hair fix pipeline instead of Gemini for character repair
+  const [useMagicApiRepair, setUseMagicApiRepair] = useState(false);
+
   // Model selection - same defaults for dev and prod (null = server defaults)
   const [modelSelections, setModelSelections] = useState<ModelSelections>({ ...MODEL_DEFAULTS });
 
@@ -224,6 +230,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setEnableFullRepairAfterGeneration,
     loadAllAvatars,
     setLoadAllAvatars,
+    useMagicApiRepair,
+    setUseMagicApiRepair,
     modelSelections,
     setModelSelections,
   };

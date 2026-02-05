@@ -105,6 +105,7 @@ export default function StoryWizard() {
     separatedEvaluation, setSeparatedEvaluation,
     enableFullRepairAfterGeneration, setEnableFullRepairAfterGeneration,
     loadAllAvatars, setLoadAllAvatars,
+    useMagicApiRepair, setUseMagicApiRepair,
     modelSelections, setModelSelections,
   } = useDeveloperMode();
 
@@ -3798,6 +3799,9 @@ export default function StoryWizard() {
                   } : undefined}
                   autoRunFullWorkflow={autoRunRepairForStoryId === storyId}
                   onAutoRunComplete={() => setAutoRunRepairForStoryId(null)}
+                  developerMode={developerMode}
+                  useMagicApiRepair={useMagicApiRepair}
+                  setUseMagicApiRepair={setUseMagicApiRepair}
                 />
               )}
               <StoryDisplay

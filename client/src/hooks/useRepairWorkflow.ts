@@ -110,7 +110,7 @@ export interface UseRepairWorkflowReturn {
   runConsistencyCheck: () => Promise<void>;
 
   // Step 6: Character repair
-  repairCharacter: (characterName: string, pages: number[]) => Promise<void>;
+  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean }) => Promise<void>;
 
   // Step 7: Artifact repair
   repairArtifacts: (pageNumbers: number[]) => Promise<void>;
@@ -558,13 +558,13 @@ export function useRepairWorkflow({
   }, [storyId, startStep, completeStep, failStep]);
 
   // Step 6: Repair character on specific pages
-  const repairCharacter = useCallback(async (characterName: string, pages: number[]) => {
+  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean }) => {
     if (!storyId || pages.length === 0) return;
 
     startStep('character-repair');
 
     try {
-      const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages }]);
+      const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages }], options);
 
       // Get pages repaired from the result
       const pagesRepaired = result.results?.[0]?.pagesRepaired || pages;

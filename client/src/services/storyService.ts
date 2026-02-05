@@ -2046,12 +2046,19 @@ export const storyService = {
   },
 
   // Step 6: Repair characters
-  async repairCharacters(storyId: string, repairs: Array<{ character: string; pages: number[] }>): Promise<{
+  async repairCharacters(
+    storyId: string,
+    repairs: Array<{ character: string; pages: number[] }>,
+    options?: { useMagicApiRepair?: boolean }
+  ): Promise<{
     results: Array<{ character: string; pagesRepaired: number[]; error?: string }>;
   }> {
     const response = await api.post<{
       results: Array<{ character: string; pagesRepaired: number[]; error?: string }>;
-    }>(`/api/stories/${storyId}/repair-workflow/character-repair`, { repairs });
+    }>(`/api/stories/${storyId}/repair-workflow/character-repair`, {
+      repairs,
+      ...(options?.useMagicApiRepair !== undefined && { useMagicApiRepair: options.useMagicApiRepair })
+    });
     return response;
   },
 

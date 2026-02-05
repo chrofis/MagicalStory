@@ -34,6 +34,10 @@ interface RepairWorkflowPanelProps {
   autoRunFullWorkflow?: boolean;
   // Callback when auto-run completes (to clear the trigger state in parent)
   onAutoRunComplete?: () => void;
+  // Developer mode settings
+  developerMode?: boolean;
+  useMagicApiRepair?: boolean;
+  setUseMagicApiRepair?: (use: boolean) => void;
 }
 
 // Step configuration
@@ -231,6 +235,9 @@ export function RepairWorkflowPanel({
   onRefreshStory,
   autoRunFullWorkflow = false,
   onAutoRunComplete,
+  developerMode = false,
+  useMagicApiRepair = false,
+  setUseMagicApiRepair,
 }: RepairWorkflowPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
@@ -982,9 +989,46 @@ export function RepairWorkflowPanel({
                   </div>
                 )}
 
+                {/* Repair method selector - only in developer mode */}
+                {developerMode && setUseMagicApiRepair && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <label className="text-sm font-medium text-blue-800 mb-2 block">Repair Method:</label>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="repairMethod"
+                          checked={!useMagicApiRepair}
+                          onChange={() => setUseMagicApiRepair(false)}
+                          className="text-blue-600"
+                          disabled={isRunning}
+                        />
+                        <span className="text-sm">Gemini (default)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="repairMethod"
+                          checked={useMagicApiRepair}
+                          onChange={() => setUseMagicApiRepair(true)}
+                          className="text-blue-600"
+                          disabled={isRunning}
+                        />
+                        <span className="text-sm">MagicAPI Face+Hair</span>
+                        <span className="text-xs text-blue-600">(~$0.006/repair)</span>
+                      </label>
+                    </div>
+                    {useMagicApiRepair && (
+                      <p className="text-xs text-blue-600 mt-2">
+                        Uses face swap + hair fix pipeline with iterative crop checking
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <button
                   onClick={async () => {
-                    await repairCharacter(selectedCharacter, selectedCharacterPages);
+                    await repairCharacter(selectedCharacter, selectedCharacterPages, { useMagicApiRepair });
                     if (onRefreshStory) {
                       await onRefreshStory();
                     }
@@ -994,6 +1038,7 @@ export function RepairWorkflowPanel({
                 >
                   <Wrench className="w-4 h-4" />
                   Repair {selectedCharacter || 'Character'} on {selectedCharacterPages.length} pages
+                  {useMagicApiRepair && <span className="text-xs opacity-75">(MagicAPI)</span>}
                 </button>
 
                 {Object.keys(workflowState.characterRepairResults.pagesRepaired).length > 0 && (
