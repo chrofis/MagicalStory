@@ -619,13 +619,33 @@ When enabled, admins can:
 │                                                                 │
 │  1. GENERATE IMAGE (Gemini)                                     │
 │                                                                 │
-│  2. QUALITY EVALUATION (evaluateImageQuality)                   │
-│     Model: Gemini 2.5 Flash                                     │
-│     Returns:                                                    │
-│       - score (0-100)                                           │
-│       - fixTargets[] with bounding boxes                        │
-│       - matches[] (character → figure mapping with face_bbox)   │
-│       - identity_sync[] (face-specific issues)                  │
+│  2. PARALLEL EVALUATION (evaluateImageQuality)                  │
+│     Runs TWO evaluations in parallel:                           │
+│                                                                 │
+│     2a. VISUAL QUALITY (image-evaluation.txt)                   │
+│         Model: Gemini 2.5 Flash                                 │
+│         Checks:                                                 │
+│           - Artifacts (extra limbs, cross-eyes, floating)       │
+│           - Anatomy (proportions, limb attachment)              │
+│           - Character consistency (age, height, clothing match) │
+│           - Spatial/action validation (pointing direction)      │
+│         Returns:                                                │
+│           - score (0-100)                                       │
+│           - fixTargets[] with bounding boxes                    │
+│           - matches[] (character → figure mapping)              │
+│                                                                 │
+│     2b. SEMANTIC FIDELITY (image-semantic.txt) - if pageText    │
+│         Model: Gemini 2.5 Flash                                 │
+│         Checks:                                                 │
+│           - Action direction ("A chases B" not "B chases A")    │
+│           - Relationship accuracy (who helps whom)              │
+│           - Spatial arrangement matches story text              │
+│         Returns:                                                │
+│           - semanticIssues[] with severity                      │
+│         Penalties applied to score:                             │
+│           - CRITICAL: -30 (action completely reversed)          │
+│           - MAJOR: -20 (relationship direction wrong)           │
+│           - MINOR: -10 (ambiguous)                              │
 │                                                                 │
 │  3. INCREMENTAL CONSISTENCY CHECK (evaluateIncrementalConsistency)
 │     Model: Gemini 2.5 Flash                                     │
@@ -701,7 +721,8 @@ When enabled, admins can:
 
 | Source | When | What it catches |
 |--------|------|-----------------|
-| **Quality Eval** | Per page | Anatomy, faces, hands, missing objects, wrong colors |
+| **Visual Quality Eval** | Per page | Anatomy, faces, hands, missing objects, wrong colors |
+| **Semantic Fidelity** | Per page (parallel) | Action direction wrong, relationship reversed, spatial mismatch |
 | **Incremental Consistency** | Per page (vs previous) | Character drift, clothing changes, style shifts |
 | **Final Consistency** | After all pages | Cross-story inconsistencies missed earlier |
 
