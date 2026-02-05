@@ -719,12 +719,14 @@ When enabled, admins can:
 
 ### Issue Sources for Repair
 
-| Source | When | What it catches |
-|--------|------|-----------------|
-| **Visual Quality Eval** | Per page | Anatomy, faces, hands, missing objects, wrong colors |
-| **Semantic Fidelity** | Per page (parallel) | Action direction wrong, relationship reversed, spatial mismatch |
-| **Incremental Consistency** | Per page (vs previous) | Character drift, clothing changes, style shifts |
-| **Final Consistency** | After all pages | Cross-story inconsistencies missed earlier |
+| Source | When | What it catches | Triggers |
+|--------|------|-----------------|----------|
+| **Visual Quality Eval** | Per page | Anatomy, faces, hands, missing objects, wrong colors | Regenerate or grid repair |
+| **Semantic Fidelity** | Per page (parallel) | Action direction wrong, relationship reversed | **Regenerate only** (CRITICAL/MAJOR) |
+| **Incremental Consistency** | Per page (vs previous) | Character drift, clothing changes, style shifts | Grid repair |
+| **Final Consistency** | After all pages | Cross-story inconsistencies missed earlier | Grid repair |
+
+**Note:** Semantic issues require full regeneration because the composition is wrong - inpainting can't fix "A chasing B" when it should be "B chasing A".
 
 ### Final Consistency Check Systems (Detailed)
 
