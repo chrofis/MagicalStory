@@ -652,8 +652,7 @@ export default function StoryWizard() {
         setStoryTitle(quickMeta.title);
         setStoryLanguage(quickMeta.language);
         setLanguageLevel(quickMeta.languageLevel);
-        setDedication(quickMeta.dedication || '');
-        setArtStyle(quickMeta.artStyle || 'pixar');
+        // Note: dedication and artStyle come from full metadata (not quick-metadata)
 
         // Initialize empty scene images array with page count for lazy loading
         // Images will show placeholders until loaded
@@ -700,6 +699,8 @@ export default function StoryWizard() {
             setStyledAvatarGeneration(fullMeta.styledAvatarGeneration || []);
             setCostumedAvatarGeneration(fullMeta.costumedAvatarGeneration || []);
             setStoryType(fullMeta.storyType || '');
+            setArtStyle(fullMeta.artStyle || 'pixar');
+            setDedication(fullMeta.dedication || '');
 
             // Generation log
             if (fullMeta.generationLog?.length) {
@@ -729,12 +730,41 @@ export default function StoryWizard() {
               setClothingRequirements(null);
             }
 
-            // Scene images metadata (without imageData - preserves version info, quality scores, etc.)
-            setSceneImages(fullMeta.sceneImages || []);
+            // Scene images metadata - MERGE with existing imageData (don't overwrite loaded images)
+            setSceneImages(prev => {
+              const metaScenes = fullMeta.sceneImages || [];
+              return metaScenes.map(metaScene => {
+                const existing = prev.find(p => p.pageNumber === metaScene.pageNumber);
+                // Keep existing imageData if already loaded, add metadata
+                return {
+                  ...metaScene,
+                  imageData: existing?.imageData || metaScene.imageData,
+                };
+              });
+            });
             setSceneDescriptions(fullMeta.sceneDescriptions || []);
 
-            // Cover images metadata (without imageData)
-            setCoverImages(fullMeta.coverImages || { frontCover: null, initialPage: null, backCover: null });
+            // Cover images metadata - MERGE with existing imageData (don't overwrite loaded images)
+            setCoverImages(prev => {
+              const newCovers = fullMeta.coverImages || { frontCover: null, initialPage: null, backCover: null };
+              return {
+                frontCover: newCovers.frontCover ? {
+                  ...(typeof newCovers.frontCover === 'object' ? newCovers.frontCover : { imageData: newCovers.frontCover }),
+                  imageData: (prev.frontCover && typeof prev.frontCover === 'object' ? prev.frontCover.imageData : prev.frontCover as string) ||
+                             (typeof newCovers.frontCover === 'object' ? newCovers.frontCover.imageData : newCovers.frontCover),
+                } : null,
+                initialPage: newCovers.initialPage ? {
+                  ...(typeof newCovers.initialPage === 'object' ? newCovers.initialPage : { imageData: newCovers.initialPage }),
+                  imageData: (prev.initialPage && typeof prev.initialPage === 'object' ? prev.initialPage.imageData : prev.initialPage as string) ||
+                             (typeof newCovers.initialPage === 'object' ? newCovers.initialPage.imageData : newCovers.initialPage),
+                } : null,
+                backCover: newCovers.backCover ? {
+                  ...(typeof newCovers.backCover === 'object' ? newCovers.backCover : { imageData: newCovers.backCover }),
+                  imageData: (prev.backCover && typeof prev.backCover === 'object' ? prev.backCover.imageData : prev.backCover as string) ||
+                             (typeof newCovers.backCover === 'object' ? newCovers.backCover.imageData : newCovers.backCover),
+                } : null,
+              };
+            });
 
             // Partial story fields
             setIsPartialStory(fullMeta.isPartial || false);

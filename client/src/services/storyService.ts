@@ -174,13 +174,12 @@ export const storyService = {
 
   // Ultra-fast metadata for instant initial render (< 100ms response time)
   // Returns only what's needed to show title + cover placeholder immediately
+  // Note: dedication and artStyle come from full metadata load (not in quick-metadata)
   async getQuickMetadata(id: string): Promise<{
     id: string;
     title: string;
     language: StoryLanguageCode;
     languageLevel: LanguageLevel;
-    dedication?: string;
-    artStyle?: string;
     pageCount: number;
     hasFrontCover: boolean;
   } | null> {
