@@ -2874,6 +2874,22 @@ function classifyIssues(evaluation) {
     });
   }
 
+  // 6. Semantic fidelity issues (action direction wrong, relationship reversed)
+  const semanticResult = evaluation.semanticResult;
+  if (semanticResult?.semanticIssues && semanticResult.semanticIssues.length > 0) {
+    for (const issue of semanticResult.semanticIssues) {
+      // CRITICAL and MAJOR semantic issues trigger regeneration
+      if (issue.severity === 'CRITICAL' || issue.severity === 'MAJOR') {
+        majorIssues.push({
+          type: 'semantic_mismatch',
+          severity: issue.severity,
+          details: { action: issue.action, observed: issue.observed, expected: issue.expected },
+          reason: `Semantic: ${issue.problem}`
+        });
+      }
+    }
+  }
+
   // Check for style mismatch
   const styleMismatch = scene.style_consistent === false;
 

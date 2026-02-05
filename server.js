@@ -5410,6 +5410,23 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
 
     const pages = {};
 
+    // Get character photos for reference images
+    const characters = storyData.characters || [];
+    const characterPhotos = characters
+      .filter(c => c.photoUrl || c.avatars?.styled)
+      .map(c => ({
+        name: c.name,
+        photoUrl: c.avatars?.styled || c.photoUrl
+      }));
+
+    // Helper to extract page text from story
+    const getPageText = (storyText, pageNum) => {
+      if (!storyText) return null;
+      const pageRegex = new RegExp(`---\\s*Page\\s*${pageNum}\\s*---([\\s\\S]*?)(?=---\\s*Page|$)`, 'i');
+      const match = storyText.match(pageRegex);
+      return match ? match[1].trim() : null;
+    };
+
     for (const pageNumber of pageNumbers) {
       const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
       if (!scene) continue;
@@ -5434,7 +5451,19 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           continue;
         }
 
-        const evaluation = await evaluateImageQuality(imageData, scene.description);
+        // Get page text for semantic fidelity check
+        const pageText = getPageText(storyData.storyText, pageNumber);
+
+        // Run evaluation with full parameters including storyText for semantic check
+        const evaluation = await evaluateImageQuality(
+          imageData,
+          scene.description,       // originalPrompt
+          characterPhotos,         // referenceImages
+          'scene',                 // evaluationType
+          null,                    // qualityModelOverride
+          `PAGE ${pageNumber}`,    // pageContext
+          pageText                 // storyText for semantic fidelity
+        );
 
         if (!evaluation) {
           log.warn(`[REPAIR-WORKFLOW] Page ${pageNumber} evaluation returned null`);
@@ -5451,6 +5480,9 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
         if (evaluation.issuesSummary) {
           log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - issues: ${evaluation.issuesSummary}`);
         }
+        if (evaluation.semanticResult?.semanticIssues?.length > 0) {
+          log.info(`🔍 [REPAIR-WORKFLOW] Page ${pageNumber} - semantic issues: ${evaluation.semanticResult.semanticIssues.map(i => i.problem).join('; ')}`);
+        }
 
         // Update scene with new evaluation
         scene.qualityScore = evaluation.score;
@@ -5462,7 +5494,8 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           verdict: evaluation.verdict,
           issuesSummary: evaluation.issuesSummary || '',
           reasoning: evaluation.reasoning,
-          fixableIssues: evaluation.fixableIssues || []
+          fixableIssues: evaluation.fixableIssues || [],
+          semanticResult: evaluation.semanticResult || null
         };
       } catch (evalErr) {
         log.error(`Error evaluating page ${pageNumber}:`, evalErr);
