@@ -1273,6 +1273,25 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
+// Protection against malformed URL attacks (e.g. /%c0 path traversal probes)
+app.use((req, res, next) => {
+  try {
+    decodeURIComponent(req.path);
+    next();
+  } catch (e) {
+    log.warn(`🛡️ Blocked malformed URL: ${req.path}`);
+    res.status(400).send('Bad Request');
+  }
+});
+
+// Fast health check - BEFORE static files for quick Railway health checks
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Serve static files
 // Priority: 1. Built React app (dist/), 2. Images folder, 3. Legacy HTML files
 const distPath = path.join(__dirname, 'dist');
@@ -5510,17 +5529,18 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
   }
 });
 
-// Step 6: Repair characters using repairSinglePage
+// Step 6: Repair characters using repairSinglePage or MagicAPI
 app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs } = req.body;
+    const { repairs, useMagicApiRepair } = req.body;
 
     if (!repairs || !Array.isArray(repairs) || repairs.length === 0) {
       return res.status(400).json({ error: 'repairs array is required' });
     }
 
-    log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id}`);
+    const repairMethod = useMagicApiRepair ? 'MagicAPI' : 'Gemini';
+    log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
     const { repairSinglePage } = require('./server/lib/entityConsistency');
     const results = [];
@@ -5593,8 +5613,93 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
 
         for (const pageNumber of pages) {
           try {
-            log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber}`);
-            const repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+            log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
+
+            let repairResult;
+
+            if (useMagicApiRepair) {
+              // Use MagicAPI face swap + hair fix pipeline
+              const { repairFaceWithMagicApi, isMagicApiConfigured } = require('./server/lib/magicApi');
+              const { getStyledAvatarForClothing, collectEntityAppearances } = require('./server/lib/entityConsistency');
+
+              if (!isMagicApiConfigured()) {
+                log.warn(`[REPAIR-WORKFLOW] MagicAPI not configured, falling back to Gemini`);
+                repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+              } else {
+                // Get the scene image for this page
+                const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+                if (!sceneImage || !sceneImage.imageData) {
+                  log.warn(`[REPAIR-WORKFLOW] No scene image for page ${pageNumber}`);
+                  continue;
+                }
+
+                // Get character appearance with bounding box
+                const sceneDescriptions = storyData.sceneDescriptions || [];
+                const entityAppearances = collectEntityAppearances([sceneImage], [character], sceneDescriptions);
+                const appearances = entityAppearances.get(characterName);
+                const appearance = appearances?.find(a => a.pageNumber === pageNumber);
+
+                if (!appearance?.faceBox && !appearance?.bodyBox) {
+                  log.warn(`[REPAIR-WORKFLOW] No bounding box for ${characterName} on page ${pageNumber}`);
+                  // Fall back to Gemini repair
+                  repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+                } else {
+                  // Get avatar for this character
+                  const clothingCategory = appearance.clothing || 'standard';
+                  const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+
+                  if (!styledAvatar) {
+                    log.warn(`[REPAIR-WORKFLOW] No avatar for ${characterName}, falling back to Gemini`);
+                    repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+                  } else {
+                    // Convert images to buffers
+                    const sceneBuffer = Buffer.from(
+                      sceneImage.imageData.replace(/^data:image\/\w+;base64,/, ''),
+                      'base64'
+                    );
+                    const avatarBuffer = styledAvatar.startsWith('data:')
+                      ? Buffer.from(styledAvatar.replace(/^data:image\/\w+;base64,/, ''), 'base64')
+                      : Buffer.from(styledAvatar, 'base64');
+
+                    // Get bounding box (prefer face box, fall back to body box)
+                    const bbox = appearance.faceBox || appearance.bodyBox;
+
+                    // Build hair config from character physical traits
+                    const hairConfig = {
+                      color: character.physical?.hairColor,
+                      style: character.physical?.hairStyle || character.physical?.hairLength,
+                      property: 'textured'
+                    };
+
+                    log.info(`[REPAIR-WORKFLOW] MagicAPI repair: bbox=${JSON.stringify(bbox)}, hair=${JSON.stringify(hairConfig)}`);
+
+                    // Call MagicAPI repair
+                    const magicResult = await repairFaceWithMagicApi(sceneBuffer, avatarBuffer, bbox, hairConfig);
+
+                    if (magicResult.success && magicResult.repairedBuffer) {
+                      // Convert result to base64 data URI
+                      const repairedDataUri = `data:image/png;base64,${magicResult.repairedBuffer.toString('base64')}`;
+                      repairResult = {
+                        success: true,
+                        updatedImages: [{
+                          pageNumber,
+                          imageData: repairedDataUri
+                        }],
+                        method: 'magicapi',
+                        clothingCategory,
+                        cropHistory: magicResult.cropHistory
+                      };
+                    } else {
+                      log.warn(`[REPAIR-WORKFLOW] MagicAPI repair failed, falling back to Gemini`);
+                      repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+                    }
+                  }
+                }
+              }
+            } else {
+              // Use standard Gemini repair
+              repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+            }
 
             if (!repairResult.success) {
               log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${repairResult.error}`);
@@ -5624,16 +5729,18 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
                 }
 
                 // Add new version
+                const isMagicApiMethod = repairResult.method === 'magicapi';
                 existingImage.imageVersions.push({
                   imageData: update.imageData,
                   description: existingImage.description,
                   prompt: existingImage.prompt,
-                  modelId: 'gemini-2.0-flash-preview-image-generation',
+                  modelId: isMagicApiMethod ? 'magicapi-faceswap-hair' : 'gemini-2.0-flash-preview-image-generation',
                   createdAt: new Date().toISOString(),
                   isActive: true,
                   type: 'entity-repair',
                   entityRepairedFor: characterName,
-                  clothingCategory: repairResult.clothingCategory
+                  clothingCategory: repairResult.clothingCategory,
+                  ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
                 });
 
                 existingImage.imageData = update.imageData;
