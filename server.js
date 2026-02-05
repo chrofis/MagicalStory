@@ -5451,8 +5451,9 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           continue;
         }
 
-        // Get page text for semantic fidelity check
-        const pageText = getPageText(storyData.storyText, pageNumber);
+        // Get page text for semantic fidelity check (with fallbacks for older formats)
+        const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
+        const pageText = getPageText(fullStoryText, pageNumber) || scene.text || null;
 
         // Run evaluation with full parameters including storyText for semantic check
         const evaluation = await evaluateImageQuality(
