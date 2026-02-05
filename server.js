@@ -3508,8 +3508,10 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
       } else {
         sceneImages[existingIndex].imageVersions = [newVersion];
       }
-      // Update main fields
-      Object.assign(sceneImages[existingIndex], newImageData);
+      // Update main fields (but NOT imageData - that would cause duplicate image storage)
+      // The new image is stored in imageVersions and activeVersion meta points to it
+      const { imageData: _unused, ...metadataOnly } = newImageData;
+      Object.assign(sceneImages[existingIndex], metadataOnly);
     } else {
       newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
@@ -3964,7 +3966,10 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
       } else {
         sceneImages[existingImageIndex].imageVersions = [newVersion];
       }
-      Object.assign(sceneImages[existingImageIndex], newImageData);
+      // Update main fields (but NOT imageData - that would cause duplicate image storage)
+      // The new image is stored in imageVersions and activeVersion meta points to it
+      const { imageData: _unusedImg, ...metadataOnly } = newImageData;
+      Object.assign(sceneImages[existingImageIndex], metadataOnly);
     } else {
       newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
@@ -5025,7 +5030,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
           if (!existingImage.preEntityRepairImage) {
             existingImage.preEntityRepairImage = existingImage.imageData;
           }
-          existingImage.imageData = update.imageData;
+          // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
+          // The new image is stored in imageVersions and activeVersion meta points to it
           existingImage.entityRepaired = true;
           existingImage.entityRepairedAt = new Date().toISOString();
           existingImage.entityRepairedFor = entityName;
@@ -5145,7 +5151,8 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         if (!existingImage.preEntityRepairImage) {
           existingImage.preEntityRepairImage = existingImage.imageData;
         }
-        existingImage.imageData = update.imageData;
+        // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
+        // The new image is stored in imageVersions and activeVersion meta points to it
         existingImage.entityRepaired = true;
         existingImage.entityRepairedAt = new Date().toISOString();
         existingImage.entityRepairedFor = entityName;
@@ -5352,8 +5359,8 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
             v.isActive = i === newVersionIndex;
           });
 
-          // Update scene with new image
-          scene.imageData = result.imageData;
+          // Update scene metadata (but NOT imageData - that would cause duplicate image storage)
+          // The new image is stored in imageVersions and activeVersion meta points to it
           scene.description = result.sceneDescription;
           scene.prompt = result.imagePrompt;
           scene.qualityScore = result.qualityScore;
@@ -5653,6 +5660,7 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
         }
 
         const pagesRepaired = [];
+        const pagesFailed = [];
 
         // Get issues for this character from the consistency report
         const entityReport = storyData.finalChecksReport?.entity;
@@ -5752,7 +5760,14 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
             }
 
             if (!repairResult.success) {
-              log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${repairResult.error}`);
+              const reason = repairResult.reason || repairResult.error || 'Unknown error';
+              log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${reason}`);
+              pagesFailed.push({
+                pageNumber,
+                reason,
+                rejected: repairResult.rejected || false,
+                comparison: repairResult.comparison || null
+              });
               continue;
             }
 
@@ -5793,7 +5808,8 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
                   ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
                 });
 
-                existingImage.imageData = update.imageData;
+                // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
+                // The new image is stored in imageVersions and activeVersion meta points to it
                 existingImage.entityRepaired = true;
                 existingImage.entityRepairedAt = new Date().toISOString();
                 existingImage.entityRepairedFor = characterName;
@@ -5825,10 +5841,10 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
           }
         }
 
-        results.push({ character: characterName, pagesRepaired });
+        results.push({ character: characterName, pagesRepaired, pagesFailed });
       } catch (repairErr) {
         log.error(`Error repairing character ${characterName}:`, repairErr);
-        results.push({ character: characterName, pagesRepaired: [], error: repairErr.message });
+        results.push({ character: characterName, pagesRepaired: [], pagesFailed: [], error: repairErr.message });
       }
     }
 
@@ -5910,8 +5926,8 @@ app.post('/api/stories/:id/repair-workflow/artifact-repair', authenticateToken, 
             v.isActive = i === newVersionIndex;
           });
 
-          // Update scene with repaired image
-          scene.imageData = repairResult.imageData;
+          // Update scene metadata (but NOT imageData - that would cause duplicate image storage)
+          // The new image is stored in imageVersions and activeVersion meta points to it
           scene.qualityScore = repairResult.score;
 
           pagesProcessed.push(pageNumber);
@@ -12351,16 +12367,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   source: 'consistency-regen'
                 });
 
-                existingImage.imageData = imageResult.imageData;
+                // NOTE: Do NOT copy to existingImage.imageData - that would cause the image
+                // to be saved twice (once as version 0, once in imageVersions). The new image
+                // is stored in imageVersions and activeVersion meta points to it.
+                // Keep metadata on main object for display purposes.
                 existingImage.prompt = imagePrompt;
                 existingImage.description = expandedDescription;
                 existingImage.qualityScore = imageResult.score;
-                log.info(`✅ [CONSISTENCY REGEN] [PAGE ${pageNum}] Replaced image (score: ${imageResult.score || 'N/A'}%)`);
+                log.info(`✅ [CONSISTENCY REGEN] [PAGE ${pageNum}] Added new version (score: ${imageResult.score || 'N/A'}%, version ${existingImage.imageVersions.length})`);
 
-                // Note: story_images update skipped during initial generation
-                // The story doesn't exist in the database yet - it's saved after consistency regen completes
-                // The regenerated image is already in allImages array and will be saved with the story
-                log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image updated in memory (will be saved with story)`);
+                log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] New version added to imageVersions (will be saved with story)`);
               } else {
                 log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Regeneration failed, keeping original`);
               }

@@ -45,6 +45,7 @@ function createInitialState(): RepairWorkflowState {
     characterRepairResults: {
       charactersProcessed: [],
       pagesRepaired: {},
+      pagesFailed: {},
     },
     artifactRepairResults: {
       pagesProcessed: [],
@@ -566,8 +567,9 @@ export function useRepairWorkflow({
     try {
       const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages }], options);
 
-      // Get pages repaired from the result - now includes imageData and versionIndex
+      // Get pages repaired and failed from the result
       const pagesRepaired = result.results?.[0]?.pagesRepaired || [];
+      const pagesFailed = result.results?.[0]?.pagesFailed || [];
 
       // Notify parent of image updates for each repaired page
       for (const repair of pagesRepaired) {
@@ -580,8 +582,15 @@ export function useRepairWorkflow({
         }
       }
 
+      // Log failed pages
+      if (pagesFailed.length > 0) {
+        console.warn(`[RepairWorkflow] ${pagesFailed.length} pages failed repair for ${characterName}:`,
+          pagesFailed.map(f => `page ${f.pageNumber}: ${f.reason}`).join(', '));
+      }
+
       // Extract just page numbers for the state
-      const pageNumbers = pagesRepaired.map(r => typeof r === 'number' ? r : r.pageNumber);
+      const repairedPageNumbers = pagesRepaired.map(r => typeof r === 'number' ? r : r.pageNumber);
+      const failedPages = pagesFailed.map(f => ({ pageNumber: f.pageNumber, reason: f.reason, rejected: f.rejected }));
 
       setWorkflowState(prev => ({
         ...prev,
@@ -589,12 +598,16 @@ export function useRepairWorkflow({
           charactersProcessed: [...prev.characterRepairResults.charactersProcessed, characterName],
           pagesRepaired: {
             ...prev.characterRepairResults.pagesRepaired,
-            [characterName]: pageNumbers,
+            [characterName]: repairedPageNumbers,
+          },
+          pagesFailed: {
+            ...prev.characterRepairResults.pagesFailed,
+            [characterName]: failedPages,
           },
         },
         stepStatus: {
           ...prev.stepStatus,
-          'character-repair': 'completed',
+          'character-repair': pagesFailed.length > 0 && pagesRepaired.length === 0 ? 'failed' : 'completed',
         },
       }));
     } catch (error) {

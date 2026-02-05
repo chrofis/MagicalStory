@@ -936,6 +936,7 @@ export interface RepairWorkflowState {
   characterRepairResults: {
     charactersProcessed: string[];
     pagesRepaired: Record<string, number[]>;
+    pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean }>>;
   };
   artifactRepairResults: {
     pagesProcessed: number[];
