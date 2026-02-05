@@ -1035,12 +1035,36 @@ async function rehydrateStoryImages(storyId, storyData) {
     }
   }
 
+  // Load ALL version images for populating imageVersions arrays
+  const allVersionImages = await dbQuery(
+    `SELECT image_type, page_number, version_index, image_data
+     FROM story_images WHERE story_id = $1
+     ORDER BY page_number, version_index`,
+    [storyId]
+  );
+
   // Populate sceneImages
   if (storyData.sceneImages) {
     for (const scene of storyData.sceneImages) {
       if (!scene.imageData) {
         const img = images.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
         if (img) scene.imageData = img.image_data;
+      }
+
+      // Populate imageVersions with their imageData from database
+      if (scene.imageVersions && scene.imageVersions.length > 0) {
+        for (let vIdx = 0; vIdx < scene.imageVersions.length; vIdx++) {
+          const version = scene.imageVersions[vIdx];
+          if (!version.imageData) {
+            // Version 0 in imageVersions = version_index 0 in DB, etc.
+            const versionImg = allVersionImages.find(
+              i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === vIdx
+            );
+            if (versionImg) {
+              version.imageData = versionImg.image_data;
+            }
+          }
+        }
       }
     }
   }
@@ -1049,13 +1073,29 @@ async function rehydrateStoryImages(storyId, storyData) {
   if (storyData.coverImages) {
     const covers = ['frontCover', 'backCover', 'initialPage'];
     for (const coverType of covers) {
-      if (storyData.coverImages[coverType] && !getCoverData(storyData.coverImages[coverType])) {
+      const cover = storyData.coverImages[coverType];
+      if (cover && !getCoverData(cover)) {
         const img = images.find(i => i.image_type === coverType);
         if (img) {
-          if (typeof storyData.coverImages[coverType] === 'string') {
+          if (typeof cover === 'string') {
             storyData.coverImages[coverType] = img.image_data;
-          } else if (storyData.coverImages[coverType]) {
-            storyData.coverImages[coverType].imageData = img.image_data;
+          } else {
+            cover.imageData = img.image_data;
+          }
+        }
+      }
+
+      // Populate cover imageVersions with their imageData from database
+      if (cover && typeof cover === 'object' && cover.imageVersions && cover.imageVersions.length > 0) {
+        for (let vIdx = 0; vIdx < cover.imageVersions.length; vIdx++) {
+          const version = cover.imageVersions[vIdx];
+          if (!version.imageData) {
+            const versionImg = allVersionImages.find(
+              i => i.image_type === coverType && i.version_index === vIdx
+            );
+            if (versionImg) {
+              version.imageData = versionImg.image_data;
+            }
           }
         }
       }
