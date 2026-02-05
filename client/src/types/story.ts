@@ -107,12 +107,34 @@ export interface SemanticEvaluationResult {
   rawScore?: number;
   verdict: string;
   semanticIssues: Array<{
-    action: string;
+    action?: string;
     problem: string;
     severity: 'CRITICAL' | 'MAJOR' | 'MINOR';
-    observed: string;
-    expected: string;
+    observed?: string;
+    expected?: string;
+    type?: string;
+    item?: string;
   }>;
+  // New prompt format - what was visible vs expected
+  visible?: {
+    characters?: string[];
+    objects?: string[];
+    setting?: string;
+    action?: string;
+  };
+  expected?: {
+    characters?: string[];
+    objects?: string[];
+    setting?: string;
+    action?: string;
+  };
+  issues?: Array<{
+    type: string;
+    item?: string;
+    severity: string;
+    problem: string;
+  }>;
+  // Legacy fields (old prompt format)
   storyActions?: Array<{
     action: string;
     actor: string;
@@ -886,7 +908,9 @@ export interface RepairWorkflowState {
   };
   reEvaluationResults: {
     pages: Record<number, {
-      qualityScore: number;
+      score?: number;                // Combined final score (quality - semantic penalties)
+      qualityScore: number;          // Visual quality score only
+      semanticScore?: number | null; // Semantic fidelity score only
       rawScore?: number;
       verdict?: string;
       issuesSummary?: string;

@@ -730,9 +730,10 @@ async function validateAndRepairScene(sceneJson, options = {}) {
  * @param {string} imageData - Image as data URI or base64
  * @param {string} storyText - The story text this image should depict
  * @param {string} imagePrompt - The prompt used to generate this image
+ * @param {string} sceneHint - Direct statement of what image should show (most authoritative)
  * @returns {Promise<{score: number, verdict: string, semanticIssues: Array, usage: Object}>}
  */
-async function evaluateSemanticFidelity(imageData, storyText, imagePrompt) {
+async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, sceneHint = null) {
   if (!storyText || !imageData) {
     log.debug('[SEMANTIC] Skipping semantic evaluation - missing storyText or imageData');
     return null;
@@ -752,6 +753,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt) {
 
   const prompt = fillTemplate(template, {
     STORY_TEXT: storyText,
+    SCENE_HINT: sceneHint || 'Not provided',
     IMAGE_PROMPT: imagePrompt || 'No prompt provided'
   });
 
@@ -805,6 +807,9 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt) {
     const verdict = analysis.verdict || 'UNKNOWN';
     const semanticIssues = analysis.semantic_issues || [];
 
+    // Log token usage
+    log.info(`🔍 [SEMANTIC] Token usage - input: ${usage?.promptTokenCount?.toLocaleString() || 0}, output: ${usage?.candidatesTokenCount?.toLocaleString() || 0}, cost: $${estimatedCost.toFixed(4)}`);
+
     if (semanticIssues.length > 0) {
       log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.problem).join('; ')}`);
     } else {
@@ -816,9 +821,20 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt) {
       rawScore: score,
       verdict,
       semanticIssues,
+      // Full analysis for UI display
+      visible: analysis.visible || null,
+      expected: analysis.expected || null,
+      issues: analysis.issues || [],
+      // Legacy fields (old prompt format)
       storyActions: analysis.story_actions || [],
       semanticChecks: analysis.semantic_checks || [],
-      usage: { tokens, estimatedCost, elapsed }
+      usage: {
+        tokens,
+        input_tokens: usage?.promptTokenCount || 0,
+        output_tokens: usage?.candidatesTokenCount || 0,
+        estimatedCost,
+        elapsed
+      }
     };
   } catch (err) {
     log.error(`[SEMANTIC] Evaluation failed: ${err.message}`);

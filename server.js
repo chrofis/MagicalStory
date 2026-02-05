@@ -5427,9 +5427,13 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
       return match ? match[1].trim() : null;
     };
 
-    for (const pageNumber of pageNumbers) {
+    // Run evaluations in parallel with concurrency limit
+    const evalLimit = pLimit(10);
+    const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
+
+    await Promise.all(pageNumbers.map(pageNumber => evalLimit(async () => {
       const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
-      if (!scene) continue;
+      if (!scene) return;
 
       try {
         // Get image data - check active version first, then fallback to scene.imageData
@@ -5448,12 +5452,14 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
             fixableIssues: [],
             error: 'No valid image data'
           };
-          continue;
+          return;
         }
 
-        // Get page text for semantic fidelity check (with fallbacks for older formats)
-        const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
+        // Get page text for semantic fidelity check
         const pageText = getPageText(fullStoryText, pageNumber) || scene.text || null;
+
+        // Get scene hint (most direct statement of what image should show)
+        const sceneHint = scene.outlineExtract || scene.sceneHint || null;
 
         // Run evaluation with full parameters including storyText for semantic check
         const evaluation = await evaluateImageQuality(
@@ -5463,7 +5469,8 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           'scene',                 // evaluationType
           null,                    // qualityModelOverride
           `PAGE ${pageNumber}`,    // pageContext
-          pageText                 // storyText for semantic fidelity
+          pageText,                // storyText for semantic fidelity
+          sceneHint                // sceneHint for semantic evaluation
         );
 
         if (!evaluation) {
@@ -5473,16 +5480,15 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
             fixableIssues: [],
             error: 'Evaluation returned null'
           };
-          continue;
+          return;
         }
 
-        // Log the raw score and reasoning for debugging
-        log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - rawScore: ${evaluation.rawScore}/10, score: ${evaluation.score}/100, verdict: ${evaluation.verdict}`);
+        // Log both scores for debugging
+        const qualityPct = evaluation.qualityScore ?? evaluation.score;
+        const semanticPct = evaluation.semanticScore ?? 100;
+        log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - Quality: ${qualityPct}, Semantic: ${semanticPct}, Final: ${evaluation.score}`);
         if (evaluation.issuesSummary) {
           log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - issues: ${evaluation.issuesSummary}`);
-        }
-        if (evaluation.semanticResult?.semanticIssues?.length > 0) {
-          log.info(`🔍 [REPAIR-WORKFLOW] Page ${pageNumber} - semantic issues: ${evaluation.semanticResult.semanticIssues.map(i => i.problem).join('; ')}`);
         }
 
         // Update scene with new evaluation
@@ -5490,7 +5496,9 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
         scene.qualityReasoning = evaluation.reasoning;
 
         pages[pageNumber] = {
-          qualityScore: evaluation.score,
+          score: evaluation.score,                    // Combined final score
+          qualityScore: evaluation.qualityScore ?? evaluation.score,  // Visual quality only
+          semanticScore: evaluation.semanticScore ?? null,            // Semantic fidelity only
           rawScore: evaluation.rawScore,
           verdict: evaluation.verdict,
           issuesSummary: evaluation.issuesSummary || '',
@@ -5506,7 +5514,7 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           error: evalErr.message
         };
       }
-    }
+    })));
 
     // Save updated story
     await saveStoryData(id, storyData);
@@ -5782,18 +5790,19 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
                 existingImage.entityRepairedAt = new Date().toISOString();
                 existingImage.entityRepairedFor = characterName;
 
-                // Calculate the version index (new version is at the end of imageVersions array)
-                const newVersionIndex = existingImage.imageVersions.length - 1;
+                // Calculate the DB version index: imageVersions[N-1] → version_index N
+                // After push, length = N, so new item should be version_index = length
+                const newDbVersionIndex = existingImage.imageVersions.length;
 
                 // Save the story data with updated sceneImages
                 storyData.sceneImages = sceneImages;
                 await saveStoryData(id, storyData);
 
                 // Save the repaired image to story_images table with correct version index
-                await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, newVersionIndex);
+                await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, { versionIndex: newDbVersionIndex });
 
                 // Set the new version as active
-                await setActiveVersion(id, update.pageNumber, newVersionIndex);
+                await setActiveVersion(id, update.pageNumber, newDbVersionIndex);
 
                 pagesRepaired.push(update.pageNumber);
               }
@@ -11618,7 +11627,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           prompt: img.prompt,
           characterPhotos: img.characterPhotos,
           sceneDescription: img.sceneDescription,
-          pageText: img.text  // Story text for semantic fidelity check
+          pageText: img.text,  // Story text for semantic fidelity check
+          sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null  // Scene hint for semantic evaluation
         })),
         {
           concurrency: 10,

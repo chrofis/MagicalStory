@@ -761,14 +761,28 @@ export function RepairWorkflowPanel({
                     <h5 className="text-sm font-medium">Evaluation Results:</h5>
                     <div className="space-y-2">
                       {Object.entries(workflowState.reEvaluationResults.pages).map(([page, result]) => {
-                        const displayScore = result.rawScore ?? Math.round(result.qualityScore / 10);
-                        const scoreClass = displayScore >= 7 ? 'text-green-600' : displayScore >= 5 ? 'text-amber-600' : 'text-red-600';
+                        const finalScore = result.score ?? result.qualityScore;
+                        const qualityScore = result.qualityScore;
+                        const semanticScore = result.semanticScore;
+                        const finalScoreClass = finalScore >= 70 ? 'text-green-600' : finalScore >= 50 ? 'text-amber-600' : 'text-red-600';
                         return (
                           <div key={page} className="p-2 bg-gray-50 rounded border text-sm space-y-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium">Page {page}:</span>
-                              <span className={scoreClass}>
-                                {displayScore}/10
+                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                                Quality: {qualityScore}%
+                              </span>
+                              {semanticScore !== null && semanticScore !== undefined && (
+                                <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                                  Semantic: {semanticScore}%
+                                </span>
+                              )}
+                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                                finalScore >= 70 ? 'bg-green-100 text-green-700' :
+                                finalScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                Final: {finalScore}%
                               </span>
                               {result.verdict && (
                                 <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -794,19 +808,63 @@ export function RepairWorkflowPanel({
                                 {result.issuesSummary}
                               </p>
                             )}
-                            {result.semanticResult?.semanticIssues && result.semanticResult.semanticIssues.length > 0 && (
+                            {result.semanticResult && (
                               <div className="text-xs text-purple-700 pl-2 border-l-2 border-purple-400 bg-purple-50 p-1 rounded-r mt-1">
-                                <span className="font-medium">🔍 Semantic Issues:</span>
-                                <ul className="list-disc list-inside mt-1">
-                                  {result.semanticResult.semanticIssues.map((issue, idx) => (
-                                    <li key={idx}>
-                                      <span className={`font-medium ${
-                                        issue.severity === 'CRITICAL' ? 'text-red-600' :
-                                        issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
-                                      }`}>[{issue.severity}]</span> {issue.problem}
-                                    </li>
-                                  ))}
-                                </ul>
+                                <span className="font-medium">🔍 Semantic Analysis (Score: {result.semanticResult.score ?? 'N/A'}):</span>
+
+                                {/* Show visible vs expected */}
+                                {result.semanticResult.visible && (
+                                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                                    <div className="bg-white p-2 rounded border border-purple-200">
+                                      <div className="font-medium text-purple-800 mb-1">👁️ Visible:</div>
+                                      {result.semanticResult.visible.characters?.length > 0 && (
+                                        <div><span className="text-gray-500">Characters:</span> {result.semanticResult.visible.characters.join(', ')}</div>
+                                      )}
+                                      {result.semanticResult.visible.objects?.length > 0 && (
+                                        <div><span className="text-gray-500">Objects:</span> {result.semanticResult.visible.objects.join(', ')}</div>
+                                      )}
+                                      {result.semanticResult.visible.setting && (
+                                        <div><span className="text-gray-500">Setting:</span> {result.semanticResult.visible.setting}</div>
+                                      )}
+                                      {result.semanticResult.visible.action && (
+                                        <div><span className="text-gray-500">Action:</span> {result.semanticResult.visible.action}</div>
+                                      )}
+                                    </div>
+                                    <div className="bg-white p-2 rounded border border-purple-200">
+                                      <div className="font-medium text-purple-800 mb-1">🎯 Expected:</div>
+                                      {result.semanticResult.expected?.characters?.length > 0 && (
+                                        <div><span className="text-gray-500">Characters:</span> {result.semanticResult.expected.characters.join(', ')}</div>
+                                      )}
+                                      {result.semanticResult.expected?.objects?.length > 0 && (
+                                        <div><span className="text-gray-500">Objects:</span> {result.semanticResult.expected.objects.join(', ')}</div>
+                                      )}
+                                      {result.semanticResult.expected?.setting && (
+                                        <div><span className="text-gray-500">Setting:</span> {result.semanticResult.expected.setting}</div>
+                                      )}
+                                      {result.semanticResult.expected?.action && (
+                                        <div><span className="text-gray-500">Action:</span> {result.semanticResult.expected.action}</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Show issues */}
+                                {result.semanticResult.semanticIssues && result.semanticResult.semanticIssues.length > 0 && (
+                                  <ul className="list-disc list-inside mt-2">
+                                    {result.semanticResult.semanticIssues.map((issue, idx) => (
+                                      <li key={idx}>
+                                        <span className={`font-medium ${
+                                          issue.severity === 'CRITICAL' ? 'text-red-600' :
+                                          issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
+                                        }`}>[{issue.severity}]</span> {issue.problem}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+
+                                {result.semanticResult.semanticIssues?.length === 0 && !result.semanticResult.visible && (
+                                  <span className="text-green-600 ml-2">✓ No issues</span>
+                                )}
                               </div>
                             )}
                           </div>

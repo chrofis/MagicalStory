@@ -303,9 +303,10 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
  * @param {string|null} qualityModelOverride - Override model for quality evaluation
  * @param {string} pageContext - Page context for logging (e.g., "PAGE 5")
  * @param {string|null} storyText - Optional story text for semantic fidelity check (runs in parallel)
+ * @param {string|null} sceneHint - Direct statement of what image should show (for semantic eval)
  * @returns {Promise<Object>} Quality result with score, reasoning, semantic issues, etc.
  */
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null) {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null, sceneHint = null) {
   try {
     // Guard against undefined/invalid imageData
     if (!imageData || typeof imageData !== 'string') {
@@ -324,7 +325,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let semanticPromise = null;
     if (storyText && evaluationType === 'scene') {
       const { evaluateSemanticFidelity } = require('./sceneValidator');
-      semanticPromise = evaluateSemanticFidelity(imageData, storyText, originalPrompt);
+      semanticPromise = evaluateSemanticFidelity(imageData, storyText, originalPrompt, sceneHint);
       log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
@@ -738,8 +739,20 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         }
       }
 
+      // Aggregate usage from quality + semantic evaluations
+      const semanticUsage = semanticResult?.usage || {};
+      const totalUsage = {
+        input_tokens: qualityInputTokens + (semanticUsage.input_tokens || 0),
+        output_tokens: qualityOutputTokens + (semanticUsage.output_tokens || 0),
+        thinking_tokens: qualityThinkingTokens,
+        semantic_input_tokens: semanticUsage.input_tokens || 0,
+        semantic_output_tokens: semanticUsage.output_tokens || 0
+      };
+
       return {
-        score: finalScore,
+        score: finalScore,                    // Combined final score
+        qualityScore: score,                  // Visual quality score only
+        semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
         rawScore, // Original 0-10 score (visual only)
         verdict,
         reasoning,
@@ -750,57 +763,82 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
         semanticResult,                   // Full semantic evaluation result (if available)
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
+        usage: totalUsage,
         modelId: modelId
       };
     }
+
+    // Helper to merge semantic results into quality result
+    const mergeSemanticResult = async (qualityScore, reasoning) => {
+      let semanticResult = null;
+      let finalScore = qualityScore;
+      let issuesSummary = '';
+
+      if (semanticPromise) {
+        try {
+          semanticResult = await semanticPromise;
+          if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
+            // Apply semantic penalties to score
+            let semanticPenalty = 0;
+            for (const issue of semanticResult.semanticIssues) {
+              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
+              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
+              else semanticPenalty += 10;
+            }
+            finalScore = Math.max(0, qualityScore - semanticPenalty);
+            log.info(`🔍 [SEMANTIC] Applied ${semanticPenalty} point penalty for semantic issues (${qualityScore} → ${finalScore})`);
+            issuesSummary = `SEMANTIC: ${semanticResult.semanticIssues.map(i => i.problem).join('; ')}`;
+          }
+        } catch (semanticErr) {
+          log.warn(`[SEMANTIC] Parallel evaluation failed: ${semanticErr.message}`);
+        }
+      }
+
+      // Aggregate usage
+      const semanticUsage = semanticResult?.usage || {};
+      const totalUsage = {
+        input_tokens: qualityInputTokens + (semanticUsage.input_tokens || 0),
+        output_tokens: qualityOutputTokens + (semanticUsage.output_tokens || 0),
+        thinking_tokens: qualityThinkingTokens,
+        semantic_input_tokens: semanticUsage.input_tokens || 0,
+        semantic_output_tokens: semanticUsage.output_tokens || 0
+      };
+
+      return {
+        score: finalScore,                    // Combined final score
+        qualityScore: qualityScore,           // Visual quality score only
+        semanticScore: semanticResult?.score ?? null,  // Semantic fidelity score (0-100)
+        reasoning,
+        issuesSummary,
+        fixTargets,
+        semanticResult,
+        usage: totalUsage,
+        modelId: modelId
+      };
+    };
 
     // Parse "Score: X/10" format (new simplified format)
     const score10Match = responseText.match(/Score:\s*(\d+)\/10\b/i);
     if (score10Match) {
       const rawScore = parseInt(score10Match[1]);
-      const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
-      log.verbose(`⭐ [QUALITY] Image quality score: ${rawScore}/10 (${score}/100)`);
-      // Await semantic to prevent memory leak (legacy format doesn't merge results)
-      if (semanticPromise) await semanticPromise.catch(() => {});
-      return {
-        score,
-        reasoning: responseText,
-        fixTargets, // Bounding boxes for auto-repair
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
-        modelId: modelId
-      };
+      const qualityScore = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
+      log.verbose(`⭐ [QUALITY] Image quality score: ${rawScore}/10 (${qualityScore}/100)`);
+      return mergeSemanticResult(qualityScore, responseText);
     }
 
     // Fallback: Parse legacy format "Score: XX/100"
     const scoreMatch = responseText.match(/Score:\s*(\d+)\/100/i);
     if (scoreMatch) {
-      const score = parseInt(scoreMatch[1]);
-      log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format)`);
-      // Await semantic to prevent memory leak
-      if (semanticPromise) await semanticPromise.catch(() => {});
-      return {
-        score,
-        reasoning: responseText,
-        fixTargets, // Bounding boxes for auto-repair
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
-        modelId: modelId
-      };
+      const qualityScore = parseInt(scoreMatch[1]);
+      log.verbose(`⭐ [QUALITY] Image quality score: ${qualityScore}/100 (legacy format)`);
+      return mergeSemanticResult(qualityScore, responseText);
     }
 
     // Fallback: Try parsing just a number (0-100)
     const numericScore = parseFloat(responseText);
     if (!isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
       log.verbose(`⭐ [QUALITY] Image quality score: ${numericScore}/100 (numeric format)`);
-      // Await semantic to prevent memory leak
-      if (semanticPromise) await semanticPromise.catch(() => {});
-      return {
-        score: numericScore,
-        reasoning: responseText,
-        fixTargets, // Bounding boxes for auto-repair
-        usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
-        modelId: modelId
-      };
+      return mergeSemanticResult(numericScore, responseText);
     }
 
     log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 200));
@@ -2667,6 +2705,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
  * @param {Array} images[].characterPhotos - Character reference photos
  * @param {string} images[].sceneDescription - Scene description for metadata extraction
  * @param {string} images[].pageText - Story text for this page (for semantic fidelity check)
+ * @param {string} images[].sceneHint - Direct statement of what image should show (for semantic eval)
  * @param {Object} options - Evaluation options
  * @param {number} options.concurrency - Max concurrent evaluations (default: 10)
  * @param {string|null} options.qualityModelOverride - Model override for quality evaluation
@@ -2708,7 +2747,8 @@ async function evaluateImageBatch(images, options = {}) {
         'scene',
         qualityModelOverride,
         pageLabel,
-        img.pageText || null  // Story text for semantic fidelity check
+        img.pageText || null,  // Story text for semantic fidelity check
+        img.sceneHint || null  // Scene hint for semantic evaluation
       );
 
       // Extract scene metadata for character positions and clothing
@@ -2760,7 +2800,9 @@ async function evaluateImageBatch(images, options = {}) {
       const evalResult = {
         pageNumber: img.pageNumber,
         evaluated: true,
-        qualityScore: qualityResult?.score ?? null,
+        score: qualityResult?.score ?? null,                    // Combined final score
+        qualityScore: qualityResult?.qualityScore ?? qualityResult?.score ?? null,  // Visual quality only
+        semanticScore: qualityResult?.semanticScore ?? null,    // Semantic fidelity only
         reasoning: qualityResult?.reasoning || null,
         issuesSummary: qualityResult?.issuesSummary || null,
         fixableIssues: qualityResult?.fixableIssues || [],
@@ -2781,7 +2823,7 @@ async function evaluateImageBatch(images, options = {}) {
         actualText: qualityResult?.actualText || null
       };
 
-      log.debug(`✅ [BATCH EVAL] ${pageLabel}: Score ${evalResult.qualityScore ?? 'N/A'}%, ${enrichedFixTargets.length} fix targets`);
+      log.debug(`✅ [BATCH EVAL] ${pageLabel}: Quality ${evalResult.qualityScore ?? 'N/A'}%, Semantic ${evalResult.semanticScore ?? 'N/A'}%, Final ${evalResult.score ?? 'N/A'}%, ${enrichedFixTargets.length} fix targets`);
       return evalResult;
     } catch (error) {
       log.error(`❌ [BATCH EVAL] ${pageLabel}: Evaluation failed - ${error.message}`);
@@ -3033,7 +3075,8 @@ function buildRepairPlan(pageEvaluations, options = {}) {
 
   for (const evaluation of pageEvaluations) {
     const pageNum = evaluation.pageNumber;
-    const score = evaluation.qualityScore;
+    // Use combined final score (includes semantic penalties), fallback to qualityScore for backwards compat
+    const score = evaluation.score ?? evaluation.qualityScore;
     const hasFixable = (evaluation.enrichedFixTargets?.length > 0) ||
                        (evaluation.fixableIssues?.length > 0);
     const evaluationFailed = !evaluation.evaluated;
@@ -3121,7 +3164,8 @@ function buildCategorizedRepairPlan(pageEvaluations, options = {}) {
 
   for (const evaluation of pageEvaluations) {
     const pageNum = evaluation.pageNumber;
-    const score = evaluation.qualityScore;
+    // Use combined final score (includes semantic penalties), fallback to qualityScore for backwards compat
+    const score = evaluation.score ?? evaluation.qualityScore;
     const evaluationFailed = !evaluation.evaluated;
 
     // Track stats
