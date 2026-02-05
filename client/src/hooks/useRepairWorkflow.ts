@@ -566,8 +566,18 @@ export function useRepairWorkflow({
     try {
       const result = await storyService.repairCharacters(storyId, [{ character: characterName, pages }], options);
 
-      // Get pages repaired from the result
-      const pagesRepaired = result.results?.[0]?.pagesRepaired || pages;
+      // Get pages repaired from the result - now includes imageData and versionIndex
+      const pagesRepaired = result.results?.[0]?.pagesRepaired || [];
+
+      // Notify parent of image updates for each repaired page
+      for (const repair of pagesRepaired) {
+        if (repair.imageData && onImageUpdate) {
+          onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex);
+        }
+      }
+
+      // Extract just page numbers for the state
+      const pageNumbers = pagesRepaired.map(r => typeof r === 'number' ? r : r.pageNumber);
 
       setWorkflowState(prev => ({
         ...prev,
@@ -575,7 +585,7 @@ export function useRepairWorkflow({
           charactersProcessed: [...prev.characterRepairResults.charactersProcessed, characterName],
           pagesRepaired: {
             ...prev.characterRepairResults.pagesRepaired,
-            [characterName]: pagesRepaired,
+            [characterName]: pageNumbers,
           },
         },
         stepStatus: {
@@ -587,7 +597,7 @@ export function useRepairWorkflow({
       console.error('Character repair failed:', error);
       failStep('character-repair', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, startStep, failStep]);
+  }, [storyId, startStep, failStep, onImageUpdate]);
 
   // Step 7: Repair artifacts on pages
   const repairArtifacts = useCallback(async (pageNumbers: number[]) => {

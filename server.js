@@ -5804,7 +5804,11 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
                 // Set the new version as active
                 await setActiveVersion(id, update.pageNumber, newDbVersionIndex);
 
-                pagesRepaired.push(update.pageNumber);
+                pagesRepaired.push({
+                  pageNumber: update.pageNumber,
+                  imageData: update.imageData,
+                  versionIndex: newDbVersionIndex
+                });
               }
             }
 

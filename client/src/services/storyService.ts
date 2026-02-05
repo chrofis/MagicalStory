@@ -2083,10 +2083,18 @@ export const storyService = {
     repairs: Array<{ character: string; pages: number[] }>,
     options?: { useMagicApiRepair?: boolean }
   ): Promise<{
-    results: Array<{ character: string; pagesRepaired: number[]; error?: string }>;
+    results: Array<{
+      character: string;
+      pagesRepaired: Array<{ pageNumber: number; imageData: string; versionIndex: number }>;
+      error?: string;
+    }>;
   }> {
     const response = await api.post<{
-      results: Array<{ character: string; pagesRepaired: number[]; error?: string }>;
+      results: Array<{
+        character: string;
+        pagesRepaired: Array<{ pageNumber: number; imageData: string; versionIndex: number }>;
+        error?: string;
+      }>;
     }>(`/api/stories/${storyId}/repair-workflow/character-repair`, {
       repairs,
       ...(options?.useMagicApiRepair !== undefined && { useMagicApiRepair: options.useMagicApiRepair })
