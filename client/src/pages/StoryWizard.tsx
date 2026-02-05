@@ -3800,15 +3800,19 @@ export default function StoryWizard() {
         );
 
       case 6:
-        // Step 6: Show StoryDisplay when we have visual content to display
-        // ALWAYS require at least one image before showing the display
-        // This prevents showing an empty display for incomplete stories
+        // Step 6: Show StoryDisplay when we have enough to display
+        // For saved stories: show immediately with title + placeholders (two-phase loading)
+        // For generating stories: require at least one image
         const hasAnyImage = coverImages.frontCover || coverImages.initialPage ||
           Object.keys(completedPageImages).length > 0 ||
           sceneImages.some(img => img.imageData);
+        const hasPlaceholders = sceneImages.some(img => img.hasImage) ||
+          (coverImages.frontCover && typeof coverImages.frontCover === 'object' && coverImages.frontCover.hasImage);
+        // Show if: 1) have story+images, 2) progressive mode, 3) generating, or 4) have title+placeholders (fast load)
         if ((generatedStory && hasAnyImage) ||
             (progressiveStoryData && hasAnyImage) ||
-            (isGenerating && hasAnyImage)) {
+            (isGenerating && hasAnyImage) ||
+            (storyTitle && hasPlaceholders)) {
           // Build scene images from progressive data if still generating
           const displaySceneImages = generatedStory
             ? sceneImages
