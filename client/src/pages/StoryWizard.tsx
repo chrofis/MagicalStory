@@ -632,7 +632,8 @@ export default function StoryWizard() {
       }
 
       log.info('Loading saved story (two-phase):', urlStoryId);
-      setIsLoading(true);
+      // Note: Don't set isLoading here - step 6 (story display) renders immediately
+      // with placeholders and handles its own loading states
       setLoadingProgress(null);
       setImageLoadProgress(null);
 
@@ -4557,7 +4558,9 @@ export default function StoryWizard() {
       {/* Main content - full width */}
       <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
-          {isLoading && !isGenerating ? (
+          {isLoading && !isGenerating && step !== 6 ? (
+            /* Show loading spinner only for steps 1-5, not for story display (step 6) */
+            /* Story display handles its own loading states with placeholders */
             <div className="py-12 flex flex-col items-center justify-center">
               <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
               <p className="text-gray-600 font-medium mb-2">
