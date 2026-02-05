@@ -257,9 +257,12 @@ async function generatePrintPdf(storyData, bookFormat = DEFAULT_FORMAT, options 
     fontSizeWarning = fontResult.warning;
   } else {
     // Standard: full page for text
-    const margin = 20;
-    const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = (pageHeight - (margin * 2)) * 0.9;
+    // Text pages are on LEFT side of spread, so right edge is the gutter (binding)
+    const marginOuter = 20;      // Left margin (outer edge)
+    const marginGutter = 30;     // Right margin (binding side) - 1.5x outer for readability
+    const marginY = 20;
+    const availableWidth = pageWidth - marginOuter - marginGutter;
+    const availableHeight = (pageHeight - (marginY * 2)) * 0.9;
 
     const fontResult = calculateConsistentFontSize(doc, storyPages, availableWidth, availableHeight, 13, 6, 'left');
     consistentFontSize = fontResult.fontSize;
@@ -360,9 +363,12 @@ function addPictureBookPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, 
 function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pageHeight = PAGE_SIZE, fontSize = 13, bleed = 0) {
   const interiorW = pageWidth + 2 * bleed;
   const interiorH = pageHeight + 2 * bleed;
-  const margin = 20;
-  const availableWidth = pageWidth - (margin * 2);
-  const availableHeight = pageHeight - (margin * 2);
+  // Text pages are on LEFT side of spread, so right edge is the gutter (binding)
+  const marginOuter = 20;      // Left margin (outer edge)
+  const marginGutter = 30;     // Right margin (binding side) - 1.5x outer for readability
+  const marginY = 20;
+  const availableWidth = pageWidth - marginOuter - marginGutter;
+  const availableHeight = pageHeight - (marginY * 2);
   const lineGap = -2;
   // Paragraph gap: half a line height (fontSize * 0.5) for tighter paragraph spacing
   const paragraphGap = fontSize * 0.5;
@@ -374,12 +380,12 @@ function addStandardPages(doc, storyData, storyPages, pageWidth = PAGE_SIZE, pag
     const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim().replace(/\n\s*\n/g, '\n');
 
     // Add text page with consistent font size (margins offset by bleed)
-    doc.addPage({ size: [interiorW, interiorH], margins: { top: bleed + margin, bottom: bleed + margin, left: bleed + margin, right: bleed + margin } });
+    doc.addPage({ size: [interiorW, interiorH], margins: { top: bleed + marginY, bottom: bleed + marginY, left: bleed + marginOuter, right: bleed + marginGutter } });
 
     doc.fontSize(fontSize).font('Helvetica').fillColor('#333');
     const textHeight = doc.heightOfString(cleanText, { width: availableWidth, align: 'left', lineGap, paragraphGap });
-    const yPosition = bleed + margin + (availableHeight - textHeight) / 2;
-    doc.text(cleanText, bleed + margin, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
+    const yPosition = bleed + marginY + (availableHeight - textHeight) / 2;
+    doc.text(cleanText, bleed + marginOuter, yPosition, { width: availableWidth, align: 'left', lineGap, paragraphGap });
 
     // Add image page if available - image fills content area, centered within bleed
     if (image && image.imageData) {
@@ -496,7 +502,10 @@ async function generateCombinedBookPdf(stories, options = {}) {
         doc.text(cleanText, bleed + textMarginMm, textY, { width: textWidth, align: 'center', lineGap });
       });
     } else {
-      const availableWidth = PAGE_SIZE - (textMargin * 2);
+      // Text pages are on LEFT side of spread, so right edge is the gutter (binding)
+      const marginOuter = 28;      // Left margin (outer edge)
+      const marginGutter = 42;     // Right margin (binding side) - 1.5x outer for readability
+      const availableWidth = PAGE_SIZE - marginOuter - marginGutter;
       const availableHeight = PAGE_SIZE - (textMargin * 2);
       const lineGap = -2;
 
@@ -505,7 +514,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
         const image = storyData.sceneImages?.find(img => img.pageNumber === pageNumber);
         const cleanText = pageText.trim().replace(/^-+|-+$/g, '').trim();
 
-        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: bleed + textMargin, bottom: bleed + textMargin, left: bleed + textMargin, right: bleed + textMargin } });
+        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: bleed + textMargin, bottom: bleed + textMargin, left: bleed + marginOuter, right: bleed + marginGutter } });
         totalStoryPages++;
 
         let fontSize = 13;
@@ -519,7 +528,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
         }
 
         const yPosition = bleed + textMargin + (availableHeight - textHeight) / 2;
-        doc.text(cleanText, bleed + textMargin, yPosition, { width: availableWidth, align: 'left', lineGap });
+        doc.text(cleanText, bleed + marginOuter, yPosition, { width: availableWidth, align: 'left', lineGap });
 
         if (image && image.imageData) {
           doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
@@ -715,9 +724,12 @@ async function generateViewPdf(storyData, bookFormat = DEFAULT_FORMAT) {
     const fontResult = calculateConsistentFontSize(doc, storyPages, textWidth, availableTextHeight, 14, 6, 'center');
     consistentFontSize = fontResult.fontSize;
   } else {
-    const margin = 20;
-    const availableWidth = pageWidth - (margin * 2);
-    const availableHeight = (pageHeight - (margin * 2)) * 0.9;
+    // Match margins used in addStandardPages (outer=20, gutter=30)
+    const marginOuter = 20;
+    const marginGutter = 30;
+    const marginY = 20;
+    const availableWidth = pageWidth - marginOuter - marginGutter;
+    const availableHeight = (pageHeight - (marginY * 2)) * 0.9;
     const fontResult = calculateConsistentFontSize(doc, storyPages, availableWidth, availableHeight, 13, 6, 'left');
     consistentFontSize = fontResult.fontSize;
   }
