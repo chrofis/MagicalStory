@@ -430,11 +430,22 @@ export const storyService = {
       success: boolean;
       error?: string;
       inputs: {
-        facePhoto: { identifier: string; sizeKB: number; imageData?: string };
-        standardAvatar: { identifier: string; sizeKB: number; imageData?: string } | null;
+        facePhoto?: { identifier: string; sizeKB: number; imageData?: string } | null;
+        standardAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
+        referenceAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
       };
       prompt?: string;
       output?: { identifier: string; sizeKB: number; imageData?: string };
+      costumeEvaluation?: {
+        pass: boolean;
+        confidence: 'high' | 'medium' | 'low';
+        reason: string;
+        details?: {
+          bottomLeft?: { hasCostume: boolean; costumeMatch: string; description: string };
+          bottomRight?: { hasCostume: boolean; costumeMatch: string; description: string };
+          consistent?: boolean;
+        };
+      } | null;
     }>;
     finalChecksReport?: FinalChecksReport;
   } | null> {
@@ -1509,11 +1520,22 @@ export const storyService = {
         success: boolean;
         error?: string;
         inputs: {
-          facePhoto: { identifier: string; sizeKB: number };
-          standardAvatar: { identifier: string; sizeKB: number } | null;
+          facePhoto?: { identifier: string; sizeKB: number } | null;
+          standardAvatar?: { identifier: string; sizeKB: number } | null;
+          referenceAvatar?: { identifier: string; sizeKB: number } | null;
         };
         prompt?: string;
         output?: { identifier: string; sizeKB: number };
+        costumeEvaluation?: {
+          pass: boolean;
+          confidence: 'high' | 'medium' | 'low';
+          reason: string;
+          details?: {
+            bottomLeft?: { hasCostume: boolean; costumeMatch: string; description: string };
+            bottomRight?: { hasCostume: boolean; costumeMatch: string; description: string };
+            consistent?: boolean;
+          };
+        } | null;
       }>;
       generationLog?: GenerationLogEntry[];
       finalChecksReport?: FinalChecksReport;
@@ -1579,11 +1601,22 @@ export const storyService = {
           success: boolean;
           error?: string;
           inputs: {
-            facePhoto: { identifier: string; sizeKB: number };
-            standardAvatar: { identifier: string; sizeKB: number } | null;
+            facePhoto?: { identifier: string; sizeKB: number } | null;
+            standardAvatar?: { identifier: string; sizeKB: number } | null;
+            referenceAvatar?: { identifier: string; sizeKB: number } | null;
           };
           prompt?: string;
           output?: { identifier: string; sizeKB: number };
+          costumeEvaluation?: {
+            pass: boolean;
+            confidence: 'high' | 'medium' | 'low';
+            reason: string;
+            details?: {
+              bottomLeft?: { hasCostume: boolean; costumeMatch: string; description: string };
+              bottomRight?: { hasCostume: boolean; costumeMatch: string; description: string };
+              consistent?: boolean;
+            };
+          } | null;
         }>;
         generationLog?: GenerationLogEntry[];
         finalChecksReport?: FinalChecksReport;
@@ -1643,11 +1676,22 @@ export const storyService = {
           success: boolean;
           error?: string;
           inputs: {
-            facePhoto: { identifier: string; sizeKB: number };
-            standardAvatar: { identifier: string; sizeKB: number } | null;
+            facePhoto?: { identifier: string; sizeKB: number } | null;
+            standardAvatar?: { identifier: string; sizeKB: number } | null;
+            referenceAvatar?: { identifier: string; sizeKB: number } | null;
           };
           prompt?: string;
           output?: { identifier: string; sizeKB: number };
+          costumeEvaluation?: {
+            pass: boolean;
+            confidence: 'high' | 'medium' | 'low';
+            reason: string;
+            details?: {
+              bottomLeft?: { hasCostume: boolean; costumeMatch: string; description: string };
+              bottomRight?: { hasCostume: boolean; costumeMatch: string; description: string };
+              consistent?: boolean;
+            };
+          } | null;
         }>;
         generationLog?: GenerationLogEntry[];
         finalChecksReport?: FinalChecksReport;

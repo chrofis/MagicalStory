@@ -47,11 +47,22 @@ interface CostumedAvatarGenerationEntry {
   success: boolean;
   error?: string;
   inputs: {
-    facePhoto: { identifier: string; sizeKB: number; imageData?: string };
-    standardAvatar: { identifier: string; sizeKB: number; imageData?: string } | null;
+    facePhoto?: { identifier: string; sizeKB: number; imageData?: string } | null;
+    standardAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
+    referenceAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
   };
   prompt?: string;
   output?: { identifier: string; sizeKB: number; imageData?: string };
+  costumeEvaluation?: {
+    pass: boolean;
+    confidence: 'high' | 'medium' | 'low';
+    reason: string;
+    details?: {
+      bottomLeft?: { hasCostume: boolean; costumeMatch: string; description: string };
+      bottomRight?: { hasCostume: boolean; costumeMatch: string; description: string };
+      consistent?: boolean;
+    };
+  } | null;
 }
 
 // Clothing requirements per character (from story outline)
@@ -331,6 +342,7 @@ export function StoryDisplay({
     originalAvatar?: string | null;
     styleSample?: string | null;
     standardAvatar?: string | null;
+    referenceAvatar?: string | null;
     output?: string | null;
   }>>({});
   const [loadingAvatarGenImages, setLoadingAvatarGenImages] = useState<Set<string>>(new Set());
@@ -487,7 +499,7 @@ export function StoryDisplay({
     type: 'styled' | 'costumed',
     index: number,
     entry: StyledAvatarGenerationEntry | CostumedAvatarGenerationEntry,
-    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'output'
+    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'referenceAvatar' | 'output'
   ): string | null => {
     const key = `${type}-${index}`;
     const loaded = loadedAvatarGenImages[key];
@@ -513,6 +525,9 @@ export function StoryDisplay({
     if (field === 'standardAvatar' && 'standardAvatar' in entry.inputs && entry.inputs.standardAvatar?.imageData) {
       return (entry.inputs.standardAvatar as { imageData?: string }).imageData || null;
     }
+    if (field === 'referenceAvatar' && 'referenceAvatar' in entry.inputs && entry.inputs.referenceAvatar?.imageData) {
+      return (entry.inputs.referenceAvatar as { imageData?: string }).imageData || null;
+    }
 
     return null;
   };
@@ -522,7 +537,7 @@ export function StoryDisplay({
     type: 'styled' | 'costumed',
     index: number,
     entry: StyledAvatarGenerationEntry | CostumedAvatarGenerationEntry,
-    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'output',
+    field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'referenceAvatar' | 'output',
     label: string,
     sizeKB?: number
   ) => {
@@ -2257,8 +2272,9 @@ export function StoryDisplay({
                       <div className="bg-blue-50 p-2 rounded text-xs">
                         <span className="font-semibold text-blue-700">Inputs:</span>
                         <div className="mt-2 flex flex-wrap gap-3">
-                          {renderAvatarGenImage('costumed', index, entry, 'facePhoto', 'Face Photo', entry.inputs.facePhoto?.sizeKB)}
-                          {renderAvatarGenImage('costumed', index, entry, 'standardAvatar', 'Standard Avatar', entry.inputs.standardAvatar?.sizeKB)}
+                          {entry.inputs?.facePhoto && renderAvatarGenImage('costumed', index, entry, 'facePhoto', 'Face Photo', entry.inputs.facePhoto?.sizeKB)}
+                          {entry.inputs?.standardAvatar && renderAvatarGenImage('costumed', index, entry, 'standardAvatar', 'Standard Avatar', entry.inputs.standardAvatar?.sizeKB)}
+                          {entry.inputs?.referenceAvatar && renderAvatarGenImage('costumed', index, entry, 'referenceAvatar', 'Reference Avatar', entry.inputs.referenceAvatar?.sizeKB)}
                         </div>
                       </div>
 
@@ -2281,6 +2297,60 @@ export function StoryDisplay({
                           <div className="mt-2">
                             {renderAvatarGenImage('costumed', index, entry, 'output', 'Costumed Avatar Output', entry.output.sizeKB)}
                           </div>
+                        </div>
+                      )}
+
+                      {/* Costume Evaluation */}
+                      {entry.costumeEvaluation && (
+                        <div className={`p-2 rounded text-xs ${
+                          entry.costumeEvaluation.pass
+                            ? 'bg-emerald-50 border border-emerald-200'
+                            : 'bg-amber-50 border border-amber-200'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            <span className={`font-semibold ${entry.costumeEvaluation.pass ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              Costume Check:
+                            </span>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              entry.costumeEvaluation.pass
+                                ? 'bg-emerald-200 text-emerald-800'
+                                : 'bg-amber-200 text-amber-800'
+                            }`}>
+                              {entry.costumeEvaluation.pass ? 'PASS' : 'FAIL'}
+                            </span>
+                            <span className="text-gray-500">
+                              ({entry.costumeEvaluation.confidence} confidence)
+                            </span>
+                          </div>
+                          <p className="mt-1 text-gray-700">{entry.costumeEvaluation.reason}</p>
+                          {entry.costumeEvaluation.details && (
+                            <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                              <div className={`p-1 rounded ${
+                                entry.costumeEvaluation.details.bottomLeft?.costumeMatch === 'full'
+                                  ? 'bg-emerald-100'
+                                  : entry.costumeEvaluation.details.bottomLeft?.costumeMatch === 'none'
+                                    ? 'bg-red-100'
+                                    : 'bg-gray-100'
+                              }`}>
+                                <span className="font-semibold">Bottom-Left:</span> {entry.costumeEvaluation.details.bottomLeft?.costumeMatch || 'N/A'}
+                                {entry.costumeEvaluation.details.bottomLeft?.description && (
+                                  <div className="text-gray-600 truncate">{entry.costumeEvaluation.details.bottomLeft.description}</div>
+                                )}
+                              </div>
+                              <div className={`p-1 rounded ${
+                                entry.costumeEvaluation.details.bottomRight?.costumeMatch === 'full'
+                                  ? 'bg-emerald-100'
+                                  : entry.costumeEvaluation.details.bottomRight?.costumeMatch === 'none'
+                                    ? 'bg-red-100'
+                                    : 'bg-gray-100'
+                              }`}>
+                                <span className="font-semibold">Bottom-Right:</span> {entry.costumeEvaluation.details.bottomRight?.costumeMatch || 'N/A'}
+                                {entry.costumeEvaluation.details.bottomRight?.description && (
+                                  <div className="text-gray-600 truncate">{entry.costumeEvaluation.details.bottomRight.description}</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
 

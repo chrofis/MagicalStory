@@ -592,6 +592,134 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
 }
 
 /**
+ * Evaluate if costume was properly applied to BOTH bottom row images in a 2x2 grid.
+ * Returns { pass: boolean, reason: string, confidence: 'high'|'medium'|'low' }
+ *
+ * Only fails with high confidence if there's a clear mismatch (one image has costume, other doesn't).
+ * Grid layout: top row = face close-ups, bottom row = full body with costume
+ */
+async function evaluateCostumeApplication(gridImage, costumeDescription, geminiApiKey) {
+  const startTime = Date.now();
+  try {
+    const imageBase64 = gridImage.replace(/^data:image\/\w+;base64,/, '');
+    const imageMime = gridImage.match(/^data:(image\/\w+);base64,/) ?
+      gridImage.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+
+    const evalPrompt = `You are evaluating a 2x2 avatar grid for costume consistency.
+
+GRID LAYOUT:
+- TOP ROW (left & right): Face close-up portraits - IGNORE these for costume check
+- BOTTOM ROW (left & right): Full body images that should show the character wearing a costume
+
+EXPECTED COSTUME: ${costumeDescription}
+
+TASK: Check if BOTH bottom row images show the expected costume.
+
+Analyze:
+1. Does the BOTTOM-LEFT image show the expected costume? (yes/no/partial)
+2. Does the BOTTOM-RIGHT image show the expected costume? (yes/no/partial)
+3. Are the costumes in both bottom images consistent with each other?
+
+Return JSON:
+{
+  "bottomLeft": {
+    "hasCostume": true/false,
+    "costumeMatch": "full" | "partial" | "none" | "different_outfit",
+    "description": "brief description of what they're wearing"
+  },
+  "bottomRight": {
+    "hasCostume": true/false,
+    "costumeMatch": "full" | "partial" | "none" | "different_outfit",
+    "description": "brief description of what they're wearing"
+  },
+  "consistent": true/false,
+  "pass": true/false,
+  "confidence": "high" | "medium" | "low",
+  "reason": "explanation"
+}
+
+IMPORTANT: Only set pass=false with confidence=high if there's a CLEAR problem:
+- One image has the costume, the other has completely different clothing
+- One image shows the costume, the other shows casual/default clothes
+- The costumes are obviously mismatched (e.g., pirate vs superhero)
+
+Set pass=true if:
+- Both images show the expected costume (even with minor variations)
+- Both images show similar costumes (slight color/detail differences are OK)
+- Can't clearly see the costume details (give benefit of doubt)`;
+
+    const requestBody = {
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: imageMime, data: imageBase64 } },
+          { text: evalPrompt }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1000,
+        responseMimeType: 'application/json'
+      },
+      safetySettings: [
+        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+      ]
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+        signal: AbortSignal.timeout(20000)
+      }
+    );
+
+    if (!response.ok) {
+      log.warn(`[COSTUME EVAL] API error: ${response.status}`);
+      return { pass: true, reason: 'Evaluation failed, giving benefit of doubt', confidence: 'low' };
+    }
+
+    const data = await response.json();
+    const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+
+    // Log token usage
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    const duration = Date.now() - startTime;
+    console.log(`📊 [COSTUME EVAL] input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, ${duration}ms`);
+
+    try {
+      const result = JSON.parse(responseText);
+
+      log.debug(`👔 [COSTUME EVAL] Bottom-left: ${result.bottomLeft?.costumeMatch} (${result.bottomLeft?.description})`);
+      log.debug(`👔 [COSTUME EVAL] Bottom-right: ${result.bottomRight?.costumeMatch} (${result.bottomRight?.description})`);
+      log.debug(`👔 [COSTUME EVAL] Result: pass=${result.pass}, confidence=${result.confidence}, reason=${result.reason}`);
+
+      return {
+        pass: result.pass !== false, // Default to pass if not explicitly false
+        reason: result.reason || 'No reason provided',
+        confidence: result.confidence || 'medium',
+        details: {
+          bottomLeft: result.bottomLeft,
+          bottomRight: result.bottomRight,
+          consistent: result.consistent
+        }
+      };
+    } catch (parseErr) {
+      log.warn(`[COSTUME EVAL] JSON parse failed: ${parseErr.message}`);
+      return { pass: true, reason: 'Parse error, giving benefit of doubt', confidence: 'low' };
+    }
+  } catch (err) {
+    log.error('[COSTUME EVAL] Error:', err.message);
+    return { pass: true, reason: 'Evaluation error, giving benefit of doubt', confidence: 'low' };
+  }
+}
+
+/**
  * Get clothing style prompt for a given category and gender
  */
 function getClothingStylePrompt(category, isFemale) {
@@ -1081,56 +1209,100 @@ Your task is to create a 2x2 grid:
       ]
     };
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+    // Retry loop for costume application issues
+    const MAX_COSTUME_RETRIES = 2;
+    let finalImageData = null;
+    let costumeEvalResult = null;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= MAX_COSTUME_RETRIES; attempt++) {
+      const attemptStart = Date.now();
+
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error(`❌ [STYLED COSTUME] Generation failed (attempt ${attempt}):`, errorText);
+        lastError = `API error: ${response.status}`;
+        continue;
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      log.error(`❌ [STYLED COSTUME] Generation failed:`, errorText);
-      return { success: false, error: `API error: ${response.status}` };
-    }
+      let data = await response.json();
 
-    let data = await response.json();
+      // Log token usage
+      const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+      const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+      if (inputTokens > 0 || outputTokens > 0) {
+        console.log(`📊 [STYLED COSTUME] ${costumeType}@${artStyle} attempt ${attempt} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+      }
 
-    // Log token usage
-    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
-    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    if (inputTokens > 0 || outputTokens > 0) {
-      console.log(`📊 [STYLED COSTUME] ${costumeType}@${artStyle} - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
-    }
+      // Check if blocked by safety filters
+      if (data.promptFeedback?.blockReason) {
+        log.warn(`[STYLED COSTUME] Blocked by safety filters:`, data.promptFeedback.blockReason);
+        lastError = `Blocked by safety filters: ${data.promptFeedback.blockReason}`;
+        continue;
+      }
 
-    // Check if blocked by safety filters
-    if (data.promptFeedback?.blockReason) {
-      log.warn(`[STYLED COSTUME] Blocked by safety filters:`, data.promptFeedback.blockReason);
-      return { success: false, error: `Blocked by safety filters: ${data.promptFeedback.blockReason}` };
-    }
-
-    // Extract image from response
-    let imageData = null;
-    if (data.candidates && data.candidates[0]?.content?.parts) {
-      for (const part of data.candidates[0].content.parts) {
-        if (part.inlineData?.mimeType?.startsWith('image/')) {
-          const imgMime = part.inlineData.mimeType;
-          imageData = `data:${imgMime};base64,${part.inlineData.data}`;
-          break;
+      // Extract image from response
+      let imageData = null;
+      if (data.candidates && data.candidates[0]?.content?.parts) {
+        for (const part of data.candidates[0].content.parts) {
+          if (part.inlineData?.mimeType?.startsWith('image/')) {
+            const imgMime = part.inlineData.mimeType;
+            imageData = `data:${imgMime};base64,${part.inlineData.data}`;
+            break;
+          }
         }
       }
+
+      if (!imageData) {
+        log.error(`❌ [STYLED COSTUME] No image in response (attempt ${attempt})`);
+        lastError = 'No image generated';
+        continue;
+      }
+
+      // Compress the avatar
+      const compressed = await compressImageToJPEG(imageData, 85, 768);
+      finalImageData = compressed || imageData;
+
+      // Evaluate costume application (check both bottom row images have costume)
+      if (ENABLE_AVATAR_EVALUATION) {
+        costumeEvalResult = await evaluateCostumeApplication(
+          finalImageData,
+          config.description || config.costume || 'costume',
+          geminiApiKey
+        );
+
+        if (!costumeEvalResult.pass && costumeEvalResult.confidence === 'high') {
+          log.warn(`👔 [STYLED COSTUME] Costume check FAILED (attempt ${attempt}): ${costumeEvalResult.reason}`);
+          if (attempt < MAX_COSTUME_RETRIES) {
+            log.info(`🔄 [STYLED COSTUME] Retrying due to costume mismatch...`);
+            continue;
+          } else {
+            log.warn(`⚠️ [STYLED COSTUME] Max retries reached, using last generated image despite costume issue`);
+          }
+        } else {
+          log.debug(`👔 [STYLED COSTUME] Costume check passed (attempt ${attempt}): ${costumeEvalResult.reason}`);
+        }
+      }
+
+      // Success - break out of retry loop
+      const attemptDuration = Date.now() - attemptStart;
+      log.debug(`✅ [STYLED COSTUME] Image generated in ${attemptDuration}ms (attempt ${attempt})`);
+      break;
     }
 
-    if (!imageData) {
-      log.error(`❌ [STYLED COSTUME] No image in response`);
-      return { success: false, error: 'No image generated' };
+    if (!finalImageData) {
+      log.error(`❌ [STYLED COSTUME] All attempts failed`);
+      return { success: false, error: lastError || 'Failed to generate image' };
     }
-
-    // Compress the avatar
-    const compressed = await compressImageToJPEG(imageData, 85, 768);
-    const finalImageData = compressed || imageData;
 
     // Evaluate face match to get clothing description (optional)
     // Use standardAvatar as reference (it contains the face we're matching against)
@@ -1155,6 +1327,12 @@ Your task is to create a 2x2 grid:
       costumeDescription: config.description || '',
       durationMs: duration,
       success: true,
+      costumeEvaluation: costumeEvalResult ? {
+        pass: costumeEvalResult.pass,
+        confidence: costumeEvalResult.confidence,
+        reason: costumeEvalResult.reason,
+        details: costumeEvalResult.details
+      } : null,
       inputs: {
         // standardAvatar is used as the reference image (contains face + body)
         referenceAvatar: {

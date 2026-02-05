@@ -133,10 +133,12 @@ function extractJobs(lines) {
       }
 
       // Job completion patterns (handle [STORYBOOK], [UNIFIED], or plain)
+      // Use this as the DEFINITIVE end time (not later post-completion iterations)
       const completedMatch = msg.match(/(?:\[(?:STORYBOOK|UNIFIED)\]\s+)?Job (job_\S+) completed successfully/);
       if (completedMatch) {
         job.status = 'completed';
         job.endTime = ts;
+        job.completionTime = ts;  // Store separately for accurate timing
         job.endIndex = i;
       }
 
@@ -313,6 +315,40 @@ function extractCostSummary(jobLines) {
       continue;
     }
 
+    // genLog.apiUsage format: ">>> genLog.apiUsage('function_name', 'model', {in: X, out: Y}, cost: $X.XX)"
+    const genLogMatch = msg.match(/genLog\.apiUsage\('(\w+)',\s*'([^']+)',\s*\{in:\s*(\d+),\s*out:\s*(\d+)\},\s*cost:\s*\$([\d.]+)\)/);
+    if (genLogMatch) {
+      const rawName = genLogMatch[1];
+      // Convert snake_case to Title Case
+      let name = rawName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+      // Normalize common variations
+      const nameMap = {
+        'Scene Expansion': 'Scene Expand',
+        'Unified Story': 'Unified Story',
+        'Cover Images': 'Cover Images',
+        'Page Images': 'Page Images',
+        'Avatar Styled': 'Avatar Styled',
+        'Consistency Check': 'Consistency Check',
+        'Text Check': 'Text Check',
+        'Cover Quality': 'Cover Quality',
+        'Page Quality': 'Page Quality'
+      };
+      name = nameMap[name] || name;
+
+      // Only add if not already present (avoid duplicates from other formats)
+      if (!costs.byFunction[name]) {
+        costs.byFunction[name] = {
+          inputTokens: parseInt(genLogMatch[3]),
+          outputTokens: parseInt(genLogMatch[4]),
+          calls: 1,
+          cost: parseFloat(genLogMatch[5]),
+          model: genLogMatch[2]
+        };
+      }
+      continue;
+    }
+
     // Provider entries without calls count: "Anthropic: 116,579 in / 40,362 out $0.9552"
     // Also with thinking: "Gemini Quality: 77,694 in / 26,828 out + 53,243 think $0.0398"
     const providerMatch = msg.match(/^\s*(Anthropic|Gemini\s*\w*):\s+([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out(?:\s+\+\s+([\d,]+)\s+think)?\s+\$([\d.]+)/);
@@ -385,7 +421,25 @@ function extractImageStats(jobLines) {
       count: 0
     },
     // Content blocked retries
-    contentBlocked: 0
+    contentBlocked: 0,
+    // Consistency regeneration
+    consistencyRegen: {
+      pagesQueued: 0,
+      pagesReplaced: 0,
+      pagesSkipped: [],
+      replacedPages: []  // Array of {page, score}
+    },
+    // Scene iterations (post-generation fixes)
+    sceneIterations: {
+      pagesIterated: 0,
+      totalMismatchesFixed: 0,
+      iterations: []  // Array of {page, mismatchesFixed, score}
+    },
+    // Scene previews (cheap Runware previews for validation)
+    scenePreviews: {
+      count: 0,
+      totalCost: 0
+    }
   };
 
   for (const line of jobLines) {
@@ -458,6 +512,50 @@ function extractImageStats(jobLines) {
     // Content blocked (PROHIBITED_CONTENT)
     if (msg.includes('PROHIBITED_CONTENT') || msg.includes('Content blocked')) {
       stats.contentBlocked++;
+    }
+
+    // Consistency regeneration - pages queued
+    // Pattern: "🔄 [CONSISTENCY REGEN] Regenerating 13 page(s) with issues: 16, 18, 2, ..."
+    const consistencyQueueMatch = msg.match(/\[CONSISTENCY REGEN\] Regenerating (\d+) page\(s\)/);
+    if (consistencyQueueMatch) {
+      stats.consistencyRegen.pagesQueued = parseInt(consistencyQueueMatch[1]);
+    }
+
+    // Consistency regeneration - page replaced
+    // Pattern: "✅ [CONSISTENCY REGEN] [PAGE 2] Replaced image (score: 95%)"
+    const consistencyReplacedMatch = msg.match(/\[CONSISTENCY REGEN\] \[PAGE (\d+)\] Replaced image \(score: (\d+)%\)/);
+    if (consistencyReplacedMatch) {
+      const page = parseInt(consistencyReplacedMatch[1]);
+      const score = parseInt(consistencyReplacedMatch[2]);
+      stats.consistencyRegen.pagesReplaced++;
+      stats.consistencyRegen.replacedPages.push({ page, score });
+    }
+
+    // Consistency regeneration - page skipped
+    // Pattern: "⚠️ [CONSISTENCY REGEN] Page 16 not found, skipping"
+    const consistencySkippedMatch = msg.match(/\[CONSISTENCY REGEN\] Page (\d+) not found/);
+    if (consistencySkippedMatch) {
+      stats.consistencyRegen.pagesSkipped.push(parseInt(consistencySkippedMatch[1]));
+    }
+
+    // Scene iterations - completed
+    // Pattern: "✅ [ITERATE] Page 6: Iteration complete (0 mismatches addressed, score: 100)"
+    const iterationCompleteMatch = msg.match(/\[ITERATE\] Page (\d+): Iteration complete \((\d+) mismatches addressed, score: (\d+)\)/);
+    if (iterationCompleteMatch) {
+      const page = parseInt(iterationCompleteMatch[1]);
+      const mismatchesFixed = parseInt(iterationCompleteMatch[2]);
+      const score = parseInt(iterationCompleteMatch[3]);
+      stats.sceneIterations.pagesIterated++;
+      stats.sceneIterations.totalMismatchesFixed += mismatchesFixed;
+      stats.sceneIterations.iterations.push({ page, mismatchesFixed, score });
+    }
+
+    // Scene previews
+    // Pattern: "[SCENE-VALIDATOR] Preview generated in 5327ms, cost: $0.000600"
+    const previewMatch = msg.match(/\[SCENE-VALIDATOR\] Preview generated.*cost: \$([\d.]+)/);
+    if (previewMatch) {
+      stats.scenePreviews.count++;
+      stats.scenePreviews.totalCost += parseFloat(previewMatch[1]);
     }
   }
 
@@ -728,14 +826,24 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
   // Timing
   console.log('\n\u23f1\ufe0f  TIMING');
   console.log(`   Started: ${job.startTime.toISOString().substring(11, 19)}`);
-  if (job.endTime) {
+  if (job.completionTime) {
+    // Use actual completion time for accurate duration
+    const completionDuration = job.completionTime - job.startTime;
+    console.log(`   Completed: ${job.completionTime.toISOString().substring(11, 19)}`);
+    console.log(`   Generation Duration: ${formatDuration(completionDuration)}`);
+    // Note if there were post-completion activities
+    if (job.endTime && job.endTime > job.completionTime) {
+      const postDuration = job.endTime - job.completionTime;
+      console.log(`   Post-completion activity: +${formatDuration(postDuration)}`);
+    }
+  } else if (job.endTime) {
     console.log(`   Ended: ${job.endTime.toISOString().substring(11, 19)}`);
     console.log(`   Total Duration: ${formatDuration(duration)}`);
   }
 
   // Per-phase timing
   if (timing && Object.keys(timing.phases).length > 0) {
-    console.log('\n   By Phase:');
+    console.log('\n   By Phase (some overlap - parallel execution):');
     for (const [phase, data] of Object.entries(timing.phases)) {
       if (data.start && data.end) {
         const phaseDuration = data.end - data.start;
@@ -791,6 +899,45 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
     console.log(`   Auto-repair: Unknown status`);
   }
 
+  // Consistency regeneration
+  if (imageStats.consistencyRegen.pagesQueued > 0) {
+    console.log(`\n🔄 CONSISTENCY REGENERATION`);
+    console.log(`   Pages queued: ${imageStats.consistencyRegen.pagesQueued}`);
+    console.log(`   Pages replaced: ${imageStats.consistencyRegen.pagesReplaced}`);
+    if (imageStats.consistencyRegen.pagesSkipped.length > 0) {
+      console.log(`   Pages skipped: ${imageStats.consistencyRegen.pagesSkipped.join(', ')} (not found)`);
+    }
+    if (imageStats.consistencyRegen.replacedPages.length > 0) {
+      const avgScore = imageStats.consistencyRegen.replacedPages.reduce((sum, p) => sum + p.score, 0) / imageStats.consistencyRegen.replacedPages.length;
+      console.log(`   Average score: ${avgScore.toFixed(0)}%`);
+      // Show pages with lower scores
+      const lowScorePages = imageStats.consistencyRegen.replacedPages.filter(p => p.score < 90);
+      if (lowScorePages.length > 0) {
+        console.log(`   Lower scores: ${lowScorePages.map(p => `p${p.page}(${p.score}%)`).join(', ')}`);
+      }
+    }
+  }
+
+  // Scene iterations
+  if (imageStats.sceneIterations.pagesIterated > 0) {
+    console.log(`\n🔁 SCENE ITERATIONS`);
+    console.log(`   Pages iterated: ${imageStats.sceneIterations.pagesIterated}`);
+    console.log(`   Total mismatches fixed: ${imageStats.sceneIterations.totalMismatchesFixed}`);
+    if (imageStats.sceneIterations.iterations.length > 0) {
+      const details = imageStats.sceneIterations.iterations.map(i =>
+        `p${i.page}(${i.mismatchesFixed} fixes, ${i.score}%)`
+      ).join(', ');
+      console.log(`   Details: ${details}`);
+    }
+  }
+
+  // Scene previews
+  if (imageStats.scenePreviews.count > 0) {
+    console.log(`\n🔍 SCENE PREVIEWS`);
+    console.log(`   Count: ${imageStats.scenePreviews.count}`);
+    console.log(`   Total cost: $${imageStats.scenePreviews.totalCost.toFixed(4)}`);
+  }
+
   // Costs
   console.log('\n\ud83d\udcb0 COST BREAKDOWN');
   if (Object.keys(costs.byProvider).length > 0) {
@@ -798,8 +945,13 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
       const tokens = `${data.inputTokens.toLocaleString()} in / ${data.outputTokens.toLocaleString()} out`;
       console.log(`   ${provider.padEnd(20)} $${data.cost.toFixed(2).padStart(5)}  (${tokens})`);
     }
+    // Add scene preview cost if significant
+    if (imageStats.scenePreviews.totalCost > 0.001) {
+      console.log(`   ${'Scene Previews'.padEnd(20)} $${imageStats.scenePreviews.totalCost.toFixed(2).padStart(5)}  (${imageStats.scenePreviews.count} previews @ $0.0006)`);
+    }
     console.log('   ' + '\u2500'.repeat(45));
-    console.log(`   ${'TOTAL'.padEnd(20)} $${costs.totals.totalCost.toFixed(2).padStart(5)}`);
+    const totalWithPreviews = costs.totals.totalCost + imageStats.scenePreviews.totalCost;
+    console.log(`   ${'TOTAL'.padEnd(20)} $${totalWithPreviews.toFixed(2).padStart(5)}`);
   } else {
     console.log('   (no cost data found)');
   }
