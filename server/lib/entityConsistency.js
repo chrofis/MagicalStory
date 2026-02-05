@@ -101,9 +101,14 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
         return value;
       }
     }
+    // Try base avatar before photo
+    if (avatars.standard) {
+      log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars, using base standard avatar`);
+      return avatars.standard;
+    }
     // Final fallback to original photo
     const fallback = getFallbackPhoto();
-    log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars found for costume, photo fallback=${fallback ? 'found' : 'null'}`);
+    log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled/base avatars found for costume, photo fallback=${fallback ? 'found' : 'null'}`);
     return fallback;
   }
 
@@ -137,9 +142,16 @@ function getStyledAvatarForClothing(character, artStyle, clothingCategory) {
     }
   }
 
+  // Try base avatars (not styled) as fallback before photo
+  const baseAvatar = avatars[clothingCategory] || avatars.standard;
+  if (baseAvatar) {
+    log.info(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars, using base ${avatars[clothingCategory] ? clothingCategory : 'standard'} avatar`);
+    return baseAvatar;
+  }
+
   // Final fallback to original photo
   const fallback = getFallbackPhoto();
-  log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled avatars found, photo fallback=${fallback ? 'found' : 'null'}`);
+  log.warn(`🔍 [AVATAR-LOOKUP] ${charName}: No styled/base avatars found, photo fallback=${fallback ? 'found' : 'null'}`);
   return fallback;
 }
 
@@ -454,7 +466,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  * @param {Array<object>} sceneDescriptions - Scene descriptions for extracting clothing metadata
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
-function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = []) {
+function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
+  const { skipMinAppearancesFilter = false } = options;
   const appearances = new Map();
 
   // Initialize for each character
@@ -572,11 +585,13 @@ function collectEntityAppearances(sceneImages, characters = [], sceneDescription
     }
   }
 
-  // Filter out entities with too few appearances
-  for (const [name, apps] of appearances) {
-    if (apps.length < MIN_APPEARANCES) {
-      log.debug(`[ENTITY-COLLECT] Filtering out "${name}" with only ${apps.length} appearances (min: ${MIN_APPEARANCES})`);
-      appearances.delete(name);
+  // Filter out entities with too few appearances (unless skip requested for repair use case)
+  if (!skipMinAppearancesFilter) {
+    for (const [name, apps] of appearances) {
+      if (apps.length < MIN_APPEARANCES) {
+        log.debug(`[ENTITY-COLLECT] Filtering out "${name}" with only ${apps.length} appearances (min: ${MIN_APPEARANCES})`);
+        appearances.delete(name);
+      }
     }
   }
 
@@ -2010,10 +2025,10 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
   log.info(`🔧 [SINGLE-PAGE-REPAIR] Starting repair for ${charName} on page ${pageNumber}`);
 
   try {
-    // Collect all appearances for this character
+    // Collect all appearances for this character (skip min filter - repair compares against avatar)
     const sceneImages = storyData.sceneImages || [];
     const sceneDescriptions = storyData.sceneDescriptions || [];
-    const entityAppearances = collectEntityAppearances(sceneImages, [character], sceneDescriptions);
+    const entityAppearances = collectEntityAppearances(sceneImages, [character], sceneDescriptions, { skipMinAppearancesFilter: true });
     const appearances = entityAppearances.get(charName);
 
     if (!appearances || appearances.length < 1) {

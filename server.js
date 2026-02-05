@@ -5677,7 +5677,7 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
 
                 // Get character appearance with bounding box
                 const sceneDescriptions = storyData.sceneDescriptions || [];
-                const entityAppearances = collectEntityAppearances([sceneImage], [character], sceneDescriptions);
+                const entityAppearances = collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
                 const appearances = entityAppearances.get(characterName);
                 const appearance = appearances?.find(a => a.pageNumber === pageNumber);
 
