@@ -874,9 +874,17 @@ async function getActiveStoryImages(storyId) {
     throw new Error('Database mode required');
   }
 
+  // First, get the active versions from image_version_meta for debugging
+  const metaRows = await dbQuery(
+    `SELECT image_version_meta FROM stories WHERE id = $1`,
+    [storyId]
+  );
+  const meta = metaRows[0]?.image_version_meta || {};
+  console.log(`📷 [getActiveStoryImages] image_version_meta: ${JSON.stringify(meta)}`);
+
   // Single query: join images with active version metadata
   // For each page/cover, only select the row where version_index matches the active version
-  return await dbQuery(
+  const results = await dbQuery(
     `WITH active_versions AS (
       SELECT
         key as page_key,
@@ -899,6 +907,14 @@ async function getActiveStoryImages(storyId) {
     ORDER BY si.image_type, si.page_number`,
     [storyId]
   );
+
+  // Log which versions were selected
+  const selected = results.slice(0, 5).map(r =>
+    `${r.image_type}${r.page_number ? '/' + r.page_number : ''}:v${r.version_index}`
+  ).join(', ');
+  console.log(`📷 [getActiveStoryImages] Selected (first 5): ${selected}`);
+
+  return results;
 }
 
 /**
