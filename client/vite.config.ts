@@ -14,9 +14,30 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-          'vendor-firebase': ['firebase/app', 'firebase/auth'],
+        manualChunks(id) {
+          // React core
+          if (id.includes('node_modules/react-dom')) {
+            return 'vendor-react-dom';
+          }
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-router')) {
+            return 'vendor-react';
+          }
+          // Firebase (large)
+          if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) {
+            return 'vendor-firebase';
+          }
+          // Icons (lucide-react is large)
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-icons';
+          }
+          // PDF generation
+          if (id.includes('node_modules/html2pdf') || id.includes('node_modules/jspdf') || id.includes('node_modules/html2canvas')) {
+            return 'vendor-pdf';
+          }
+          // Other node_modules
+          if (id.includes('node_modules')) {
+            return 'vendor-other';
+          }
         },
       },
     },

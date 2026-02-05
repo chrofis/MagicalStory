@@ -8,8 +8,11 @@ import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
-import { GenerationProgress, StoryDisplay, ModelSelector, RepairWorkflowPanel } from '@/components/generation';
+import { GenerationProgress, ModelSelector } from '@/components/generation';
 import type { GenerationSettings } from '@/components/generation/story';
+// Lazy load heavy components for better code splitting
+const StoryDisplay = lazy(() => import('@/components/generation/StoryDisplay'));
+const RepairWorkflowPanel = lazy(() => import('@/components/generation/RepairWorkflowPanel'));
 // Lazy load wizard steps for faster initial load when viewing stories
 const WizardStep2Characters = lazy(() => import('./wizard/WizardStep2Characters').then(m => ({ default: m.WizardStep2Characters })));
 const WizardStep3BookSettings = lazy(() => import('./wizard/WizardStep3BookSettings').then(m => ({ default: m.WizardStep3BookSettings })));
@@ -3926,6 +3929,7 @@ export default function StoryWizard() {
               )}
               {/* Developer Mode: Manual Repair Workflow */}
               {developerMode && storyId && !isGenerating && (
+                <Suspense fallback={<div className="p-4 text-gray-500">Loading repair panel...</div>}>
                 <RepairWorkflowPanel
                   storyId={storyId}
                   sceneImages={displaySceneImages}
@@ -3972,7 +3976,9 @@ export default function StoryWizard() {
                   useMagicApiRepair={useMagicApiRepair}
                   setUseMagicApiRepair={setUseMagicApiRepair}
                 />
+                </Suspense>
               )}
+              <Suspense fallback={<div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 text-indigo-600 animate-spin" /></div>}>
               <StoryDisplay
               title={storyTitle}
               dedication={dedication || undefined}
@@ -4582,6 +4588,7 @@ export default function StoryWizard() {
                 }
               } : undefined}
             />
+            </Suspense>
             </>
           );
         }

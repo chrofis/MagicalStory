@@ -1239,3 +1239,5 @@ export function RepairWorkflowPanel({
     </div>
   );
 }
+
+export default RepairWorkflowPanel;
