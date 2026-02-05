@@ -1344,7 +1344,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               activeVersion: row.version_index
             });
           } else {
-            // Full path: build imageVersions array
+            // Full path: build imageVersions array with ALL versions
             if (!sceneImagesMap.has(pageNum)) {
               sceneImagesMap.set(pageNum, {
                 pageNumber: pageNum,
@@ -1355,21 +1355,22 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               });
             }
             const scene = sceneImagesMap.get(pageNum);
+            const activeIdx = activeVersions[pageNum.toString()] ?? 0;
 
+            // Add ALL versions to imageVersions array (including version 0)
+            scene.imageVersions.push({
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              createdAt: row.generated_at, // Alias for frontend compatibility
+              isActive: row.version_index === activeIdx
+            });
+
+            // Set main imageData to version 0 (for backwards compatibility)
             if (row.version_index === 0) {
-              // Main image
               scene.imageData = normalizeImageData(row.image_data);
               scene.qualityScore = row.quality_score;
               scene.generatedAt = row.generated_at;
-            } else {
-              // Version image
-              scene.imageVersions.push({
-                imageData: normalizeImageData(row.image_data),
-                qualityScore: row.quality_score,
-                generatedAt: row.generated_at,
-                createdAt: row.generated_at, // Alias for frontend compatibility
-                isActive: activeVersions[pageNum.toString()] === row.version_index
-              });
             }
           }
         } else {
