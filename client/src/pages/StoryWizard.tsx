@@ -831,14 +831,14 @@ export default function StoryWizard() {
           });
         }
 
-        // Load all images in background (batch request)
-        storyService.getAllImages(urlStoryId).then(batchResult => {
+        // PHASE 2a: Fast image load (activeOnly=true) - shows images quickly
+        storyService.getAllImages(urlStoryId, true).then(batchResult => {
           const images = batchResult?.images || [];
           const covers = batchResult?.covers || {};
           const coverCount = Object.keys(covers).filter(k => covers[k as keyof typeof covers]?.imageData).length;
           const imageCount = images.filter(img => img.imageData).length;
 
-          log.info(`Batch images loaded: ${imageCount} pages, ${coverCount} covers`);
+          log.info(`Fast images loaded: ${imageCount} pages, ${coverCount} covers`);
 
           if (imageCount > 0 || coverCount > 0) {
             let loadedCount = 0;
@@ -860,30 +860,65 @@ export default function StoryWizard() {
               }
             }
 
-            // Update page images with imageData
+            // Update page images with imageData (no versions yet)
             for (const img of images) {
               if (img.imageData) {
                 loadedCount++;
                 setSceneImages(prev => prev.map(scene => {
                   if (scene.pageNumber !== img.pageNumber) return scene;
-                  // Merge: keep existing metadata, add imageData from batch
-                  const existingVersions = scene.imageVersions || [];
-                  const mergedVersions = img.imageVersions?.map((v, i) => ({
-                    ...(existingVersions[i] || {}),
-                    ...(v as Record<string, unknown>),
-                  })) as typeof scene.imageVersions;
-                  return { ...scene, imageData: img.imageData, imageVersions: mergedVersions || existingVersions };
+                  return { ...scene, imageData: img.imageData };
                 }));
                 setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
               }
             }
 
-            log.info('All images loaded');
-          } else {
-            log.info('No images in batch response (may be cached)');
+            log.info('Fast images displayed');
           }
-          // Always clear progress when done, regardless of whether images were found
+          // Clear progress when fast load is done
           setImageLoadProgress(null);
+
+          // PHASE 2b: Full image load (activeOnly=false) - adds imageVersions for dev mode
+          // This runs in background after images are already displayed
+          storyService.getAllImages(urlStoryId, false).then(fullResult => {
+            const fullImages = fullResult?.images || [];
+            const fullCovers = fullResult?.covers || {};
+
+            log.info(`Full images loaded: ${fullImages.length} pages with versions`);
+
+            // Update scene images with imageVersions
+            for (const img of fullImages) {
+              if (img.imageVersions && img.imageVersions.length > 0) {
+                setSceneImages(prev => prev.map(scene => {
+                  if (scene.pageNumber !== img.pageNumber) return scene;
+                  return {
+                    ...scene,
+                    imageData: img.imageData || scene.imageData,
+                    imageVersions: img.imageVersions
+                  };
+                }));
+              }
+            }
+
+            // Update cover images with full data (imageVersions, metadata)
+            const coverTypes2: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
+            for (const coverType of coverTypes2) {
+              const cover = fullCovers[coverType];
+              if (cover) {
+                setCoverImages(prev => ({
+                  ...prev,
+                  [coverType]: {
+                    ...(typeof prev[coverType] === 'object' ? prev[coverType] : {}),
+                    ...cover
+                  }
+                }));
+              }
+            }
+
+            log.info('Full image data with versions loaded');
+          }).catch(err => {
+            log.warn('Failed to load full images (versions may be unavailable):', err);
+          });
+
         }).catch(err => {
           log.warn('Failed to load images:', err);
           setImageLoadProgress(null);

@@ -1302,6 +1302,15 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       ? await getActiveStoryImages(id)
       : await getAllStoryImages(id);
 
+    // Debug: log which versions are being loaded in fast mode
+    if (activeOnly && separateImages?.length > 0) {
+      const versionInfo = separateImages.slice(0, 5).map(r =>
+        `${r.image_type}${r.page_number ? '/' + r.page_number : ''}:v${r.version_index}`
+      ).join(', ');
+      console.log(`📷 [FAST-DEBUG] Active versions from meta: ${JSON.stringify(activeVersions)}`);
+      console.log(`📷 [FAST-DEBUG] First 5 images loaded: ${versionInfo}`);
+    }
+
     if (separateImages && separateImages.length > 0) {
       // Load story data blob for cover metadata (regeneration history, etc.)
       // Skip for activeOnly mode to save time
