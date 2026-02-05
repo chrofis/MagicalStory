@@ -346,7 +346,7 @@ function formatLandmarkContext(visualBible) {
 }
 
 /**
- * Analyze a generated story image, identifying characters by name using traits/clothing
+ * Analyze a generated story image for composition and character placement
  *
  * @param {string} imageData - Image as data URI or base64
  * @param {Array} characters - Array of character objects with traits (optional)
@@ -723,6 +723,115 @@ async function validateAndRepairScene(sceneJson, options = {}) {
   };
 }
 
+/**
+ * Evaluate semantic fidelity - does the image correctly depict the story text?
+ * Checks action direction, relationships, who does what to whom.
+ *
+ * @param {string} imageData - Image as data URI or base64
+ * @param {string} storyText - The story text this image should depict
+ * @param {string} imagePrompt - The prompt used to generate this image
+ * @returns {Promise<{score: number, verdict: string, semanticIssues: Array, usage: Object}>}
+ */
+async function evaluateSemanticFidelity(imageData, storyText, imagePrompt) {
+  if (!storyText || !imageData) {
+    log.debug('[SEMANTIC] Skipping semantic evaluation - missing storyText or imageData');
+    return null;
+  }
+
+  log.debug('[SEMANTIC] Evaluating semantic fidelity against story text...');
+
+  const model = genAI.getGenerativeModel({ model: VISION_MODEL });
+  const startTime = Date.now();
+
+  // Load semantic evaluation template
+  const template = PROMPT_TEMPLATES.imageSemantic;
+  if (!template) {
+    log.warn('[SEMANTIC] Semantic evaluation prompt not loaded, skipping');
+    return null;
+  }
+
+  const prompt = fillTemplate(template, {
+    STORY_TEXT: storyText,
+    IMAGE_PROMPT: imagePrompt || 'No prompt provided'
+  });
+
+  // Convert image to base64 if needed
+  let imageBase64 = imageData;
+  if (imageData.startsWith('data:')) {
+    imageBase64 = imageData.split(',')[1];
+  }
+
+  try {
+    const result = await model.generateContent([
+      prompt,
+      { inlineData: { mimeType: 'image/png', data: imageBase64 } }
+    ]);
+
+    const elapsed = Date.now() - startTime;
+    const text = result.response.text();
+
+    const usage = result.response.usageMetadata;
+    const tokens = (usage?.promptTokenCount || 0) + (usage?.candidatesTokenCount || 0);
+    const estimatedCost = ((usage?.promptTokenCount || 0) * 0.15 + (usage?.candidatesTokenCount || 0) * 0.60) / 1000000;
+
+    // Parse JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      log.warn(`[SEMANTIC] Failed to parse response: ${text.substring(0, 200)}`);
+      return {
+        score: null,
+        verdict: 'UNKNOWN',
+        semanticIssues: [],
+        usage: { tokens, estimatedCost, elapsed },
+        error: 'Failed to parse response'
+      };
+    }
+
+    let analysis;
+    try {
+      analysis = JSON.parse(jsonMatch[0]);
+    } catch (err) {
+      log.warn(`[SEMANTIC] JSON parse error: ${err.message}`);
+      return {
+        score: null,
+        verdict: 'UNKNOWN',
+        semanticIssues: [],
+        usage: { tokens, estimatedCost, elapsed },
+        error: err.message
+      };
+    }
+
+    const score = analysis.score ?? null;
+    const verdict = analysis.verdict || 'UNKNOWN';
+    const semanticIssues = analysis.semantic_issues || [];
+
+    if (semanticIssues.length > 0) {
+      log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.problem).join('; ')}`);
+    } else {
+      log.debug(`[SEMANTIC] No semantic issues found (score: ${score}/10)`);
+    }
+
+    return {
+      score: score !== null ? score * 10 : null, // Convert 0-10 to 0-100
+      rawScore: score,
+      verdict,
+      semanticIssues,
+      storyActions: analysis.story_actions || [],
+      semanticChecks: analysis.semantic_checks || [],
+      usage: { tokens, estimatedCost, elapsed }
+    };
+  } catch (err) {
+    log.error(`[SEMANTIC] Evaluation failed: ${err.message}`);
+    return {
+      score: null,
+      verdict: 'ERROR',
+      semanticIssues: [],
+      usage: { tokens: 0, estimatedCost: 0, elapsed: Date.now() - startTime },
+      error: err.message
+    };
+  }
+}
+
 module.exports = {
   generateCheapPreview,
   describeImage,
@@ -736,5 +845,6 @@ module.exports = {
   isValidationAvailable,
   buildPreviewPrompt,
   generatePreviewFeedback,
-  buildSimplePreviewPrompt
+  buildSimplePreviewPrompt,
+  evaluateSemanticFidelity
 };

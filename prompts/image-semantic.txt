@@ -1,0 +1,137 @@
+You are checking if this children's book illustration correctly depicts the story text.
+
+**TASK**: Verify semantic fidelity - does the image show what the story describes?
+
+**INPUTS**
+1. GENERATED_IMAGE - the illustration to check
+2. STORY_TEXT: "{STORY_TEXT}"
+3. IMAGE_PROMPT: "{IMAGE_PROMPT}"
+
+---
+
+**STEP 1: EXTRACT ACTIONS FROM STORY**
+
+List each action/relationship mentioned in the story text:
+- Who is doing what?
+- Who is doing it TO whom?
+- What direction is the action going?
+
+Examples:
+- "Emma chases Lucas" → Emma is the CHASER, Lucas is being CHASED
+- "Dad helps Sophie climb" → Dad is HELPING, Sophie is CLIMBING
+- "The dog follows the children" → Dog FOLLOWING, children being FOLLOWED
+
+---
+
+**STEP 2: VERIFY IN IMAGE**
+
+For EACH action identified above:
+
+1. **Identify the figures**: Which figure in the image matches each character?
+   - Use clothing, hair, position to match
+
+2. **Check action direction**:
+   - Who appears to be PERFORMING the action?
+   - Who appears to be RECEIVING/TARGET of the action?
+   - Is this CORRECT per the story text?
+
+3. **Check spatial relationships**:
+   - "A follows B" → A should be BEHIND B
+   - "A chases B" → A should be BEHIND B, B moving away
+   - "A helps B up" → A should be below or beside B, reaching toward B
+   - "A gives B something" → object should be moving from A to B
+   - "A points at B" → A's arm should extend toward B
+
+---
+
+**STEP 3: FLAG MISMATCHES**
+
+A SEMANTIC MISMATCH occurs when:
+- Action is REVERSED (B chasing A instead of A chasing B)
+- Wrong character performing the action
+- Relationship direction is backwards
+- Spatial arrangement contradicts the action
+
+---
+
+**SCORING**
+
+- CRITICAL (-3): Action completely reversed (wrong character doing the action)
+- MAJOR (-2): Relationship direction wrong, spatial contradiction
+- MINOR (-1): Ambiguous but not clearly wrong
+
+Start at 10, subtract for issues.
+VERDICT: PASS (7+), FAIL (0-6)
+
+---
+
+**OUTPUT FORMAT**
+
+Return JSON only:
+
+```json
+{
+  "story_actions": [
+    {
+      "action": "Emma chases Lucas",
+      "actor": "Emma",
+      "target": "Lucas",
+      "expected_spatial": "Emma behind Lucas, both moving in same direction"
+    }
+  ],
+  "image_observations": [
+    {
+      "actor_figure": "Figure on left (blonde girl in blue dress)",
+      "target_figure": "Figure on right (boy in red shirt)",
+      "observed_action": "Left figure appears to be running toward right figure",
+      "observed_spatial": "Left figure behind right figure"
+    }
+  ],
+  "semantic_checks": [
+    {
+      "story_action": "Emma chases Lucas",
+      "actor_match": {
+        "expected": "Emma",
+        "observed_figure": "blonde girl on left",
+        "confidence": 0.9,
+        "correct": true
+      },
+      "target_match": {
+        "expected": "Lucas",
+        "observed_figure": "boy on right",
+        "confidence": 0.85,
+        "correct": true
+      },
+      "action_direction_correct": true,
+      "spatial_correct": true,
+      "issue": null
+    }
+  ],
+  "score": 10,
+  "verdict": "PASS",
+  "issues_summary": null,
+  "semantic_issues": []
+}
+```
+
+If there ARE issues:
+```json
+{
+  "semantic_issues": [
+    {
+      "action": "Emma chases Lucas",
+      "problem": "Action reversed - Lucas appears to be chasing Emma",
+      "severity": "CRITICAL",
+      "observed": "Boy figure is behind and pursuing girl figure",
+      "expected": "Girl figure should be behind and pursuing boy figure"
+    }
+  ]
+}
+```
+
+**RULES:**
+- Output ONLY valid JSON
+- Focus on WHO is doing WHAT to WHOM
+- Spatial arrangement must support the action
+- If figures are ambiguous, note LOW confidence but don't fail
+- Only flag clear contradictions as issues

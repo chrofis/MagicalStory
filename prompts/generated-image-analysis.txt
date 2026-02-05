@@ -1,4 +1,4 @@
-Analyze this children's book illustration. Use the character information provided to identify people by name.
+Analyze this children's book illustration for composition and character placement.
 
 ## Known Characters
 {CHARACTER_INFO}
@@ -11,33 +11,29 @@ Analyze this children's book illustration. Use the character information provide
 ## Your Analysis
 
 ### 1. IMAGE SUMMARY
-Write 4-5 sentences describing the overall scene. Include:
-- The setting/location and time of day
-- The mood and atmosphere
-- What is happening in the scene (the action)
-- Who is present and their general arrangement
-- Any notable visual elements (colors, lighting, weather)
+Write 3-4 sentences describing what the image actually shows:
+- The setting/location
+- Who is present and where they are positioned
+- What action is happening
 
-### 2. LANDMARKS & OBJECTS
-For each significant object or landmark visible:
-- Name (if known from list above, otherwise describe it)
-- Position in frame (left/center/right, foreground/midground/background)
-- Interaction: Is any character touching, holding, or near it?
-
-### 3. CHARACTERS
+### 2. CHARACTERS
 For each person visible, identify them by matching traits/clothing:
 
 **[Character Name or "Unknown Figure"]**
-- Identification confidence: HIGH/MEDIUM/LOW (based on trait/clothing match)
+- Identification confidence: HIGH/MEDIUM/LOW
 - Position in frame: (left/center/right, foreground/midground/background)
-- Body orientation: (toward camera, away from camera, facing left, facing right, profile)
-- Face direction: (toward camera, away, left, right, up, down)
-- Clothing observed: (describe what they're wearing)
+- Body orientation: (toward camera, away, facing left/right, profile)
 - Action: What are they doing?
-- Interactions: With which characters or objects?
+- Clothing observed: (brief description)
 
-### 4. COMPOSITION ISSUES (if any)
+### 3. LANDMARKS & OBJECTS
+For each significant object or landmark:
+- Name (if known from list above)
+- Position in frame
+- Who is interacting with it?
+
+### 4. COMPOSITION ISSUES
 Note any geometric impossibilities:
 - Pointing at something behind them while facing camera
 - Expressions visible from back view
-- Scale mismatches
+- Scale mismatches between characters

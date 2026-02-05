@@ -11583,7 +11583,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           pageNumber: img.pageNumber,
           prompt: img.prompt,
           characterPhotos: img.characterPhotos,
-          sceneDescription: img.sceneDescription
+          sceneDescription: img.sceneDescription,
+          pageText: img.text  // Story text for semantic fidelity check
         })),
         {
           concurrency: 10,

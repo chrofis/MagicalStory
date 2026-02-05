@@ -294,15 +294,18 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
 }
 
 /**
- * Evaluate image quality using Claude API
- * Sends the image to Claude for quality assessment
+ * Evaluate image quality using Gemini API (visual quality + optional semantic fidelity)
+ * Sends the image to Gemini for quality assessment, with parallel semantic check when storyText provided
  * @param {string} imageData - Base64 encoded image with data URI prefix
  * @param {string} originalPrompt - The prompt used to generate the image
  * @param {string[]} referenceImages - Reference images used for generation
  * @param {string} evaluationType - Type of evaluation: 'scene' (default) or 'cover' (text-focused)
- * @returns {Promise<number>} Quality score from 0-100
+ * @param {string|null} qualityModelOverride - Override model for quality evaluation
+ * @param {string} pageContext - Page context for logging (e.g., "PAGE 5")
+ * @param {string|null} storyText - Optional story text for semantic fidelity check (runs in parallel)
+ * @returns {Promise<Object>} Quality result with score, reasoning, semantic issues, etc.
  */
-async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '') {
+async function evaluateImageQuality(imageData, originalPrompt = '', referenceImages = [], evaluationType = 'scene', qualityModelOverride = null, pageContext = '', storyText = null) {
   try {
     // Guard against undefined/invalid imageData
     if (!imageData || typeof imageData !== 'string') {
@@ -315,6 +318,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     if (!apiKey) {
       log.verbose('⚠️  [QUALITY] Gemini API key not configured, skipping quality evaluation');
       return null;
+    }
+
+    // Start semantic evaluation in parallel if story text provided (for scene evaluations)
+    let semanticPromise = null;
+    if (storyText && evaluationType === 'scene') {
+      const { evaluateSemanticFidelity } = require('./sceneValidator');
+      semanticPromise = evaluateSemanticFidelity(imageData, storyText, originalPrompt);
+      log.debug('🔍 [QUALITY] Starting parallel semantic fidelity evaluation');
     }
 
     // Extract base64 and mime type for generated image
@@ -698,17 +709,47 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         log.info(`⭐ [QUALITY] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
       }
 
+      // Await semantic evaluation if running in parallel
+      let semanticResult = null;
+      let finalScore = score;
+      let combinedIssuesSummary = issuesSummary;
+      if (semanticPromise) {
+        try {
+          semanticResult = await semanticPromise;
+          if (semanticResult && semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0) {
+            // Apply semantic penalties to score
+            // CRITICAL (-30), MAJOR (-20) severity
+            let semanticPenalty = 0;
+            for (const issue of semanticResult.semanticIssues) {
+              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
+              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
+              else semanticPenalty += 10;
+            }
+            finalScore = Math.max(0, score - semanticPenalty);
+            log.info(`🔍 [SEMANTIC] Applied ${semanticPenalty} point penalty for semantic issues (${score} → ${finalScore})`);
+            // Append semantic issues to summary
+            const semanticSummary = semanticResult.semanticIssues.map(i => i.problem).join('; ');
+            combinedIssuesSummary = issuesSummary
+              ? `${issuesSummary}; SEMANTIC: ${semanticSummary}`
+              : `SEMANTIC: ${semanticSummary}`;
+          }
+        } catch (semanticErr) {
+          log.warn(`[SEMANTIC] Parallel evaluation failed: ${semanticErr.message}`);
+        }
+      }
+
       return {
-        score,
-        rawScore, // Original 0-10 score
+        score: finalScore,
+        rawScore, // Original 0-10 score (visual only)
         verdict,
         reasoning,
-        issuesSummary, // Brief summary for quick display
+        issuesSummary: combinedIssuesSummary,
         textIssue,
         fixTargets: jsonFixTargets,       // Legacy format with bboxes (backwards compat)
         fixableIssues: fixableIssues,     // New format without bboxes (for two-stage detection)
         figures,                          // Detected figures with descriptions
         matches,                          // Character name → figure mapping with face_bbox
+        semanticResult,                   // Full semantic evaluation result (if available)
         usage: { input_tokens: qualityInputTokens, output_tokens: qualityOutputTokens, thinking_tokens: qualityThinkingTokens },
         modelId: modelId
       };
@@ -720,6 +761,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
       const rawScore = parseInt(score10Match[1]);
       const score = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
       log.verbose(`⭐ [QUALITY] Image quality score: ${rawScore}/10 (${score}/100)`);
+      // Await semantic to prevent memory leak (legacy format doesn't merge results)
+      if (semanticPromise) await semanticPromise.catch(() => {});
       return {
         score,
         reasoning: responseText,
@@ -734,6 +777,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     if (scoreMatch) {
       const score = parseInt(scoreMatch[1]);
       log.verbose(`⭐ [QUALITY] Image quality score: ${score}/100 (legacy format)`);
+      // Await semantic to prevent memory leak
+      if (semanticPromise) await semanticPromise.catch(() => {});
       return {
         score,
         reasoning: responseText,
@@ -747,6 +792,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     const numericScore = parseFloat(responseText);
     if (!isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
       log.verbose(`⭐ [QUALITY] Image quality score: ${numericScore}/100 (numeric format)`);
+      // Await semantic to prevent memory leak
+      if (semanticPromise) await semanticPromise.catch(() => {});
       return {
         score: numericScore,
         reasoning: responseText,
@@ -757,6 +804,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     }
 
     log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 200));
+    // Await semantic to prevent memory leak
+    if (semanticPromise) await semanticPromise.catch(() => {});
     return null;
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
@@ -2617,6 +2666,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
  * @param {string} images[].prompt - The prompt used to generate the image
  * @param {Array} images[].characterPhotos - Character reference photos
  * @param {string} images[].sceneDescription - Scene description for metadata extraction
+ * @param {string} images[].pageText - Story text for this page (for semantic fidelity check)
  * @param {Object} options - Evaluation options
  * @param {number} options.concurrency - Max concurrent evaluations (default: 10)
  * @param {string|null} options.qualityModelOverride - Model override for quality evaluation
@@ -2650,14 +2700,15 @@ async function evaluateImageBatch(images, options = {}) {
         };
       }
 
-      // Run quality evaluation
+      // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       const qualityResult = await evaluateImageQuality(
         img.imageData,
         img.prompt || '',
         img.characterPhotos || [],
         'scene',
         qualityModelOverride,
-        pageLabel
+        pageLabel,
+        img.pageText || null  // Story text for semantic fidelity check
       );
 
       // Extract scene metadata for character positions and clothing
@@ -2711,6 +2762,7 @@ async function evaluateImageBatch(images, options = {}) {
         evaluated: true,
         qualityScore: qualityResult?.score ?? null,
         reasoning: qualityResult?.reasoning || null,
+        issuesSummary: qualityResult?.issuesSummary || null,
         fixableIssues: qualityResult?.fixableIssues || [],
         fixTargets: qualityResult?.fixTargets || [],
         enrichedFixTargets,
@@ -2721,6 +2773,8 @@ async function evaluateImageBatch(images, options = {}) {
         bboxOverlayImage,
         usage: qualityResult?.usage || null,
         modelId: qualityResult?.modelId || null,
+        // Semantic fidelity results (parallel evaluation when pageText provided)
+        semanticResult: qualityResult?.semanticResult || null,
         // Text error info for covers
         textIssue: qualityResult?.textIssue || null,
         expectedText: qualityResult?.expectedText || null,
@@ -3497,7 +3551,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   const { modelOverrides = {}, usageTracker = null } = options;
 
   const {
-    describeImage
+    analyzeGeneratedImage
   } = require('./sceneValidator');
 
   const {
@@ -3537,8 +3591,8 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
 
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Analyzing current image with vision model...`);
 
-  // Step 1: Analyze the current image using describeImage
-  const imageDescription = await describeImage(imageData);
+  // Step 1: Analyze the current image using analyzeGeneratedImage (composition analysis for regeneration)
+  const imageDescription = await analyzeGeneratedImage(imageData, characters, visualBible, clothingRequirements);
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
 
   // Step 2: Build previewFeedback from the image analysis

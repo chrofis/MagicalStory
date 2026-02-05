@@ -786,9 +786,28 @@ export function RepairWorkflowPanel({
                               )}
                             </div>
                             {result.issuesSummary && result.issuesSummary !== 'none' && (
-                              <p className="text-xs text-gray-600 pl-2 border-l-2 border-gray-300">
+                              <p className={`text-xs pl-2 border-l-2 ${
+                                result.issuesSummary.includes('SEMANTIC:')
+                                  ? 'text-purple-700 border-purple-400 bg-purple-50 p-1 rounded-r'
+                                  : 'text-gray-600 border-gray-300'
+                              }`}>
                                 {result.issuesSummary}
                               </p>
+                            )}
+                            {result.semanticResult?.semanticIssues && result.semanticResult.semanticIssues.length > 0 && (
+                              <div className="text-xs text-purple-700 pl-2 border-l-2 border-purple-400 bg-purple-50 p-1 rounded-r mt-1">
+                                <span className="font-medium">🔍 Semantic Issues:</span>
+                                <ul className="list-disc list-inside mt-1">
+                                  {result.semanticResult.semanticIssues.map((issue, idx) => (
+                                    <li key={idx}>
+                                      <span className={`font-medium ${
+                                        issue.severity === 'CRITICAL' ? 'text-red-600' :
+                                        issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
+                                      }`}>[{issue.severity}]</span> {issue.problem}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
                             )}
                           </div>
                         );

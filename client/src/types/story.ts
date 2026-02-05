@@ -101,9 +101,30 @@ export interface SceneDescription {
   textModelId?: string;        // Text model used to generate the scene description
 }
 
+// Semantic fidelity evaluation result (parallel check for action/relationship accuracy)
+export interface SemanticEvaluationResult {
+  score: number | null;
+  rawScore?: number;
+  verdict: string;
+  semanticIssues: Array<{
+    action: string;
+    problem: string;
+    severity: 'CRITICAL' | 'MAJOR' | 'MINOR';
+    observed: string;
+    expected: string;
+  }>;
+  storyActions?: Array<{
+    action: string;
+    actor: string;
+    target: string;
+    expected_spatial: string;
+  }>;
+}
+
 export interface EvaluationData {
   score: number;
   reasoning: string;
+  issuesSummary?: string;
   fixTargets?: Array<{
     boundingBox: number[];
     issue: string;
@@ -115,6 +136,7 @@ export interface EvaluationData {
     type: string;
     fix: string;
   }>;
+  semanticResult?: SemanticEvaluationResult | null;
 }
 
 // Two-stage bounding box detection result
@@ -870,6 +892,7 @@ export interface RepairWorkflowState {
       issuesSummary?: string;
       reasoning?: string;
       fixableIssues: EvaluationData['fixableIssues'];
+      semanticResult?: SemanticEvaluationResult | null;
     }>;
   };
   consistencyResults: {
