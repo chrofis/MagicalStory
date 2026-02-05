@@ -1052,13 +1052,16 @@ async function rehydrateStoryImages(storyId, storyData) {
       }
 
       // Populate imageVersions with their imageData from database
+      // Note: imageVersions[i] is saved with version_index = i + 1 (see saveStoryData line 487)
+      // version_index 0 is the main imageData, versions 1+ are in imageVersions array
       if (scene.imageVersions && scene.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < scene.imageVersions.length; vIdx++) {
           const version = scene.imageVersions[vIdx];
           if (!version.imageData) {
-            // Version 0 in imageVersions = version_index 0 in DB, etc.
+            // imageVersions[0] → version_index 1, imageVersions[1] → version_index 2, etc.
+            const dbVersionIndex = vIdx + 1;
             const versionImg = allVersionImages.find(
-              i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === vIdx
+              i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === dbVersionIndex
             );
             if (versionImg) {
               version.imageData = versionImg.image_data;
