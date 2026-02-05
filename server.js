@@ -3528,7 +3528,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 
     // Update image_version_meta with new active version (new version is always the last one)
     const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length - 1 : 0;
+    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length : 0;  // DB version_index = array_index + 1
     await setActiveVersion(id, pageNumber, newActiveIndex);
 
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
@@ -3987,7 +3987,7 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
 
     // Update active version in metadata
     const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length - 1 : 0;
+    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length : 0;  // DB version_index = array_index + 1
     await setActiveVersion(id, pageNumber, newActiveIndex);
 
     // Deduct credits if not unlimited
@@ -5055,13 +5055,14 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         promptUsed: repairResult.promptUsed
       };
 
-      // Calculate the new version index (new version is at the end of imageVersions array)
-      const newVersionIndex = existingImage.imageVersions.length - 1;
+      // Calculate the new version index: imageVersions[N-1] → DB version_index N
+      // (because imageVersions[i] → version_index i+1 in saveStoryData)
+      const newVersionIndex = existingImage.imageVersions.length;
 
       await saveStoryData(id, storyData);
 
-      // Save the repaired image to story_images table with correct version index
-      await saveStoryImage(id, 'scene', pageNumber, existingImage.imageData, newVersionIndex);
+      // Note: saveStoryData already saves images from imageVersions to story_images table
+      // No need for separate saveStoryImage call
 
       // Set the new version as active
       await setActiveVersion(id, pageNumber, newVersionIndex);
@@ -5181,15 +5182,16 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
       clothingGroupCount: repairResult.clothingGroupCount
     };
 
-    // Save updated story
+    // Save updated story (this saves all images from imageVersions to story_images)
     await saveStoryData(id, storyData);
 
-    // Save repaired images to story_images table and set correct active version
+    // Set correct active version for each updated page
+    // Note: saveStoryData already saved images, so no need for separate saveStoryImage
     for (const update of repairResult.updatedImages) {
       const existingImage = sceneImages.find(s => s.pageNumber === update.pageNumber);
       if (existingImage && existingImage.imageVersions) {
-        const newVersionIndex = existingImage.imageVersions.length - 1;
-        await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, newVersionIndex);
+        // imageVersions[N-1] → DB version_index N (because saveStoryData uses i+1)
+        const newVersionIndex = existingImage.imageVersions.length;
         await setActiveVersion(id, update.pageNumber, newVersionIndex);
       }
     }
@@ -5368,8 +5370,12 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
 
           storyData.sceneImages[sceneIndex] = scene;
 
-          // Save story
+          // Save story (this saves images from imageVersions to story_images)
           await saveStoryData(id, storyData);
+
+          // Set active version to the new image
+          // imageVersions[newVersionIndex] → DB version_index (newVersionIndex + 1)
+          await setActiveVersion(id, pageNumber, newVersionIndex + 1);
 
           pagesCompleted.push(pageNumber);
           newVersions[pageNumber] = newVersionIndex;
@@ -5507,6 +5513,8 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
         // Update scene with new evaluation
         scene.qualityScore = evaluation.score;
         scene.qualityReasoning = evaluation.reasoning;
+        scene.semanticScore = evaluation.semanticScore ?? null;
+        scene.semanticResult = evaluation.semanticResult ?? null;
 
         pages[pageNumber] = {
           score: evaluation.score,                    // Combined final score
@@ -5938,8 +5946,17 @@ app.post('/api/stories/:id/repair-workflow/artifact-repair', authenticateToken, 
       }
     }
 
-    // Save updated story
+    // Save updated story (this saves all images from imageVersions to story_images)
     await saveStoryData(id, storyData);
+
+    // Set active version for each repaired page
+    // imageVersions[N-1] → DB version_index N (because saveStoryData uses i+1)
+    for (const pageNumber of pagesProcessed) {
+      const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      if (scene?.imageVersions?.length) {
+        await setActiveVersion(id, pageNumber, scene.imageVersions.length);
+      }
+    }
 
     log.info(`✅ [REPAIR-WORKFLOW] Artifact repair complete: ${pagesProcessed.length} pages, ${issuesFixed} issues fixed`);
     res.json({ pagesProcessed, issuesFixed });
@@ -10114,7 +10131,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIndex = scene.imageVersions.length - 1;  // Last version is active
+          const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
           await setActiveVersion(storyId, scene.pageNumber, activeIndex);
         }
       }
@@ -12558,7 +12575,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIndex = scene.imageVersions.length - 1;  // Last version is active
+          const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
           await setActiveVersion(storyId, scene.pageNumber, activeIndex);
         }
       }
@@ -14782,7 +14799,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIndex = scene.imageVersions.length - 1;  // Last version is active
+          const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
           await setActiveVersion(storyId, scene.pageNumber, activeIndex);
         }
       }
@@ -15062,7 +15079,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             if (sceneImages?.length > 0) {
               for (const scene of sceneImages) {
                 if (scene.imageVersions?.length > 0) {
-                  const activeIndex = scene.imageVersions.length - 1;
+                  const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
                   await setActiveVersion(jobId, scene.pageNumber, activeIndex);
                 }
               }
