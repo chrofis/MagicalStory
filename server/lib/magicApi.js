@@ -296,11 +296,22 @@ async function stitchBack(faceBuffer, originalBuffer, region) {
  * @returns {object} Expanded region {left, top, width, height}
  */
 function expandBboxForHair(bbox, imageWidth, imageHeight) {
-  // Normalize bbox format
-  const left = bbox.left ?? bbox.x ?? 0;
-  const top = bbox.top ?? bbox.y ?? 0;
-  const width = bbox.width || 100;
-  const height = bbox.height || 100;
+  // Normalize bbox format - handle array [x1, y1, x2, y2] or object {left, top, width, height}
+  let left, top, width, height;
+
+  if (Array.isArray(bbox)) {
+    // Normalized coordinates [x1, y1, x2, y2] - convert to pixel values
+    const [x1, y1, x2, y2] = bbox;
+    left = Math.round(x1 * imageWidth);
+    top = Math.round(y1 * imageHeight);
+    width = Math.round((x2 - x1) * imageWidth);
+    height = Math.round((y2 - y1) * imageHeight);
+  } else {
+    left = bbox.left ?? bbox.x ?? 0;
+    top = bbox.top ?? bbox.y ?? 0;
+    width = bbox.width || 100;
+    height = bbox.height || 100;
+  }
 
   // Expand upward for hair (50% of face height) and slightly to sides (20%)
   const hairExpansionUp = Math.round(height * 0.5);
@@ -458,7 +469,7 @@ async function iterativeCrop(sceneImageBuffer, initialRegion, imageWidth, imageH
       evaluation
     });
 
-    if (evaluation.isGoodCrop || !evaluation.adjustment?.needed) {
+    if (evaluation.isGoodCrop) {
       log.info(`[MAGICAPI] Good crop found on attempt ${attempt} (confidence: ${evaluation.confidence})`);
       return {
         buffer: croppedBuffer,
