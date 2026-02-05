@@ -4467,10 +4467,19 @@ export default function StoryWizard() {
                   // Update local state with the active version's image data
                   setSceneImages(prev => prev.map(img => {
                     if (img.pageNumber === pageNumber && img.imageVersions) {
+                      // Validate version index is in bounds
+                      if (versionIndex < 0 || versionIndex >= img.imageVersions.length) {
+                        log.error(`Invalid versionIndex ${versionIndex} for page ${pageNumber} (max: ${img.imageVersions.length - 1})`);
+                        return img;
+                      }
                       const activeVersion = img.imageVersions[versionIndex];
+                      if (!activeVersion?.imageData) {
+                        log.error(`Version ${versionIndex} has no imageData for page ${pageNumber}`);
+                        return img;
+                      }
                       return {
                         ...img,
-                        imageData: activeVersion?.imageData || img.imageData,
+                        imageData: activeVersion.imageData,
                         imageVersions: img.imageVersions.map((v, i) => ({
                           ...v,
                           isActive: i === versionIndex
@@ -4496,12 +4505,21 @@ export default function StoryWizard() {
                     if (!cover || typeof cover === 'string') return prev;
                     const coverObj = cover as import('@/types/story').CoverImageData;
                     if (!coverObj.imageVersions) return prev;
+                    // Validate version index is in bounds
+                    if (versionIndex < 0 || versionIndex >= coverObj.imageVersions.length) {
+                      log.error(`Invalid versionIndex ${versionIndex} for ${coverType} (max: ${coverObj.imageVersions.length - 1})`);
+                      return prev;
+                    }
                     const activeVersion = coverObj.imageVersions[versionIndex];
+                    if (!activeVersion?.imageData) {
+                      log.error(`Version ${versionIndex} has no imageData for ${coverType}`);
+                      return prev;
+                    }
                     return {
                       ...prev,
                       [coverType]: {
                         ...coverObj,
-                        imageData: activeVersion?.imageData || coverObj.imageData,
+                        imageData: activeVersion.imageData,
                         imageVersions: coverObj.imageVersions.map((v, i) => ({
                           ...v,
                           isActive: i === versionIndex
