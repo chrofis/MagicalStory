@@ -572,7 +572,11 @@ export function useRepairWorkflow({
       // Notify parent of image updates for each repaired page
       for (const repair of pagesRepaired) {
         if (repair.imageData && onImageUpdate) {
-          onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex);
+          try {
+            onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex);
+          } catch (err) {
+            console.error(`[RepairWorkflow] Failed to notify parent of image update for page ${repair.pageNumber}:`, err);
+          }
         }
       }
 
@@ -753,7 +757,12 @@ export function useRepairWorkflow({
   } = {}) => {
     if (!storyId) return;
 
-    const { scoreThreshold = 6, issueThreshold = 3, maxRetries = 4, onProgress } = options;
+    // Default thresholds for repair decisions
+    const DEFAULT_SCORE_THRESHOLD = 6;      // Out of 10 - pages below this need redo
+    const DEFAULT_ISSUE_THRESHOLD = 3;      // Number of fixable issues triggering redo
+    const DEFAULT_MAX_RETRIES = 4;          // Max iterations per page
+
+    const { scoreThreshold = DEFAULT_SCORE_THRESHOLD, issueThreshold = DEFAULT_ISSUE_THRESHOLD, maxRetries = DEFAULT_MAX_RETRIES, onProgress } = options;
 
     // Create abort controller for this workflow run
     abortControllerRef.current = new AbortController();
@@ -793,6 +802,10 @@ export function useRepairWorkflow({
       for (const [pageNumStr, result] of Object.entries(evalPages)) {
         const pageNum = parseInt(pageNumStr);
         const rawScore = result.rawScore ?? Math.round(result.qualityScore / 10);
+        // Validate rawScore is on 0-10 scale (not 0-100)
+        if (rawScore > 10) {
+          console.error(`[RepairWorkflow] Invalid rawScore scale for page ${pageNum}: ${rawScore} (expected 0-10)`);
+        }
         const issueCount = result.fixableIssues?.length ?? 0;
         if (rawScore < scoreThreshold || issueCount >= issueThreshold) {
           pagesToRedo.push(pageNum);

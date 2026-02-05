@@ -764,6 +764,10 @@ export function RepairWorkflowPanel({
                         const finalScore = result.score ?? result.qualityScore;
                         const qualityScore = result.qualityScore;
                         const semanticScore = result.semanticScore;
+                        // Warn if using fallback (indicates potential bug in evaluation)
+                        if (result.score === null && result.qualityScore !== null) {
+                          console.warn(`[RepairWorkflow] Page ${page}: Missing combined score, using qualityScore fallback`);
+                        }
                         return (
                           <div key={page} className="p-2 bg-gray-50 rounded border text-sm space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">

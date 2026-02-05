@@ -874,16 +874,8 @@ async function getActiveStoryImages(storyId) {
     throw new Error('Database mode required');
   }
 
-  // First, get the active versions from image_version_meta for debugging
-  const metaRows = await dbQuery(
-    `SELECT image_version_meta FROM stories WHERE id = $1`,
-    [storyId]
-  );
-  const meta = metaRows[0]?.image_version_meta || {};
-  console.log(`📷 [getActiveStoryImages] image_version_meta: ${JSON.stringify(meta)}`);
-
-  // Single query: join images with active version metadata
-  // For each page/cover, only select the row where version_index matches the active version
+  // Single optimized query: join images with active version metadata
+  // Uses CTEs for both active versions and version counts to avoid correlated subqueries
   const results = await dbQuery(
     `WITH active_versions AS (
       SELECT
@@ -891,28 +883,30 @@ async function getActiveStoryImages(storyId) {
         COALESCE((value->>'activeVersion')::int, 0) as active_version
       FROM stories, jsonb_each(COALESCE(image_version_meta, '{}'))
       WHERE id = $1
+    ),
+    version_counts AS (
+      SELECT story_id, image_type, page_number, COUNT(*) as version_count
+      FROM story_images
+      WHERE story_id = $1
+      GROUP BY story_id, image_type, page_number
     )
     SELECT si.image_type, si.page_number, si.version_index, si.image_data, si.quality_score, si.generated_at,
-           (SELECT COUNT(*) FROM story_images si2
-            WHERE si2.story_id = si.story_id
-              AND si2.image_type = si.image_type
-              AND si2.page_number IS NOT DISTINCT FROM si.page_number) as version_count
+           COALESCE(vc.version_count, 1) as version_count
     FROM story_images si
     LEFT JOIN active_versions av ON (
       (si.image_type = 'scene' AND av.page_key = si.page_number::text) OR
       (si.image_type != 'scene' AND av.page_key = si.image_type)
+    )
+    LEFT JOIN version_counts vc ON (
+      vc.story_id = si.story_id
+      AND vc.image_type = si.image_type
+      AND vc.page_number IS NOT DISTINCT FROM si.page_number
     )
     WHERE si.story_id = $1
       AND si.version_index = COALESCE(av.active_version, 0)
     ORDER BY si.image_type, si.page_number`,
     [storyId]
   );
-
-  // Log which versions were selected
-  const selected = results.slice(0, 5).map(r =>
-    `${r.image_type}${r.page_number ? '/' + r.page_number : ''}:v${r.version_index}`
-  ).join(', ');
-  console.log(`📷 [getActiveStoryImages] Selected (first 5): ${selected}`);
 
   return results;
 }

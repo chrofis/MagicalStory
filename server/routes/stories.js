@@ -815,13 +815,17 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         timestamp: entry.timestamp,
         characterName: entry.characterName,
         costumeType: entry.costumeType,
+        artStyle: entry.artStyle,
+        costumeDescription: entry.costumeDescription,
         durationMs: entry.durationMs,
         success: entry.success,
         error: entry.error,
         prompt: entry.prompt,
+        costumeEvaluation: entry.costumeEvaluation || null,
         inputs: entry.inputs ? {
           facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto?.identifier, sizeKB: entry.inputs.facePhoto?.sizeKB } : null,
-          standardAvatar: entry.inputs.standardAvatar ? { identifier: entry.inputs.standardAvatar?.identifier, sizeKB: entry.inputs.standardAvatar?.sizeKB } : null
+          standardAvatar: entry.inputs.standardAvatar ? { identifier: entry.inputs.standardAvatar?.identifier, sizeKB: entry.inputs.standardAvatar?.sizeKB } : null,
+          referenceAvatar: entry.inputs.referenceAvatar ? { identifier: entry.inputs.referenceAvatar?.identifier, sizeKB: entry.inputs.referenceAvatar?.sizeKB } : null
         } : null,
         output: entry.output ? { identifier: entry.output?.identifier, sizeKB: entry.output?.sizeKB } : null
       })),
@@ -1305,15 +1309,6 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       ? await getActiveStoryImages(id)
       : await getAllStoryImages(id);
 
-    // Debug: log which versions are being loaded in fast mode
-    if (activeOnly && separateImages?.length > 0) {
-      const versionInfo = separateImages.slice(0, 5).map(r =>
-        `${r.image_type}${r.page_number ? '/' + r.page_number : ''}:v${r.version_index}`
-      ).join(', ');
-      console.log(`📷 [FAST-DEBUG] Active versions from meta: ${JSON.stringify(activeVersions)}`);
-      console.log(`📷 [FAST-DEBUG] First 5 images loaded: ${versionInfo}`);
-    }
-
     if (separateImages && separateImages.length > 0) {
       // Load story data blob for cover metadata (regeneration history, etc.)
       // Skip for activeOnly mode to save time
@@ -1444,10 +1439,6 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           'regeneratedAt', 'bboxDetection'];
 
         for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
-          const dbVersionCount = covers[coverType]?.imageVersions?.length || 0;
-          const blobVersionCount = storyData.coverImages?.[coverType]?.imageVersions?.length || 0;
-          console.log(`📷 [COVER-VERSIONS] ${coverType}: DB has ${dbVersionCount}, blob has ${blobVersionCount}`);
-
           if (covers[coverType] && storyData.coverImages?.[coverType]) {
             const blobCover = storyData.coverImages[coverType];
             for (const field of coverMetadataFields) {
@@ -2402,14 +2393,7 @@ router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req,
       );
 
       const versionCount = dataCheck.rows[0]?.version_count || 0;
-      console.log(`🖼️ [COVER-VERSION] ${coverType} v${versionIndex}: story_images not found, blob has ${versionCount} versions`);
       if (versionIndex >= versionCount) {
-        // Also check story_images count for this cover type
-        const imgCount = await pool.query(
-          `SELECT COUNT(*) as cnt FROM story_images WHERE story_id = $1 AND image_type = $2`,
-          [id, coverType]
-        );
-        console.log(`🖼️ [COVER-VERSION] story_images count for ${coverType}: ${imgCount.rows[0]?.cnt}`);
         return res.status(400).json({ error: 'Invalid version index' });
       }
     }

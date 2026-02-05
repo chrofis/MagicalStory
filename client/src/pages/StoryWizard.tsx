@@ -283,11 +283,22 @@ export default function StoryWizard() {
     success: boolean;
     error?: string;
     inputs: {
-      facePhoto: { identifier: string; sizeKB: number; imageData?: string };
-      standardAvatar: { identifier: string; sizeKB: number; imageData?: string } | null;
+      facePhoto?: { identifier: string; sizeKB: number; imageData?: string } | null;
+      standardAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
+      referenceAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
     };
     prompt?: string;
     output?: { identifier: string; sizeKB: number; imageData?: string };
+    costumeEvaluation?: {
+      pass: boolean;
+      confidence: 'high' | 'medium' | 'low';
+      reason: string;
+      details?: {
+        bottomLeft?: { hasCostume: boolean; costumeMatch: string; description: string };
+        bottomRight?: { hasCostume: boolean; costumeMatch: string; description: string };
+        consistent?: boolean;
+      };
+    } | null;
   }>>([]); // Costumed avatar generation log (dev mode)
   const [generationLog, setGenerationLog] = useState<GenerationLogEntry[]>([]); // Generation log (dev mode)
   const [finalChecksReport, setFinalChecksReport] = useState<FinalChecksReport | null>(null); // Final consistency checks report (dev mode)
@@ -832,9 +843,23 @@ export default function StoryWizard() {
         }
 
         // PHASE 2a: Fast image load (activeOnly=true) - shows images quickly
-        storyService.getAllImages(urlStoryId, true).then(batchResult => {
-          const images = batchResult?.images || [];
-          const covers = batchResult?.covers || {};
+        // Add timeout to prevent stuck progress indicator (30 second timeout)
+        const IMAGE_LOAD_TIMEOUT = 30000;
+        const imageLoadPromise = storyService.getAllImages(urlStoryId, true);
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => {
+            log.warn('Image load timeout - clearing progress indicator');
+            resolve(null);
+          }, IMAGE_LOAD_TIMEOUT)
+        );
+
+        Promise.race([imageLoadPromise, timeoutPromise]).then(batchResult => {
+          if (!batchResult) {
+            setImageLoadProgress(null);
+            return;
+          }
+          const images = batchResult.images || [];
+          const covers = batchResult.covers || {};
           const coverCount = Object.keys(covers).filter(k => covers[k as keyof typeof covers]?.imageData).length;
           const imageCount = images.filter(img => img.imageData).length;
 

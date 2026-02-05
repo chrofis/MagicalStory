@@ -727,7 +727,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
               else semanticPenalty += 10;
             }
             finalScore = Math.max(0, score - semanticPenalty);
-            log.info(`🔍 [SEMANTIC] Applied ${semanticPenalty} point penalty for semantic issues (${score} → ${finalScore})`);
+            log.info(`🔍 [SEMANTIC] Semantic score: ${semanticResult.score}/100, penalty: ${semanticPenalty} points (quality ${score} → final ${finalScore})`);
             // Append semantic issues to summary
             const semanticSummary = semanticResult.semanticIssues.map(i => i.problem).join('; ');
             combinedIssuesSummary = issuesSummary
@@ -3077,6 +3077,10 @@ function buildRepairPlan(pageEvaluations, options = {}) {
     const pageNum = evaluation.pageNumber;
     // Use combined final score (includes semantic penalties), fallback to qualityScore for backwards compat
     const score = evaluation.score ?? evaluation.qualityScore;
+    // Warn if fallback is used despite semantic evaluation running (indicates bug)
+    if (evaluation.score === null && evaluation.qualityScore !== null && evaluation.semanticScore !== null) {
+      log.warn(`⚠️ [REPAIR PLAN] Page ${pageNum}: Missing combined score despite semantic evaluation, using qualityScore fallback`);
+    }
     const hasFixable = (evaluation.enrichedFixTargets?.length > 0) ||
                        (evaluation.fixableIssues?.length > 0);
     const evaluationFailed = !evaluation.evaluated;
@@ -3166,6 +3170,10 @@ function buildCategorizedRepairPlan(pageEvaluations, options = {}) {
     const pageNum = evaluation.pageNumber;
     // Use combined final score (includes semantic penalties), fallback to qualityScore for backwards compat
     const score = evaluation.score ?? evaluation.qualityScore;
+    // Warn if fallback is used despite semantic evaluation running (indicates bug)
+    if (evaluation.score === null && evaluation.qualityScore !== null && evaluation.semanticScore !== null) {
+      log.warn(`⚠️ [CATEGORIZED REPAIR] Page ${pageNum}: Missing combined score despite semantic evaluation, using qualityScore fallback`);
+    }
     const evaluationFailed = !evaluation.evaluated;
 
     // Track stats

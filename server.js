@@ -5428,7 +5428,8 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
     };
 
     // Run evaluations in parallel with concurrency limit
-    const evalLimit = pLimit(10);
+    // Each page makes 2 API calls (quality + semantic), so limit to 5 pages = 10 concurrent calls
+    const evalLimit = pLimit(5);
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
 
     await Promise.all(pageNumbers.map(pageNumber => evalLimit(async () => {
@@ -5483,6 +5484,11 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           return;
         }
 
+        // Validate semantic evaluation ran when expected
+        if (evaluation.semanticScore === null && sceneHint) {
+          log.warn(`⚠️ [RE-EVALUATE] Page ${pageNumber}: Semantic evaluation failed despite sceneHint being available`);
+        }
+
         // Log both scores for debugging
         const qualityPct = evaluation.qualityScore ?? evaluation.score;
         const semanticPct = evaluation.semanticScore ?? 100;
@@ -5507,7 +5513,7 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
           semanticResult: evaluation.semanticResult || null
         };
       } catch (evalErr) {
-        log.error(`Error evaluating page ${pageNumber}:`, evalErr);
+        log.error(`❌ [RE-EVALUATE] Page ${pageNumber} evaluation failed:`, evalErr);
         pages[pageNumber] = {
           qualityScore: null,
           fixableIssues: [],
@@ -5522,7 +5528,7 @@ app.post('/api/stories/:id/repair-workflow/re-evaluate', authenticateToken, asyn
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     res.json({ pages });
   } catch (err) {
-    log.error('Error in re-evaluate:', err);
+    log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
     res.status(500).json({ error: 'Failed to re-evaluate: ' + err.message });
   }
 });
