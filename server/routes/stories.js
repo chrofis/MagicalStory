@@ -1364,6 +1364,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 imageData: normalizeImageData(row.image_data),
                 qualityScore: row.quality_score,
                 generatedAt: row.generated_at,
+                createdAt: row.generated_at, // Alias for frontend compatibility
                 isActive: activeVersions[pageNum.toString()] === row.version_index
               });
             }
@@ -1400,6 +1401,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               imageData: normalizeImageData(row.image_data),
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
+              createdAt: row.generated_at, // Alias for frontend compatibility
               isActive: row.version_index === activeCoverVersion
             });
 
