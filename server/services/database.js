@@ -711,10 +711,12 @@ async function upsertStory(storyId, userId, storyData) {
 
   // Extract and save cover images to story_images table
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+  console.log(`💾 [UPSERT] Processing covers for ${storyId}: ${Object.keys(dataForStorage.coverImages || {}).join(', ') || 'none'}`);
   for (const coverType of coverTypes) {
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
       const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+      console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}, type=${typeof coverData}`);
       if (imageData) {
         await saveStoryImage(storyId, coverType, null, imageData, {
           qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null,
@@ -722,6 +724,7 @@ async function upsertStory(storyId, userId, storyData) {
           versionIndex: 0
         });
         imagesSaved++;
+        console.log(`✅ [UPSERT] Saved ${coverType} to story_images (${imageData.length} chars)`);
         // Remove imageData from storage (keep metadata for object type)
         if (typeof coverData === 'object') {
           delete coverData.imageData;
@@ -789,9 +792,11 @@ async function getStoryImage(storyId, imageType, pageNumber, versionIndex = 0) {
   );
 
   if (rows.length === 0) {
+    console.log(`🔍 [GET_IMAGE] No image found: storyId=${storyId}, type=${imageType}, page=${pageNumber}, version=${versionIndex}`);
     return null;
   }
 
+  console.log(`🔍 [GET_IMAGE] Found image: storyId=${storyId}, type=${imageType}, dataLength=${rows[0].image_data?.length || 0}`);
   return {
     imageData: rows[0].image_data,
     qualityScore: rows[0].quality_score,

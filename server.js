@@ -16031,25 +16031,40 @@ app.get('/api/shared/:shareToken/og-image', async (req, res) => {
     // Fast path: get only story ID, then fetch cover from separate table
     const storyId = await getSharedStoryId(shareToken);
     if (!storyId) {
+      log.warn(`🖼️ [OG-IMAGE] Story not found for shareToken: ${shareToken}`);
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
+    log.debug(`🖼️ [OG-IMAGE] Fetching frontCover for story ${storyId}`);
     const coverImageResult = await getStoryImage(storyId, 'frontCover', null, 0);
     let coverImage = coverImageResult?.imageData?.replace(/^data:image\/\w+;base64,/, '') || null;
+
+    if (coverImage) {
+      log.debug(`🖼️ [OG-IMAGE] Found frontCover in story_images table (${coverImage.length} chars)`);
+    } else {
+      log.debug(`🖼️ [OG-IMAGE] frontCover not in story_images, trying legacy fallback...`);
+    }
 
     // Fallback: fetch full story data for legacy coverImages
     if (!coverImage) {
       const story = await getSharedStory(shareToken);
       if (story?.data.coverImages?.frontCover) {
         const fc = story.data.coverImages.frontCover;
+        log.debug(`🖼️ [OG-IMAGE] Legacy frontCover type: ${typeof fc}, keys: ${typeof fc === 'object' ? Object.keys(fc).join(',') : 'N/A'}`);
         const fcData = typeof fc === 'string' ? fc : fc?.imageData;
         if (fcData) {
           coverImage = fcData.replace(/^data:image\/\w+;base64,/, '');
+          log.debug(`🖼️ [OG-IMAGE] Found legacy frontCover (${coverImage.length} chars)`);
+        } else {
+          log.warn(`🖼️ [OG-IMAGE] Legacy frontCover exists but no imageData - was it stripped? Keys: ${typeof fc === 'object' ? Object.keys(fc).join(',') : 'N/A'}`);
         }
+      } else {
+        log.warn(`🖼️ [OG-IMAGE] No coverImages.frontCover in story data`);
       }
     }
 
     if (!coverImage) {
+      log.error(`🖼️ [OG-IMAGE] Cover image not found for story ${storyId} - both story_images and legacy fallback failed`);
       return res.status(404).json({ error: 'Cover image not found' });
     }
 
