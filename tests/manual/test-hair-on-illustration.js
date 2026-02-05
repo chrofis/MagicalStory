@@ -112,15 +112,33 @@ async function runHairChangeWithProperty(imageUrl, hairColor, hairStyle, hairPro
   return result.output?.image_url;
 }
 
+async function uploadBuffer(buffer) {
+  const base64 = buffer.toString('base64');
+  const formData = new URLSearchParams();
+  formData.append('source', base64);
+  formData.append('type', 'base64');
+  formData.append('action', 'upload');
+  const response = await fetch('https://freeimage.host/api/1/upload?key=6d207e02198a847aa98d0a2a901485a5', {
+    method: 'POST',
+    body: formData
+  });
+  const result = await response.json();
+  return result.image.url;
+}
+
 async function main() {
-  console.log('Testing Hair V2 API - Forward swept bangs\n');
+  console.log('Testing Hair V2 API - Very short + shiny\n');
 
-  const imageUrl = await uploadToFreeImageHost('tests/fixtures/test-lukas-face-C-v3.png');
+  // Use the face-swapped result as input
+  const faceSwapped = fs.readFileSync('tests/fixtures/pipeline-step1-faceswap.png');
+  const imageUrl = await uploadBuffer(faceSwapped);
+  console.log('Uploaded face-swapped image\n');
 
-  // Try forward/bangs style - straight, not curly (like real Lukas)
-  await runHairChangeWithProperty(imageUrl, 'light brown', 'forward swept bangs', 'straight', 'test-hair-bangs1.png');
-  await runHairChangeWithProperty(imageUrl, 'light brown', 'fringe', 'straight', 'test-hair-fringe.png');
-  await runHairChangeWithProperty(imageUrl, 'light brown', 'textured fringe', 'straight', 'test-hair-textured.png');
+  // Try very short length prompts with shine
+  await runHairChangeWithProperty(imageUrl, 'shiny dark brown', 'very short fringe well above eyebrows', 'glossy', 'hair-veryshort1.png');
+  await runHairChangeWithProperty(imageUrl, 'shiny dark brown', 'cropped fringe 1 inch forehead visible', 'glossy', 'hair-cropped.png');
+  await runHairChangeWithProperty(imageUrl, 'shiny dark brown', 'short textured crop high forehead', 'glossy', 'hair-highforehead.png');
+  await runHairChangeWithProperty(imageUrl, 'shiny dark brown', 'caesar cut short fringe', 'glossy', 'hair-caesar.png');
 }
 
 main().catch(console.error);

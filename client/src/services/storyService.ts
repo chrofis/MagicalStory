@@ -1701,15 +1701,6 @@ export const storyService = {
       };
     }>(`/api/jobs/${jobId}/status`);
 
-    // Debug: Log raw API response
-    console.log('[storyService.getJobStatus] Raw response:', {
-      status: response.status,
-      hasResult: !!response.result,
-      hasResultData: !!response.resultData,
-      resultKeys: response.result ? Object.keys(response.result) : response.resultData ? Object.keys(response.resultData) : [],
-      progress: response.progress
-    });
-
     // Map server response to client format
     // Backend sends 'result' (not 'resultData') - support both for backwards compatibility
     const resultData = response.result || response.resultData;

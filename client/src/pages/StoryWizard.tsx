@@ -326,6 +326,7 @@ export default function StoryWizard() {
   const [autoRunRepairForStoryId, setAutoRunRepairForStoryId] = useState<string | null>(null);
   // Flag to track if dev metadata has been loaded (prevents duplicate fetches)
   const devMetadataLoadedRef = useRef(false);
+  const storyTextReceivedRef = useRef(false);
 
   // Progressive story display state (show story while images are generating)
   const [progressiveStoryData, setProgressiveStoryData] = useState<{
@@ -3214,6 +3215,7 @@ export default function StoryWizard() {
     setSceneImages([]);
     setSceneDescriptions([]);
     setProgressiveStoryData(null);
+    storyTextReceivedRef.current = false;
     setCompletedPageImages({});
     setCoverImages({ frontCover: null, initialPage: null, backCover: null });
 
@@ -3495,10 +3497,11 @@ export default function StoryWizard() {
         }
 
         // Update story text for progressive display (text available before images)
-        if (status.storyText && !progressiveStoryData) {
+        if (status.storyText && !storyTextReceivedRef.current) {
+          storyTextReceivedRef.current = true;
           setProgressiveStoryData(status.storyText);
           setStoryTitle(status.storyText.title);
-          log.debug(`Story text received: ${status.storyText.totalPages} pages ready for display`);
+          log.info(`Story text loaded: ${status.storyText.totalPages} pages`);
         }
 
         // Update completed page images as they become available
@@ -3518,14 +3521,6 @@ export default function StoryWizard() {
             return updated;
           });
         }
-
-        // Debug: Log job status to understand completion detection
-        console.log('[StoryWizard] Job status check:', {
-          status: status.status,
-          hasResult: !!status.result,
-          resultKeys: status.result ? Object.keys(status.result) : [],
-          progress: status.progress
-        });
 
         if (status.status === 'completed' && status.result) {
           // Job completed successfully
