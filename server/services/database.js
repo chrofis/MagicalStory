@@ -1017,17 +1017,21 @@ async function rehydrateStoryImages(storyId, storyData) {
   const metaResult = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
   const versionMeta = metaResult[0]?.image_version_meta || {};
 
-  // For pages with non-zero active version, load that version's image instead
-  for (const [pageNum, meta] of Object.entries(versionMeta)) {
+  // For pages/covers with non-zero active version, load that version's image instead
+  const coverTypes = ['frontCover', 'backCover', 'initialPage'];
+  for (const [key, meta] of Object.entries(versionMeta)) {
     if (meta.activeVersion && meta.activeVersion > 0) {
+      const isCover = coverTypes.includes(key);
       const activeImg = await dbQuery(
         `SELECT image_data FROM story_images
-         WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2 AND version_index = $3`,
-        [storyId, parseInt(pageNum), meta.activeVersion]
+         WHERE story_id = $1 AND image_type = $2 AND ${isCover ? 'page_number IS NULL' : 'page_number = $3'} AND version_index = $${isCover ? '3' : '4'}`,
+        isCover ? [storyId, key, meta.activeVersion] : [storyId, 'scene', parseInt(key), meta.activeVersion]
       );
       if (activeImg.length > 0) {
         // Replace the main image entry with the active version
-        const existing = images.find(i => i.image_type === 'scene' && i.page_number === parseInt(pageNum));
+        const existing = isCover
+          ? images.find(i => i.image_type === key)
+          : images.find(i => i.image_type === 'scene' && i.page_number === parseInt(key));
         if (existing) {
           existing.image_data = activeImg[0].image_data;
         }
