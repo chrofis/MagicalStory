@@ -9,7 +9,7 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getRetryHistoryImages, rehydrateStoryImages } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
@@ -1266,12 +1266,14 @@ router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) 
   }
 });
 
-// GET /api/stories/:id/images - Get ALL images in one request (optimized batch load)
-// This dramatically improves story load time: 1 request instead of 20+
+// GET /api/stories/:id/images - Get images in one request (optimized batch load)
+// Use ?activeOnly=true for fast initial load (~3MB instead of ~53MB)
+// Without activeOnly, returns all versions for dev mode / version switching
 router.get('/:id/images', authenticateToken, async (req, res) => {
   const startTime = Date.now();
   try {
     const { id } = req.params;
+    const activeOnly = req.query.activeOnly === 'true';
 
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
@@ -1295,15 +1297,21 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
     // Get all active versions from image_version_meta (fast lookup)
     const activeVersions = await getAllActiveVersions(id);
 
-    // Try FAST path: get all images from story_images table
-    const separateImages = await getAllStoryImages(id);
+    // Use fast query for activeOnly mode, full query otherwise
+    const separateImages = activeOnly
+      ? await getActiveStoryImages(id)
+      : await getAllStoryImages(id);
 
     if (separateImages && separateImages.length > 0) {
       // Load story data blob for cover metadata (regeneration history, etc.)
-      const storyDataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
-      const storyData = storyDataRows.length > 0
-        ? (typeof storyDataRows[0].data === 'string' ? JSON.parse(storyDataRows[0].data) : storyDataRows[0].data)
-        : {};
+      // Skip for activeOnly mode to save time
+      let storyData = {};
+      if (!activeOnly) {
+        const storyDataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+        storyData = storyDataRows.length > 0
+          ? (typeof storyDataRows[0].data === 'string' ? JSON.parse(storyDataRows[0].data) : storyDataRows[0].data)
+          : {};
+      }
 
       // Group images by page/cover type
       const sceneImagesMap = new Map();
@@ -1312,110 +1320,148 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       for (const row of separateImages) {
         if (row.image_type === 'scene') {
           const pageNum = row.page_number;
-          if (!sceneImagesMap.has(pageNum)) {
+
+          if (activeOnly) {
+            // Fast path: one image per page, no versions array
             sceneImagesMap.set(pageNum, {
               pageNumber: pageNum,
-              imageData: null,
-              qualityScore: null,
-              generatedAt: null,
-              imageVersions: []
-            });
-          }
-          const scene = sceneImagesMap.get(pageNum);
-
-          if (row.version_index === 0) {
-            // Main image
-            scene.imageData = normalizeImageData(row.image_data);
-            scene.qualityScore = row.quality_score;
-            scene.generatedAt = row.generated_at;
-          } else {
-            // Version image
-            scene.imageVersions.push({
               imageData: normalizeImageData(row.image_data),
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
-              isActive: activeVersions[pageNum.toString()] === row.version_index
+              versionCount: row.version_count || 1,
+              activeVersion: row.version_index
             });
+          } else {
+            // Full path: build imageVersions array
+            if (!sceneImagesMap.has(pageNum)) {
+              sceneImagesMap.set(pageNum, {
+                pageNumber: pageNum,
+                imageData: null,
+                qualityScore: null,
+                generatedAt: null,
+                imageVersions: []
+              });
+            }
+            const scene = sceneImagesMap.get(pageNum);
+
+            if (row.version_index === 0) {
+              // Main image
+              scene.imageData = normalizeImageData(row.image_data);
+              scene.qualityScore = row.quality_score;
+              scene.generatedAt = row.generated_at;
+            } else {
+              // Version image
+              scene.imageVersions.push({
+                imageData: normalizeImageData(row.image_data),
+                qualityScore: row.quality_score,
+                generatedAt: row.generated_at,
+                isActive: activeVersions[pageNum.toString()] === row.version_index
+              });
+            }
           }
         } else {
-          // Cover image (frontCover, initialPage, backCover) - now supports versions
+          // Cover image (frontCover, initialPage, backCover)
           const coverType = row.image_type;
-          if (!covers[coverType]) {
+
+          if (activeOnly) {
+            // Fast path: one image per cover, no versions array
             covers[coverType] = {
-              imageData: null,
-              qualityScore: null,
-              generatedAt: null,
-              imageVersions: []
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              versionCount: row.version_count || 1,
+              activeVersion: row.version_index
             };
-          }
+          } else {
+            // Full path: build imageVersions array
+            if (!covers[coverType]) {
+              covers[coverType] = {
+                imageData: null,
+                qualityScore: null,
+                generatedAt: null,
+                imageVersions: []
+              };
+            }
 
-          const coverData = covers[coverType];
-          const activeCoverVersion = activeVersions[coverType] ?? 0;
+            const coverData = covers[coverType];
+            const activeCoverVersion = activeVersions[coverType] ?? 0;
 
-          // Add to imageVersions array
-          coverData.imageVersions.push({
-            imageData: normalizeImageData(row.image_data),
-            qualityScore: row.quality_score,
-            generatedAt: row.generated_at,
-            isActive: row.version_index === activeCoverVersion
-          });
+            // Add to imageVersions array
+            coverData.imageVersions.push({
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              isActive: row.version_index === activeCoverVersion
+            });
 
-          // If this is the active version, set as main imageData
-          if (row.version_index === activeCoverVersion) {
-            coverData.imageData = normalizeImageData(row.image_data);
-            coverData.qualityScore = row.quality_score;
-            coverData.generatedAt = row.generated_at;
+            // If this is the active version, set as main imageData
+            if (row.version_index === activeCoverVersion) {
+              coverData.imageData = normalizeImageData(row.image_data);
+              coverData.qualityScore = row.quality_score;
+              coverData.generatedAt = row.generated_at;
+            }
           }
         }
       }
 
       // Sort cover imageVersions by version_index (rows may not be in order)
-      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
-        if (covers[coverType]?.imageVersions?.length > 0) {
-          // imageVersions were added in row order, but version_index determines actual order
-          // Since we don't have version_index in the version object, rely on insertion order
-          // (getAllStoryImages returns them ordered by version_index ASC)
+      // Skip for activeOnly mode (no imageVersions array)
+      if (!activeOnly) {
+        for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+          if (covers[coverType]?.imageVersions?.length > 0) {
+            // imageVersions were added in row order, but version_index determines actual order
+            // Since we don't have version_index in the version object, rely on insertion order
+            // (getAllStoryImages returns them ordered by version_index ASC)
+          }
         }
       }
 
-      // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
-      // IMPORTANT: Exclude image fields (previousImage, originalImage, bboxOverlayImage, retryHistory)
-      // to avoid bloating the response. These can be lazy-loaded if needed.
-      const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
-        'regenerationCount', 'previousScore', 'previousReasoning',
-        'originalScore', 'originalReasoning', 'referencePhotos',
-        'regeneratedAt', 'bboxDetection'];
+      // For full mode only: merge cover metadata and process imageVersions
+      if (!activeOnly) {
+        // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
+        // IMPORTANT: Exclude image fields (previousImage, originalImage, bboxOverlayImage, retryHistory)
+        // to avoid bloating the response. These can be lazy-loaded if needed.
+        const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
+          'regenerationCount', 'previousScore', 'previousReasoning',
+          'originalScore', 'originalReasoning', 'referencePhotos',
+          'regeneratedAt', 'bboxDetection'];
 
-      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
-        if (covers[coverType] && storyData.coverImages?.[coverType]) {
-          const blobCover = storyData.coverImages[coverType];
-          for (const field of coverMetadataFields) {
-            if (blobCover[field] !== undefined) {
-              covers[coverType][field] = blobCover[field];
+        for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+          if (covers[coverType] && storyData.coverImages?.[coverType]) {
+            const blobCover = storyData.coverImages[coverType];
+            for (const field of coverMetadataFields) {
+              if (blobCover[field] !== undefined) {
+                covers[coverType][field] = blobCover[field];
+              }
             }
-          }
-          // Also merge imageVersions metadata (description, type, createdAt) from blob
-          if (blobCover.imageVersions && covers[coverType].imageVersions) {
-            for (let i = 0; i < covers[coverType].imageVersions.length && i < blobCover.imageVersions.length; i++) {
-              const blobVersion = blobCover.imageVersions[i];
-              if (blobVersion) {
-                covers[coverType].imageVersions[i].description = blobVersion.description;
-                covers[coverType].imageVersions[i].type = blobVersion.type;
-                covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt;
+            // Also merge imageVersions metadata (description, type, createdAt) from blob
+            if (blobCover.imageVersions && covers[coverType].imageVersions) {
+              for (let i = 0; i < covers[coverType].imageVersions.length && i < blobCover.imageVersions.length; i++) {
+                const blobVersion = blobCover.imageVersions[i];
+                if (blobVersion) {
+                  covers[coverType].imageVersions[i].description = blobVersion.description;
+                  covers[coverType].imageVersions[i].type = blobVersion.type;
+                  covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt;
+                }
               }
             }
           }
-        }
-        // Strip imageVersions if only one version (original, no regenerations)
-        if (covers[coverType]?.imageVersions?.length <= 1) {
-          delete covers[coverType].imageVersions;
+          // Strip imageVersions if only one version (original, no regenerations)
+          if (covers[coverType]?.imageVersions?.length <= 1) {
+            delete covers[coverType].imageVersions;
+          }
         }
       }
 
-      // Convert map to sorted array and mark active versions
+      // Convert map to sorted array
       const images = Array.from(sceneImagesMap.values())
         .sort((a, b) => a.pageNumber - b.pageNumber)
         .map(img => {
+          if (activeOnly) {
+            // Fast path: already have active image, no imageVersions
+            return img;
+          }
+          // Full path: mark active versions
           const activeIdx = activeVersions[img.pageNumber.toString()];
           return {
             ...img,
@@ -1425,7 +1471,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         });
 
       const totalSize = separateImages.reduce((sum, r) => sum + (r.image_data?.length || 0), 0);
-      console.log(`📷 [BATCH] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Math.round(totalSize/1024)}KB, ${Date.now() - startTime}ms`);
+      const mode = activeOnly ? 'FAST' : 'BATCH';
+      console.log(`📷 [${mode}] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Math.round(totalSize/1024)}KB, ${Date.now() - startTime}ms`);
 
       return res.json({ images, covers });
     }

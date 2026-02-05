@@ -632,13 +632,17 @@ export const storyService = {
     }
   },
 
-  // Get ALL images in one request (batch load - 15x faster than individual requests)
-  async getAllImages(storyId: string): Promise<{
+  // Get images in one request
+  // activeOnly=true (default): Fast load ~3MB - only active images, no versions (for initial display)
+  // activeOnly=false: Full load ~53MB - all versions for dev mode / version switching
+  async getAllImages(storyId: string, activeOnly = true): Promise<{
     images: Array<{
       pageNumber: number;
       imageData: string;
       qualityScore?: number;
       isActive?: boolean;
+      versionCount?: number;
+      activeVersion?: number;
       imageVersions?: Array<{
         imageData: string;
         qualityScore?: number;
@@ -646,18 +650,23 @@ export const storyService = {
       }>;
     }>;
     covers: {
-      frontCover?: { imageData: string; qualityScore?: number };
-      initialPage?: { imageData: string; qualityScore?: number };
-      backCover?: { imageData: string; qualityScore?: number };
+      frontCover?: { imageData: string; qualityScore?: number; versionCount?: number };
+      initialPage?: { imageData: string; qualityScore?: number; versionCount?: number };
+      backCover?: { imageData: string; qualityScore?: number; versionCount?: number };
     };
   } | null> {
     try {
+      const url = activeOnly
+        ? `/api/stories/${storyId}/images?activeOnly=true`
+        : `/api/stories/${storyId}/images`;
       const response = await api.get<{
         images: Array<{
           pageNumber: number;
           imageData: string;
           qualityScore?: number;
           isActive?: boolean;
+          versionCount?: number;
+          activeVersion?: number;
           imageVersions?: Array<{
             imageData: string;
             qualityScore?: number;
@@ -665,12 +674,12 @@ export const storyService = {
           }>;
         }>;
         covers: {
-          frontCover?: { imageData: string; qualityScore?: number };
-          initialPage?: { imageData: string; qualityScore?: number };
-          backCover?: { imageData: string; qualityScore?: number };
+          frontCover?: { imageData: string; qualityScore?: number; versionCount?: number };
+          initialPage?: { imageData: string; qualityScore?: number; versionCount?: number };
+          backCover?: { imageData: string; qualityScore?: number; versionCount?: number };
         };
-      }>(`/api/stories/${storyId}/images`);
-      console.log(`[getAllImages] Loaded ${response.images?.length || 0} pages, ${Object.keys(response.covers || {}).length} covers`);
+      }>(url);
+      console.log(`[getAllImages] ${activeOnly ? 'FAST' : 'FULL'}: ${response.images?.length || 0} pages, ${Object.keys(response.covers || {}).length} covers`);
       return response;
     } catch (err) {
       console.error('[getAllImages] Failed to load batch images:', err);

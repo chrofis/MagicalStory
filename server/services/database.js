@@ -863,6 +863,45 @@ async function getAllStoryImages(storyId) {
 }
 
 /**
+ * Get ONLY active images for a story (for fast initial load).
+ * Uses image_version_meta to determine which version is active for each page/cover.
+ * Returns ~3MB instead of ~53MB by excluding inactive versions.
+ * @param {string} storyId - Story ID
+ * @returns {array} Array of active image records only
+ */
+async function getActiveStoryImages(storyId) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  // Single query: join images with active version metadata
+  // For each page/cover, only select the row where version_index matches the active version
+  return await dbQuery(
+    `WITH active_versions AS (
+      SELECT
+        key as page_key,
+        COALESCE((value->>'activeVersion')::int, 0) as active_version
+      FROM stories, jsonb_each(COALESCE(image_version_meta, '{}'))
+      WHERE id = $1
+    )
+    SELECT si.image_type, si.page_number, si.version_index, si.image_data, si.quality_score, si.generated_at,
+           (SELECT COUNT(*) FROM story_images si2
+            WHERE si2.story_id = si.story_id
+              AND si2.image_type = si.image_type
+              AND si2.page_number IS NOT DISTINCT FROM si.page_number) as version_count
+    FROM story_images si
+    LEFT JOIN active_versions av ON (
+      (si.image_type = 'scene' AND av.page_key = si.page_number::text) OR
+      (si.image_type != 'scene' AND av.page_key = si.image_type)
+    )
+    WHERE si.story_id = $1
+      AND si.version_index = COALESCE(av.active_version, 0)
+    ORDER BY si.image_type, si.page_number`,
+    [storyId]
+  );
+}
+
+/**
  * Check if a story has images in the new table.
  * @param {string} storyId - Story ID
  * @returns {boolean} True if images exist in new table
@@ -1275,6 +1314,7 @@ module.exports = {
   getStoryImage,
   getStoryImageWithVersions,
   getAllStoryImages,
+  getActiveStoryImages,
   hasStorySeparateImages,
   deleteStoryImages,
   rehydrateStoryImages,
