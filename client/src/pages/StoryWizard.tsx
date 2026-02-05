@@ -810,9 +810,9 @@ export default function StoryWizard() {
               })));
             }
 
-            // Update total image count for progress tracking
+            // Update total image count for progress tracking (only if still tracking)
             if (fullMeta.totalImages > 0) {
-              setImageLoadProgress(prev => prev ? { ...prev, total: fullMeta.totalImages } : { loaded: 0, total: fullMeta.totalImages });
+              setImageLoadProgress(prev => prev ? { ...prev, total: fullMeta.totalImages } : null);
             }
           }
         }).catch(err => {

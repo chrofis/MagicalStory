@@ -1379,10 +1379,12 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       }
 
       // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
+      // IMPORTANT: Exclude image fields (previousImage, originalImage, bboxOverlayImage, retryHistory)
+      // to avoid bloating the response. These can be lazy-loaded if needed.
       const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
-        'regenerationCount', 'previousImage', 'previousScore', 'previousReasoning',
-        'originalImage', 'originalScore', 'originalReasoning', 'referencePhotos',
-        'regeneratedAt', 'bboxDetection', 'bboxOverlayImage', 'retryHistory'];
+        'regenerationCount', 'previousScore', 'previousReasoning',
+        'originalScore', 'originalReasoning', 'referencePhotos',
+        'regeneratedAt', 'bboxDetection'];
 
       for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
         if (covers[coverType] && storyData.coverImages?.[coverType]) {
