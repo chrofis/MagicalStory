@@ -834,9 +834,12 @@ export default function StoryWizard() {
         storyService.getAllImages(urlStoryId).then(batchResult => {
           const images = batchResult?.images || [];
           const covers = batchResult?.covers || {};
-          const hasImages = images.length > 0 || Object.keys(covers).length > 0;
+          const coverCount = Object.keys(covers).filter(k => covers[k as keyof typeof covers]?.imageData).length;
+          const imageCount = images.filter(img => img.imageData).length;
 
-          if (hasImages) {
+          log.info(`Batch images loaded: ${imageCount} pages, ${coverCount} covers`);
+
+          if (imageCount > 0 || coverCount > 0) {
             let loadedCount = 0;
 
             // Update cover images with imageData
@@ -875,8 +878,11 @@ export default function StoryWizard() {
             }
 
             log.info('All images loaded');
-            setImageLoadProgress(null);
+          } else {
+            log.info('No images in batch response (may be cached)');
           }
+          // Always clear progress when done, regardless of whether images were found
+          setImageLoadProgress(null);
         }).catch(err => {
           log.warn('Failed to load images:', err);
           setImageLoadProgress(null);
