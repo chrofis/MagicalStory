@@ -12154,6 +12154,20 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Re-expand scene using unified 3-step prompt with correction notes
               log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with unified 3-step prompt and corrections...`);
 
+              // Analyze existing image to build preview feedback for comparison
+              let previewFeedback = null;
+              if (existingImage.imageData) {
+                try {
+                  const { analyzeGeneratedImage } = require('./server/lib/sceneValidator');
+                  log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Analyzing existing image for preview feedback...`);
+                  const imageDescription = await analyzeGeneratedImage(existingImage.imageData, inputData.characters, visualBible, clothingRequirements);
+                  previewFeedback = { composition: imageDescription.description };
+                  log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Preview feedback: ${imageDescription.description.substring(0, 100)}...`);
+                } catch (analysisErr) {
+                  log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Image analysis failed: ${analysisErr.message}`);
+                }
+              }
+
               // Get short scene hint for re-expansion (NOT the already-expanded description)
               // The outlineExtract contains the original short scene summary like "Sophie finds a magic key"
               // Using the expanded description would cause "double expansion" - distorting the scene
@@ -12202,7 +12216,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 previousScenes,
                 clothingDataForPrompt,
                 correctionNotes,
-                availableAvatars
+                availableAvatars,
+                null,  // rawOutlineContext
+                previewFeedback  // Pass existing image analysis for comparison
               );
 
               const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel, { prefill: '{"previewMismatches":[' });
