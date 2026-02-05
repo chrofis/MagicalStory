@@ -764,7 +764,6 @@ export function RepairWorkflowPanel({
                         const finalScore = result.score ?? result.qualityScore;
                         const qualityScore = result.qualityScore;
                         const semanticScore = result.semanticScore;
-                        const finalScoreClass = finalScore >= 70 ? 'text-green-600' : finalScore >= 50 ? 'text-amber-600' : 'text-red-600';
                         return (
                           <div key={page} className="p-2 bg-gray-50 rounded border text-sm space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -817,10 +816,10 @@ export function RepairWorkflowPanel({
                                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                                     <div className="bg-white p-2 rounded border border-purple-200">
                                       <div className="font-medium text-purple-800 mb-1">👁️ Visible:</div>
-                                      {result.semanticResult.visible.characters?.length > 0 && (
+                                      {result.semanticResult.visible.characters && result.semanticResult.visible.characters.length > 0 && (
                                         <div><span className="text-gray-500">Characters:</span> {result.semanticResult.visible.characters.join(', ')}</div>
                                       )}
-                                      {result.semanticResult.visible.objects?.length > 0 && (
+                                      {result.semanticResult.visible.objects && result.semanticResult.visible.objects.length > 0 && (
                                         <div><span className="text-gray-500">Objects:</span> {result.semanticResult.visible.objects.join(', ')}</div>
                                       )}
                                       {result.semanticResult.visible.setting && (
@@ -832,10 +831,10 @@ export function RepairWorkflowPanel({
                                     </div>
                                     <div className="bg-white p-2 rounded border border-purple-200">
                                       <div className="font-medium text-purple-800 mb-1">🎯 Expected:</div>
-                                      {result.semanticResult.expected?.characters?.length > 0 && (
+                                      {result.semanticResult.expected?.characters && result.semanticResult.expected.characters.length > 0 && (
                                         <div><span className="text-gray-500">Characters:</span> {result.semanticResult.expected.characters.join(', ')}</div>
                                       )}
-                                      {result.semanticResult.expected?.objects?.length > 0 && (
+                                      {result.semanticResult.expected?.objects && result.semanticResult.expected.objects.length > 0 && (
                                         <div><span className="text-gray-500">Objects:</span> {result.semanticResult.expected.objects.join(', ')}</div>
                                       )}
                                       {result.semanticResult.expected?.setting && (
