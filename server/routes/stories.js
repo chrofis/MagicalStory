@@ -1358,6 +1358,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             const activeIdx = activeVersions[pageNum.toString()] ?? 0;
 
             // Add ALL versions to imageVersions array (including version 0)
+            // imageVersions[i] → version_index = i (zero-indexed)
             scene.imageVersions.push({
               imageData: normalizeImageData(row.image_data),
               qualityScore: row.quality_score,
@@ -1366,8 +1367,9 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               isActive: row.version_index === activeIdx
             });
 
-            // Set main imageData to version 0 (for backwards compatibility)
-            if (row.version_index === 0) {
+            // Set main imageData to the ACTIVE version (not always version 0)
+            // This ensures full load returns the same image as fast load
+            if (row.version_index === activeIdx) {
               scene.imageData = normalizeImageData(row.image_data);
               scene.qualityScore = row.quality_score;
               scene.generatedAt = row.generated_at;
