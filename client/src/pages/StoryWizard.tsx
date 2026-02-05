@@ -886,6 +886,8 @@ export default function StoryWizard() {
             log.info(`Full images loaded: ${fullImages.length} pages with versions`);
 
             // Update scene images with imageVersions
+            // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
+            // Full load's imageData is version 0, not the active version
             for (const img of fullImages) {
               if (img.imageVersions && img.imageVersions.length > 0) {
                 setSceneImages(prev => prev.map(scene => {
@@ -897,7 +899,9 @@ export default function StoryWizard() {
                   })) as typeof scene.imageVersions;
                   return {
                     ...scene,
-                    imageData: img.imageData || scene.imageData,
+                    // Keep existing imageData from fast load (correct active version)
+                    // Only use full load's imageData if we don't have one yet
+                    imageData: scene.imageData || img.imageData,
                     imageVersions: mergedVersions
                   };
                 }));
@@ -905,17 +909,23 @@ export default function StoryWizard() {
             }
 
             // Update cover images with full data (imageVersions, metadata)
+            // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
             const coverTypes2: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
             for (const coverType of coverTypes2) {
               const cover = fullCovers[coverType];
               if (cover) {
-                setCoverImages(prev => ({
-                  ...prev,
-                  [coverType]: {
-                    ...(typeof prev[coverType] === 'object' ? prev[coverType] : {}),
-                    ...cover
-                  }
-                }));
+                setCoverImages(prev => {
+                  const existing = typeof prev[coverType] === 'object' ? prev[coverType] : {};
+                  return {
+                    ...prev,
+                    [coverType]: {
+                      ...existing,
+                      ...cover,
+                      // Keep existing imageData from fast load (correct active version)
+                      imageData: (existing as { imageData?: string })?.imageData || cover.imageData
+                    }
+                  };
+                });
               }
             }
 
