@@ -645,6 +645,8 @@ export interface SceneImage {
   qualityScore?: number;
   qualityReasoning?: string;
   qualityModelId?: string;  // Model used for quality evaluation
+  semanticScore?: number | null;  // Semantic fidelity score (0-100)
+  semanticResult?: SemanticEvaluationResult | null;  // Full semantic evaluation result
   fixTargets?: Array<{  // Bounding boxes for auto-repair from quality evaluation
     boundingBox: number[];
     issue: string;
