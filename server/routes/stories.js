@@ -477,16 +477,19 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           frontCover: story.coverImages.frontCover ? {
             ...(typeof story.coverImages.frontCover === 'object' ? story.coverImages.frontCover : {}),
             imageData: undefined,
+            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
             hasImage: !!(typeof story.coverImages.frontCover === 'string' ? story.coverImages.frontCover : story.coverImages.frontCover?.imageData)
           } : null,
           initialPage: story.coverImages.initialPage ? {
             ...(typeof story.coverImages.initialPage === 'object' ? story.coverImages.initialPage : {}),
             imageData: undefined,
+            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
             hasImage: !!(typeof story.coverImages.initialPage === 'string' ? story.coverImages.initialPage : story.coverImages.initialPage?.imageData)
           } : null,
           backCover: story.coverImages.backCover ? {
             ...(typeof story.coverImages.backCover === 'object' ? story.coverImages.backCover : {}),
             imageData: undefined,
+            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
             hasImage: !!(typeof story.coverImages.backCover === 'string' ? story.coverImages.backCover : story.coverImages.backCover?.imageData)
           } : null
         } : null,
@@ -1438,6 +1441,10 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           'regeneratedAt', 'bboxDetection'];
 
         for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+          const dbVersionCount = covers[coverType]?.imageVersions?.length || 0;
+          const blobVersionCount = storyData.coverImages?.[coverType]?.imageVersions?.length || 0;
+          console.log(`📷 [COVER-VERSIONS] ${coverType}: DB has ${dbVersionCount}, blob has ${blobVersionCount}`);
+
           if (covers[coverType] && storyData.coverImages?.[coverType]) {
             const blobCover = storyData.coverImages[coverType];
             for (const field of coverMetadataFields) {
@@ -1446,6 +1453,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               }
             }
             // Also merge imageVersions metadata (description, type, createdAt) from blob
+            // IMPORTANT: Only merge up to the number of versions in the DB, not from blob
             if (blobCover.imageVersions && covers[coverType].imageVersions) {
               for (let i = 0; i < covers[coverType].imageVersions.length && i < blobCover.imageVersions.length; i++) {
                 const blobVersion = blobCover.imageVersions[i];
