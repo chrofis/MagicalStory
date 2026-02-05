@@ -5621,10 +5621,12 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
           continue;
         }
 
-        // Check if character has avatar data - if not, try to enrich from characters table
+        // Check if character has usable avatar data - need styled standard or at least base standard
         const artStyle = storyData.artStyle || 'pixar';
-        if (!character.avatars?.styledAvatars?.[artStyle]) {
-          log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing avatar data, fetching from database...`);
+        const hasStyledStandard = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
+        const hasBaseStandard = !!character.avatars?.standard;
+        if (!hasStyledStandard && !hasBaseStandard) {
+          log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing standard avatar, fetching from database...`);
           try {
             // Get the character set ID from story data
             const characterSetId = storyData.characterSetId;
