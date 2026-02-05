@@ -83,32 +83,52 @@ export default function SharedStoryViewer() {
     fetchStory();
   }, [shareToken]);
 
+  // Page layout:
+  // 0 = Front Cover
+  // 1 = Initial Page (dedication)
+  // 2 to (pageCount+1) = Story pages
+  // pageCount+2 = Back Cover
+  const totalPages = story ? story.pages.length + 3 : 0; // frontCover + initialPage + story pages + backCover
+
+  // Get story page index from current page (returns -1 if not a story page)
+  const getStoryPageIndex = (page: number) => {
+    if (page >= 2 && page < story!.pages.length + 2) {
+      return page - 2;
+    }
+    return -1;
+  };
+
   // Preload adjacent page images for faster navigation
   useEffect(() => {
     if (!story || !shareToken) return;
 
-    const pagesToPreload: number[] = [];
-    // Preload next page
-    if (currentPage > 0 && currentPage < story.pages.length) {
-      pagesToPreload.push(story.pages[currentPage].pageNumber);
+    // Preload cover images when near them
+    if (currentPage <= 2) {
+      ['frontCover', 'initialPage'].forEach(type => {
+        const img = new Image();
+        img.src = `/api/shared/${shareToken}/cover-image/${type}`;
+      });
     }
-    // Preload previous page
-    if (currentPage > 1) {
-      pagesToPreload.push(story.pages[currentPage - 2].pageNumber);
-    }
-    // Preload cover if on page 1
-    if (currentPage === 1) {
-      const coverImg = new Image();
-      coverImg.src = `/api/shared/${shareToken}/cover-image/frontCover`;
-    }
-
-    pagesToPreload.forEach(pageNum => {
+    if (currentPage >= totalPages - 3) {
       const img = new Image();
-      img.src = `/api/shared/${shareToken}/image/${pageNum}`;
-    });
-  }, [currentPage, story, shareToken]);
+      img.src = `/api/shared/${shareToken}/cover-image/backCover`;
+    }
 
-  const totalPages = story ? story.pages.length + 1 : 0; // +1 for cover
+    // Preload adjacent story page images
+    const storyPageIdx = getStoryPageIndex(currentPage);
+    if (storyPageIdx >= 0) {
+      // Preload next story page
+      if (storyPageIdx + 1 < story.pages.length) {
+        const img = new Image();
+        img.src = `/api/shared/${shareToken}/image/${story.pages[storyPageIdx + 1].pageNumber}`;
+      }
+      // Preload previous story page
+      if (storyPageIdx > 0) {
+        const img = new Image();
+        img.src = `/api/shared/${shareToken}/image/${story.pages[storyPageIdx - 1].pageNumber}`;
+      }
+    }
+  }, [currentPage, story, shareToken, totalPages]);
 
   const goToPage = (page: number) => {
     if (page >= 0 && page < totalPages) {
@@ -189,7 +209,7 @@ export default function SharedStoryViewer() {
 
         {/* Book container */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
-          {/* Cover Page */}
+          {/* Front Cover (page 0) */}
           {currentPage === 0 && (
             <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
               <img
@@ -204,33 +224,68 @@ export default function SharedStoryViewer() {
             </div>
           )}
 
-          {/* Story Pages */}
-          {currentPage > 0 && story.pages[currentPage - 1] && (
-            <div className="md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
-              {/* Image - 50% width */}
-              <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
-                <img
-                  src={`/api/shared/${shareToken}/image/${story.pages[currentPage - 1].pageNumber}`}
-                  alt={`Page ${currentPage}`}
-                  className="w-full h-full object-contain"
-                  loading="eager"
-                  onError={(e) => {
-                    e.currentTarget.src = '';
-                    e.currentTarget.alt = 'Image not available';
-                  }}
-                />
-              </div>
-              {/* Text - 50% width, scrollable */}
-              <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden">
-                <div className="flex-1 overflow-y-auto min-h-0">
-                  <p className="text-sm md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
-                    {story.pages[currentPage - 1].text}
-                  </p>
+          {/* Initial/Dedication Page (page 1) */}
+          {currentPage === 1 && (
+            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
+              <img
+                src={`/api/shared/${shareToken}/cover-image/initialPage`}
+                alt="Dedication"
+                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
+                loading="eager"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+
+          {/* Story Pages (pages 2 to pageCount+1) */}
+          {(() => {
+            const storyPageIdx = getStoryPageIndex(currentPage);
+            if (storyPageIdx < 0 || !story.pages[storyPageIdx]) return null;
+            const page = story.pages[storyPageIdx];
+            return (
+              <div className="md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
+                {/* Image - 50% width */}
+                <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
+                  <img
+                    src={`/api/shared/${shareToken}/image/${page.pageNumber}`}
+                    alt={`Page ${storyPageIdx + 1}`}
+                    className="w-full h-full object-contain"
+                    loading="eager"
+                    onError={(e) => {
+                      e.currentTarget.src = '';
+                      e.currentTarget.alt = 'Image not available';
+                    }}
+                  />
                 </div>
-                <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
-                  Page {currentPage} of {story.pages.length}
+                {/* Text - 50% width, scrollable */}
+                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden">
+                  <div className="flex-1 overflow-y-auto min-h-0">
+                    <p className="text-sm md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
+                      {page.text}
+                    </p>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
+                    Page {storyPageIdx + 1} of {story.pages.length}
+                  </div>
                 </div>
               </div>
+            );
+          })()}
+
+          {/* Back Cover (last page) */}
+          {currentPage === totalPages - 1 && (
+            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
+              <img
+                src={`/api/shared/${shareToken}/cover-image/backCover`}
+                alt="Back Cover"
+                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
+                loading="eager"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
             </div>
           )}
 
