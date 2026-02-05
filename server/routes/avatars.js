@@ -657,7 +657,7 @@ Set pass=true if:
       }],
       generationConfig: {
         temperature: 0.2,
-        maxOutputTokens: 1000,
+        maxOutputTokens: 2000,
         responseMimeType: 'application/json'
       },
       safetySettings: [
@@ -685,12 +685,25 @@ Set pass=true if:
 
     const data = await response.json();
     const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    const finishReason = data.candidates?.[0]?.finishReason;
 
     // Log token usage
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     const duration = Date.now() - startTime;
     console.log(`📊 [COSTUME EVAL] input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}, ${duration}ms`);
+
+    // Check for truncated response
+    if (finishReason && finishReason !== 'STOP') {
+      log.warn(`[COSTUME EVAL] Response truncated (finishReason: ${finishReason}), giving benefit of doubt`);
+      return { pass: true, reason: `Response truncated: ${finishReason}`, confidence: 'low' };
+    }
+
+    // Check for empty response
+    if (!responseText) {
+      log.warn(`[COSTUME EVAL] Empty response from API`);
+      return { pass: true, reason: 'Empty response, giving benefit of doubt', confidence: 'low' };
+    }
 
     try {
       const result = JSON.parse(responseText);
@@ -710,7 +723,9 @@ Set pass=true if:
         }
       };
     } catch (parseErr) {
-      log.warn(`[COSTUME EVAL] JSON parse failed: ${parseErr.message}`);
+      // Log the raw response for debugging (truncated for log readability)
+      const truncatedResponse = responseText.length > 200 ? responseText.substring(0, 200) + '...' : responseText;
+      log.warn(`[COSTUME EVAL] JSON parse failed: ${parseErr.message}. Response: ${truncatedResponse}`);
       return { pass: true, reason: 'Parse error, giving benefit of doubt', confidence: 'low' };
     }
   } catch (err) {
