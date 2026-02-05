@@ -890,10 +890,15 @@ export default function StoryWizard() {
               if (img.imageVersions && img.imageVersions.length > 0) {
                 setSceneImages(prev => prev.map(scene => {
                   if (scene.pageNumber !== img.pageNumber) return scene;
+                  // Merge API imageVersions with existing scene data
+                  const mergedVersions = img.imageVersions?.map((v, i) => ({
+                    ...(scene.imageVersions?.[i] || {}),
+                    ...v,
+                  })) as typeof scene.imageVersions;
                   return {
                     ...scene,
                     imageData: img.imageData || scene.imageData,
-                    imageVersions: img.imageVersions
+                    imageVersions: mergedVersions
                   };
                 }));
               }
