@@ -593,7 +593,8 @@ export interface LandmarkPhoto {
 
 export interface SceneImage {
   pageNumber: number;
-  imageData: string;
+  imageData?: string;  // Optional for lazy loading - undefined means not loaded yet
+  hasImage?: boolean;  // True if image exists (for lazy loading placeholder)
   score?: number;
   description?: string;
   prompt?: string;  // The actual prompt sent to image generation API
@@ -651,6 +652,7 @@ export interface SceneImage {
 
 export interface CoverImageData {
   imageData?: string;
+  hasImage?: boolean;  // True if image exists (for lazy loading placeholder)
   description?: string;  // Scene description for the cover (English, for image generation)
   translatedDescription?: string;  // Scene description in story's language (for display in edit modal)
   prompt?: string;       // The actual prompt sent to image generation API

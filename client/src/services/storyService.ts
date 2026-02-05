@@ -172,6 +172,30 @@ export const storyService = {
     }
   },
 
+  // Ultra-fast metadata for instant initial render (< 100ms response time)
+  // Returns only what's needed to show title + cover placeholder immediately
+  async getQuickMetadata(id: string): Promise<{
+    id: string;
+    title: string;
+    language: StoryLanguageCode;
+    languageLevel: LanguageLevel;
+    dedication?: string;
+    artStyle?: string;
+    pageCount: number;
+    hasFrontCover: boolean;
+  } | null> {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${id}/quick-metadata`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
+      return null;
+    }
+  },
+
   async getStory(id: string): Promise<SavedStory | null> {
     try {
       // Server returns story directly, not wrapped in { story: ... }

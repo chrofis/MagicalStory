@@ -216,6 +216,83 @@ router.get('/debug/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/stories/:id/quick-metadata - Ultra-fast endpoint for initial render (< 100ms)
+// Returns minimal data needed to display title + cover immediately
+router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const startTime = Date.now();
+
+    // Single fast query - NO jsonb_array_elements iteration, no large field extraction
+    const [metaResult, coverCheck] = await Promise.all([
+      dbQuery(`
+        SELECT
+          data::jsonb->>'id' as id,
+          data::jsonb->>'title' as title,
+          data::jsonb->>'language' as language,
+          data::jsonb->>'languageLevel' as language_level,
+          data::jsonb->>'dedication' as dedication,
+          data::jsonb->>'artStyle' as art_style,
+          COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as page_count
+        FROM stories WHERE id = $1 AND user_id = $2
+      `, [id, req.user.id]),
+      dbQuery(`SELECT 1 FROM story_images WHERE story_id = $1 AND image_type = 'frontCover' LIMIT 1`, [id])
+    ]);
+
+    if (metaResult.length === 0) {
+      // Check if impersonating admin
+      if (req.user.impersonating && req.user.originalAdminId) {
+        const adminResult = await dbQuery(`
+          SELECT
+            data::jsonb->>'id' as id,
+            data::jsonb->>'title' as title,
+            data::jsonb->>'language' as language,
+            data::jsonb->>'languageLevel' as language_level,
+            data::jsonb->>'dedication' as dedication,
+            data::jsonb->>'artStyle' as art_style,
+            COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as page_count
+          FROM stories WHERE id = $1
+        `, [id]);
+        if (adminResult.length === 0) {
+          return res.status(404).json({ error: 'Story not found' });
+        }
+        const m = adminResult[0];
+        const duration = Date.now() - startTime;
+        console.log(`⚡ GET /api/stories/${id}/quick-metadata - ${duration}ms (admin)`);
+        return res.json({
+          id: m.id,
+          title: m.title,
+          language: m.language,
+          languageLevel: m.language_level,
+          dedication: m.dedication,
+          artStyle: m.art_style,
+          pageCount: parseInt(m.page_count) || 0,
+          hasFrontCover: coverCheck.length > 0
+        });
+      }
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const m = metaResult[0];
+    const duration = Date.now() - startTime;
+    console.log(`⚡ GET /api/stories/${id}/quick-metadata - ${duration}ms`);
+
+    res.json({
+      id: m.id,
+      title: m.title,
+      language: m.language,
+      languageLevel: m.language_level,
+      dedication: m.dedication,
+      artStyle: m.art_style,
+      pageCount: parseInt(m.page_count) || 0,
+      hasFrontCover: coverCheck.length > 0
+    });
+  } catch (err) {
+    console.error('❌ Error fetching quick metadata:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/stories/:id/metadata - Get story WITHOUT image data (for fast initial load)
 // Optimized: If story has separate images, skip the slow blob loading
 router.get('/:id/metadata', authenticateToken, async (req, res) => {

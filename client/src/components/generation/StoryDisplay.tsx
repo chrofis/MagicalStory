@@ -3326,20 +3326,31 @@ export function StoryDisplay({
       )}
 
       {/* Front Cover Display */}
-      {coverImages && getCoverImageData(coverImages.frontCover) && (() => {
+      {coverImages && (getCoverImageData(coverImages.frontCover) || (coverImages.frontCover && typeof coverImages.frontCover === 'object' && (coverImages.frontCover as CoverImageData).hasImage)) && (() => {
         const frontCoverObj = getCoverObject(coverImages.frontCover);
+        const frontCoverImageData = getCoverImageData(coverImages.frontCover);
+        const isCoverLazyLoading = !frontCoverImageData && frontCoverObj?.hasImage;
         return (
           <div className="mt-6 max-w-2xl mx-auto">
             <p className="text-sm text-gray-500 text-center mb-2">
               {storyLang === 'de' ? 'Titelseite' : storyLang === 'fr' ? 'Couverture' : 'Front Cover'}
             </p>
             <div className="relative">
-              <DiagnosticImage
-                src={getCoverImageData(coverImages.frontCover)!}
-                alt="Front Cover"
-                className="w-full rounded-lg shadow-lg"
-                label="Front Cover"
-              />
+              {isCoverLazyLoading ? (
+                <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
+                  <p className="text-indigo-600 font-medium">
+                    {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture...' : 'Loading cover...'}
+                  </p>
+                </div>
+              ) : (
+                <DiagnosticImage
+                  src={frontCoverImageData!}
+                  alt="Front Cover"
+                  className="w-full rounded-lg shadow-lg"
+                  label="Front Cover"
+                />
+              )}
               {regeneratingCovers.has('frontCover') && (
                 <div className="absolute inset-0 bg-white/50 flex items-center justify-center rounded-lg">
                   <Loader2 className="w-10 h-10 animate-spin text-indigo-600" />
@@ -3781,6 +3792,8 @@ export function StoryDisplay({
             const progressiveImageData = progressiveMode ? completedPageImages[sceneNumber] : undefined;
             const hasPageImage = !!(image?.imageData || progressiveImageData);
             const isWaitingForImage = progressiveMode && pageNumber === maxViewablePage && !hasPageImage;
+            // Lazy loading: image exists but imageData not loaded yet
+            const isLazyLoading = !progressiveMode && image?.hasImage && !image?.imageData;
 
             return (
               <div key={pageNumber} className="p-4 md:p-6">
@@ -3791,16 +3804,21 @@ export function StoryDisplay({
                 {/* Picture Book Layout: Image on top, text below */}
                 {isPictureBook ? (
                   <div className="flex flex-col items-center max-w-2xl mx-auto">
-                    {/* Image on top - show placeholder if waiting for image */}
-                    {isWaitingForImage ? (
+                    {/* Image on top - show placeholder if waiting for image or lazy loading */}
+                    {(isWaitingForImage || isLazyLoading) ? (
                       <div className="w-full mb-4 aspect-[4/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                         <p className="text-indigo-600 font-medium">
-                          {storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image...' : 'Creating image...'}
+                          {isLazyLoading
+                            ? (storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...')
+                            : (storyLang === 'de' ? 'Bild wird erstellt...' : storyLang === 'fr' ? 'Création de l\'image...' : 'Creating image...')
+                          }
                         </p>
-                        <p className="text-indigo-400 text-sm mt-1">
-                          {storyLang === 'de' ? 'Die nächste Seite erscheint bald' : storyLang === 'fr' ? 'La page suivante arrive bientôt' : 'Next page coming soon'}
-                        </p>
+                        {isWaitingForImage && (
+                          <p className="text-indigo-400 text-sm mt-1">
+                            {storyLang === 'de' ? 'Die nächste Seite erscheint bald' : storyLang === 'fr' ? 'La page suivante arrive bientôt' : 'Next page coming soon'}
+                          </p>
+                        )}
                       </div>
                     ) : (image?.imageData || progressiveImageData) ? (
                       <div className="w-full mb-4 relative">
@@ -4197,8 +4215,17 @@ export function StoryDisplay({
                 ) : (
                   /* Standard Layout: Image on left, text on right (side-by-side) */
                   <div className="grid md:grid-cols-2 gap-6 items-stretch">
-                    {/* Image on the left */}
-                    {image && image.imageData ? (
+                    {/* Image on the left - show placeholder if lazy loading */}
+                    {isLazyLoading ? (
+                      <div className="flex flex-col">
+                        <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-md flex flex-col items-center justify-center">
+                          <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
+                          <p className="text-indigo-600 font-medium text-sm">
+                            {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...'}
+                          </p>
+                        </div>
+                      </div>
+                    ) : image && image.imageData ? (
                       <div className="flex flex-col">
                         <div className="relative">
                           <img
@@ -4884,17 +4911,9 @@ export function StoryDisplay({
               </div>
             )}
 
-            {/* Edit Story */}
-            {onSaveStoryText && !isEditMode && (
-              <button
-                onClick={() => setIsEditMode(true)}
-                disabled={isGenerating}
-                className={`bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 ${
-                  isGenerating ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                }`}
-              >
-                <Edit3 size={16} /> {language === 'de' ? 'Text bearbeiten' : language === 'fr' ? 'Modifier le texte' : 'Edit Text'}
-              </button>
+            {/* Share Story */}
+            {storyId && !isGenerating && (
+              <ShareButton storyId={storyId} variant="full" />
             )}
 
             {/* Create Another Story */}

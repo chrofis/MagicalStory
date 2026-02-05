@@ -611,7 +611,9 @@ export default function StoryWizard() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Load saved story from URL parameter - uses progressive loading for better UX
+  // Load saved story from URL parameter - uses TWO-PHASE loading for instant render
+  // Phase 1: Quick metadata (~100ms) - shows title + cover placeholder immediately
+  // Phase 2: Full metadata + images load in background (non-blocking)
   useEffect(() => {
     const urlStoryId = searchParams.get('storyId');
     // Ensure step is 6 when viewing a saved story (even if localStorage has a different step)
@@ -629,179 +631,227 @@ export default function StoryWizard() {
         return;
       }
 
-      log.info('Loading saved story progressively:', urlStoryId);
+      log.info('Loading saved story (two-phase):', urlStoryId);
       setIsLoading(true);
       setLoadingProgress(null);
       setImageLoadProgress(null);
 
       try {
-        await storyService.getStoryProgressively(
-          urlStoryId,
-          // Step 1: Metadata loaded - show story immediately (no images yet)
-          (story, totalImages) => {
-            log.info('Metadata loaded:', story.title, `(${totalImages} images to load)`);
+        // ============================================
+        // PHASE 1: Instant render (< 200ms)
+        // ============================================
+        const quickMeta = await storyService.getQuickMetadata(urlStoryId);
+        if (!quickMeta) {
+          throw new Error('Story not found');
+        }
 
-            // Populate story data
-            setStoryId(story.id);
-            setStoryTitle(story.title || '');
-            setStoryType(story.storyType || '');
-            setArtStyle(story.artStyle || 'pixar');
-            setStoryOutline(story.outline || '');
-            setOutlinePrompt(story.outlinePrompt || '');
-            setOutlineModelId(story.outlineModelId);
-            setOutlineUsage(story.outlineUsage);
-            setStoryTextPrompts(story.storyTextPrompts || []);
-            setStyledAvatarGeneration(story.styledAvatarGeneration || []);
-            setCostumedAvatarGeneration(story.costumedAvatarGeneration || []);
-            // Note: generationLog is loaded from devMetadata, not from story metadata
-            // Don't overwrite here - it would clear entries set from job result
-            if (story.generationLog?.length) {
-              console.log('[StoryWizard] Loading story metadata, generationLog:', story.generationLog?.length ?? 0, 'entries');
-              setGenerationLog(story.generationLog);
+        log.info('Quick metadata loaded:', quickMeta.title, `(${quickMeta.pageCount} pages)`);
+
+        // Set minimal state for immediate render
+        setStoryId(quickMeta.id);
+        setStoryTitle(quickMeta.title);
+        setStoryLanguage(quickMeta.language);
+        setLanguageLevel(quickMeta.languageLevel);
+        setDedication(quickMeta.dedication || '');
+        setArtStyle(quickMeta.artStyle || 'pixar');
+
+        // Initialize empty scene images array with page count for lazy loading
+        // Images will show placeholders until loaded
+        setSceneImages(Array.from({ length: quickMeta.pageCount }, (_, i) => ({
+          pageNumber: i + 1,
+          imageData: undefined,  // Will be loaded lazily
+          hasImage: true,        // Assume images exist
+        })));
+
+        // Set cover images placeholder (hasImage flag for lazy loading)
+        setCoverImages(quickMeta.hasFrontCover ? {
+          frontCover: { hasImage: true, imageData: undefined },
+          initialPage: null,
+          backCover: null,
+        } : { frontCover: null, initialPage: null, backCover: null });
+
+        // Show the story view immediately - user sees title + cover NOW
+        setStep(6);
+        setIsLoading(false);
+        setIsGenerating(false);
+        setLoadingProgress(null);
+
+        // ============================================
+        // PHASE 2: Background loading (non-blocking)
+        // ============================================
+
+        // Start image progress tracking
+        const estimatedTotalImages = quickMeta.pageCount + (quickMeta.hasFrontCover ? 3 : 0);
+        if (estimatedTotalImages > 0) {
+          setImageLoadProgress({ loaded: 0, total: estimatedTotalImages });
+        }
+
+        // Load full metadata in background for edit features
+        storyService.getStoryMetadata(urlStoryId).then(fullMeta => {
+          if (fullMeta) {
+            log.info('Full metadata loaded:', fullMeta.title, `(${fullMeta.totalImages} images to load)`);
+
+            // Update with full data for edit features
+            setStoryOutline(fullMeta.outline || '');
+            setOutlinePrompt(fullMeta.outlinePrompt || '');
+            setOutlineModelId(fullMeta.outlineModelId);
+            setOutlineUsage(fullMeta.outlineUsage);
+            setStoryTextPrompts(fullMeta.storyTextPrompts || []);
+            setStyledAvatarGeneration(fullMeta.styledAvatarGeneration || []);
+            setCostumedAvatarGeneration(fullMeta.costumedAvatarGeneration || []);
+            setStoryType(fullMeta.storyType || '');
+
+            // Generation log
+            if (fullMeta.generationLog?.length) {
+              setGenerationLog(fullMeta.generationLog);
             }
 
             // Visual Bible
-            if (story.visualBible) {
+            if (fullMeta.visualBible) {
               setVisualBible({
-                mainCharacters: story.visualBible.mainCharacters || [],
-                secondaryCharacters: story.visualBible.secondaryCharacters || [],
-                animals: story.visualBible.animals || [],
-                artifacts: story.visualBible.artifacts || [],
-                locations: story.visualBible.locations || [],
-                vehicles: story.visualBible.vehicles || [],
-                clothing: story.visualBible.clothing || [],
-                changeLog: story.visualBible.changeLog || []
+                mainCharacters: fullMeta.visualBible.mainCharacters || [],
+                secondaryCharacters: fullMeta.visualBible.secondaryCharacters || [],
+                animals: fullMeta.visualBible.animals || [],
+                artifacts: fullMeta.visualBible.artifacts || [],
+                locations: fullMeta.visualBible.locations || [],
+                vehicles: fullMeta.visualBible.vehicles || [],
+                clothing: fullMeta.visualBible.clothing || [],
+                changeLog: fullMeta.visualBible.changeLog || []
               });
             } else {
               setVisualBible(null);
             }
 
             // Clothing requirements
-            if (story.clothingRequirements) {
-              setClothingRequirements(story.clothingRequirements);
+            if (fullMeta.clothingRequirements) {
+              setClothingRequirements(fullMeta.clothingRequirements);
             } else {
               setClothingRequirements(null);
             }
 
-            // Scene images (without imageData - will be loaded progressively)
-            setSceneImages(story.sceneImages || []);
-            setSceneDescriptions(story.sceneDescriptions || []);
-            setCoverImages(story.coverImages || { frontCover: null, initialPage: null, backCover: null });
-            setLanguageLevel(story.languageLevel || 'standard');
-            // Set story language for correct display labels (Page/Seite/etc)
-            if (story.language) {
-              setStoryLanguage(story.language);
-            }
-            setIsGenerating(false);
+            // Scene images metadata (without imageData - preserves version info, quality scores, etc.)
+            setSceneImages(fullMeta.sceneImages || []);
+            setSceneDescriptions(fullMeta.sceneDescriptions || []);
+
+            // Cover images metadata (without imageData)
+            setCoverImages(fullMeta.coverImages || { frontCover: null, initialPage: null, backCover: null });
 
             // Partial story fields
-            setIsPartialStory(story.isPartial || false);
-            setFailureReason(story.failureReason);
-            setGeneratedPages(story.generatedPages);
-            setTotalPages(story.totalPages);
+            setIsPartialStory(fullMeta.isPartial || false);
+            setFailureReason(fullMeta.failureReason);
+            setGeneratedPages(fullMeta.generatedPages);
+            setTotalPages(fullMeta.totalPages);
 
             // Story text
-            setGeneratedStory(story.story || '');
-            setOriginalStory(story.originalStory || story.story || '');
+            setGeneratedStory(fullMeta.story || '');
+            setOriginalStory(fullMeta.originalStory || fullMeta.story || '');
 
             // Save generation settings for dev mode display
             setSavedGenerationSettings({
-              storyCategory: story.storyCategory,
-              storyTopic: story.storyTopic,
-              storyTheme: story.storyTheme,
-              storyTypeName: story.storyTypeName,
-              storyDetails: story.storyDetails,
-              artStyle: story.artStyle,
-              language: story.language,
-              languageLevel: story.languageLevel,
-              pages: story.pages,
-              dedication: story.dedication,
-              characters: story.characters?.map(c => ({
+              storyCategory: fullMeta.storyCategory,
+              storyTopic: fullMeta.storyTopic,
+              storyTheme: fullMeta.storyTheme,
+              storyTypeName: fullMeta.storyTypeName,
+              storyDetails: fullMeta.storyDetails,
+              artStyle: fullMeta.artStyle,
+              language: fullMeta.language,
+              languageLevel: fullMeta.languageLevel,
+              pages: fullMeta.pages,
+              dedication: fullMeta.dedication,
+              characters: fullMeta.characters?.map(c => ({
                 id: c.id,
                 name: c.name,
-                isMain: story.mainCharacters?.includes(c.id)
+                isMain: fullMeta.mainCharacters?.includes(c.id)
               })),
-              mainCharacters: story.mainCharacters,
-              relationships: story.relationships,
-              relationshipTexts: story.relationshipTexts,
-              season: story.season,
-              userLocation: story.userLocation,
+              mainCharacters: fullMeta.mainCharacters,
+              relationships: fullMeta.relationships,
+              relationshipTexts: fullMeta.relationshipTexts,
+              season: fullMeta.season,
+              userLocation: fullMeta.userLocation,
             });
 
-            // Store story's characters for regeneration (these are the characters used when the story was created)
-            if (story.characters?.length) {
-              setStoryCharacters(story.characters.map((c: any) => ({
+            // Store story's characters for regeneration
+            if (fullMeta.characters?.length) {
+              setStoryCharacters(fullMeta.characters.map((c: any) => ({
                 id: c.id,
                 name: c.name,
                 photoData: c.photoData || c.photos?.face || c.photos?.original
               })));
             }
 
-            // Show the story view immediately - images will load progressively
-            setStep(6);
-            setIsLoading(false);
-            setLoadingProgress(null);
+            // Update total image count for progress tracking
+            if (fullMeta.totalImages > 0) {
+              setImageLoadProgress(prev => prev ? { ...prev, total: fullMeta.totalImages } : { loaded: 0, total: fullMeta.totalImages });
+            }
+          }
+        }).catch(err => {
+          log.warn('Failed to load full metadata:', err);
+        });
 
-            // Start image progress tracking
-            if (totalImages > 0) {
-              setImageLoadProgress({ loaded: 0, total: totalImages });
+        // Load dev metadata only if developer mode is enabled
+        if (developerMode) {
+          devMetadataLoadedRef.current = true;
+          storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
+            mergeDevMetadata(devMetadata);
+            log.debug('Dev metadata merged into story');
+          }).catch(err => {
+            log.warn('Failed to load dev metadata:', err);
+            devMetadataLoadedRef.current = false;
+          });
+        }
+
+        // Load all images in background (batch request)
+        storyService.getAllImages(urlStoryId).then(batchResult => {
+          const images = batchResult?.images || [];
+          const covers = batchResult?.covers || {};
+          const hasImages = images.length > 0 || Object.keys(covers).length > 0;
+
+          if (hasImages) {
+            let loadedCount = 0;
+
+            // Update cover images with imageData
+            const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
+            for (const coverType of coverTypes) {
+              const cover = covers[coverType];
+              if (cover?.imageData) {
+                loadedCount++;
+                setCoverImages(prev => {
+                  const current = prev[coverType];
+                  if (typeof current === 'object' && current !== null) {
+                    return { ...prev, [coverType]: { ...current, imageData: cover.imageData } };
+                  }
+                  return { ...prev, [coverType]: cover.imageData };
+                });
+                setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
+              }
             }
 
-            // Always fetch dev metadata for completed stories - needed for scene descriptions
-            // which are required for the scene edit/regeneration feature
-            {
-              devMetadataLoadedRef.current = true; // Prevent duplicate fetch on dev mode toggle
-              storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
-                mergeDevMetadata(devMetadata);
-                log.debug('Dev metadata merged into story');
-              }).catch(err => {
-                log.warn('Failed to load dev metadata:', err);
-                devMetadataLoadedRef.current = false; // Allow retry on error
-              });
-            }
-          },
-          // Step 2: Each image loaded - update state progressively
-          (pageNumber, imageData, imageVersions, loadedCount) => {
-            if (typeof pageNumber === 'number') {
-              // Page image - merge imageVersions to preserve metadata (prompt, description)
-              // from story metadata while adding imageData from page-image endpoint
-              setSceneImages(prev => prev.map(img => {
-                if (img.pageNumber !== pageNumber) return img;
-
-                // Merge: keep existing metadata, add imageData from response
-                const existingVersions = img.imageVersions || [];
-                const mergedVersions = imageVersions?.map((v, i) => ({
-                  // Keep metadata from existing version (prompt, description, type, modelId, etc.)
-                  ...(existingVersions[i] || {}),
-                  // Add imageData and other fields from page-image response
-                  ...(v as Record<string, unknown>),
-                })) as typeof img.imageVersions;
-
-                return { ...img, imageData, imageVersions: mergedVersions || existingVersions };
-              }));
-            } else {
-              // Cover image
-              const coverType = pageNumber as 'frontCover' | 'initialPage' | 'backCover';
-              setCoverImages(prev => {
-                const current = prev[coverType];
-                if (typeof current === 'object' && current !== null) {
-                  return { ...prev, [coverType]: { ...current, imageData } };
-                }
-                return { ...prev, [coverType]: imageData };
-              });
+            // Update page images with imageData
+            for (const img of images) {
+              if (img.imageData) {
+                loadedCount++;
+                setSceneImages(prev => prev.map(scene => {
+                  if (scene.pageNumber !== img.pageNumber) return scene;
+                  // Merge: keep existing metadata, add imageData from batch
+                  const existingVersions = scene.imageVersions || [];
+                  const mergedVersions = img.imageVersions?.map((v, i) => ({
+                    ...(existingVersions[i] || {}),
+                    ...(v as Record<string, unknown>),
+                  })) as typeof scene.imageVersions;
+                  return { ...scene, imageData: img.imageData, imageVersions: mergedVersions || existingVersions };
+                }));
+                setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
+              }
             }
 
-            // Update progress
-            if (loadedCount !== undefined) {
-              setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
-            }
-          },
-          // Step 3: All images loaded
-          () => {
             log.info('All images loaded');
             setImageLoadProgress(null);
           }
-        );
+        }).catch(err => {
+          log.warn('Failed to load images:', err);
+          setImageLoadProgress(null);
+        });
+
       } catch (error) {
         log.error('Failed to load story:', error);
         setIsLoading(false);
@@ -811,6 +861,9 @@ export default function StoryWizard() {
     };
 
     loadSavedStory();
+    // Note: developerMode excluded from deps intentionally - we don't want story to reload when dev mode is toggled
+    // The separate effect at line ~1120 handles loading dev metadata when dev mode is toggled
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, isAuthenticated, storyRefreshKey]);
 
   // Clear "Fertig!" notification when viewing story (step 6)
