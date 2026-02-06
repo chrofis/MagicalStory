@@ -4992,50 +4992,56 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
 
       // Apply updated image to story
       const sceneImages = storyData.sceneImages || [];
+      const sceneIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
+
+      if (sceneIndex < 0) {
+        log.error(`❌ [ENTITY-REPAIR] Scene not found for page ${pageNumber}`);
+        return res.status(404).json({ error: `Scene not found for page ${pageNumber}` });
+      }
+
+      const existingImage = sceneImages[sceneIndex];
+
       for (const update of repairResult.updatedImages) {
-        const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
-        if (sceneIndex >= 0) {
-          const existingImage = sceneImages[sceneIndex];
+        if (update.pageNumber !== pageNumber) continue;
 
-          // Initialize imageVersions if not present (migrate existing as original)
-          if (!existingImage.imageVersions) {
-            existingImage.imageVersions = [{
-              imageData: existingImage.imageData,
-              description: existingImage.description,
-              prompt: existingImage.prompt,
-              modelId: existingImage.modelId,
-              createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
-              isActive: false,
-              type: 'original'
-            }];
-          } else {
-            // Mark all previous versions as inactive
-            existingImage.imageVersions.forEach(v => v.isActive = false);
-          }
-
-          // Add new version for entity repair
-          existingImage.imageVersions.push({
-            imageData: update.imageData,
+        // Initialize imageVersions if not present (migrate existing as original)
+        if (!existingImage.imageVersions) {
+          existingImage.imageVersions = [{
+            imageData: existingImage.imageData,
             description: existingImage.description,
             prompt: existingImage.prompt,
-            modelId: 'gemini-2.0-flash-preview-image-generation',
-            createdAt: new Date().toISOString(),
-            isActive: true,
-            type: 'entity-repair',
-            entityRepairedFor: entityName,
-            clothingCategory: repairResult.clothingCategory
-          });
-
-          // Keep preEntityRepairImage for backward compatibility
-          if (!existingImage.preEntityRepairImage) {
-            existingImage.preEntityRepairImage = existingImage.imageData;
-          }
-          // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
-          // The new image is stored in imageVersions and activeVersion meta points to it
-          existingImage.entityRepaired = true;
-          existingImage.entityRepairedAt = new Date().toISOString();
-          existingImage.entityRepairedFor = entityName;
+            modelId: existingImage.modelId,
+            createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
+            isActive: false,
+            type: 'original'
+          }];
+        } else {
+          // Mark all previous versions as inactive
+          existingImage.imageVersions.forEach(v => v.isActive = false);
         }
+
+        // Add new version for entity repair
+        existingImage.imageVersions.push({
+          imageData: update.imageData,
+          description: existingImage.description,
+          prompt: existingImage.prompt,
+          modelId: 'gemini-2.0-flash-preview-image-generation',
+          createdAt: new Date().toISOString(),
+          isActive: true,
+          type: 'entity-repair',
+          entityRepairedFor: entityName,
+          clothingCategory: repairResult.clothingCategory
+        });
+
+        // Keep preEntityRepairImage for backward compatibility
+        if (!existingImage.preEntityRepairImage) {
+          existingImage.preEntityRepairImage = existingImage.imageData;
+        }
+        // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
+        // The new image is stored in imageVersions and activeVersion meta points to it
+        existingImage.entityRepaired = true;
+        existingImage.entityRepairedAt = new Date().toISOString();
+        existingImage.entityRepairedFor = entityName;
       }
 
       storyData.sceneImages = sceneImages;
@@ -12154,18 +12160,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               // Re-expand scene using unified 3-step prompt with correction notes
               log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with unified 3-step prompt and corrections...`);
 
-              // Analyze existing image to build preview feedback for comparison
+              // Reuse existing quality evaluation as preview feedback (avoids duplicate vision call)
               let previewFeedback = null;
-              if (existingImage.imageData) {
-                try {
-                  const { analyzeGeneratedImage } = require('./server/lib/sceneValidator');
-                  log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Analyzing existing image for preview feedback...`);
-                  const imageDescription = await analyzeGeneratedImage(existingImage.imageData, inputData.characters, visualBible, clothingRequirements);
-                  previewFeedback = { composition: imageDescription.description };
-                  log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Preview feedback: ${imageDescription.description.substring(0, 100)}...`);
-                } catch (analysisErr) {
-                  log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Image analysis failed: ${analysisErr.message}`);
-                }
+              if (existingImage.qualityReasoning) {
+                previewFeedback = { composition: existingImage.qualityReasoning };
+                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using existing evaluation as preview feedback`);
               }
 
               // Get short scene hint for re-expansion (NOT the already-expanded description)
