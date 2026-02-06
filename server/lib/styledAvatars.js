@@ -669,6 +669,37 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
   log.debug(`✅ [STYLED AVATARS] Converted ${successCount}/${neededAvatars.size} avatars in ${duration}ms`);
 
+  // Store styled avatars on character objects immediately (not just in cache)
+  // This ensures consistency checks can find them later in the pipeline
+  for (const result of results) {
+    if (!result.success || !result.styledAvatar) continue;
+
+    // Parse the cache key to get character and clothing info
+    const { cacheKey } = result;
+    const info = neededAvatars.get(cacheKey);
+    if (!info?.character) continue;
+
+    const { character, clothingCategory } = info;
+
+    // Initialize styledAvatars structure if not exists
+    if (!character.avatars) character.avatars = {};
+    if (!character.avatars.styledAvatars) character.avatars.styledAvatars = {};
+    if (!character.avatars.styledAvatars[artStyle]) character.avatars.styledAvatars[artStyle] = {};
+
+    // Store the styled avatar
+    if (clothingCategory.startsWith('costumed:')) {
+      const costumeType = clothingCategory.split(':')[1];
+      if (!character.avatars.styledAvatars[artStyle].costumed) {
+        character.avatars.styledAvatars[artStyle].costumed = {};
+      }
+      character.avatars.styledAvatars[artStyle].costumed[costumeType] = result.styledAvatar;
+    } else {
+      character.avatars.styledAvatars[artStyle][clothingCategory] = result.styledAvatar;
+    }
+  }
+
+  log.debug(`💾 [STYLED AVATARS] Stored ${successCount} styled avatars on character objects for ${artStyle}`);
+
   return styledAvatarCache;
 }
 

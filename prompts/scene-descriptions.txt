@@ -140,6 +140,28 @@ The scene hint is a STARTING IDEA - change it freely if composition doesn't work
 
 ---
 
+## DRAFT-THEN-VALIDATE PROCESS
+
+**Step 1: Draft the corrected scene** based on checks and issues found.
+
+**Step 2: Validate the draft** for internal consistency:
+- **Pose vs Action**: If character has "back view" or "seen from behind", they CANNOT be "looking at" something in front of them (toward camera). Back view = facing away from camera.
+- **Position vs Gaze**: Character in position A looking at target in position B - verify the geometry works (e.g., bottom-right looking at top-left = looking UP-LEFT, not down-right).
+- **Holding vs Action**: If hand is "holding X", that hand cannot simultaneously do another action.
+- **Camera vs Expression**: Back view or distant characters = no detailed expressions visible.
+
+**Step 3: Fix any contradictions** found in Step 2 before finalizing.
+
+Common contradiction patterns to catch:
+- ❌ "seen from behind, looking down at siblings in foreground" (if siblings are closer to camera, character would face camera to see them)
+- ✅ "seen from behind, looking into the distance ahead" OR "profile view, head turned toward siblings"
+- ❌ "back view with worried expression" (can't see face from behind)
+- ✅ "back view, shoulders hunched" OR "side profile with worried expression"
+
+**Output the validation in `draftValidation` field** showing what was checked and any fixes applied.
+
+---
+
 ## OUTPUT FORMAT
 
 Output raw JSON. Start directly with `{` - no markdown, no explanation.
@@ -173,6 +195,12 @@ Output raw JSON. Start directly with `{` - no markdown, no explanation.
   },
   "issues": ["Pointing geometry wrong - arm pointed RIGHT but tower is LEFT"],
   "corrections": ["Fixed Sophie's arm direction to UP-LEFT toward tower"],
+  "draftValidation": {
+    "poseActionCheck": "Sophie: standing facing left + pointing left = CONSISTENT. Manuel: walking + looking up = CONSISTENT",
+    "positionGazeCheck": "Sophie bottom-right looks up-left at tower top-left = VALID geometry",
+    "contradictionsFound": [],
+    "fixesApplied": []
+  },
   "scene": {
     "landmarkPlacement": { "tower": "top-left background" },
     "imageSummary": "Sophie stands in the foreground pointing up-left toward the distant tower while Manuel walks beside her on the left. The snowy plaza stretches between them and the tower. Main characters: Sophie, Manuel.",
