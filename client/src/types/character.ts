@@ -303,8 +303,3 @@ export interface VisualBible {
   clothing: VisualBibleClothingEntry[];
   changeLog: VisualBibleChangeLogEntry[];
 }
-
-// Legacy type aliases for backward compatibility during migration
-// TODO: Remove these after full migration
-export type ClothingAvatars = CharacterAvatars;
-export type PhysicalFeatures = PhysicalTraits;
