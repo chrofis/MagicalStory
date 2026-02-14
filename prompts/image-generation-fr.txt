@@ -1,13 +1,4 @@
-ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
-
 **STYLE: {STYLE_DESCRIPTION}**
-
-**TRANSFORMATION DE STYLE:**
-- Les images de référence montrent de VRAIES PHOTOGRAPHIES - transformer dans le style artistique
-- Les personnages doivent rester RECONNAISSABLES (couleur de cheveux, forme du visage, âge, genre)
-- Rendre dans le style artistique - PAS de copies photo-réalistes
-- TOUS les personnages dans le MÊME style cohérent
-- VÊTEMENTS des personnages: Utiliser les vêtements décrits dans la scène. Si non spécifié, EXACTEMENT comme sur les images de référence
 
 **COMPOSITION (CRITIQUE):**
 - RESPECTER les positions spatiales exactes décrites dans la scène (bord gauche, bord droit, centre, etc.)
@@ -23,8 +14,3 @@ ILLUSTRATION DE LIVRE POUR ENFANTS - Contenu sûr et familial.
 **SCÈNE:** {SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
-
----
-
-Montrer des émotions appropriées. Composition claire et épurée. Pas de texte ni de filigranes.
-Ceci est une illustration de livre pour enfants. Tout le contenu est innocent et adapté à l'âge.

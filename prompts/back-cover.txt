@@ -1,4 +1,3 @@
-CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
 Create a back cover illustration for a children's book.
 
 **SCENE:**
@@ -6,20 +5,7 @@ Create a back cover illustration for a children's book.
 
 **ART STYLE:** {STYLE_DESCRIPTION}
 
-**STYLE TRANSFORMATION:**
-- Reference images show REAL PHOTOGRAPHS - transform into the art style
-- Characters must remain RECOGNIZABLE (hair color, face shape, age, gender)
-- Render in artistic style - NOT photo-realistic copies
-- ALL characters in the SAME consistent style
-- Character CLOTHING: Use EXACTLY what is shown in the reference images (the correct outfit has been pre-selected)
-
 {CHARACTER_REFERENCE_LIST}
-
-**REFERENCE IMAGE USAGE (CRITICAL):**
-- Reference photos are PROVIDED FOR YOUR UNDERSTANDING ONLY
-- DO NOT include reference photos, thumbnails, or numbered image grids in the generated image
-- The output must be a SINGLE illustration showing ONLY the described scene
-- Reference photos show what characters LOOK LIKE - use them to draw the characters accurately, but NEVER show the photos themselves
 
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene - include all characters together

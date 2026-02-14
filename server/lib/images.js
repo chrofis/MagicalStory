@@ -36,6 +36,12 @@ function getStoryHelpers() {
 // Character photo helpers
 const { getFacePhoto } = require('./characterPhotos');
 
+// Helper: Get system instruction for image generation (scenes, covers, repairs)
+function getImageSystemInstruction() {
+  if (!PROMPT_TEMPLATES.imageSystemInstruction) return null;
+  return { parts: [{ text: PROMPT_TEMPLATES.imageSystemInstruction }] };
+}
+
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
@@ -2156,7 +2162,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   }
 
+  const systemInstruction = getImageSystemInstruction();
   const requestBody = {
+    ...(systemInstruction && { systemInstruction }),
     contents: [{
       parts: parts
     }],
@@ -2170,7 +2178,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   };
 
   log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt (${prompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
-  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8`);
+  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8, systemInstruction: ${!!systemInstruction}`);
 
   const data = await withRetry(async () => {
     const response = await fetch(
@@ -2594,7 +2602,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   }
 
   // Gemini API call
+  const systemInstruction = getImageSystemInstruction();
   const requestBody = {
+    ...(systemInstruction && { systemInstruction }),
     contents: [{
       parts: parts
     }],
@@ -2607,7 +2617,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }
   };
 
-  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars)`);
+  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), systemInstruction: ${!!systemInstruction}`);
 
   const data = await withRetry(async () => {
     const response = await fetch(
@@ -3867,10 +3877,12 @@ OUTPUT: A single image matching the reference style.`;
   const modelId = MODEL_DEFAULTS.pageImage || 'gemini-3-pro-image-preview';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
+  const systemInstruction = getImageSystemInstruction();
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      ...(systemInstruction && { systemInstruction }),
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
@@ -3975,10 +3987,12 @@ OUTPUT: A single image with the replaced character.`;
   const modelId = MODEL_DEFAULTS.pageImage || 'gemini-3-pro-image-preview';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
+  const systemInstruction = getImageSystemInstruction();
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
+      ...(systemInstruction && { systemInstruction }),
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
@@ -4487,10 +4501,12 @@ async function editImageWithPrompt(imageData, editInstruction) {
     const modelId = MODEL_DEFAULTS.pageImage;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
+    const systemInstruction = getImageSystemInstruction();
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        ...(systemInstruction && { systemInstruction }),
         contents: [{ parts }],
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
@@ -6132,11 +6148,13 @@ IMPORTANT INSTRUCTIONS:
     const modelId = MODEL_DEFAULTS.pageImage;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
+    const systemInstruction = getImageSystemInstruction();
     const data = await withRetry(async () => {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...(systemInstruction && { systemInstruction }),
           contents: [{ parts }],
           generationConfig: {
             responseModalities: ["TEXT", "IMAGE"],

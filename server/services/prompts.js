@@ -35,6 +35,8 @@ async function loadPromptTemplates() {
     PROMPT_TEMPLATES.rewriteBlockedScene = await fs.readFile(path.join(promptsDir, 'rewrite-blocked-scene.txt'), 'utf-8');
     // Character analysis prompt
     PROMPT_TEMPLATES.characterAnalysis = await fs.readFile(path.join(promptsDir, 'character-analysis.txt'), 'utf-8');
+    // Image generation system instruction
+    PROMPT_TEMPLATES.imageSystemInstruction = await fs.readFile(path.join(promptsDir, 'image-system-instruction.txt'), 'utf-8');
     // Avatar generation prompts
     PROMPT_TEMPLATES.avatarSystemInstruction = await fs.readFile(path.join(promptsDir, 'avatar-system-instruction.txt'), 'utf-8');
     PROMPT_TEMPLATES.avatarMainPrompt = await fs.readFile(path.join(promptsDir, 'avatar-main-prompt.txt'), 'utf-8');

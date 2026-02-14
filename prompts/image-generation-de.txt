@@ -1,13 +1,4 @@
-Nur sichere, familienfreundliche Inhalte.
-
 **STIL: {STYLE_DESCRIPTION}**
-
-**STILTRANSFORMATION:**
-- Referenzbilder zeigen ECHTE FOTOGRAFIEN - transformiere in den Kunststil
-- Charaktere müssen ERKENNBAR bleiben (Haarfarbe, Gesichtsform, Alter, Geschlecht)
-- Im künstlerischen Stil rendern - KEINE fotorealistischen Kopien
-- ALLE Charaktere im GLEICHEN konsistenten Stil
-- KLEIDUNG der Charaktere: Verwende die in der Szene beschriebene Kleidung. Falls nicht angegeben, EXAKT wie in den Referenzbildern
 
 **KOMPOSITION (KRITISCH):**
 - EXAKTE räumliche Positionen aus der Szene einhalten (linker Rand, rechter Rand, Mitte, etc.)
@@ -23,8 +14,3 @@ Nur sichere, familienfreundliche Inhalte.
 **SZENE:** {SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
-
----
-
-Zeige angemessene Emotionen. Klare, aufgeräumte Komposition. Kein Text oder Wasserzeichen.
-Alle Inhalte müssen unschuldig und altersgerecht sein.

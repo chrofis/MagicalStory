@@ -1,12 +1,5 @@
-CHILDREN'S BOOK ILLUSTRATION - Safe, family-friendly content.
-
 **STYLE: {STYLE_DESCRIPTION}**
 
-**REFERENCE HANDLING:**
-- Transform real photos into the art style (NOT photo-realistic)
-- Characters must remain RECOGNIZABLE (same face, hair color, age, build)
-- Use EXACTLY the clothing shown in reference images
-- ALL characters in consistent style
 - For element references (animals, objects): match EXACT appearance from reference
 
 **COMPOSITION (CRITICAL):**
@@ -29,7 +22,3 @@ CLOTHING RULE: Characters wear the SAME clothes as the previous scene unless the
 {SCENE_DESCRIPTION}
 
 {REQUIRED_OBJECTS}
-
----
-
-Show appropriate emotions. Clean, clear composition. No text or watermarks.
