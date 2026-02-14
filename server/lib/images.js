@@ -42,6 +42,19 @@ function getImageSystemInstruction() {
   return { parts: [{ text: PROMPT_TEMPLATES.imageSystemInstruction }] };
 }
 
+// Helper: Extract thinking text from Gemini response parts (thought: true)
+function extractThinkingFromParts(parts, logPrefix = 'IMAGE GEN') {
+  if (!parts || !Array.isArray(parts)) return null;
+  const thoughts = parts
+    .filter(p => p.thought && p.text)
+    .map(p => p.text);
+  if (thoughts.length === 0) return null;
+  const thinkingText = thoughts.join('\n');
+  log.info(`🧠 [${logPrefix}] Thinking (${thinkingText.length} chars): ${thinkingText.substring(0, 300)}${thinkingText.length > 300 ? '...' : ''}`);
+  log.verbose(`🧠 [${logPrefix}] Full thinking:\n${thinkingText}`);
+  return thinkingText;
+}
+
 // =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
@@ -2171,6 +2184,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
       temperature: 0.8,
+      includeThoughts: true,
       imageConfig: {
         aspectRatio: "1:1"
       }
@@ -2222,6 +2236,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Extract image data
   const candidate = data.candidates[0];
 
+  // Extract thinking text from response (Gemini 3 Pro / 2.5 Flash thinking mode)
+  const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN');
+
   if (candidate.content && candidate.content.parts) {
     for (const part of candidate.content.parts) {
       // Check both camelCase (inlineData) and snake_case (inline_data) - Gemini API may vary
@@ -2254,6 +2271,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
             score: null,
             reasoning: null,
             modelId,
+            thinkingText,
             imageUsage: imageUsage
           };
           imageCache.set(cacheKey, result);
@@ -2295,6 +2313,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           objectMatches, // Object/animal/landmark matches from evaluation
           modelId,  // Include which model was used for image generation
           qualityModelId,  // Include which model was used for quality evaluation
+          thinkingText, // Gemini thinking/reasoning text (if available)
           imageUsage: imageUsage,  // Token usage for image generation
           qualityUsage: qualityUsage  // Token usage for quality evaluation
         };
@@ -2611,6 +2630,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
       temperature: 0.8,
+      includeThoughts: true,
       imageConfig: {
         aspectRatio: "1:1"
       }
@@ -2655,6 +2675,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   // Extract image data
   const candidate = data.candidates[0];
 
+  // Extract thinking text from response
+  const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
+
   if (candidate.content && candidate.content.parts) {
     for (const part of candidate.content.parts) {
       const inlineData = part.inlineData || part.inline_data;
@@ -2676,6 +2699,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         const result = {
           imageData: compressedImageData,
           modelId,
+          thinkingText,
           usage
         };
 
@@ -3506,6 +3530,7 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
           results.regenerated.set(pageNum, {
             imageData: genResult.imageData,
             modelId: genResult.modelId,
+            thinkingText: genResult.thinkingText || null,
             usage: genResult.usage
           });
           log.info(`✅ [REPAIR EXEC] Page ${pageNum}: Regenerated successfully`);
@@ -3886,7 +3911,8 @@ OUTPUT: A single image matching the reference style.`;
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
-        temperature: 0.5
+        temperature: 0.5,
+        includeThoughts: true
       }
     })
   });
@@ -3902,7 +3928,11 @@ OUTPUT: A single image matching the reference style.`;
   // Extract usage
   const inputTokens = data.usageMetadata?.promptTokenCount || 0;
   const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-  log.debug(`📊 [STYLE REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+  log.debug(`📊 [STYLE REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}`);
+
+  // Extract thinking text
+  const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'STYLE REPAIR');
 
   // Extract the generated image
   if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -3914,7 +3944,8 @@ OUTPUT: A single image matching the reference style.`;
         log.info(`✅ [STYLE REPAIR] Style transfer completed successfully`);
         return {
           imageData: repairedImageData,
-          usage: { inputTokens, outputTokens, model: modelId },
+          usage: { inputTokens, outputTokens, thinkingTokens, model: modelId },
+          thinkingText,
           method: 'style_transfer'
         };
       }
@@ -3996,7 +4027,8 @@ OUTPUT: A single image with the replaced character.`;
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
-        temperature: 0.4  // Lower temperature for more faithful reproduction
+        temperature: 0.4,  // Lower temperature for more faithful reproduction
+        includeThoughts: true
       }
     })
   });
@@ -4012,7 +4044,11 @@ OUTPUT: A single image with the replaced character.`;
   // Extract usage
   const inputTokens = data.usageMetadata?.promptTokenCount || 0;
   const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-  log.debug(`📊 [CHAR REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}`);
+  const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+  log.debug(`📊 [CHAR REPAIR] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}`);
+
+  // Extract thinking text
+  const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'CHAR REPAIR');
 
   // Extract the generated image
   if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -4025,7 +4061,8 @@ OUTPUT: A single image with the replaced character.`;
         return {
           imageData: repairedImageData,
           character: charName,
-          usage: { inputTokens, outputTokens, model: modelId },
+          usage: { inputTokens, outputTokens, thinkingTokens, model: modelId },
+          thinkingText,
           method: 'character_replacement'
         };
       }
@@ -4511,6 +4548,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.6,
+          includeThoughts: true,
           imageConfig: {
             aspectRatio: "1:1"
           }
@@ -4529,14 +4567,11 @@ async function editImageWithPrompt(imageData, editInstruction) {
     // Extract token usage
     const inputTokens = data.usageMetadata?.promptTokenCount || 0;
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
-    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}, model: ${modelId}`);
+    const thinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
+    log.debug(`📊 [IMAGE EDIT] Token usage - input: ${inputTokens}, output: ${outputTokens}${thinkingTokens ? `, thinking: ${thinkingTokens}` : ''}, model: ${modelId}`);
 
-    // Log response structure for debugging
-    log.debug('✏️  [IMAGE EDIT] Response structure:', {
-      hasCandidates: !!data.candidates,
-      candidatesCount: data.candidates?.length || 0,
-      responseKeys: Object.keys(data)
-    });
+    // Extract thinking text
+    const thinkingText = extractThinkingFromParts(data.candidates?.[0]?.content?.parts, 'IMAGE EDIT');
 
     // Extract the edited image from the response
     if (data.candidates && data.candidates[0]?.content?.parts) {
@@ -4550,7 +4585,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
           const respMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
           const editedImageData = `data:${respMimeType};base64,${inlineData.data}`;
           log.info(`✅ [IMAGE EDIT] Successfully edited image`);
-          return { imageData: editedImageData, usage: { inputTokens, outputTokens, model: modelId } };
+          return { imageData: editedImageData, thinkingText, usage: { inputTokens, outputTokens, thinkingTokens, model: modelId } };
         }
       }
     }
@@ -4762,6 +4797,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       score: score,
       evalSkipped: evalWasBlocked,
       reasoning: result.reasoning,
+      thinkingText: result.thinkingText || null,  // Gemini thinking/reasoning (if available)
       textIssue: result.textIssue,
       expectedText: result.expectedText,
       actualText: result.actualText,
@@ -6158,7 +6194,8 @@ IMPORTANT INSTRUCTIONS:
           contents: [{ parts }],
           generationConfig: {
             responseModalities: ["TEXT", "IMAGE"],
-            temperature: 0.6
+            temperature: 0.6,
+            includeThoughts: true
           }
         })
       });
@@ -6186,6 +6223,9 @@ IMPORTANT INSTRUCTIONS:
         thinking_tokens: usageMetadata.thoughtsTokenCount || 0
       };
 
+      // Extract thinking text
+      const thinkingText = extractThinkingFromParts(responseParts, 'INPAINT');
+
       for (const part of responseParts) {
         const inlineData = part.inlineData || part.inline_data;
         if (inlineData && inlineData.data) {
@@ -6197,7 +6237,7 @@ IMPORTANT INSTRUCTIONS:
           const compressedImageData = await compressImageToJPEG(rawImageData);
 
           log.info(`✅ [INPAINT] Successfully inpainted image (tokens: ${usage.input_tokens} in, ${usage.output_tokens} out)`);
-          return { imageData: compressedImageData, usage, modelId, fullPrompt: inpaintPrompt };
+          return { imageData: compressedImageData, thinkingText, usage, modelId, fullPrompt: inpaintPrompt };
         }
       }
     }

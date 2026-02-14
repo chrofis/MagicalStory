@@ -564,6 +564,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           attempt: r.attempt,
           modelId: r.modelId,
           reasoning: r.reasoning,
+          thinkingText: r.thinkingText || null,
           textIssue: r.textIssue,
           timestamp: r.timestamp,
           evalSkipped: r.evalSkipped,
@@ -602,6 +603,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           type: r.type,
           score: r.score,
           reasoning: r.reasoning,
+          thinkingText: r.thinkingText || null,
           hasImageData: !!r.imageData,
           hasOriginalImage: !!r.originalImage
         })),
