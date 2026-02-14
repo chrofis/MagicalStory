@@ -144,7 +144,7 @@ const IMAGE_MODELS = {
     modelId: 'gemini-3-pro-image-preview',
     description: 'Gemini 3 Pro Image Preview - Higher quality images',
     backend: 'gemini',
-    supportsThinking: true,
+    supportsThinking: true,  // Thinks by default; thinkingConfig.includeThoughts returns thought text
     maxPromptLength: 30000
   },
   'flux-schnell': {

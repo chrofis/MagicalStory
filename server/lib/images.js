@@ -2190,7 +2190,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
       temperature: 0.8,
-      ...(modelSupportsThinking(modelId) && { includeThoughts: true }),
+      ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
         aspectRatio: "1:1"
       }
@@ -2636,7 +2636,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
       temperature: 0.8,
-      ...(modelSupportsThinking(modelId) && { includeThoughts: true }),
+      ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
         aspectRatio: "1:1"
       }
@@ -3918,7 +3918,7 @@ OUTPUT: A single image matching the reference style.`;
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
         temperature: 0.5,
-        ...(modelSupportsThinking(modelId) && { includeThoughts: true })
+        ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
       }
     })
   });
@@ -4034,7 +4034,7 @@ OUTPUT: A single image with the replaced character.`;
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
         temperature: 0.4,  // Lower temperature for more faithful reproduction
-        ...(modelSupportsThinking(modelId) && { includeThoughts: true })
+        ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
       }
     })
   });
@@ -4554,7 +4554,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
         generationConfig: {
           responseModalities: ["TEXT", "IMAGE"],
           temperature: 0.6,
-          ...(modelSupportsThinking(modelId) && { includeThoughts: true }),
+          ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
           imageConfig: {
             aspectRatio: "1:1"
           }
@@ -6201,7 +6201,7 @@ IMPORTANT INSTRUCTIONS:
           generationConfig: {
             responseModalities: ["TEXT", "IMAGE"],
             temperature: 0.6,
-            ...(modelSupportsThinking(modelId) && { includeThoughts: true })
+            ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
           }
         })
       });
