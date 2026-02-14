@@ -208,6 +208,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
   }
   log.debug(`[STYLED AVATAR] Using art style: ${ART_STYLE_PROMPTS[characterArtStyle] ? characterArtStyle : artStyle}`);
 
+  // Declare outside try so it's accessible in catch error handler
+  let styleSample = null;
+
   try {
     // Build full prompt using the unified styled-costumed-avatar template
     // (same template used by generateStyledAvatarWithSignature in avatars.js)
@@ -252,7 +255,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     });
 
     // Image 3: Art style sample (for style reference)
-    const styleSample = loadStyleSampleImage(artStyle);
+    styleSample = loadStyleSampleImage(artStyle);
     if (styleSample) {
       referencePhotos.push({
         name: 'style_sample',

@@ -137,12 +137,14 @@ const IMAGE_MODELS = {
     modelId: 'gemini-2.5-flash-image',
     description: 'Gemini 2.5 Flash Image - Fast image generation',
     backend: 'gemini',
+    supportsThinking: false,
     maxPromptLength: 30000  // Gemini supports very long prompts
   },
   'gemini-3-pro-image-preview': {
     modelId: 'gemini-3-pro-image-preview',
     description: 'Gemini 3 Pro Image Preview - Higher quality images',
     backend: 'gemini',
+    supportsThinking: true,
     maxPromptLength: 30000
   },
   'flux-schnell': {
