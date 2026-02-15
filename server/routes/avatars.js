@@ -1824,12 +1824,31 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
 
         charData.characters = characters;
 
+        // Build lightweight metadata (matching POST route format)
+        // Must include all display fields - not just id/name
+        const lightCharacters = characters.map(char => {
+          const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...lightChar } = char;
+          if (lightChar.avatars) {
+            const standardThumb = lightChar.avatars.faceThumbnails?.standard;
+            lightChar.avatars = {
+              status: lightChar.avatars.status,
+              stale: lightChar.avatars.stale,
+              generatedAt: lightChar.avatars.generatedAt,
+              hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+              faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
+              clothing: lightChar.avatars.clothing
+            };
+          }
+          return lightChar;
+        });
+        const metadataObj = Array.isArray(charData) ? lightCharacters : { ...charData, characters: lightCharacters };
+
         // Upsert the characters row
         await dbQuery(`
           INSERT INTO characters (id, user_id, data, metadata)
           VALUES ($1, $2, $3, $4)
           ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4
-        `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify({ characters: characters.map(c => ({ id: c.id, name: c.name })) })]);
+        `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify(metadataObj)]);
       } catch (dbErr) {
         // Log but don't fail - character creation is a nice-to-have
         log.warn(`📸 [PHOTO] Failed to create character in DB (avatar job will retry): ${dbErr.message}`);

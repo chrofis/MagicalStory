@@ -41,7 +41,40 @@ router.get('/', authenticateToken, async (req, res) => {
 
       // Rename metadata to data for consistent handling below
       if (rows.length > 0 && rows[0].metadata) {
-        rows[0].data = rows[0].metadata;
+        // Detect corrupted metadata (photo upload bug wrote only {id,name} per character)
+        const meta = typeof rows[0].metadata === 'string' ? JSON.parse(rows[0].metadata) : rows[0].metadata;
+        const metaChars = meta?.characters || (Array.isArray(meta) ? meta : []);
+        const firstChar = metaChars[0];
+        if (firstChar && !firstChar.gender && !firstChar.physical && !firstChar.avatars) {
+          // Metadata is corrupted (photo upload bug wrote only {id,name} per character)
+          // Fall back to full data column and auto-repair metadata in background
+          console.log('[Characters] GET - Metadata corrupted (missing gender/physical/avatars), falling back to full data and auto-repairing');
+          rows = await dbQuery('SELECT data FROM characters WHERE id = $1', [characterId]);
+          // Auto-repair: rebuild metadata from full data (fire-and-forget)
+          if (rows.length > 0 && rows[0].data) {
+            const fullData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+            const chars = fullData?.characters || (Array.isArray(fullData) ? fullData : []);
+            const lightChars = chars.map(c => {
+              const { body_no_bg_url, body_photo_url, photo_url, thumbnail_url, clothing_avatars, photos, ...light } = c;
+              if (light.avatars) {
+                const stdThumb = light.avatars.faceThumbnails?.standard;
+                light.avatars = {
+                  status: light.avatars.status, stale: light.avatars.stale, generatedAt: light.avatars.generatedAt,
+                  hasFullAvatars: !!(light.avatars.winter || light.avatars.standard || light.avatars.summer || light.avatars.formal),
+                  faceThumbnails: stdThumb ? { standard: stdThumb } : undefined,
+                  clothing: light.avatars.clothing
+                };
+              }
+              return light;
+            });
+            const repairedMeta = Array.isArray(fullData) ? lightChars : { ...fullData, characters: lightChars };
+            dbQuery('UPDATE characters SET metadata = $1 WHERE id = $2', [JSON.stringify(repairedMeta), characterId])
+              .then(() => console.log('[Characters] GET - Metadata auto-repaired successfully'))
+              .catch(err => console.error('[Characters] GET - Metadata auto-repair failed:', err.message));
+          }
+        } else {
+          rows[0].data = rows[0].metadata;
+        }
       } else if (rows.length > 0 && !rows[0].metadata) {
         // Fallback: metadata column not populated yet, use full data with JS stripping
         console.log('[Characters] GET - metadata column empty, falling back to full data');
