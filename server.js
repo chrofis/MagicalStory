@@ -388,13 +388,16 @@ async function detectBboxOnCovers(coverImages, characters) {
 
     // Use cover's referencePhotos (only the characters that appear on THIS cover)
     // Fall back to all characters if referencePhotos not available
-    const coverCharacterSource = cover.referencePhotos || characters || [];
-    const expectedCharacters = coverCharacterSource.map(c => {
-      // referencePhotos have .name directly; full character objects need buildCharacterPhysicalDescription
-      const physicalDesc = c.photoType ? (c.clothingDescription || c.name) : buildCharacterPhysicalDescription(c);
+    const coverCharacterNames = cover.referencePhotos
+      ? cover.referencePhotos.map(p => p.name)
+      : (characters || []).map(c => c.name);
+    // Build detailed descriptions using full character physical info for better bbox matching
+    const charLookup = new Map((characters || []).map(c => [c.name.toLowerCase(), c]));
+    const expectedCharacters = coverCharacterNames.map(name => {
+      const char = charLookup.get(name.toLowerCase());
       return {
-        name: c.name,
-        description: physicalDesc || 'character',
+        name,
+        description: char ? buildCharacterPhysicalDescription(char) : 'character',
         position: null  // Covers don't have expected positions
       };
     });
@@ -8560,7 +8563,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             // Use quality retry with labeled character photos (name + photoUrl)
             // Pass vbGrid for combined reference (instead of individual VB element photos)
             const sceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: streamingIncrConfig });
+            imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, sceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: streamingIncrConfig, sceneCharacters });
           } catch (error) {
             retries++;
             log.error(`❌ [STREAM-IMG] Page ${pageNum} attempt ${retries} failed:`, error.message);
@@ -9226,7 +9229,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
                 ...incrConfig,
                 currentCharacters: sceneCharacters.map(c => c.name)
               } : null;
-              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrConfigWithCurrentChars });
+              imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, previousImage, 'scene', null, pageUsageTracker, null, seqSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrConfigWithCurrentChars, sceneCharacters });
             } catch (error) {
               retries++;
               log.error(`❌ [STORYBOOK] Page ${pageNum} image attempt ${retries} failed:`, error.message);
@@ -11252,10 +11255,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
 
-      // Extract clothing from scene expansion's JSON output (not from outline)
-      // This ensures Claude's validated clothing selection is used, not the outline's suggestion
+      // Extract clothing from scene expansion's JSON output AND from Characters section (streaming parser)
+      // Characters section (scene.characterClothing) takes priority — it's the explicit per-page assignment
+      // Scene metadata JSON may carry stale costume data from other pages
       const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
-      const perCharClothing = sceneMetadataForClothing?.characterClothing || scene.characterClothing || {};
+      const perCharClothing = {
+        ...(sceneMetadataForClothing?.characterClothing || {}),
+        ...(scene.characterClothing || {})
+      };
 
       // Always default to 'standard' for unlisted characters (not first character's costume)
       // This prevents inheriting costumes from other characters
@@ -11431,8 +11438,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const preparePageData = async (scene, index) => {
         const pageNum = scene.pageNumber;
         const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
+        // Characters section takes priority over scene metadata JSON (may have stale costume data)
         const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
-        const perCharClothing = sceneMetadataForClothing?.characterClothing || scene.characterClothing || {};
+        const perCharClothing = {
+          ...(sceneMetadataForClothing?.characterClothing || {}),
+          ...(scene.characterClothing || {})
+        };
         const defaultClothing = 'standard';
         const sceneClothingRequirements = { ...clothingRequirements };
         for (const char of sceneCharacters) {
@@ -12227,7 +12238,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 null,
                 { imageModel: modelOverrides?.imageModel, qualityModel: modelOverrides?.qualityModel },
                 `PAGE ${pageNum} (consistency fix)`,
-                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length }
+                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters }
               );
 
               // Track scene rewrite usage if a safety block triggered a rewrite
@@ -13687,7 +13698,7 @@ Output Format:
               try {
                 // Pass vbGrid for combined reference (instead of individual VB element photos)
                 const parallelSceneModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: parallelPipelineIncrConfig });
+                imageResult = await generateImageWithQualityRetry(imagePrompt, referencePhotos, null, 'scene', onImageReady, pageUsageTracker, null, parallelSceneModelOverrides, `PAGE ${pageNum}`, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: parallelPipelineIncrConfig, sceneCharacters });
               } catch (error) {
                 retries++;
                 log.error(`❌ [PAGE ${pageNum}] Image generation attempt ${retries} failed:`, error.message);
@@ -14253,7 +14264,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
                 const seqPipelineModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
                 imageResult = await generateImageWithQualityRetry(
                   imagePrompt, referencePhotos, previousImage, 'scene', onImageReady, pageUsageTracker, null, seqPipelineModelOverrides, `PAGE ${pageNum}`,
-                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrementalConsistencyConfig }
+                  { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, incrementalConsistency: incrementalConsistencyConfig, sceneCharacters }
                 );
               } catch (error) {
                 retries++;

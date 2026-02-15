@@ -448,6 +448,273 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`⭐ [QUALITY] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
     }
 
+    // === TWO-PASS EVALUATION FOR SCENE TYPE ===
+    // Pass 1: Visual inventory (image + refs, NO original prompt) — honest description
+    // Pass 2: Prompt compliance (text-only, NO image) — scoring against prompt
+    // This prevents the model from hallucinating compliance with the prompt
+    if (evaluationType === 'scene' && PROMPT_TEMPLATES.imageVisualInventory && PROMPT_TEMPLATES.imagePromptCompliance) {
+      log.verbose(`⭐ [QUALITY P1] Starting two-pass evaluation for ${pageContext || 'scene'}`);
+
+      try {
+        // --- Pass 1: Visual Inventory (image + refs, no original prompt) ---
+        const inventoryParts = [...parts]; // image + reference images, no text prompt yet
+        inventoryParts.push({ text: PROMPT_TEMPLATES.imageVisualInventory });
+
+        const p1Response = await withRetry(async () => {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+          return fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: inventoryParts }],
+              generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
+              safetySettings: [
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+              ]
+            })
+          });
+        }, { maxRetries: 2, baseDelay: 2000 });
+
+        let twoPassFailed = false;
+
+        if (!p1Response.ok) {
+          const errText = await p1Response.text();
+          log.warn(`⚠️ [QUALITY P1] API error, falling back to single-pass: ${errText.substring(0, 200)}`);
+          twoPassFailed = true;
+        }
+
+        if (!twoPassFailed) {
+          const p1Data = await p1Response.json();
+          const p1InputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
+          const p1OutputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
+          const p1ThinkingTokens = p1Data.usageMetadata?.thoughtsTokenCount || 0;
+
+          // Check if blocked
+          const p1Blocked = p1Data.promptFeedback?.blockReason ||
+            !p1Data.candidates || p1Data.candidates.length === 0 ||
+            p1Data.candidates[0]?.finishReason === 'SAFETY' ||
+            p1Data.candidates[0]?.finishReason === 'PROHIBITED_CONTENT';
+
+          if (p1Blocked) {
+            log.warn(`⚠️ [QUALITY P1] Content blocked, falling back to single-pass`);
+            twoPassFailed = true;
+          }
+
+          if (!twoPassFailed) {
+            const p1Text = p1Data.candidates[0]?.content?.parts?.[0]?.text?.trim();
+            if (!p1Text) {
+              log.warn(`⚠️ [QUALITY P1] No text response, falling back to single-pass`);
+              twoPassFailed = true;
+            }
+
+            if (!twoPassFailed) {
+              // Parse Pass 1 JSON
+              const p1JsonMatch = p1Text.match(/\{[\s\S]*\}/);
+              let inventoryJson = null;
+              if (p1JsonMatch) {
+                try {
+                  inventoryJson = JSON.parse(p1JsonMatch[0]);
+                } catch (e) {
+                  log.warn(`⚠️ [QUALITY P1] JSON parse failed, falling back to single-pass`);
+                  twoPassFailed = true;
+                }
+              } else {
+                log.warn(`⚠️ [QUALITY P1] No JSON in response, falling back to single-pass`);
+                twoPassFailed = true;
+              }
+
+              if (!twoPassFailed && inventoryJson) {
+                // Log Pass 1 results
+                const p1ThinkingInfo = p1ThinkingTokens > 0 ? `, thinking: ${p1ThinkingTokens.toLocaleString()}` : '';
+                log.verbose(`📊 [QUALITY P1] Token usage - input: ${p1InputTokens.toLocaleString()}, output: ${p1OutputTokens.toLocaleString()}${p1ThinkingInfo}`);
+
+                const figures = inventoryJson.figures || [];
+                const matches = inventoryJson.matches || [];
+                if (figures.length > 0) {
+                  log.info(`⭐ [QUALITY P1] Figures: ${figures.map(f => `#${f.id} ${f.apparent_age} ${f.hair} (${f.position})`).join('; ')}`);
+                }
+                if (matches.length > 0) {
+                  log.info(`⭐ [QUALITY P1] Matches: ${matches.map(m => `Fig ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%${m.age_match === false ? ', AGE MISMATCH' : ''})`).join('; ')}`);
+                }
+
+                // --- Pass 2: Prompt Compliance (text-only, NO image) ---
+                log.verbose(`⭐ [QUALITY P2] Starting prompt compliance scoring for ${pageContext || 'scene'}`);
+
+                const compliancePrompt = fillTemplate(PROMPT_TEMPLATES.imagePromptCompliance, {
+                  ORIGINAL_PROMPT: promptForEval,
+                  VISUAL_INVENTORY: JSON.stringify(inventoryJson)
+                });
+
+                const p2Response = await withRetry(async () => {
+                  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+                  return fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      contents: [{ parts: [{ text: compliancePrompt }] }],
+                      generationConfig: { maxOutputTokens: 8000, temperature: 0.3 }
+                    })
+                  });
+                }, { maxRetries: 2, baseDelay: 1000 });
+
+                if (!p2Response.ok) {
+                  const p2ErrText = await p2Response.text();
+                  log.warn(`⚠️ [QUALITY P2] API error, falling back to single-pass: ${p2ErrText.substring(0, 200)}`);
+                  twoPassFailed = true;
+                }
+
+                if (!twoPassFailed) {
+                  const p2Data = await p2Response.json();
+                  const p2InputTokens = p2Data.usageMetadata?.promptTokenCount || 0;
+                  const p2OutputTokens = p2Data.usageMetadata?.candidatesTokenCount || 0;
+                  const p2ThinkingTokens = p2Data.usageMetadata?.thoughtsTokenCount || 0;
+                  const p2ThinkingInfo = p2ThinkingTokens > 0 ? `, thinking: ${p2ThinkingTokens.toLocaleString()}` : '';
+                  log.verbose(`📊 [QUALITY P2] Token usage - input: ${p2InputTokens.toLocaleString()}, output: ${p2OutputTokens.toLocaleString()}${p2ThinkingInfo}`);
+
+                  const p2Text = p2Data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                  if (p2Text) {
+                    const p2JsonMatch = p2Text.match(/\{[\s\S]*\}/);
+                    let complianceJson = null;
+                    if (p2JsonMatch) {
+                      try {
+                        complianceJson = JSON.parse(p2JsonMatch[0]);
+                      } catch (e) {
+                        log.warn(`⚠️ [QUALITY P2] JSON parse failed, falling back to single-pass`);
+                        twoPassFailed = true;
+                      }
+                    } else {
+                      twoPassFailed = true;
+                    }
+
+                    if (!twoPassFailed && complianceJson && typeof complianceJson.score === 'number') {
+                      // === Two-pass succeeded! Merge results into standard output format ===
+                      const rawScore = complianceJson.score;
+                      const score = rawScore * 10; // Convert 0-10 to 0-100
+                      const verdict = complianceJson.verdict || 'UNKNOWN';
+                      let issuesSummary = complianceJson.issues_summary || '';
+                      if (Array.isArray(issuesSummary)) issuesSummary = issuesSummary.join('. ');
+
+                      log.info(`⭐ [QUALITY P2] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
+                      if (issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none') {
+                        log.info(`⭐ [QUALITY P2] Issues: ${issuesSummary}`);
+                      }
+
+                      // Build fixable_issues from Pass 2
+                      let fixableIssues = [];
+                      if (complianceJson.fixable_issues && Array.isArray(complianceJson.fixable_issues)) {
+                        fixableIssues = complianceJson.fixable_issues
+                          .filter(i => i.description)
+                          .map(i => ({
+                            description: i.description,
+                            severity: i.severity || 'MODERATE',
+                            type: i.type || 'default',
+                            fix: i.fix || `Fix: ${i.description}`
+                          }));
+                        if (fixableIssues.length > 0) {
+                          log.info(`⭐ [QUALITY P2] ${fixableIssues.length} fixable issues identified`);
+                        }
+                      }
+
+                      // Merge figures/matches from Pass 1 with scene/spatial/score from Pass 2
+                      const mergedResult = {
+                        ...inventoryJson,
+                        ...complianceJson,
+                        figures: inventoryJson.figures || [],
+                        matches: inventoryJson.matches || [],
+                        object_matches: inventoryJson.object_matches || [],
+                        rendering: inventoryJson.rendering || {}
+                      };
+
+                      // Store FULL merged JSON as reasoning (for dev mode display)
+                      const reasoning = JSON.stringify(mergedResult, null, 2);
+
+                      // Await semantic evaluation if running in parallel
+                      let semanticResult = null;
+                      let finalScore = score;
+                      let combinedIssuesSummary = issuesSummary;
+                      if (semanticPromise) {
+                        try {
+                          semanticResult = await semanticPromise;
+                          if (semanticResult?.semanticIssues?.length > 0) {
+                            let semanticPenalty = 0;
+                            for (const issue of semanticResult.semanticIssues) {
+                              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
+                              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
+                              else semanticPenalty += 10;
+                            }
+                            finalScore = Math.max(0, score - semanticPenalty);
+                            log.info(`🔍 [SEMANTIC] Semantic score: ${semanticResult.score}/100, penalty: ${semanticPenalty} points (quality ${score} → final ${finalScore})`);
+                            const semanticSummary = semanticResult.semanticIssues.map(i => i.problem).join('; ');
+                            combinedIssuesSummary = issuesSummary
+                              ? `${issuesSummary}; SEMANTIC: ${semanticSummary}`
+                              : `SEMANTIC: ${semanticSummary}`;
+                          }
+                        } catch (semanticErr) {
+                          log.warn(`[SEMANTIC] Parallel evaluation failed: ${semanticErr.message}`);
+                        }
+                      }
+
+                      // Aggregate token usage from both passes + semantic
+                      const semanticUsage = semanticResult?.usage || {};
+                      const totalUsage = {
+                        input_tokens: p1InputTokens + p2InputTokens + (semanticUsage.input_tokens || 0),
+                        output_tokens: p1OutputTokens + p2OutputTokens + (semanticUsage.output_tokens || 0),
+                        thinking_tokens: p1ThinkingTokens + p2ThinkingTokens,
+                        semantic_input_tokens: semanticUsage.input_tokens || 0,
+                        semantic_output_tokens: semanticUsage.output_tokens || 0,
+                        p1_input_tokens: p1InputTokens,
+                        p1_output_tokens: p1OutputTokens,
+                        p2_input_tokens: p2InputTokens,
+                        p2_output_tokens: p2OutputTokens
+                      };
+
+                      log.verbose(`✅ [QUALITY] Two-pass evaluation complete: quality ${score}/100, final ${finalScore}/100`);
+
+                      return {
+                        score: finalScore,
+                        qualityScore: score,
+                        semanticScore: semanticResult?.score ?? null,
+                        rawScore,
+                        verdict,
+                        reasoning,
+                        issuesSummary: combinedIssuesSummary,
+                        textIssue: null,
+                        fixTargets: [],
+                        fixableIssues,
+                        figures: inventoryJson.figures || [],
+                        matches: inventoryJson.matches || [],
+                        semanticResult,
+                        usage: totalUsage,
+                        modelId,
+                        twoPass: true
+                      };
+                    }
+                  }
+
+                  if (!twoPassFailed) {
+                    log.warn(`⚠️ [QUALITY P2] Could not parse scoring response, falling back to single-pass`);
+                    twoPassFailed = true;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // If we reach here, two-pass failed — fall through to single-pass
+        if (twoPassFailed) {
+          log.verbose(`⭐ [QUALITY] Two-pass incomplete, using single-pass fallback for ${pageContext || 'scene'}`);
+        }
+      } catch (twoPassErr) {
+        log.warn(`⚠️ [QUALITY] Two-pass error, falling back to single-pass: ${twoPassErr.message}`);
+      }
+    }
+    // === END TWO-PASS EVALUATION ===
+
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });
 
@@ -872,6 +1139,8 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     return null;
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
+    // Await semantic to prevent memory leak
+    if (semanticPromise) await semanticPromise.catch(() => {});
     return null;
   }
 }
@@ -1363,15 +1632,23 @@ function buildExpectedCharactersForBbox(characterDescriptions, expectedPositions
     const position = expectedPositions?.[name] || expectedPositions?.[name.charAt(0).toUpperCase() + name.slice(1)] || '';
     // Use clothing from characterClothing map, or from parsed description (covers), or empty
     const clothing = getClothing(name) || desc.clothing || '';
-    const descParts = [];
-    if (desc.genderTerm) descParts.push(desc.genderTerm);
-    if (desc.age) descParts.push(`${desc.age} years old`);
-    if (desc.isChild === true) descParts.push('child');
-    else if (desc.isChild === false) descParts.push('adult');
-    if (clothing) descParts.push(clothing);
+    let description;
+    if (desc.richDescription) {
+      // Full physical description from character objects
+      description = clothing ? `${desc.richDescription}. Wearing: ${clothing}` : desc.richDescription;
+    } else {
+      // Minimal description from prompt parsing
+      const descParts = [];
+      if (desc.genderTerm) descParts.push(desc.genderTerm);
+      if (desc.age) descParts.push(`${desc.age} years old`);
+      if (desc.isChild === true) descParts.push('child');
+      else if (desc.isChild === false) descParts.push('adult');
+      if (clothing) descParts.push(clothing);
+      description = descParts.join(', ') || 'character';
+    }
     chars.push({
       name,
-      description: descParts.join(', ') || 'character',
+      description,
       position
     });
     addedNames.add(name.toLowerCase());
@@ -4642,6 +4919,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Default: null (use standard logic). Set to 100 to always repair pages with issues.
     // Can also be passed via incrementalConsistency.forceRepairThreshold
     forceRepairThreshold: forceRepairThresholdInput = null,
+    // Full character objects for rich bbox descriptions (from scene character lookup)
+    sceneCharacters = [],
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -4914,8 +5193,20 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];
 
-    // Parse character descriptions (age, gender) from prompt for smarter matching
-    const characterDescriptions = getStoryHelpers().parseCharacterDescriptions(currentPrompt);
+    // Build character descriptions for bbox detection
+    // Use rich descriptions from full character objects when available, fall back to prompt parsing
+    let characterDescriptions;
+    if (sceneCharacters.length > 0) {
+      characterDescriptions = {};
+      for (const char of sceneCharacters) {
+        characterDescriptions[char.name] = {
+          richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char)
+        };
+      }
+    } else {
+      // Fallback: parse minimal descriptions from prompt
+      characterDescriptions = getStoryHelpers().parseCharacterDescriptions(currentPrompt);
+    }
 
     // Parse Visual Bible objects from prompt (REQUIRED OBJECTS section)
     const vbObjects = parseVisualBibleObjects(currentPrompt);
