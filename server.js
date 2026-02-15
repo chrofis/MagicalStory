@@ -374,19 +374,6 @@ function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
 async function detectBboxOnCovers(coverImages, characters) {
   if (!coverImages) return coverImages;
 
-  // Build detailed expected characters for bbox detection using the same helper as page-level
-  const expectedCharacters = (characters || []).map(c => {
-    // Use buildCharacterPhysicalDescription for full, consistent descriptions
-    const physicalDesc = buildCharacterPhysicalDescription(c);
-    return {
-      name: c.name,
-      description: physicalDesc || 'character',
-      position: null  // Covers don't have expected positions
-    };
-  });
-
-  log.debug(`📦 [COVER BBOX] Expected characters: ${expectedCharacters.map(c => `${c.name}: ${c.description.substring(0, 60)}...`).join(' | ')}`);
-
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
 
   for (const coverType of coverTypes) {
@@ -398,6 +385,21 @@ async function detectBboxOnCovers(coverImages, characters) {
 
     // Skip if already has bbox detection
     if (cover.bboxDetection) continue;
+
+    // Use cover's referencePhotos (only the characters that appear on THIS cover)
+    // Fall back to all characters if referencePhotos not available
+    const coverCharacterSource = cover.referencePhotos || characters || [];
+    const expectedCharacters = coverCharacterSource.map(c => {
+      // referencePhotos have .name directly; full character objects need buildCharacterPhysicalDescription
+      const physicalDesc = c.photoType ? (c.clothingDescription || c.name) : buildCharacterPhysicalDescription(c);
+      return {
+        name: c.name,
+        description: physicalDesc || 'character',
+        position: null  // Covers don't have expected positions
+      };
+    });
+
+    log.debug(`📦 [COVER BBOX] ${coverType}: expecting ${expectedCharacters.length} characters: ${expectedCharacters.map(c => c.name).join(', ')}`);
 
     try {
       log.debug(`📦 [COVER BBOX] Running bbox detection on ${coverType}...`);
