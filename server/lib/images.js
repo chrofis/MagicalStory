@@ -56,7 +56,7 @@ function extractThinkingFromParts(parts, logPrefix = 'IMAGE GEN') {
     .map(p => p.text);
   if (thoughts.length === 0) return null;
   const thinkingText = thoughts.join('\n');
-  log.info(`🧠 [${logPrefix}] Thinking (${thinkingText.length} chars): ${thinkingText.substring(0, 300)}${thinkingText.length > 300 ? '...' : ''}`);
+  log.debug(`🧠 [${logPrefix}] Thinking (${thinkingText.length} chars): ${thinkingText.substring(0, 200)}${thinkingText.length > 200 ? '...' : ''}`);
   log.verbose(`🧠 [${logPrefix}] Full thinking:\n${thinkingText}`);
   return thinkingText;
 }
