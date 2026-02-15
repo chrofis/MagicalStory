@@ -96,13 +96,13 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
 
   // Length - use detailed analysis with descriptive terms (short, ear-length, shoulder-length, etc.)
   // Length scale: bald < buzz cut < short < ear-length < chin-length < neck-length < shoulder-length < mid-back < waist-length
-  const lengthOrder = ['bald', 'buzz cut', 'shaved', 'short', 'ear-length', 'chin-length', 'neck-length', 'shoulder-length', 'mid-back', 'waist-length'];
+  const lengthOrder = ['bald', 'buzz cut', 'shaved', 'fade', 'tapered', 'short', 'ear-length', 'chin-length', 'neck-length', 'shoulder-length', 'mid-back', 'waist-length'];
 
   if (detailed?.lengthTop) {
     const topLength = detailed.lengthTop?.toLowerCase();
     const sidesLength = detailed.lengthSides?.toLowerCase();
 
-    // Check if sides are significantly shorter than top (fade/undercut style)
+    // Check if sides are different from top (fade/tapered/undercut)
     if (sidesLength && sidesLength !== 'same as top') {
       const topIdx = lengthOrder.indexOf(topLength);
       const sidesIdx = lengthOrder.indexOf(sidesLength);
@@ -122,14 +122,21 @@ function buildHairDescription(physical, physicalTraitsSource = null) {
     parts.push(physical.hairLength);
   }
 
+  // Styling from detailed analysis (if descriptive)
+  const styling = detailed?.styling?.toLowerCase();
+  if (styling && !['natural', 'textured'].includes(styling)) {
+    parts.push(styling);
+  }
+
   // Bangs from detailed analysis
   if (detailed?.bangsEndAt && detailed.bangsEndAt !== 'no bangs') {
     parts.push(`bangs ${detailed.bangsEndAt}`);
   }
 
-  // Parting/direction from detailed analysis (if specific)
-  if (detailed?.direction && !['natural', 'back', 'forward'].includes(detailed.direction)) {
-    parts.push(detailed.direction);
+  // Parting from detailed analysis (supports both new 'parting' and legacy 'direction' field)
+  const parting = detailed?.parting || detailed?.direction;
+  if (parting && !['none', 'natural', 'back', 'forward'].includes(parting)) {
+    parts.push(parting);
   }
 
   // If no detailed parts, fall back to legacy hair field
