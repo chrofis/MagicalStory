@@ -85,7 +85,16 @@ interface CharacterApiResponse {
   detailedHairAnalysis?: string;
   physical_traits_source?: PhysicalTraitsSource;
   physicalTraitsSource?: PhysicalTraitsSource;
-  // Photos (snake_case + camelCase legacy)
+  // Photos (canonical nested format)
+  photos?: {
+    original?: string;
+    face?: string;
+    body?: string;
+    bodyNoBg?: string;
+    faceBox?: { x: number; y: number; width: number; height: number };
+    bodyBox?: { x: number; y: number; width: number; height: number };
+  };
+  // Photos (legacy flat fields - snake_case + camelCase)
   photo_url?: string;
   photoUrl?: string;
   thumbnail_url?: string;
@@ -177,12 +186,12 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     },
 
     photos: {
-      original: api.photo_url || api.photoUrl,
-      face: api.thumbnail_url || api.thumbnailUrl,
-      body: api.body_photo_url || api.bodyPhotoUrl,
-      bodyNoBg: api.body_no_bg_url || api.bodyNoBgUrl,
-      faceBox: api.face_box || api.faceBox,
-      bodyBox: api.body_box || api.bodyBox,
+      original: api.photos?.original || api.photo_url || api.photoUrl,
+      face: api.photos?.face || api.thumbnail_url || api.thumbnailUrl,
+      body: api.photos?.body || api.body_photo_url || api.bodyPhotoUrl,
+      bodyNoBg: api.photos?.bodyNoBg || api.body_no_bg_url || api.bodyNoBgUrl,
+      faceBox: api.photos?.faceBox || api.face_box || api.faceBox,
+      bodyBox: api.photos?.bodyBox || api.body_box || api.bodyBox,
     },
 
     avatars: api.avatars || api.clothing_avatars || api.clothingAvatars,
@@ -492,6 +501,20 @@ export const characterService = {
     error?: string;
   }> {
     try {
+      // Auto-load full character data if photos are missing (list view strips photos)
+      const hasPhotos = !!(character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original);
+      if (!hasPhotos && character.id) {
+        log.info(`📸 No photos in character object for ${character.name} (id: ${character.id}), loading full data...`);
+        const fullChar = await characterService.loadFullCharacter(character.id);
+        if (fullChar?.photos) {
+          character = { ...character, photos: fullChar.photos };
+          log.info(`📸 Loaded photos: bodyNoBg=${!!fullChar.photos.bodyNoBg}, body=${!!fullChar.photos.body}, face=${!!fullChar.photos.face}, original=${!!fullChar.photos.original}`);
+        } else {
+          log.warn(`📸 Failed to load photos for ${character.name} (id: ${character.id})`);
+          return { success: false, error: 'No photo available - upload a photo first' };
+        }
+      }
+
       // Build physical description from character data
       const age = parseInt(character.age) || 10;
       const gender = character.gender || 'child';
@@ -643,6 +666,20 @@ export const characterService = {
     error?: string;
   }> {
     try {
+      // Auto-load full character data if photos are missing (list view strips photos)
+      const hasPhotos = !!(character.photos?.bodyNoBg || character.photos?.body || character.photos?.face || character.photos?.original);
+      if (!hasPhotos && character.id) {
+        log.info(`📸 No photos in character object for ${character.name} (id: ${character.id}), loading full data...`);
+        const fullChar = await characterService.loadFullCharacter(character.id);
+        if (fullChar?.photos) {
+          character = { ...character, photos: fullChar.photos };
+          log.info(`📸 Loaded photos: bodyNoBg=${!!fullChar.photos.bodyNoBg}, body=${!!fullChar.photos.body}, face=${!!fullChar.photos.face}, original=${!!fullChar.photos.original}`);
+        } else {
+          log.warn(`📸 Failed to load photos for ${character.name} (id: ${character.id})`);
+          return { success: false, error: 'No photo available - upload a photo first' };
+        }
+      }
+
       // Build physical description from character data
       const age = parseInt(character.age) || 10;
       const gender = character.gender || 'child';
@@ -1025,8 +1062,16 @@ export const characterService = {
     };
 
     try {
-      // Check if character has a photo
-      const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+      // Check if character has a photo - auto-load full data if missing
+      let hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
+      if (!hasPhoto && character.id) {
+        log.info(`📸 No photos in character object for ${character.name} (id: ${character.id}), loading full data...`);
+        const fullChar = await characterService.loadFullCharacter(character.id);
+        if (fullChar?.photos) {
+          character = { ...character, photos: fullChar.photos };
+          hasPhoto = !!(fullChar.photos.original || fullChar.photos.face || fullChar.photos.body || fullChar.photos.bodyNoBg);
+        }
+      }
       if (!hasPhoto) {
         result.skipped = true;
         result.skipReason = 'No photo available';
