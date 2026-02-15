@@ -2560,7 +2560,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
 
               // Merge with existing physical object
               dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(data->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(meta->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${freshCharIndex},physical}', COALESCE(metadata->'characters'->${freshCharIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(physical));
               paramIndex += 1;
             }
@@ -3436,7 +3436,7 @@ These corrections OVERRIDE what is visible in the reference photo.
 
               // Merge with existing physical object
               dataUpdate = `jsonb_set(${dataUpdate}, '{characters,${charIndex},physical}', COALESCE(data->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
-              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', COALESCE(meta->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
+              metaUpdate = `jsonb_set(${metaUpdate}, '{characters,${charIndex},physical}', COALESCE(metadata->'characters'->${charIndex}->'physical', '{}'::jsonb) || $${paramIndex}::jsonb, true)`;
               params.push(JSON.stringify(physical));
               paramIndex += 1;
               log.debug(`💾 [CLOTHING AVATARS] Applied extracted traits to character.physical: apparentAge=${t.apparentAge}`);
