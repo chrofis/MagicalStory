@@ -135,24 +135,24 @@ interface CharacterApiResponse {
 // Convert API response to frontend Character
 // Handles both snake_case (new format) and camelCase (legacy format) for backward compatibility
 function mapCharacterFromApi(api: CharacterApiResponse): Character {
-  // Extract physical traits from nested physical object (canonical) OR flat fields (legacy)
+  // Read from canonical nested physical object; flat fields only as legacy fallback
   const p = api.physical;
   const physical = {
-    height: api.height || p?.height,
-    build: api.build || p?.build,
-    face: api.other_features || api.otherFeatures || p?.face,
-    eyeColor: api.eye_color || api.eyeColor || p?.eyeColor,
-    hairColor: api.hair_color || api.hairColor || p?.hairColor,
-    hairLength: api.hair_length || api.hairLength || p?.hairLength,
-    hairStyle: api.hair_style || api.hairStyle || p?.hairStyle,
-    facialHair: api.facial_hair || api.facialHair || p?.facialHair,
-    skinTone: api.skin_tone || api.skinTone || p?.skinTone,
-    skinUndertone: api.skin_undertone || api.skinUndertone || p?.skinUndertone,
-    skinToneHex: api.skin_tone_hex || api.skinToneHex || p?.skinToneHex,
-    hair: api.hair_color || api.hairColor || p?.hairColor,  // Legacy: combined hair field
-    other: api.other || p?.other,  // Glasses, birthmarks, always-present accessories
-    detailedHairAnalysis: api.detailed_hair_analysis || api.detailedHairAnalysis || p?.detailedHairAnalysis,
-    apparentAge: (api.apparent_age || api.apparentAge || p?.apparentAge) as AgeCategory | undefined, // How old they look
+    height: p?.height || api.height,
+    build: p?.build || api.build,
+    face: p?.face || api.other_features || api.otherFeatures,
+    eyeColor: p?.eyeColor || api.eye_color || api.eyeColor,
+    hairColor: p?.hairColor || api.hair_color || api.hairColor,
+    hairLength: p?.hairLength || api.hair_length || api.hairLength,
+    hairStyle: p?.hairStyle || api.hair_style || api.hairStyle,
+    facialHair: p?.facialHair || api.facial_hair || api.facialHair,
+    skinTone: p?.skinTone || api.skin_tone || api.skinTone,
+    skinUndertone: p?.skinUndertone || api.skin_undertone || api.skinUndertone,
+    skinToneHex: p?.skinToneHex || api.skin_tone_hex || api.skinToneHex,
+    hair: p?.hairColor || api.hair_color || api.hairColor,
+    other: p?.other || api.other,
+    detailedHairAnalysis: p?.detailedHairAnalysis || api.detailed_hair_analysis || api.detailedHairAnalysis,
+    apparentAge: (p?.apparentAge || api.apparent_age || api.apparentAge) as AgeCategory | undefined,
   };
 
   // Compute ageCategory from API or derive from age
@@ -170,10 +170,10 @@ function mapCharacterFromApi(api: CharacterApiResponse): Character {
     physicalTraitsSource: api.physical_traits_source || api.physicalTraitsSource,
 
     traits: {
-      strengths: api.strengths || api.traits?.strengths || [],
-      flaws: api.flaws || api.weaknesses || api.traits?.flaws || [],
-      challenges: api.challenges || api.fears || api.traits?.challenges || [],
-      specialDetails: api.special_details || api.specialDetails || api.traits?.specialDetails,
+      strengths: api.traits?.strengths || api.strengths || [],
+      flaws: api.traits?.flaws || api.flaws || api.weaknesses || [],
+      challenges: api.traits?.challenges || api.challenges || api.fears || [],
+      specialDetails: api.traits?.specialDetails || api.special_details || api.specialDetails,
     },
 
     photos: {
