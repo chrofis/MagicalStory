@@ -996,6 +996,9 @@ function extractCharacterNamesFromScene(sceneDescription) {
       /^[\t ]*(?:[\-\*\u2022]\s*)?(?:\d+\.\s*)?\*\*([^*:]+?)\*\*\s*:?/gm,
       // Bold name at start of line (no bullet)
       /^\s*\*\*([^*:]+?)\*\*\s*:?/gm,
+      // Non-bold: "- Name (position): clothing" or "- Name: clothing"
+      // Requires bullet + clothing value to avoid matching section headers
+      /^[\t ]*[-*\u2022]\s+([^:\r\n(]+?)(?:\s*\([^)]*\))?\s*:\s*(?:standard|winter|summer|formal|costumed)/gm,
     ];
 
     for (const pattern of namePatterns) {
@@ -1539,6 +1542,14 @@ class ProgressiveUnifiedParser {
   }
 
   /**
+   * Check if a section marker exists in the text, tolerating spaces around the name.
+   * e.g. _hasMarker('TITLE') matches both '---TITLE---' and '--- TITLE ---'
+   */
+  _hasMarker(name) {
+    return new RegExp(`---\\s*${name.replace(/\s+/g, '\\s+')}\\s*---`).test(this.fullText);
+  }
+
+  /**
    * Process a new chunk of streamed text
    * @param {string} chunk - New text chunk
    * @param {string} fullText - Complete text so far
@@ -1563,10 +1574,10 @@ class ProgressiveUnifiedParser {
     if (this.emitted.title) return;
 
     // Title is complete when we see the next section marker
-    if (!this.fullText.includes('---TITLE---')) return;
-    if (!this.fullText.includes('---CLOTHING REQUIREMENTS---')) return;
+    if (!this._hasMarker('TITLE')) return;
+    if (!this._hasMarker('CLOTHING REQUIREMENTS')) return;
 
-    const match = this.fullText.match(/---TITLE---\s*(?:TITLE:\s*)?(.+?)(?:\n|---CLOTHING)/i);
+    const match = this.fullText.match(/---\s*TITLE\s*---\s*(?:TITLE:\s*)?(.+?)(?:\n|---\s*CLOTHING)/i);
     if (match) {
       const title = match[1].trim();
       this.emitted.title = true;
@@ -1588,10 +1599,10 @@ class ProgressiveUnifiedParser {
     if (this.emitted.clothingRequirements) return;
 
     // Complete when we see VISUAL BIBLE marker (next section in output)
-    if (!this.fullText.includes('---CLOTHING REQUIREMENTS---')) return;
-    if (!this.fullText.includes('---VISUAL BIBLE---')) return;
+    if (!this._hasMarker('CLOTHING REQUIREMENTS')) return;
+    if (!this._hasMarker('VISUAL BIBLE')) return;
 
-    const sectionMatch = this.fullText.match(/---CLOTHING REQUIREMENTS---\s*([\s\S]*?)(?=---VISUAL BIBLE---)/i);
+    const sectionMatch = this.fullText.match(/---\s*CLOTHING\s+REQUIREMENTS\s*---\s*([\s\S]*?)(?=---\s*VISUAL\s+BIBLE\s*---)/i);
     if (!sectionMatch) return;
 
     const section = sectionMatch[1];
@@ -1624,8 +1635,8 @@ class ProgressiveUnifiedParser {
   _checkCharacterArcs() {
     if (this.emitted.characterArcs) return;
 
-    if (!this.fullText.includes('---CHARACTER ARCS---')) return;
-    if (!this.fullText.includes('---PLOT STRUCTURE---')) return;
+    if (!this._hasMarker('CHARACTER ARCS')) return;
+    if (!this._hasMarker('PLOT STRUCTURE')) return;
 
     this.emitted.characterArcs = true;
     log.debug(`🌊 [STREAM-UNIFIED] Character arcs section complete`);
@@ -1644,8 +1655,8 @@ class ProgressiveUnifiedParser {
   _checkPlotStructure() {
     if (this.emitted.plotStructure) return;
 
-    if (!this.fullText.includes('---PLOT STRUCTURE---')) return;
-    if (!this.fullText.includes('---VISUAL BIBLE---')) return;
+    if (!this._hasMarker('PLOT STRUCTURE')) return;
+    if (!this._hasMarker('VISUAL BIBLE')) return;
 
     this.emitted.plotStructure = true;
     log.debug(`🌊 [STREAM-UNIFIED] Plot structure section complete`);
@@ -1664,10 +1675,10 @@ class ProgressiveUnifiedParser {
   _checkVisualBible() {
     if (this.emitted.visualBible) return;
 
-    if (!this.fullText.includes('---VISUAL BIBLE---')) return;
-    if (!this.fullText.includes('---COVER SCENE HINTS---')) return;
+    if (!this._hasMarker('VISUAL BIBLE')) return;
+    if (!this._hasMarker('COVER SCENE HINTS')) return;
 
-    const sectionMatch = this.fullText.match(/---VISUAL BIBLE---\s*([\s\S]*?)(?=---COVER SCENE HINTS---)/i);
+    const sectionMatch = this.fullText.match(/---\s*VISUAL\s+BIBLE\s*---\s*([\s\S]*?)(?=---\s*COVER\s+SCENE\s+HINTS\s*---)/i);
     if (!sectionMatch) return;
 
     const section = sectionMatch[1];
@@ -1791,8 +1802,8 @@ class ProgressiveUnifiedParser {
   _checkCoverHints() {
     if (this.emitted.coverHints) return;
 
-    if (!this.fullText.includes('---COVER SCENE HINTS---')) return;
-    if (!this.fullText.includes('---STORY PAGES---')) return;
+    if (!this._hasMarker('COVER SCENE HINTS')) return;
+    if (!this._hasMarker('STORY PAGES')) return;
 
     this.emitted.coverHints = true;
     log.debug(`🌊 [STREAM-UNIFIED] Cover hints section complete`);
@@ -1809,7 +1820,7 @@ class ProgressiveUnifiedParser {
    * Check for newly completed story pages
    */
   _checkPages() {
-    if (!this.fullText.includes('---STORY PAGES---')) return;
+    if (!this._hasMarker('STORY PAGES')) return;
 
     // Find all page blocks
     const pagePattern = /---\s*Page\s+(\d+)\s*---\s*([\s\S]*?)(?=---\s*Page\s+\d+\s*---|$)/gi;

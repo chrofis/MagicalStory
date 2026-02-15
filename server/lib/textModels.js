@@ -185,6 +185,18 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     console.log(`🌊 [STREAM] Starting streaming request to Anthropic (${maxTokens} max tokens)...`);
     const startTime = Date.now();
 
+    // Timeout protection: overall max + stream inactivity detection
+    const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+    const INACTIVITY_TIMEOUT_MS = 120000; // 120s with no data → abort
+    const controller = new AbortController();
+    const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
+    let inactivityTimer;
+    const resetInactivity = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => controller.abort(new Error('stream inactivity timeout (120s)')), INACTIVITY_TIMEOUT_MS);
+    };
+
+    try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -197,7 +209,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
         max_tokens: maxTokens,
         stream: true,
         messages
-      })
+      }),
+      signal: controller.signal
     });
 
     if (!res.ok) {
@@ -215,6 +228,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     let inputTokens = 0;
     let outputTokens = 0;
     let firstChunkTime = null;
+    resetInactivity(); // Start inactivity timer after connection established
 
     try {
       while (true) {
@@ -224,6 +238,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
           log.debug('🌊 [STREAM] Stream complete');
           break;
         }
+
+        resetInactivity(); // Reset on every chunk received
 
         // Capture time-to-first-token (TTFT)
         if (!firstChunkTime && value) {
@@ -288,6 +304,10 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
       modelId,
       ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
+    } finally {
+      clearTimeout(maxTimer);
+      clearTimeout(inactivityTimer);
+    }
   }, { maxRetries: 2, baseDelay: 2000 });
 }
 
@@ -311,6 +331,18 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     console.log(`🌊 [STREAM] Starting streaming request to Gemini (${maxTokens} max tokens)...`);
     const startTime = Date.now();
 
+    // Timeout protection: overall max + stream inactivity detection
+    const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+    const INACTIVITY_TIMEOUT_MS = 120000; // 120s with no data → abort
+    const controller = new AbortController();
+    const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
+    let inactivityTimer;
+    const resetInactivity = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => controller.abort(new Error('stream inactivity timeout (120s)')), INACTIVITY_TIMEOUT_MS);
+    };
+
+    try {
     // Use streamGenerateContent endpoint for streaming
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
@@ -325,7 +357,8 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           maxOutputTokens: maxTokens,
           temperature: 0.7
         }
-      })
+      }),
+      signal: controller.signal
     });
 
     if (!response.ok) {
@@ -342,6 +375,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     let outputTokens = 0;
     let thinkingTokens = 0;
     let firstChunkTime = null;
+    resetInactivity(); // Start inactivity timer after connection established
 
     try {
       while (true) {
@@ -351,6 +385,8 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
           log.debug('🌊 [GEMINI STREAM] Stream complete');
           break;
         }
+
+        resetInactivity(); // Reset on every chunk received
 
         // Capture time-to-first-token (TTFT)
         if (!firstChunkTime && value) {
@@ -415,6 +451,10 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
       modelId,
       ttft: firstChunkTime ? firstChunkTime - startTime : null
     };
+    } finally {
+      clearTimeout(maxTimer);
+      clearTimeout(inactivityTimer);
+    }
   }, { maxRetries: 2, baseDelay: 2000 });
 }
 

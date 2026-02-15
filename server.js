@@ -15256,12 +15256,12 @@ app.post('/api/jobs/create-story', authenticateToken, storyGenerationLimiter, va
         const HEARTBEAT_TIMEOUT_MINUTES = 15;
 
         const isStale = jobAgeMinutes > TOTAL_TIMEOUT_MINUTES ||
-          (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES && activeJob.progress > 0);
+          minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES;
 
         if (isStale) {
           const reason = jobAgeMinutes > 120 ? 'abandoned' :
             minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
-          log.info(`🧹 Job ${activeJob.id} is stale (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago), cleaning up`);
+          log.info(`🧹 Auto-cancelling stale job ${activeJob.id} (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago)`);
 
           // Refund reserved credits for stale job
           try {
@@ -15492,8 +15492,8 @@ app.get('/api/jobs/:jobId/status', jobStatusLimiter, authenticateToken, async (r
           // Very old job - was abandoned (server restart, browser closed, etc.)
           errorMessage = 'Job was abandoned (server may have restarted)';
           log.info(`🧹 [STATUS] Job ${jobId} is abandoned (${Math.round(jobAgeMinutes)} minutes old), cleaning up`);
-        } else if (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES && job.progress > 0) {
-          // Job started but stopped making progress - something is stuck
+        } else if (minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES) {
+          // Job stopped making progress - something is stuck
           errorMessage = `Job stopped responding (no progress for ${Math.round(minutesSinceUpdate)} minutes) - please try again`;
           log.warn(`💔 [STATUS] Job ${jobId} heartbeat timeout: no progress for ${Math.round(minutesSinceUpdate)} minutes (last progress: ${job.progress}%)`);
         } else if (jobAgeMinutes > TOTAL_TIMEOUT_MINUTES) {
