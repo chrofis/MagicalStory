@@ -1181,25 +1181,31 @@ export const characterService = {
     for (let i = 0; i < charactersToProcess.length; i += maxConcurrent) {
       const batch = charactersToProcess.slice(i, i + maxConcurrent);
 
-      const batchPromises = batch.map(async (character) => {
+      const batchPromises = batch.map(async (listChar) => {
         const result: AvatarGenerationResult = {
-          characterId: character.id,
-          characterName: character.name,
+          characterId: listChar.id,
+          characterName: listChar.name,
           success: false,
         };
 
         try {
-          // Check if should skip
+          if (!forceRegenerate && listChar.avatars?.winter) {
+            result.skipped = true;
+            result.skipReason = 'Avatars already exist';
+            return result;
+          }
+
+          // Load full character data (list view strips photos)
+          const character = await characterService.loadFullCharacter(listChar.id);
+          if (!character) {
+            result.error = 'Failed to load character data';
+            return result;
+          }
+
           const hasPhoto = !!(character.photos?.original || character.photos?.face || character.photos?.body || character.photos?.bodyNoBg);
           if (!hasPhoto) {
             result.skipped = true;
             result.skipReason = 'No photo available';
-            return result;
-          }
-
-          if (!forceRegenerate && character.avatars?.winter) {
-            result.skipped = true;
-            result.skipReason = 'Avatars already exist';
             return result;
           }
 
@@ -1231,8 +1237,8 @@ export const characterService = {
 
         } catch (error) {
           result.error = String(error);
-          onProgress?.(character.id, 'error', result.error);
-          log.error(`Failed to generate avatars for ${character.name}:`, error);
+          onProgress?.(listChar.id, 'error', result.error);
+          log.error(`Failed to generate avatars for ${listChar.name}:`, error);
           return result;
         }
       });
@@ -1283,9 +1289,9 @@ export const characterService = {
   ): Promise<AvatarGenerationResult> {
     log.info(`🔄 Regenerating avatars for character ${characterId}...`);
 
-    // Fetch current data
-    const currentData = await characterService.getCharacterData();
-    const character = currentData.characters.find(c => c.id === characterId);
+    // Load full character data (includes photos needed for avatar generation)
+    // The list view strips photos to keep payload small, so we must load individually
+    const character = await characterService.loadFullCharacter(characterId);
 
     if (!character) {
       return {
