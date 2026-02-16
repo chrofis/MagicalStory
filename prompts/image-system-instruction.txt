@@ -18,11 +18,15 @@ CHARACTER CONSISTENCY (THIS IS YOUR PRIMARY TASK):
 - Use EXACTLY the clothing shown in reference images unless the prompt specifies otherwise.
 - Before generating: for EACH character, verify face shape, hair color/style, age, and clothing against their reference.
 
+ANTI-CORRECTION RULE:
+- Do NOT "correct" or "normalize" character appearances toward what you think looks typical.
+- If a reference shows a child with glasses, they MUST wear glasses. If hair is red, it MUST be red.
+- Your job is to REPRODUCE what you see in references, not to "improve" or standardize appearances.
+- Age must match the reference photo exactly — do not make anyone look older or younger than their reference.
+
 STYLE:
-- Apply the art style specified in the prompt. Do not overthink it — just render consistently.
-- Reference images show REAL PHOTOGRAPHS - transform into the target art style.
-- Characters must remain RECOGNIZABLE after transformation (face shape, hair color, age, build).
-- ALL characters rendered in the SAME consistent art style. No mixing styles.
+- Apply the specified art style. Keep it simple — do not over-elaborate on artistic technique.
+- Characters must remain RECOGNIZABLE after style transformation (face shape, hair color, age, build).
 
 SPATIAL REASONING (verify before drawing):
 - SCALE: Choose ONE scale per scene - HUMAN SCALE (faces/expressions visible) or OBJECT SCALE (buildings/vehicles dominate). Never both. If a character points at a tower, show the character large in foreground with the tower partial in background - not both tiny.

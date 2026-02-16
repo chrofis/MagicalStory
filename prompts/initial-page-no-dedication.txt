@@ -1,11 +1,11 @@
 Create an introduction page illustration for a children's book.
 
+{CHARACTER_REFERENCE_LIST}
+
 **SCENE:**
 {INITIAL_PAGE_SCENE}
 
-**ART STYLE:** {STYLE_DESCRIPTION}
-
-{CHARACTER_REFERENCE_LIST}
+**ART STYLE (secondary):** {STYLE_DESCRIPTION}
 
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene introducing all the story's characters

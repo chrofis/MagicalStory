@@ -1,11 +1,11 @@
 Create a front cover illustration for a children's book.
 
+{CHARACTER_REFERENCE_LIST}
+
 **SCENE:**
 {TITLE_PAGE_SCENE}
 
-**ART STYLE:** {STYLE_DESCRIPTION}
-
-{CHARACTER_REFERENCE_LIST}
+**ART STYLE (secondary):** {STYLE_DESCRIPTION}
 
 **COMPOSITION GUIDELINES:**
 - ALL MAIN CHARACTERS should be prominently featured and clearly recognizable

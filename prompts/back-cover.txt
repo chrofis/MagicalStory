@@ -1,11 +1,11 @@
 Create a back cover illustration for a children's book.
 
+{CHARACTER_REFERENCE_LIST}
+
 **SCENE:**
 {BACK_COVER_SCENE}
 
-**ART STYLE:** {STYLE_DESCRIPTION}
-
-{CHARACTER_REFERENCE_LIST}
+**ART STYLE (secondary):** {STYLE_DESCRIPTION}
 
 **COMPOSITION GUIDELINES:**
 - This is a GROUP scene - include all characters together
