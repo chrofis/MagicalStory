@@ -13306,10 +13306,14 @@ async function processStoryJob(jobId) {
       const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
       // Prepare all cover generation promises
-      // Front cover - use only MAIN characters (isMainCharacter: true)
+      // Front cover - use only MAIN characters (isMainCharacter: true), capped at 5
       const allCharacters = inputData.characters || [];
       const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
-      const frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+      let frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+      if (frontCoverCharacters.length > 5) {
+        log.info(`📕 [PIPELINE] Capping front cover characters from ${frontCoverCharacters.length} to 5`);
+        frontCoverCharacters = frontCoverCharacters.slice(0, 5);
+      }
       log.debug(`📕 [PIPELINE] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars)`);
       const frontCoverClothingRaw = coverScenes.titlePage?.clothing || parseClothingCategory(titlePageScene) || 'standard';
       let frontCoverClothing = frontCoverClothingRaw;
@@ -13334,6 +13338,21 @@ async function processStoryJob(jobId) {
       });
       coverPrompts.frontCover = frontCoverPrompt;
 
+      // Initial page & back cover: cap at 5 characters, split non-main across covers
+      const MAX_COVER_CHARACTERS = 5;
+      const nonMainCharacters = mainCharacters.length > 0
+        ? allCharacters.filter(c => !c.isMainCharacter)
+        : allCharacters;
+      const mainCapped = mainCharacters.slice(0, MAX_COVER_CHARACTERS);
+      const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
+      const halfPoint = Math.ceil(nonMainCharacters.length / 2);
+      const initialPageExtras = nonMainCharacters.slice(0, halfPoint).slice(0, extraSlots);
+      const backCoverExtras = nonMainCharacters.slice(halfPoint).slice(0, extraSlots);
+      const initialPageCharacters = [...mainCapped, ...initialPageExtras];
+      const backCoverCharacters = [...mainCapped, ...backCoverExtras];
+      log.debug(`📕 [PIPELINE] Initial page: ${initialPageCharacters.map(c => c.name).join(', ')} (${initialPageCharacters.length} chars)`);
+      log.debug(`📕 [PIPELINE] Back cover: ${backCoverCharacters.map(c => c.name).join(', ')} (${backCoverCharacters.length} chars)`);
+
       // Initial page - pass artStyle for styled costumed avatars
       const initialPageClothingRaw = coverScenes.initialPage?.clothing || parseClothingCategory(initialPageScene) || 'standard';
       let initialPageClothing = initialPageClothingRaw;
@@ -13343,7 +13362,7 @@ async function processStoryJob(jobId) {
         initialPageCostumeType = initialPageClothingRaw.split(':')[1];
       }
       // Use converted clothing requirements (defined earlier for front cover)
-      let initialPagePhotos = getCharacterPhotoDetails(inputData.characters || [], initialPageClothing, initialPageCostumeType, artStyle, convertedPipelineClothingReqs);
+      let initialPagePhotos = getCharacterPhotoDetails(initialPageCharacters, initialPageClothing, initialPageCostumeType, artStyle, convertedPipelineClothingReqs);
       if (initialPageClothing !== 'costumed') {
         initialPagePhotos = applyStyledAvatars(initialPagePhotos, artStyle);
       }
@@ -13352,14 +13371,14 @@ async function processStoryJob(jobId) {
             INITIAL_PAGE_SCENE: initialPageScene,
             STYLE_DESCRIPTION: styleDescription,
             DEDICATION: inputData.dedication,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, inputData.characters),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, initialPageCharacters),
             VISUAL_BIBLE: visualBiblePrompt
           })
         : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
             INITIAL_PAGE_SCENE: initialPageScene,
             STYLE_DESCRIPTION: styleDescription,
             STORY_TITLE: storyTitle,
-            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, inputData.characters),
+            CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(initialPagePhotos, initialPageCharacters),
             VISUAL_BIBLE: visualBiblePrompt
           });
       coverPrompts.initialPage = initialPagePrompt;
@@ -13373,14 +13392,14 @@ async function processStoryJob(jobId) {
         backCoverCostumeType = backCoverClothingRaw.split(':')[1];
       }
       // Use converted clothing requirements (defined earlier for front cover)
-      let backCoverPhotos = getCharacterPhotoDetails(inputData.characters || [], backCoverClothing, backCoverCostumeType, artStyle, convertedPipelineClothingReqs);
+      let backCoverPhotos = getCharacterPhotoDetails(backCoverCharacters, backCoverClothing, backCoverCostumeType, artStyle, convertedPipelineClothingReqs);
       if (backCoverClothing !== 'costumed') {
         backCoverPhotos = applyStyledAvatars(backCoverPhotos, artStyle);
       }
       const backCoverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
         BACK_COVER_SCENE: backCoverScene,
         STYLE_DESCRIPTION: styleDescription,
-        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos, inputData.characters),
+        CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(backCoverPhotos, backCoverCharacters),
         VISUAL_BIBLE: visualBiblePrompt
       });
       coverPrompts.backCover = backCoverPrompt;
