@@ -12981,6 +12981,12 @@ async function processStoryJob(jobId) {
       log.debug(`🔍 [PIPELINE] Scene validation ENABLED - will generate preview images for composition checks`);
     }
 
+    log.info(`🔧 [PIPELINE] Settings: autoRepair=${enableAutoRepair}, gridRepair=${useGridRepair}, ` +
+      `forceRepairThreshold=${forceRepairThreshold}, finalChecks=${enableFinalChecks}, ` +
+      `checkOnly=${checkOnlyMode}, sceneValidation=${enableSceneValidation}, ` +
+      `separatedEval=${separatedEvaluation}, skipImages=${skipImages}, skipCovers=${skipCovers}, ` +
+      `incrementalConsistency=${enableIncrementalConsistency}${enableIncrementalConsistency ? ` (dryRun=${incrementalConsistencyDryRun}, lookback=${incrementalConsistencyLookback})` : ''}`);
+
     // Check if user is admin (for including debug images in repair history)
     const userResult = await dbPool.query('SELECT role FROM users WHERE id = $1', [job.user_id]);
     const isAdmin = userResult.rows.length > 0 && userResult.rows[0].role === 'admin';

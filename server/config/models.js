@@ -138,6 +138,7 @@ const IMAGE_MODELS = {
     description: 'Gemini 2.5 Flash Image - Fast image generation',
     backend: 'gemini',
     supportsThinking: false,
+    temperature: 0.5,  // Lower temp for more consistent character reproduction
     maxPromptLength: 30000  // Gemini supports very long prompts
   },
   'gemini-3-pro-image-preview': {
@@ -145,6 +146,7 @@ const IMAGE_MODELS = {
     description: 'Gemini 3 Pro Image Preview - Higher quality images',
     backend: 'gemini',
     supportsThinking: true,  // Thinks by default; thinkingConfig.includeThoughts returns thought text
+    temperature: 1.0,  // Google strongly recommends 1.0 for Gemini 3 — other values cause degraded behavior
     maxPromptLength: 30000
   },
   'flux-schnell': {

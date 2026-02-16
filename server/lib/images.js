@@ -556,7 +556,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       contents: [{ parts: [{ text: compliancePrompt }] }],
-                      generationConfig: { maxOutputTokens: 8000, temperature: 0.3 }
+                      generationConfig: { maxOutputTokens: 8000, temperature: 0.3, responseMimeType: 'application/json' }
                     })
                   });
                 }, { maxRetries: 2, baseDelay: 1000 });
@@ -575,7 +575,18 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                   const p2ThinkingInfo = p2ThinkingTokens > 0 ? `, thinking: ${p2ThinkingTokens.toLocaleString()}` : '';
                   log.verbose(`📊 [QUALITY P2] Token usage - input: ${p2InputTokens.toLocaleString()}, output: ${p2OutputTokens.toLocaleString()}${p2ThinkingInfo}`);
 
-                  const p2Text = p2Data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+                  // Check for content blocks (same pattern as P1)
+                  const p2Blocked = p2Data.promptFeedback?.blockReason ||
+                    !p2Data.candidates?.[0]?.content?.parts?.length ||
+                    p2Data.candidates[0]?.finishReason === 'SAFETY' ||
+                    p2Data.candidates[0]?.finishReason === 'PROHIBITED_CONTENT';
+                  if (p2Blocked) {
+                    const reason = p2Data.promptFeedback?.blockReason || p2Data.candidates?.[0]?.finishReason || 'empty response';
+                    log.warn(`⚠️ [QUALITY P2] Content blocked (${reason}), falling back to single-pass`);
+                    twoPassFailed = true;
+                  }
+
+                  const p2Text = !twoPassFailed ? p2Data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() : null;
                   if (p2Text) {
                     const p2JsonMatch = p2Text.match(/\{[\s\S]*\}/);
                     let complianceJson = null;
@@ -583,10 +594,11 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                       try {
                         complianceJson = JSON.parse(p2JsonMatch[0]);
                       } catch (e) {
-                        log.warn(`⚠️ [QUALITY P2] JSON parse failed, falling back to single-pass`);
+                        log.warn(`⚠️ [QUALITY P2] JSON parse failed, falling back to single-pass. Response (${p2Text.length} chars): ${p2Text.substring(0, 300)}`);
                         twoPassFailed = true;
                       }
                     } else {
+                      log.warn(`⚠️ [QUALITY P2] No JSON found in response, falling back to single-pass. Response (${p2Text.length} chars): ${p2Text.substring(0, 300)}`);
                       twoPassFailed = true;
                     }
 
@@ -2459,6 +2471,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   }
 
   const systemInstruction = getImageSystemInstruction();
+  const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -2466,7 +2479,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      temperature: 0.8,
+      temperature: modelTemp,
       ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
         aspectRatio: "1:1"
@@ -2475,7 +2488,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   };
 
   log.debug(`🖼️  [IMAGE GEN] Calling Gemini API with prompt (${prompt.length} chars), scene: ${prompt.substring(0, 80).replace(/\n/g, ' ')}...`);
-  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: 0.8, systemInstruction: ${!!systemInstruction}`);
+  log.debug(`🖼️  [IMAGE GEN] Model: ${modelId}, Aspect Ratio: 1:1, Temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
 
   const data = await withRetry(async () => {
     const response = await fetch(
@@ -2905,6 +2918,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Gemini API call
   const systemInstruction = getImageSystemInstruction();
+  const modelTemp = IMAGE_MODELS[modelId]?.temperature ?? 0.8;
   const requestBody = {
     ...(systemInstruction && { systemInstruction }),
     contents: [{
@@ -2912,7 +2926,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }],
     generationConfig: {
       responseModalities: ["TEXT", "IMAGE"],
-      temperature: 0.8,
+      temperature: modelTemp,
       ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } }),
       imageConfig: {
         aspectRatio: "1:1"
@@ -2920,7 +2934,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }
   };
 
-  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), systemInstruction: ${!!systemInstruction}`);
+  log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
 
   const data = await withRetry(async () => {
     const response = await fetch(
