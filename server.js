@@ -4223,22 +4223,48 @@ app.post('/api/stories/:id/regenerate/cover/:coverType', authenticateToken, imag
     // Get character photos with correct clothing variant
     let coverCharacterPhotos;
 
-    // If user provided specific character IDs, use those
+    // Cap at 5 characters max — more than 5 almost always produces bad results
+    // Strategy: main characters appear on ALL covers, non-main are split across initial/back
+    const MAX_COVER_CHARACTERS = 5;
+    const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
+    // If no isMainCharacter flags, treat all as "extras" to split across covers
+    const nonMainChars = mainChars.length > 0
+      ? mergedCharacters.filter(c => !c.isMainCharacter)
+      : mergedCharacters;
+
+    // If user provided specific character IDs, use those (still capped)
     if (characterIds && Array.isArray(characterIds) && characterIds.length > 0) {
-      const selectedCharacters = mergedCharacters.filter(c => characterIds.includes(c.id));
+      let selectedCharacters = mergedCharacters.filter(c => characterIds.includes(c.id));
+      if (selectedCharacters.length > MAX_COVER_CHARACTERS) {
+        log.info(`📕 [COVER REGEN] Capping selected characters from ${selectedCharacters.length} to ${MAX_COVER_CHARACTERS}`);
+        selectedCharacters = selectedCharacters.slice(0, MAX_COVER_CHARACTERS);
+      }
       coverCharacterPhotos = getCharacterPhotoDetails(selectedCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
       log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: SELECTED ${selectedCharacters.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else if (normalizedCoverType === 'front') {
-      // Front cover default: use only MAIN characters (isMainCharacter: true)
-      const allCharacters = mergedCharacters;
-      const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
-      const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+      // Front cover: main characters only (capped)
+      let charactersToUse = mainChars.length > 0 ? mainChars : mergedCharacters;
+      if (charactersToUse.length > MAX_COVER_CHARACTERS) {
+        log.info(`📕 [COVER REGEN] Capping front cover characters from ${charactersToUse.length} to ${MAX_COVER_CHARACTERS}`);
+        charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
+      }
       coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
+      log.debug(`📕 [COVER REGEN] Front cover: ${mainChars.length > 0 ? 'MAIN: ' + mainChars.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     } else {
-      // Initial/Back covers default: use ALL characters
-      coverCharacterPhotos = getCharacterPhotoDetails(mergedCharacters, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ALL ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
+      // Initial/Back: main characters + different non-main extras per cover
+      const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
+      const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
+      const halfPoint = Math.ceil(nonMainChars.length / 2);
+      let extras;
+      if (normalizedCoverType === 'initialPage') {
+        extras = nonMainChars.slice(0, halfPoint).slice(0, extraSlots);
+      } else {
+        // back cover gets the second half
+        extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
+      }
+      const coverChars = [...mainCapped, ...extras];
+      coverCharacterPhotos = getCharacterPhotoDetails(coverChars, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      log.debug(`📕 [COVER REGEN] ${normalizedCoverType}: ${coverChars.map(c => c.name).join(', ')} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
     }
     // Apply styled avatars for non-costumed characters
     if (effectiveCoverClothing !== 'costumed') {
@@ -8663,19 +8689,42 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const convertedClothingRequirements = convertClothingToCurrentFormat(streamingClothingRequirements);
 
         // Determine character selection based on cover type
+        // Cap at 5 characters max — more than 5 almost always produces bad results
+        // Strategy: main characters appear on ALL covers, non-main are split across initial/back
+        const MAX_COVER_CHARACTERS = 5;
+        const allCharacters = inputData.characters || [];
+        const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+        // If no isMainCharacter flags, treat all as "extras" to split across covers
+        const nonMainCharacters = mainCharacters.length > 0
+          ? allCharacters.filter(c => !c.isMainCharacter)
+          : allCharacters;
         let referencePhotos;
+
         if (coverType === 'titlePage') {
-          // Front cover: use only MAIN characters (isMainCharacter: true)
-          const allCharacters = inputData.characters || [];
-          const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
-          // Fallback to all characters if no main characters defined
-          const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+          // Front cover: main characters only (or all capped if none flagged)
+          let charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+          if (charactersToUse.length > MAX_COVER_CHARACTERS) {
+            log.info(`📕 [STREAM-COVER] Capping front cover characters from ${charactersToUse.length} to ${MAX_COVER_CHARACTERS}`);
+            charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
+          }
           referencePhotos = getCharacterPhotoDetails(charactersToUse, clothing, costumeType, artStyleId, convertedClothingRequirements);
           log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         } else {
-          // Initial page and back cover: ALL characters
-          referencePhotos = getCharacterPhotoDetails(inputData.characters || [], clothing, costumeType, artStyleId, convertedClothingRequirements);
-          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ALL ${referencePhotos.length} characters, clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+          // Initial page & back cover: main characters + different non-main extras
+          // Split non-main into two halves so each cover shows different characters
+          const mainCapped = mainCharacters.slice(0, MAX_COVER_CHARACTERS);
+          const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
+          const halfPoint = Math.ceil(nonMainCharacters.length / 2);
+          let extras;
+          if (coverType === 'initialPage') {
+            extras = nonMainCharacters.slice(0, halfPoint).slice(0, extraSlots);
+          } else {
+            // backCover gets the second half
+            extras = nonMainCharacters.slice(halfPoint).slice(0, extraSlots);
+          }
+          const coverCharacters = [...mainCapped, ...extras];
+          referencePhotos = getCharacterPhotoDetails(coverCharacters, clothing, costumeType, artStyleId, convertedClothingRequirements);
+          log.debug(`📕 [STREAM-COVER] Generating ${coverType}: ${coverCharacters.map(c => c.name).join(', ')} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
         }
         // Apply styled avatars for non-costumed characters
         if (clothing !== 'costumed') {
