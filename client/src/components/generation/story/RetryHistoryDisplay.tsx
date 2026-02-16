@@ -373,12 +373,12 @@ export function RetryHistoryDisplay({
           </span>
         </summary>
       <div className="mt-3 space-y-3">
-        {retryHistory.map((attempt, idx) => (
+        {(() => { const displayAttempts = retryHistory.filter(a => a.type !== 'bbox_detection_only'); return displayAttempts.map((attempt, idx) => (
           <div key={idx} className={`border rounded-lg p-3 ${
             attempt.type === 'grid_repair_failed' ? 'bg-red-50 border-red-300' :
             attempt.type === 'grid_repair' ? 'bg-violet-50 border-violet-300' :
             attempt.type === 'auto_repair' ? 'bg-amber-50 border-amber-300' :
-            idx === retryHistory.length - 1
+            idx === displayAttempts.length - 1
               ? 'bg-green-50 border-green-300'
               : 'bg-white border-gray-200'
           }`}>
@@ -404,7 +404,7 @@ export function RetryHistoryDisplay({
                 {attempt.type === 'auto_repair_failed' && (
                   <span className="text-xs ml-2 text-red-600">(auto-repair failed)</span>
                 )}
-                {idx === retryHistory.length - 1 && attempt.type !== 'auto_repair' && (
+                {idx === displayAttempts.length - 1 && attempt.type !== 'auto_repair' && (
                   <span className="text-xs ml-2 text-green-600 font-bold">✓ USED</span>
                 )}
               </span>
@@ -1087,7 +1087,7 @@ export function RetryHistoryDisplay({
                     <img
                       src={imgData}
                       alt={`Attempt ${attempt.attempt}`}
-                      className={`w-48 h-48 object-contain rounded border cursor-pointer hover:ring-2 ${idx === retryHistory.length - 1 ? 'border-green-300 hover:ring-green-400' : 'border-gray-200 opacity-75 hover:ring-gray-400'}`}
+                      className={`w-48 h-48 object-contain rounded border cursor-pointer hover:ring-2 ${idx === displayAttempts.length - 1 ? 'border-green-300 hover:ring-green-400' : 'border-gray-200 opacity-75 hover:ring-gray-400'}`}
                       onClick={() => setEnlargedImg({ src: imgData, title: `${language === 'de' ? 'Versuch' : 'Attempt'} ${attempt.attempt}` })}
                     />
                   </div>
@@ -1118,7 +1118,7 @@ export function RetryHistoryDisplay({
               {new Date(attempt.timestamp).toLocaleTimeString()}
             </div>
           </div>
-        ))}
+        )); })()}
       </div>
     </details>
     </>
