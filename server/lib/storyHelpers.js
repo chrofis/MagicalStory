@@ -1779,10 +1779,9 @@ function buildCharacterReferenceList(photos, characters = null) {
     // Build physical object from flat snake_case fields (how avatar generation saves traits)
     const physical = getPhysicalFromChar(char);
 
-    // Visual age first (how old they look), then actual age
+    // Visual age category (how old they look) — skip numeric age, category is enough
     const effectiveAgeCategory = physical.apparentAge || char?.ageCategory || (char?.age ? getAgeCategory(char.age) : null);
     const visualAge = effectiveAgeCategory ? `Looks: ${effectiveAgeCategory.replace(/-/g, ' ')}` : '';
-    const age = char?.age ? `${char.age} years old` : '';
     const gender = getGenderTerm(char?.gender, effectiveAgeCategory);
 
     // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
@@ -1803,7 +1802,7 @@ function buildCharacterReferenceList(photos, characters = null) {
     const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
     // Format: [Name] to match the label we put before each image in parts array
     // IMPORTANT: Do NOT use numbered format like [Image 1 - Name] as it triggers "character sheet" generation
-    const description = [visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
+    const description = [visualAge, gender, physicalDesc].filter(Boolean).join(', ');
     return `[${photo.name}]: ${description}`;
   });
 
@@ -2566,9 +2565,8 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       // Build physical object from flat snake_case fields (how avatar generation saves traits)
       const physical = getPhysicalFromChar(char);
 
-      // Visual age first (how old they look), then actual age
+      // Visual age category (how old they look) — skip numeric age, category is enough
       const visualAge = physical.apparentAge ? `Looks: ${physical.apparentAge.replace(/-/g, ' ')}` : '';
-      const age = char.age ? `${char.age} years old` : '';
 
       // Age-specific gender term based on apparentAge
       const getGenderTerm = (gender, apparentAge) => {
@@ -2614,7 +2612,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
       }
       // Build hair description using detailed analysis helper (pass trait sources to respect user edits)
       const hairDescText = buildHairDescription(physical, char.physical_traits_source);
-      const hairDesc = hairDescText ? `Hair (MUST MATCH EXACTLY - color, length, style): ${hairDescText}` : '';
+      const hairDesc = hairDescText ? `Hair: ${hairDescText}` : '';
 
       const physicalParts = [
         physical.build ? `Build: ${physical.build}` : '',
@@ -2625,10 +2623,10 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         char.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none' ? `Facial hair: ${physical.facialHair}` : '',
         physical.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
-        avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `CLOTHING STYLE (MUST MATCH - colors and patterns): ${clothingStyle}` : '')
+        avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
       ].filter(Boolean);
       const physicalDesc = physicalParts.length > 0 ? physicalParts.join('. ') : '';
-      const brief = [char.name, visualAge, age, gender, physicalDesc].filter(Boolean).join(', ');
+      const brief = [char.name, visualAge, gender, physicalDesc].filter(Boolean).join(', ');
       return `${index + 1}. ${brief}`;
     });
 
