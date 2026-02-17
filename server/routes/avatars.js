@@ -5,6 +5,8 @@
  * Extracted from server.js for better code organization.
  */
 
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
@@ -16,6 +18,67 @@ const { IMAGE_MODELS } = require('../config/models');
 const { generateWithRunware, generateAvatarWithACE, isRunwareConfigured } = require('../lib/runware');
 const { buildHairDescription, getAgeCategory } = require('../lib/storyHelpers');
 const { getFacePhoto } = require('../lib/characterPhotos');
+
+// ============================================================================
+// ART STYLE SAMPLE IMAGES (copied from styledAvatars.js — can't import due to circular dep)
+// ============================================================================
+
+const ART_STYLE_SAMPLES = {
+  'watercolor': 'water color style.jpg',
+  'concept': 'concept art style.jpg',
+  'anime': 'anime style.jpg',
+  'pixar': 'pixar art style 2.jpg',
+  'cartoon': 'cartoon style.jpg',
+  'comic': 'comic book style.jpg',
+  'oil': 'oil painting style.jpg',
+  'steampunk': 'steampunk style.jpg',
+  'cyber': 'cyber punk style.jpg',
+  'chibi': 'chibi style.jpg',
+  'manga': 'manga style.jpg',
+  'pixel': 'pixel style.jpg',
+  'lowpoly': 'low poly 3-D style.jpg'
+};
+
+const styleSampleCache = new Map();
+
+/**
+ * Load art style sample image as base64 (local copy — mirrors styledAvatars.js)
+ * @param {string} artStyle - Art style ID
+ * @returns {string|null} Base64 data URL or null if not found
+ */
+function loadStyleSampleImage(artStyle) {
+  if (styleSampleCache.has(artStyle)) {
+    return styleSampleCache.get(artStyle);
+  }
+
+  const filename = ART_STYLE_SAMPLES[artStyle];
+  if (!filename) {
+    log.debug(`[STYLE SAMPLE] No sample image defined for art style: ${artStyle}`);
+    return null;
+  }
+
+  const imagePath = path.join(__dirname, '../../images', filename);
+
+  try {
+    if (!fs.existsSync(imagePath)) {
+      log.warn(`[STYLE SAMPLE] Sample image not found: ${imagePath}`);
+      return null;
+    }
+
+    const imageBuffer = fs.readFileSync(imagePath);
+    const base64 = imageBuffer.toString('base64');
+    const mimeType = filename.endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    styleSampleCache.set(artStyle, dataUrl);
+    log.debug(`[STYLE SAMPLE] Loaded and cached sample for ${artStyle} (${Math.round(imageBuffer.length / 1024)}KB)`);
+
+    return dataUrl;
+  } catch (error) {
+    log.error(`[STYLE SAMPLE] Failed to load sample for ${artStyle}: ${error.message}`);
+    return null;
+  }
+}
 
 // ============================================================================
 // COSTUMED AVATAR GENERATION LOG (for developer mode auditing)
@@ -1174,27 +1237,53 @@ async function generateStyledCostumedAvatar(character, config, artStyle) {
       'PHYSICAL_TRAITS': buildPhysicalTraitsForAvatar(character)
     });
 
-    // Prepare standard avatar data as the only reference
+    // Build image parts array with labeled reference images
+    const imageParts = [];
+
+    // Image 1: Face photo (identity reference) - if available
+    let facePhoto = getFacePhoto(character);
+    if (facePhoto && typeof facePhoto === 'object' && facePhoto.data) facePhoto = facePhoto.data;
+    if (facePhoto && typeof facePhoto === 'string') {
+      const faceBase64 = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+      const faceMimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+        facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+      imageParts.push(
+        { text: '[Face photo - identity reference]' },
+        { inline_data: { mime_type: faceMimeType, data: faceBase64 } }
+      );
+      log.debug(`🎨 [STYLED COSTUME] Added face photo for ${character.name} (${Math.round(faceBase64.length * 0.75 / 1024)}KB)`);
+    }
+
+    // Image 2: Standard avatar (body and clothing reference)
     const avatarBase64 = standardAvatar.replace(/^data:image\/\w+;base64,/, '');
     const avatarMimeType = standardAvatar.match(/^data:(image\/\w+);base64,/) ?
       standardAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    imageParts.push(
+      { text: '[Reference avatar - body and clothing]' },
+      { inline_data: { mime_type: avatarMimeType, data: avatarBase64 } }
+    );
 
-    // Build image parts array with only the standard avatar
-    const imageParts = [
-      {
-        inline_data: {
-          mime_type: avatarMimeType,
-          data: avatarBase64
-        }
-      }
-    ];
+    // Image 3: Art style sample - if available
+    const styleSample = loadStyleSampleImage(artStyle);
+    if (styleSample) {
+      const styleBase64 = styleSample.replace(/^data:image\/\w+;base64,/, '');
+      const styleMimeType = styleSample.match(/^data:(image\/\w+);base64,/) ?
+        styleSample.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+      imageParts.push(
+        { text: '[Art style sample - match this style]' },
+        { inline_data: { mime_type: styleMimeType, data: styleBase64 } }
+      );
+      log.debug(`🎨 [STYLED COSTUME] Added style sample for ${artStyle}`);
+    }
 
-    // System instruction - top row keeps reference style, bottom row gets new style
+    // System instruction - references all provided images
+    const hasFace = facePhoto && typeof facePhoto === 'string';
+    const hasStyle = !!styleSample;
     const systemText = `You are an expert character artist creating avatar illustrations for children's books.
-You are given a reference avatar.
+You are given ${hasFace ? 'a face photo for identity, ' : ''}a reference avatar${hasStyle ? ', and an art style sample' : ''}.
 Your task is to create a 2x2 grid:
-- TOP ROW: EXACT copies of the reference face (same style as reference), just zoomed in to show face only
-- BOTTOM ROW: Full body in NEW ${artStyle} style wearing the specified costume
+- TOP ROW: EXACT copies of the reference face (same style as reference), just zoomed in to show face only${hasFace ? ' - use the face photo for accurate identity' : ''}
+- BOTTOM ROW: Full body in NEW ${artStyle} style wearing the specified costume${hasStyle ? ' - match the art style sample exactly' : ''}
 - The TOP ROW must keep the ORIGINAL reference style - do NOT change it
 - Only the BOTTOM ROW gets the new ${artStyle} style
 - All 4 images must show the SAME person`;
@@ -1475,27 +1564,53 @@ async function generateStyledAvatarWithSignature(character, category, config, ar
       'PHYSICAL_TRAITS': buildPhysicalTraitsForAvatar(character)
     });
 
-    // Prepare base avatar data as the only reference
+    // Build image parts array with labeled reference images
+    const imageParts = [];
+
+    // Image 1: Face photo (identity reference) - if available
+    let facePhoto = getFacePhoto(character);
+    if (facePhoto && typeof facePhoto === 'object' && facePhoto.data) facePhoto = facePhoto.data;
+    if (facePhoto && typeof facePhoto === 'string') {
+      const faceBase64 = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+      const faceMimeType = facePhoto.match(/^data:(image\/\w+);base64,/) ?
+        facePhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+      imageParts.push(
+        { text: '[Face photo - identity reference]' },
+        { inline_data: { mime_type: faceMimeType, data: faceBase64 } }
+      );
+      log.debug(`🎨 [STYLED SIGNATURE] Added face photo for ${character.name} (${Math.round(faceBase64.length * 0.75 / 1024)}KB)`);
+    }
+
+    // Image 2: Base avatar (body and clothing reference)
     const avatarBase64 = baseAvatar.replace(/^data:image\/\w+;base64,/, '');
     const avatarMimeType = baseAvatar.match(/^data:(image\/\w+);base64,/) ?
       baseAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+    imageParts.push(
+      { text: '[Reference avatar - body and clothing]' },
+      { inline_data: { mime_type: avatarMimeType, data: avatarBase64 } }
+    );
 
-    // Build image parts array
-    const imageParts = [
-      {
-        inline_data: {
-          mime_type: avatarMimeType,
-          data: avatarBase64
-        }
-      }
-    ];
+    // Image 3: Art style sample - if available
+    const styleSample = loadStyleSampleImage(artStyle);
+    if (styleSample) {
+      const styleBase64 = styleSample.replace(/^data:image\/\w+;base64,/, '');
+      const styleMimeType = styleSample.match(/^data:(image\/\w+);base64,/) ?
+        styleSample.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
+      imageParts.push(
+        { text: '[Art style sample - match this style]' },
+        { inline_data: { mime_type: styleMimeType, data: styleBase64 } }
+      );
+      log.debug(`🎨 [STYLED SIGNATURE] Added style sample for ${artStyle}`);
+    }
 
-    // System instruction - top row keeps reference style, bottom row gets new style
+    // System instruction - references all provided images
+    const hasFace = facePhoto && typeof facePhoto === 'string';
+    const hasStyle = !!styleSample;
     const systemText = `You are an expert character artist creating avatar illustrations for children's books.
-You are given a reference avatar.
+You are given ${hasFace ? 'a face photo for identity, ' : ''}a reference avatar${hasStyle ? ', and an art style sample' : ''}.
 Your task is to create a 2x2 grid:
-- TOP ROW: EXACT copies of the reference face (same style as reference), just zoomed in to show face only
-- BOTTOM ROW: Full body in NEW ${artStyle} style wearing the specified outfit with signature items
+- TOP ROW: EXACT copies of the reference face (same style as reference), just zoomed in to show face only${hasFace ? ' - use the face photo for accurate identity' : ''}
+- BOTTOM ROW: Full body in NEW ${artStyle} style wearing the specified outfit with signature items${hasStyle ? ' - match the art style sample exactly' : ''}
 - The TOP ROW must keep the ORIGINAL reference style - do NOT change it
 - Only the BOTTOM ROW gets the new ${artStyle} style
 - All 4 images must show the SAME person

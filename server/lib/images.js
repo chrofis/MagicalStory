@@ -286,6 +286,21 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
       return `data:${originalMimeType};base64,${base64Data}`;
     }
 
+    // Skip re-compression for JPEG images already at target size
+    // Avoids double JPEG compression quality loss (e.g., face photos stored at 768x768 JPEG 95%)
+    const isJpeg = originalMimeType === 'image/jpeg';
+    if (isJpeg) {
+      const metadata = await sharp(imageBuffer).metadata();
+      const isSmallEnough = !maxDimension || (metadata.width <= maxDimension && metadata.height <= maxDimension);
+      if (isSmallEnough) {
+        log.debug(`🗜️  [COMPRESSION] Skipping re-compression - already JPEG ${metadata.width}x${metadata.height} (${originalSizeKB} KB)`);
+        if (pngBase64.startsWith('data:')) {
+          return pngBase64;
+        }
+        return `data:image/jpeg;base64,${base64Data}`;
+      }
+    }
+
     // Build sharp pipeline
     let pipeline = sharp(imageBuffer);
 
