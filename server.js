@@ -5614,18 +5614,6 @@ app.post('/api/stories/:id/repair-workflow/consistency-check', authenticateToken
     // Rehydrate image data into a COPY for crop extraction (don't modify original)
     const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
 
-    // DEBUG: Log what data we have for entity consistency
-    const sceneImages = rehydratedData.sceneImages || [];
-    log.info(`🔍 [REPAIR-WORKFLOW] Debug: ${sceneImages.length} sceneImages, ${(rehydratedData.characters || []).length} characters`);
-    for (const img of sceneImages) {
-      const hasImageData = !!img.imageData;
-      const hasBbox = !!img.bboxDetection;
-      const retryLen = img.retryHistory?.length || 0;
-      const retryWithBbox = (img.retryHistory || []).filter(e => !!e.bboxDetection).length;
-      const retryTypes = (img.retryHistory || []).map(e => e.type).join(',');
-      log.info(`🔍 [REPAIR-WORKFLOW] Page ${img.pageNumber}: imageData=${hasImageData}, bboxDetection=${hasBbox}, retryHistory=${retryLen} entries (${retryWithBbox} with bbox), types=[${retryTypes}]`);
-    }
-
     // Run entity consistency check with rehydrated data
     const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
     const characters = rehydratedData.characters || [];
@@ -11434,7 +11422,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, incrementalConsistency: incrConfigWithCurrentChars }
+        { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
       // Track scene rewrite usage if a safety block triggered a rewrite

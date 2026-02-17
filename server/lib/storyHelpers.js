@@ -415,13 +415,15 @@ function parseCharacterDescriptions(prompt) {
   const characterInfo = {};
   let match;
 
-  // Match numbered character entries (scene format): "1. Name, Looks: age category, X years old, gender, ..."
-  const charPattern = /^\d+\.\s*([^,]+),\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|child|baby|toddler|teen|teenager)/gmi;
+  // Match numbered character entries (scene format):
+  //   New: "1. Name, Looks: age category, gender, ..."
+  //   Legacy: "1. Name, Looks: age category, X years old, gender, ..."
+  const charPattern = /^\d+\.\s*([^,]+),\s*Looks:\s*([^,]+),\s*(?:(\d+)\s*years?\s*old,\s*)?(boy|girl|man|woman|child|baby|toddler|teen|teenager)/gmi;
 
   while ((match = charPattern.exec(prompt)) !== null) {
     const name = match[1].trim();
     const ageCategory = match[2].trim();
-    const age = parseInt(match[3], 10);
+    const age = match[3] ? parseInt(match[3], 10) : null;
     const genderTerm = match[4].toLowerCase();
 
     // Map gender term to gender
@@ -430,7 +432,7 @@ function parseCharacterDescriptions(prompt) {
     else if (['girl', 'woman'].includes(genderTerm)) gender = 'female';
 
     // Determine if child or adult
-    const isChild = age < 18 || ['boy', 'girl', 'child', 'baby', 'toddler', 'teen', 'teenager'].includes(genderTerm);
+    const isChild = (age !== null && age < 18) || ['boy', 'girl', 'child', 'baby', 'toddler', 'teen', 'teenager'].includes(genderTerm);
 
     characterInfo[name] = {
       age,
@@ -441,15 +443,17 @@ function parseCharacterDescriptions(prompt) {
     };
   }
 
-  // Match cover/reference format: "[Name]: Looks: age category, X years old, gender, ..."
+  // Match cover/reference format:
+  //   New: "[Name]: Looks: age category, gender, ..."
+  //   Legacy: "[Name]: Looks: age category, X years old, gender, ..."
   // This format includes clothing after "Wearing:"
   // Note: Pattern also matches legacy "[Image N - Name]:" format for backwards compatibility
-  const coverPattern = /\[(?:Image\s+\d+\s*-\s*)?([^\]]+)\]:\s*Looks:\s*([^,]+),\s*(\d+)\s*years?\s*old,\s*(boy|girl|man|woman|little boy|little girl|teenage boy|teenage girl|young man|young woman|elderly man|elderly woman|baby boy|baby girl)([^\[]*)/gi;
+  const coverPattern = /\[(?:Image\s+\d+\s*-\s*)?([^\]]+)\]:\s*Looks:\s*([^,]+),\s*(?:(\d+)\s*years?\s*old,\s*)?(boy|girl|man|woman|little boy|little girl|teenage boy|teenage girl|young man|young woman|elderly man|elderly woman|baby boy|baby girl)([^\[]*)/gi;
 
   while ((match = coverPattern.exec(prompt)) !== null) {
     const name = match[1].trim();
     const ageCategory = match[2].trim();
-    const age = parseInt(match[3], 10);
+    const age = match[3] ? parseInt(match[3], 10) : null;
     const rawGenderTerm = match[4].toLowerCase();
     const restOfLine = match[5] || '';
 
@@ -467,7 +471,7 @@ function parseCharacterDescriptions(prompt) {
     else if (['girl', 'woman'].includes(genderTerm)) gender = 'female';
 
     // Determine if child or adult
-    const isChild = age < 18 || ['boy', 'girl', 'child', 'baby', 'toddler', 'teen', 'teenager'].includes(genderTerm);
+    const isChild = (age !== null && age < 18) || ['boy', 'girl', 'child', 'baby', 'toddler', 'teen', 'teenager'].includes(genderTerm);
 
     // Extract clothing from "Wearing:" section
     let clothing = '';
