@@ -1206,14 +1206,25 @@ export function CharacterForm({
                   <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                 </div>
               ) : displayPhoto ? (
-                <img
-                    draggable={false}
-                  src={displayPhoto}
-                  alt={character.name}
-                  className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => setLightboxImage(character.avatars?.standard || displayPhoto)}
-                  title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
-                />
+                <div className="flex items-center gap-1.5">
+                  <img
+                      draggable={false}
+                    src={displayPhoto}
+                    alt={character.name}
+                    className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setLightboxImage(character.avatars?.standard || displayPhoto)}
+                    title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
+                  />
+                  {character.photos?.face && (
+                    <img
+                      src={character.photos.face}
+                      alt="Face crop"
+                      className="w-10 h-10 rounded object-cover border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setLightboxImage(character.photos!.face!)}
+                      title={language === 'de' ? 'Original-Gesichtsfoto' : 'Original face photo'}
+                    />
+                  )}
+                </div>
               ) : (
                 <div className="w-14 h-14 rounded-full bg-gray-200 border-2 border-gray-300 flex items-center justify-center">
                   <Upload size={18} className="text-gray-400" />
