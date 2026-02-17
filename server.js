@@ -10615,9 +10615,37 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         let effectiveCategory = defaultClothingCategory;
         let costumeType = null;
 
+        // Cap characters at 5 — more than 5 almost always produces bad results
+        // Main characters appear on ALL covers, non-main are split across initial/back
+        const MAX_COVER_CHARACTERS = 5;
+        let charactersForCover;
+        if (coverType === 'titlePage') {
+          charactersForCover = coverCharacters.length > MAX_COVER_CHARACTERS
+            ? coverCharacters.slice(0, MAX_COVER_CHARACTERS)
+            : coverCharacters;
+        } else {
+          const allChars = inputData.characters || [];
+          const mainChars = allChars.filter(c => c.isMainCharacter === true);
+          const nonMainChars = mainChars.length > 0
+            ? allChars.filter(c => !c.isMainCharacter)
+            : allChars;
+          const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
+          const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
+          const halfPoint = Math.ceil(nonMainChars.length / 2);
+          let extras;
+          if (coverType === 'initialPage') {
+            extras = nonMainChars.slice(0, halfPoint).slice(0, extraSlots);
+          } else {
+            // backCover gets the second half
+            extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
+          }
+          charactersForCover = [...mainCapped, ...extras];
+          log.debug(`📕 [COVER] ${coverType}: ${charactersForCover.map(c => c.name).join(', ')} (${mainCapped.length} main + ${extras.length} extras, capped at ${MAX_COVER_CHARACTERS})`);
+        }
+
         // Get character photos with clothing - per-character clothing from mergedClothingRequirements takes precedence
         let coverPhotos = getCharacterPhotoDetails(
-          coverType === 'titlePage' ? coverCharacters : inputData.characters,
+          charactersForCover,
           effectiveCategory,
           costumeType,
           artStyle,
