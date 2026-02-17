@@ -695,6 +695,16 @@ export function CharacterForm({
                     className="hidden"
                   />
                 </label>
+
+                {character.photos?.face && (
+                  <img
+                    src={character.photos.face}
+                    alt="Face crop"
+                    className="w-10 h-10 rounded object-cover border border-gray-300 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setLightboxImage(character.photos!.face!)}
+                    title={language === 'de' ? 'Original-Gesichtsfoto' : 'Original face photo'}
+                  />
+                )}
               </div>
 
               {/* Name input */}
