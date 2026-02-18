@@ -12362,20 +12362,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] existingImage.pageNumber=${existingImage.pageNumber}, arrayIndex=${allImages.indexOf(existingImage)}`);
                 log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image hash: ${oldHash} -> ${newHash}`);
 
-                // Preserve original image in imageVersions before replacing (for version history/rollback)
+                // Add consistency regen as a new version
+                // Note: original image is already saved as versionIndex 0 via img.imageData
+                // in saveStoryData, so we don't duplicate it into imageVersions
                 if (!existingImage.imageVersions) {
                   existingImage.imageVersions = [];
-                }
-                // Add original as version 0 if this is the first consistency regen
-                if (existingImage.imageVersions.length === 0 && existingImage.imageData) {
-                  existingImage.imageVersions.push({
-                    imageData: existingImage.imageData,
-                    prompt: existingImage.prompt,
-                    description: existingImage.description,
-                    qualityScore: existingImage.qualityScore,
-                    generatedAt: new Date().toISOString(),
-                    source: 'original'
-                  });
                 }
                 // Add consistency-fixed image as new version
                 existingImage.imageVersions.push({
