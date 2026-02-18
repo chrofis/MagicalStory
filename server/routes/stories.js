@@ -412,14 +412,18 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           }
           // Add all versions (including version 0) to imageVersions array
           // Merge with metadata from data blob (description, prompt, modelId, type)
+          // NOTE: DB version_index 0 = main image, version_index 1+ = blob imageVersions[0+]
+          // saveStoryData saves imageVersions[i] at version_index i+1, so offset by -1
           const scene = sceneImagesMap.get(row.page_number);
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
-          const versionMeta = pageMeta[row.version_index] || {};
+          const versionMeta = row.version_index > 0 ? (pageMeta[row.version_index - 1] || {}) : {};
+          const versionDate = row.generated_at || versionMeta.createdAt;
           scene.imageVersions.push({
             versionIndex: row.version_index,
             hasImage: true,
             qualityScore: row.quality_score,
-            generatedAt: row.generated_at || versionMeta.createdAt,
+            generatedAt: versionDate,
+            createdAt: versionDate,  // ImageHistoryModal reads createdAt
             isActive: row.version_index === activeVersion,
             // Dev mode metadata from data blob
             description: versionMeta.description,
