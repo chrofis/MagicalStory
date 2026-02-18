@@ -170,6 +170,18 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
 - Instead create humor through: funny situations, silly reactions, absurd moments, physical comedy
 - Let the story be warm and entertaining without trying to be a comedian
 
+**STORY OPENING (Page 1):**
+- Start in the middle of action or with a character doing something specific
+- NEVER open with weather descriptions ("It was a beautiful sunny day..."), waking up, or narrated backstory
+- The first sentence should hook the reader — something happens, someone speaks, a problem appears
+- Introduce the setting through the action, not before it
+
+**PLOT STRUCTURE — AVOID FORMULAS:**
+- Do NOT default to the "try-fail-try-succeed" formula (character tries, fails, tries again, succeeds)
+- Consider varied structures: mystery with clues, journey with discoveries, parallel storylines converging, time pressure, moral dilemma, or unexpected twist
+- The plot should surprise — if you can predict every beat, rewrite it
+- Avoid: gathering-the-team montages, training sequences, "believe in yourself" speeches as the solution
+
 **PACING:**
 - Vary the rhythm: slow down for emotional moments, speed up for action
 - Balance dialogue, description, and action - don't overload any single page
@@ -230,6 +242,11 @@ For EACH of the {PAGES} pages:
 
 ---CRITICAL ANALYSIS---
 Analyze the draft above. Be harsh and critical - pretend you are editing someone else's work.
+
+**PRIORITY ORDER**: Fix story-breaking issues first, formatting issues last:
+1. **HIGH** — Sections A (narrative/plot) and B (character): Plot holes, out-of-character behavior, missing arcs, and flat dialogue ruin the story. Spend most analysis here.
+2. **MEDIUM** — Sections C (prose) and E (clichés): Repetition, passive voice, and banned gestures degrade quality.
+3. **LOW** — Section D (scene hints): Formatting issues like missing positions or weather inconsistency. Fix them, but don't over-analyze if the story itself has bigger problems.
 
 **A. NARRATIVE & PLOT:**
 1. **Plot holes** - Are there any logical gaps? Events that don't make sense? Missing explanations?
@@ -293,33 +310,14 @@ TITLE: [Your creative, specific title]
 Based on the story draft, determine which clothing variants each character needs.
 
 **Guidelines:**
-- **COSTUME PRIORITY RULE:**
-  1. If outline/story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed:type`
-  2. If no costumes defined → use `standard` (or create appropriate costumes if story theme warrants it)
-  3. Winter clothing is ONLY for outdoor cold weather scenes, NOT indoor scenes
-- For standard/winter/summer: describe ONE **signature element** - a single visible clothing addition or accessory
-  - Must be ONE item only (not a list)
-  - Prefer clothing modifications over carried objects
-  - Examples by theme:
-    - Space story: "NASA mission patch on shoulder"
-    - Camping story: "scout vest with badges"
-    - Birthday story: "colorful party suspenders"
-    - Cooking story: "kid-sized apron"
-    - Detective story: "magnifying glass on belt"
-  - If no addition needed, write "none"
-- For costumed: Provide **complete outfit description** (CLOTHING ONLY - do NOT include pets, companions, animals, carried objects, or items in pockets/pouches)
-  - ✅ INCLUDE: clothes, shoes, belts, jewelry, capes, vests, aprons worn on body
-  - ❌ EXCLUDE: pets ("elephant peeking from pocket"), companions, toys, bag contents
-  - Example WRONG: "brown vest with a pocket where Eli the mouse peeks out"
-  - Example RIGHT: "brown vest with brass buttons and a small pocket"
-- Only mark `used: true` for variations that actually appear
-- **CRITICAL - No Face Coverings**: Costumes must NEVER include hats, helmets, crowns, head coverings, face masks, or anything that covers/obstructs the face. Faces must stay fully visible and unobstructed for character recognition. NO ninja masks, superhero masks, or any face coverings.
-- **CRITICAL - Distinct Styles**: Each character must have a structurally DIFFERENT outfit, not just color variations:
-  - Give different ROLES (princess vs scribe, captain vs sailor, knight vs squire)
-  - Vary outfit TYPES (dress vs tunic, long robes vs short practical clothes)
-  - Vary ACCESSORIES (one has jewelry, another has tools, another has rope/belt)
-  - Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
-  - Example RIGHT: One has "priestess robes with ceremonial sash" + other has "explorer tunic with leather sandal straps and rope belt"
+- **COSTUME PRIORITY**: Story-defined costumes (spacesuits, uniforms, period attire) → use `costumed:type`. No costumes → use `standard`. Winter only for outdoor cold scenes.
+- **Signature element** (standard/winter/summer): ONE visible clothing item or accessory per character (e.g., "scout vest with badges", "red scarf"). Write "none" if not needed. Prefer worn items over carried objects.
+- **Costumed**: Full outfit description. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
+- Only mark `used: true` for variations that actually appear in the story.
+- **CRITICAL — No Face Coverings**: NEVER include hats, helmets, crowns, masks, or anything covering/obstructing the face. Faces must stay fully visible for character recognition.
+- **CRITICAL — Distinct Styles**: Each character needs a structurally DIFFERENT outfit — different roles, outfit types, and accessories. Not just color swaps.
+  - WRONG: Two characters both wearing "white dress with gold collar"
+  - RIGHT: One has "priestess robes with ceremonial sash", other has "explorer tunic with rope belt"
 
 **Output format:**
 ```json
@@ -468,25 +466,27 @@ Characters:
 - [MainChar2] (position): [clothing]
 (List EVERY main character by name with position and clothing)
 
-**Initial Page**
+**Initial Page** (Dedication)
 ALL main characters ({MAIN_CHARACTER_NAMES}) + ALL primary characters ({PRIMARY_CHARACTER_NAMES})
+**MAX 5 characters in the scene.** If there are more than 5, pick the 5 most important. Place 2-3 in the foreground with positions, rest in background (small, from behind, or partially visible).
 
-Hint: [1-2 sentences - welcoming scene, all characters, generic setting]
+Hint: [1-2 sentences - welcoming scene, characters, generic setting]
 Characters:
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
-(List EVERY main and primary character by name)
+(List each character by name — foreground characters with position, background characters marked "background")
 
 **Back Cover**
 ALL main characters ({MAIN_CHARACTER_NAMES}) + ALL primary characters ({PRIMARY_CHARACTER_NAMES})
+**MAX 5 characters in the scene.** Same rule: pick the most important if more than 5. Foreground 2-3, rest in background.
 
-Hint: [1-2 sentences - happy conclusion, all characters together]
+Hint: [1-2 sentences - happy conclusion, characters together]
 Characters:
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
-(List EVERY main and primary character by name)
+(List each character by name — foreground characters with position, background characters marked "background")
 
 ---STORY PAGES---
 Rewrite the story applying ALL FIXES from CRITICAL ANALYSIS. No word counts - clean text only.
