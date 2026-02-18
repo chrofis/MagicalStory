@@ -3963,7 +3963,7 @@ function getPageText(storyText, pageNumber) {
  * @returns {Promise<Object>} { imageData, newScene, previewMismatches, method: 'iterate' }
  */
 async function iteratePage(imageData, pageNumber, storyData, options = {}) {
-  const { modelOverrides = {}, usageTracker = null } = options;
+  const { modelOverrides = {}, usageTracker = null, useOriginalAsReference = false } = options;
 
   const {
     analyzeGeneratedImage
@@ -4136,8 +4136,12 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
 
   // Step 6: Generate new image with corrected scene
   const imageModelId = modelOverrides?.imageModel || 'gemini-3-pro-image-preview';
+  const previousImage = useOriginalAsReference ? imageData : null;
+  if (previousImage) {
+    log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Using original image as reference for generation`);
+  }
   const imageResult = await generateImageWithQualityRetry(
-    imagePrompt, referencePhotos, null, 'scene', null, usageTracker, null,
+    imagePrompt, referencePhotos, previousImage, 'scene', null, usageTracker, null,
     { imageModel: imageModelId },
     `PAGE ${pageNumber} ITERATE`,
     { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
@@ -4147,6 +4151,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
 
   return {
     imageData: imageResult.imageData,
+    imagePrompt,
     newScene: newSceneDescription,
     newSceneMetadata,
     previewMismatches,

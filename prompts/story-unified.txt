@@ -107,6 +107,26 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **INDOOR SCENES** - Use "n/a" for weather
 
+**Scene Variety (IMPORTANT for great illustrations):**
+- **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters in the foreground per scene. A third only when truly needed. More faces in close-up = harder to illustrate well.
+  Avoid group scenes. If a group moment is needed, keep only 1-2 characters in the foreground and place others far in the background (small, no detail needed), or show background characters from behind (walking toward something, looking at something). Back-view and distant figures are much simpler to illustrate.
+  - Good: "Sophie (center) discovers the cave entrance while Max (right, far background) waves from the hilltop"
+  - Good: "Luna (left) reads the map. Behind her, two friends walk away down the path, seen from behind"
+  - Bad: "Sophie, Max, Emma, and Luna all stand in a circle discussing the plan"
+- **EVERY CHARACTER VISIBLE** - Each primary character must appear in at least 2 scene hints across the story. Plan their appearances. A character that's only in the text but never illustrated feels invisible.
+- **VARY THE CAMERA** - Alternate between these shot types across pages. Add the shot type to your scene hint:
+  - Close-up (face/upper body, 1 character, emotional moment)
+  - Medium shot (1-2 characters, waist up, dialogue/interaction)
+  - Wide shot (full body, characters in environment, action)
+  - Ultra-wide/establishing (tiny characters in big landscape, new location)
+  Never use the same shot type 3 pages in a row.
+- **VARY THE COMPOSITION** - Don't always put 2 characters facing each other. Mix it up:
+  - Character alone discovering something
+  - Character seen from behind looking at something
+  - Over-the-shoulder view
+  - Characters side by side looking at the same thing
+  - One character in foreground, another small in distance
+
 # Character Portrayal Guidelines
 
 - Write in third person (he/she/they)
@@ -244,11 +264,14 @@ For EACH character ({CHARACTER_NAMES}), answer these questions BY NAME:
 16. **Positions** - Does EACH scene hint specify left/right/center for all characters?
 17. **Clothing** - Categories match scene (winter for cold outdoor, costumed for costume scenes)?
 18. **Setting/Weather** - Is weather consistent across outdoor scenes? Time progresses logically?
+19. **Shot variety** - List the shot type for each page (close-up / medium / wide / ultra-wide). Are 3+ consecutive pages the same type? Fix by varying.
+20. **Scene simplicity** - Count foreground characters per scene hint. More than 2 on most pages? Simplify — pick 1-2 central figures, move others to background or show from behind.
+21. **Character coverage** - List which pages each primary character appears in scene hints. Any character with fewer than 2 appearances? Add them to a relevant scene.
 
 **E. CLICHÉ CHECK:**
-19. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". FORBIDDEN. Replace with: fist-bump, high-five, thumbs up, playful elbow nudge.
-20. **Repeated gestures** - Same gesture (hug, smile, wink) used twice? Vary them.
-21. **Cliché phrases** - Any "little did they know", "it was a dark and stormy night", "suddenly"? Remove.
+22. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". FORBIDDEN. Replace with: fist-bump, high-five, thumbs up, playful elbow nudge.
+23. **Repeated gestures** - Same gesture (hug, smile, wink) used twice? Vary them.
+24. **Cliché phrases** - Any "little did they know", "it was a dark and stormy night", "suddenly"? Remove.
 
 **FIXES REQUIRED:**
 For EACH issue found above, write the page number and exactly how you will fix it:

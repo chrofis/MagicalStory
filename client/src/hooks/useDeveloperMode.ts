@@ -87,7 +87,7 @@ const MODEL_DEFAULTS: ModelSelections = {
 // Feature flag defaults (must match server/config/models.js MODEL_DEFAULTS)
 const FEATURE_DEFAULTS = {
   enableAutoRepair: false,    // Auto-repair: fix detected issues in generated images
-  enableFinalChecks: true,    // Final checks: run consistency checks at end of generation
+  enableFinalChecks: false,   // Final checks: run consistency checks at end of generation (+ sequential regen)
   incrementalConsistency: false,  // Incremental consistency: check each image against previous
   incrementalConsistencyDryRun: true, // Dry run: log what would be fixed without fixing
   lookbackCount: 3,             // Number of previous pages to compare (1-5)

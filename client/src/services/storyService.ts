@@ -1067,7 +1067,7 @@ export const storyService = {
   },
 
   // Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
-  async iteratePage(storyId: string, pageNumber: number, imageModel?: string): Promise<{
+  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { useOriginalAsReference?: boolean }): Promise<{
     success: boolean;
     pageNumber: number;
     // What the vision model saw
@@ -1139,7 +1139,7 @@ export const storyService = {
       message: string;
     }>(
       `/api/stories/${storyId}/iterate/${pageNumber}`,
-      { imageModel }
+      { imageModel, ...(options?.useOriginalAsReference && { useOriginalAsReference: true }) }
     );
     return response;
   },
@@ -1985,14 +1985,17 @@ export const storyService = {
   },
 
   // Step 3: Redo pages (complete regeneration)
-  async redoPages(storyId: string, pageNumbers: number[]): Promise<{
+  async redoPages(storyId: string, pageNumbers: number[], options?: { useOriginalAsReference?: boolean }): Promise<{
     pagesCompleted: number[];
     newVersions: Record<number, number>;
   }> {
     const response = await api.post<{
       pagesCompleted: number[];
       newVersions: Record<number, number>;
-    }>(`/api/stories/${storyId}/repair-workflow/redo-pages`, { pageNumbers });
+    }>(`/api/stories/${storyId}/repair-workflow/redo-pages`, {
+      pageNumbers,
+      ...(options?.useOriginalAsReference && { useOriginalAsReference: true }),
+    });
     return response;
   },
 

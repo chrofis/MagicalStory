@@ -25,6 +25,7 @@ function createInitialState(): RepairWorkflowState {
       'consistency-check': 'pending',
       'character-repair': 'pending',
       'artifact-repair': 'pending',
+      'cover-repair': 'pending',
     },
     collectedFeedback: {
       pages: {},
@@ -65,6 +66,7 @@ const STEP_ORDER: RepairWorkflowStep[] = [
   'consistency-check',
   'character-repair',
   'artifact-repair',
+  'cover-repair',
 ];
 
 export interface UseRepairWorkflowProps {
@@ -101,7 +103,7 @@ export interface UseRepairWorkflowReturn {
   autoIdentifyRedoPages: (scoreThreshold?: number, issueThreshold?: number) => void;
 
   // Step 3: Redo pages (uses existing iterate function)
-  redoMarkedPages: () => Promise<void>;
+  redoMarkedPages: (options?: { useOriginalAsReference?: boolean }) => Promise<void>;
   redoProgress: { current: number; total: number; currentPage?: number };
 
   // Step 4: Re-evaluate
@@ -115,6 +117,10 @@ export interface UseRepairWorkflowReturn {
 
   // Step 7: Artifact repair
   repairArtifacts: (pageNumbers: number[]) => Promise<void>;
+
+  // Step 8: Cover repair
+  regenerateCovers: (coverTypes: ('front' | 'back' | 'initial')[]) => Promise<void>;
+  coverRepairProgress: { current: number; total: number; currentCover?: string };
 
   // Full automated workflow
   runFullWorkflow: (options?: {
@@ -434,7 +440,7 @@ export function useRepairWorkflow({
   }, [workflowState.collectedFeedback.pages, startStep]);
 
   // Step 3: Redo marked pages using existing iterate function
-  const redoMarkedPages = useCallback(async () => {
+  const redoMarkedPages = useCallback(async (options?: { useOriginalAsReference?: boolean }) => {
     if (!storyId || workflowState.redoPages.pageNumbers.length === 0) return;
 
     startStep('redo-pages');
@@ -451,7 +457,9 @@ export function useRepairWorkflow({
 
         try {
           // Use existing iteratePage function
-          const result = await storyService.iteratePage(storyId, pageNumber, imageModel);
+          const result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
+            useOriginalAsReference: options?.useOriginalAsReference,
+          });
 
           if (result.success) {
             pagesCompleted.push(pageNumber);
@@ -642,6 +650,45 @@ export function useRepairWorkflow({
     }
   }, [storyId, startStep, failStep]);
 
+  // Step 8: Regenerate covers
+  const [coverRepairProgress, setCoverRepairProgress] = useState({ current: 0, total: 0, currentCover: undefined as string | undefined });
+
+  const regenerateCovers = useCallback(async (coverTypes: ('front' | 'back' | 'initial')[]) => {
+    if (!storyId || coverTypes.length === 0) return;
+
+    startStep('cover-repair');
+    setCoverRepairProgress({ current: 0, total: coverTypes.length, currentCover: undefined });
+
+    const coversCompleted: string[] = [];
+
+    try {
+      for (let i = 0; i < coverTypes.length; i++) {
+        const coverType = coverTypes[i];
+        setCoverRepairProgress({ current: i, total: coverTypes.length, currentCover: coverType });
+
+        try {
+          await storyService.regenerateCover(storyId, coverType);
+          coversCompleted.push(coverType);
+        } catch (coverError) {
+          console.error(`Failed to regenerate ${coverType} cover:`, coverError);
+        }
+      }
+
+      setWorkflowState(prev => ({
+        ...prev,
+        stepStatus: {
+          ...prev.stepStatus,
+          'cover-repair': coversCompleted.length > 0 ? 'completed' : 'failed',
+        },
+      }));
+
+      setCoverRepairProgress({ current: coverTypes.length, total: coverTypes.length, currentCover: undefined });
+    } catch (error) {
+      console.error('Cover repair failed:', error);
+      failStep('cover-repair', error instanceof Error ? error.message : 'Unknown error');
+    }
+  }, [storyId, startStep, failStep]);
+
   // Can proceed to a step?
   const canProceedToStep = useCallback((step: RepairWorkflowStep): boolean => {
     const stepIndex = STEP_ORDER.indexOf(step);
@@ -677,6 +724,10 @@ export function useRepairWorkflow({
       case 'artifact-repair':
         // Can run if there are artifact issues identified
         return workflowState.stepStatus['collect-feedback'] === 'completed';
+
+      case 'cover-repair':
+        // Can always run independently — no prerequisite steps
+        return true;
 
       default:
         return false;
@@ -1022,6 +1073,9 @@ export function useRepairWorkflow({
     repairCharacter,
 
     repairArtifacts,
+
+    regenerateCovers,
+    coverRepairProgress,
 
     runFullWorkflow,
     abortWorkflow,

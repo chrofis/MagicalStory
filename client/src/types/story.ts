@@ -868,7 +868,8 @@ export type RepairWorkflowStep =
   | 're-evaluate'
   | 'consistency-check'
   | 'character-repair'
-  | 'artifact-repair';
+  | 'artifact-repair'
+  | 'cover-repair';
 
 export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
 

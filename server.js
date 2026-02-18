@@ -3620,7 +3620,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel } = req.body;  // Optional: developer model override
+    const { imageModel, useOriginalAsReference } = req.body;  // Optional: developer model override
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
@@ -3907,8 +3907,12 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
     if (imageModelOverride) {
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModelOverride}`);
     }
+    const previousImage = useOriginalAsReference ? currentImage.imageData : null;
+    if (previousImage) {
+      log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
+    }
     const imageResult = await generateImageWithQualityRetry(
-      imagePrompt, referencePhotos, null, 'scene', null, null, null,
+      imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
       { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
       { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
@@ -5333,7 +5337,7 @@ app.post('/api/stories/:id/repair-workflow/collect-feedback', authenticateToken,
 app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { pageNumbers } = req.body;
+    const { pageNumbers, useOriginalAsReference } = req.body;
 
     if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
@@ -5358,7 +5362,10 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
         }
 
         const story = storyResult.rows[0];
-        const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+        let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+        // Rehydrate images from story_images table (images are stored separately)
+        storyData = await rehydrateStoryImages(id, storyData);
 
         // Find the scene
         const sceneIndex = storyData.sceneImages?.findIndex(s => s.pageNumber === pageNumber);
@@ -5370,10 +5377,12 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
         const scene = storyData.sceneImages[sceneIndex];
 
         // Generate new image using existing iterate logic
-        const { iteratePageImage } = await import('./server/lib/images.js');
-        const result = await iteratePageImage(storyData, pageNumber, req.user.id);
+        const { iteratePage } = require('./server/lib/images');
+        const result = await iteratePage(scene.imageData, pageNumber, storyData, {
+          useOriginalAsReference: !!useOriginalAsReference,
+        });
 
-        if (result.success) {
+        if (result.imageData) {
           // Add to image versions
           if (!scene.imageVersions) {
             scene.imageVersions = [{
@@ -5390,13 +5399,12 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
           const newVersionIndex = scene.imageVersions.length;
           scene.imageVersions.push({
             imageData: result.imageData,
-            description: result.sceneDescription,
+            description: result.newScene,
             prompt: result.imagePrompt,
-            modelId: result.modelId,
             createdAt: new Date().toISOString(),
             isActive: true,
             type: 'iteration',
-            qualityScore: result.qualityScore
+            qualityScore: result.score
           });
 
           // Mark all other versions as inactive
@@ -5406,10 +5414,9 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
 
           // Update scene metadata (but NOT imageData - that would cause duplicate image storage)
           // The new image is stored in imageVersions and activeVersion meta points to it
-          scene.description = result.sceneDescription;
+          scene.description = result.newScene;
           scene.prompt = result.imagePrompt;
-          scene.qualityScore = result.qualityScore;
-          scene.modelId = result.modelId;
+          scene.qualityScore = result.score;
 
           storyData.sceneImages[sceneIndex] = scene;
 

@@ -17,6 +17,7 @@ import {
   Play,
   SkipForward,
   Square,
+  Image,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback } from '@/types/story';
@@ -50,6 +51,7 @@ const STEP_CONFIG: Record<RepairWorkflowStep, { label: string; icon: React.Compo
   'consistency-check': { label: '5. Consistency Check', icon: Users, description: 'Run entity consistency on all pages' },
   'character-repair': { label: '6. Character Repair', icon: Users, description: 'Fix character appearance issues' },
   'artifact-repair': { label: '7. Artifact Repair', icon: Grid, description: 'Fix remaining artifacts via grid repair' },
+  'cover-repair': { label: '8. Cover Repair', icon: Image, description: 'Regenerate front, back, or dedication covers' },
 };
 
 // Status badge component
@@ -256,6 +258,8 @@ export function RepairWorkflowPanel({
     runConsistencyCheck,
     repairCharacter,
     repairArtifacts,
+    regenerateCovers,
+    coverRepairProgress,
     runFullWorkflow,
     abortWorkflow,
     isAborted,
@@ -354,6 +358,12 @@ export function RepairWorkflowPanel({
 
   // Selected pages for artifact repair
   const [selectedArtifactPages, setSelectedArtifactPages] = useState<number[]>([]);
+
+  // Use original as reference option for step 3
+  const [useOriginalAsReference, setUseOriginalAsReference] = useState(false);
+
+  // Selected covers for step 8
+  const [selectedCovers, setSelectedCovers] = useState<('front' | 'back' | 'initial')[]>([]);
 
   // Toggle step expansion
   const toggleStepExpanded = (step: RepairWorkflowStep) => {
@@ -684,13 +694,28 @@ export function RepairWorkflowPanel({
               <div className="p-4 space-y-3 bg-white">
                 <p className="text-sm text-gray-600">{STEP_CONFIG['redo-pages'].description}</p>
 
+                <label className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={useOriginalAsReference}
+                    onChange={(e) => setUseOriginalAsReference(e.target.checked)}
+                    className="mt-0.5"
+                    disabled={isRunning}
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-blue-800">Use original as reference</span>
+                    <p className="text-xs text-blue-600">Passes the current image to Gemini as reference — preserves composition, fixes details</p>
+                  </div>
+                </label>
+
                 <button
-                  onClick={redoMarkedPages}
+                  onClick={() => redoMarkedPages({ useOriginalAsReference })}
                   disabled={isRunning || workflowState.redoPages.pageNumbers.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Play className="w-4 h-4" />
                   Redo {workflowState.redoPages.pageNumbers.length} Pages
+                  {useOriginalAsReference && <span className="text-xs opacity-75">(with reference)</span>}
                 </button>
 
                 {redoProgress.total > 0 && (
@@ -1228,6 +1253,82 @@ export function RepairWorkflowPanel({
                     <h5 className="text-sm font-medium text-green-800">
                       Processed {workflowState.artifactRepairResults.pagesProcessed.length} pages,
                       fixed {workflowState.artifactRepairResults.issuesFixed} issues
+                    </h5>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Step 8: Cover Repair */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {renderStepHeader('cover-repair')}
+            {expandedSteps.has('cover-repair') && (
+              <div className="p-4 space-y-3 bg-white">
+                <p className="text-sm text-gray-600">{STEP_CONFIG['cover-repair'].description}</p>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Covers to Regenerate:</label>
+                  <div className="flex flex-wrap gap-3">
+                    {(['front', 'initial', 'back'] as const).map(coverType => {
+                      const labels = { front: 'Front Cover', initial: 'Dedication Page', back: 'Back Cover' };
+                      return (
+                        <label key={coverType} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedCovers.includes(coverType)}
+                            onChange={(e) => {
+                              setSelectedCovers(prev =>
+                                e.target.checked
+                                  ? [...prev, coverType]
+                                  : prev.filter(c => c !== coverType)
+                              );
+                            }}
+                            disabled={isRunning}
+                            className="rounded text-amber-600"
+                          />
+                          <span className="text-sm">{labels[coverType]}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <button
+                  onClick={async () => {
+                    await regenerateCovers(selectedCovers);
+                    if (onRefreshStory) {
+                      await onRefreshStory();
+                    }
+                  }}
+                  disabled={isRunning || selectedCovers.length === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+                >
+                  <Image className="w-4 h-4" />
+                  Regenerate {selectedCovers.length} Cover{selectedCovers.length !== 1 ? 's' : ''}
+                </button>
+
+                {coverRepairProgress.total > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Progress: {coverRepairProgress.current} / {coverRepairProgress.total}</span>
+                      {coverRepairProgress.currentCover && (
+                        <span className="text-gray-500">Currently: {coverRepairProgress.currentCover} cover</span>
+                      )}
+                    </div>
+                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-amber-500 transition-all"
+                        style={{ width: `${(coverRepairProgress.current / coverRepairProgress.total) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {workflowState.stepStatus['cover-repair'] === 'completed' && (
+                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <h5 className="text-sm font-medium text-green-800">
+                      Covers regenerated successfully
                     </h5>
                   </div>
                 )}
