@@ -758,7 +758,13 @@ export default function StoryWizard() {
                 };
               });
             });
-            setSceneDescriptions(fullMeta.sceneDescriptions || []);
+            // Only set sceneDescriptions if actually present in response.
+            // The FAST PATH metadata query doesn't include sceneDescriptions,
+            // so fullMeta.sceneDescriptions is undefined. Don't overwrite with []
+            // because dev-metadata (which loads in parallel) provides the real data.
+            if (fullMeta.sceneDescriptions?.length) {
+              setSceneDescriptions(fullMeta.sceneDescriptions);
+            }
 
             // Cover images metadata - MERGE with existing imageData (don't overwrite loaded images)
             setCoverImages(prev => {

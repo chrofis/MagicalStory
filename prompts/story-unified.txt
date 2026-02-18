@@ -101,8 +101,11 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
 ```
 
 **Rules:**
-- **MAX 3 CHARACTERS** - Pick the most important for this visual moment. Others can be in text but not illustration.
-- **POSITIONS REQUIRED** - Every character needs (left), (right), or (center). Example: "Luna (left) waves at Max (right)"
+- **MAX 3 CHARACTERS** - Pick the most important for this visual moment. Others can be in the story text but NOT in the scene hint.
+  - The scene hint description must ONLY mention characters from the Characters list. Do NOT name anyone else in the hint — not in the background, not "nearby", not "standing together". If they're not in the Characters list, they don't exist in this illustration.
+  - BAD: "Werner (left) gestures. Franziska and Roger stand together smiling. Lukas sits with Manuel and Sophie nearby." (7 characters named!)
+  - GOOD: "Werner (left) gestures appreciatively at the clean room. Verena (center) sets down pirate decorations." (only listed characters)
+- **POSITIONS REQUIRED** - Every character needs (left), (right), or (center). No other position words like "background" or "foreground" in the position field. Example: "Luna (left) waves at Max (right)"
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **INDOOR SCENES** - Use "n/a" for weather
@@ -467,26 +470,25 @@ Characters:
 (List EVERY main character by name with position and clothing)
 
 **Initial Page** (Dedication)
-ALL main characters ({MAIN_CHARACTER_NAMES}) + ALL primary characters ({PRIMARY_CHARACTER_NAMES})
-**MAX 5 characters in the scene.** If there are more than 5, pick the 5 most important. Place 2-3 in the foreground with positions, rest in background (small, from behind, or partially visible).
+Pick **UP TO 5** of the most important characters from {MAIN_CHARACTER_NAMES} and {PRIMARY_CHARACTER_NAMES}.
+Always include main characters. If total characters exceed 5, DROP the least important primary characters entirely — do NOT put them in the background, do NOT reference them as a group ("the children", "the others"). They simply don't appear in this cover.
+Place 2-3 characters in the foreground with positions, rest in background.
 
 Hint: [1-2 sentences - welcoming scene, characters, generic setting]
-Characters:
+Characters (MAX 5, each listed BY NAME):
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
-(List each character by name — foreground characters with position, background characters marked "background")
 
 **Back Cover**
-ALL main characters ({MAIN_CHARACTER_NAMES}) + ALL primary characters ({PRIMARY_CHARACTER_NAMES})
-**MAX 5 characters in the scene.** Same rule: pick the most important if more than 5. Foreground 2-3, rest in background.
+Pick **UP TO 5** of the most important characters — same rules as Initial Page.
+Do NOT try to include everyone. Characters not listed simply don't appear.
 
 Hint: [1-2 sentences - happy conclusion, characters together]
-Characters:
+Characters (MAX 5, each listed BY NAME):
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
 - [Name] (position): [clothing]
-(List each character by name — foreground characters with position, background characters marked "background")
 
 ---STORY PAGES---
 Rewrite the story applying ALL FIXES from CRITICAL ANALYSIS. No word counts - clean text only.
