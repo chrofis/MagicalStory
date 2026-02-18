@@ -126,7 +126,7 @@ apiRouter.get('/stories/:id/share-status', authenticateToken, async (req, res) =
 
     const story = result[0];
     const shareUrl = story.is_shared && story.share_token
-      ? `${req.protocol}://${req.get('host')}/shared/${story.share_token}`
+      ? `${req.protocol}://${req.get('host')}/s/${story.share_token}`
       : null;
 
     res.json({
@@ -171,7 +171,7 @@ apiRouter.post('/stories/:id/share', authenticateToken, async (req, res) => {
     );
 
     const actualToken = result[0].share_token;
-    const shareUrl = `${req.protocol}://${req.get('host')}/shared/${actualToken}`;
+    const shareUrl = `${req.protocol}://${req.get('host')}/s/${actualToken}`;
 
     res.json({
       isShared: true,
@@ -341,15 +341,20 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
   }
 });
 
-// GET /api/shared/:shareToken/og-image - Generate Open Graph image (1200x630 for social)
-apiRouter.get('/shared/:shareToken/og-image', async (req, res) => {
+// GET /api/shared/:shareToken/og-image.jpg - Generate Open Graph image (1200x630 for social)
+// The .jpg extension helps WhatsApp/Facebook crawlers recognize this as an image URL.
+// Also supports /og-image without extension for backwards compatibility.
+apiRouter.get('/shared/:shareToken/og-image.jpg', ogImageHandler);
+apiRouter.get('/shared/:shareToken/og-image', ogImageHandler);
+
+async function ogImageHandler(req, res) {
   try {
     const { shareToken } = req.params;
 
     // Fast path: get only story ID, then fetch cover from separate table
     const storyId = await getSharedStoryId(shareToken);
     if (!storyId) {
-      log.warn(`[OG-IMAGE] Story not found for shareToken: ${shareToken}`);
+      log.warn(`[OG-IMAGE] Story not found for shareToken: ${shareToken.substring(0, 8)}...`);
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
@@ -386,37 +391,15 @@ apiRouter.get('/shared/:shareToken/og-image', async (req, res) => {
       return res.status(404).json({ error: 'Cover image not found' });
     }
 
-    // Create proper 1200x630 OG image (WhatsApp is strict about dimension matching)
+    // Fast OG image: single resize to 1200x630 (fit: cover crops to fill).
+    // Previous version did blur + composite (4 sharp ops) which was too slow for WhatsApp's ~5s timeout.
     const imageBuffer = Buffer.from(coverImage, 'base64');
-
-    // Get original dimensions
-    const metadata = await sharp(imageBuffer).metadata();
-
-    // Create blurred, darkened background (stretch to fill 1200x630)
-    const background = await sharp(imageBuffer)
-      .resize(1200, 630, { fit: 'cover' })
-      .blur(30)
-      .modulate({ brightness: 0.5 })
-      .toBuffer();
-
-    // Scale cover to fit within canvas with padding
-    const maxCoverHeight = 550;
-    const coverHeight = Math.min(metadata.height, maxCoverHeight);
-    const coverWidth = Math.round((metadata.width / metadata.height) * coverHeight);
-
-    const scaledCover = await sharp(imageBuffer)
-      .resize(coverWidth, coverHeight, { fit: 'inside' })
-      .toBuffer();
-
-    // Composite: blurred background + centered cover
-    const ogImage = await sharp(background)
-      .composite([{
-        input: scaledCover,
-        gravity: 'center'
-      }])
+    const ogImage = await sharp(imageBuffer)
+      .resize(1200, 630, { fit: 'cover', position: 'centre' })
       .jpeg({ quality: 85 })
       .toBuffer();
 
+    log.debug(`[OG-IMAGE] Generated ${ogImage.length} bytes for story ${storyId}`);
     res.set('Content-Type', 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=86400');
     res.send(ogImage);
@@ -424,7 +407,7 @@ apiRouter.get('/shared/:shareToken/og-image', async (req, res) => {
     log.error('Error generating OG image:', err);
     res.status(500).json({ error: 'Failed to generate preview image' });
   }
-});
+}
 
 // ============================================
 // HTML ROUTER - Mount at root
@@ -432,6 +415,9 @@ apiRouter.get('/shared/:shareToken/og-image', async (req, res) => {
 // ============================================
 
 // GET /s/:shareToken - Serve HTML with OG meta tags for WhatsApp/social previews
+// This is the PRIMARY sharing URL. It returns a tiny HTML with just OG tags,
+// then redirects to /shared/:shareToken for the actual React app.
+// WhatsApp's lightweight crawler parses this easily (no scripts/styles/fonts to wade through).
 htmlRouter.get('/s/:shareToken', async (req, res) => {
   const { shareToken } = req.params;
 
@@ -439,38 +425,35 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
     const story = await getSharedStory(shareToken);
 
     if (story) {
-      const title = story.data.title || 'Eine magische Geschichte';
+      // HTML-escape the title to prevent broken meta tags from quotes/special chars
+      const rawTitle = story.data.title || 'Eine magische Geschichte';
+      const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image`;
+      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image.jpg`;
       const pageUrl = `https://magicalstory.ch/s/${shareToken}`;
 
-      // Return HTML with OG meta tags, then load React app
+      // Minimal HTML with ONLY OG tags — nothing else. WhatsApp parses this reliably.
       const html = `<!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title} - MagicalStory</title>
-
-  <!-- Open Graph / Facebook / WhatsApp -->
   <meta property="og:type" content="article">
   <meta property="og:url" content="${pageUrl}">
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
   <meta property="og:image" content="${ogImageUrl}">
+  <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
-
-  <!-- Twitter -->
+  <meta property="og:site_name" content="MagicalStory">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${title}">
-  <meta name="twitter:description" content="${description}">
   <meta name="twitter:image" content="${ogImageUrl}">
-
+  <title>${title}</title>
   <meta http-equiv="refresh" content="0;url=/shared/${shareToken}">
 </head>
 <body>
-  <p>Weiterleitung zu <a href="/shared/${shareToken}">${title}</a>...</p>
+  <p>Weiterleitung zu <a href="/shared/${shareToken}">${rawTitle}</a>...</p>
 </body>
 </html>`;
 
@@ -500,9 +483,10 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       const indexPath = path.join(distPath, 'index.html');
       let html = await fs.readFile(indexPath, 'utf8');
 
-      const title = story.data.title || 'Eine magische Geschichte';
+      const rawTitle = story.data.title || 'Eine magische Geschichte';
+      const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image`;
+      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image.jpg`;
       const pageUrl = `https://magicalstory.ch/shared/${shareToken}`;
 
       // Create OG meta tags
@@ -513,8 +497,10 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
   <meta property="og:image" content="${ogImageUrl}">
+  <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="MagicalStory">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="${title}">
   <meta name="twitter:description" content="${description}">
@@ -527,6 +513,8 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       html = html.replace(/<meta name="twitter:[^>]*>\s*/g, '');
       // Replace title
       html = html.replace(/<title>[^<]*<\/title>/, '');
+      // Remove canonical URL (points to homepage, confuses WhatsApp/Facebook crawler)
+      html = html.replace(/<link rel="canonical"[^>]*>\s*/g, '');
       // Insert story-specific tags after <head>
       html = html.replace('<head>', '<head>' + ogTags);
 
