@@ -402,6 +402,9 @@ async function ogImageHandler(req, res) {
     log.debug(`[OG-IMAGE] Generated ${ogImage.length} bytes for story ${storyId}`);
     res.set('Content-Type', 'image/jpeg');
     res.set('Cache-Control', 'public, max-age=86400');
+    // Override Helmet's same-origin policy — WhatsApp/Facebook fetches from cross-origin
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.set('Access-Control-Allow-Origin', '*');
     res.send(ogImage);
   } catch (err) {
     log.error('Error generating OG image:', err);
