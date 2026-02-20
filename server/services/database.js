@@ -1342,5 +1342,8 @@ module.exports = {
   getAllActiveVersions,
   // Retry history image functions
   saveRetryHistoryImages,
-  getRetryHistoryImages
+  getRetryHistoryImages,
+  // Exposed for testing
+  normalizeCoverValue,
+  getCoverData
 };
