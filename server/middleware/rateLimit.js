@@ -66,6 +66,15 @@ const errorLoggingLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Job status polling rate limiter (very permissive - lightweight read operation)
+const jobStatusLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 300, // 300 requests per minute (5/second)
+  message: { error: 'Too many status requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Image regeneration rate limiter (prevent credit drain abuse)
 const imageRegenerationLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
@@ -83,5 +92,6 @@ module.exports = {
   aiProxyLimiter,
   passwordResetLimiter,
   errorLoggingLimiter,
-  imageRegenerationLimiter
+  imageRegenerationLimiter,
+  jobStatusLimiter
 };
