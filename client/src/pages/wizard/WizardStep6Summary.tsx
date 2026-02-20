@@ -268,7 +268,7 @@ export function WizardStep6Summary({
     lengthLabel: language === 'de' ? 'Länge' : language === 'fr' ? 'Longueur' : 'Length',
     locationLabel: language === 'de' ? 'Ort' : language === 'fr' ? 'Lieu' : 'Location',
     seasonLabel: language === 'de' ? 'Jahreszeit' : language === 'fr' ? 'Saison' : 'Season',
-    chooseIdea: language === 'de' ? 'Wählen Sie eine Idee oder bearbeiten Sie sie:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la:' : 'Choose an idea or edit it:',
+    chooseIdea: language === 'de' ? 'Idee auswählen oder bearbeiten:' : language === 'fr' ? 'Choisissez une idée ou modifiez-la:' : 'Choose an idea or edit it:',
     useThis: language === 'de' ? 'Diese verwenden' : language === 'fr' ? 'Utiliser celle-ci' : 'Use this',
     option1: language === 'de' ? 'Option 1' : language === 'fr' ? 'Option 1' : 'Option 1',
     option2: language === 'de' ? 'Option 2' : language === 'fr' ? 'Option 2' : 'Option 2',

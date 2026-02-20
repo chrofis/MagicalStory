@@ -468,7 +468,7 @@ export function StorySettings({
             <div className="space-y-4">
               <p className="text-sm text-gray-600 mb-2">
                 {language === 'de'
-                  ? 'Wählen Sie eine Idee oder bearbeiten Sie sie:'
+                  ? 'Idee auswählen oder bearbeiten:'
                   : language === 'fr'
                   ? 'Choisissez une idée ou modifiez-la:'
                   : 'Choose an idea or edit it:'}

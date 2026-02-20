@@ -33,6 +33,36 @@ function initJobRoutes(serverDeps) {
   deps = serverDeps;
 }
 
+// Clean up old completed/failed jobs and their checkpoints
+async function cleanupOldCompletedJobs() {
+  if (STORAGE_MODE !== 'database') return;
+  const pool = getDbPool();
+  if (!pool) return;
+
+  try {
+    const cpResult = await pool.query(`
+      DELETE FROM story_job_checkpoints
+      WHERE job_id IN (
+        SELECT id FROM story_jobs
+        WHERE status IN ('completed', 'failed')
+        AND updated_at < NOW() - INTERVAL '1 hour'
+      )
+    `);
+
+    const jobResult = await pool.query(`
+      DELETE FROM story_jobs
+      WHERE status IN ('completed', 'failed')
+      AND updated_at < NOW() - INTERVAL '1 hour'
+    `);
+
+    if (cpResult.rowCount > 0 || jobResult.rowCount > 0) {
+      log.info(`🧹 Cleanup: deleted ${cpResult.rowCount} old checkpoints, ${jobResult.rowCount} old jobs`);
+    }
+  } catch (err) {
+    log.error(`❌ Failed to cleanup old jobs:`, err.message);
+  }
+}
+
 // Create a new story generation job
 router.post('/create-story', authenticateToken, storyGenerationLimiter, validateBody(schemas.createStory), async (req, res) => {
   try {

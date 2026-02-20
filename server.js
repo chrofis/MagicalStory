@@ -1882,34 +1882,6 @@ async function deleteJobCheckpoints(jobId) {
 }
 
 // Clean up old completed/failed jobs (call when new job starts)
-async function cleanupOldCompletedJobs() {
-  if (STORAGE_MODE !== 'database' || !dbPool) return;
-
-  try {
-    // Delete checkpoints for jobs completed more than 1 hour ago
-    const cpResult = await dbPool.query(`
-      DELETE FROM story_job_checkpoints
-      WHERE job_id IN (
-        SELECT id FROM story_jobs
-        WHERE status IN ('completed', 'failed')
-        AND updated_at < NOW() - INTERVAL '1 hour'
-      )
-    `);
-
-    // Delete old completed/failed jobs
-    const jobResult = await dbPool.query(`
-      DELETE FROM story_jobs
-      WHERE status IN ('completed', 'failed')
-      AND updated_at < NOW() - INTERVAL '1 hour'
-    `);
-
-    if (cpResult.rowCount > 0 || jobResult.rowCount > 0) {
-      log.info(`🧹 Cleanup: deleted ${cpResult.rowCount} old checkpoints, ${jobResult.rowCount} old jobs`);
-    }
-  } catch (err) {
-    log.error(`❌ Failed to cleanup old jobs:`, err.message);
-  }
-}
 
 // Middleware to verify JWT token
 function authenticateToken(req, res, next) {
