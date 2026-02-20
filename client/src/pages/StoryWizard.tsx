@@ -702,7 +702,8 @@ export default function StoryWizard() {
         }
 
         // Load full metadata in background for edit features
-        storyService.getStoryMetadata(urlStoryId).then(fullMeta => {
+        // Pass developerMode to include version metadata (description, prompt, modelId) for dev mode
+        storyService.getStoryMetadata(urlStoryId, developerMode).then(fullMeta => {
           if (fullMeta) {
             log.info('Full metadata loaded:', fullMeta.title, `(${fullMeta.totalImages} images to load)`);
 

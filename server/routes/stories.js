@@ -373,24 +373,27 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const activeVersions = await getAllActiveVersions(id);
 
       // Get version metadata (description, prompt, modelId, type) from data blob
-      // This is needed for dev mode comparison - we extract just the metadata, not imageData
-      const versionMetaQuery = await dbQuery(
-        `SELECT scene->>'pageNumber' as page_number, scene->'imageVersions' as image_versions
-         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
-         WHERE id = $1`,
-        [id]
-      );
+      // Only needed for dev mode — skip this expensive jsonb_array_elements subquery for normal users
+      const isDevMode = req.query.devMode === 'true';
       const versionMetaByPage = new Map();
-      for (const row of versionMetaQuery) {
-        if (row.page_number && row.image_versions) {
-          versionMetaByPage.set(parseInt(row.page_number), row.image_versions.map(v => ({
-            description: v.description,
-            prompt: v.prompt,
-            userInput: v.userInput,
-            modelId: v.modelId,
-            type: v.type,
-            createdAt: v.createdAt
-          })));
+      if (isDevMode) {
+        const versionMetaQuery = await dbQuery(
+          `SELECT scene->>'pageNumber' as page_number, scene->'imageVersions' as image_versions
+           FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+           WHERE id = $1`,
+          [id]
+        );
+        for (const row of versionMetaQuery) {
+          if (row.page_number && row.image_versions) {
+            versionMetaByPage.set(parseInt(row.page_number), row.image_versions.map(v => ({
+              description: v.description,
+              prompt: v.prompt,
+              userInput: v.userInput,
+              modelId: v.modelId,
+              type: v.type,
+              createdAt: v.createdAt
+            })));
+          }
         }
       }
 

@@ -334,10 +334,12 @@ export const storyService = {
   },
 
   // Get story metadata only (no images) for fast initial load
-  async getStoryMetadata(id: string): Promise<(SavedStory & { totalImages: number }) | null> {
+  // Pass devMode=true to include version metadata (description, prompt, modelId) from data blob
+  async getStoryMetadata(id: string, devMode?: boolean): Promise<(SavedStory & { totalImages: number }) | null> {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch(`/api/stories/${id}/metadata`, {
+      const url = devMode ? `/api/stories/${id}/metadata?devMode=true` : `/api/stories/${id}/metadata`;
+      const response = await fetch(url, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
