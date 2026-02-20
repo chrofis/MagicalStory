@@ -253,6 +253,7 @@ const {
   getHistoricalLocations
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
+const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const { GenerationLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
 const configRoutes = require('./server/routes/config');
@@ -3539,7 +3540,7 @@ app.post('/api/stories/:id/regenerate/image/:pageNum', authenticateToken, imageR
 
     // Update image_version_meta with new active version (new version is always the last one)
     const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length : 0;  // DB version_index = array_index + 1
+    const newActiveIndex = scene?.imageVersions?.length ? getActiveIndexAfterPush(scene.imageVersions, 'scene') : 0;
     await setActiveVersion(id, pageNumber, newActiveIndex);
 
     // Deduct credits after successful generation (skip for infinite credits or impersonating admin)
@@ -4002,7 +4003,7 @@ app.post('/api/stories/:id/iterate/:pageNum', authenticateToken, imageRegenerati
 
     // Update active version in metadata
     const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-    const newActiveIndex = scene?.imageVersions?.length ? scene.imageVersions.length : 0;  // DB version_index = array_index + 1
+    const newActiveIndex = scene?.imageVersions?.length ? getActiveIndexAfterPush(scene.imageVersions, 'scene') : 0;
     await setActiveVersion(id, pageNumber, newActiveIndex);
 
     // Deduct credits if not unlimited
@@ -5102,9 +5103,7 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
         promptUsed: repairResult.promptUsed
       };
 
-      // Calculate the new version index: imageVersions[N-1] → DB version_index N
-      // (because imageVersions[i] → version_index i+1 in saveStoryData)
-      const newVersionIndex = existingImage.imageVersions.length;
+      const newVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
 
       await saveStoryData(id, storyData);
 
@@ -5237,8 +5236,7 @@ app.post('/api/stories/:id/repair-entity-consistency', authenticateToken, imageR
     for (const update of repairResult.updatedImages) {
       const existingImage = sceneImages.find(s => s.pageNumber === update.pageNumber);
       if (existingImage && existingImage.imageVersions) {
-        // imageVersions[N-1] → DB version_index N (because saveStoryData uses i+1)
-        const newVersionIndex = existingImage.imageVersions.length;
+        const newVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
         await setActiveVersion(id, update.pageNumber, newVersionIndex);
       }
     }
@@ -5424,8 +5422,7 @@ app.post('/api/stories/:id/repair-workflow/redo-pages', authenticateToken, image
           await saveStoryData(id, storyData);
 
           // Set active version to the new image
-          // imageVersions[newVersionIndex] → DB version_index (newVersionIndex + 1)
-          await setActiveVersion(id, pageNumber, newVersionIndex + 1);
+          await setActiveVersion(id, pageNumber, getActiveIndexAfterPush(scene.imageVersions, 'scene'));
 
           pagesCompleted.push(pageNumber);
           newVersions[pageNumber] = newVersionIndex;
@@ -5872,9 +5869,7 @@ app.post('/api/stories/:id/repair-workflow/character-repair', authenticateToken,
                 existingImage.entityRepairedAt = new Date().toISOString();
                 existingImage.entityRepairedFor = characterName;
 
-                // Calculate the DB version index: imageVersions[N-1] → version_index N
-                // After push, length = N, so new item should be version_index = length
-                const newDbVersionIndex = existingImage.imageVersions.length;
+                const newDbVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
 
                 // Save the story data with updated sceneImages
                 storyData.sceneImages = sceneImages;
@@ -6000,11 +5995,10 @@ app.post('/api/stories/:id/repair-workflow/artifact-repair', authenticateToken, 
     await saveStoryData(id, storyData);
 
     // Set active version for each repaired page
-    // imageVersions[N-1] → DB version_index N (because saveStoryData uses i+1)
     for (const pageNumber of pagesProcessed) {
       const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
       if (scene?.imageVersions?.length) {
-        await setActiveVersion(id, pageNumber, scene.imageVersions.length);
+        await setActiveVersion(id, pageNumber, getActiveIndexAfterPush(scene.imageVersions, 'scene'));
       }
     }
 
@@ -10092,7 +10086,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
+          const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
           await setActiveVersion(storyId, scene.pageNumber, activeIndex);
         }
       }
@@ -12576,7 +12570,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
+          const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
           await setActiveVersion(storyId, scene.pageNumber, activeIndex);
         }
       }
@@ -14825,7 +14819,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     if (storyData.sceneImages?.length > 0) {
       for (const scene of storyData.sceneImages) {
         if (scene.imageVersions?.length > 0) {
-          const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
+          const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
           await setActiveVersion(storyId, scene.pageNumber, activeIndex);
         }
       }
@@ -15105,7 +15099,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             if (sceneImages?.length > 0) {
               for (const scene of sceneImages) {
                 if (scene.imageVersions?.length > 0) {
-                  const activeIndex = scene.imageVersions.length;  // DB version_index = array_index + 1
+                  const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
                   await setActiveVersion(jobId, scene.pageNumber, activeIndex);
                 }
               }

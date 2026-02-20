@@ -13,6 +13,7 @@ const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryIm
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
+const { dbToArrayIndex } = require('../lib/versionManager');
 
 /**
  * Build metadata object from story data for fast list queries.
@@ -416,7 +417,7 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           // saveStoryData saves imageVersions[i] at version_index i+1, so offset by -1
           const scene = sceneImagesMap.get(row.page_number);
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
-          const versionMeta = row.version_index > 0 ? (pageMeta[row.version_index - 1] || {}) : {};
+          const versionMeta = row.version_index > 0 ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {}) : {};
           const versionDate = row.generated_at || versionMeta.createdAt;
           scene.imageVersions.push({
             versionIndex: row.version_index,
