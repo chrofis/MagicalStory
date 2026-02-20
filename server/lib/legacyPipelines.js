@@ -13,6 +13,7 @@
  */
 
 // --- Module imports (same as server.js) ---
+const { CREDIT_CONFIG } = require('../config/credits');
 const pLimit = require('p-limit');
 const { getActiveIndexAfterPush } = require('./versionManager');
 const { GenerationLogger } = require('./generationLogger');
@@ -2397,7 +2398,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
 async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false) {
   // Destructure server.js-local dependencies
-  const { dbPool, log, saveCheckpoint, getCheckpoint, deleteJobCheckpoints, getAllCheckpoints, detectBboxOnCovers, buildCoverSceneImages, IMAGE_GEN_MODE, CREDIT_CONFIG, email } = deps;
+  const { dbPool, log, saveCheckpoint, getCheckpoint, deleteJobCheckpoints, getAllCheckpoints, detectBboxOnCovers, buildCoverSceneImages, IMAGE_GEN_MODE, email } = deps;
 
   log.debug(`📖 [OUTLINE+TEXT] Starting outline+text generation for job ${jobId}`);
 

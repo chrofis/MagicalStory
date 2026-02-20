@@ -32,40 +32,8 @@ const log = {
   verbose: (msg, ...args) => CURRENT_LOG_LEVEL >= LOG_LEVELS.debug && console.log(`[DEBUG] ${msg}`, ...args)
 };
 
-// Credit costs and pricing configuration (centralized for easy maintenance)
-const CREDIT_CONFIG = {
-  // Credit costs per operation
-  COSTS: {
-    IMAGE_REGENERATION: 5,    // Cost to regenerate a single scene image
-    COVER_REGENERATION: 5,    // Cost to regenerate a cover image
-    PER_PAGE: 10,             // Credits per story page (e.g., 20-page story = 200 credits)
-  },
-
-  // Credit purchase pricing
-  PRICING: {
-    CENTS_PER_CREDIT: 5,      // 5 cents per credit (CHF 0.05)
-    // So CHF 5 = 500 cents = 100 credits
-  },
-
-  // Credit limits
-  LIMITS: {
-    MIN_PURCHASE: 100,        // Minimum credits to purchase
-    MAX_PURCHASE: 10000,      // Maximum credits to purchase
-    INITIAL_USER: 500,        // Credits for new users
-    INITIAL_ADMIN: -1,        // Unlimited credits for admins (-1)
-  },
-
-  // Story page limits
-  STORY_PAGES: {
-    MIN: 4,      // Minimum 4 pages (2 scenes for standard, 4 for picture book) - dev mode uses this
-    MIN_PUBLIC: 10,  // Minimum for non-dev users
-    MAX: 100,
-    DEFAULT: 20,
-  },
-};
-
-// Legacy export for backward compatibility
-const CREDIT_COSTS = CREDIT_CONFIG.COSTS;
+// Credit costs and pricing configuration (shared across route modules)
+const { CREDIT_CONFIG, CREDIT_COSTS } = require('./server/config/credits');
 
 // Initialize BOTH Stripe clients - test for admins/developers, live for regular users
 const stripeTest = process.env.STRIPE_TEST_SECRET_KEY
@@ -250,7 +218,10 @@ const {
   getLandmarkPhotosForScene,
   extractSceneMetadata,
   stripSceneMetadata,
-  getHistoricalLocations
+  getHistoricalLocations,
+  convertClothingToCurrentFormat,
+  getPageText,
+  updatePageText
 } = require('./server/lib/storyHelpers');
 const { OutlineParser, UnifiedStoryParser, ProgressiveUnifiedParser } = require('./server/lib/outlineParser');
 const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
@@ -270,39 +241,6 @@ const photosRoutes = require('./server/routes/photos');
 const avatarsRoutes = require('./server/routes/avatars');
 const aiProxyRoutes = require('./server/routes/ai-proxy');
 const { apiRouter: sharingApiRoutes, htmlRouter: sharingHtmlRoutes, initSharingRoutes } = require('./server/routes/sharing');
-
-/**
- * Convert clothingRequirements to _currentClothing format for getCharacterPhotoDetails
- * This ensures characters use the story's costumes (not 'standard' fallback) for covers
- *
- * @param {Object} clothingRequirements - Raw clothing requirements from story/streaming
- * @returns {Object} - Converted requirements with _currentClothing set for each character
- */
-function convertClothingToCurrentFormat(clothingRequirements) {
-  const converted = {};
-  for (const [charName, charData] of Object.entries(clothingRequirements || {})) {
-    if (typeof charData === 'string') {
-      // Flat format: "costumed:1889 belle epoque"
-      converted[charName] = { _currentClothing: charData };
-    } else if (charData && typeof charData === 'object') {
-      if (charData._currentClothing) {
-        // Already has _currentClothing, copy as-is
-        converted[charName] = { ...charData };
-      } else if (charData.costumed && charData.costumed.costume) {
-        // Nested format: { costumed: { costume: "1889 belle epoque", used: true } }
-        const costume = charData.costumed.costume;
-        converted[charName] = {
-          ...charData,
-          _currentClothing: `costumed:${costume}`
-        };
-      } else {
-        // No costume found, copy as-is
-        converted[charName] = { ...charData };
-      }
-    }
-  }
-  return converted;
-}
 
 /**
  * Build scene image objects for cover images to include in consistency checks.
@@ -582,7 +520,7 @@ if (STORAGE_MODE === 'database') {
     dbPool, log, email,
     saveCheckpoint, getCheckpoint, deleteJobCheckpoints, getAllCheckpoints,
     detectBboxOnCovers, buildCoverSceneImages,
-    IMAGE_GEN_MODE, STORAGE_MODE, STORY_BATCH_SIZE, CREDIT_CONFIG
+    IMAGE_GEN_MODE, STORAGE_MODE, STORY_BATCH_SIZE
   });
 
   log.debug(`✓ Database pools initialized`);
@@ -3004,6 +2942,8 @@ ${landmarkEntries}`;
     const combinedResponse = `=== STORY 1 ===\n${fullResponse1}\n\n=== STORY 2 ===\n${fullResponse2}`;
     res.write(`data: ${JSON.stringify({ done: true, fullResponse: combinedResponse })}\n\n`);
     log.debug('  Done event sent, closing stream');
+    // Small delay before closing to let HTTP/2 proxy flush the final event
+    await new Promise(resolve => setTimeout(resolve, 500));
     res.end();
 
   } catch (err) {
@@ -6315,31 +6255,6 @@ app.get('/api/jobs/:jobId/checkpoints/:stepName', authenticateToken, async (req,
   }
 });
 
-// Helper: Get text for a specific page from storyText
-function getPageText(storyText, pageNumber) {
-  if (!storyText) return null;
-
-  // Match page markers like "--- Page X ---" or "## Page X"
-  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
-  const match = storyText.match(pageRegex);
-
-  return match ? match[1].trim() : null;
-}
-
-// Helper: Update text for a specific page in storyText
-function updatePageText(storyText, pageNumber, newText) {
-  if (!storyText) return `--- Page ${pageNumber} ---\n${newText}\n`;
-
-  const pageRegex = new RegExp(`((?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
-  const match = storyText.match(pageRegex);
-
-  if (match) {
-    return storyText.replace(pageRegex, `$1\n${newText}\n`);
-  } else {
-    // Page doesn't exist, append it
-    return storyText + `\n--- Page ${pageNumber} ---\n${newText}\n`;
-  }
-}
 
 // Print Provider API - Create photobook order
 // Accepts bookFormat: 'square' (default) or 'A4'

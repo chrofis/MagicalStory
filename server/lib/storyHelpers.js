@@ -3403,6 +3403,84 @@ function buildPreviousScenesContext(sceneDescriptions, currentPage, maxPrevious 
     }));
 }
 
+// ============================================================================
+// CLOTHING FORMAT CONVERSION
+// ============================================================================
+
+/**
+ * Convert clothingRequirements to _currentClothing format for getCharacterPhotoDetails
+ * This ensures characters use the story's costumes (not 'standard' fallback) for covers
+ *
+ * @param {Object} clothingRequirements - Raw clothing requirements from story/streaming
+ * @returns {Object} - Converted requirements with _currentClothing set for each character
+ */
+function convertClothingToCurrentFormat(clothingRequirements) {
+  const converted = {};
+  for (const [charName, charData] of Object.entries(clothingRequirements || {})) {
+    if (typeof charData === 'string') {
+      // Flat format: "costumed:1889 belle epoque"
+      converted[charName] = { _currentClothing: charData };
+    } else if (charData && typeof charData === 'object') {
+      if (charData._currentClothing) {
+        // Already has _currentClothing, copy as-is
+        converted[charName] = { ...charData };
+      } else if (charData.costumed && charData.costumed.costume) {
+        // Nested format: { costumed: { costume: "1889 belle epoque", used: true } }
+        const costume = charData.costumed.costume;
+        converted[charName] = {
+          ...charData,
+          _currentClothing: `costumed:${costume}`
+        };
+      } else {
+        // No costume found, copy as-is
+        converted[charName] = { ...charData };
+      }
+    }
+  }
+  return converted;
+}
+
+// ============================================================================
+// PAGE TEXT HELPERS
+// ============================================================================
+
+/**
+ * Get text for a specific page from storyText
+ * @param {string} storyText - Full story text with page markers
+ * @param {number} pageNumber - Page number to extract
+ * @returns {string|null} Page text or null if not found
+ */
+function getPageText(storyText, pageNumber) {
+  if (!storyText) return null;
+
+  // Match page markers like "--- Page X ---" or "## Page X"
+  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * Update text for a specific page in storyText
+ * @param {string} storyText - Full story text with page markers
+ * @param {number} pageNumber - Page number to update
+ * @param {string} newText - New text for the page
+ * @returns {string} Updated story text
+ */
+function updatePageText(storyText, pageNumber, newText) {
+  if (!storyText) return `--- Page ${pageNumber} ---\n${newText}\n`;
+
+  const pageRegex = new RegExp(`((?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  if (match) {
+    return storyText.replace(pageRegex, `$1\n${newText}\n`);
+  } else {
+    // Page doesn't exist, append it
+    return storyText + `\n--- Page ${pageNumber} ---\n${newText}\n`;
+  }
+}
+
 module.exports = {
   // Config
   ART_STYLES,
@@ -3469,5 +3547,12 @@ module.exports = {
   POSITION_ABBREVIATIONS,
 
   // Character parsing for bbox matching
-  parseCharacterDescriptions
+  parseCharacterDescriptions,
+
+  // Clothing format conversion
+  convertClothingToCurrentFormat,
+
+  // Page text helpers
+  getPageText,
+  updatePageText
 };
