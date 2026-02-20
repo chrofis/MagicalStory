@@ -328,6 +328,15 @@ export default function StoryWizard() {
   const devMetadataLoadedRef = useRef(false);
   const storyTextReceivedRef = useRef(false);
 
+  // Track which load phases have completed to prevent race conditions
+  // where later phases overwrite data from earlier phases
+  const loadPhaseRef = useRef({
+    metadataLoaded: false,
+    fastImagesLoaded: false,
+    fullImagesLoaded: false,
+    devMetadataLoaded: false,
+  });
+
   // Progressive story display state (show story while images are generating)
   const [progressiveStoryData, setProgressiveStoryData] = useState<{
     title: string;
@@ -647,6 +656,8 @@ export default function StoryWizard() {
       }
 
       log.info('Loading saved story (two-phase):', urlStoryId);
+      // Reset load phase tracker for new story
+      loadPhaseRef.current = { metadataLoaded: false, fastImagesLoaded: false, fullImagesLoaded: false, devMetadataLoaded: false };
       // Note: Don't set isLoading here - step 6 (story display) renders immediately
       // with placeholders and handles its own loading states
       setLoadingProgress(null);
@@ -747,45 +758,43 @@ export default function StoryWizard() {
               setClothingRequirements(null);
             }
 
-            // Scene images metadata - MERGE with existing imageData (don't overwrite loaded images)
+            // Scene images metadata - MERGE with existing data (preserve imageData + imageVersions)
+            loadPhaseRef.current.metadataLoaded = true;
             setSceneImages(prev => {
               const metaScenes = fullMeta.sceneImages || [];
               return metaScenes.map(metaScene => {
                 const existing = prev.find(p => p.pageNumber === metaScene.pageNumber);
-                // Keep existing imageData if already loaded, add metadata
                 return {
                   ...metaScene,
+                  // Preserve imageData from fast/full image phases if already loaded
                   imageData: existing?.imageData || metaScene.imageData,
+                  // Preserve imageVersions from full-images phase if already loaded
+                  ...(existing?.imageVersions ? { imageVersions: existing.imageVersions } : {}),
                 };
               });
             });
-            // Only set sceneDescriptions if actually present in response.
-            // The FAST PATH metadata query doesn't include sceneDescriptions,
-            // so fullMeta.sceneDescriptions is undefined. Don't overwrite with []
-            // because dev-metadata (which loads in parallel) provides the real data.
-            if (fullMeta.sceneDescriptions?.length) {
+            // Only set sceneDescriptions if present AND dev-metadata hasn't already loaded them
+            if (fullMeta.sceneDescriptions?.length && !loadPhaseRef.current.devMetadataLoaded) {
               setSceneDescriptions(fullMeta.sceneDescriptions);
             }
 
             // Cover images metadata - MERGE with existing imageData (don't overwrite loaded images)
             setCoverImages(prev => {
+              const mergeCover = (prevCover: typeof prev.frontCover, newCover: typeof prev.frontCover) => {
+                if (!newCover) return null;
+                const newObj = typeof newCover === 'object' ? newCover : { imageData: newCover };
+                const prevData = prevCover && typeof prevCover === 'object' ? prevCover.imageData : (prevCover as string | undefined);
+                const newData = typeof newCover === 'object' ? newCover.imageData : newCover;
+                return {
+                  ...newObj,
+                  imageData: prevData || newData,
+                };
+              };
               const newCovers = fullMeta.coverImages || { frontCover: null, initialPage: null, backCover: null };
               return {
-                frontCover: newCovers.frontCover ? {
-                  ...(typeof newCovers.frontCover === 'object' ? newCovers.frontCover : { imageData: newCovers.frontCover }),
-                  imageData: (prev.frontCover && typeof prev.frontCover === 'object' ? prev.frontCover.imageData : prev.frontCover as string) ||
-                             (typeof newCovers.frontCover === 'object' ? newCovers.frontCover.imageData : newCovers.frontCover),
-                } : null,
-                initialPage: newCovers.initialPage ? {
-                  ...(typeof newCovers.initialPage === 'object' ? newCovers.initialPage : { imageData: newCovers.initialPage }),
-                  imageData: (prev.initialPage && typeof prev.initialPage === 'object' ? prev.initialPage.imageData : prev.initialPage as string) ||
-                             (typeof newCovers.initialPage === 'object' ? newCovers.initialPage.imageData : newCovers.initialPage),
-                } : null,
-                backCover: newCovers.backCover ? {
-                  ...(typeof newCovers.backCover === 'object' ? newCovers.backCover : { imageData: newCovers.backCover }),
-                  imageData: (prev.backCover && typeof prev.backCover === 'object' ? prev.backCover.imageData : prev.backCover as string) ||
-                             (typeof newCovers.backCover === 'object' ? newCovers.backCover.imageData : newCovers.backCover),
-                } : null,
+                frontCover: mergeCover(prev.frontCover, newCovers.frontCover),
+                initialPage: mergeCover(prev.initialPage, newCovers.initialPage),
+                backCover: mergeCover(prev.backCover, newCovers.backCover),
               };
             });
 
@@ -845,6 +854,7 @@ export default function StoryWizard() {
         if (developerMode) {
           devMetadataLoadedRef.current = true;
           storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
+            loadPhaseRef.current.devMetadataLoaded = true;
             mergeDevMetadata(devMetadata);
             log.debug('Dev metadata merged into story');
           }).catch(err => {
@@ -910,6 +920,8 @@ export default function StoryWizard() {
 
             log.info('Fast images displayed');
           }
+          // Mark fast images phase complete
+          loadPhaseRef.current.fastImagesLoaded = true;
           // Clear progress when fast load is done
           setImageLoadProgress(null);
 
@@ -965,6 +977,7 @@ export default function StoryWizard() {
               }
             }
 
+            loadPhaseRef.current.fullImagesLoaded = true;
             log.info('Full image data with versions loaded');
           }).catch(err => {
             log.warn('Failed to load full images (versions may be unavailable):', err);
