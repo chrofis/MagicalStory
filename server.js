@@ -329,7 +329,7 @@ function buildCoverSceneImages(coverImages, characters, totalStoryPages) {
     const cover = coverImages?.[key];
     if (!cover) continue;
 
-    const imageData = typeof cover === 'string' ? cover : cover.imageData;
+    const imageData = cover.imageData;
     if (!imageData) continue;
 
     // Build retryHistory with bboxDetection if available (for entity consistency cropping)
@@ -382,7 +382,7 @@ async function detectBboxOnCovers(coverImages, characters) {
     const cover = coverImages[coverType];
     if (!cover) continue;
 
-    const imageData = typeof cover === 'string' ? cover : cover.imageData;
+    const imageData = cover.imageData;
     if (!imageData) continue;
 
     // Skip if already has bbox detection
@@ -440,17 +440,8 @@ async function detectBboxOnCovers(coverImages, characters) {
         }
 
         // Update cover with bbox data
-        if (typeof cover === 'string') {
-          // Old format - convert to object
-          coverImages[coverType] = {
-            imageData: cover,
-            bboxDetection,
-            bboxOverlayImage
-          };
-        } else {
-          cover.bboxDetection = bboxDetection;
-          cover.bboxOverlayImage = bboxOverlayImage;
-        }
+        cover.bboxDetection = bboxDetection;
+        cover.bboxOverlayImage = bboxOverlayImage;
       }
     } catch (err) {
       log.warn(`⚠️ [COVER BBOX] Failed to detect bbox on ${coverType}: ${err.message}`);

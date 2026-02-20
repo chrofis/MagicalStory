@@ -5,7 +5,28 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport } from '@/types/story';
+
+/**
+ * Normalize a cover value from the API to always be CoverImageData | null.
+ * The API may return a raw string (legacy) or an object. This ensures
+ * the frontend always works with the object form.
+ */
+function normalizeCover(cover: string | CoverImageData | null | undefined): CoverImageData | null {
+  if (!cover) return null;
+  if (typeof cover === 'string') return { imageData: cover };
+  return cover;
+}
+
+/** Normalize all cover values in a CoverImages object */
+function normalizeCoverImages(covers: { frontCover?: unknown; initialPage?: unknown; backCover?: unknown } | null | undefined): CoverImages {
+  if (!covers) return { frontCover: null, initialPage: null, backCover: null };
+  return {
+    frontCover: normalizeCover(covers.frontCover as string | CoverImageData | null),
+    initialPage: normalizeCover(covers.initialPage as string | CoverImageData | null),
+    backCover: normalizeCover(covers.backCover as string | CoverImageData | null),
+  };
+}
 
 interface StoryDraft {
   storyType: string;
@@ -223,7 +244,7 @@ export const storyService = {
         visualBible: s.visualBible,
         sceneDescriptions: s.sceneDescriptions,
         sceneImages: s.sceneImages,
-        coverImages: s.coverImages,
+        coverImages: normalizeCoverImages(s.coverImages),
         thumbnail: s.thumbnail,
         createdAt: s.createdAt,
         isPartial: s.isPartial,
@@ -323,7 +344,7 @@ export const storyService = {
       visualBible: s.visualBible,
       sceneDescriptions: s.sceneDescriptions,
       sceneImages: s.sceneImages,
-      coverImages: s.coverImages,
+      coverImages: normalizeCoverImages(s.coverImages),
       thumbnail: s.thumbnail,
       createdAt: s.createdAt,
       isPartial: s.isPartial,

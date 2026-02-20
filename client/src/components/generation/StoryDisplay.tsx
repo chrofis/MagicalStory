@@ -841,8 +841,8 @@ export function StoryDisplay({
   // Get cover image versions
   const getCoverVersions = (coverType: 'frontCover' | 'initialPage' | 'backCover'): ImageVersion[] => {
     const cover = coverImages?.[coverType];
-    if (!cover || typeof cover === 'string') return [];
-    return (cover as CoverImageData).imageVersions || [];
+    if (!cover) return [];
+    return cover.imageVersions || [];
   };
 
   // Extract just the Image Summary from a full scene description
@@ -1195,18 +1195,9 @@ export function StoryDisplay({
   // Debug: Log progressive state (only when values change significantly, to avoid spam)
   // Removed excessive logging - use browser DevTools if needed
 
-  // Helper to get cover image data (handles both string and object formats)
-  const getCoverImageData = (img: string | CoverImageData | null | undefined): string | null => {
-    if (!img) return null;
-    if (typeof img === 'string') return img;
-    return img.imageData || null;
-  };
-
-  // Helper to get full cover object (for accessing prompt, quality, etc.)
-  const getCoverObject = (img: string | CoverImageData | null | undefined): CoverImageData | null => {
-    if (!img) return null;
-    if (typeof img === 'string') return { imageData: img };
-    return img;
+  // Helper to get cover image data
+  const getCoverImageData = (img: CoverImageData | null | undefined): string | null => {
+    return img?.imageData || null;
   };
 
   // Helper to get scene description for a page (pretty-printed JSON)
@@ -3396,8 +3387,8 @@ export function StoryDisplay({
       )}
 
       {/* Front Cover Display */}
-      {coverImages && (getCoverImageData(coverImages.frontCover) || (coverImages.frontCover && typeof coverImages.frontCover === 'object' && (coverImages.frontCover as CoverImageData).hasImage)) && (() => {
-        const frontCoverObj = getCoverObject(coverImages.frontCover);
+      {coverImages && (getCoverImageData(coverImages.frontCover) || coverImages.frontCover?.hasImage) && (() => {
+        const frontCoverObj = coverImages.frontCover;
         const frontCoverImageData = getCoverImageData(coverImages.frontCover);
         const isCoverLazyLoading = !frontCoverImageData && frontCoverObj?.hasImage;
         return (
@@ -3616,7 +3607,7 @@ export function StoryDisplay({
 
       {/* Initial Page (Dedication Page) Display */}
       {coverImages && getCoverImageData(coverImages.initialPage) && (() => {
-        const initialPageObj = getCoverObject(coverImages.initialPage);
+        const initialPageObj = coverImages.initialPage;
         return (
           <div className="mt-6 max-w-2xl mx-auto">
             <p className="text-sm text-gray-500 text-center mb-2">
@@ -4774,7 +4765,7 @@ export function StoryDisplay({
 
       {/* Back Cover Display - show as soon as available */}
       {coverImages && getCoverImageData(coverImages.backCover) && (() => {
-        const backCoverObj = getCoverObject(coverImages.backCover);
+        const backCoverObj = coverImages.backCover;
         return (
           <div className="mt-8 max-w-2xl mx-auto">
             <p className="text-sm text-gray-500 text-center mb-2">

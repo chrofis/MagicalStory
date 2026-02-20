@@ -429,9 +429,9 @@ async function logActivity(userId, username, action, details) {
  */
 function buildStoryMetadata(story) {
   const sceneCount = story.sceneImages?.length || 0;
+  const frontCover = story.coverImages?.frontCover;
   const hasThumbnail = !!(
-    story.coverImages?.frontCover?.imageData ||
-    story.coverImages?.frontCover ||
+    (frontCover && (frontCover.imageData || frontCover.hasImage)) ||
     story.thumbnail
   );
 
@@ -519,26 +519,26 @@ async function saveStoryData(storyId, storyData) {
   // Extract and save cover images (including versions)
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
   for (const coverType of coverTypes) {
+    // Normalize legacy string covers to object format before saving
+    if (dataForStorage.coverImages?.[coverType]) {
+      dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
+    }
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
       // Save main imageData as version 0 (for backwards compatibility)
-      const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+      const imageData = coverData.imageData;
       if (imageData) {
         await saveStoryImage(storyId, coverType, null, imageData, {
-          qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null,
-          generatedAt: typeof coverData === 'object' ? coverData.generatedAt : null,
+          qualityScore: coverData.qualityScore || null,
+          generatedAt: coverData.generatedAt || null,
           versionIndex: 0
         });
         imagesSaved++;
-        if (typeof coverData === 'object') {
-          delete coverData.imageData;
-        } else {
-          dataForStorage.coverImages[coverType] = { stripped: true };
-        }
+        delete coverData.imageData;
       }
 
       // Also save additional cover versions (imageVersions array)
-      if (typeof coverData === 'object' && coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
+      if (coverData.imageVersions && Array.isArray(coverData.imageVersions)) {
         for (let i = 0; i < coverData.imageVersions.length; i++) {
           const version = coverData.imageVersions[i];
           if (version.imageData) {
@@ -614,16 +614,12 @@ async function updateStoryDataOnly(storyId, storyData) {
     }
   }
 
-  // Strip cover images
+  // Strip cover images (normalize to object format first)
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
   for (const coverType of coverTypes) {
-    const coverData = dataForStorage.coverImages?.[coverType];
-    if (coverData) {
-      if (typeof coverData === 'object') {
-        delete coverData.imageData;
-      } else if (typeof coverData === 'string') {
-        dataForStorage.coverImages[coverType] = { stripped: true };
-      }
+    if (dataForStorage.coverImages?.[coverType]) {
+      dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
+      delete dataForStorage.coverImages[coverType].imageData;
     }
   }
 
@@ -714,25 +710,23 @@ async function upsertStory(storyId, userId, storyData) {
   const coverTypes = ['frontCover', 'initialPage', 'backCover'];
   console.log(`💾 [UPSERT] Processing covers for ${storyId}: ${Object.keys(dataForStorage.coverImages || {}).join(', ') || 'none'}`);
   for (const coverType of coverTypes) {
+    // Normalize legacy string covers to object format
+    if (dataForStorage.coverImages?.[coverType]) {
+      dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
+    }
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
-      const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
-      console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}, type=${typeof coverData}`);
+      const imageData = coverData.imageData;
+      console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}`);
       if (imageData) {
         await saveStoryImage(storyId, coverType, null, imageData, {
-          qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null,
-          generatedAt: typeof coverData === 'object' ? coverData.generatedAt : null,
+          qualityScore: coverData.qualityScore || null,
+          generatedAt: coverData.generatedAt || null,
           versionIndex: 0
         });
         imagesSaved++;
         console.log(`✅ [UPSERT] Saved ${coverType} to story_images (${imageData.length} chars)`);
-        // Remove imageData from storage (keep metadata for object type)
-        if (typeof coverData === 'object') {
-          delete coverData.imageData;
-        } else {
-          // For string-only cover data, replace with placeholder
-          dataForStorage.coverImages[coverType] = { stripped: true };
-        }
+        delete coverData.imageData;
       }
     }
   }
@@ -1129,25 +1123,24 @@ async function rehydrateStoryImages(storyId, storyData) {
     }
   }
 
-  // Populate coverImages
+  // Populate coverImages — normalize to object format first
   if (storyData.coverImages) {
     const covers = ['frontCover', 'backCover', 'initialPage'];
     for (const coverType of covers) {
+      // Normalize legacy string covers to object format
+      storyData.coverImages[coverType] = normalizeCoverValue(storyData.coverImages[coverType]);
       const cover = storyData.coverImages[coverType];
+
       if (cover && !getCoverData(cover)) {
         const img = images.find(i => i.image_type === coverType);
         if (img) {
-          if (typeof cover === 'string') {
-            storyData.coverImages[coverType] = img.image_data;
-          } else {
-            cover.imageData = img.image_data;
-          }
+          cover.imageData = img.image_data;
         }
       }
 
       // Populate cover imageVersions with their imageData from database
       // Populate cover imageVersions — covers use arrayToDbIndex(i, coverType) = i
-      if (cover && typeof cover === 'object' && cover.imageVersions && cover.imageVersions.length > 0) {
+      if (cover && cover.imageVersions && cover.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < cover.imageVersions.length; vIdx++) {
           const version = cover.imageVersions[vIdx];
           if (!version.imageData) {
@@ -1169,9 +1162,18 @@ async function rehydrateStoryImages(storyId, storyData) {
 
 function getCoverData(cover) {
   if (!cover) return null;
-  if (typeof cover === 'string' && cover.startsWith('data:')) return cover;
   if (cover.imageData) return cover.imageData;
   return null;
+}
+
+/**
+ * Normalize a cover value to always be an object { imageData, ... } or null.
+ * Handles legacy string format (just base64 data) and converts it.
+ */
+function normalizeCoverValue(cover) {
+  if (!cover) return null;
+  if (typeof cover === 'string') return { imageData: cover };
+  return cover;
 }
 
 // ============================================

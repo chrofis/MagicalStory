@@ -760,7 +760,7 @@ router.post('/strip-migrated-image-data', authenticateToken, requireAdmin, async
             delete coverData.imageData;
             imagesStripped++;
           } else if (coverData && typeof coverData === 'string') {
-            // Old format: coverImages.frontCover is just the image string
+            // Old format: normalize to object and strip
             story.coverImages[coverType] = { stripped: true };
             imagesStripped++;
           }

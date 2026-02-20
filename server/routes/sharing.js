@@ -325,7 +325,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
       return res.status(404).json({ error: 'Cover not found' });
     }
     const coverObj = story.data.coverImages?.[coverType];
-    const coverImageData = typeof coverObj === 'string' ? coverObj : coverObj?.imageData;
+    const coverImageData = coverObj?.imageData;
     if (!coverImageData) {
       return res.status(404).json({ error: 'Cover not found' });
     }

@@ -483,22 +483,22 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
         })),
         coverImages: story.coverImages ? {
           frontCover: story.coverImages.frontCover ? {
-            ...(typeof story.coverImages.frontCover === 'object' ? story.coverImages.frontCover : {}),
+            ...story.coverImages.frontCover,
             imageData: undefined,
             imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-            hasImage: !!(typeof story.coverImages.frontCover === 'string' ? story.coverImages.frontCover : story.coverImages.frontCover?.imageData)
+            hasImage: !!story.coverImages.frontCover?.imageData
           } : null,
           initialPage: story.coverImages.initialPage ? {
-            ...(typeof story.coverImages.initialPage === 'object' ? story.coverImages.initialPage : {}),
+            ...story.coverImages.initialPage,
             imageData: undefined,
             imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-            hasImage: !!(typeof story.coverImages.initialPage === 'string' ? story.coverImages.initialPage : story.coverImages.initialPage?.imageData)
+            hasImage: !!story.coverImages.initialPage?.imageData
           } : null,
           backCover: story.coverImages.backCover ? {
-            ...(typeof story.coverImages.backCover === 'object' ? story.coverImages.backCover : {}),
+            ...story.coverImages.backCover,
             imageData: undefined,
             imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
-            hasImage: !!(typeof story.coverImages.backCover === 'string' ? story.coverImages.backCover : story.coverImages.backCover?.imageData)
+            hasImage: !!story.coverImages.backCover?.imageData
           } : null
         } : null,
         totalImages: (story.sceneImages?.length || 0) + (story.coverImages ? 3 : 0)
@@ -1012,12 +1012,11 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         return res.json({ bboxOverlayImage: coverImage.bboxOverlayImage || null });
       }
       if (field === 'imageData') {
-        const imageData = typeof coverImage === 'string' ? coverImage : coverImage.imageData;
-        return res.json({ imageData: imageData || null });
+        return res.json({ imageData: coverImage.imageData || null });
       }
       // Return all cover data
       return res.json({
-        imageData: typeof coverImage === 'string' ? coverImage : coverImage.imageData,
+        imageData: coverImage.imageData || null,
         bboxOverlayImage: coverImage.bboxOverlayImage || null,
         bboxDetection: coverImage.bboxDetection || null
       });
@@ -1528,15 +1527,15 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
         const coverData = story.coverImages[coverType];
         if (coverData) {
-          const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+          const imageData = coverData.imageData;
           if (imageData) {
             const activeCoverIdx = activeVersions[coverType] ?? 0;
             covers[coverType] = {
               imageData: normalizeImageData(imageData),
-              qualityScore: typeof coverData === 'object' ? coverData.qualityScore : null
+              qualityScore: coverData.qualityScore || null
             };
             // Include imageVersions if available in blob (more than 1 version)
-            if (typeof coverData === 'object' && coverData.imageVersions && coverData.imageVersions.length > 1) {
+            if (coverData.imageVersions && coverData.imageVersions.length > 1) {
               covers[coverType].imageVersions = coverData.imageVersions.map((v, i) => ({
                 imageData: normalizeImageData(v.imageData),
                 qualityScore: v.qualityScore,
@@ -1745,8 +1744,7 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
       return res.status(404).json({ error: 'Cover not found' });
     }
 
-    // Handle both string (legacy) and object formats
-    const imageData = typeof coverData === 'string' ? coverData : coverData.imageData;
+    const imageData = coverData.imageData;
     if (!imageData) {
       return res.status(404).json({ error: 'Cover image not found' });
     }
@@ -1754,7 +1752,8 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
     res.json({
       coverType,
       imageData: normalizeImageData(imageData),
-      ...(typeof coverData === 'object' ? { description: coverData.description, storyTitle: coverData.storyTitle } : {})
+      description: coverData.description,
+      storyTitle: coverData.storyTitle
     });
   } catch (err) {
     console.error('❌ Error fetching cover image:', err);

@@ -782,12 +782,9 @@ export default function StoryWizard() {
             setCoverImages(prev => {
               const mergeCover = (prevCover: typeof prev.frontCover, newCover: typeof prev.frontCover) => {
                 if (!newCover) return null;
-                const newObj = typeof newCover === 'object' ? newCover : { imageData: newCover };
-                const prevData = prevCover && typeof prevCover === 'object' ? prevCover.imageData : (prevCover as string | undefined);
-                const newData = typeof newCover === 'object' ? newCover.imageData : newCover;
                 return {
-                  ...newObj,
-                  imageData: prevData || newData,
+                  ...newCover,
+                  imageData: prevCover?.imageData || newCover.imageData,
                 };
               };
               const newCovers = fullMeta.coverImages || { frontCover: null, initialPage: null, backCover: null };
@@ -4548,8 +4545,8 @@ export default function StoryWizard() {
                   setCoverImages(prev => {
                     if (!prev) return prev;
                     const cover = prev[coverType];
-                    if (!cover || typeof cover === 'string') return prev;
-                    const coverObj = cover as import('@/types/story').CoverImageData;
+                    if (!cover) return prev;
+                    const coverObj = cover;
                     if (!coverObj.imageVersions) return prev;
                     // Validate version index is in bounds
                     if (versionIndex < 0 || versionIndex >= coverObj.imageVersions.length) {

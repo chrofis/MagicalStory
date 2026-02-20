@@ -207,11 +207,9 @@ export function GenerationProgress({
   // Use server progress directly (0-100 scale)
   const progressPercent = total === 100 ? current : Math.round((current / total) * 100);
 
-  // Helper to extract imageData from cover (can be string or object with imageData)
-  const getImageData = (cover: string | { imageData?: string } | null | undefined): string | undefined => {
-    if (!cover) return undefined;
-    if (typeof cover === 'string') return cover;
-    return cover.imageData;
+  // Helper to extract imageData from cover
+  const getImageData = (cover: { imageData?: string } | null | undefined): string | undefined => {
+    return cover?.imageData;
   };
 
   // Check which covers are available

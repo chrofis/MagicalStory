@@ -734,9 +734,9 @@ export interface CoverImageData {
 }
 
 export interface CoverImages {
-  frontCover: string | CoverImageData | null;
-  initialPage: string | CoverImageData | null;
-  backCover: string | CoverImageData | null;
+  frontCover: CoverImageData | null;
+  initialPage: CoverImageData | null;
+  backCover: CoverImageData | null;
 }
 
 // Token usage info for dev mode display
