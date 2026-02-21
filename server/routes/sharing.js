@@ -386,8 +386,18 @@ async function ogImageHandler(req, res) {
       }
     }
 
+    // Fallback 2: use first page image if no cover exists (covers may be skipped)
     if (!coverImage) {
-      log.error(`[OG-IMAGE] Cover image not found for story ${storyId} - both story_images and legacy fallback failed`);
+      log.debug(`[OG-IMAGE] No cover found, trying first page image...`);
+      const pageImageResult = await getStoryImage(storyId, 'scene', 1, 0);
+      if (pageImageResult?.imageData) {
+        coverImage = pageImageResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+        log.debug(`[OG-IMAGE] Using page 1 image as fallback (${coverImage.length} chars)`);
+      }
+    }
+
+    if (!coverImage) {
+      log.error(`[OG-IMAGE] No image found for story ${storyId} - cover, legacy, and page fallbacks all failed`);
       return res.status(404).json({ error: 'Cover image not found' });
     }
 
