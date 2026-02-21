@@ -4062,7 +4062,7 @@ export default function StoryWizard() {
                       originalImage: result.originalImage,
                       originalScore: result.originalScore,
                       originalReasoning: result.originalReasoning,
-                      imageVersions: result.imageVersions,
+                      imageVersions: result.imageVersions || img.imageVersions,
                       // Update reference images used for this regeneration (for dev mode display)
                       referencePhotos: result.referencePhotos || img.referencePhotos,
                       landmarkPhotos: result.landmarkPhotos || img.landmarkPhotos,

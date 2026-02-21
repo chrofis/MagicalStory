@@ -614,8 +614,21 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
     }
 
-    // Get version count for response
-    const versionCount = sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions?.length || 1;
+    // Get version info for response
+    const updatedScene = sceneImages.find(s => s.pageNumber === pageNumber);
+    const versionCount = updatedScene?.imageVersions?.length || 1;
+    const imageVersions = updatedScene?.imageVersions?.map((v, idx) => ({
+      description: v.description,
+      prompt: v.prompt,
+      userInput: v.userInput,
+      modelId: v.modelId,
+      createdAt: v.createdAt,
+      isActive: v.isActive,
+      type: v.type,
+      qualityScore: v.qualityScore,
+      // Only include imageData for latest versions to keep response small
+      imageData: idx >= (updatedScene.imageVersions.length - 2) ? v.imageData : undefined
+    })) || [];
 
     res.json({
       success: true,
@@ -630,8 +643,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       retryHistory: imageResult.retryHistory || [],
       wasRegenerated: true,
       regenerationCount: newImageData.regenerationCount,
-      // Version info
+      // Version info (with metadata for dev mode scene comparison)
       versionCount,
+      imageVersions,
       creditsUsed: creditCost,
       creditsRemaining: newCredits,
       // API cost tracking
