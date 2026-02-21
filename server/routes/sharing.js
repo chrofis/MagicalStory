@@ -351,6 +351,7 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
   <meta property="og:image" content="${ogImageUrl}">
+  <meta property="og:image:secure_url" content="${ogImageUrl}">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -359,7 +360,7 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
   <meta name="twitter:title" content="${title}">
   <meta name="twitter:image" content="${ogImageUrl}">
   <title>${title}</title>
-  <meta http-equiv="refresh" content="0;url=/shared/${shareToken}">
+  <meta http-equiv="refresh" content="0;url=${SITE_URL}/shared/${shareToken}">
 </head>
 <body>
   <p>Weiterleitung zu <a href="/shared/${shareToken}">${rawTitle}</a>...</p>
@@ -411,6 +412,7 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
   <meta property="og:title" content="${title}">
   <meta property="og:description" content="${description}">
   <meta property="og:image" content="${ogImageUrl}">
+  <meta property="og:image:secure_url" content="${ogImageUrl}">
   <meta property="og:image:type" content="image/jpeg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
