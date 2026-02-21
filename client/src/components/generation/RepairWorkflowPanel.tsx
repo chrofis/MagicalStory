@@ -20,6 +20,7 @@ import {
   Image,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
+import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback } from '@/types/story';
 import type { Character } from '@/types/character';
 
@@ -243,6 +244,7 @@ export function RepairWorkflowPanel({
 }: RepairWorkflowPanelProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
+  const [gridLightbox, setGridLightbox] = useState<string | null>(null);
 
   const {
     workflowState,
@@ -440,6 +442,7 @@ export function RepairWorkflowPanel({
   if (!storyId) return null;
 
   return (
+    <>
     <div className="mb-6 border-2 border-amber-300 rounded-lg bg-amber-50/50 overflow-hidden">
       {/* Header */}
       <button
@@ -963,6 +966,17 @@ export function RepairWorkflowPanel({
                                   {clothingResult.score}/10
                                 </span>
                               </div>
+                              {clothingResult.gridImage && (
+                                <div className="mt-2 mb-2">
+                                  <img
+                                    src={clothingResult.gridImage}
+                                    alt={`${charName} - ${clothing} consistency grid`}
+                                    className="w-full max-h-48 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => setGridLightbox(clothingResult.gridImage!)}
+                                    title="Click to enlarge"
+                                  />
+                                </div>
+                              )}
                               {clothingResult.issues && clothingResult.issues.length > 0 && (
                                 <ul className="mt-1 space-y-1">
                                   {clothingResult.issues.map((issue, i) => (
@@ -1338,6 +1352,14 @@ export function RepairWorkflowPanel({
         </div>
       )}
     </div>
+    {gridLightbox && (
+      <ImageLightbox
+        src={gridLightbox}
+        alt="Consistency Grid"
+        onClose={() => setGridLightbox(null)}
+      />
+    )}
+    </>
   );
 }
 
