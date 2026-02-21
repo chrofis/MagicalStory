@@ -2491,11 +2491,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Main characters appear on ALL covers, non-main are split across initial/back
         const MAX_COVER_CHARACTERS = 5;
         let charactersForCover;
-        if (coverType === 'titlePage') {
+        if (coverCharacters.length > 0) {
+          // Scene description contained character names - use exactly those
           charactersForCover = coverCharacters.length > MAX_COVER_CHARACTERS
             ? coverCharacters.slice(0, MAX_COVER_CHARACTERS)
             : coverCharacters;
-        } else {
+        } else if (coverType !== 'titlePage') {
+          // initialPage/backCover without scene-based characters: distribute across covers
           const allChars = inputData.characters || [];
           let mainChars = allChars.filter(c => c.isMainCharacter === true);
           // Fallback: use mainCharacters array of IDs (same as titlePage logic)
@@ -2517,6 +2519,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
           charactersForCover = [...mainCapped, ...extras];
           log.debug(`📕 [COVER] ${coverType}: ${charactersForCover.map(c => c.name).join(', ')} (${mainCapped.length} main + ${extras.length} extras, capped at ${MAX_COVER_CHARACTERS})`);
+        } else {
+          // titlePage without characters (shouldn't happen due to earlier fallbacks)
+          charactersForCover = coverCharacters;
         }
 
         // Get character photos with clothing - per-character clothing from mergedClothingRequirements takes precedence
