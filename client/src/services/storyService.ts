@@ -394,6 +394,20 @@ export const storyService = {
       faceEvaluation: unknown | null;
       referencePhotos: ReferencePhoto[] | null;
       landmarkPhotos?: LandmarkPhoto[] | null;
+      imageVersionsMeta?: Array<{
+        description: string | null;
+        prompt: string | null;
+        userInput: string | null;
+        modelId: string | null;
+        createdAt: string | null;
+        isActive: boolean;
+        type: string | null;
+        qualityScore: number | null;
+        qualityReasoning: string | null;
+        fixTargets: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
+        totalAttempts: number | null;
+        referencePhotoNames: Array<{ name: string; photoType?: string; clothingCategory?: string; clothingDescription?: string }>;
+      }>;
       consistencyRegen?: {
         originalImage: string;
         originalPrompt: string;

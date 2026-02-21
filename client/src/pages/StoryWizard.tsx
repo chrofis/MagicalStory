@@ -398,6 +398,21 @@ export default function StoryWizard() {
             referencePhotos: devData.referencePhotos ?? img.referencePhotos,
             landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
+            // Merge per-version metadata into imageVersions
+            imageVersions: img.imageVersions?.map((v, idx) => {
+              const meta = devData.imageVersionsMeta?.[idx];
+              if (!meta) return v;
+              return {
+                ...v,
+                qualityScore: meta.qualityScore ?? v.qualityScore,
+                qualityReasoning: meta.qualityReasoning ?? v.qualityReasoning,
+                fixTargets: meta.fixTargets?.length ? meta.fixTargets : v.fixTargets,
+                totalAttempts: meta.totalAttempts ?? v.totalAttempts,
+                referencePhotoNames: meta.referencePhotoNames?.length ? meta.referencePhotoNames : v.referencePhotoNames,
+                prompt: meta.prompt ?? v.prompt,
+                description: meta.description ?? v.description,
+              };
+            }) ?? img.imageVersions,
           };
         }
         return img;
@@ -4525,6 +4540,14 @@ export default function StoryWizard() {
                       return {
                         ...img,
                         imageData: activeVersion.imageData,
+                        // Swap metadata to match selected version (only if version has the data)
+                        ...(activeVersion.qualityScore !== undefined && { qualityScore: activeVersion.qualityScore }),
+                        ...(activeVersion.qualityReasoning !== undefined && { qualityReasoning: activeVersion.qualityReasoning }),
+                        ...(activeVersion.fixTargets !== undefined && { fixTargets: activeVersion.fixTargets }),
+                        ...(activeVersion.prompt !== undefined && { prompt: activeVersion.prompt }),
+                        ...(activeVersion.description !== undefined && { description: activeVersion.description }),
+                        ...(activeVersion.totalAttempts !== undefined && { totalAttempts: activeVersion.totalAttempts }),
+                        ...(activeVersion.modelId !== undefined && { modelId: activeVersion.modelId }),
                         imageVersions: img.imageVersions.map((v, i) => ({
                           ...v,
                           isActive: i === versionIndex

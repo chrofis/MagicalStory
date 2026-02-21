@@ -622,6 +622,10 @@ export interface ImageVersion {
   isActive: boolean;
   type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair';
   qualityScore?: number;
+  qualityReasoning?: string;
+  fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
+  totalAttempts?: number;
+  referencePhotoNames?: Array<{ name: string; photoType?: string; clothingCategory?: string; clothingDescription?: string }>;
   // Entity repair specific
   entityRepairedFor?: string;
   clothingCategory?: string;

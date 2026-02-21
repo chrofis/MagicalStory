@@ -4256,6 +4256,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   prompt: imagePrompt,
                   description: expandedDescription,
                   qualityScore: imageResult.score,
+                  qualityReasoning: imageResult.reasoning || null,
+                  fixTargets: imageResult.fixTargets || [],
+                  totalAttempts: imageResult.totalAttempts || null,
                   generatedAt: new Date().toISOString(),
                   source: 'consistency-regen'
                 });

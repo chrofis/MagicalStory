@@ -548,7 +548,15 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         prompt: existingImage.prompt,
         modelId: existingImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
-        isActive: false  // Will become inactive when new image is added
+        isActive: false,  // Will become inactive when new image is added
+        qualityScore: existingImage.qualityScore ?? null,
+        qualityReasoning: existingImage.qualityReasoning || null,
+        fixTargets: existingImage.fixTargets || [],
+        totalAttempts: existingImage.totalAttempts || null,
+        referencePhotoNames: (existingImage.referencePhotos || []).map(p => ({
+          name: p.name, photoType: p.photoType,
+          clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+        })),
       }];
     }
 
@@ -560,7 +568,15 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       prompt: imagePrompt,
       modelId: imageResult.modelId || null,
       createdAt: new Date().toISOString(),
-      isActive: true
+      isActive: true,
+      qualityScore: imageResult.score ?? null,
+      qualityReasoning: imageResult.reasoning || null,
+      fixTargets: imageResult.fixTargets || [],
+      totalAttempts: imageResult.totalAttempts || null,
+      referencePhotoNames: (referencePhotos || []).map(p => ({
+        name: p.name, photoType: p.photoType,
+        clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+      })),
     };
 
     if (existingIndex >= 0) {
@@ -1023,7 +1039,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         modelId: currentImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
         isActive: false,
-        type: 'original'
+        type: 'original',
+        qualityScore: currentImage.qualityScore ?? null,
+        qualityReasoning: currentImage.qualityReasoning || null,
+        fixTargets: currentImage.fixTargets || [],
+        totalAttempts: currentImage.totalAttempts || null,
+        referencePhotoNames: (currentImage.referencePhotos || []).map(p => ({
+          name: p.name, photoType: p.photoType,
+          clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+        })),
       }];
     }
 
@@ -1037,7 +1061,15 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       isActive: true,
       type: 'iteration',
       iterationFeedback: previewFeedback.composition,
-      previewMismatches
+      previewMismatches,
+      qualityScore: imageResult.score ?? null,
+      qualityReasoning: imageResult.reasoning || null,
+      fixTargets: imageResult.fixTargets || [],
+      totalAttempts: imageResult.totalAttempts || null,
+      referencePhotoNames: (referencePhotos || []).map(p => ({
+        name: p.name, photoType: p.photoType,
+        clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+      })),
     };
 
     if (existingImageIndex >= 0) {
@@ -2120,7 +2152,15 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
             modelId: existingImage.modelId,
             createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
             isActive: false,
-            type: 'original'
+            type: 'original',
+            qualityScore: existingImage.qualityScore ?? null,
+            qualityReasoning: existingImage.qualityReasoning || null,
+            fixTargets: existingImage.fixTargets || [],
+            totalAttempts: existingImage.totalAttempts || null,
+            referencePhotoNames: (existingImage.referencePhotos || []).map(p => ({
+              name: p.name, photoType: p.photoType,
+              clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+            })),
           }];
         } else {
           // Mark all previous versions as inactive
@@ -2137,7 +2177,11 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
           isActive: true,
           type: 'entity-repair',
           entityRepairedFor: entityName,
-          clothingCategory: repairResult.clothingCategory
+          clothingCategory: repairResult.clothingCategory,
+          qualityScore: null,
+          qualityReasoning: null,
+          fixTargets: [],
+          totalAttempts: null,
         });
 
         // Keep preEntityRepairImage for backward compatibility
@@ -2467,7 +2511,14 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
               createdAt: new Date().toISOString(),
               isActive: false,
               type: 'original',
-              qualityScore: scene.qualityScore
+              qualityScore: scene.qualityScore,
+              qualityReasoning: scene.qualityReasoning || null,
+              fixTargets: scene.fixTargets || [],
+              totalAttempts: scene.totalAttempts || null,
+              referencePhotoNames: (scene.referencePhotos || []).map(p => ({
+                name: p.name, photoType: p.photoType,
+                clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+              })),
             }];
           }
 
@@ -2479,7 +2530,10 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
             createdAt: new Date().toISOString(),
             isActive: true,
             type: 'iteration',
-            qualityScore: result.score
+            qualityScore: result.score,
+            qualityReasoning: result.reasoning || null,
+            fixTargets: result.fixTargets || [],
+            totalAttempts: result.totalAttempts || null,
           });
 
           // Mark all other versions as inactive
@@ -3039,7 +3093,14 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
               createdAt: new Date().toISOString(),
               isActive: false,
               type: 'original',
-              qualityScore: scene.qualityScore
+              qualityScore: scene.qualityScore,
+              qualityReasoning: scene.qualityReasoning || null,
+              fixTargets: scene.fixTargets || [],
+              totalAttempts: scene.totalAttempts || null,
+              referencePhotoNames: (scene.referencePhotos || []).map(p => ({
+                name: p.name, photoType: p.photoType,
+                clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+              })),
             }];
           }
 
@@ -3050,7 +3111,10 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
             createdAt: new Date().toISOString(),
             isActive: true,
             type: 'repair',
-            qualityScore: repairResult.score
+            qualityScore: repairResult.score,
+            qualityReasoning: repairResult.reasoning || null,
+            fixTargets: repairResult.fixTargets || [],
+            totalAttempts: null,
           });
 
           // Mark all other versions as inactive

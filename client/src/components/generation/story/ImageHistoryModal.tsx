@@ -90,11 +90,21 @@ export function ImageHistoryModal({
                         : `V${idx + 1}`
                       }
                     </span>
-                    {version.isActive && (
-                      <span className="bg-green-500 px-2 py-0.5 rounded text-[10px] font-bold">
-                        {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {developerMode && version.qualityScore != null && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          version.qualityScore >= 80 ? 'bg-green-600' :
+                          version.qualityScore >= 60 ? 'bg-yellow-600' : 'bg-red-600'
+                        }`}>
+                          {version.qualityScore}%
+                        </span>
+                      )}
+                      {version.isActive && (
+                        <span className="bg-green-500 px-2 py-0.5 rounded text-[10px] font-bold">
+                          {language === 'de' ? 'Aktiv' : language === 'fr' ? 'Actif' : 'Active'}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-[10px] text-gray-300 mt-1">
                     {new Date(version.createdAt).toLocaleDateString()}
@@ -148,6 +158,45 @@ export function ImageHistoryModal({
                     )}
                     {version.modelId && (
                       <div className="text-xs text-gray-500">Model: {version.modelId}</div>
+                    )}
+                    {version.qualityScore != null && (
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs font-semibold text-gray-700">Quality:</span>
+                        <span className={`text-xs font-bold ${
+                          version.qualityScore >= 80 ? 'text-green-600' :
+                          version.qualityScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                        }`}>
+                          {version.qualityScore}%
+                        </span>
+                        {version.totalAttempts != null && version.totalAttempts > 1 && (
+                          <span className="text-xs text-gray-400">({version.totalAttempts} attempts)</span>
+                        )}
+                      </div>
+                    )}
+                    {version.qualityReasoning && (
+                      <div>
+                        <div className="text-xs font-semibold text-gray-700">Quality Reasoning:</div>
+                        <pre className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-2 rounded border border-gray-200 max-h-24 overflow-y-auto">
+                          {version.qualityReasoning}
+                        </pre>
+                      </div>
+                    )}
+                    {version.fixTargets && version.fixTargets.length > 0 && (
+                      <div>
+                        <div className="text-xs font-semibold text-orange-700">
+                          Fix Targets ({version.fixTargets.length}):
+                        </div>
+                        <ul className="text-xs text-gray-600 list-disc list-inside">
+                          {version.fixTargets.map((ft, ftIdx) => (
+                            <li key={ftIdx}>{ft.issue}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {version.referencePhotoNames && version.referencePhotoNames.length > 0 && (
+                      <div className="text-xs text-gray-500">
+                        Avatars: {version.referencePhotoNames.map(p => p.name).join(', ')}
+                      </div>
                     )}
                   </div>
                 </details>
