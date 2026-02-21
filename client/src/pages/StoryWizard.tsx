@@ -397,6 +397,7 @@ export default function StoryWizard() {
             faceEvaluation: devData.faceEvaluation ?? img.faceEvaluation,
             referencePhotos: devData.referencePhotos ?? img.referencePhotos,
             landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
+            hasVisualBibleGrid: devData.hasVisualBibleGrid ?? img.hasVisualBibleGrid,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
             // Merge per-version metadata into imageVersions
             imageVersions: img.imageVersions?.map((v, idx) => {

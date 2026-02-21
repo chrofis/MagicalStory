@@ -4192,11 +4192,12 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid) && image && (
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
                                 visualBibleGrid={image.visualBibleGrid}
+                                hasVisualBibleGrid={image.hasVisualBibleGrid}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -4712,11 +4713,12 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid) && (
+                            {((image.referencePhotos?.length ?? 0) > 0 || (image.landmarkPhotos?.length ?? 0) > 0 || image.visualBibleGrid || image.hasVisualBibleGrid) && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
                                 visualBibleGrid={image.visualBibleGrid}
+                                hasVisualBibleGrid={image.hasVisualBibleGrid}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}

@@ -669,6 +669,7 @@ export interface SceneImage {
   landmarkPhotos?: LandmarkPhoto[];
   // Visual Bible grid image (combines VB elements + secondary landmarks)
   visualBibleGrid?: string;  // Base64 data URL
+  hasVisualBibleGrid?: boolean;  // Flag when visualBibleGrid is stripped (for lazy loading)
   // API model used (for dev mode)
   modelId?: string;
   // User-initiated image versions (first is original, subsequent are regenerations)

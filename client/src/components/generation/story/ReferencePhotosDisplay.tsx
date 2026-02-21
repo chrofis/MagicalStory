@@ -15,6 +15,7 @@ interface ReferencePhotosDisplayProps {
   referencePhotos: ReferencePhoto[];
   landmarkPhotos?: LandmarkPhoto[];
   visualBibleGrid?: string;  // Base64 data URL of combined VB elements grid
+  hasVisualBibleGrid?: boolean;  // Flag when visualBibleGrid is stripped (for lazy loading)
   language: string;
   // For lazy loading
   storyId?: string;
@@ -28,6 +29,7 @@ export function ReferencePhotosDisplay({
   referencePhotos,
   landmarkPhotos,
   visualBibleGrid,
+  hasVisualBibleGrid,
   language,
   storyId,
   pageNumber
@@ -35,26 +37,31 @@ export function ReferencePhotosDisplay({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [loadedReferencePhotos, setLoadedReferencePhotos] = useState<ReferencePhoto[] | null>(null);
   const [loadedLandmarkPhotos, setLoadedLandmarkPhotos] = useState<LandmarkPhoto[] | null>(null);
+  const [loadedVBGrid, setLoadedVBGrid] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // Check if we need to lazy load (photos have hasPhoto flag but no actual data)
   const needsLazyLoadRef = referencePhotos?.some(p => p.hasPhoto && !p.photoUrl);
   const needsLazyLoadLandmark = landmarkPhotos?.some(p => p.hasPhoto && !p.photoData);
+  const needsLazyLoadVBGrid = hasVisualBibleGrid && !visualBibleGrid;
 
   const loadImages = useCallback(async () => {
     if (!storyId || !pageNumber || isLoading) return;
-    if (!needsLazyLoadRef && !needsLazyLoadLandmark) return;
+    if (!needsLazyLoadRef && !needsLazyLoadLandmark && !needsLazyLoadVBGrid) return;
 
     setIsLoading(true);
     setLoadError(null);
 
     try {
-      // Load reference photos
-      if (needsLazyLoadRef) {
+      // Load reference photos (and VB grid - returned together from 'reference' endpoint)
+      if (needsLazyLoadRef || needsLazyLoadVBGrid) {
         const refData = await storyService.getDevImage(storyId, pageNumber, 'reference');
         if (refData?.referencePhotos) {
           setLoadedReferencePhotos(refData.referencePhotos as ReferencePhoto[]);
+        }
+        if (refData?.visualBibleGrid) {
+          setLoadedVBGrid(refData.visualBibleGrid as string);
         }
       }
 
@@ -70,15 +77,17 @@ export function ReferencePhotosDisplay({
     } finally {
       setIsLoading(false);
     }
-  }, [storyId, pageNumber, isLoading, needsLazyLoadRef, needsLazyLoadLandmark]);
+  }, [storyId, pageNumber, isLoading, needsLazyLoadRef, needsLazyLoadLandmark, needsLazyLoadVBGrid]);
 
   // Use loaded photos if available, otherwise use props
   const displayRefPhotos = loadedReferencePhotos || referencePhotos;
   const displayLandmarkPhotos = loadedLandmarkPhotos || landmarkPhotos;
 
+  const displayVBGrid = loadedVBGrid || visualBibleGrid;
+
   const hasCharacterPhotos = displayRefPhotos && displayRefPhotos.length > 0;
   const hasLandmarkPhotos = displayLandmarkPhotos && displayLandmarkPhotos.length > 0;
-  const hasVBGrid = !!visualBibleGrid;
+  const hasVBGrid = !!displayVBGrid || hasVisualBibleGrid;
 
   if (!hasCharacterPhotos && !hasLandmarkPhotos && !hasVBGrid) return null;
 
@@ -132,7 +141,7 @@ export function ReferencePhotosDisplay({
     <details
       className="bg-pink-50 border border-pink-300 rounded-lg p-3"
       onToggle={(e) => {
-        if ((e.target as HTMLDetailsElement).open && (needsLazyLoadRef || needsLazyLoadLandmark)) {
+        if ((e.target as HTMLDetailsElement).open && (needsLazyLoadRef || needsLazyLoadLandmark || needsLazyLoadVBGrid)) {
           loadImages();
         }
       }}
@@ -283,13 +292,19 @@ export function ReferencePhotosDisplay({
                 ? 'Personnages secondaires, animaux, artefacts, véhicules et monuments supplémentaires'
                 : 'Secondary characters, animals, artifacts, vehicles, and additional landmarks'}
             </div>
-            <img
-              src={visualBibleGrid}
-              alt="Visual Bible Reference Grid"
-              className="w-full max-h-64 object-contain rounded border border-indigo-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => setLightboxImage(visualBibleGrid!)}
-              title="Click to enlarge"
-            />
+            {displayVBGrid ? (
+              <img
+                src={displayVBGrid}
+                alt="Visual Bible Reference Grid"
+                className="w-full max-h-64 object-contain rounded border border-indigo-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => setLightboxImage(displayVBGrid!)}
+                title="Click to enlarge"
+              />
+            ) : (
+              <div className="text-xs text-gray-500 italic py-4 text-center bg-gray-100 rounded">
+                {isLoading ? (language === 'de' ? 'Wird geladen...' : 'Loading...') : (language === 'de' ? 'Bild nicht geladen' : 'Image not loaded')}
+              </div>
+            )}
           </div>
         </div>
       )}

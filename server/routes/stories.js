@@ -638,6 +638,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           source: p.source,
           hasPhoto: !!p.photoData
         })),
+        hasVisualBibleGrid: !!img.visualBibleGrid,
         // Consistency regeneration - flags only, images lazy loaded
         consistencyRegen: img.consistencyRegen ? {
           hasOriginalImage: !!img.consistencyRegen.originalImage,
@@ -1138,7 +1139,8 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
             clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription,
             photoUrl: p.photoUrl || p.photoData || null  // photoData contains base64 data URI
-          }))
+          })),
+          visualBibleGrid: sceneImage.visualBibleGrid || null
         };
         break;
 

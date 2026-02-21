@@ -394,6 +394,7 @@ export const storyService = {
       faceEvaluation: unknown | null;
       referencePhotos: ReferencePhoto[] | null;
       landmarkPhotos?: LandmarkPhoto[] | null;
+      hasVisualBibleGrid?: boolean;
       imageVersionsMeta?: Array<{
         description: string | null;
         prompt: string | null;
@@ -526,6 +527,7 @@ export const storyService = {
       name: string;
       photoData?: string | null;
     }>;
+    visualBibleGrid?: string | null;
   } | null> {
     try {
       const token = localStorage.getItem('auth_token');
