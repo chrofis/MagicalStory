@@ -5359,7 +5359,7 @@ app.get('/robots.txt', (req, res) => {
     res.type('text/plain').sendFile(robotsPath);
   } else {
     // Fallback inline robots.txt
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nSitemap: https://magicalstory.ch/sitemap.xml`);
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nAllow: /api/shared/\nDisallow: /api/\nDisallow: /admin/\nSitemap: https://magicalstory.ch/sitemap.xml`);
   }
 });
 
