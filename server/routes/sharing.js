@@ -335,7 +335,9 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
       const rawTitle = story.data.title || 'Eine magische Geschichte';
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg`;
+      // Cache buster: rotate daily so WhatsApp/Facebook re-fetch after fixes or image changes
+      const ogCacheBuster = Math.floor(Date.now() / 86400000);
+      const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg?v=${ogCacheBuster}`;
       const pageUrl = `${SITE_URL}/s/${shareToken}`;
 
       // Minimal HTML with ONLY OG tags — nothing else. WhatsApp parses this reliably.
@@ -394,7 +396,9 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       const rawTitle = story.data.title || 'Eine magische Geschichte';
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg`;
+      // Cache buster: rotate daily so WhatsApp/Facebook re-fetch after fixes or image changes
+      const ogCacheBuster = Math.floor(Date.now() / 86400000);
+      const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg?v=${ogCacheBuster}`;
       const pageUrl = `${SITE_URL}/shared/${shareToken}`;
 
       // Create OG meta tags

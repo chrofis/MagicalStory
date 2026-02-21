@@ -5,9 +5,5 @@ Allow: /
 # Sitemap location
 Sitemap: https://magicalstory.ch/sitemap.xml
 
-# Allow social crawlers to fetch shared story images (og:image)
-Allow: /api/shared/
-
-# Disallow other internal/API paths
-Disallow: /api/
+# Disallow internal paths (but not /api/shared/ which serves OG images)
 Disallow: /admin/
