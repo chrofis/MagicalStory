@@ -4978,7 +4978,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     : (incrementalConsistencyInput?.forceRepairThreshold ?? null);
 
   // In check-only mode: only 1 attempt, no auto-repair, force dry-run for consistency
-  const MAX_ATTEMPTS = checkOnlyMode ? 1 : 3;
+  // enableQualityRetry: when false, generate once and accept (no retry on low scores)
+  const enableQualityRetry = options.enableQualityRetry === true; // Default: false
+  const MAX_ATTEMPTS = checkOnlyMode ? 1 : (enableQualityRetry ? 3 : 1);
   const enableAutoRepair = checkOnlyMode ? false : enableAutoRepairInput;
   const incrementalConsistency = checkOnlyMode && incrementalConsistencyInput
     ? { ...incrementalConsistencyInput, dryRun: true }

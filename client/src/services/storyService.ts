@@ -1409,6 +1409,7 @@ export const storyService = {
     skipSceneDescriptions?: boolean;
     skipCovers?: boolean;
     // Developer feature options
+    enableQualityRetry?: boolean;  // Retry on low quality scores (default: ON)
     enableAutoRepair?: boolean;
     useGridRepair?: boolean;  // Use grid-based repair instead of legacy inpainting
     forceRepairThreshold?: number | null;  // Force repair on pages with issues below this score (100 = always)
@@ -1486,6 +1487,7 @@ export const storyService = {
       skipSceneDescriptions: data.skipSceneDescriptions,
       skipCovers: data.skipCovers,
       // Developer feature options
+      enableQualityRetry: data.enableQualityRetry,
       enableAutoRepair: data.enableAutoRepair,
       useGridRepair: data.useGridRepair,
       forceRepairThreshold: data.forceRepairThreshold,

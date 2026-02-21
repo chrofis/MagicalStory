@@ -74,7 +74,8 @@ const MODEL_DEFAULTS = {
   // Feature flags for generation pipeline
   enableAutoRepair: false,             // Auto-repair: fix detected issues in generated images
   useGridRepair: true,                 // Grid-based repair (new system) - default ON when autoRepair enabled
-  enableFinalChecks: true,             // Final checks: run consistency checks at end of generation
+  enableQualityRetry: false,           // Quality retry: regenerate images scoring below 50%
+  enableFinalChecks: false,            // Final checks: run consistency checks at end of generation (default: OFF)
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
 
   // Separated Evaluation Pipeline (new architecture)

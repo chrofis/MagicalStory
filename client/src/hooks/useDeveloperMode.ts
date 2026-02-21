@@ -62,6 +62,9 @@ interface DeveloperModeState {
   // Load all avatar variants upfront (heavy - for debugging)
   loadAllAvatars: boolean;
   setLoadAllAvatars: (load: boolean) => void;
+  // Quality retry: regenerate images scoring below 50% (default: ON)
+  enableQualityRetry: boolean;
+  setEnableQualityRetry: (enable: boolean) => void;
   // MagicAPI repair: use face swap + hair fix pipeline instead of Gemini for character repair
   useMagicApiRepair: boolean;
   setUseMagicApiRepair: (use: boolean) => void;
@@ -86,6 +89,7 @@ const MODEL_DEFAULTS: ModelSelections = {
 
 // Feature flag defaults (must match server/config/models.js MODEL_DEFAULTS)
 const FEATURE_DEFAULTS = {
+  enableQualityRetry: false,  // Quality retry: regenerate images scoring below 50%
   enableAutoRepair: false,    // Auto-repair: fix detected issues in generated images
   enableFinalChecks: false,   // Final checks: run consistency checks at end of generation (+ sequential regen)
   incrementalConsistency: false,  // Incremental consistency: check each image against previous
@@ -127,6 +131,9 @@ export function useDeveloperMode(): DeveloperModeState {
   const [devSkipImages, setDevSkipImages] = useState(false);
   // Skip covers by default in dev mode
   const [devSkipCovers, setDevSkipCovers] = useState(wasDevMode);
+
+  // Quality retry: regenerate images scoring below 50%
+  const [enableQualityRetry, setEnableQualityRetry] = useState(FEATURE_DEFAULTS.enableQualityRetry);
 
   // Auto-repair: automatically fix detected issues in generated images
   const [enableAutoRepair, setEnableAutoRepair] = useState(FEATURE_DEFAULTS.enableAutoRepair);
@@ -206,6 +213,8 @@ export function useDeveloperMode(): DeveloperModeState {
     setDevSkipImages,
     devSkipCovers,
     setDevSkipCovers,
+    enableQualityRetry,
+    setEnableQualityRetry,
     enableAutoRepair,
     setEnableAutoRepair,
     enableFinalChecks,

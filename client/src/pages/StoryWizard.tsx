@@ -96,6 +96,7 @@ export default function StoryWizard() {
     devSkipSceneDescriptions, setDevSkipSceneDescriptions,
     devSkipImages, setDevSkipImages,
     devSkipCovers, setDevSkipCovers,
+    enableQualityRetry, setEnableQualityRetry,
     enableAutoRepair, setEnableAutoRepair,
     useGridRepair, setUseGridRepair,
     forceRepairThreshold, setForceRepairThreshold,
@@ -3395,6 +3396,7 @@ export default function StoryWizard() {
         skipSceneDescriptions: devSkipSceneDescriptions,
         skipCovers: devSkipCovers,
         // Developer feature options
+        enableQualityRetry: enableQualityRetry,
         enableAutoRepair: enableAutoRepair,
         useGridRepair: useGridRepair,
         forceRepairThreshold: forceRepairThreshold,
@@ -4390,10 +4392,10 @@ export default function StoryWizard() {
                 }
               } : undefined}
               // Iterate page using 17-check scene description with actual image analysis (dev mode only)
-              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number) => {
+              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, options?: { useOriginalAsReference?: boolean }) => {
                 try {
-                  log.info('Starting iteration for page:', pageNumber, 'imageModel:', modelSelections.imageModel);
-                  const result = await storyService.iteratePage(storyId, pageNumber, modelSelections.imageModel || undefined);
+                  log.info('Starting iteration for page:', pageNumber, 'imageModel:', modelSelections.imageModel, 'options:', options);
+                  const result = await storyService.iteratePage(storyId, pageNumber, modelSelections.imageModel || undefined, options);
 
                   if (result.success) {
                     // Update the scene image with the iterated version
@@ -4862,6 +4864,19 @@ export default function StoryWizard() {
                         🔧 {language === 'de' ? 'Feature-Optionen' : language === 'fr' ? 'Options de fonctionnalités' : 'Feature Options'}
                       </h3>
                       <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={enableQualityRetry}
+                          onChange={(e) => setEnableQualityRetry(e.target.checked)}
+                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
+                        />
+                        <span className="text-gray-700">{language === 'de' ? 'Qualitäts-Retry' : language === 'fr' ? 'Réessai qualité' : 'Quality retry (regenerate if score < 50%)'}</span>
+                      </label>
+                      <p className="text-xs text-gray-500 ml-6">
+                        {language === 'de' ? 'Regeneriert Bilder automatisch bis zu 3x wenn Qualitätsscore unter 50%' : language === 'fr' ? 'Régénère automatiquement les images jusqu\'à 3x si le score qualité est inférieur à 50%' : 'Automatically regenerates images up to 3x when quality score is below 50%'}
+                      </p>
+
+                      <label className="flex items-center gap-2 cursor-pointer mt-2">
                         <input
                           type="checkbox"
                           checked={enableAutoRepair}

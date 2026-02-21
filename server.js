@@ -2085,7 +2085,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false, separatedEvaluation = false) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false, separatedEvaluation = false, enableQualityRetry = true) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -2577,7 +2577,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
@@ -3322,7 +3322,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, incrementalConsistency: incrConfigWithCurrentChars }
+        { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
       // Track scene rewrite usage if a safety block triggered a rewrite
@@ -4843,6 +4843,7 @@ async function processStoryJob(jobId) {
 
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
+    const enableQualityRetry = inputData.enableQualityRetry === true; // Developer mode: retry on low quality scores (default: OFF)
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
     const useGridRepair = inputData.useGridRepair !== false; // Use grid-based repair (default: ON when autoRepair is on)
     const forceRepairThreshold = typeof inputData.forceRepairThreshold === 'number' ? inputData.forceRepairThreshold : null; // Force repair on pages with issues below this score
@@ -4872,7 +4873,7 @@ async function processStoryJob(jobId) {
       log.debug(`🔍 [PIPELINE] Scene validation ENABLED - will generate preview images for composition checks`);
     }
 
-    log.info(`🔧 [PIPELINE] Settings: autoRepair=${enableAutoRepair}, gridRepair=${useGridRepair}, ` +
+    log.info(`🔧 [PIPELINE] Settings: qualityRetry=${enableQualityRetry}, autoRepair=${enableAutoRepair}, gridRepair=${useGridRepair}, ` +
       `forceRepairThreshold=${forceRepairThreshold}, finalChecks=${enableFinalChecks}, ` +
       `checkOnly=${checkOnlyMode}, sceneValidation=${enableSceneValidation}, ` +
       `separatedEval=${separatedEvaluation}, skipImages=${skipImages}, skipCovers=${skipCovers}, ` +
@@ -4971,7 +4972,7 @@ async function processStoryJob(jobId) {
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation, separatedEvaluation);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation, separatedEvaluation, enableQualityRetry);
     }
 
     if (generationMode === 'pictureBook') {
