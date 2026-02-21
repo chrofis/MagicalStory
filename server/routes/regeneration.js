@@ -2756,6 +2756,25 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     const characters = rehydratedData.characters || [];
     const report = await runEntityConsistencyChecks(rehydratedData, characters);
 
+    // Save any newly-generated bboxDetection back to the original storyData
+    // so it's cached in retryHistory for next time (avoids redundant API calls)
+    if (report.pagesWithNewBbox?.length > 0) {
+      log.info(`🔍 [REPAIR-WORKFLOW] Saving fallback bboxDetection for pages: ${report.pagesWithNewBbox.join(', ')}`);
+      for (const pageNumber of report.pagesWithNewBbox) {
+        const rehydratedScene = rehydratedData.sceneImages?.find(s => s.pageNumber === pageNumber);
+        const originalScene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+        if (rehydratedScene?.bboxDetection && originalScene) {
+          if (!originalScene.retryHistory) originalScene.retryHistory = [];
+          originalScene.retryHistory.push({
+            type: 'bbox_detection_only',
+            bboxDetection: rehydratedScene.bboxDetection,
+            timestamp: new Date().toISOString(),
+            source: 'consistency-check-fallback'
+          });
+        }
+      }
+    }
+
     // Save report to ORIGINAL story data (without image data) to avoid re-saving images
     if (!storyData.finalChecksReport) {
       storyData.finalChecksReport = {};
@@ -2881,7 +2900,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
                 // Get character appearance with bounding box
                 const sceneDescriptions = storyData.sceneDescriptions || [];
-                const entityAppearances = collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
+                const entityAppearances = await collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
                 const appearances = entityAppearances.get(characterName);
                 const appearance = appearances?.find(a => a.pageNumber === pageNumber);
 

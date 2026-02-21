@@ -15,8 +15,9 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { createLabeledGrid, escapeXml } = require('./repairGrid');
 const { PROMPT_TEMPLATES } = require('../services/prompts');
 const { log } = require('../utils/logger');
-const { extractSceneMetadata } = require('./storyHelpers');
+const { extractSceneMetadata, buildCharacterPhysicalDescription, getCharactersInScene } = require('./storyHelpers');
 const { getFacePhoto } = require('./characterPhotos');
+const { detectAllBoundingBoxes } = require('./images');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
@@ -199,7 +200,14 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
 
     // Collect entity appearances from bbox detection data
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
-    const entityAppearances = collectEntityAppearances(sceneImages, characters, sceneDescriptions);
+    const entityAppearances = await collectEntityAppearances(sceneImages, characters, sceneDescriptions, {
+      storyCharacters: characters
+    });
+
+    // Extract and forward pages where fallback bbox detection was run
+    const pagesWithNewBbox = entityAppearances._pagesWithNewBbox || [];
+    delete entityAppearances._pagesWithNewBbox;
+    report.pagesWithNewBbox = pagesWithNewBbox;
 
     if (entityAppearances.size === 0) {
       report.summary = 'No entity appearances found with bounding boxes';
@@ -466,8 +474,9 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  * @param {Array<object>} sceneDescriptions - Scene descriptions for extracting clothing metadata
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
-function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
-  const { skipMinAppearancesFilter = false } = options;
+async function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
+  const { skipMinAppearancesFilter = false, storyCharacters = null } = options;
+  const pagesWithNewBbox = [];
   const appearances = new Map();
 
   // Initialize for each character
@@ -524,7 +533,7 @@ function collectEntityAppearances(sceneImages, characters = [], sceneDescription
     }
 
     // Get figures from bbox detection - now includes direct character identification via figure.name
-    const figures = bboxDetection?.figures || [];
+    let figures = bboxDetection?.figures || [];
 
     // Debug logging for entity collection
     if (!bboxDetection) {
@@ -532,6 +541,48 @@ function collectEntityAppearances(sceneImages, characters = [], sceneDescription
     } else {
       const identifiedFigures = figures.filter(f => f.name && f.name !== 'UNKNOWN');
       log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: ${figures.length} figures, ${identifiedFigures.length} identified: ${identifiedFigures.map(f => f.name).join(', ')}`);
+    }
+
+    // Fallback: run on-the-fly bbox detection for pages with missing or unusable data
+    const identifiedCount = figures.filter(f => f.name && f.name !== 'UNKNOWN').length;
+    const needsFallbackDetection = !bboxDetection || (figures.length > 0 && identifiedCount === 0);
+
+    if (needsFallbackDetection && storyCharacters) {
+      // Determine which characters are expected on this page
+      let pageCharNames = [];
+      const sceneDesc = sceneDescriptions.find(s => s.pageNumber === pageNumber);
+      if (sceneDesc?.description) {
+        const pageChars = getCharactersInScene(sceneDesc.description, storyCharacters);
+        pageCharNames = pageChars.map(c => c.name);
+      }
+
+      if (pageCharNames.length > 0) {
+        // Build expected characters with physical descriptions for Gemini
+        const expectedChars = pageCharNames.map(name => {
+          const fullChar = storyCharacters.find(c => c.name === name);
+          return {
+            name,
+            description: fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character'
+          };
+        });
+
+        log.info(`🔍 [ENTITY-COLLECT] Page ${pageNumber}: Running fallback bbox detection for ${pageCharNames.join(', ')}`);
+        try {
+          const detection = await detectAllBoundingBoxes(imageData, { expectedCharacters: expectedChars });
+          if (detection) {
+            bboxDetection = detection;
+            figures = detection.figures || [];
+            // Cache result back on the image for future use
+            img.bboxDetection = detection;
+            pagesWithNewBbox.push(pageNumber);
+
+            const newIdentified = figures.filter(f => f.name && f.name !== 'UNKNOWN');
+            log.info(`🔍 [ENTITY-COLLECT] Page ${pageNumber}: Fallback detection found ${figures.length} figures, ${newIdentified.length} identified: ${newIdentified.map(f => f.name).join(', ')}`);
+          }
+        } catch (err) {
+          log.warn(`⚠️  [ENTITY-COLLECT] Page ${pageNumber}: Fallback bbox detection failed: ${err.message}`);
+        }
+      }
     }
 
     // Match characters by figure.name (direct AI identification)
@@ -599,6 +650,12 @@ function collectEntityAppearances(sceneImages, characters = [], sceneDescription
   const totalAppearances = Array.from(appearances.values()).reduce((sum, apps) => sum + apps.length, 0);
   log.info(`[ENTITY-COLLECT] Found ${appearances.size} characters with ${totalAppearances} total appearances: ${Array.from(appearances.entries()).map(([name, apps]) => `${name}(${apps.length})`).join(', ')}`);
 
+  if (pagesWithNewBbox.length > 0) {
+    log.info(`[ENTITY-COLLECT] Ran fallback bbox detection on ${pagesWithNewBbox.length} pages: ${pagesWithNewBbox.join(', ')}`);
+  }
+
+  // Return both appearances and metadata about new detections
+  appearances._pagesWithNewBbox = pagesWithNewBbox;
   return appearances;
 }
 
@@ -1124,7 +1181,7 @@ async function repairEntityConsistency(storyData, character, entityReport, optio
     // Step 1: Collect entity appearances with forRegeneration=true
     const sceneImages = storyData.sceneImages || [];
     const sceneDescriptions = storyData.sceneDescriptions || [];
-    const entityAppearances = collectEntityAppearances(sceneImages, [character], sceneDescriptions);
+    const entityAppearances = await collectEntityAppearances(sceneImages, [character], sceneDescriptions);
     const appearances = entityAppearances.get(charName);
 
     if (!appearances || appearances.length < 2) {
@@ -2028,7 +2085,7 @@ async function repairSinglePage(storyData, character, pageNumber, options = {}) 
     // Collect all appearances for this character (skip min filter - repair compares against avatar)
     const sceneImages = storyData.sceneImages || [];
     const sceneDescriptions = storyData.sceneDescriptions || [];
-    const entityAppearances = collectEntityAppearances(sceneImages, [character], sceneDescriptions, { skipMinAppearancesFilter: true });
+    const entityAppearances = await collectEntityAppearances(sceneImages, [character], sceneDescriptions, { skipMinAppearancesFilter: true });
     const appearances = entityAppearances.get(charName);
 
     if (!appearances || appearances.length < 1) {
