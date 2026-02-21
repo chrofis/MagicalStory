@@ -648,6 +648,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                         fixableIssues = complianceJson.fixable_issues
                           .filter(i => i.description)
                           .map(i => ({
+                            character: i.character || null,
                             description: i.description,
                             severity: i.severity || 'MODERATE',
                             type: i.type || 'default',
@@ -2002,21 +2003,32 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
     const issueFix = (issue.fix || '').toLowerCase();
     const issueKeywords = extractKeywords(issueDesc + ' ' + issueFix);
 
-    // Check if issue mentions a character name we know about (now directly identified)
-    const mentionedChars = extractCharacterNames(issueDesc + ' ' + issueFix);
-
     let bestMatch = null;
     let matchedCharacter = null;
 
-    // DIRECT CHARACTER MATCH (AI already identified by name)
-    if (mentionedChars.length > 0) {
-      for (const charName of mentionedChars) {
-        const figure = charToDetectionFigure[charName];
-        if (figure) {
-          bestMatch = { ...figure, elementType: 'figure' };
-          matchedCharacter = charName;
-          log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → direct match to "${figure.label}"`);
-          break;
+    // PRIORITY 1: Use explicit character field from Pass 2 fixable_issues
+    if (issue.character) {
+      const charKey = issue.character.toLowerCase();
+      const figure = charToDetectionFigure[charKey];
+      if (figure) {
+        bestMatch = { ...figure, elementType: 'figure' };
+        matchedCharacter = charKey;
+        log.debug(`📦 [BBOX-ENRICH] Issue has character="${issue.character}" → direct match to "${figure.label}"`);
+      }
+    }
+
+    // PRIORITY 2: Check if issue text mentions a character name we know about
+    if (!bestMatch) {
+      const mentionedChars = extractCharacterNames(issueDesc + ' ' + issueFix);
+      if (mentionedChars.length > 0) {
+        for (const charName of mentionedChars) {
+          const figure = charToDetectionFigure[charName];
+          if (figure) {
+            bestMatch = { ...figure, elementType: 'figure' };
+            matchedCharacter = charName;
+            log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → direct match to "${figure.label}"`);
+            break;
+          }
         }
       }
     }
@@ -3109,18 +3121,29 @@ async function evaluateImageBatch(images, options = {}) {
         img.sceneHint || null  // Scene hint for semantic evaluation
       );
 
-      // Extract scene metadata for character positions and clothing
-      const sceneMetadata = img.sceneDescription
+      // Use pre-extracted scene metadata if available, otherwise extract from scene description
+      const sceneMetadata = img.sceneMetadata || (img.sceneDescription
         ? getStoryHelpers().extractSceneMetadata(img.sceneDescription)
-        : null;
+        : null);
       const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
       const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
       const expectedObjects = sceneMetadata?.objects || [];
 
-      // Parse character descriptions from prompt
-      const characterDescriptions = img.prompt
-        ? getStoryHelpers().parseCharacterDescriptions(img.prompt)
-        : {};
+      // Use rich character descriptions from full character objects when available
+      let characterDescriptions;
+      if (img.sceneCharacters && img.sceneCharacters.length > 0) {
+        characterDescriptions = {};
+        for (const char of img.sceneCharacters) {
+          characterDescriptions[char.name] = {
+            richDescription: getStoryHelpers().buildCharacterPhysicalDescription(char)
+          };
+        }
+      } else {
+        // Fallback: parse minimal descriptions from prompt
+        characterDescriptions = img.prompt
+          ? getStoryHelpers().parseCharacterDescriptions(img.prompt)
+          : {};
+      }
 
       // Parse Visual Bible objects from prompt
       const vbObjects = parseVisualBibleObjects(img.prompt || '');
@@ -4979,6 +5002,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     forceRepairThreshold: forceRepairThresholdInput = null,
     // Full character objects for rich bbox descriptions (from scene character lookup)
     sceneCharacters = [],
+    // Pre-extracted scene metadata with character positions (avoids re-parsing from flattened prompt)
+    sceneMetadata: sceneMetadataInput = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -5245,10 +5270,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     const qualityMatches = result.matches || [];  // Character → figure mapping from quality eval
     const objectMatches = result.objectMatches || [];  // Object/animal/landmark mapping from quality eval
 
-    // Extract expected character positions, clothing, and objects from scene description in prompt
-    // Scene descriptions contain structured JSON with character positions like "bottom-left foreground"
-    // and objects like "star [ART001]"
-    const sceneMetadata = getStoryHelpers().extractSceneMetadata(currentPrompt);
+    // Use pre-extracted scene metadata if available, otherwise try to extract from prompt
+    const sceneMetadata = sceneMetadataInput || getStoryHelpers().extractSceneMetadata(currentPrompt);
     const expectedCharacterPositions = sceneMetadata?.characterPositions || {};
     const expectedCharacterClothing = sceneMetadata?.characterClothing || {};
     const expectedObjects = sceneMetadata?.objects || [];

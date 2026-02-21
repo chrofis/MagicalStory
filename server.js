@@ -3331,7 +3331,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, incrementalConsistency: incrConfigWithCurrentChars }
+        { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, incrementalConsistency: incrConfigWithCurrentChars }
       );
 
       // Track scene rewrite usage if a safety block triggered a rewrite
@@ -3439,6 +3439,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           landmarkPhotos: pageLandmarkPhotos,
           visualBibleGrid: vbGrid,
           sceneCharacters,
+          sceneMetadata,
           perCharClothing
         };
       };
@@ -3506,6 +3507,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,
+              sceneMetadata: pageData.sceneMetadata,
               perCharClothing: pageData.perCharClothing,
               scene: pageData.scene
             };
@@ -3520,6 +3522,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,
+              sceneMetadata: pageData.sceneMetadata,
               perCharClothing: pageData.perCharClothing,
               scene: pageData.scene
             };
@@ -3547,6 +3550,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           prompt: img.prompt,
           characterPhotos: img.characterPhotos,
           sceneDescription: img.sceneDescription,
+          sceneCharacters: img.sceneCharacters,
+          sceneMetadata: img.sceneMetadata,
           pageText: img.text,  // Story text for semantic fidelity check
           sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null  // Scene hint for semantic evaluation
         })),
@@ -4206,7 +4211,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 null,
                 { imageModel: modelOverrides?.imageModel, qualityModel: modelOverrides?.qualityModel },
                 `PAGE ${pageNum} (consistency fix)`,
-                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters }
+                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: sceneMetadataForClothing }
               );
 
               // Track scene rewrite usage if a safety block triggered a rewrite

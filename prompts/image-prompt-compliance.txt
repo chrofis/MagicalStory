@@ -46,15 +46,14 @@ Flag MISMATCH if:
 **STEP 4: SCORING (0-10)**
 
 Start at 10, subtract for issues found:
-- CRITICAL (-3): Missing/wrong character, duplicate character, extra limbs (from rendering check), person floating in air
+- CRITICAL (-4): Missing/wrong character, unrecognizable character, duplicate character, extra limbs (from rendering check), person floating in air
 - MAJOR (-2):
   - Cross-eyes (from rendering check)
   - Wrong age (inventory age doesn't match prompt age — e.g., prompt says "elderly 80" but figure appears "adult ~40")
   - Wrong height order
-  - Wrong clothing (different color/type than prompt described)
-  - Unrecognizable character, impossible physics
-- MODERATE (-1): Minor clothing difference, minor spatial misalignment, small physics issues
-- MINOR (-0.5): Small differences, minor issues
+  - Major clothing mismatch (completely wrong outfit type, e.g. dress instead of pants; or character A wearing character B's clothing)
+  - Impossible physics
+- MODERATE (-1): Minor clothing differences (wrong shade, small detail differences, accessory missing), minor spatial misalignment, small physics issues, wrong hair part direction, minor color differences
 
 VERDICT: PASS (5+), SOFT_FAIL (3-4), HARD_FAIL (0-2)
 
@@ -91,6 +90,7 @@ Return JSON only (no other text):
   "issues_summary": "Werner appears ~40-50 but should be elderly ~80; Manuel missing from scene",
   "fixable_issues": [
     {
+      "character": "Werner",
       "description": "figure in center appears middle-aged (~40-50) but should appear elderly (~80) with white hair and wrinkles",
       "severity": "MAJOR",
       "type": "face",
@@ -105,8 +105,9 @@ Return JSON only (no other text):
 - Base ALL assessments on the visual inventory, NOT on assumptions about the image
 - Age mismatches between inventory and prompt are MAJOR issues (not minor)
 - `fixable_issues`: only if score < 9 and issues are fixable by inpainting. ONE entry per issue.
-  - `description`: What is WRONG (visual description only, NO character names)
-  - `severity`: CRITICAL, MAJOR, MODERATE, MINOR
+  - `character`: Character name this issue belongs to (from the prompt), or null for non-character issues
+  - `description`: What is WRONG (visual description, reference the character by name)
+  - `severity`: CRITICAL, MAJOR, MODERATE
   - `type`: face, limb, clothing, object, environment, physics
   - `fix`: How to fix THIS EXACT issue (visual description only, NO character names)
 - Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting
