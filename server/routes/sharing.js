@@ -331,8 +331,9 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
     const story = await getSharedStory(shareToken);
 
     if (story) {
-      // HTML-escape the title to prevent broken meta tags from quotes/special chars
-      const rawTitle = story.data.title || 'Eine magische Geschichte';
+      // Strip markdown bold/heading markers, then HTML-escape for safe meta tags
+      const rawTitle = (story.data.title || 'Eine magische Geschichte')
+        .replace(/^\*{1,2}|\*{1,2}$/g, '').replace(/^#+\s*/, '').trim();
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
       // Cache buster: rotate daily so WhatsApp/Facebook re-fetch after fixes or image changes
@@ -393,7 +394,8 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       const indexPath = path.join(distPath, 'index.html');
       let html = await fs.readFile(indexPath, 'utf8');
 
-      const rawTitle = story.data.title || 'Eine magische Geschichte';
+      const rawTitle = (story.data.title || 'Eine magische Geschichte')
+        .replace(/^\*{1,2}|\*{1,2}$/g, '').replace(/^#+\s*/, '').trim();
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
       // Cache buster: rotate daily so WhatsApp/Facebook re-fetch after fixes or image changes
