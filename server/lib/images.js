@@ -571,7 +571,22 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       contents: [{ parts: [{ text: compliancePrompt }] }],
-                      generationConfig: { maxOutputTokens: 8000, temperature: 0.3, responseMimeType: 'application/json' }
+                      generationConfig: {
+                        maxOutputTokens: 16000,
+                        temperature: 0.3,
+                        responseMimeType: 'application/json'
+                      },
+                      // Cap thinking tokens so they don't eat the output budget
+                      // (gemini-2.5-flash counts thinking toward maxOutputTokens)
+                      thinkingConfig: { thinkingBudget: 4000 },
+                      // Match P1 safety settings — historical content triggers PROHIBITED_CONTENT blocks
+                      safetySettings: [
+                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+                        { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+                      ]
                     })
                   });
                 }, { maxRetries: 2, baseDelay: 1000 });
