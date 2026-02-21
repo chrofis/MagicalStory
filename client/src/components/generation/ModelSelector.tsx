@@ -5,15 +5,15 @@ import { useLanguage } from '@/context/LanguageContext';
 export const TEXT_MODELS = {
   'claude-sonnet': {
     provider: 'anthropic',
-    description: 'Claude Sonnet 4.5 - Best narrative quality',
-    descriptionDe: 'Claude Sonnet 4.5 - Beste Erzählqualität',
-    descriptionFr: 'Claude Sonnet 4.5 - Meilleure qualité narrative'
+    description: 'Claude Sonnet 4.6 - Best narrative quality',
+    descriptionDe: 'Claude Sonnet 4.6 - Beste Erzählqualität',
+    descriptionFr: 'Claude Sonnet 4.6 - Meilleure qualité narrative'
   },
   'claude-haiku': {
     provider: 'anthropic',
-    description: 'Claude Haiku 3.5 - Fast and cheap',
-    descriptionDe: 'Claude Haiku 3.5 - Schnell und günstig',
-    descriptionFr: 'Claude Haiku 3.5 - Rapide et économique'
+    description: 'Claude Haiku 4.5 - Fast and affordable',
+    descriptionDe: 'Claude Haiku 4.5 - Schnell und günstig',
+    descriptionFr: 'Claude Haiku 4.5 - Rapide et économique'
   },
   'gemini-2.5-pro': {
     provider: 'google',

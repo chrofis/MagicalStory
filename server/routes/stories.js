@@ -2473,7 +2473,7 @@ router.get('/:id/share-status', authenticateToken, async (req, res) => {
     res.json({
       isShared: is_shared || false,
       shareToken: is_shared ? share_token : null,
-      shareUrl: is_shared && share_token ? `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}/s/${share_token}` : null
+      shareUrl: is_shared && share_token ? `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/s/${share_token}` : null
     });
   } catch (err) {
     console.error('Error getting share status:', err);
@@ -2519,7 +2519,7 @@ router.post('/:id/share', authenticateToken, async (req, res) => {
       );
     }
 
-    const shareUrl = `${process.env.FRONTEND_URL || 'https://magicalstory.ch'}/s/${shareToken}`;
+    const shareUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/s/${shareToken}`;
 
     console.log(`✅ Sharing enabled for story ${id}, token: ${shareToken.substring(0, 8)}...`);
 

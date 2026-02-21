@@ -148,8 +148,8 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
             onClick={() => setIsOpen(false)}
           />
 
-          {/* Dropdown content */}
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
+          {/* Dropdown content - fixed centered on mobile, absolute on desktop */}
+          <div className="fixed inset-x-4 bottom-4 sm:absolute sm:inset-auto sm:right-0 sm:bottom-auto sm:mt-2 w-auto sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden">
             <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
               <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                 <Share2 className="w-5 h-5 text-blue-600" />

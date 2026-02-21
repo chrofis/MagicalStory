@@ -1278,7 +1278,7 @@ app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
 app.use('/api/jobs', jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', storyIdeasRoutes);  // Story idea generation
-app.use('/api', sharingApiRoutes);  // /api/stories/:id/share*, /api/shared/*
+app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
 app.use('/', sharingHtmlRoutes);  // /s/:shareToken, /shared/:shareToken (HTML)
 
 console.log('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin, photos, sharing');

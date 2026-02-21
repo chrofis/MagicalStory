@@ -1289,6 +1289,7 @@ export const storyService = {
     const fetchStream = async () => {
       resetTimeout(); // Start initial timeout
       const streamStartTime = Date.now();
+      let streamCompleted = false; // Track if we received the done event
       try {
         const response = await fetch('/api/generate-story-ideas-stream', {
           method: 'POST',
@@ -1344,6 +1345,7 @@ export const storyService = {
                   callbacks.onError?.(eventData.error);
                 }
                 if (eventData.done) {
+                  streamCompleted = true;
                   const duration = ((Date.now() - streamStartTime) / 1000).toFixed(1);
                   console.log(`[IDEAS] Complete in ${duration}s`);
                   callbacks.onDone?.(eventData.fullResponse);
@@ -1357,6 +1359,11 @@ export const storyService = {
       } catch (err) {
         if (timeoutId) clearTimeout(timeoutId);
         if ((err as Error).name !== 'AbortError') {
+          // Suppress network errors if stream already completed (HTTP/2 proxy close race)
+          if (streamCompleted) {
+            console.log('[IDEAS] Stream completed successfully (ignoring post-close network error)');
+            return;
+          }
           callbacks.onError?.((err as Error).message || 'Stream error');
         }
       } finally {

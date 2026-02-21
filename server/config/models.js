@@ -9,15 +9,15 @@
 const TEXT_MODELS = {
   'claude-sonnet': {
     provider: 'anthropic',
-    modelId: 'claude-sonnet-4-5-20250929',
+    modelId: 'claude-sonnet-4-6',
     maxOutputTokens: 64000,
-    description: 'Claude Sonnet 4.5 - Best narrative quality'
+    description: 'Claude Sonnet 4.6 - Best narrative quality'
   },
   'claude-haiku': {
     provider: 'anthropic',
-    modelId: 'claude-3-5-haiku-20241022',
+    modelId: 'claude-haiku-4-5-20251001',
     maxOutputTokens: 8192,
-    description: 'Claude Haiku 3.5 - Fast and cheap'
+    description: 'Claude Haiku 4.5 - Fast and affordable'
   },
   'gemini-2.5-pro': {
     provider: 'google',
@@ -170,14 +170,18 @@ const IMAGE_MODELS = {
 };
 
 // Approximate pricing per 1M tokens (USD)
-// Updated Jan 2026 - check provider websites for latest pricing
+// Updated Feb 2026 - check provider websites for latest pricing
+// Source: https://platform.claude.com/docs/en/about-claude/pricing
 const MODEL_PRICING = {
-  // Anthropic Claude models
+  // Anthropic Claude models (Feb 2026)
+  'claude-sonnet-4-6': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet-4-5': { input: 3.00, output: 15.00, thinking: 15.00 },
   'claude-sonnet': { input: 3.00, output: 15.00, thinking: 15.00 },
-  'claude-3-5-haiku-20241022': { input: 0.25, output: 1.25, thinking: 1.25 },
-  'claude-haiku': { input: 0.25, output: 1.25, thinking: 1.25 },
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, thinking: 5.00 },
+  'claude-haiku-4-5': { input: 1.00, output: 5.00, thinking: 5.00 },
+  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, thinking: 4.00 },
+  'claude-haiku': { input: 1.00, output: 5.00, thinking: 5.00 },
 
   // Google Gemini models (per 1M tokens) - Updated Jan 2026
   // Source: https://ai.google.dev/gemini-api/docs/pricing

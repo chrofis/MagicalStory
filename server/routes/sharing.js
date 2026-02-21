@@ -2,8 +2,6 @@
  * Sharing Routes - /api/shared/*, /s/*, /shared/*
  *
  * Public sharing endpoints for stories:
- * - Share status (authenticated)
- * - Enable/disable sharing (authenticated)
  * - Public story access (no auth)
  * - Image serving for shared stories (no auth)
  * - OG meta tag pages for social previews (no auth)
@@ -14,14 +12,15 @@
  */
 
 const express = require('express');
-const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
 const { dbQuery, getStoryImage } = require('../services/database');
-const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
+
+// Base URL for OG tags and share links (consistent with stories.js)
+const SITE_URL = process.env.FRONTEND_URL || 'https://www.magicalstory.ch';
 
 // API router for /api/* endpoints
 const apiRouter = express.Router();
@@ -108,114 +107,8 @@ function getPageText(storyText, pageNumber) {
 // API ROUTER - Mount at /api
 // ============================================
 
-// GET share status for a story
-apiRouter.get('/stories/:id/share-status', authenticateToken, async (req, res) => {
-  try {
-    const storyId = req.params.id;
-    const userId = req.user.id;
-
-    // Get story and verify ownership
-    const result = await dbQuery(
-      'SELECT is_shared, share_token FROM stories WHERE id = $1 AND user_id = $2',
-      [storyId, userId]
-    );
-
-    if (result.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    const story = result[0];
-    const shareUrl = story.is_shared && story.share_token
-      ? `${req.protocol}://${req.get('host')}/s/${story.share_token}`
-      : null;
-
-    res.json({
-      isShared: story.is_shared || false,
-      shareToken: story.share_token || null,
-      shareUrl
-    });
-  } catch (err) {
-    log.error('Error getting share status:', err);
-    res.status(500).json({ error: 'Failed to get share status' });
-  }
-});
-
-// POST enable sharing for a story
-apiRouter.post('/stories/:id/share', authenticateToken, async (req, res) => {
-  try {
-    const storyId = req.params.id;
-    const userId = req.user.id;
-
-    // Verify ownership
-    const checkResult = await dbQuery(
-      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
-      [storyId, userId]
-    );
-
-    if (checkResult.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    // Generate share token if not exists (32 bytes = 64 hex chars)
-    const shareToken = crypto.randomBytes(32).toString('hex');
-
-    await dbQuery(
-      'UPDATE stories SET is_shared = true, share_token = COALESCE(share_token, $1) WHERE id = $2',
-      [shareToken, storyId]
-    );
-
-    // Get the actual token (might be existing one)
-    const result = await dbQuery(
-      'SELECT share_token FROM stories WHERE id = $1',
-      [storyId]
-    );
-
-    const actualToken = result[0].share_token;
-    const shareUrl = `${req.protocol}://${req.get('host')}/s/${actualToken}`;
-
-    res.json({
-      isShared: true,
-      shareToken: actualToken,
-      shareUrl
-    });
-  } catch (err) {
-    log.error('Error enabling sharing:', err);
-    res.status(500).json({ error: 'Failed to enable sharing' });
-  }
-});
-
-// DELETE disable sharing for a story
-apiRouter.delete('/stories/:id/share', authenticateToken, async (req, res) => {
-  try {
-    const storyId = req.params.id;
-    const userId = req.user.id;
-
-    // Verify ownership
-    const checkResult = await dbQuery(
-      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
-      [storyId, userId]
-    );
-
-    if (checkResult.length === 0) {
-      return res.status(404).json({ error: 'Story not found' });
-    }
-
-    // Disable sharing but keep the token for potential re-enabling
-    await dbQuery(
-      'UPDATE stories SET is_shared = false WHERE id = $1',
-      [storyId]
-    );
-
-    res.json({
-      isShared: false,
-      shareToken: null,
-      shareUrl: null
-    });
-  } catch (err) {
-    log.error('Error disabling sharing:', err);
-    res.status(500).json({ error: 'Failed to disable sharing' });
-  }
-});
+// NOTE: Share auth endpoints (share-status, enable/disable sharing) are in stories.js
+// They are mounted at /api/stories before this router, so they handle those requests.
 
 // GET /api/shared/:shareToken - Get shared story data (public, no auth)
 apiRouter.get('/shared/:shareToken', async (req, res) => {
@@ -442,8 +335,8 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
       const rawTitle = story.data.title || 'Eine magische Geschichte';
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image.jpg`;
-      const pageUrl = `https://magicalstory.ch/s/${shareToken}`;
+      const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg`;
+      const pageUrl = `${SITE_URL}/s/${shareToken}`;
 
       // Minimal HTML with ONLY OG tags — nothing else. WhatsApp parses this reliably.
       const html = `<!DOCTYPE html>
@@ -499,8 +392,8 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       const rawTitle = story.data.title || 'Eine magische Geschichte';
       const title = rawTitle.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const description = `Eine personalisierte Geschichte von MagicalStory.ch`;
-      const ogImageUrl = `https://magicalstory.ch/api/shared/${shareToken}/og-image.jpg`;
-      const pageUrl = `https://magicalstory.ch/shared/${shareToken}`;
+      const ogImageUrl = `${SITE_URL}/api/shared/${shareToken}/og-image.jpg`;
+      const pageUrl = `${SITE_URL}/shared/${shareToken}`;
 
       // Create OG meta tags
       const ogTags = `
