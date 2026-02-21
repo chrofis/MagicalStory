@@ -471,6 +471,7 @@ export const storyService = {
         facePhoto?: { identifier: string; sizeKB: number; imageData?: string } | null;
         standardAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
         referenceAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
+        styleSample?: { identifier: string; sizeKB: number; imageData?: string } | null;
       };
       prompt?: string;
       output?: { identifier: string; sizeKB: number; imageData?: string };

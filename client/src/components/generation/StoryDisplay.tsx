@@ -50,6 +50,7 @@ interface CostumedAvatarGenerationEntry {
     facePhoto?: { identifier: string; sizeKB: number; imageData?: string } | null;
     standardAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
     referenceAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
+    styleSample?: { identifier: string; sizeKB: number; imageData?: string } | null;
   };
   prompt?: string;
   output?: { identifier: string; sizeKB: number; imageData?: string };
@@ -2269,7 +2270,8 @@ export function StoryDisplay({
                         <div className="mt-2 flex flex-wrap gap-3">
                           {entry.inputs?.facePhoto && renderAvatarGenImage('costumed', index, entry, 'facePhoto', 'Face Photo', entry.inputs.facePhoto?.sizeKB)}
                           {entry.inputs?.standardAvatar && renderAvatarGenImage('costumed', index, entry, 'standardAvatar', 'Standard Avatar', entry.inputs.standardAvatar?.sizeKB)}
-                          {entry.inputs?.referenceAvatar && renderAvatarGenImage('costumed', index, entry, 'referenceAvatar', 'Reference Avatar', entry.inputs.referenceAvatar?.sizeKB)}
+                          {entry.inputs?.referenceAvatar && !entry.inputs?.standardAvatar && renderAvatarGenImage('costumed', index, entry, 'referenceAvatar', 'Reference Avatar', entry.inputs.referenceAvatar?.sizeKB)}
+                          {entry.inputs?.styleSample && renderAvatarGenImage('costumed', index, entry, 'styleSample', 'Style Sample', entry.inputs.styleSample?.sizeKB)}
                         </div>
                       </div>
 

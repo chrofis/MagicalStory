@@ -1438,12 +1438,26 @@ Your task is to create a 2x2 grid:
         details: costumeEvalResult.details
       } : null,
       inputs: {
-        // standardAvatar is used as the reference image (contains face + body)
+        facePhoto: (facePhoto && typeof facePhoto === 'string') ? {
+          identifier: getImageIdentifier(facePhoto),
+          sizeKB: getImageSizeKB(facePhoto),
+          imageData: facePhoto
+        } : null,
+        standardAvatar: {
+          identifier: getImageIdentifier(standardAvatar),
+          sizeKB: getImageSizeKB(standardAvatar),
+          imageData: standardAvatar
+        },
         referenceAvatar: {
           identifier: getImageIdentifier(standardAvatar),
           sizeKB: getImageSizeKB(standardAvatar),
           imageData: standardAvatar
-        }
+        },
+        styleSample: styleSample ? {
+          identifier: getImageIdentifier(styleSample),
+          sizeKB: getImageSizeKB(styleSample),
+          imageData: styleSample
+        } : null
       },
       prompt: avatarPrompt,
       output: {
