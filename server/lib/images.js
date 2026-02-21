@@ -576,9 +576,6 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
                         temperature: 0.3,
                         responseMimeType: 'application/json'
                       },
-                      // Cap thinking tokens so they don't eat the output budget
-                      // (gemini-2.5-flash counts thinking toward maxOutputTokens)
-                      thinkingConfig: { thinkingBudget: 4000 },
                       // Match P1 safety settings — historical content triggers PROHIBITED_CONTENT blocks
                       safetySettings: [
                         { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },

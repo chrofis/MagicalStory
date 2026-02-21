@@ -2497,7 +2497,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             : coverCharacters;
         } else {
           const allChars = inputData.characters || [];
-          const mainChars = allChars.filter(c => c.isMainCharacter === true);
+          let mainChars = allChars.filter(c => c.isMainCharacter === true);
+          // Fallback: use mainCharacters array of IDs (same as titlePage logic)
+          if (mainChars.length === 0 && inputData.mainCharacters?.length > 0) {
+            mainChars = allChars.filter(c => inputData.mainCharacters.includes(c.id));
+          }
           const nonMainChars = mainChars.length > 0
             ? allChars.filter(c => !c.isMainCharacter)
             : allChars;
@@ -3357,6 +3361,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Include quality info if available
         qualityScore: imageResult?.score,
         qualityReasoning: imageResult?.reasoning,
+        fixTargets: imageResult?.fixTargets || [],
+        fixableIssues: imageResult?.fixableIssues || [],
         thinkingText: imageResult?.thinkingText || null,
         wasRegenerated: imageResult?.wasRegenerated,
         totalAttempts: imageResult?.totalAttempts,
@@ -3631,6 +3637,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           sceneCharacterClothing: img.perCharClothing,
           bboxDetection: img.bboxDetection,
           bboxOverlayImage: img.bboxOverlayImage,
+          fixTargets: img.fixTargets || [],
+          fixableIssues: img.fixableIssues || [],
           retryHistory: [{
             attempt: 1,
             type: 'separated_evaluation',
@@ -3655,6 +3663,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
             qualityScore: evalResult?.qualityScore,
             qualityReasoning: evalResult?.reasoning,
+            fixTargets: evalResult?.fixTargets || evalResult?.enrichedFixTargets || [],
+            fixableIssues: evalResult?.fixableIssues || [],
             thinkingText: img.thinkingText || null,
             referencePhotos: img.characterPhotos,
             landmarkPhotos: img.landmarkPhotos,

@@ -742,7 +742,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     const clothingRequirements = storyData.clothingRequirements || null;
 
     // Step 1: Analyze the current image using analyzeGeneratedImage (identifies characters by name)
-    const { analyzeGeneratedImage } = require('./server/lib/sceneValidator');
+    const { analyzeGeneratedImage } = require('../lib/sceneValidator');
     const imageDescription = await analyzeGeneratedImage(currentImage.imageData, characters, visualBible, clothingRequirements);
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
     log.debug(`🔄 [ITERATE] Composition: ${imageDescription.description.substring(0, 200)}...`);
@@ -2354,6 +2354,18 @@ router.post('/:id/repair-workflow/collect-feedback', authenticateToken, async (r
         feedback.fixableIssues = latestRetry.preRepairEval.fixableIssues;
       }
 
+      // Fallback: read fixableIssues or fixTargets directly from scene (stored by generation and re-evaluate)
+      if (feedback.fixableIssues.length === 0 && scene.fixableIssues?.length > 0) {
+        feedback.fixableIssues = scene.fixableIssues;
+      }
+      if (feedback.fixableIssues.length === 0 && scene.fixTargets?.length > 0) {
+        feedback.fixableIssues = scene.fixTargets.map(ft => ({
+          issue: ft.description || ft.issue || 'Quality issue detected',
+          severity: ft.severity || 'medium',
+          bbox: ft.bbox || null
+        }));
+      }
+
       // Get entity issues from finalChecksReport
       if (storyData.finalChecksReport?.entity?.characters) {
         for (const [charName, charResult] of Object.entries(storyData.finalChecksReport.entity.characters)) {
@@ -2613,6 +2625,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         scene.qualityReasoning = evaluation.reasoning;
         scene.semanticScore = evaluation.semanticScore ?? null;
         scene.semanticResult = evaluation.semanticResult ?? null;
+        scene.fixTargets = evaluation.fixTargets || evaluation.enrichedFixTargets || [];
+        scene.fixableIssues = evaluation.fixableIssues || [];
 
         pages[pageNumber] = {
           score: evaluation.score,                    // Combined final score
