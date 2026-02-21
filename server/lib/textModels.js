@@ -107,9 +107,15 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
   const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
 
   // Build messages - optionally add assistant prefill to prevent preamble
+  // Claude 4+ models don't support assistant prefill — move it into the prompt instead
+  const supportsAssistantPrefill = !modelId.match(/claude-(sonnet|opus|haiku)-[4-9]/);
+  let effectivePrompt = prompt;
   const messages = [{ role: 'user', content: prompt }];
-  if (options.prefill) {
+  if (options.prefill && supportsAssistantPrefill) {
     messages.push({ role: 'assistant', content: options.prefill });
+  } else if (options.prefill) {
+    effectivePrompt = prompt + `\n\nIMPORTANT: Start your response EXACTLY with: ${options.prefill}`;
+    messages[0] = { role: 'user', content: effectivePrompt };
   }
 
   const data = await withRetry(async () => {
@@ -175,9 +181,13 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
   }
 
   // Build messages - optionally add assistant prefill to prevent preamble
+  // Claude 4+ models don't support assistant prefill — move it into the prompt instead
+  const supportsAssistantPrefill = !modelId.match(/claude-(sonnet|opus|haiku)-[4-9]/);
   const messages = [{ role: 'user', content: prompt }];
-  if (options.prefill) {
+  if (options.prefill && supportsAssistantPrefill) {
     messages.push({ role: 'assistant', content: options.prefill });
+  } else if (options.prefill) {
+    messages[0] = { role: 'user', content: prompt + `\n\nIMPORTANT: Start your response EXACTLY with: ${options.prefill}` };
   }
 
   // Wrap entire request + stream reading in retry to handle mid-stream socket errors
