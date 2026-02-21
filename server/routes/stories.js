@@ -593,7 +593,9 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           preRepairEval: r.preRepairEval || null,
           postRepairEval: r.postRepairEval || null,
           // Flags for lazy loading images
-          hasImageData: !!r.imageData,
+          // Note: imageData is stripped from data blob by saveStoryData and saved to story_retry_images table.
+          // For 'generation' entries, images always exist in the table even though r.imageData is null in the blob.
+          hasImageData: !!r.imageData || r.type === 'generation',
           hasOriginalImage: !!r.originalImage,
           hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
           hasAnnotatedOriginal: !!r.annotatedOriginal,
@@ -612,7 +614,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           score: r.score,
           reasoning: r.reasoning,
           thinkingText: r.thinkingText || null,
-          hasImageData: !!r.imageData,
+          hasImageData: !!r.imageData || r.type === 'generation',
           hasOriginalImage: !!r.originalImage
         })),
         wasRegenerated: img.wasRegenerated || false,
@@ -674,7 +676,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             preRepairEval: r.preRepairEval || null,
             postRepairEval: r.postRepairEval || null,
             bboxDetection: r.bboxDetection || null,
-            hasImageData: !!r.imageData,
+            hasImageData: !!r.imageData || r.type === 'generation',
             hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
             hasAnnotatedOriginal: !!r.annotatedOriginal,
             hasGrids: !!(r.grids && r.grids.length > 0),
@@ -704,7 +706,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             preRepairEval: r.preRepairEval || null,
             postRepairEval: r.postRepairEval || null,
             bboxDetection: r.bboxDetection || null,
-            hasImageData: !!r.imageData,
+            hasImageData: !!r.imageData || r.type === 'generation',
             hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
             hasAnnotatedOriginal: !!r.annotatedOriginal,
             hasGrids: !!(r.grids && r.grids.length > 0),
@@ -734,7 +736,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             preRepairEval: r.preRepairEval || null,
             postRepairEval: r.postRepairEval || null,
             bboxDetection: r.bboxDetection || null,
-            hasImageData: !!r.imageData,
+            hasImageData: !!r.imageData || r.type === 'generation',
             hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
             hasAnnotatedOriginal: !!r.annotatedOriginal,
             hasGrids: !!(r.grids && r.grids.length > 0),
