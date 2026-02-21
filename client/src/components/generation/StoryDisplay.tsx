@@ -112,7 +112,7 @@ interface StoryDisplayProps {
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
   onRepairImage?: (pageNumber: number) => Promise<void>;
-  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean }) => Promise<void>;
+  onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
   onVisualBibleChange?: (visualBible: VisualBible) => void;
   storyId?: string | null;
@@ -263,7 +263,7 @@ export function StoryDisplay({
   const [iteratingPage, setIteratingPage] = useState<number | null>(null);
   // Iterate options panel: which page is showing options, and the toggle value
   const [iterateOptionsPage, setIterateOptionsPage] = useState<number | null>(null);
-  const [iterateUseOriginalAsRef, setIterateUseOriginalAsRef] = useState(false);
+  const [iterateMode, setIterateMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
 
   // Enlarged image modal for single image viewing
   const [enlargedImage, setEnlargedImage] = useState<{ src: string; title: string } | null>(null);
@@ -646,7 +646,7 @@ export function StoryDisplay({
   };
 
   // Handle iterate page (dev mode) - analyze current image, run 17 checks, regenerate
-  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean }) => {
+  const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => {
     if (!onIteratePage || iteratingPage !== null) return;
     setIteratingPage(pageNumber);
     setIterateOptionsPage(null); // Close options panel
@@ -3964,7 +3964,7 @@ export function StoryDisplay({
                                       setIterateOptionsPage(null);
                                     } else {
                                       setIterateOptionsPage(pageNumber);
-                                      setIterateUseOriginalAsRef(false);
+                                      setIterateMode('fresh');
                                     }
                                   }}
                                   disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
@@ -3987,25 +3987,33 @@ export function StoryDisplay({
                                 </button>
                                 {iterateOptionsPage === pageNumber && (
                                   <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={iterateUseOriginalAsRef}
-                                        onChange={(e) => setIterateUseOriginalAsRef(e.target.checked)}
-                                        className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
-                                      />
-                                      <span className="text-sm text-gray-700">
-                                        {language === 'de' ? 'Aktuelles Bild als Referenz' : language === 'fr' ? 'Utiliser l\'image actuelle comme référence' : 'Use current image as reference'}
-                                      </span>
-                                    </label>
+                                    <div className="space-y-1">
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-purple-600" />
+                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
+                                      </label>
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-purple-600" />
+                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
+                                      </label>
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-purple-600" />
+                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
+                                      </label>
+                                    </div>
                                     <p className="text-xs text-gray-500 ml-6">
-                                      {iterateUseOriginalAsRef
-                                        ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen bei vielen Referenzbildern einschränken' : language === 'fr' ? 'Préserve la composition mais peut limiter les corrections avec beaucoup d\'images de référence' : 'Preserves composition but may limit corrections with many reference images')
-                                        : (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : language === 'fr' ? 'Nouvelle génération à partir de la scène corrigée par l\'IA' : 'Fresh generation from AI-corrected scene')}
+                                      {iterateMode === 'fresh'
+                                        ? (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : 'Fresh generation from AI-corrected scene')
+                                        : iterateMode === 'reference'
+                                        ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
+                                        : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
                                     </p>
                                     <div className="flex gap-2">
                                       <button
-                                        onClick={() => handleIteratePage(pageNumber, { useOriginalAsReference: iterateUseOriginalAsRef })}
+                                        onClick={() => handleIteratePage(pageNumber, {
+                                          useOriginalAsReference: iterateMode === 'reference',
+                                          blackoutIssues: iterateMode === 'blackout',
+                                        })}
                                         className="flex-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-purple-700"
                                       >
                                         {language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration'}
@@ -4485,7 +4493,7 @@ export function StoryDisplay({
                                       setIterateOptionsPage(null);
                                     } else {
                                       setIterateOptionsPage(pageNumber);
-                                      setIterateUseOriginalAsRef(false);
+                                      setIterateMode('fresh');
                                     }
                                   }}
                                   disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
@@ -4508,25 +4516,33 @@ export function StoryDisplay({
                                 </button>
                                 {iterateOptionsPage === pageNumber && (
                                   <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
-                                    <label className="flex items-center gap-2 cursor-pointer">
-                                      <input
-                                        type="checkbox"
-                                        checked={iterateUseOriginalAsRef}
-                                        onChange={(e) => setIterateUseOriginalAsRef(e.target.checked)}
-                                        className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
-                                      />
-                                      <span className="text-sm text-gray-700">
-                                        {language === 'de' ? 'Aktuelles Bild als Referenz' : language === 'fr' ? 'Utiliser l\'image actuelle comme référence' : 'Use current image as reference'}
-                                      </span>
-                                    </label>
+                                    <div className="space-y-1">
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-purple-600" />
+                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
+                                      </label>
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-purple-600" />
+                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
+                                      </label>
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-purple-600" />
+                                        <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
+                                      </label>
+                                    </div>
                                     <p className="text-xs text-gray-500 ml-6">
-                                      {iterateUseOriginalAsRef
-                                        ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen bei vielen Referenzbildern einschränken' : language === 'fr' ? 'Préserve la composition mais peut limiter les corrections avec beaucoup d\'images de référence' : 'Preserves composition but may limit corrections with many reference images')
-                                        : (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : language === 'fr' ? 'Nouvelle génération à partir de la scène corrigée par l\'IA' : 'Fresh generation from AI-corrected scene')}
+                                      {iterateMode === 'fresh'
+                                        ? (language === 'de' ? 'Neue Generierung aus KI-korrigierter Szene' : 'Fresh generation from AI-corrected scene')
+                                        : iterateMode === 'reference'
+                                        ? (language === 'de' ? 'Erhält Komposition, kann aber Korrekturen einschränken' : 'Preserves composition but may limit corrections')
+                                        : (language === 'de' ? 'Schwärzt fehlerhafte Bereiche, erzwingt Neugenerierung' : 'Blacks out broken areas, forces regeneration')}
                                     </p>
                                     <div className="flex gap-2">
                                       <button
-                                        onClick={() => handleIteratePage(pageNumber, { useOriginalAsReference: iterateUseOriginalAsRef })}
+                                        onClick={() => handleIteratePage(pageNumber, {
+                                          useOriginalAsReference: iterateMode === 'reference',
+                                          blackoutIssues: iterateMode === 'blackout',
+                                        })}
                                         className="flex-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-purple-700"
                                       >
                                         {language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration'}

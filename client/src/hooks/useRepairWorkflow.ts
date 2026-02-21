@@ -103,7 +103,7 @@ export interface UseRepairWorkflowReturn {
   autoIdentifyRedoPages: (scoreThreshold?: number, issueThreshold?: number) => void;
 
   // Step 3: Redo pages (uses existing iterate function)
-  redoMarkedPages: (options?: { useOriginalAsReference?: boolean }) => Promise<void>;
+  redoMarkedPages: (options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => Promise<void>;
   redoProgress: { current: number; total: number; currentPage?: number };
 
   // Step 4: Re-evaluate
@@ -440,7 +440,7 @@ export function useRepairWorkflow({
   }, [workflowState.collectedFeedback.pages, startStep]);
 
   // Step 3: Redo marked pages using existing iterate function
-  const redoMarkedPages = useCallback(async (options?: { useOriginalAsReference?: boolean }) => {
+  const redoMarkedPages = useCallback(async (options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => {
     if (!storyId || workflowState.redoPages.pageNumbers.length === 0) return;
 
     startStep('redo-pages');
@@ -459,6 +459,7 @@ export function useRepairWorkflow({
           // Use existing iteratePage function
           const result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
             useOriginalAsReference: options?.useOriginalAsReference,
+            blackoutIssues: options?.blackoutIssues,
           });
 
           if (result.success) {

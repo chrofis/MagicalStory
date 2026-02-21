@@ -50,6 +50,7 @@ const {
   deleteFromImageCache,
   generateImageCacheKey,
   buildVisualBibleGrid,
+  blackoutIssueRegions,
   IMAGE_QUALITY_THRESHOLD
 } = require('../lib/images');
 const { callClaudeAPI } = require('../lib/textModels');
@@ -702,7 +703,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, useOriginalAsReference } = req.body;  // Optional: developer model override
+    const { imageModel, useOriginalAsReference, blackoutIssues } = req.body;  // Optional: developer model override
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
@@ -989,8 +990,19 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     if (imageModelOverride) {
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using model override: ${imageModelOverride}`);
     }
-    const previousImage = useOriginalAsReference ? currentImage.imageData : null;
-    if (previousImage) {
+    let previousImage = null;
+    if (blackoutIssues) {
+      // Blackout mode: black out issue regions in the current image to force regeneration
+      const fixTargets = currentImage.fixTargets || [];
+      if (fixTargets.length > 0) {
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: Blacking out ${fixTargets.length} issue regions in current image`);
+        previousImage = await blackoutIssueRegions(currentImage.imageData, fixTargets);
+      } else {
+        log.warn(`🔄 [ITERATE] Page ${pageNumber}: No fix targets available for blackout, falling back to original as reference`);
+        previousImage = currentImage.imageData;
+      }
+    } else if (useOriginalAsReference) {
+      previousImage = currentImage.imageData;
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
     }
     const imageResult = await generateImageWithQualityRetry(

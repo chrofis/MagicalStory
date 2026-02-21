@@ -6395,6 +6395,109 @@ async function createCombinedMask(width, height, boundingBoxes) {
 }
 
 /**
+ * Black out issue regions in an image to force regeneration of broken areas.
+ * Takes fix targets from quality evaluation and composites black rectangles
+ * over the affected areas, choosing the most appropriate box per issue type.
+ * @param {string} imageBase64 - Base64 image data (with or without data: prefix)
+ * @param {Array} fixTargets - Enriched fix targets with boundingBox, faceBox, bodyBox, type
+ * @param {number} padding - Padding around each region as fraction (0.05 = 5%)
+ * @returns {Promise<string>} Modified image as base64 (with data: prefix)
+ */
+async function blackoutIssueRegions(imageBase64, fixTargets, padding = 0.05) {
+  if (!fixTargets || fixTargets.length === 0) {
+    log.warn('⬛ [BLACKOUT] No fix targets provided, returning original image');
+    return imageBase64;
+  }
+
+  try {
+    // Decode image
+    const rawBase64 = imageBase64.replace(/^data:image\/[^;]+;base64,/, '');
+    const imageBuffer = Buffer.from(rawBase64, 'base64');
+    const metadata = await sharp(imageBuffer).metadata();
+    const { width, height } = metadata;
+
+    log.info(`⬛ [BLACKOUT] Blacking out ${fixTargets.length} issue regions in ${width}x${height} image`);
+
+    // Build black rectangles for each fix target
+    const compositeInputs = [];
+    for (let i = 0; i < fixTargets.length; i++) {
+      const target = fixTargets[i];
+
+      // Choose the most appropriate box based on issue type
+      let box;
+      if (target.type === 'face' && target.faceBox) {
+        box = target.faceBox;
+      } else if ((target.type === 'clothing' || target.type === 'limb' || target.type === 'hand') && target.bodyBox) {
+        box = target.bodyBox;
+      } else {
+        box = target.boundingBox || target.bodyBox || target.faceBox;
+      }
+
+      if (!box || box.length < 4) {
+        log.debug(`⬛ [BLACKOUT] Target ${i + 1} has no usable box, skipping: ${target.issue?.substring(0, 50)}`);
+        continue;
+      }
+
+      let [ymin, xmin, ymax, xmax] = box;
+
+      // Handle both 0.0-1.0 format and 0-1000 format
+      const scale = (ymin <= 1 && xmin <= 1 && ymax <= 1 && xmax <= 1) ? 1 : 1000;
+      ymin /= scale;
+      xmin /= scale;
+      ymax /= scale;
+      xmax /= scale;
+
+      // Add padding (clamped to 0-1)
+      const padX = (xmax - xmin) * padding;
+      const padY = (ymax - ymin) * padding;
+      ymin = Math.max(0, ymin - padY);
+      xmin = Math.max(0, xmin - padX);
+      ymax = Math.min(1, ymax + padY);
+      xmax = Math.min(1, xmax + padX);
+
+      // Convert to pixel coordinates
+      const left = Math.floor(xmin * width);
+      const top = Math.floor(ymin * height);
+      const rectWidth = Math.max(1, Math.floor((xmax - xmin) * width));
+      const rectHeight = Math.max(1, Math.floor((ymax - ymin) * height));
+
+      log.debug(`⬛ [BLACKOUT] Target ${i + 1} (${target.type || 'unknown'}): [${left},${top},${rectWidth}x${rectHeight}] — ${target.issue?.substring(0, 60) || 'no description'}`);
+
+      const blackRect = await sharp({
+        create: {
+          width: rectWidth,
+          height: rectHeight,
+          channels: 3,
+          background: { r: 0, g: 0, b: 0 }
+        }
+      }).png().toBuffer();
+
+      compositeInputs.push({ input: blackRect, left, top });
+    }
+
+    if (compositeInputs.length === 0) {
+      log.warn('⬛ [BLACKOUT] No valid bounding boxes found in fix targets, returning original image');
+      return imageBase64;
+    }
+
+    // Composite black rectangles onto the original image
+    const resultBuffer = await sharp(imageBuffer)
+      .composite(compositeInputs)
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const resultBase64 = `data:image/jpeg;base64,${resultBuffer.toString('base64')}`;
+    log.info(`⬛ [BLACKOUT] Blacked out ${compositeInputs.length}/${fixTargets.length} regions (${Math.round(resultBuffer.length / 1024)}KB)`);
+
+    return resultBase64;
+  } catch (error) {
+    log.error(`⬛ [BLACKOUT] Failed to blackout issue regions: ${error.message}`);
+    // Return original image on failure rather than crashing
+    return imageBase64;
+  }
+}
+
+/**
  * Inpaint using Runware API backend
  * Uses actual mask images (white=replace, black=preserve) instead of text coordinates.
  * Much cheaper than Gemini: ~$0.002/image (SDXL) vs ~$0.03/image
@@ -8333,6 +8436,7 @@ module.exports = {
   inspectImageForErrors,
   createMaskFromBoundingBox,
   createCombinedMask,
+  blackoutIssueRegions,
   calculateMaskCoverage,
   inpaintWithMask,
   autoRepairImage,

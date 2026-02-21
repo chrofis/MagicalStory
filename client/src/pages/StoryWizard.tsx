@@ -4408,7 +4408,7 @@ export default function StoryWizard() {
                 }
               } : undefined}
               // Iterate page using 17-check scene description with actual image analysis (dev mode only)
-              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, options?: { useOriginalAsReference?: boolean }) => {
+              onIteratePage={storyId && (user?.role === 'admin' || isImpersonating) ? async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => {
                 try {
                   log.info('Starting iteration for page:', pageNumber, 'imageModel:', modelSelections.imageModel, 'options:', options);
                   const result = await storyService.iteratePage(storyId, pageNumber, modelSelections.imageModel || undefined, options);

@@ -361,8 +361,8 @@ export function RepairWorkflowPanel({
   // Selected pages for artifact repair
   const [selectedArtifactPages, setSelectedArtifactPages] = useState<number[]>([]);
 
-  // Use original as reference option for step 3
-  const [useOriginalAsReference, setUseOriginalAsReference] = useState(false);
+  // Redo mode option for step 3
+  const [redoMode, setRedoMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
 
   // Selected covers for step 8
   const [selectedCovers, setSelectedCovers] = useState<('front' | 'back' | 'initial')[]>([]);
@@ -697,28 +697,41 @@ export function RepairWorkflowPanel({
               <div className="p-4 space-y-3 bg-white">
                 <p className="text-sm text-gray-600">{STEP_CONFIG['redo-pages'].description}</p>
 
-                <label className="flex items-start gap-2 p-2 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={useOriginalAsReference}
-                    onChange={(e) => setUseOriginalAsReference(e.target.checked)}
-                    className="mt-0.5"
-                    disabled={isRunning}
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-blue-800">Use original as reference</span>
-                    <p className="text-xs text-blue-600">Passes the current image to Gemini as reference — preserves composition, fixes details</p>
-                  </div>
-                </label>
+                <div className="space-y-1.5">
+                  <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'fresh' ? 'bg-amber-50 border border-amber-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
+                    <input type="radio" name="redoMode" checked={redoMode === 'fresh'} onChange={() => setRedoMode('fresh')} disabled={isRunning} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium">Fresh generation</span>
+                      <p className="text-xs text-gray-500">New generation from AI-corrected scene description</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'reference' ? 'bg-blue-50 border border-blue-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
+                    <input type="radio" name="redoMode" checked={redoMode === 'reference'} onChange={() => setRedoMode('reference')} disabled={isRunning} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium">Use original as reference</span>
+                      <p className="text-xs text-gray-500">Passes current image to Gemini — preserves composition, fixes details</p>
+                    </div>
+                  </label>
+                  <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'blackout' ? 'bg-purple-50 border border-purple-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
+                    <input type="radio" name="redoMode" checked={redoMode === 'blackout'} onChange={() => setRedoMode('blackout')} disabled={isRunning} className="mt-0.5" />
+                    <div>
+                      <span className="text-sm font-medium">Blackout issues</span>
+                      <p className="text-xs text-gray-500">Blacks out broken areas in the image, forces AI to regenerate those regions</p>
+                    </div>
+                  </label>
+                </div>
 
                 <button
-                  onClick={() => redoMarkedPages({ useOriginalAsReference })}
+                  onClick={() => redoMarkedPages({
+                    useOriginalAsReference: redoMode === 'reference',
+                    blackoutIssues: redoMode === 'blackout',
+                  })}
                   disabled={isRunning || workflowState.redoPages.pageNumbers.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Play className="w-4 h-4" />
                   Redo {workflowState.redoPages.pageNumbers.length} Pages
-                  {useOriginalAsReference && <span className="text-xs opacity-75">(with reference)</span>}
+                  {redoMode !== 'fresh' && <span className="text-xs opacity-75">({redoMode === 'reference' ? 'with reference' : 'blackout issues'})</span>}
                 </button>
 
                 {redoProgress.total > 0 && (
