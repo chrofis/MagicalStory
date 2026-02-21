@@ -1427,12 +1427,22 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
             if (!costumeObj || !prefix) return null;
             // First try exact match
             if (costumeObj[prefix]) return prefix;
-            // Then try prefix match (e.g., "gla" matches "gladiator")
-            const matchingKey = Object.keys(costumeObj).find(key => key.startsWith(prefix));
+            // Case-insensitive match
+            const prefixLower = prefix.toLowerCase();
+            const matchingKey = Object.keys(costumeObj).find(key =>
+              key.toLowerCase() === prefixLower || key.toLowerCase().startsWith(prefixLower) || prefixLower.startsWith(key.toLowerCase())
+            );
             if (matchingKey) {
-              log.debug(`[AVATAR LOOKUP] Prefix match: "${prefix}" -> "${matchingKey}"`);
+              log.debug(`[AVATAR LOOKUP] Fuzzy match: "${prefix}" -> "${matchingKey}"`);
+              return matchingKey;
             }
-            return matchingKey;
+            // Last resort: just use the first costumed avatar (one costume per story)
+            const firstKey = Object.keys(costumeObj)[0];
+            if (firstKey) {
+              log.debug(`[AVATAR LOOKUP] Using first available costume: "${firstKey}" (wanted "${prefix}")`);
+              return firstKey;
+            }
+            return null;
           };
 
           // Check styled costumed avatars (generated during this story's creation)

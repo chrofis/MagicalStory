@@ -174,7 +174,7 @@ function buildPhysicalTraitsString(character) {
  * @returns {string}
  */
 function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
-  return `${characterName.toLowerCase()}_${clothingCategory}_${artStyle}`;
+  return `${characterName.toLowerCase()}_${clothingCategory.toLowerCase()}_${artStyle}`;
 }
 
 /**
@@ -715,7 +715,19 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
  */
 function getStyledAvatar(characterName, clothingCategory, artStyle) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
-  const styledAvatar = styledAvatarCache.get(cacheKey);
+  let styledAvatar = styledAvatarCache.get(cacheKey);
+  if (!styledAvatar && clothingCategory.startsWith('costumed:')) {
+    // Prefix match: find any costumed avatar for this character+style
+    const prefix = `${characterName.toLowerCase()}_costumed:`;
+    const suffix = `_${artStyle}`;
+    for (const [key, value] of styledAvatarCache.entries()) {
+      if (key.startsWith(prefix) && key.endsWith(suffix)) {
+        log.debug(`🔄 [STYLED AVATARS] Fuzzy match: wanted "${cacheKey}", found "${key}"`);
+        styledAvatar = value;
+        break;
+      }
+    }
+  }
   if (!styledAvatar) {
     log.info(`📍 [STYLED AVATARS] Cache miss: ${cacheKey}`);
   }

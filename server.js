@@ -2658,7 +2658,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   ? Object.entries(charReqs)
                       .filter(([cat, config]) => config?.used)
                       .map(([cat, config]) => cat === 'costumed' && config?.costume
-                        ? `costumed:${config.costume}`
+                        ? `costumed:${config.costume.toLowerCase()}`
                         : cat)
                   : ['standard'];
 
@@ -2938,7 +2938,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               ? Object.entries(charReqs)
                   .filter(([cat, config]) => config?.used)
                   .map(([cat, config]) => cat === 'costumed' && config?.costume
-                    ? `costumed:${config.costume}`
+                    ? `costumed:${config.costume.toLowerCase()}`
                     : cat)
               : ['standard'];
 
