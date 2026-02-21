@@ -281,7 +281,7 @@ class OutlineParser {
       new RegExp(`^#{1,2}\\s*(?:${titleWords})\\s*\\n+\\*\\*(.+?)\\*\\*`, 'im')
     );
     if (boldMatch) {
-      this._cache.title = boldMatch[1].trim();
+      this._cache.title = this.cleanMarkdown(boldMatch[1]);
       log.debug(`[OUTLINE-PARSER] Title (bold format): "${this._cache.title}"`);
       return this._cache.title;
     }
@@ -291,7 +291,7 @@ class OutlineParser {
       new RegExp(`^#{1,2}\\s*(?:${titleWords})\\s*\\n+(?:${titleWords}):\\s*(.+?)$`, 'im')
     );
     if (prefixMatch) {
-      this._cache.title = prefixMatch[1].trim();
+      this._cache.title = this.cleanMarkdown(prefixMatch[1]);
       log.debug(`[OUTLINE-PARSER] Title (prefix format): "${this._cache.title}"`);
       return this._cache.title;
     }
@@ -301,7 +301,7 @@ class OutlineParser {
       new RegExp(`^#{1,2}\\s*(?:${titleWords})\\s*\\n+([^#\\-\\n].+?)$`, 'im')
     );
     if (plainMatch) {
-      this._cache.title = plainMatch[1].trim();
+      this._cache.title = this.cleanMarkdown(plainMatch[1]);
       log.debug(`[OUTLINE-PARSER] Title (plain format): "${this._cache.title}"`);
       return this._cache.title;
     }
@@ -311,7 +311,7 @@ class OutlineParser {
       new RegExp(`(?:${titleWords}):\\s*(.+)`, 'i')
     );
     if (inlineMatch) {
-      this._cache.title = inlineMatch[1].trim();
+      this._cache.title = this.cleanMarkdown(inlineMatch[1]);
       log.debug(`[OUTLINE-PARSER] Title (inline format): "${this._cache.title}"`);
       return this._cache.title;
     }
@@ -1107,7 +1107,10 @@ class UnifiedStoryParser {
 
     const match = this.response.match(/---TITLE---\s*(?:TITLE:\s*)?(.+?)(?:\n|$)/i);
     if (match) {
-      this._cache.title = match[1].trim();
+      this._cache.title = match[1].trim()
+        .replace(/^\*{1,2}|\*{1,2}$/g, '')  // Strip markdown bold
+        .replace(/^#+\s*/, '')               // Strip heading markers
+        .trim();
       log.debug(`[UNIFIED-PARSER] Title: "${this._cache.title}"`);
       return this._cache.title;
     }

@@ -2053,7 +2053,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
 
     // Single-page mode: repair just one page
     if (isSinglePageMode) {
-      const { repairSinglePage } = require('./server/lib/entityConsistency');
+      const { repairSinglePage } = require('../lib/entityConsistency');
 
       // Get issues for this character from the consistency report
       const entityReport = storyData.finalChecksReport?.entity;
@@ -2186,7 +2186,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
     if (!entityReport || !entityReport.characters?.[entityName]) {
       // Run entity consistency check first
       log.info(`🔧 [ENTITY-REPAIR] Running entity consistency check for ${entityName}`);
-      const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
+      const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
       entityReport = await runEntityConsistencyChecks(storyData, storyData.characters || [], {
         checkCharacters: true,
         checkObjects: false
@@ -2194,7 +2194,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
     }
 
     // Run the repair
-    const { repairEntityConsistency } = require('./server/lib/entityConsistency');
+    const { repairEntityConsistency } = require('../lib/entityConsistency');
     const repairResult = await repairEntityConsistency(storyData, character, entityReport);
 
     if (!repairResult.success) {
@@ -2438,7 +2438,7 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
         const scene = storyData.sceneImages[sceneIndex];
 
         // Generate new image using existing iterate logic
-        const { iteratePage } = require('./server/lib/images');
+        const { iteratePage } = require('../lib/images');
         const result = await iteratePage(scene.imageData, pageNumber, storyData, {
           useOriginalAsReference: !!useOriginalAsReference,
         });
@@ -2684,7 +2684,7 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     const rehydratedData = await rehydrateStoryImages(id, JSON.parse(JSON.stringify(storyData)));
 
     // Run entity consistency check with rehydrated data
-    const { runEntityConsistencyChecks } = require('./server/lib/entityConsistency');
+    const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
     const characters = rehydratedData.characters || [];
     const report = await runEntityConsistencyChecks(rehydratedData, characters);
 
@@ -2717,7 +2717,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const repairMethod = useMagicApiRepair ? 'MagicAPI' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
-    const { repairSinglePage } = require('./server/lib/entityConsistency');
+    const { repairSinglePage } = require('../lib/entityConsistency');
     const results = [];
 
     for (const repair of repairs) {
@@ -2797,8 +2797,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
             if (useMagicApiRepair) {
               // Use MagicAPI face swap + hair fix pipeline
-              const { repairFaceWithMagicApi, isMagicApiConfigured } = require('./server/lib/magicApi');
-              const { getStyledAvatarForClothing, collectEntityAppearances } = require('./server/lib/entityConsistency');
+              const { repairFaceWithMagicApi, isMagicApiConfigured } = require('../lib/magicApi');
+              const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 
               if (!isMagicApiConfigured()) {
                 log.warn(`[REPAIR-WORKFLOW] MagicAPI not configured, falling back to Gemini`);
