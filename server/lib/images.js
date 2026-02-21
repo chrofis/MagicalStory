@@ -4104,7 +4104,21 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   // Step 5: Prepare for image generation
   const sceneCharacters = getCharactersInScene(newSceneDescription, characters);
 
-  // Get clothing category
+  // Build per-character clothing requirements from scene metadata (like main pipeline does)
+  const sceneMetadataForClothing = extractSceneMetadata(newSceneDescription) || {};
+  const sceneClothingReqs = { ...clothingRequirements };
+
+  if (sceneMetadataForClothing.characterClothing && Object.keys(sceneMetadataForClothing.characterClothing).length > 0) {
+    for (const [charName, clothing] of Object.entries(sceneMetadataForClothing.characterClothing)) {
+      if (!sceneClothingReqs[charName]) {
+        sceneClothingReqs[charName] = {};
+      }
+      sceneClothingReqs[charName]._currentClothing = clothing;
+    }
+    log.debug(`🔄 [ITERATE] Per-character clothing: ${Object.entries(sceneMetadataForClothing.characterClothing).map(([n, c]) => `${n}:${c}`).join(', ')}`);
+  }
+
+  // Default clothing for characters not in the per-character map
   let clothingCategory = typeof pageClothingData?.pageClothing?.[pageNumber] === 'string'
     ? pageClothingData.pageClothing[pageNumber]
     : parseClothingCategory(newSceneDescription) || pageClothingData?.primaryClothing || 'standard';
@@ -4116,13 +4130,11 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     effectiveClothing = 'costumed';
   }
 
-  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, clothingRequirements);
+  let referencePhotos = getCharacterPhotoDetails(sceneCharacters, effectiveClothing, costumeType, artStyle, sceneClothingReqs);
 
-  // Apply styled avatars if not costumed
-  if (effectiveClothing !== 'costumed') {
-    const { applyStyledAvatars } = require('./styledAvatars');
-    referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
-  }
+  // Apply styled avatars (handles non-costumed characters in mixed scenes)
+  const { applyStyledAvatars } = require('./styledAvatars');
+  referencePhotos = applyStyledAvatars(referencePhotos, artStyle);
 
   // Build landmark photos and VB grid
   const newSceneMetadata = extractSceneMetadata(newSceneDescription);
