@@ -1482,7 +1482,7 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
                 if (blobVersion) {
                   covers[coverType].imageVersions[i].description = blobVersion.description;
                   covers[coverType].imageVersions[i].type = blobVersion.type;
-                  covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt;
+                  covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt || storyData.createdAt || null;
                 }
               }
             }
@@ -1490,6 +1490,30 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
           // Strip imageVersions if only one version (original, no regenerations)
           if (covers[coverType]?.imageVersions?.length <= 1) {
             delete covers[coverType].imageVersions;
+          }
+        }
+      }
+
+      // Merge scene imageVersions metadata from blob (description, prompt, modelId, etc.)
+      if (!activeOnly && storyData.sceneImages) {
+        for (const [pageNum, scene] of sceneImagesMap) {
+          const blobScene = storyData.sceneImages.find(s => s.pageNumber === pageNum);
+          if (blobScene?.imageVersions && scene.imageVersions) {
+            for (let i = 0; i < scene.imageVersions.length && i < blobScene.imageVersions.length; i++) {
+              const blobVersion = blobScene.imageVersions[i];
+              if (blobVersion) {
+                scene.imageVersions[i].description = blobVersion.description || null;
+                scene.imageVersions[i].prompt = blobVersion.prompt || null;
+                scene.imageVersions[i].userInput = blobVersion.userInput || null;
+                scene.imageVersions[i].modelId = blobVersion.modelId || null;
+                scene.imageVersions[i].type = blobVersion.type || null;
+                scene.imageVersions[i].qualityReasoning = blobVersion.qualityReasoning || null;
+                scene.imageVersions[i].fixTargets = blobVersion.fixTargets || [];
+                scene.imageVersions[i].totalAttempts = blobVersion.totalAttempts || null;
+                scene.imageVersions[i].referencePhotoNames = blobVersion.referencePhotoNames || [];
+                scene.imageVersions[i].createdAt = blobVersion.createdAt || scene.imageVersions[i].generatedAt || storyData.createdAt || null;
+              }
+            }
           }
         }
       }
