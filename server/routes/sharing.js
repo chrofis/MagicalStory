@@ -363,6 +363,8 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
 </body>
 </html>`;
 
+      // Override Helmet's same-origin CORP so social crawlers (WhatsApp, Facebook) can read OG tags
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
       res.type('text/html').send(html);
     } else {
       // Story not found - redirect to home
@@ -424,6 +426,8 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
       // Insert story-specific tags after <head>
       html = html.replace('<head>', '<head>' + ogTags);
 
+      // Override Helmet's same-origin CORP so social crawlers (WhatsApp, Facebook) can read OG tags
+      res.set('Cross-Origin-Resource-Policy', 'cross-origin');
       res.type('text/html').send(html);
     } else {
       // Story not found or no dist folder - serve default
