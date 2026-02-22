@@ -334,6 +334,106 @@ async function compressImageToJPEG(pngBase64, quality = 85, maxDimension = null)
 }
 
 /**
+ * Run P1 Visual Inventory — honest figure/age detection without seeing the original prompt.
+ * Returns parsed inventory data or null on failure. No scoring, no P2 follow-up.
+ * @param {Array} parts - Image + reference image parts (no text prompt)
+ * @param {string} modelId - Gemini model to use
+ * @param {string} apiKey - Gemini API key
+ * @param {string} pageContext - Page context for logging
+ * @returns {Promise<{figures: Array, matches: Array, objectMatches: Array, rendering: Object, inputTokens: number, outputTokens: number}|null>}
+ */
+async function runVisualInventory(parts, modelId, apiKey, pageContext) {
+  try {
+    const inventoryParts = [...parts];
+    inventoryParts.push({ text: PROMPT_TEMPLATES.imageVisualInventory });
+
+    const p1Response = await withRetry(async () => {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: inventoryParts }],
+          generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
+          safetySettings: [
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
+            { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
+          ]
+        })
+      });
+    }, { maxRetries: 2, baseDelay: 2000 });
+
+    if (!p1Response.ok) {
+      const errText = await p1Response.text();
+      log.warn(`⚠️ [QUALITY P1] API error: ${errText.substring(0, 200)}`);
+      return null;
+    }
+
+    const p1Data = await p1Response.json();
+    const inputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
+    const thinkingTokens = p1Data.usageMetadata?.thoughtsTokenCount || 0;
+
+    const p1Blocked = p1Data.promptFeedback?.blockReason ||
+      !p1Data.candidates || p1Data.candidates.length === 0 ||
+      p1Data.candidates[0]?.finishReason === 'SAFETY' ||
+      p1Data.candidates[0]?.finishReason === 'PROHIBITED_CONTENT';
+
+    if (p1Blocked) {
+      log.warn(`⚠️ [QUALITY P1] Content blocked`);
+      return null;
+    }
+
+    const p1Text = p1Data.candidates[0]?.content?.parts?.[0]?.text?.trim();
+    if (!p1Text) {
+      log.warn(`⚠️ [QUALITY P1] No text response`);
+      return null;
+    }
+
+    const p1JsonMatch = p1Text.match(/\{[\s\S]*\}/);
+    if (!p1JsonMatch) {
+      log.warn(`⚠️ [QUALITY P1] No JSON in response`);
+      return null;
+    }
+
+    let inventoryJson;
+    try {
+      inventoryJson = JSON.parse(p1JsonMatch[0]);
+    } catch (e) {
+      log.warn(`⚠️ [QUALITY P1] JSON parse failed`);
+      return null;
+    }
+
+    const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
+    log.verbose(`📊 [QUALITY P1] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+
+    const figures = inventoryJson.figures || [];
+    const matches = inventoryJson.matches || [];
+    if (figures.length > 0) {
+      log.info(`⭐ [QUALITY P1] Figures: ${figures.map(f => `#${f.id} ${f.apparent_age} ${f.hair} (${f.position})`).join('; ')}`);
+    }
+    if (matches.length > 0) {
+      log.info(`⭐ [QUALITY P1] Matches: ${matches.map(m => `Fig ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%${m.age_match === false ? ', AGE MISMATCH' : ''})`).join('; ')}`);
+    }
+
+    return {
+      figures,
+      matches,
+      objectMatches: inventoryJson.object_matches || [],
+      rendering: inventoryJson.rendering || {},
+      inputTokens,
+      outputTokens
+    };
+  } catch (err) {
+    log.warn(`⚠️ [QUALITY P1] Figure check failed: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Evaluate image quality using Gemini API (visual quality + optional semantic fidelity)
  * Sends the image to Gemini for quality assessment, with parallel semantic check when storyText provided
  * @param {string} imageData - Base64 encoded image with data URI prefix
@@ -463,297 +563,12 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
       log.verbose(`⭐ [QUALITY] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
     }
 
-    // === TWO-PASS EVALUATION FOR SCENE TYPE ===
-    // Pass 1: Visual inventory (image + refs, NO original prompt) — honest description
-    // Pass 2: Prompt compliance (text-only, NO image) — scoring against prompt
-    // This prevents the model from hallucinating compliance with the prompt
-    if (evaluationType === 'scene' && PROMPT_TEMPLATES.imageVisualInventory && PROMPT_TEMPLATES.imagePromptCompliance) {
-      log.verbose(`⭐ [QUALITY P1] Starting two-pass evaluation for ${pageContext || 'scene'}`);
-
-      try {
-        // --- Pass 1: Visual Inventory (image + refs, no original prompt) ---
-        const inventoryParts = [...parts]; // image + reference images, no text prompt yet
-        inventoryParts.push({ text: PROMPT_TEMPLATES.imageVisualInventory });
-
-        const p1Response = await withRetry(async () => {
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-          return fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: inventoryParts }],
-              generationConfig: { maxOutputTokens: 16000, temperature: 0.3 },
-              safetySettings: [
-                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-              ]
-            })
-          });
-        }, { maxRetries: 2, baseDelay: 2000 });
-
-        let twoPassFailed = false;
-
-        if (!p1Response.ok) {
-          const errText = await p1Response.text();
-          log.warn(`⚠️ [QUALITY P1] API error, falling back to single-pass: ${errText.substring(0, 200)}`);
-          twoPassFailed = true;
-        }
-
-        if (!twoPassFailed) {
-          const p1Data = await p1Response.json();
-          const p1InputTokens = p1Data.usageMetadata?.promptTokenCount || 0;
-          const p1OutputTokens = p1Data.usageMetadata?.candidatesTokenCount || 0;
-          const p1ThinkingTokens = p1Data.usageMetadata?.thoughtsTokenCount || 0;
-
-          // Check if blocked
-          const p1Blocked = p1Data.promptFeedback?.blockReason ||
-            !p1Data.candidates || p1Data.candidates.length === 0 ||
-            p1Data.candidates[0]?.finishReason === 'SAFETY' ||
-            p1Data.candidates[0]?.finishReason === 'PROHIBITED_CONTENT';
-
-          if (p1Blocked) {
-            log.warn(`⚠️ [QUALITY P1] Content blocked, falling back to single-pass`);
-            twoPassFailed = true;
-          }
-
-          if (!twoPassFailed) {
-            const p1Text = p1Data.candidates[0]?.content?.parts?.[0]?.text?.trim();
-            if (!p1Text) {
-              log.warn(`⚠️ [QUALITY P1] No text response, falling back to single-pass`);
-              twoPassFailed = true;
-            }
-
-            if (!twoPassFailed) {
-              // Parse Pass 1 JSON
-              const p1JsonMatch = p1Text.match(/\{[\s\S]*\}/);
-              let inventoryJson = null;
-              if (p1JsonMatch) {
-                try {
-                  inventoryJson = JSON.parse(p1JsonMatch[0]);
-                } catch (e) {
-                  log.warn(`⚠️ [QUALITY P1] JSON parse failed, falling back to single-pass`);
-                  twoPassFailed = true;
-                }
-              } else {
-                log.warn(`⚠️ [QUALITY P1] No JSON in response, falling back to single-pass`);
-                twoPassFailed = true;
-              }
-
-              if (!twoPassFailed && inventoryJson) {
-                // Log Pass 1 results
-                const p1ThinkingInfo = p1ThinkingTokens > 0 ? `, thinking: ${p1ThinkingTokens.toLocaleString()}` : '';
-                log.verbose(`📊 [QUALITY P1] Token usage - input: ${p1InputTokens.toLocaleString()}, output: ${p1OutputTokens.toLocaleString()}${p1ThinkingInfo}`);
-
-                const figures = inventoryJson.figures || [];
-                const matches = inventoryJson.matches || [];
-                if (figures.length > 0) {
-                  log.info(`⭐ [QUALITY P1] Figures: ${figures.map(f => `#${f.id} ${f.apparent_age} ${f.hair} (${f.position})`).join('; ')}`);
-                }
-                if (matches.length > 0) {
-                  log.info(`⭐ [QUALITY P1] Matches: ${matches.map(m => `Fig ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%${m.age_match === false ? ', AGE MISMATCH' : ''})`).join('; ')}`);
-                }
-
-                // --- Pass 2: Prompt Compliance (text-only, NO image) ---
-                log.verbose(`⭐ [QUALITY P2] Starting prompt compliance scoring for ${pageContext || 'scene'}`);
-
-                const compliancePrompt = fillTemplate(PROMPT_TEMPLATES.imagePromptCompliance, {
-                  ORIGINAL_PROMPT: promptForEval,
-                  VISUAL_INVENTORY: JSON.stringify(inventoryJson)
-                });
-
-                const p2Response = await withRetry(async () => {
-                  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-                  return fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      contents: [{ parts: [{ text: compliancePrompt }] }],
-                      generationConfig: {
-                        maxOutputTokens: 16000,
-                        temperature: 0.3,
-                        responseMimeType: 'application/json'
-                      },
-                      // Match P1 safety settings — historical content triggers PROHIBITED_CONTENT blocks
-                      safetySettings: [
-                        { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" },
-                        { category: "HARM_CATEGORY_CIVIC_INTEGRITY", threshold: "BLOCK_NONE" }
-                      ]
-                    })
-                  });
-                }, { maxRetries: 2, baseDelay: 1000 });
-
-                if (!p2Response.ok) {
-                  const p2ErrText = await p2Response.text();
-                  log.warn(`⚠️ [QUALITY P2] API error, falling back to single-pass: ${p2ErrText.substring(0, 200)}`);
-                  twoPassFailed = true;
-                }
-
-                if (!twoPassFailed) {
-                  const p2Data = await p2Response.json();
-                  const p2InputTokens = p2Data.usageMetadata?.promptTokenCount || 0;
-                  const p2OutputTokens = p2Data.usageMetadata?.candidatesTokenCount || 0;
-                  const p2ThinkingTokens = p2Data.usageMetadata?.thoughtsTokenCount || 0;
-                  const p2ThinkingInfo = p2ThinkingTokens > 0 ? `, thinking: ${p2ThinkingTokens.toLocaleString()}` : '';
-                  log.verbose(`📊 [QUALITY P2] Token usage - input: ${p2InputTokens.toLocaleString()}, output: ${p2OutputTokens.toLocaleString()}${p2ThinkingInfo}`);
-
-                  // Check for content blocks (same pattern as P1)
-                  const p2Blocked = p2Data.promptFeedback?.blockReason ||
-                    !p2Data.candidates?.[0]?.content?.parts?.length ||
-                    p2Data.candidates[0]?.finishReason === 'SAFETY' ||
-                    p2Data.candidates[0]?.finishReason === 'PROHIBITED_CONTENT';
-                  if (p2Blocked) {
-                    const reason = p2Data.promptFeedback?.blockReason || p2Data.candidates?.[0]?.finishReason || 'empty response';
-                    log.warn(`⚠️ [QUALITY P2] Content blocked (${reason}), falling back to single-pass`);
-                    twoPassFailed = true;
-                  }
-
-                  const p2Text = !twoPassFailed ? p2Data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() : null;
-                  if (p2Text) {
-                    const p2JsonMatch = p2Text.match(/\{[\s\S]*\}/);
-                    let complianceJson = null;
-                    if (p2JsonMatch) {
-                      try {
-                        complianceJson = JSON.parse(p2JsonMatch[0]);
-                      } catch (e) {
-                        log.warn(`⚠️ [QUALITY P2] JSON parse failed, falling back to single-pass. Response (${p2Text.length} chars): ${p2Text.substring(0, 300)}`);
-                        twoPassFailed = true;
-                      }
-                    } else {
-                      log.warn(`⚠️ [QUALITY P2] No JSON found in response, falling back to single-pass. Response (${p2Text.length} chars): ${p2Text.substring(0, 300)}`);
-                      twoPassFailed = true;
-                    }
-
-                    if (!twoPassFailed && complianceJson && typeof complianceJson.score === 'number') {
-                      // === Two-pass succeeded! Merge results into standard output format ===
-                      const rawScore = complianceJson.score;
-                      const score = rawScore * 10; // Convert 0-10 to 0-100
-                      const verdict = complianceJson.verdict || 'UNKNOWN';
-                      let issuesSummary = complianceJson.issues_summary || '';
-                      if (Array.isArray(issuesSummary)) issuesSummary = issuesSummary.join('. ');
-
-                      log.info(`⭐ [QUALITY P2] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
-                      if (issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none') {
-                        log.info(`⭐ [QUALITY P2] Issues: ${issuesSummary}`);
-                      }
-
-                      // Build fixable_issues from Pass 2
-                      let fixableIssues = [];
-                      if (complianceJson.fixable_issues && Array.isArray(complianceJson.fixable_issues)) {
-                        fixableIssues = complianceJson.fixable_issues
-                          .filter(i => i.description)
-                          .map(i => ({
-                            character: i.character || null,
-                            description: i.description,
-                            severity: i.severity || 'MODERATE',
-                            type: i.type || 'default',
-                            fix: i.fix || `Fix: ${i.description}`
-                          }));
-                        if (fixableIssues.length > 0) {
-                          log.info(`⭐ [QUALITY P2] ${fixableIssues.length} fixable issues identified`);
-                        }
-                      }
-
-                      // Merge figures/matches from Pass 1 with scene/spatial/score from Pass 2
-                      const mergedResult = {
-                        ...inventoryJson,
-                        ...complianceJson,
-                        figures: inventoryJson.figures || [],
-                        matches: inventoryJson.matches || [],
-                        object_matches: inventoryJson.object_matches || [],
-                        rendering: inventoryJson.rendering || {}
-                      };
-
-                      // Store FULL merged JSON as reasoning (for dev mode display)
-                      const reasoning = JSON.stringify(mergedResult, null, 2);
-
-                      // Await semantic evaluation if running in parallel
-                      let semanticResult = null;
-                      let finalScore = score;
-                      let combinedIssuesSummary = issuesSummary;
-                      if (semanticPromise) {
-                        try {
-                          semanticResult = await semanticPromise;
-                          if (semanticResult?.semanticIssues?.length > 0) {
-                            let semanticPenalty = 0;
-                            for (const issue of semanticResult.semanticIssues) {
-                              if (issue.severity === 'CRITICAL') semanticPenalty += 30;
-                              else if (issue.severity === 'MAJOR') semanticPenalty += 20;
-                              else semanticPenalty += 10;
-                            }
-                            finalScore = Math.max(0, score - semanticPenalty);
-                            log.info(`🔍 [SEMANTIC] Semantic score: ${semanticResult.score}/100, penalty: ${semanticPenalty} points (quality ${score} → final ${finalScore})`);
-                            const semanticSummary = semanticResult.semanticIssues.map(i => i.problem).join('; ');
-                            combinedIssuesSummary = issuesSummary
-                              ? `${issuesSummary}; SEMANTIC: ${semanticSummary}`
-                              : `SEMANTIC: ${semanticSummary}`;
-                          }
-                        } catch (semanticErr) {
-                          log.warn(`[SEMANTIC] Parallel evaluation failed: ${semanticErr.message}`);
-                        }
-                      }
-
-                      // Aggregate token usage from both passes + semantic
-                      const semanticUsage = semanticResult?.usage || {};
-                      const totalUsage = {
-                        input_tokens: p1InputTokens + p2InputTokens + (semanticUsage.input_tokens || 0),
-                        output_tokens: p1OutputTokens + p2OutputTokens + (semanticUsage.output_tokens || 0),
-                        thinking_tokens: p1ThinkingTokens + p2ThinkingTokens,
-                        semantic_input_tokens: semanticUsage.input_tokens || 0,
-                        semantic_output_tokens: semanticUsage.output_tokens || 0,
-                        p1_input_tokens: p1InputTokens,
-                        p1_output_tokens: p1OutputTokens,
-                        p2_input_tokens: p2InputTokens,
-                        p2_output_tokens: p2OutputTokens
-                      };
-
-                      log.verbose(`✅ [QUALITY] Two-pass evaluation complete: quality ${score}/100, final ${finalScore}/100`);
-
-                      return {
-                        score: finalScore,
-                        qualityScore: score,
-                        semanticScore: semanticResult?.score ?? null,
-                        rawScore,
-                        verdict,
-                        reasoning,
-                        issuesSummary: combinedIssuesSummary,
-                        textIssue: null,
-                        fixTargets: [],
-                        fixableIssues,
-                        figures: inventoryJson.figures || [],
-                        matches: inventoryJson.matches || [],
-                        semanticResult,
-                        usage: totalUsage,
-                        modelId,
-                        twoPass: true
-                      };
-                    }
-                  }
-
-                  if (!twoPassFailed) {
-                    log.warn(`⚠️ [QUALITY P2] Could not parse scoring response, falling back to single-pass`);
-                    twoPassFailed = true;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // If we reach here, two-pass failed — fall through to single-pass
-        if (twoPassFailed) {
-          log.verbose(`⭐ [QUALITY] Two-pass incomplete, using single-pass fallback for ${pageContext || 'scene'}`);
-        }
-      } catch (twoPassErr) {
-        log.warn(`⚠️ [QUALITY] Two-pass error, falling back to single-pass: ${twoPassErr.message}`);
-      }
+    // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
+    let p1Promise = null;
+    if (evaluationType === 'scene' && PROMPT_TEMPLATES.imageVisualInventory) {
+      log.debug(`⭐ [QUALITY P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
+      p1Promise = runVisualInventory(parts, modelId, apiKey, pageContext);
     }
-    // === END TWO-PASS EVALUATION ===
 
     // Add evaluation prompt text
     parts.push({ text: evaluationPrompt });
@@ -1036,10 +851,33 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
       // Extract figures and matches for character-aware bbox matching
       // figures: [{id, position, hair, clothing, action, view}]
       // matches: [{figure, reference (char name), confidence, face_bbox, issues}]
-      const figures = parsedJson.figures || [];
-      const matches = parsedJson.matches || [];
+      let figures = parsedJson.figures || [];
+      let matches = parsedJson.matches || [];
       if (matches.length > 0) {
         log.info(`⭐ [QUALITY] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
+      }
+
+      // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
+      let p1Usage = null;
+      if (p1Promise) {
+        try {
+          const p1Result = await p1Promise;
+          if (p1Result) {
+            // Use P1's figures/matches (more honest, no prompt bias)
+            figures = p1Result.figures || figures;
+            matches = p1Result.matches || matches;
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+            // Log age mismatches as warnings
+            for (const m of matches) {
+              if (m.age_match === false) {
+                const figureData = figures.find(f => f.id === m.figure);
+                log.warn(`⚠️ [QUALITY P1] Age mismatch: ${m.reference} — figure appears ${figureData?.apparent_age || 'unknown'}`);
+              }
+            }
+          }
+        } catch (e) {
+          log.warn(`⚠️ [QUALITY P1] Figure check failed: ${e.message}`);
+        }
       }
 
       // Await semantic evaluation if running in parallel
@@ -1071,12 +909,14 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         }
       }
 
-      // Aggregate usage from quality + semantic evaluations
+      // Aggregate usage from quality + P1 + semantic evaluations
       const semanticUsage = semanticResult?.usage || {};
       const totalUsage = {
-        input_tokens: qualityInputTokens + (semanticUsage.input_tokens || 0),
-        output_tokens: qualityOutputTokens + (semanticUsage.output_tokens || 0),
+        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0),
+        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0),
         thinking_tokens: qualityThinkingTokens,
+        p1_input_tokens: p1Usage?.inputTokens || 0,
+        p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
         semantic_output_tokens: semanticUsage.output_tokens || 0
       };
@@ -1100,11 +940,22 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
       };
     }
 
-    // Helper to merge semantic results into quality result
+    // Helper to merge semantic + P1 results into quality result (used by fallback text-format parsers)
     const mergeSemanticResult = async (qualityScore, reasoning) => {
       let semanticResult = null;
       let finalScore = qualityScore;
       let issuesSummary = '';
+
+      // Await P1 for figure data (best-effort)
+      let p1Usage = null;
+      if (p1Promise) {
+        try {
+          const p1Result = await p1Promise;
+          if (p1Result) {
+            p1Usage = { inputTokens: p1Result.inputTokens, outputTokens: p1Result.outputTokens };
+          }
+        } catch (e) { /* already logged */ }
+      }
 
       if (semanticPromise) {
         try {
@@ -1129,9 +980,11 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
       // Aggregate usage
       const semanticUsage = semanticResult?.usage || {};
       const totalUsage = {
-        input_tokens: qualityInputTokens + (semanticUsage.input_tokens || 0),
-        output_tokens: qualityOutputTokens + (semanticUsage.output_tokens || 0),
+        input_tokens: qualityInputTokens + (p1Usage?.inputTokens || 0) + (semanticUsage.input_tokens || 0),
+        output_tokens: qualityOutputTokens + (p1Usage?.outputTokens || 0) + (semanticUsage.output_tokens || 0),
         thinking_tokens: qualityThinkingTokens,
+        p1_input_tokens: p1Usage?.inputTokens || 0,
+        p1_output_tokens: p1Usage?.outputTokens || 0,
         semantic_input_tokens: semanticUsage.input_tokens || 0,
         semantic_output_tokens: semanticUsage.output_tokens || 0
       };
@@ -1174,12 +1027,14 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     }
 
     log.warn(`⚠️  [QUALITY] Could not parse score from response (finishReason=${finishReason}, ${responseText.length} chars):`, responseText.substring(0, 200));
-    // Await semantic to prevent memory leak
+    // Await parallel promises to prevent memory leak
+    if (p1Promise) await p1Promise.catch(() => {});
     if (semanticPromise) await semanticPromise.catch(() => {});
     return null;
   } catch (error) {
     log.error('❌ [QUALITY] Error evaluating image quality:', error);
-    // Await semantic to prevent memory leak
+    // Await parallel promises to prevent memory leak
+    if (p1Promise) await p1Promise.catch(() => {});
     if (semanticPromise) await semanticPromise.catch(() => {});
     return null;
   }
