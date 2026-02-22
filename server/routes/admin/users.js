@@ -208,6 +208,42 @@ router.post('/:userId/email-verified', authenticateToken, requireAdmin, async (r
   }
 });
 
+// POST /api/admin/users/:userId/role - Update user role
+router.post('/:userId/role', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ error: 'role must be "user" or "admin"' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(503).json({ error: 'This feature requires database mode' });
+    }
+
+    const rows = await dbQuery('SELECT id, username, role FROM users WHERE id = $1', [userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = rows[0];
+    const previousRole = user.role;
+
+    await dbQuery('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
+
+    log.info(`[ADMIN] Role for user ${user.username} changed: ${previousRole} -> ${role} (by ${req.user.username})`);
+
+    res.json({
+      message: 'User role updated',
+      user: { id: user.id, username: user.username, role, previousRole }
+    });
+  } catch (err) {
+    console.error('Error updating user role:', err);
+    res.status(500).json({ error: 'Failed to update user role' });
+  }
+});
+
 // POST /api/admin/users/:userId/photo-consent - Toggle photo consent status
 router.post('/:userId/photo-consent', authenticateToken, requireAdmin, async (req, res) => {
   try {
