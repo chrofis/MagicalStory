@@ -571,6 +571,7 @@ app.use(helmet({
   contentSecurityPolicy: false, // Disable CSP as it can interfere with inline scripts/styles
   crossOriginEmbedderPolicy: false, // Allow embedding external resources
   crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, // Required for Google OAuth popup
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow WhatsApp/Facebook crawlers to fetch OG images
 }));
 
 // Rate limiting for authentication endpoints (prevent brute force attacks)
