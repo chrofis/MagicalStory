@@ -145,7 +145,7 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
 
     // Generate new scene description (includes Visual Bible recurring elements)
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
-    const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{"previewMismatches":[' });
+    const sceneResult = await callClaudeAPI(scenePrompt, 10000, null, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
@@ -368,7 +368,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       );
 
       try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, 6000, null, { prefill: '{"previewMismatches":[' });
+        const expansionResult = await callClaudeAPI(expansionPrompt, 10000, null, { prefill: '{"previewMismatches":[' });
         expandedDescription = expansionResult.text;
         console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
@@ -850,7 +850,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     // Step 5: Call Claude to run 17 checks and generate corrected scene
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-    const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{"previewMismatches":[' });
+    const sceneResult = await callClaudeAPI(scenePrompt, 10000, null, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Parse the scene JSON to extract previewMismatches

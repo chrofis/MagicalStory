@@ -2332,7 +2332,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           previewFeedback    // pass preview feedback for composition hints
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 6000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"previewMismatches":[' });
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"previewMismatches":[' });
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
@@ -4101,7 +4101,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 previewFeedback  // Pass existing image analysis for comparison
               );
 
-              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 6000, modelOverrides?.textModel, { prefill: '{"previewMismatches":[' });
+              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 10000, modelOverrides?.textModel, { prefill: '{"previewMismatches":[' });
 
               // Track token usage for scene expansion (Issue #1 fix)
               if (expandedDescriptionResult?.usage) {

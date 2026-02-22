@@ -4106,7 +4106,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
 
   // Step 4: Call Claude to run 17 checks and generate corrected scene
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 6000, null, { prefill: '{"previewMismatches":[' });
+  const sceneResult = await callClaudeAPI(scenePrompt, 10000, null, { prefill: '{"previewMismatches":[' });
   const newSceneDescription = sceneResult.text;
 
   // Track usage
@@ -5633,6 +5633,8 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
       return {
         ...result,
+        // Prefer enriched fix targets (with bounding boxes from bbox detection) over raw quality eval targets
+        fixTargets: (enrichedFixTargets && enrichedFixTargets.length > 0) ? enrichedFixTargets : result.fixTargets,
         wasRegenerated: attempts > 1,
         retryHistory: retryHistory,
         totalAttempts: attempts,

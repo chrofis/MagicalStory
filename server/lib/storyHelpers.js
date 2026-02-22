@@ -2647,7 +2647,7 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
     // Build relative height description (AI understands this better than cm values)
     const heightDescription = buildRelativeHeightDescription(sceneCharacters);
 
-    characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (in order):**\n${charDescriptions.join('\n')}\nMatch each character to their corresponding reference photo above.\n`;
+    characterReferenceList = `\n**CHARACTER REFERENCE PHOTOS (in order) — EXACTLY ${sceneCharacters.length} characters, no more:**\n${charDescriptions.join('\n')}\nINCLUDE ALL ${sceneCharacters.length} characters above AND NO OTHERS. Every person in the image must match one of these references. Do NOT add extra figures, background people, or supporting characters.\n`;
 
     if (heightDescription) {
       characterReferenceList += `\n${heightDescription}\n`;

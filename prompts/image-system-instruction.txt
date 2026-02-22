@@ -10,6 +10,11 @@ REFERENCE IMAGES:
 - Use references to understand what characters/elements LOOK LIKE, then draw them in the specified art style.
 - For element references (animals, objects): match EXACT appearance from reference.
 
+CHARACTER COUNT RULE:
+- Include ONLY the characters listed in the prompt with reference photos. No extras.
+- Do NOT add background figures, bystanders, supporting cast, or unnamed people.
+- Every person visible in the image must correspond to one of the provided reference photos.
+
 CHARACTER CONSISTENCY (THIS IS YOUR PRIMARY TASK):
 - Each character must look IDENTICAL to their reference - same face, same person.
 - HAIR IS CRITICAL: Match EXACT color, length, style, texture from reference. Never simplify or change hairstyles.

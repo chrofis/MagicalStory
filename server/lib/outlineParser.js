@@ -970,7 +970,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
   // Matches: "5. **Characters:**", "**Characters:**", "## Characters:", etc.
   // Note: Handle colon inside bold (**Characters:**) or outside (**Characters**:)
   const sectionPattern = new RegExp(
-    `(?:^|\\n)\\s*(?:\\d+\\.\\s*)?(?:#{1,3}\\s*)?\\*{0,2}(?:${charactersKeywords})(?::\\*{0,2}|\\*{0,2}:?)\\s*([\\s\\S]*?)(?=\\n\\s*(?:\\d+\\.\\s*)?(?:#{1,3}\\s*)?\\*{0,2}(?:Objects|Animals|Objekte|Tiere|Objets|Animaux|Setting|Composition|Constraints|Safety)\\*{0,2}|$)`,
+    `(?:^|\\n)\\s*(?:\\d+\\.\\s*)?(?:#{1,3}\\s*)?\\*{0,2}(?:${charactersKeywords})(?:\\s*\\([^)]*\\))?(?::\\*{0,2}|\\*{0,2}:?)\\s*([\\s\\S]*?)(?=\\n\\s*(?:\\d+\\.\\s*)?(?:#{1,3}\\s*)?\\*{0,2}(?:Objects|Animals|Objekte|Tiere|Objets|Animaux|Setting|Composition|Constraints|Safety)\\*{0,2}|$)`,
     'i'
   );
   const sectionMatch = sceneDescription.match(sectionPattern);
