@@ -336,7 +336,7 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, email FROM users WHERE email = $1 OR username = $1',
+      'SELECT id, username, email, preferred_language FROM users WHERE email = $1 OR username = $1',
       [email.toLowerCase()]
     );
 
@@ -356,7 +356,7 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
 
     if (emailService) {
       const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
-      const emailResult = await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl);
+      const emailResult = await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl, user.preferred_language);
       if (emailResult.success) {
         console.log(`✅ Password reset email sent to ${user.email}`);
       } else {
@@ -460,7 +460,7 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, username, email, email_verified, email_verification_expires, last_verification_email_sent FROM users WHERE id = $1',
+      'SELECT id, username, email, email_verified, email_verification_expires, last_verification_email_sent, preferred_language FROM users WHERE id = $1',
       [userId]
     );
 
@@ -504,7 +504,7 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
     const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
     console.log(`📧 Sending verification email to: ${user.email}, URL: ${verifyUrl}`);
 
-    const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+    const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl, user.preferred_language);
 
     if (!emailResult.success) {
       console.error(`❌ Failed to send verification email to ${user.email}:`, emailResult.error);
@@ -578,7 +578,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, username, email, password FROM users WHERE id = $1', [userId]);
+    const result = await pool.query('SELECT id, username, email, password, preferred_language FROM users WHERE id = $1', [userId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -610,7 +610,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
 
     if (emailService) {
       const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-      const emailResult = await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl);
+      const emailResult = await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl, user.preferred_language);
       if (!emailResult.success) {
         console.error(`❌ Failed to send verification email for email change:`, emailResult.error);
         // Email was already changed in DB, but verification email failed

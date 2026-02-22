@@ -93,8 +93,9 @@ loadEmailTemplates();
 function normalizeLanguage(language) {
   if (!language) return 'ENGLISH';
   const lang = language.toUpperCase();
-  if (lang === 'GERMAN' || lang === 'DE' || lang === 'DEUTSCH') return 'GERMAN';
-  if (lang === 'FRENCH' || lang === 'FR' || lang === 'FRANCAIS' || lang === 'FRANÇAIS') return 'FRENCH';
+  // Match exact values and prefix-based language codes (de-ch, de-at, fr-ch, etc.)
+  if (lang === 'GERMAN' || lang === 'DEUTSCH' || lang.startsWith('DE') || lang.startsWith('GSW')) return 'GERMAN';
+  if (lang === 'FRENCH' || lang === 'FRANCAIS' || lang === 'FRANÇAIS' || lang.startsWith('FR')) return 'FRENCH';
   return 'ENGLISH';
 }
 
