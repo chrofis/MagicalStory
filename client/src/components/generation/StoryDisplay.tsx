@@ -3565,7 +3565,7 @@ export function StoryDisplay({
                 {frontCoverObj.retryHistory && frontCoverObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
                     retryHistory={frontCoverObj.retryHistory}
-                    totalAttempts={frontCoverObj.totalAttempts || frontCoverObj.retryHistory.length}
+                    totalAttempts={Math.max(frontCoverObj.totalAttempts || 0, frontCoverObj.retryHistory.length, frontCoverObj.imageVersions?.length || 0)}
                     language={language}
                   />
                 )}
@@ -3773,7 +3773,7 @@ export function StoryDisplay({
                 {initialPageObj.retryHistory && initialPageObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
                     retryHistory={initialPageObj.retryHistory}
-                    totalAttempts={initialPageObj.totalAttempts || initialPageObj.retryHistory.length}
+                    totalAttempts={Math.max(initialPageObj.totalAttempts || 0, initialPageObj.retryHistory.length, initialPageObj.imageVersions?.length || 0)}
                     language={language}
                   />
                 )}
@@ -4322,7 +4322,7 @@ export function StoryDisplay({
                             {image?.retryHistory && image.retryHistory.length > 0 && (
                               <RetryHistoryDisplay
                                 retryHistory={image.retryHistory}
-                                totalAttempts={image?.totalAttempts || image.retryHistory.length}
+                                totalAttempts={Math.max(image?.totalAttempts || 0, image.retryHistory.length, image?.imageVersions?.length || 0)}
                                 language={language}
                                 onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
                                 storyId={storyId}
@@ -4780,7 +4780,7 @@ export function StoryDisplay({
                             {image.retryHistory && image.retryHistory.length > 0 && (
                               <RetryHistoryDisplay
                                 retryHistory={image.retryHistory}
-                                totalAttempts={image.totalAttempts || image.retryHistory.length}
+                                totalAttempts={Math.max(image.totalAttempts || 0, image.retryHistory.length, image.imageVersions?.length || 0)}
                                 language={language}
                                 onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
                                 storyId={storyId}
@@ -5035,7 +5035,7 @@ export function StoryDisplay({
                 {backCoverObj.retryHistory && backCoverObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
                     retryHistory={backCoverObj.retryHistory}
-                    totalAttempts={backCoverObj.totalAttempts || backCoverObj.retryHistory.length}
+                    totalAttempts={Math.max(backCoverObj.totalAttempts || 0, backCoverObj.retryHistory.length, backCoverObj.imageVersions?.length || 0)}
                     language={language}
                   />
                 )}
