@@ -6463,16 +6463,18 @@ async function blackoutIssueRegions(imageBase64, fixTargets, padding = 0.05) {
 
       log.debug(`⬛ [BLACKOUT] Target ${i + 1} (${target.type || 'unknown'}): [${left},${top},${rectWidth}x${rectHeight}] — ${target.issue?.substring(0, 60) || 'no description'}`);
 
-      const blackRect = await sharp({
+      // Semi-transparent magenta overlay — preserves composition context
+      // while clearly marking the area as needing regeneration
+      const overlay = await sharp({
         create: {
           width: rectWidth,
           height: rectHeight,
-          channels: 3,
-          background: { r: 0, g: 0, b: 0 }
+          channels: 4,
+          background: { r: 200, g: 0, b: 100, alpha: 0.6 }
         }
       }).png().toBuffer();
 
-      compositeInputs.push({ input: blackRect, left, top });
+      compositeInputs.push({ input: overlay, left, top });
     }
 
     if (compositeInputs.length === 0) {
