@@ -118,6 +118,7 @@ export interface ModelSelections {
   outlineModel: TextModelKey | null;
   textModel: TextModelKey | null;
   sceneDescriptionModel: TextModelKey | null;
+  sceneIterationModel: TextModelKey | null;  // Scene iteration/retry (thorough)
   imageModel: ImageModelKey | null;
   coverImageModel: ImageModelKey | null;
   qualityModel: QualityModelKey | null;
@@ -227,6 +228,15 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           value={selections.sceneDescriptionModel}
           options={TEXT_MODELS}
           onChange={(v) => updateSelection('sceneDescriptionModel', v)}
+          language={language}
+        />
+
+        <ModelDropdown
+          label={language === 'de' ? 'Szenen-Iteration' : language === 'fr' ? 'Itération de scène' : 'Scene Iteration Model'}
+          icon={<Palette size={12} />}
+          value={selections.sceneIterationModel}
+          options={TEXT_MODELS}
+          onChange={(v) => updateSelection('sceneIterationModel', v)}
           language={language}
         />
 

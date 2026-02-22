@@ -208,9 +208,9 @@ const {
   extractPageClothing,
   buildBasePrompt,
   buildStoryPrompt,
+  buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
   buildImagePrompt,
-  // buildSceneExpansionPrompt,  // UNUSED - templates moved to prompts/_unused/
   buildUnifiedStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
@@ -2284,59 +2284,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         // Build available avatars string - only show clothing categories used in this story
         const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters, streamingClothingRequirements);
 
-        // Generate cheap preview feedback for scene critique workflow
-        // Always try to generate preview - it helps the model compare intent vs reality
-        let previewFeedback = null;
-        try {
-          const { generatePreviewFeedback, isValidationAvailable } = require('./server/lib/sceneValidator');
-
-          if (isValidationAvailable()) {
-            log.debug(`🖼️ [STREAM-SCENE] Page ${page.pageNumber} generating preview feedback...`);
-
-            // Get character names for this scene
-            const charNames = (page.characters || []).map(c =>
-              typeof c === 'string' ? c : c.name
-            ).filter(Boolean);
-
-            previewFeedback = await generatePreviewFeedback(
-              page.sceneHint || page.text.substring(0, 200),
-              charNames
-            );
-
-            // Track costs
-            if (previewFeedback?.usage) {
-              addUsage('runware', { cost: previewFeedback.usage.previewCost }, 'preview_feedback');
-              addUsage('gemini_text', {
-                promptTokenCount: 500,
-                candidatesTokenCount: 200
-              }, 'preview_feedback');
-            }
-
-            log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} preview: ${previewFeedback?.composition?.substring(0, 100) || 'empty'}...`);
-          } else {
-            log.debug(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview skipped: validation not available (Runware not configured)`);
-          }
-        } catch (err) {
-          log.warn(`⚠️ [STREAM-SCENE] Page ${page.pageNumber} preview failed: ${err.message}`);
-          // Continue without preview feedback - the prompt handles this gracefully
-        }
-
-        const expansionPrompt = buildSceneDescriptionPrompt(
+        // Initial expansion: simplified prompt, no preview feedback (fast/cheap)
+        const expansionPrompt = buildSceneExpansionPrompt(
           page.pageNumber,
           page.text,
           sceneCharacters,
-          '', // shortSceneDesc - not needed, using rawOutlineContext
           lang,
           streamingVisualBible,
-          [], // previousScenes - not needed, using rawOutlineContext
-          {}, // pageClothing - not needed, using rawOutlineContext
-          '',  // correctionNotes
           availableAvatars,
-          rawOutlineContext, // pass raw outline blocks directly
-          previewFeedback    // pass preview feedback for composition hints
+          rawOutlineContext // pass raw outline blocks directly
         );
 
-        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"previewMismatches":[' });
+        const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"scene":{' });
         const expansionProvider = expansionResult.provider === 'google' ? 'gemini_text' : 'anthropic';
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
@@ -4116,7 +4075,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 previewFeedback  // Pass existing image analysis for comparison
               );
 
-              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 10000, modelOverrides?.textModel, { prefill: '{"previewMismatches":[' });
+              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 10000, modelOverrides?.sceneIterationModel, { prefill: '{"previewMismatches":[' });
 
               // Track token usage for scene expansion (Issue #1 fix)
               if (expandedDescriptionResult?.usage) {
@@ -4934,13 +4893,14 @@ async function processStoryJob(jobId) {
       outlineModel: MODEL_DEFAULTS.outline,
       textModel: MODEL_DEFAULTS.storyText,
       sceneDescriptionModel: MODEL_DEFAULTS.sceneDescription,
+      sceneIterationModel: MODEL_DEFAULTS.sceneIteration,
       imageModel: MODEL_DEFAULTS.pageImage,
       coverImageModel: MODEL_DEFAULTS.coverImage,
       qualityModel: MODEL_DEFAULTS.qualityEval,
       ...filteredUserOverrides  // Only non-null user overrides
     };
     // Always log model defaults being used
-    log.debug(`🔧 [PIPELINE] Models: outline=${modelOverrides.outlineModel}, text=${modelOverrides.textModel}, scene=${modelOverrides.sceneDescriptionModel}, quality=${modelOverrides.qualityModel}`);
+    log.debug(`🔧 [PIPELINE] Models: outline=${modelOverrides.outlineModel}, text=${modelOverrides.textModel}, scene=${modelOverrides.sceneDescriptionModel}, sceneIter=${modelOverrides.sceneIterationModel}, quality=${modelOverrides.qualityModel}`);
     if (Object.keys(filteredUserOverrides).length > 0) {
       log.debug(`🔧 [PIPELINE] User overrides applied: ${JSON.stringify(filteredUserOverrides)}`);
     }

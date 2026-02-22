@@ -80,6 +80,7 @@ const MODEL_DEFAULTS: ModelSelections = {
   outlineModel: null,
   textModel: null,
   sceneDescriptionModel: null,
+  sceneIterationModel: null,
   imageModel: null,
   coverImageModel: null,
   qualityModel: null,

@@ -15,7 +15,7 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary } = require('../config/models');
+const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS } = require('../config/models');
 
 // Services
 const { log } = require('../utils/logger');
@@ -143,9 +143,9 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     // Build available avatars - only show clothing categories used in this story
     const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
-    // Generate new scene description (includes Visual Bible recurring elements)
+    // Generate new scene description (includes Visual Bible recurring elements) — iteration model for regen
     const scenePrompt = buildSceneDescriptionPrompt(pageNumber, pageText, characters, '', language, visualBible, previousScenes, expectedClothing, '', availableAvatars);
-    const sceneResult = await callClaudeAPI(scenePrompt, 10000, null, { prefill: '{"previewMismatches":[' });
+    const sceneResult = await callClaudeAPI(scenePrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Update the scene description in story data (sceneDescriptions already loaded above)
@@ -368,7 +368,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       );
 
       try {
-        const expansionResult = await callClaudeAPI(expansionPrompt, 10000, null, { prefill: '{"previewMismatches":[' });
+        const expansionResult = await callClaudeAPI(expansionPrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
         expandedDescription = expansionResult.text;
         console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
@@ -716,6 +716,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // Check user credits first (-1 means infinite/unlimited, impersonating admins also skip)
     const userResult = await getDbPool().query('SELECT credits, role FROM users WHERE id = $1', [req.user.id]);
     if (userResult.rows.length === 0) {
+      log.warn(`🔄 [ITERATE] User not found: ${req.user.id}`);
       return res.status(404).json({ error: 'User not found' });
     }
     const userCredits = userResult.rows[0].credits || 0;
@@ -724,10 +725,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     // Only admins can use iteration (dev mode feature)
     if (userRole !== 'admin' && !isImpersonating) {
+      log.warn(`🔄 [ITERATE] Access denied: role=${userRole}, impersonating=${isImpersonating}`);
       return res.status(403).json({ error: 'Iteration is only available in developer mode' });
     }
 
     if (!hasInfiniteCredits && userCredits < creditCost) {
+      log.warn(`🔄 [ITERATE] Insufficient credits: ${userCredits} < ${creditCost}`);
       return res.status(402).json({
         error: 'Insufficient credits',
         required: creditCost,
@@ -742,6 +745,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     );
 
     if (storyResult.rows.length === 0) {
+      log.warn(`🔄 [ITERATE] Story not found: ${id} for user ${req.user.id}`);
       return res.status(404).json({ error: 'Story not found' });
     }
 
@@ -850,9 +854,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       previewFeedback  // The actual image analysis feedback!
     );
 
-    // Step 5: Call Claude to run 17 checks and generate corrected scene
+    // Step 5: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
     log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-    const sceneResult = await callClaudeAPI(scenePrompt, 10000, null, { prefill: '{"previewMismatches":[' });
+    const sceneResult = await callClaudeAPI(scenePrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
     // Parse the scene JSON to extract previewMismatches

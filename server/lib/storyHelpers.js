@@ -2258,7 +2258,135 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
 }
 
 /**
- * Build Art Director scene description prompt
+ * Build simplified scene expansion prompt for initial generation (fast/cheap)
+ * Uses scene-expansion.txt template - no validation checks, no preview feedback
+ * @param {number} pageNumber - Current page number
+ * @param {string} pageContent - Text content for current page
+ * @param {Array} characters - Character data array
+ * @param {string} language - Output language
+ * @param {Object} visualBible - Visual Bible data
+ * @param {string} availableAvatars - Pre-built string of available avatars per character
+ * @param {Object} rawOutlineContext - Raw outline blocks {previousPages: string, currentPage: string}
+ */
+function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language = 'en', visualBible = null, availableAvatars = '', rawOutlineContext = null) {
+  // Build character names list ONLY
+  const characterDetails = characters.map(c => `* **${c.name}**`).join('\n');
+
+  // Build Visual Bible recurring elements section (same logic as iteration prompt)
+  let recurringElements = '';
+  if (visualBible) {
+    const idLabel = (entry) => entry.id ? ` [${entry.id}]` : '';
+
+    if (visualBible.secondaryCharacters && visualBible.secondaryCharacters.length > 0) {
+      for (const sc of visualBible.secondaryCharacters) {
+        const description = sc.extractedDescription || sc.description;
+        recurringElements += `* **${sc.name}**${idLabel(sc)} (secondary character): ${description}\n`;
+      }
+    }
+    if (visualBible.locations && visualBible.locations.length > 0) {
+      for (const loc of visualBible.locations) {
+        const description = loc.extractedDescription || loc.description;
+        if (loc.isRealLandmark && loc.photoVariants && loc.photoVariants.length > 1) {
+          recurringElements += `* **${loc.name}**${idLabel(loc)} (real landmark): ${description}\n`;
+          recurringElements += `  PHOTO OPTIONS (select ONE via landmarkPhotoVariant field):\n`;
+          for (const variant of loc.photoVariants) {
+            const variantDesc = variant.description || `Photo variant ${variant.variantNumber}`;
+            recurringElements += `    - variant ${variant.variantNumber}: ${variantDesc}\n`;
+          }
+        } else {
+          const locType = loc.isRealLandmark ? 'real landmark' : 'location';
+          recurringElements += `* **${loc.name}**${idLabel(loc)} (${locType}): ${description}\n`;
+        }
+      }
+    }
+    if (visualBible.vehicles && visualBible.vehicles.length > 0) {
+      for (const veh of visualBible.vehicles) {
+        const description = veh.extractedDescription || veh.description;
+        recurringElements += `* **${veh.name}**${idLabel(veh)} (vehicle): ${description}\n`;
+      }
+    }
+    if (visualBible.animals && visualBible.animals.length > 0) {
+      for (const animal of visualBible.animals) {
+        const description = animal.extractedDescription || animal.description;
+        recurringElements += `* **${animal.name}**${idLabel(animal)} (animal): ${description}\n`;
+      }
+    }
+    if (visualBible.artifacts && visualBible.artifacts.length > 0) {
+      for (const artifact of visualBible.artifacts) {
+        const description = artifact.extractedDescription || artifact.description;
+        recurringElements += `* **${artifact.name}**${idLabel(artifact)} (object): ${description}\n`;
+      }
+    }
+    if (visualBible.clothing && visualBible.clothing.length > 0) {
+      for (const item of visualBible.clothing) {
+        const description = item.extractedDescription || item.description;
+        const wornBy = item.wornBy ? ` (worn by ${item.wornBy})` : '';
+        recurringElements += `* **${item.name}**${idLabel(item)}${wornBy} (clothing): ${description}\n`;
+      }
+    }
+  }
+  if (!recurringElements) {
+    recurringElements = '(None available)';
+  }
+
+  // Build previous scenes and scene context
+  let previousScenesText = '';
+  let sceneContextText = '';
+
+  if (rawOutlineContext) {
+    if (rawOutlineContext.previousPages) {
+      previousScenesText = '**PREVIOUS SCENES (for context only - do NOT illustrate these):**\n';
+      previousScenesText += rawOutlineContext.previousPages + '\n\n';
+    }
+  }
+
+  // Build draft scene description from scene hint
+  let draftSceneDescription = '';
+  if (rawOutlineContext?.currentPage) {
+    const sceneHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(.+?)(?=\n[A-Z]|\n\n|$)/s);
+    if (sceneHintMatch) {
+      draftSceneDescription = sceneHintMatch[1].trim();
+    } else {
+      draftSceneDescription = rawOutlineContext.currentPage;
+    }
+  }
+
+  // Build scene summary
+  let sceneSummary = '';
+  if (rawOutlineContext?.currentPage) {
+    sceneSummary = rawOutlineContext.currentPage + '\n\n';
+  }
+
+  if (!PROMPT_TEMPLATES.sceneExpansion) {
+    log.warn('[SCENE EXPANSION] Template not loaded, falling back to iteration prompt');
+    // Fall back to the iteration prompt (same as old behavior)
+    return buildSceneDescriptionPrompt(pageNumber, pageContent, characters, '', language, visualBible, [], {}, '', availableAvatars, rawOutlineContext, null);
+  }
+
+  const languageInstruction = getLanguageInstruction(language);
+  const languageName = getLanguageNameEnglish(language);
+
+  return fillTemplate(PROMPT_TEMPLATES.sceneExpansion, {
+    DRAFT_SCENE_DESCRIPTION: draftSceneDescription,
+    PREVIOUS_SCENES: previousScenesText,
+    SCENE_SUMMARY: sceneSummary,
+    SCENE_CONTEXT: sceneContextText,
+    PAGE_NUMBER: pageNumber.toString(),
+    PAGE_CONTENT: pageContent,
+    CHARACTERS: characterDetails,
+    RECURRING_ELEMENTS: recurringElements,
+    AVAILABLE_AVATARS: availableAvatars || buildAvailableAvatarsForPrompt(characters),
+    LANGUAGE_NAME: languageName,
+    LANGUAGE_INSTRUCTION: languageInstruction,
+    LANGUAGE_NOTE: getLanguageNote(language),
+    CORRECTION_NOTES: ''
+  });
+}
+
+/**
+ * Build Art Director scene description prompt (iteration/retry - full validation)
+ * Uses scene-iteration.txt template - includes all 18 checks, draft-then-validate, preview feedback
+ * Alias: buildSceneDescriptionPrompt (backwards compat)
  * @param {number} pageNumber - Current page number
  * @param {string} pageContent - Text content for current page
  * @param {Array} characters - Character data array
@@ -3531,9 +3659,10 @@ module.exports = {
   // Prompt builders
   buildBasePrompt,
   buildStoryPrompt,
+  buildSceneExpansionPrompt,
   buildSceneDescriptionPrompt,
+  buildSceneIterationPrompt: buildSceneDescriptionPrompt,  // Alias: iteration = full description prompt
   buildImagePrompt,
-  // buildSceneExpansionPrompt,  // UNUSED - templates moved to prompts/_unused/
   buildUnifiedStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,

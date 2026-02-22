@@ -1445,6 +1445,7 @@ export const storyService = {
       outlineModel?: string | null;
       textModel?: string | null;
       sceneDescriptionModel?: string | null;
+      sceneIterationModel?: string | null;
       imageModel?: string | null;
       coverImageModel?: string | null;
       qualityModel?: string | null;

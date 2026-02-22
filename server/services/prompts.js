@@ -16,7 +16,10 @@ async function loadPromptTemplates() {
 
     PROMPT_TEMPLATES.outline = await fs.readFile(path.join(promptsDir, 'outline.txt'), 'utf-8');
     PROMPT_TEMPLATES.storyText = await fs.readFile(path.join(promptsDir, 'story-text.txt'), 'utf-8');
-    PROMPT_TEMPLATES.sceneDescriptions = await fs.readFile(path.join(promptsDir, 'scene-descriptions.txt'), 'utf-8');
+    PROMPT_TEMPLATES.sceneExpansion = await fs.readFile(path.join(promptsDir, 'scene-expansion.txt'), 'utf-8');
+    PROMPT_TEMPLATES.sceneIteration = await fs.readFile(path.join(promptsDir, 'scene-iteration.txt'), 'utf-8');
+    // Backwards compat alias - points to iteration (full prompt with all checks)
+    PROMPT_TEMPLATES.sceneDescriptions = PROMPT_TEMPLATES.sceneIteration;
     PROMPT_TEMPLATES.imageGeneration = await fs.readFile(path.join(promptsDir, 'image-generation.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationDe = await fs.readFile(path.join(promptsDir, 'image-generation-de.txt'), 'utf-8');
     PROMPT_TEMPLATES.imageGenerationFr = await fs.readFile(path.join(promptsDir, 'image-generation-fr.txt'), 'utf-8');

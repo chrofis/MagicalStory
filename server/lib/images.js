@@ -3959,9 +3959,9 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
     previewFeedback  // The actual image analysis feedback!
   );
 
-  // Step 4: Call Claude to run 17 checks and generate corrected scene
+  // Step 4: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 10000, null, { prefill: '{"previewMismatches":[' });
+  const sceneResult = await callClaudeAPI(scenePrompt, 10000, modelOverrides?.sceneIterationModel, { prefill: '{"previewMismatches":[' });
   const newSceneDescription = sceneResult.text;
 
   // Track usage

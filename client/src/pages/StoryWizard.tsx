@@ -3444,6 +3444,7 @@ export default function StoryWizard() {
           outlineModel: modelSelections.outlineModel,
           textModel: modelSelections.textModel,
           sceneDescriptionModel: modelSelections.sceneDescriptionModel,
+          sceneIterationModel: modelSelections.sceneIterationModel,
           imageModel: modelSelections.imageModel,
           coverImageModel: modelSelections.coverImageModel,
           qualityModel: modelSelections.qualityModel,
