@@ -196,7 +196,7 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
     const startTime = Date.now();
 
     // Timeout protection: overall max + stream inactivity detection
-    const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+    const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
     const INACTIVITY_TIMEOUT_MS = 120000; // 120s with no data → abort
     const controller = new AbortController();
     const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
@@ -342,7 +342,7 @@ async function callGeminiTextAPIStreaming(prompt, maxTokens, modelId, onChunk) {
     const startTime = Date.now();
 
     // Timeout protection: overall max + stream inactivity detection
-    const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+    const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
     const INACTIVITY_TIMEOUT_MS = 120000; // 120s with no data → abort
     const controller = new AbortController();
     const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
