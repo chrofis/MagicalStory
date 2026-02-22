@@ -5374,21 +5374,14 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       log.debug(`⏭️ [QUALITY RETRY] ${pageLabel}Auto-repair skipped (disabled). ${fixTargetsToUse.length} fix targets available.`);
     }
 
-    // ALWAYS record bbox detection in retryHistory for dev mode display
-    // This ensures Object Detection section shows for ALL pages, not just repaired ones
+    // Attach bbox analysis to the most recent generation entry (not as a separate entry — bbox is analysis, not a generation attempt)
     if (bboxDetectionHistory) {
-      retryHistory.push({
-        attempt: attempts,
-        type: 'bbox_detection_only',
-        score: score,
-        fixableIssuesCount: result.fixableIssues?.length || 0,
-        enrichedTargetsCount: enrichedFixTargets?.length || 0,
-        bboxDetection: bboxDetectionHistory,
-        bboxOverlayImage: bboxOverlayImage,  // Image with boxes drawn for dev mode
-        hasBboxOverlay: !!bboxOverlayImage,  // Flag for lazy loading
-        autoRepairEnabled: enableAutoRepair,
-        timestamp: new Date().toISOString()
-      });
+      const lastGenEntry = [...retryHistory].reverse().find(h => h.type === 'generation' || h.type === 'incremental_consistency');
+      if (lastGenEntry) {
+        lastGenEntry.bboxDetection = bboxDetectionHistory;
+        lastGenEntry.bboxOverlayImage = bboxOverlayImage;
+        lastGenEntry.hasBboxOverlay = !!bboxOverlayImage;
+      }
     }
     if (enableAutoRepair && couldRepair) {
       const repairSource = incrEnabled ? 'unified (quality + consistency)' : 'quality';
@@ -5612,22 +5605,6 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     // Check if quality is good enough (and no text errors for covers)
     if (score >= IMAGE_QUALITY_THRESHOLD && !hasTextError) {
       console.log(`✅ [QUALITY RETRY] Success on attempt ${attempts}! Score ${score}% >= ${IMAGE_QUALITY_THRESHOLD}%${wasSceneRewritten ? ' (scene was rewritten for safety)' : ''}${result.wasRepaired ? ' (after auto-repair)' : ''}`);
-
-      // Add bbox detection to retryHistory if not already there (for dev mode visibility)
-      const hasBboxEntry = retryHistory.some(h => h.bboxDetection || h.bboxOverlayImage);
-      if (bboxDetectionHistory && !hasBboxEntry) {
-        retryHistory.push({
-          attempt: attempts,
-          type: 'bbox_detection_only',
-          score: score,
-          fixableIssuesCount: result.fixableIssues?.length || 0,
-          enrichedTargetsCount: enrichedFixTargets?.length || 0,
-          bboxDetection: bboxDetectionHistory,
-          bboxOverlayImage: bboxOverlayImage,
-          autoRepairEnabled: enableAutoRepair,
-          timestamp: new Date().toISOString()
-        });
-      }
 
       // Extract rewrite usage from retryHistory if a scene was rewritten
       const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);

@@ -2788,12 +2788,17 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
         const originalScene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
         if (rehydratedScene?.bboxDetection && originalScene) {
           if (!originalScene.retryHistory) originalScene.retryHistory = [];
-          originalScene.retryHistory.push({
-            type: 'bbox_detection_only',
-            bboxDetection: rehydratedScene.bboxDetection,
-            timestamp: new Date().toISOString(),
-            source: 'consistency-check-fallback'
-          });
+          // Attach bbox data to the last generation entry (bbox is analysis, not a generation attempt)
+          const lastGenEntry = [...originalScene.retryHistory].reverse().find(h => h.type === 'generation' || h.type === 'incremental_consistency');
+          if (lastGenEntry) {
+            lastGenEntry.bboxDetection = rehydratedScene.bboxDetection;
+            lastGenEntry.source = 'consistency-check-fallback';
+          } else {
+            // No generation entry exists — store on first entry as fallback
+            if (originalScene.retryHistory.length > 0) {
+              originalScene.retryHistory[originalScene.retryHistory.length - 1].bboxDetection = rehydratedScene.bboxDetection;
+            }
+          }
         }
       }
     }

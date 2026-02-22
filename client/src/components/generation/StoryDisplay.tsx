@@ -3565,7 +3565,7 @@ export function StoryDisplay({
                 {frontCoverObj.retryHistory && frontCoverObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
                     retryHistory={frontCoverObj.retryHistory}
-                    totalAttempts={Math.max(frontCoverObj.totalAttempts || 0, frontCoverObj.retryHistory.length, frontCoverObj.imageVersions?.length || 0)}
+                    totalAttempts={Math.max(frontCoverObj.totalAttempts || 0, frontCoverObj.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length || 0, frontCoverObj.imageVersions?.length || 0)}
                     language={language}
                   />
                 )}
@@ -3773,7 +3773,7 @@ export function StoryDisplay({
                 {initialPageObj.retryHistory && initialPageObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
                     retryHistory={initialPageObj.retryHistory}
-                    totalAttempts={Math.max(initialPageObj.totalAttempts || 0, initialPageObj.retryHistory.length, initialPageObj.imageVersions?.length || 0)}
+                    totalAttempts={Math.max(initialPageObj.totalAttempts || 0, initialPageObj.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, initialPageObj.imageVersions?.length || 0)}
                     language={language}
                   />
                 )}
@@ -4322,7 +4322,7 @@ export function StoryDisplay({
                             {image?.retryHistory && image.retryHistory.length > 0 && (
                               <RetryHistoryDisplay
                                 retryHistory={image.retryHistory}
-                                totalAttempts={Math.max(image?.totalAttempts || 0, image.retryHistory.length, image?.imageVersions?.length || 0)}
+                                totalAttempts={Math.max(image?.totalAttempts || 0, image.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, image?.imageVersions?.length || 0)}
                                 language={language}
                                 onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
                                 storyId={storyId}
@@ -4780,7 +4780,7 @@ export function StoryDisplay({
                             {image.retryHistory && image.retryHistory.length > 0 && (
                               <RetryHistoryDisplay
                                 retryHistory={image.retryHistory}
-                                totalAttempts={Math.max(image.totalAttempts || 0, image.retryHistory.length, image.imageVersions?.length || 0)}
+                                totalAttempts={Math.max(image.totalAttempts || 0, image.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, image.imageVersions?.length || 0)}
                                 language={language}
                                 onRevertRepair={onRevertRepair ? (_idx, beforeImage) => onRevertRepair(image.pageNumber, beforeImage) : undefined}
                                 storyId={storyId}
@@ -5035,7 +5035,7 @@ export function StoryDisplay({
                 {backCoverObj.retryHistory && backCoverObj.retryHistory.length > 0 && (
                   <RetryHistoryDisplay
                     retryHistory={backCoverObj.retryHistory}
-                    totalAttempts={Math.max(backCoverObj.totalAttempts || 0, backCoverObj.retryHistory.length, backCoverObj.imageVersions?.length || 0)}
+                    totalAttempts={Math.max(backCoverObj.totalAttempts || 0, backCoverObj.retryHistory.filter((a: { type: string }) => a.type !== 'bbox_detection_only').length, backCoverObj.imageVersions?.length || 0)}
                     language={language}
                   />
                 )}
