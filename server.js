@@ -2245,22 +2245,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           await landmarkDescriptionsPromise;
         }
 
-        // Use pre-parsed character names from outline when available (sceneHint alone excludes the Characters section)
-        let sceneCharacters;
+        // Always detect characters from scene text (reliable, not dependent on streaming completeness)
+        let sceneCharacters = getCharactersInScene(
+          (page.sceneHint || '') + '\n' + (page.text || ''),
+          inputData.characters
+        );
+        // Also include any characters from clothing parsing that text matching might have missed
         if (page.characters && page.characters.length > 0) {
           const allChars = inputData.characters || [];
-          sceneCharacters = allChars.filter(char => {
-            if (!char.name) return false;
-            const nameLower = char.name.toLowerCase().trim();
-            const firstName = nameLower.split(' ')[0];
-            return page.characters.some(parsed => {
-              const parsedLower = parsed.toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
+          for (const parsed of page.characters) {
+            const parsedLower = parsed.toLowerCase().replace(/\s*\([^)]*\)\s*$/, '').trim();
+            const match = allChars.find(char => {
+              if (!char.name) return false;
+              const nameLower = char.name.toLowerCase().trim();
+              const firstName = nameLower.split(' ')[0];
               return parsedLower === nameLower || parsedLower === firstName;
             });
-          });
-        }
-        if (!sceneCharacters || sceneCharacters.length === 0) {
-          sceneCharacters = getCharactersInScene(page.sceneHint, inputData.characters);
+            if (match && !sceneCharacters.some(sc => sc.name === match.name)) {
+              sceneCharacters.push(match);
+            }
+          }
         }
 
         // SIMPLE: Get raw outline blocks directly from parser (no parsing/reconstruction needed)

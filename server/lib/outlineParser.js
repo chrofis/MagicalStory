@@ -1853,7 +1853,7 @@ class ProgressiveUnifiedParser {
       // IMPORTANT: Check if Characters block is fully received
       // Complete when: followed by Setting:, blank line, or end of content
       const charactersBlockComplete = /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*\r?\n(?:Setting:|[^\S\r\n]*\r?\n)/mi.test(content) ||
-        /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*$/mi.test(content);
+        /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*$/i.test(content);
 
       if ((nextPageIndex > match.index && charactersBlockComplete) || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
         // Extract page data
