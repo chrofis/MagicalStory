@@ -251,12 +251,21 @@ export function useRepairWorkflow({
           needsFullRedo: false,
         };
 
-        // Get fixable issues from retry history or current evaluation
+        // Get fixable issues from retry history or current evaluation (match backend fallback chain)
         const latestRetry = scene.retryHistory?.slice(-1)[0];
         if (latestRetry?.postRepairEval?.fixableIssues) {
           feedback.fixableIssues = latestRetry.postRepairEval.fixableIssues;
         } else if (latestRetry?.preRepairEval?.fixableIssues) {
           feedback.fixableIssues = latestRetry.preRepairEval.fixableIssues;
+        } else if ((scene as any).fixableIssues?.length) {
+          feedback.fixableIssues = (scene as any).fixableIssues;
+        } else if (scene.fixTargets?.length) {
+          feedback.fixableIssues = scene.fixTargets.map(t => ({
+            description: t.issue || 'Quality issue detected',
+            severity: 'medium',
+            type: 'visual',
+            fix: t.fixPrompt || '',
+          }));
         }
 
         // Get entity issues from finalChecksReport - CHARACTERS
@@ -402,7 +411,7 @@ export function useRepairWorkflow({
   }, []);
 
   // Auto-identify pages needing redo based on thresholds
-  const autoIdentifyRedoPages = useCallback((scoreThreshold = 6, issueThreshold = 3) => {
+  const autoIdentifyRedoPages = useCallback((scoreThreshold = 60, issueThreshold = 3) => {
     startStep('identify-redo-pages');
 
     const pagesToRedo: number[] = [];
@@ -411,7 +420,7 @@ export function useRepairWorkflow({
     for (const [pageNum, feedback] of Object.entries(workflowState.collectedFeedback.pages)) {
       const page = parseInt(pageNum);
       const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length;
-      const score = feedback.qualityScore ?? 10;
+      const score = feedback.qualityScore ?? 100;
 
       // Mark for redo if score is low or too many issues
       if (score < scoreThreshold) {
@@ -745,9 +754,9 @@ export function useRepairWorkflow({
   const getPagesNeedingAttention = useCallback((): number[] => {
     return Object.entries(workflowState.collectedFeedback.pages)
       .filter(([_, feedback]) => {
-        const score = feedback.qualityScore ?? 10;
+        const score = feedback.qualityScore ?? 100;
         const issues = feedback.fixableIssues.length + feedback.entityIssues.length;
-        return score < 7 || issues > 0 || feedback.needsFullRedo;
+        return score < 70 || issues > 0 || feedback.needsFullRedo;
       })
       .map(([pageNum]) => parseInt(pageNum))
       .sort((a, b) => a - b);

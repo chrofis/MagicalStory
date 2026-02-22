@@ -91,7 +91,7 @@ function PageFeedbackCard({
   const [expanded, setExpanded] = useState(false);
   const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length +
                       (feedback.objectIssues?.length || 0) + (feedback.semanticIssues?.length || 0);
-  const hasIssues = totalIssues > 0 || (feedback.qualityScore !== undefined && feedback.qualityScore < 7);
+  const hasIssues = totalIssues > 0 || (feedback.qualityScore !== undefined && feedback.qualityScore < 70);
 
   return (
     <div className={`border rounded-lg p-3 ${isMarkedForRedo ? 'border-red-300 bg-red-50' : hasIssues ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
@@ -106,11 +106,11 @@ function PageFeedbackCard({
           <span className="font-medium">Page {feedback.pageNumber}</span>
           {feedback.qualityScore !== undefined && (
             <span className={`text-xs px-1.5 py-0.5 rounded ${
-              feedback.qualityScore >= 8 ? 'bg-green-100 text-green-700' :
-              feedback.qualityScore >= 6 ? 'bg-yellow-100 text-yellow-700' :
+              feedback.qualityScore >= 80 ? 'bg-green-100 text-green-700' :
+              feedback.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              Score: {feedback.qualityScore}
+              Score: {Math.max(0, feedback.qualityScore)}
             </span>
           )}
           {totalIssues > 0 && (
@@ -1011,18 +1011,33 @@ export function RepairWorkflowPanel({
                             </div>
                           ))}
                           {/* Legacy flat issues (backward compat) */}
-                          {!charResult.byClothing && charResult.issues && charResult.issues.length > 0 && (
-                            <ul className="space-y-1">
-                              {charResult.issues.map((issue, i) => (
-                                <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
-                                  <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
-                                    issue.severity === 'critical' ? 'bg-red-400' :
-                                    issue.severity === 'major' ? 'bg-amber-400' : 'bg-gray-400'
-                                  }`} />
-                                  <span>{issue.description}</span>
-                                </li>
-                              ))}
-                            </ul>
+                          {!charResult.byClothing && (
+                            <>
+                              {charResult.gridImage && (
+                                <div className="mb-2">
+                                  <img
+                                    src={charResult.gridImage}
+                                    alt={`${charName} consistency grid`}
+                                    className="w-full max-h-48 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => setGridLightbox(charResult.gridImage!)}
+                                    title="Click to enlarge"
+                                  />
+                                </div>
+                              )}
+                              {charResult.issues && charResult.issues.length > 0 && (
+                                <ul className="space-y-1">
+                                  {charResult.issues.map((issue, i) => (
+                                    <li key={i} className="text-xs text-gray-600 flex items-start gap-1">
+                                      <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${
+                                        issue.severity === 'critical' ? 'bg-red-400' :
+                                        issue.severity === 'major' ? 'bg-amber-400' : 'bg-gray-400'
+                                      }`} />
+                                      <span>{issue.description}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </>
                           )}
                           {/* No issues */}
                           {(!charResult.byClothing || Object.values(charResult.byClothing).every(c => !c.issues?.length)) &&
