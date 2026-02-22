@@ -124,8 +124,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
       // Get paginated data using metadata column (fast - no image data loaded)
       // Falls back to full data parsing if metadata is null (for stories created before migration)
+      // Also check story_images for frontCover (metadata.hasThumbnail can be stale)
       const rows = await dbQuery(
-        'SELECT metadata, CASE WHEN metadata IS NULL THEN data ELSE NULL END as data FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+        `SELECT s.metadata, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
+         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover') as has_cover_image
+         FROM stories s WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
 
@@ -159,7 +162,7 @@ router.get('/', authenticateToken, async (req, res) => {
           languageLevel: meta.languageLevel,
           characters: meta.characters || [],
           pageCount,
-          hasThumbnail: meta.hasThumbnail || false,
+          hasThumbnail: meta.hasThumbnail || row.has_cover_image || false,
           isPartial: meta.isPartial || false,
           generatedPages: meta.generatedPages,
           totalPages: meta.totalPages
