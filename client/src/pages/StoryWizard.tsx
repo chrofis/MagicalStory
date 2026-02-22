@@ -859,23 +859,25 @@ export default function StoryWizard() {
             if (fullMeta.totalImages > 0) {
               setImageLoadProgress(prev => prev ? { ...prev, total: fullMeta.totalImages } : null);
             }
+
+            // Load dev metadata AFTER full metadata is merged (not in parallel!)
+            // Dev metadata fields (prompt, referencePhotos, retryHistory) would be overwritten
+            // by the full metadata merge above if loaded in parallel (race condition)
+            if (developerMode) {
+              devMetadataLoadedRef.current = true;
+              storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
+                loadPhaseRef.current.devMetadataLoaded = true;
+                mergeDevMetadata(devMetadata);
+                log.debug('Dev metadata merged into story');
+              }).catch(err => {
+                log.warn('Failed to load dev metadata:', err);
+                devMetadataLoadedRef.current = false;
+              });
+            }
           }
         }).catch(err => {
           log.warn('Failed to load full metadata:', err);
         });
-
-        // Load dev metadata only if developer mode is enabled
-        if (developerMode) {
-          devMetadataLoadedRef.current = true;
-          storyService.getStoryDevMetadata(urlStoryId).then(devMetadata => {
-            loadPhaseRef.current.devMetadataLoaded = true;
-            mergeDevMetadata(devMetadata);
-            log.debug('Dev metadata merged into story');
-          }).catch(err => {
-            log.warn('Failed to load dev metadata:', err);
-            devMetadataLoadedRef.current = false;
-          });
-        }
 
         // PHASE 2a: Fast image load (activeOnly=true) - shows images quickly
         // Add timeout to prevent stuck progress indicator (30 second timeout)
