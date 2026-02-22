@@ -41,7 +41,7 @@ export function GenerationProgress({
   const [isCancelling, setIsCancelling] = useState(false);
   const [rotationIndex, setRotationIndex] = useState(0);
 
-  // 10 funny messages per character - uses {name} placeholder
+  // 25 funny messages per character - uses {name} placeholder
   const funnyMessageTemplates = [
     {
       en: '{name} is getting ready for their big adventure...',
@@ -92,6 +92,81 @@ export function GenerationProgress({
       en: '{name} just met a friendly dragon! Making friends...',
       de: '{name} hat gerade einen freundlichen Drachen getroffen! Sie werden Freunde...',
       fr: '{name} vient de rencontrer un dragon amical ! Ils deviennent amis...'
+    },
+    {
+      en: '{name} is looking for the perfect hiding spot...',
+      de: '{name} sucht das perfekte Versteck...',
+      fr: '{name} cherche la cachette parfaite...'
+    },
+    {
+      en: '{name} is trying on different hats for the story...',
+      de: '{name} probiert verschiedene Hüte für die Geschichte an...',
+      fr: '{name} essaie différents chapeaux pour le récit...'
+    },
+    {
+      en: '{name} just spotted a rainbow! Quick, follow it...',
+      de: '{name} hat gerade einen Regenbogen entdeckt! Schnell, hinterher...',
+      fr: '{name} vient de repérer un arc-en-ciel ! Vite, suivons-le...'
+    },
+    {
+      en: '{name} is teaching the story characters a secret handshake...',
+      de: '{name} bringt den Figuren einen geheimen Handschlag bei...',
+      fr: '{name} apprend une poignée de main secrète aux personnages...'
+    },
+    {
+      en: '{name} found a treasure map in their pocket!',
+      de: '{name} hat eine Schatzkarte in der Tasche gefunden!',
+      fr: '{name} a trouvé une carte au trésor dans sa poche !'
+    },
+    {
+      en: '{name} is building a fort out of storybooks...',
+      de: '{name} baut eine Burg aus Geschichtenbüchern...',
+      fr: '{name} construit un fort avec des livres d\'histoires...'
+    },
+    {
+      en: '{name} is chasing butterflies between chapters...',
+      de: '{name} jagt Schmetterlinge zwischen den Kapiteln...',
+      fr: '{name} court après les papillons entre les chapitres...'
+    },
+    {
+      en: '{name} is counting shooting stars...',
+      de: '{name} zählt Sternschnuppen...',
+      fr: '{name} compte les étoiles filantes...'
+    },
+    {
+      en: '{name} just learned a new magic spell!',
+      de: '{name} hat gerade einen neuen Zauberspruch gelernt!',
+      fr: '{name} vient d\'apprendre un nouveau sort magique !'
+    },
+    {
+      en: '{name} is drawing pictures in the sand...',
+      de: '{name} malt Bilder in den Sand...',
+      fr: '{name} dessine des images dans le sable...'
+    },
+    {
+      en: '{name} packed a picnic for the adventure...',
+      de: '{name} hat ein Picknick für das Abenteuer eingepackt...',
+      fr: '{name} a préparé un pique-nique pour l\'aventure...'
+    },
+    {
+      en: '{name} is tiptoeing past a sleeping giant...',
+      de: '{name} schleicht auf Zehenspitzen an einem schlafenden Riesen vorbei...',
+      fr: '{name} passe sur la pointe des pieds devant un géant endormi...'
+    },
+    {
+      en: '{name} made friends with a talking squirrel!',
+      de: '{name} hat sich mit einem sprechenden Eichhörnchen angefreundet!',
+      fr: '{name} s\'est lié d\'amitié avec un écureuil parlant !'
+    },
+    {
+      en: '{name} discovered a secret door behind the bookshelf...',
+      de: '{name} hat eine Geheimtür hinter dem Bücherregal entdeckt...',
+      fr: '{name} a découvert une porte secrète derrière la bibliothèque...'
+    },
+    {
+      en: '{name} is braiding flowers into a crown...',
+      de: '{name} flicht Blumen zu einer Krone...',
+      fr: '{name} tresse des fleurs en couronne...'
     }
   ];
 
@@ -101,34 +176,27 @@ export function GenerationProgress({
   // Current character display state (computed on rotation change)
   const [currentCharDisplay, setCurrentCharDisplay] = useState<{ avatarUrl: string; message: string } | null>(null);
 
-  // Get characters with available avatars (one entry per character)
-  const charactersWithAvatars = useMemo(() => {
-    return characters.filter(char => {
-      const avatars = char.avatars;
-      // Use faceThumbnails for display (lightweight), or full avatars if available
-      return avatars && (avatars.faceThumbnails?.standard || avatars.standard || avatars.summer || avatars.winter || avatars.formal || avatars.hasFullAvatars);
-    });
-  }, [characters]);
-
-  // Get the best available avatar for a character (prefer lightweight faceThumbnails)
-  const getRandomAvatar = (char: Character): string => {
+  // Get all available avatar URLs for a character (face thumbnails + full body)
+  const getAllAvatarUrls = (char: Character): string[] => {
     const avatars = char.avatars;
-    if (!avatars) return '';
-
-    // Prefer faceThumbnails.standard for display (lightweight ~50KB vs 1.5MB full avatar)
-    if (avatars.faceThumbnails?.standard) return avatars.faceThumbnails.standard;
-
-    // Fall back to full avatars if faceThumbnails not available
-    const available: string[] = [];
-    if (avatars.standard) available.push(avatars.standard);
-    if (avatars.summer) available.push(avatars.summer);
-    if (avatars.winter) available.push(avatars.winter);
-    if (avatars.formal) available.push(avatars.formal);
-
-    return available[Math.floor(Math.random() * available.length)] || '';
+    if (!avatars) return [];
+    const urls: string[] = [];
+    // Face thumbnails (all clothing variants)
+    if (avatars.faceThumbnails) {
+      for (const url of Object.values(avatars.faceThumbnails)) {
+        if (url && typeof url === 'string') urls.push(url);
+      }
+    }
+    // Full body avatars (all clothing variants)
+    if (avatars.standard) urls.push(avatars.standard);
+    if (avatars.summer) urls.push(avatars.summer);
+    if (avatars.winter) urls.push(avatars.winter);
+    if (avatars.formal) urls.push(avatars.formal);
+    return urls;
   };
 
   // Build rotation items: always alternate tip, char, tip, char...
+  // Each character × avatar pair is a separate entry for maximum variety
   const rotationItems = useMemo(() => {
     const messages = [
       { type: 'message' as const, key: 'timeInfo' },
@@ -140,26 +208,43 @@ export function GenerationProgress({
       { type: 'message' as const, key: 'tipArtStyle' },
     ];
 
-    // If no characters with avatars, just use messages
-    if (charactersWithAvatars.length === 0) {
+    // Build flat list of all (character, avatarUrl) pairs
+    const charAvatarPairs: { char: Character; avatarUrl: string }[] = [];
+    for (const char of characters) {
+      const urls = getAllAvatarUrls(char);
+      for (const url of urls) {
+        charAvatarPairs.push({ char, avatarUrl: url });
+      }
+    }
+
+    // If no avatar pairs, just use messages
+    if (charAvatarPairs.length === 0) {
       return messages;
+    }
+
+    // Shuffle pairs so same character doesn't cluster (Fisher-Yates)
+    const shuffled = [...charAvatarPairs];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
     const items: Array<
       { type: 'message'; key: string } |
-      { type: 'character'; char: Character }
+      { type: 'character'; char: Character; avatarUrl: string }
     > = [];
 
     // Always alternate: tip, char, tip, char...
     // Use the longer list to determine total pairs, cycling through the shorter one
-    const numPairs = Math.max(messages.length, charactersWithAvatars.length);
+    const numPairs = Math.max(messages.length, shuffled.length);
     for (let i = 0; i < numPairs; i++) {
       items.push(messages[i % messages.length]);
-      items.push({ type: 'character', char: charactersWithAvatars[i % charactersWithAvatars.length] });
+      items.push({ type: 'character', char: shuffled[i % shuffled.length].char, avatarUrl: shuffled[i % shuffled.length].avatarUrl });
     }
 
     return items;
-  }, [charactersWithAvatars]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characters]);
 
   // Rotate every 8 seconds
   useEffect(() => {
@@ -179,7 +264,7 @@ export function GenerationProgress({
     const currentItem = rotationItems[rotationIndex];
     if (currentItem.type === 'character') {
       const char = currentItem.char;
-      const avatarUrl = getRandomAvatar(char);
+      const avatarUrl = currentItem.avatarUrl;
 
       // Get next message index for this character (using ref to avoid dependency issues)
       const currentIndex = messageIndicesRef.current[char.id] ?? -1;
