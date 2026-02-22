@@ -500,7 +500,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
       { imageModel: imageModelId },
       `PAGE ${pageNumber}`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata }
     );
 
     // Log API costs for this regeneration
@@ -1005,11 +1005,12 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       previousImage = currentImage.imageData;
       log.info(`🔄 [ITERATE] Page ${pageNumber}: Using original image as reference for generation`);
     }
+    const iterateSceneMetadata = extractSceneMetadata(newSceneDescription);
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, previousImage, 'scene', null, null, null,
       { imageModel: imageModelOverride },
       `PAGE ${pageNumber} ITERATE`,
-      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid }
+      { landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: iterateSceneMetadata }
     );
 
     log.info(`🔄 [ITERATE] Page ${pageNumber}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
