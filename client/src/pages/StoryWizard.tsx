@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useGeneration } from '@/context/GenerationContext';
-import { ArrowLeft, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles, AlertTriangle, RotateCcw } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
@@ -69,7 +69,7 @@ export default function StoryWizard() {
   const { t, language } = useLanguage();
   const { isAuthenticated, user, updateCredits, refreshUser, isLoading: isAuthLoading, isImpersonating } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
-  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, markCompletionViewed, hasUnviewedCompletion } = useGeneration();
+  const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, markCompletionViewed, hasUnviewedCompletion, error: contextGenerationError, clearError: clearContextError } = useGeneration();
 
   // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Start at step 1 if ?new=true (creating new story)
@@ -253,6 +253,16 @@ export default function StoryWizard() {
   const [generationProgress, setGenerationProgress] = useState({ current: 0, total: 0, message: '' });
   const [imageLoadProgress, setImageLoadProgress] = useState<{ loaded: number; total: number } | null>(null); // Progressive image loading
   const [isProgressStalled, setIsProgressStalled] = useState(false); // Track if generation seems stuck
+  const [lastGenerationError, setLastGenerationError] = useState<string | null>(null); // Persistent error after failed generation
+
+  // Pick up error from GenerationContext (e.g. user returns after being away and job failed)
+  useEffect(() => {
+    if (contextGenerationError && !isGenerating) {
+      setLastGenerationError(contextGenerationError);
+      clearContextError();
+    }
+  }, [contextGenerationError, isGenerating, clearContextError]);
+
   const [storyTitle, setStoryTitle] = useState('');
   const [generatedStory, setGeneratedStory] = useState('');
   const [originalStory, setOriginalStory] = useState(''); // Original AI-generated story for restore functionality
@@ -3221,6 +3231,7 @@ export default function StoryWizard() {
     }
 
     console.log('[generateStory] Starting generation, setting step to 6');
+    setLastGenerationError(null); // Clear previous error
     setIsGenerating(true);
     setIsProgressMinimized(false); // Reset minimized state for new generation
     setStep(6);
@@ -3689,6 +3700,7 @@ export default function StoryWizard() {
         setIsGenerating(false);
         return;
       } else {
+        setLastGenerationError(errorMessage);
         showError(language === 'de'
           ? `Generierung fehlgeschlagen: ${errorMessage}`
           : language === 'fr'
@@ -4661,15 +4673,36 @@ export default function StoryWizard() {
         }
         return (
           <div className="text-center py-12">
-            <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.generateStory}</h2>
-            <p className="text-gray-600 mb-6">
-              {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire!' : 'Ready to create your story!'}
-            </p>
-
-            <Button onClick={() => generateStory()} size="lg" icon={Sparkles}>
-              {t.generateStory} ({pages * 10} Credits)
-            </Button>
+            {lastGenerationError ? (
+              <>
+                <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-red-700 mb-2">
+                  {language === 'de' ? 'Generierung fehlgeschlagen' : language === 'fr' ? 'La génération a échoué' : 'Generation Failed'}
+                </h2>
+                <p className="text-red-600 mb-4 max-w-md mx-auto text-sm">
+                  {lastGenerationError}
+                </p>
+                <p className="text-gray-500 mb-6 text-sm">
+                  {language === 'de' ? 'Deine Credits wurden nicht belastet. Du kannst es erneut versuchen.'
+                    : language === 'fr' ? 'Vos crédits n\'ont pas été débités. Vous pouvez réessayer.'
+                    : 'Your credits were not charged. You can try again.'}
+                </p>
+                <Button onClick={() => { setLastGenerationError(null); generateStory(); }} size="lg" icon={RotateCcw}>
+                  {language === 'de' ? 'Erneut versuchen' : language === 'fr' ? 'Réessayer' : 'Try Again'} ({pages * 10} Credits)
+                </Button>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">{t.generateStory}</h2>
+                <p className="text-gray-600 mb-6">
+                  {language === 'de' ? 'Bereit, deine Geschichte zu erstellen!' : language === 'fr' ? 'Prêt à créer votre histoire!' : 'Ready to create your story!'}
+                </p>
+                <Button onClick={() => generateStory()} size="lg" icon={Sparkles}>
+                  {t.generateStory} ({pages * 10} Credits)
+                </Button>
+              </>
+            )}
           </div>
         );
 
