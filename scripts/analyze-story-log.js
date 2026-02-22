@@ -301,42 +301,68 @@ function extractCostSummary(jobLines) {
       continue;
     }
 
-    // Avatar cost entries: "[GEN:finalize]  avatar_styled: gemini-2.5-flash-image (885 in / 1,300 out) $0.0393"
-    const avatarCostMatch = msg.match(/(?:\[GEN:finalize\]\s+)?(avatar_\w+):\s+(\S+)\s+\(([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\)\s+\$([\d.]+)/);
+    // Avatar/image cost entries: "avatar_styled: gemini-2.5-flash-image (885 in / 1,300 out) (8 calls) $0.0393"
+    // Also handles legacy format without calls: "avatar_styled: gemini-2.5-flash-image (885 in / 1,300 out) $0.0393"
+    const avatarCostMatch = msg.match(/(?:\[GEN:finalize\]\s+)?(avatar_\w+|page_images|cover_images):\s+(\S+)\s+\(([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\)(?:\s+\((\d+)\s+calls?\))?\s+\$([\d.]+)/);
     if (avatarCostMatch) {
-      const name = avatarCostMatch[1].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); // avatar_styled -> Avatar Styled
+      const name = avatarCostMatch[1].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       costs.byFunction[name] = {
         inputTokens: parseInt(avatarCostMatch[3].replace(/,/g, '')),
         outputTokens: parseInt(avatarCostMatch[4].replace(/,/g, '')),
-        calls: 1,
-        cost: parseFloat(avatarCostMatch[5]),
+        calls: avatarCostMatch[5] ? parseInt(avatarCostMatch[5]) : 1,
+        cost: parseFloat(avatarCostMatch[6]),
         model: avatarCostMatch[2]
       };
       continue;
     }
 
-    // genLog.apiUsage format: ">>> genLog.apiUsage('function_name', 'model', {in: X, out: Y}, cost: $X.XX)"
-    const genLogMatch = msg.match(/genLog\.apiUsage\('(\w+)',\s*'([^']+)',\s*\{in:\s*(\d+),\s*out:\s*(\d+)\},\s*cost:\s*\$([\d.]+)\)/);
-    if (genLogMatch) {
-      const rawName = genLogMatch[1];
-      // Convert snake_case to Title Case
+    // genLog.apiUsage format (new): "page_images: gemini-2.5-flash-image (26,000 in / 12,900 out) (5 calls) $0.4000"
+    // Also legacy format: "genLog.apiUsage('function_name', 'model', {in: X, out: Y}, cost: $X.XX)"
+    const genLogNewMatch = msg.match(/(\w+):\s+(\S+)\s+\(([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\)\s+\((\d+)\s+calls?\)\s+\$([\d.]+)/);
+    if (genLogNewMatch) {
+      const rawName = genLogNewMatch[1];
       let name = rawName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-      // Normalize common variations
       const nameMap = {
         'Scene Expansion': 'Scene Expand',
         'Unified Story': 'Unified Story',
         'Cover Images': 'Cover Images',
         'Page Images': 'Page Images',
         'Avatar Styled': 'Avatar Styled',
+        'Avatar Costumed': 'Avatar Costumed',
         'Consistency Check': 'Consistency Check',
         'Text Check': 'Text Check',
         'Cover Quality': 'Cover Quality',
         'Page Quality': 'Page Quality'
       };
       name = nameMap[name] || name;
-
-      // Only add if not already present (avoid duplicates from other formats)
+      if (!costs.byFunction[name]) {
+        costs.byFunction[name] = {
+          inputTokens: parseInt(genLogNewMatch[3].replace(/,/g, '')),
+          outputTokens: parseInt(genLogNewMatch[4].replace(/,/g, '')),
+          calls: parseInt(genLogNewMatch[5]),
+          cost: parseFloat(genLogNewMatch[6]),
+          model: genLogNewMatch[2]
+        };
+      }
+      continue;
+    }
+    const genLogMatch = msg.match(/genLog\.apiUsage\('(\w+)',\s*'([^']+)',\s*\{in:\s*(\d+),\s*out:\s*(\d+)\},\s*cost:\s*\$([\d.]+)\)/);
+    if (genLogMatch) {
+      const rawName = genLogMatch[1];
+      let name = rawName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const nameMap = {
+        'Scene Expansion': 'Scene Expand',
+        'Unified Story': 'Unified Story',
+        'Cover Images': 'Cover Images',
+        'Page Images': 'Page Images',
+        'Avatar Styled': 'Avatar Styled',
+        'Avatar Costumed': 'Avatar Costumed',
+        'Consistency Check': 'Consistency Check',
+        'Text Check': 'Text Check',
+        'Cover Quality': 'Cover Quality',
+        'Page Quality': 'Page Quality'
+      };
+      name = nameMap[name] || name;
       if (!costs.byFunction[name]) {
         costs.byFunction[name] = {
           inputTokens: parseInt(genLogMatch[3]),

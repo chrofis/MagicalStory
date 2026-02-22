@@ -544,12 +544,12 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     // Initialize imageVersions if not present (migrate existing image as first version)
     if (existingImage && !existingImage.imageVersions) {
       existingImage.imageVersions = [{
-        imageData: existingImage.imageData,
-        description: existingImage.description || originalDescription,  // Scene description for this version
+        // Don't copy imageData — the original is already stored at DB version_index 0.
+        description: existingImage.description || originalDescription,
         prompt: existingImage.prompt,
         modelId: existingImage.modelId,
         createdAt: storyData.createdAt || new Date().toISOString(),
-        isActive: false,  // Will become inactive when new image is added
+        isActive: false,
         qualityScore: existingImage.qualityScore ?? null,
         qualityReasoning: existingImage.qualityReasoning || null,
         fixTargets: existingImage.fixTargets || [],
@@ -592,6 +592,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       // The new image is stored in imageVersions and activeVersion meta points to it
       const { imageData: _unused, ...metadataOnly } = newImageData;
       Object.assign(sceneImages[existingIndex], metadataOnly);
+      // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
+      delete sceneImages[existingIndex].imageData;
     } else {
       newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
@@ -1046,7 +1048,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // Initialize imageVersions if needed
     if (currentImage && !currentImage.imageVersions) {
       currentImage.imageVersions = [{
-        imageData: currentImage.imageData,
+        // Don't copy imageData — the original is already stored at DB version_index 0.
+        // Including it here would cause saveStoryData to re-save it at version_index 1,
+        // creating a duplicate row and an extra "attempt" in the UI.
         description: currentImage.description,
         prompt: currentImage.prompt,
         modelId: currentImage.modelId,
@@ -1096,6 +1100,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // The new image is stored in imageVersions and activeVersion meta points to it
       const { imageData: _unusedImg, ...metadataOnly } = newImageData;
       Object.assign(sceneImages[existingImageIndex], metadataOnly);
+      // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
+      delete sceneImages[existingImageIndex].imageData;
     } else {
       newImageData.imageVersions = [newVersion];
       sceneImages.push(newImageData);
@@ -2159,7 +2165,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
         // Initialize imageVersions if not present (migrate existing as original)
         if (!existingImage.imageVersions) {
           existingImage.imageVersions = [{
-            imageData: existingImage.imageData,
+            // Don't copy imageData — the original is already stored at DB version_index 0.
             description: existingImage.description,
             prompt: existingImage.prompt,
             modelId: existingImage.modelId,
@@ -2201,8 +2207,8 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
         if (!existingImage.preEntityRepairImage) {
           existingImage.preEntityRepairImage = existingImage.imageData;
         }
-        // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
-        // The new image is stored in imageVersions and activeVersion meta points to it
+        // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
+        delete existingImage.imageData;
         existingImage.entityRepaired = true;
         existingImage.entityRepairedAt = new Date().toISOString();
         existingImage.entityRepairedFor = entityName;
@@ -2290,7 +2296,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
         // Initialize imageVersions if not present (migrate existing as original)
         if (!existingImage.imageVersions) {
           existingImage.imageVersions = [{
-            imageData: existingImage.imageData,
+            // Don't copy imageData — the original is already stored at DB version_index 0.
             description: existingImage.description,
             prompt: existingImage.prompt,
             modelId: existingImage.modelId,
@@ -2320,8 +2326,8 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
         if (!existingImage.preEntityRepairImage) {
           existingImage.preEntityRepairImage = existingImage.imageData;
         }
-        // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
-        // The new image is stored in imageVersions and activeVersion meta points to it
+        // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
+        delete existingImage.imageData;
         existingImage.entityRepaired = true;
         existingImage.entityRepairedAt = new Date().toISOString();
         existingImage.entityRepairedFor = entityName;
@@ -2518,7 +2524,9 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
           // Add to image versions
           if (!scene.imageVersions) {
             scene.imageVersions = [{
-              imageData: scene.imageData,
+              // Don't copy imageData — the original is already stored at DB version_index 0.
+              // Including it here would cause saveStoryData to re-save it at version_index 1,
+              // creating a duplicate row and an extra "attempt" in the UI.
               description: scene.description,
               prompt: scene.prompt,
               createdAt: new Date().toISOString(),
@@ -2559,6 +2567,8 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
           scene.description = result.newScene;
           scene.prompt = result.imagePrompt;
           scene.qualityScore = result.score;
+          // Delete rehydrated imageData to prevent saveStoryData from re-saving it at version_index 0
+          delete scene.imageData;
 
           storyData.sceneImages[sceneIndex] = scene;
 
@@ -3030,7 +3040,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 // Initialize imageVersions if not present
                 if (!existingImage.imageVersions) {
                   existingImage.imageVersions = [{
-                    imageData: existingImage.imageData,
+                    // Don't copy imageData — the original is already stored at DB version_index 0.
                     description: existingImage.description,
                     prompt: existingImage.prompt,
                     modelId: existingImage.modelId,
@@ -3057,8 +3067,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                   ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
                 });
 
-                // NOTE: Do NOT set existingImage.imageData - that would cause duplicate image storage
-                // The new image is stored in imageVersions and activeVersion meta points to it
+                // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
+                delete existingImage.imageData;
                 existingImage.entityRepaired = true;
                 existingImage.entityRepairedAt = new Date().toISOString();
                 existingImage.entityRepairedFor = characterName;
@@ -3153,7 +3163,9 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
           // Add to image versions
           if (!scene.imageVersions) {
             scene.imageVersions = [{
-              imageData: scene.imageData,
+              // Don't copy imageData — the original is already stored at DB version_index 0.
+              // Including it here would cause saveStoryData to re-save it at version_index 1,
+              // creating a duplicate row and an extra "attempt" in the UI.
               description: scene.description,
               prompt: scene.prompt,
               createdAt: new Date().toISOString(),

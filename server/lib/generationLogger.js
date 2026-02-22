@@ -208,18 +208,14 @@ class GenerationLogger {
    * @param {number} estimatedCost - Total estimated cost in USD
    */
   apiUsage(functionName, model, usage, estimatedCost) {
-    // Debug: Log the raw usage values
-    log.debug(`📊 [GENLOG] apiUsage called: ${functionName}, model=${model}, inputTokens=${usage.inputTokens}, outputTokens=${usage.outputTokens}`);
-
+    const calls = usage.calls || 1;
     const tokens = usage.inputTokens || usage.outputTokens
       ? `${(usage.inputTokens || 0).toLocaleString()} in / ${(usage.outputTokens || 0).toLocaleString()} out${usage.thinkingTokens ? ` / ${usage.thinkingTokens.toLocaleString()} think` : ''}`
       : null;
     const costStr = `$${estimatedCost.toFixed(4)}`;
     const message = tokens
-      ? `${functionName}: ${model} (${tokens}) ${costStr}`
-      : `${functionName}: ${model} ${costStr}`;
-
-    log.debug(`📊 [GENLOG] Generated message: "${message}"`);
+      ? `${functionName}: ${model} (${tokens}) (${calls} calls) ${costStr}`
+      : `${functionName}: ${model} (${calls} calls) ${costStr}`;
 
     this._log('info', 'api_usage', message, null, {
       function: functionName,
@@ -228,6 +224,7 @@ class GenerationLogger {
       outputTokens: usage.outputTokens || 0,
       thinkingTokens: usage.thinkingTokens || 0,
       directCost: usage.directCost || 0,
+      calls,
       estimatedCost
     });
   }

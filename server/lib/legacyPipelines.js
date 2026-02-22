@@ -2169,7 +2169,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` / ${tokenUsage.anthropic.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr} (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
+    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_image.calls} calls)  $${imageCost.toFixed(4)}`);
     log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr} (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
@@ -2198,7 +2198,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           inputTokens: funcData.input_tokens,
           outputTokens: funcData.output_tokens,
           thinkingTokens: funcData.thinking_tokens,
-          directCost: directCost
+          directCost: directCost,
+          calls: funcData.calls
         }, cost);
       }
     }
@@ -2231,7 +2232,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     if (byFunc.cover_images.calls > 0) {
       const model = getModels(byFunc.cover_images);
       const cost = calculateImageCost(model, byFunc.cover_images.calls);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
@@ -2240,7 +2241,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     if (byFunc.page_images.calls > 0) {
       const model = getModels(byFunc.page_images);
       const cost = calculateImageCost(model, byFunc.page_images.calls);
-      log.debug(`   Page Images:   ${byFunc.page_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
+      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
@@ -4111,7 +4112,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     const thinkingAnthropicStr = tokenUsage.anthropic.thinking_tokens > 0 ? ` / ${tokenUsage.anthropic.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     const thinkingQualityStr = tokenUsage.gemini_quality.thinking_tokens > 0 ? ` / ${tokenUsage.gemini_quality.thinking_tokens.toLocaleString().padStart(6)} think` : '';
     log.debug(`   Anthropic:     ${tokenUsage.anthropic.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.anthropic.output_tokens.toLocaleString().padStart(8)} out${thinkingAnthropicStr} (${tokenUsage.anthropic.calls} calls)  $${anthropicCost.total.toFixed(4)}`);
-    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.calls} images  $${imageCost.toFixed(4)}`);
+    log.debug(`   Gemini Image:  ${tokenUsage.gemini_image.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_image.output_tokens.toLocaleString().padStart(8)} out (${tokenUsage.gemini_image.calls} calls)  $${imageCost.toFixed(4)}`);
     log.debug(`   Gemini Quality:${tokenUsage.gemini_quality.input_tokens.toLocaleString().padStart(8)} in / ${tokenUsage.gemini_quality.output_tokens.toLocaleString().padStart(8)} out${thinkingQualityStr} (${tokenUsage.gemini_quality.calls} calls)  $${geminiQualityCost.total.toFixed(4)}`);
     log.trace(`   ─────────────────────────────────────────────────────────────`);
     log.debug(`   BY FUNCTION:`);
@@ -4132,7 +4133,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     if (byFunc.cover_images.calls > 0) {
       const model = getModels(byFunc.cover_images);
       const cost = calculateImageCost(model, byFunc.cover_images.calls);
-      log.debug(`   Cover Images:  ${byFunc.cover_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
+      log.debug(`   Cover Images:  ${byFunc.cover_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.cover_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.cover_images.calls} calls)  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.cover_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.cover_quality), byFunc.cover_quality.input_tokens, byFunc.cover_quality.output_tokens, byFunc.cover_quality.thinking_tokens);
@@ -4141,7 +4142,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     if (byFunc.page_images.calls > 0) {
       const model = getModels(byFunc.page_images);
       const cost = calculateImageCost(model, byFunc.page_images.calls);
-      log.debug(`   Page Images:   ${byFunc.page_images.calls} images  $${cost.toFixed(4)}  [${model}]`);
+      log.debug(`   Page Images:   ${byFunc.page_images.input_tokens.toLocaleString().padStart(8)} in / ${byFunc.page_images.output_tokens.toLocaleString().padStart(8)} out (${byFunc.page_images.calls} calls)  $${cost.toFixed(4)}  [${model}]`);
     }
     if (byFunc.page_quality.calls > 0) {
       const cost = calculateCost(getCostModel(byFunc.page_quality), byFunc.page_quality.input_tokens, byFunc.page_quality.output_tokens, byFunc.page_quality.thinking_tokens);
@@ -4177,7 +4178,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           inputTokens: funcData.input_tokens,
           outputTokens: funcData.output_tokens,
           thinkingTokens: funcData.thinking_tokens,
-          directCost: directCost
+          directCost: directCost,
+          calls: funcData.calls
         }, cost);
       }
     }
