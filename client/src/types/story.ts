@@ -910,6 +910,26 @@ export interface PageFeedback {
   needsFullRedo: boolean;
 }
 
+export interface RepairComparison {
+  before: string | null;
+  after: string;
+  diff?: string;
+  reference: string;
+}
+
+export interface RepairVerification {
+  improved: boolean;
+  confidence: string;
+  explanation: string;
+}
+
+export interface RepairPageResult {
+  pageNumber: number;
+  comparison?: RepairComparison | null;
+  verification?: RepairVerification | null;
+  method?: string;
+}
+
 export interface RepairWorkflowState {
   currentStep: RepairWorkflowStep;
   stepStatus: Record<RepairWorkflowStep, StepStatus>;
@@ -943,8 +963,8 @@ export interface RepairWorkflowState {
   };
   characterRepairResults: {
     charactersProcessed: string[];
-    pagesRepaired: Record<string, number[]>;
-    pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean }>>;
+    pagesRepaired: Record<string, RepairPageResult[]>;
+    pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: RepairComparison | null }>>;
   };
   artifactRepairResults: {
     pagesProcessed: number[];

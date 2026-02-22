@@ -606,9 +606,19 @@ export function useRepairWorkflow({
           pagesFailed.map(f => `page ${f.pageNumber}: ${f.reason}`).join(', '));
       }
 
-      // Extract just page numbers for the state
-      const repairedPageNumbers = pagesRepaired.map(r => typeof r === 'number' ? r : r.pageNumber);
-      const failedPages = pagesFailed.map(f => ({ pageNumber: f.pageNumber, reason: f.reason, rejected: f.rejected }));
+      // Store full repair details (comparison, verification, method) for debug UI
+      const repairedDetails = pagesRepaired.map(r => ({
+        pageNumber: typeof r === 'number' ? r : r.pageNumber,
+        comparison: r.comparison || null,
+        verification: r.verification || null,
+        method: r.method || 'gemini',
+      }));
+      const failedPages = pagesFailed.map(f => ({
+        pageNumber: f.pageNumber,
+        reason: f.reason,
+        rejected: f.rejected,
+        comparison: f.comparison || null,
+      }));
 
       setWorkflowState(prev => ({
         ...prev,
@@ -616,7 +626,7 @@ export function useRepairWorkflow({
           charactersProcessed: [...prev.characterRepairResults.charactersProcessed, characterName],
           pagesRepaired: {
             ...prev.characterRepairResults.pagesRepaired,
-            [characterName]: repairedPageNumbers,
+            [characterName]: repairedDetails,
           },
           pagesFailed: {
             ...prev.characterRepairResults.pagesFailed,

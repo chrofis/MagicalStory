@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
-import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback } from '@/types/story';
+import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult } from '@/types/story';
 import type { Character } from '@/types/character';
 
 interface RepairWorkflowPanelProps {
@@ -1188,15 +1188,136 @@ export function RepairWorkflowPanel({
                   {useMagicApiRepair && <span className="text-xs opacity-75">(MagicAPI)</span>}
                 </button>
 
+                {/* Repaired pages with debug images */}
                 {Object.keys(workflowState.characterRepairResults.pagesRepaired).length > 0 && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <h5 className="text-sm font-medium text-green-800 mb-2">Repair Results:</h5>
+                  <div className="space-y-3">
+                    <h5 className="text-sm font-medium text-green-800">Repair Results:</h5>
                     {Object.entries(workflowState.characterRepairResults.pagesRepaired).map(([char, pages]) => (
-                      <div key={char} className="text-sm">
-                        <span className="font-medium">{char}:</span>{' '}
-                        <span className="text-gray-600">Pages {pages.join(', ')}</span>
+                      <div key={char} className="space-y-2">
+                        <span className="text-sm font-medium">{char}</span>
+                        {(pages as RepairPageResult[]).map((page) => (
+                          <div key={page.pageNumber} className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-medium text-green-800">Page {page.pageNumber}</span>
+                              {page.method && (
+                                <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${
+                                  page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                                }`}>
+                                  {page.method === 'magicapi' ? 'MagicAPI' : 'Gemini'}
+                                </span>
+                              )}
+                              {page.verification && (
+                                <span className={`px-1.5 py-0.5 text-xs rounded ${
+                                  page.verification.confidence === 'high' ? 'bg-green-100 text-green-700' :
+                                  page.verification.confidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {page.verification.confidence} confidence
+                                </span>
+                              )}
+                            </div>
+                            {page.comparison && (
+                              <div className="grid grid-cols-3 gap-2 mb-2">
+                                <div className="text-center">
+                                  <img
+                                    src={page.comparison.reference}
+                                    alt="Reference avatar"
+                                    className="w-full h-24 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => setGridLightbox(page.comparison!.reference)}
+                                  />
+                                  <span className="text-xs text-gray-500 mt-1 block">Reference</span>
+                                </div>
+                                <div className="text-center">
+                                  {page.comparison.before ? (
+                                    <img
+                                      src={page.comparison.before}
+                                      alt="Before repair"
+                                      className="w-full h-24 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => setGridLightbox(page.comparison!.before!)}
+                                    />
+                                  ) : (
+                                    <div className="w-full h-24 flex items-center justify-center rounded border border-gray-200 bg-gray-50 text-xs text-gray-400">N/A</div>
+                                  )}
+                                  <span className="text-xs text-gray-500 mt-1 block">Before</span>
+                                </div>
+                                <div className="text-center">
+                                  <img
+                                    src={page.comparison.after}
+                                    alt="After repair"
+                                    className="w-full h-24 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    onClick={() => setGridLightbox(page.comparison!.after)}
+                                  />
+                                  <span className="text-xs text-gray-500 mt-1 block">After</span>
+                                </div>
+                              </div>
+                            )}
+                            {page.verification?.explanation && (
+                              <p className="text-xs text-gray-600 italic">{page.verification.explanation}</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* Failed pages with debug images */}
+                {Object.keys(workflowState.characterRepairResults.pagesFailed).length > 0 && (
+                  <div className="space-y-3">
+                    <h5 className="text-sm font-medium text-red-800">Failed/Rejected:</h5>
+                    {Object.entries(workflowState.characterRepairResults.pagesFailed).map(([char, pages]) =>
+                      pages.length > 0 && (
+                        <div key={char} className="space-y-2">
+                          <span className="text-sm font-medium">{char}</span>
+                          {pages.map((page) => (
+                            <div key={page.pageNumber} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="text-sm font-medium text-red-800">Page {page.pageNumber}</span>
+                                {page.rejected && (
+                                  <span className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-700 font-medium">Rejected</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-red-700 mb-2">{page.reason}</p>
+                              {page.comparison && (
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div className="text-center">
+                                    <img
+                                      src={page.comparison.reference}
+                                      alt="Reference avatar"
+                                      className="w-full h-24 object-contain rounded border border-red-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => setGridLightbox(page.comparison!.reference)}
+                                    />
+                                    <span className="text-xs text-gray-500 mt-1 block">Reference</span>
+                                  </div>
+                                  <div className="text-center">
+                                    {page.comparison.before ? (
+                                      <img
+                                        src={page.comparison.before}
+                                        alt="Before repair"
+                                        className="w-full h-24 object-contain rounded border border-red-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                        onClick={() => setGridLightbox(page.comparison!.before!)}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-24 flex items-center justify-center rounded border border-red-200 bg-gray-50 text-xs text-gray-400">N/A</div>
+                                    )}
+                                    <span className="text-xs text-gray-500 mt-1 block">Before</span>
+                                  </div>
+                                  <div className="text-center">
+                                    <img
+                                      src={page.comparison.after}
+                                      alt="After (rejected)"
+                                      className="w-full h-24 object-contain rounded border border-red-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                      onClick={() => setGridLightbox(page.comparison!.after)}
+                                    />
+                                    <span className="text-xs text-gray-500 mt-1 block">After (rejected)</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
               </div>

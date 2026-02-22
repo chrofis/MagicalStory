@@ -2172,16 +2172,34 @@ export const storyService = {
   ): Promise<{
     results: Array<{
       character: string;
-      pagesRepaired: Array<{ pageNumber: number; imageData: string; versionIndex: number }>;
-      pagesFailed?: Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: { before: string; after: string; reference: string } | null }>;
+      pagesRepaired: Array<{
+        pageNumber: number; imageData: string; versionIndex: number;
+        comparison?: { before: string | null; after: string; diff?: string; reference: string } | null;
+        verification?: { improved: boolean; confidence: string; explanation: string } | null;
+        method?: string;
+        cropHistory?: unknown;
+      }>;
+      pagesFailed?: Array<{
+        pageNumber: number; reason: string; rejected?: boolean;
+        comparison?: { before: string | null; after: string; diff?: string; reference: string } | null;
+      }>;
       error?: string;
     }>;
   }> {
     const response = await api.post<{
       results: Array<{
         character: string;
-        pagesRepaired: Array<{ pageNumber: number; imageData: string; versionIndex: number }>;
-        pagesFailed?: Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: { before: string; after: string; reference: string } | null }>;
+        pagesRepaired: Array<{
+          pageNumber: number; imageData: string; versionIndex: number;
+          comparison?: { before: string | null; after: string; diff?: string; reference: string } | null;
+          verification?: { improved: boolean; confidence: string; explanation: string } | null;
+          method?: string;
+          cropHistory?: unknown;
+        }>;
+        pagesFailed?: Array<{
+          pageNumber: number; reason: string; rejected?: boolean;
+          comparison?: { before: string | null; after: string; diff?: string; reference: string } | null;
+        }>;
         error?: string;
       }>;
     }>(`/api/stories/${storyId}/repair-workflow/character-repair`, {

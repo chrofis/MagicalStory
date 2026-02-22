@@ -2954,9 +2954,33 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                     // Call MagicAPI repair
                     const magicResult = await repairFaceWithMagicApi(sceneBuffer, avatarBuffer, bbox, hairConfig);
 
+                    // Build comparison reference from avatar
+                    const avatarDataUri = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
+
                     if (magicResult.success && magicResult.repairedBuffer) {
                       // Convert result to base64 data URI
                       const repairedDataUri = `data:image/png;base64,${magicResult.repairedBuffer.toString('base64')}`;
+
+                      // Extract bbox crop as "before" image for comparison
+                      let beforeDataUri = null;
+                      try {
+                        const sharp = require('sharp');
+                        const imgMeta = await sharp(sceneBuffer).metadata();
+                        const cropX = Math.round(bbox.x * imgMeta.width);
+                        const cropY = Math.round(bbox.y * imgMeta.height);
+                        const cropW = Math.round(bbox.width * imgMeta.width);
+                        const cropH = Math.round(bbox.height * imgMeta.height);
+                        if (cropW > 0 && cropH > 0) {
+                          const cropBuf = await sharp(sceneBuffer)
+                            .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
+                            .jpeg({ quality: 80 })
+                            .toBuffer();
+                          beforeDataUri = `data:image/jpeg;base64,${cropBuf.toString('base64')}`;
+                        }
+                      } catch (cropErr) {
+                        log.debug(`[REPAIR-WORKFLOW] Could not extract bbox crop for comparison: ${cropErr.message}`);
+                      }
+
                       repairResult = {
                         success: true,
                         updatedImages: [{
@@ -2965,7 +2989,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                         }],
                         method: 'magicapi',
                         clothingCategory,
-                        cropHistory: magicResult.cropHistory
+                        cropHistory: magicResult.cropHistory,
+                        comparison: {
+                          before: beforeDataUri,
+                          after: repairedDataUri,
+                          reference: avatarDataUri,
+                        },
                       };
                     } else {
                       log.warn(`[REPAIR-WORKFLOW] MagicAPI repair failed, falling back to Gemini`);
@@ -3049,7 +3078,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 pagesRepaired.push({
                   pageNumber: update.pageNumber,
                   imageData: update.imageData,
-                  versionIndex: newDbVersionIndex
+                  versionIndex: newDbVersionIndex,
+                  // Debug data for repair panel
+                  comparison: repairResult.comparison || null,
+                  verification: repairResult.verification || null,
+                  method: repairResult.method || 'gemini',
+                  cropHistory: repairResult.cropHistory || null,
                 });
               }
             }
