@@ -174,7 +174,7 @@ function buildPhysicalTraitsString(character) {
  * @returns {string}
  */
 function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
-  return `${characterName.toLowerCase()}_${clothingCategory.toLowerCase()}_${artStyle}`;
+  return `${characterName.trim().toLowerCase()}_${clothingCategory.trim().toLowerCase()}_${artStyle}`;
 }
 
 /**
@@ -499,11 +499,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
         if (!originalAvatar) {
           // Costumed avatar doesn't exist - GENERATE it on-demand
           // Look up costume config from clothingRequirements
-          let charReqs = clothingRequirements?.[charName];
+          let charReqs = clothingRequirements?.[charName] || clothingRequirements?.[charName.trim()];
           if (!charReqs && clothingRequirements) {
-            // Fallback: case-insensitive lookup
-            const charNameLower = charName.toLowerCase();
-            const matchingKey = Object.keys(clothingRequirements).find(k => k.toLowerCase() === charNameLower);
+            // Fallback: case-insensitive + trimmed lookup
+            const charNameLower = charName.trim().toLowerCase();
+            const matchingKey = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === charNameLower);
             if (matchingKey) charReqs = clothingRequirements[matchingKey];
           }
           const costumeConfig = charReqs?.costumed;
@@ -599,11 +599,11 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
         // Debug: log what's in clothingRequirements for this character
         // Use case-insensitive lookup for character name (Claude might use different casing)
-        let charReqs = clothingRequirements?.[charName];
+        let charReqs = clothingRequirements?.[charName] || clothingRequirements?.[charName.trim()];
         if (!charReqs && clothingRequirements) {
-          // Fallback: case-insensitive lookup
-          const charNameLower = charName.toLowerCase();
-          const matchingKey = Object.keys(clothingRequirements).find(k => k.toLowerCase() === charNameLower);
+          // Fallback: case-insensitive + trimmed lookup
+          const charNameLower = charName.trim().toLowerCase();
+          const matchingKey = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === charNameLower);
           if (matchingKey) {
             charReqs = clothingRequirements[matchingKey];
             log.debug(`🔍 [STYLED AVATARS] ${charName}: found clothingRequirements via case-insensitive match: "${matchingKey}"`);
@@ -973,7 +973,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
     // A character can have MULTIPLE used categories (e.g., standard AND costumed)
     const characterClothingMap = {};
     for (const [charName, reqs] of Object.entries(clothingRequirements)) {
-      const keyLower = charName.toLowerCase();
+      const keyLower = charName.trim().toLowerCase();
       characterClothingMap[keyLower] = [];
       // Collect ALL categories with used=true
       for (const [category, config] of Object.entries(reqs)) {
@@ -1003,7 +1003,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
       // Add requirement for each character with ALL their clothing categories
       for (const char of sceneCharacters) {
-        const clothingCategories = characterClothingMap[char.name.toLowerCase()] || [defaultClothing];
+        const clothingCategories = characterClothingMap[char.name.trim().toLowerCase()] || [defaultClothing];
         for (const clothingCategory of clothingCategories) {
           requirements.push({
             pageNumber: pageNum,
@@ -1016,7 +1016,7 @@ function collectAvatarRequirements(sceneDescriptions, characters, pageClothing =
 
     // For covers, each character needs ALL their clothing variations
     for (const char of characters) {
-      const clothingCategories = characterClothingMap[char.name.toLowerCase()] || [defaultClothing];
+      const clothingCategories = characterClothingMap[char.name.trim().toLowerCase()] || [defaultClothing];
       for (const clothingCategory of clothingCategories) {
         requirements.push({
           pageNumber: 'cover',

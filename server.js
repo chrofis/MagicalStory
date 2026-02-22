@@ -2659,11 +2659,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           streamingAvatarStylingPromise = (async () => {
             try {
               const basicRequirements = (inputData.characters || []).flatMap(char => {
-                const charNameLower = char.name?.toLowerCase();
+                const charNameTrimmed = char.name?.trim();
+                const charNameLower = charNameTrimmed?.toLowerCase();
                 const charReqs = requirements?.[char.name] ||
+                                 requirements?.[charNameTrimmed] ||
                                  requirements?.[charNameLower] ||
                                  (requirements && Object.entries(requirements)
-                                   .find(([k]) => k.toLowerCase() === charNameLower)?.[1]);
+                                   .find(([k]) => k.trim().toLowerCase() === charNameLower)?.[1]);
 
                 let usedCategories = charReqs
                   ? Object.entries(charReqs)
