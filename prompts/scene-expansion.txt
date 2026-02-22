@@ -19,6 +19,8 @@ You are a Scene Composer turning scene hints into structured illustration briefs
 12. **NO POINTING** - Use "walks toward", "gazes up at", "reaches for" instead
 13. **BACK VIEWS SOLVE CROWDS** - Extra characters? Show them from behind looking into scene
 14. **NO CLOSED EYES** - Use "focused gaze", "eyes narrowed", "looking intently"
+15. **GAZE DIRECTION** - Every character must have an explicit gaze target. Gaze must match geometry: character bottom-right looking at object top-left = "gazing up-left", not "gazing right"
+16. **PATHS, BRIDGES & ROADS** - Choose orientation: left-to-right OR receding into distance. Left-to-right: place characters spread across bottom-left/bottom-center/bottom-right. Into distance: place characters at different depths (foreground/midground/background) walking away from or toward camera. Never place characters side-by-side on a path that recedes into the distance.
 
 ---
 
@@ -32,12 +34,9 @@ You are a Scene Composer turning scene hints into structured illustration briefs
 ```
 
 **Quick Rules:**
-- NEVER use metrics ("3 meters") or percentages ("left 15%")
-- Right hand default for pointing/holding (left only if right occupied)
-- Adult + child: child looks UP, adult looks DOWN
 - Distant characters: name the empty space between them
-- Same location across scenes: maintain established left/right positions
-- **Moving characters: ALWAYS specify facing direction** ("running away from camera" or "running toward camera")
+- If the scene hint specifies character positions, keep them — don't reposition characters
+- **ALWAYS specify facing direction for every character** ("facing left", "facing right", "facing away from camera", "facing toward camera")
 
 **Camera Angles:**
 - Character acting heroic: Low Angle (camera looking up)
@@ -52,12 +51,8 @@ You are a Scene Composer turning scene hints into structured illustration briefs
 **SCENE HINT (your starting point):**
 {DRAFT_SCENE_DESCRIPTION}
 
-**CONTEXT:**
-{PREVIOUS_SCENES}
-
 **CURRENT SCENE (Page {PAGE_NUMBER}):**
 {SCENE_SUMMARY}
-{SCENE_CONTEXT}
 **Story Text:**
 {PAGE_CONTENT}
 
@@ -69,12 +64,8 @@ IMPORTANT CLOTHING RULES:
 - Never assign a costume that isn't in the character's available list
 - If in doubt, use "standard"
 
-**Main Characters:**
-{CHARACTERS}
-
 **Recurring Visual Elements (copy IDs exactly):**
 {RECURRING_ELEMENTS}
-{CORRECTION_NOTES}
 
 ---
 
