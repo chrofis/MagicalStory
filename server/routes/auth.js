@@ -673,8 +673,28 @@ router.post('/refresh', authenticateToken, async (req, res) => {
 
     const user = result.rows[0];
 
-    // Generate new token with same 7-day expiry
-    const newToken = generateToken(user);
+    // Preserve impersonation state when refreshing an impersonation token
+    let newToken;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      newToken = jwt.sign(
+        {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          role: user.role,
+          emailVerified: user.email_verified,
+          impersonating: true,
+          originalAdminId: req.user.originalAdminId,
+          originalAdminUsername: req.user.originalAdminUsername,
+          originalAdminRole: req.user.originalAdminRole || 'admin'
+        },
+        JWT_SECRET,
+        { expiresIn: '2h' }  // Impersonation tokens get shorter expiry
+      );
+      console.log(`🔄 [AUTH] Token refreshed for impersonation session (${req.user.originalAdminUsername} → ${user.username})`);
+    } else {
+      newToken = generateToken(user);
+    }
 
     // Log the refresh
     await logActivity(userId, user.username, 'TOKEN_REFRESHED', {});
