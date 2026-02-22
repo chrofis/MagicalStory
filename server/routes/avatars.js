@@ -589,7 +589,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
     }
 
-    log.debug(`🔍 [AVATAR EVAL] Raw response: ${responseText.substring(0, 300)}${responseText.length > 300 ? '...' : ''}`);
+    log.debug(`🔍 [AVATAR EVAL] Raw response: ${responseText.replace(/\n\s*/g, ' ').substring(0, 200)}...`);
 
     // Parse JSON response (new combined format)
     try {
@@ -619,22 +619,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           `Final Score: ${score}/10`
         ].join('\n');
 
-        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10`);
-        if (lpipsResult) {
-          log.debug(`🔍 [AVATAR EVAL] LPIPS: ${lpipsResult.lpipsScore?.toFixed(4)} (${lpipsResult.interpretation})`);
-        }
-        if (arcfaceResult) {
-          log.debug(`🔍 [AVATAR EVAL] ArcFace: ${arcfaceResult.similarity?.toFixed(4)} (${arcfaceResult.interpretation}, same_person: ${arcfaceResult.samePerson})`);
-        }
-        if (physicalTraits) {
-          log.debug(`🔍 [AVATAR EVAL] Extracted traits: ${JSON.stringify(physicalTraits).substring(0, 100)}...`);
-        }
-        if (clothing) {
-          log.debug(`🔍 [AVATAR EVAL] Extracted clothing: ${JSON.stringify(clothing)}`);
-        }
-        if (detailedHairAnalysis) {
-          log.debug(`💇 [AVATAR EVAL] Detailed hair: ${JSON.stringify(detailedHairAnalysis)}`);
-        }
+        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10, traits: ${!!physicalTraits}, clothing: ${!!clothing}, hair: ${!!detailedHairAnalysis}${lpipsResult ? `, LPIPS: ${lpipsResult.lpipsScore?.toFixed(4)}` : ''}${arcfaceResult ? `, ArcFace: ${arcfaceResult.similarity?.toFixed(4)}` : ''}`);
 
         return { score, details, physicalTraits, clothing, detailedHairAnalysis, lpips: lpipsResult, arcface: arcfaceResult, raw: evalResult };
       }

@@ -2337,6 +2337,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         addUsage(expansionProvider, expansionResult.usage, 'scene_expansion', expansionResult.modelId);
 
         log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded`);
+        genLog.info('scene_expanded', `Page ${page.pageNumber} scene expanded`, null, { pageNumber: page.pageNumber, model: expansionResult.modelId });
 
         // Post-expansion validation: validate and repair scene composition if enabled
         let finalSceneDescription = expansionResult.text;
@@ -2709,6 +2710,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       },
       onPageComplete: (page) => {
         streamingPagesDetected = Math.max(streamingPagesDetected, page.pageNumber);
+        genLog.info('page_streamed', `Page ${page.pageNumber} parsed from stream`, null, { pageNumber: page.pageNumber, textLength: page.text?.length || 0 });
         // Store page data for scene expansion
         streamingExpandedPages.set(page.pageNumber, page);
         // Start scene expansion immediately
@@ -2794,6 +2796,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     ).join('\n\n');
 
     log.debug(`📖 [UNIFIED] Parsed: title="${title}", ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`);
+    genLog.info('story_parsed', `"${title}" - ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`, null, { title, pageCount: storyPages.length });
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
 
     // Start text consistency check early (runs in parallel with image generation)
@@ -3053,6 +3056,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Sort by page number and create expandedScenes array
     const expandedScenes = sceneResults.sort((a, b) => a.pageNumber - b.pageNumber);
     log.debug(`✅ [UNIFIED] All ${expandedScenes.length} scene expansions complete`);
+    genLog.info('scenes_complete', `All ${expandedScenes.length} scene expansions complete`);
 
     // FIX: Update characterClothing from full re-parse to fix truncated costume names from streaming
     // Streaming can truncate costume names (e.g., "costumed:gla" instead of "costumed:gladiator")
@@ -3341,6 +3345,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       if (imageResult?.imageData) {
+        genLog.imageGenerated(pageNum, true, { model: imageResult.modelId, score: imageResult.score, attempts: imageResult.totalAttempts || 1 });
 
         // Save partial_page checkpoint for progressive display
         await saveCheckpoint(jobId, 'partial_page', {
@@ -3352,6 +3357,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           modelId: imageResult.modelId
         }, pageNum);
         log.debug(`💾 [UNIFIED] Saved page ${pageNum} for progressive display`);
+      } else {
+        genLog.imageGenerated(pageNum, false, { model: imageResult?.modelId });
       }
 
       return {
@@ -3754,8 +3761,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     timing.pagesEnd = Date.now();
-    log.debug(`📖 [UNIFIED] Generated ${allImages.filter(p => p.imageData).length}/${allImages.length} page images`);
+    const imgSuccess = allImages.filter(p => p.imageData).length;
+    log.debug(`📖 [UNIFIED] Generated ${imgSuccess}/${allImages.length} page images`);
     log.debug(`⏱️ [UNIFIED] Page images: ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
+    genLog.info('images_complete', `Generated ${imgSuccess}/${allImages.length} page images in ${((timing.pagesEnd - timing.pagesStart) / 1000).toFixed(1)}s`);
 
     // Wait for cover images if still running (they ran parallel with page images)
     if (coverAwaitPromise) {
@@ -4605,6 +4614,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
   } catch (error) {
     log.error(`❌ [UNIFIED] Error generating story:`, error.message);
+    genLog.error('pipeline_error', error.message, null, { stage: genLog.currentStage, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
 
     // Try to refund credits on failure
     try {

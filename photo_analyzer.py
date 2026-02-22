@@ -7,6 +7,7 @@ Uses MediaPipe for fast face detection and background removal (no heavy AI model
 # Disable MediaPipe GPU to avoid OpenGL/EGL errors on headless systems
 import os
 os.environ["MEDIAPIPE_DISABLE_GPU"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # Suppress TF/MediaPipe C++ logs
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -30,6 +31,7 @@ cli = sys.modules.get('flask.cli')
 if cli:
     cli.show_server_banner = lambda *args: None
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('mediapipe').setLevel(logging.CRITICAL)
 
 app = Flask(__name__)
 CORS(app)
@@ -1492,11 +1494,11 @@ def split_grid():
             }), 400
 
         height, width = image.shape[:2]
-        print(f"[SPLIT-GRID] Input image size: {width}x{height}")
 
         # Split into 4 quadrants
         mid_h = height // 2
         mid_w = width // 2
+        print(f"[SPLIT-GRID] {width}x{height}, quadrants: {mid_w}x{mid_h}")
 
         quadrants = {
             'faceFront': image[0:mid_h, 0:mid_w],           # Top-left
@@ -1505,14 +1507,11 @@ def split_grid():
             'bodyProfile': image[mid_h:height, mid_w:width] # Bottom-right
         }
 
-        print(f"[SPLIT-GRID] Quadrant sizes: {mid_w}x{mid_h} each")
-
         # Encode each quadrant as base64 JPEG
         encoded_quadrants = {}
         for name, quad in quadrants.items():
             _, buffer = cv2.imencode('.jpg', quad, [cv2.IMWRITE_JPEG_QUALITY, 90])
             encoded_quadrants[name] = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
-            print(f"[SPLIT-GRID] Encoded {name}: {len(encoded_quadrants[name])} bytes")
 
         # Extract face from top-left quadrant (faceFront)
         face_thumbnail = None
@@ -1522,10 +1521,8 @@ def split_grid():
         face_box = detect_face_mediapipe(face_front)
 
         if face_box:
-            print(f"[SPLIT-GRID] Face detected at: x={face_box['x']:.1f}%, y={face_box['y']:.1f}%, w={face_box['width']:.1f}%, h={face_box['height']:.1f}%")
             face_thumbnail = create_face_thumbnail(face_front, face_box, size=768)
         else:
-            print("[SPLIT-GRID] No face detected in faceFront quadrant, using full quadrant as thumbnail")
             # If no face detected, use the whole faceFront quadrant resized to square
             h, w = face_front.shape[:2]
             max_dim = max(h, w)
@@ -1537,7 +1534,9 @@ def split_grid():
             _, buffer = cv2.imencode('.jpg', thumbnail, [cv2.IMWRITE_JPEG_QUALITY, 90])
             face_thumbnail = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
 
-        print(f"[SPLIT-GRID] Face thumbnail generated: {len(face_thumbnail) if face_thumbnail else 0} bytes")
+        thumb_kb = round(len(face_thumbnail) / 1024) if face_thumbnail else 0
+        face_info = f"detected at {face_box['x']:.0f}%,{face_box['y']:.0f}%" if face_box else "not detected"
+        print(f"[SPLIT-GRID] Face: {face_info}, thumbnail: {thumb_kb}KB")
 
         return jsonify({
             "success": True,
