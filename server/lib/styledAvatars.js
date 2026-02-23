@@ -275,6 +275,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     let downsized = null;
     let faceMatchScore = null;
     let clothingMatchScore = null;
+    let faceMatchDetails = null;
+    let clothingMatchReason = null;
     let successAttempt = 1;
 
     for (let attempt = 1; attempt <= MAX_STYLED_AVATAR_RETRIES; attempt++) {
@@ -301,6 +303,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
         if (evalResult) {
           faceMatchScore = evalResult.score || null;
           clothingMatchScore = evalResult.clothingMatch?.score || null;
+          faceMatchDetails = evalResult.details || null;
+          clothingMatchReason = evalResult.clothingMatch?.reason || null;
 
           const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
           const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
@@ -339,6 +343,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       success: true,
       faceMatchScore,
       clothingMatchScore,
+      faceMatchDetails,
+      clothingMatchReason,
       attempt: successAttempt,
       inputs: {
         facePhoto: hasMultipleRefs ? {

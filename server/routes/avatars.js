@@ -102,6 +102,10 @@ const ENABLE_AVATAR_EVALUATION = true;
 // Disable for faster avatar generation on production
 const ENABLE_FACE_COMPARISON = false;
 
+// Minimum face score for base clothing avatars before triggering a retry
+// Categories scoring below this threshold get one regeneration attempt
+const MIN_BASE_AVATAR_SCORE = 5;
+
 // ============================================================================
 // AVATAR JOB QUEUE (for non-blocking avatar generation)
 // ============================================================================
@@ -2508,6 +2512,108 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             log.debug(`📋 [AVATAR JOB] Extracted traits: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
           }
         }
+
+        // Auto-retry categories with low face scores
+        const lowScoreCategories = Object.entries(results.faceMatch || {})
+          .filter(([, fm]) => fm.score != null && fm.score < MIN_BASE_AVATAR_SCORE)
+          .map(([cat]) => cat);
+
+        if (lowScoreCategories.length > 0) {
+          log.debug(`🔄 [AVATAR JOB ${jobId}] Retrying ${lowScoreCategories.length} low-score categories: ${lowScoreCategories.join(', ')}`);
+          job.message = `Retrying ${lowScoreCategories.length} low-quality avatar(s)...`;
+          const retryStart = Date.now();
+
+          const retryPromises = lowScoreCategories.map(async (category) => {
+            const originalScore = results.faceMatch[category].score;
+            log.debug(`🔄 [AVATAR JOB ${jobId}] Retrying ${category} (score ${originalScore}/10 < ${MIN_BASE_AVATAR_SCORE})...`);
+
+            // Regenerate using the same helper
+            const retryGen = await generateSingleAvatarForJob(category);
+            if (!retryGen?.imageData) {
+              log.warn(`🔄 [AVATAR JOB ${jobId}] Retry for ${category} produced no image — keeping original`);
+              return null;
+            }
+
+            // Aggregate retry token usage
+            if (retryGen.inputTokens > 0 || retryGen.outputTokens > 0) {
+              if (!results.tokenUsage.byModel[geminiModelId]) {
+                results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
+              }
+              results.tokenUsage.byModel[geminiModelId].input_tokens += retryGen.inputTokens;
+              results.tokenUsage.byModel[geminiModelId].output_tokens += retryGen.outputTokens;
+            }
+
+            // Extract thumbnails from retry result
+            let faceThumbnail = null;
+            let bodyThumbnail = null;
+            try {
+              const splitResult = await splitGridAndExtractFace(retryGen.imageData);
+              if (splitResult.success) {
+                faceThumbnail = splitResult.faceThumbnail || null;
+                bodyThumbnail = splitResult.quadrants?.bodyFront || null;
+              }
+            } catch (splitErr) {
+              log.warn(`🔄 [AVATAR JOB ${jobId}] Thumbnail extraction failed for ${category} retry: ${splitErr.message}`);
+            }
+
+            // Re-evaluate
+            const retryEval = await evaluateAvatarFaceMatch(facePhoto, retryGen.imageData, geminiApiKey);
+            const retryScore = retryEval?.score ?? 0;
+            log.debug(`🔄 [AVATAR JOB ${jobId}] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
+
+            if (retryScore > originalScore) {
+              log.debug(`✅ [AVATAR JOB ${jobId}] Retry improved ${category}: ${originalScore} → ${retryScore}`);
+              return { category, retryGen, retryEval, retryScore, faceThumbnail, bodyThumbnail, improved: true };
+            } else {
+              log.debug(`⏭️ [AVATAR JOB ${jobId}] Retry did NOT improve ${category}: ${originalScore} → ${retryScore}, keeping original`);
+              return null;
+            }
+          });
+
+          const retryOutcomes = await Promise.all(retryPromises);
+
+          for (const outcome of retryOutcomes) {
+            if (!outcome?.improved) continue;
+            const { category, retryGen, retryEval, faceThumbnail, bodyThumbnail } = outcome;
+
+            // Replace image + thumbnails
+            results[category] = retryGen.imageData;
+            if (faceThumbnail) {
+              if (!results.faceThumbnails) results.faceThumbnails = {};
+              results.faceThumbnails[category] = faceThumbnail;
+            }
+            if (bodyThumbnail) {
+              if (!results.bodyThumbnails) results.bodyThumbnails = {};
+              results.bodyThumbnails[category] = bodyThumbnail;
+            }
+            if (retryGen.prompt) results.prompts[category] = retryGen.prompt;
+
+            // Replace evaluation
+            results.faceMatch[category] = {
+              score: retryEval.score,
+              details: retryEval.details,
+              lpips: retryEval.lpips || null
+            };
+
+            // Replace clothing if available
+            if (retryEval.clothing && typeof retryEval.clothing === 'object') {
+              results.structuredClothing = results.structuredClothing || {};
+              results.structuredClothing[category] = retryEval.clothing;
+              const clothingParts = [];
+              if (retryEval.clothing.fullBody) {
+                clothingParts.push(retryEval.clothing.fullBody);
+              } else {
+                if (retryEval.clothing.upperBody) clothingParts.push(retryEval.clothing.upperBody);
+                if (retryEval.clothing.lowerBody) clothingParts.push(retryEval.clothing.lowerBody);
+              }
+              if (retryEval.clothing.shoes) clothingParts.push(retryEval.clothing.shoes);
+              results.clothing = results.clothing || {};
+              results.clothing[category] = clothingParts.join(', ');
+            }
+          }
+
+          log.debug(`🔄 [AVATAR JOB ${jobId}] Retry phase completed in ${Date.now() - retryStart}ms`);
+        }
       } catch (evalErr) {
         log.warn(`[AVATAR JOB ${jobId}] Evaluation failed (continuing without traits):`, evalErr.message);
       }
@@ -3394,6 +3500,86 @@ These corrections OVERRIDE what is visible in the reference photo.
 
           log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
         }
+      }
+
+      // PHASE 2b: Auto-retry categories with low face scores
+      const lowScoreCategories = Object.entries(results.faceMatch)
+        .filter(([, fm]) => fm.score != null && fm.score < MIN_BASE_AVATAR_SCORE)
+        .map(([cat]) => cat);
+
+      if (lowScoreCategories.length > 0) {
+        log.debug(`🔄 [CLOTHING AVATARS] Retrying ${lowScoreCategories.length} low-score categories: ${lowScoreCategories.join(', ')}`);
+        const retryStart = Date.now();
+
+        const retryPromises = lowScoreCategories.map(async (category) => {
+          const config = clothingCategories[category];
+          if (!config) return null;
+
+          const originalScore = results.faceMatch[category].score;
+          log.debug(`🔄 [CLOTHING AVATARS] Retrying ${category} (score ${originalScore}/10 < ${MIN_BASE_AVATAR_SCORE})...`);
+
+          // Regenerate
+          const retryResult = await generateSingleAvatar(category, config);
+          if (!retryResult?.imageData) {
+            log.warn(`🔄 [CLOTHING AVATARS] Retry for ${category} produced no image — keeping original`);
+            return null;
+          }
+
+          // Re-evaluate
+          const retryEval = await evaluateAvatarFaceMatch(facePhoto, retryResult.imageData, geminiApiKey);
+          const retryScore = retryEval?.score ?? 0;
+          log.debug(`🔄 [CLOTHING AVATARS] Retry ${category}: new score ${retryScore}/10 (was ${originalScore}/10)`);
+
+          if (retryScore > originalScore) {
+            log.debug(`✅ [CLOTHING AVATARS] Retry improved ${category}: ${originalScore} → ${retryScore}`);
+            return { category, retryResult, retryEval, retryScore, improved: true };
+          } else {
+            log.debug(`⏭️ [CLOTHING AVATARS] Retry did NOT improve ${category}: ${originalScore} → ${retryScore}, keeping original`);
+            return null;
+          }
+        });
+
+        const retryOutcomes = await Promise.all(retryPromises);
+
+        for (const outcome of retryOutcomes) {
+          if (!outcome?.improved) continue;
+          const { category, retryResult, retryEval } = outcome;
+
+          // Replace image + thumbnails
+          results[category] = retryResult.imageData;
+          if (retryResult.faceThumbnail) {
+            if (!results.faceThumbnails) results.faceThumbnails = {};
+            results.faceThumbnails[category] = retryResult.faceThumbnail;
+          }
+          if (retryResult.bodyThumbnail) {
+            if (!results.bodyThumbnails) results.bodyThumbnails = {};
+            results.bodyThumbnails[category] = retryResult.bodyThumbnail;
+          }
+          if (retryResult.prompt) results.prompts[category] = retryResult.prompt;
+
+          // Replace evaluation
+          results.faceMatch[category] = {
+            score: retryEval.score,
+            details: retryEval.details,
+            lpips: retryEval.lpips || null
+          };
+
+          // Replace clothing if available
+          if (retryEval.clothing && typeof retryEval.clothing === 'object') {
+            results.structuredClothing[category] = retryEval.clothing;
+            const clothingParts = [];
+            if (retryEval.clothing.fullBody) {
+              clothingParts.push(retryEval.clothing.fullBody);
+            } else {
+              if (retryEval.clothing.upperBody) clothingParts.push(retryEval.clothing.upperBody);
+              if (retryEval.clothing.lowerBody) clothingParts.push(retryEval.clothing.lowerBody);
+            }
+            if (retryEval.clothing.shoes) clothingParts.push(retryEval.clothing.shoes);
+            results.clothing[category] = clothingParts.join(', ');
+          }
+        }
+
+        log.debug(`🔄 [CLOTHING AVATARS] Retry phase completed in ${Date.now() - retryStart}ms`);
       }
 
       // PHASE 3: Cross-avatar LPIPS/ArcFace comparison (optional, controlled by ENABLE_FACE_COMPARISON)
