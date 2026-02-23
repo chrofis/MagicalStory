@@ -30,6 +30,8 @@ interface StyledAvatarGenerationEntry {
   error?: string;
   faceMatchScore?: number | null;
   clothingMatchScore?: number | null;
+  faceMatchDetails?: string | null;
+  clothingMatchReason?: string | null;
   attempt?: number;
   inputs: {
     facePhoto: { identifier: string; sizeKB: number; imageData?: string } | null;
@@ -2221,6 +2223,43 @@ export function StoryDisplay({
                         </div>
                       )}
 
+                      {/* Quality Check (face + clothing evaluation details) */}
+                      {(entry.faceMatchScore != null || entry.clothingMatchScore != null) && (
+                        <div className={`p-2 rounded text-xs ${
+                          (entry.faceMatchScore == null || entry.faceMatchScore >= 5) && (entry.clothingMatchScore == null || entry.clothingMatchScore >= 5)
+                            ? 'bg-emerald-50 border border-emerald-200'
+                            : 'bg-amber-50 border border-amber-200'
+                        }`}>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-700">Quality Check:</span>
+                            {entry.faceMatchScore != null && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                entry.faceMatchScore >= 5
+                                  ? 'bg-emerald-200 text-emerald-800'
+                                  : 'bg-amber-200 text-amber-800'
+                              }`}>
+                                Face: {entry.faceMatchScore >= 5 ? 'PASS' : 'FAIL'} ({entry.faceMatchScore}/10)
+                              </span>
+                            )}
+                            {entry.clothingMatchScore != null && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                entry.clothingMatchScore >= 5
+                                  ? 'bg-emerald-200 text-emerald-800'
+                                  : 'bg-amber-200 text-amber-800'
+                              }`}>
+                                Clothing: {entry.clothingMatchScore >= 5 ? 'PASS' : 'FAIL'} ({entry.clothingMatchScore}/10)
+                              </span>
+                            )}
+                          </div>
+                          {entry.faceMatchDetails && (
+                            <p className="mt-1 text-gray-700">{entry.faceMatchDetails}</p>
+                          )}
+                          {entry.clothingMatchReason && (
+                            <p className="mt-1 text-gray-600">{entry.clothingMatchReason}</p>
+                          )}
+                        </div>
+                      )}
+
                       {/* Error */}
                       {!entry.success && entry.error && (
                         <div className="bg-red-50 p-2 rounded text-xs">
@@ -3022,10 +3061,10 @@ export function StoryDisplay({
               }`}>
                 {finalChecksReport.overallConsistent ? '✓' : '⚠️'}
                 {language === 'de'
-                  ? `Konsistenzprüfung (${(finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0)} Probleme)`
+                  ? `Konsistenzprüfung (${Math.max(0, (finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0))} Probleme)`
                   : language === 'fr'
-                    ? `Vérification de cohérence (${(finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0)} problèmes)`
-                    : `Final Checks (${(finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0)} issues)`}
+                    ? `Vérification de cohérence (${Math.max(0, (finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0))} problèmes)`
+                    : `Final Checks (${Math.max(0, (finalChecksReport.totalIssues || 0) - (finalChecksReport.entity?.totalIssues || 0))} issues)`}
               </summary>
               <div className="mt-4 space-y-4">
                 {/* Summary */}

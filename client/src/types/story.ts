@@ -659,6 +659,8 @@ export interface SceneImage {
   qualityModelId?: string;  // Model used for quality evaluation
   semanticScore?: number | null;  // Semantic fidelity score (0-100)
   semanticResult?: SemanticEvaluationResult | null;  // Full semantic evaluation result
+  verdict?: string;  // PASS / SOFT_FAIL / FAIL from quality gate
+  issuesSummary?: string;  // One-line summary of issues from evaluation
   fixTargets?: Array<{  // Bounding boxes for auto-repair from quality evaluation
     boundingBox: number[];
     issue: string;
@@ -889,6 +891,10 @@ export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | '
 export interface PageFeedback {
   pageNumber: number;
   qualityScore?: number;
+  semanticScore?: number | null;
+  verdict?: string;
+  issuesSummary?: string;
+  semanticResult?: SemanticEvaluationResult | null;
   fixableIssues: Array<{
     description: string;
     severity: string;

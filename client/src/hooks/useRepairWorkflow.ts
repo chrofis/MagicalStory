@@ -244,6 +244,10 @@ export function useRepairWorkflow({
         const feedback: PageFeedback = {
           pageNumber: scene.pageNumber,
           qualityScore: scene.qualityScore,
+          semanticScore: scene.semanticScore ?? null,
+          verdict: scene.verdict,
+          issuesSummary: scene.issuesSummary,
+          semanticResult: scene.semanticResult ?? null,
           fixableIssues: [],
           entityIssues: [],
           objectIssues: [],

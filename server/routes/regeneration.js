@@ -2856,6 +2856,10 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
       storyData.finalChecksReport = {};
     }
     storyData.finalChecksReport.entity = report;
+    // Update top-level fields so frontend display is consistent
+    const legacyIssues = storyData.finalChecksReport.legacy?.totalIssues || 0;
+    storyData.finalChecksReport.totalIssues = (report.totalIssues || 0) + legacyIssues;
+    storyData.finalChecksReport.overallConsistent = (report.totalIssues || 0) + legacyIssues === 0;
 
     await saveStoryData(id, storyData);
 

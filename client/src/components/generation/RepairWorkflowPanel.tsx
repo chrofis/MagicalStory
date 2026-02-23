@@ -110,7 +110,30 @@ function PageFeedbackCard({
               feedback.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              Score: {Math.max(0, feedback.qualityScore)}
+              {feedback.semanticScore != null ? 'Quality' : 'Score'}: {Math.max(0, feedback.qualityScore)}
+            </span>
+          )}
+          {feedback.semanticScore != null && (
+            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+              Semantic: {feedback.semanticScore}%
+            </span>
+          )}
+          {feedback.qualityScore !== undefined && feedback.semanticScore != null && (
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+              feedback.qualityScore >= 70 ? 'bg-green-100 text-green-700' :
+              feedback.qualityScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              Final: {feedback.qualityScore}%
+            </span>
+          )}
+          {feedback.verdict && (
+            <span className={`text-xs px-1.5 py-0.5 rounded ${
+              feedback.verdict === 'PASS' ? 'bg-green-100 text-green-700' :
+              feedback.verdict === 'SOFT_FAIL' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-red-100 text-red-700'
+            }`}>
+              {feedback.verdict}
             </span>
           )}
           {totalIssues > 0 && (
@@ -131,6 +154,69 @@ function PageFeedbackCard({
 
       {expanded && (
         <div className="mt-3 space-y-2 pl-7">
+          {feedback.issuesSummary && feedback.issuesSummary !== 'none' && (
+            <p className={`text-xs pl-2 border-l-2 ${
+              feedback.issuesSummary.includes('SEMANTIC:')
+                ? 'text-purple-700 border-purple-400 bg-purple-50 p-1 rounded-r'
+                : 'text-gray-600 border-gray-300'
+            }`}>
+              {feedback.issuesSummary}
+            </p>
+          )}
+          {feedback.semanticResult && (
+            <div className="text-xs text-purple-700 pl-2 border-l-2 border-purple-400 bg-purple-50 p-1 rounded-r mt-1">
+              <span className="font-medium">Semantic Analysis (Score: {feedback.semanticResult.score ?? 'N/A'}):</span>
+              {feedback.semanticResult.visible && (
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-white p-2 rounded border border-purple-200">
+                    <div className="font-medium text-purple-800 mb-1">Visible:</div>
+                    {feedback.semanticResult.visible.characters && feedback.semanticResult.visible.characters.length > 0 && (
+                      <div><span className="text-gray-500">Characters:</span> {feedback.semanticResult.visible.characters.join(', ')}</div>
+                    )}
+                    {feedback.semanticResult.visible.objects && feedback.semanticResult.visible.objects.length > 0 && (
+                      <div><span className="text-gray-500">Objects:</span> {feedback.semanticResult.visible.objects.join(', ')}</div>
+                    )}
+                    {feedback.semanticResult.visible.setting && (
+                      <div><span className="text-gray-500">Setting:</span> {feedback.semanticResult.visible.setting}</div>
+                    )}
+                    {feedback.semanticResult.visible.action && (
+                      <div><span className="text-gray-500">Action:</span> {feedback.semanticResult.visible.action}</div>
+                    )}
+                  </div>
+                  <div className="bg-white p-2 rounded border border-purple-200">
+                    <div className="font-medium text-purple-800 mb-1">Expected:</div>
+                    {feedback.semanticResult.expected?.characters && feedback.semanticResult.expected.characters.length > 0 && (
+                      <div><span className="text-gray-500">Characters:</span> {feedback.semanticResult.expected.characters.join(', ')}</div>
+                    )}
+                    {feedback.semanticResult.expected?.objects && feedback.semanticResult.expected.objects.length > 0 && (
+                      <div><span className="text-gray-500">Objects:</span> {feedback.semanticResult.expected.objects.join(', ')}</div>
+                    )}
+                    {feedback.semanticResult.expected?.setting && (
+                      <div><span className="text-gray-500">Setting:</span> {feedback.semanticResult.expected.setting}</div>
+                    )}
+                    {feedback.semanticResult.expected?.action && (
+                      <div><span className="text-gray-500">Action:</span> {feedback.semanticResult.expected.action}</div>
+                    )}
+                  </div>
+                </div>
+              )}
+              {feedback.semanticResult.semanticIssues && feedback.semanticResult.semanticIssues.length > 0 && (
+                <ul className="list-disc list-inside mt-2">
+                  {feedback.semanticResult.semanticIssues.map((issue, idx) => (
+                    <li key={idx}>
+                      <span className={`font-medium ${
+                        issue.severity === 'CRITICAL' ? 'text-red-600' :
+                        issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
+                      }`}>[{issue.severity}]</span> {issue.problem}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {feedback.semanticResult.semanticIssues?.length === 0 && !feedback.semanticResult.visible && (
+                <span className="text-green-600 ml-2">No issues</span>
+              )}
+            </div>
+          )}
           {feedback.fixableIssues.length > 0 && (
             <div>
               <h5 className="text-xs font-medium text-gray-600 mb-1">Quality Issues ({feedback.fixableIssues.length}):</h5>
