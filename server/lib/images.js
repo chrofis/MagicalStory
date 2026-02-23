@@ -3794,12 +3794,25 @@ function mergeRepairResults(originalImages, evaluations, repairResults) {
     let mergedImage = { ...img };
 
     // Apply repair or regeneration if available
+    // Preserve original in imageData (version 0), push repair to imageVersions (version 1+)
     if (repaired?.imageData) {
-      mergedImage.imageData = repaired.imageData;
+      mergedImage.imageVersions = [{
+        imageData: repaired.imageData,
+        wasRepaired: true,
+        repairMethod: repaired.method,
+        generatedAt: new Date().toISOString(),
+        source: 'separated-eval-repair'
+      }];
       mergedImage.wasRepaired = true;
       mergedImage.repairMethod = repaired.method;
     } else if (regenerated?.imageData) {
-      mergedImage.imageData = regenerated.imageData;
+      mergedImage.imageVersions = [{
+        imageData: regenerated.imageData,
+        wasRegenerated: true,
+        modelId: regenerated.modelId,
+        generatedAt: new Date().toISOString(),
+        source: 'separated-eval-regen'
+      }];
       mergedImage.wasRegenerated = true;
       mergedImage.modelId = regenerated.modelId;
     }

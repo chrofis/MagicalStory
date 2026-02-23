@@ -3622,6 +3622,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           bboxOverlayImage: img.bboxOverlayImage,
           fixTargets: img.fixTargets || [],
           fixableIssues: img.fixableIssues || [],
+          imageVersions: img.imageVersions || [],
           retryHistory: [{
             attempt: 1,
             type: 'separated_evaluation',
