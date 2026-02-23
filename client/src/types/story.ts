@@ -886,17 +886,20 @@ export interface PageFeedback {
     severity: string;
     type: string;
     fix: string;
+    source?: string;
   }>;
   entityIssues: Array<{
     character: string;
     issue: string;
     severity: string;
+    source?: string;
   }>;
   // Object consistency issues (from entity.objects)
   objectIssues: Array<{
     object: string;
     issue: string;
     severity: string;
+    source?: string;
   }>;
   // Semantic/legacy image check issues (character_appearance, position_swap, etc.)
   semanticIssues: Array<{
@@ -905,6 +908,7 @@ export interface PageFeedback {
     severity: string;
     characterInvolved?: string;
     recommendation?: string;
+    source?: string;
   }>;
   manualNotes: string;
   needsFullRedo: boolean;
@@ -944,6 +948,13 @@ export interface RepairWorkflowState {
   redoResults: {
     pagesCompleted: number[];
     newVersions: Record<number, number>;
+    pageDetails: Record<number, {
+      previousScore: number | null;
+      newScore: number | null;
+      previousImage: string | null;
+      newImage: string | null;
+      blackoutImage: string | null;
+    }>;
   };
   reEvaluationResults: {
     pages: Record<number, {

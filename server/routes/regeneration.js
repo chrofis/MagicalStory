@@ -1174,6 +1174,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       // Previous version
       previousImage: previousImageData,
       previousScore: previousScore,
+      // Blackout image (the masked image sent to the generator, only when blackout mode was used with fix targets)
+      blackoutImage: (blackoutIssues && previousImage !== currentImage.imageData) ? previousImage : null,
       // Image versions for history display
       imageVersions,
       // Credits

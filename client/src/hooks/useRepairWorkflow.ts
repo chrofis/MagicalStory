@@ -38,6 +38,7 @@ function createInitialState(): RepairWorkflowState {
     redoResults: {
       pagesCompleted: [],
       newVersions: {},
+      pageDetails: {},
     },
     reEvaluationResults: {
       pages: {},
@@ -251,40 +252,39 @@ export function useRepairWorkflow({
           needsFullRedo: false,
         };
 
-        // Get fixable issues from retry history or current evaluation (match backend fallback chain)
+        // Collect fixable issues from ALL sources (tagged with source)
         const latestRetry = scene.retryHistory?.slice(-1)[0];
-        if (latestRetry?.postRepairEval?.fixableIssues) {
-          feedback.fixableIssues = latestRetry.postRepairEval.fixableIssues;
-        } else if (latestRetry?.preRepairEval?.fixableIssues) {
-          feedback.fixableIssues = latestRetry.preRepairEval.fixableIssues;
-        } else if ((scene as any).fixableIssues?.length) {
-          feedback.fixableIssues = (scene as any).fixableIssues;
-        } else if (scene.fixTargets?.length) {
-          feedback.fixableIssues = scene.fixTargets.map(t => ({
+        if (latestRetry?.postRepairEval?.fixableIssues?.length) {
+          feedback.fixableIssues.push(...latestRetry.postRepairEval.fixableIssues.map(i => ({ ...i, source: 'post-repair eval' })));
+        }
+        if (latestRetry?.preRepairEval?.fixableIssues?.length) {
+          feedback.fixableIssues.push(...latestRetry.preRepairEval.fixableIssues.map(i => ({ ...i, source: 'pre-repair eval' })));
+        }
+        if ((scene as any).fixableIssues?.length) {
+          feedback.fixableIssues.push(...(scene as any).fixableIssues.map((i: any) => ({ ...i, source: 'quality eval' })));
+        }
+        if (scene.fixTargets?.length) {
+          feedback.fixableIssues.push(...scene.fixTargets.map(t => ({
             description: t.issue || 'Quality issue detected',
             severity: 'medium',
             type: 'visual',
             fix: t.fixPrompt || '',
-          }));
+            source: 'fix targets',
+          })));
         }
 
         // Get entity issues from finalChecksReport - CHARACTERS
         if (finalChecksReport?.entity) {
           for (const [charName, charResult] of Object.entries(finalChecksReport.entity.characters || {})) {
-            // Collect issues from both new byClothing structure and legacy flat structure
+            // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
             const allIssues: typeof charResult.issues = [];
-
-            // New structure: byClothing[category].issues
-            if (charResult.byClothing) {
+            if (charResult.byClothing && Object.keys(charResult.byClothing).length > 0) {
               for (const clothingResult of Object.values(charResult.byClothing)) {
                 if (clothingResult.issues) {
                   allIssues.push(...clothingResult.issues);
                 }
               }
-            }
-
-            // Legacy structure: issues at root level
-            if (charResult.issues) {
+            } else if (charResult.issues) {
               allIssues.push(...charResult.issues);
             }
 
@@ -298,26 +298,22 @@ export function useRepairWorkflow({
                 character: charName,
                 issue: issue.description,
                 severity: issue.severity,
+                source: 'entity check',
               });
             }
           }
 
           // Get entity issues from finalChecksReport - OBJECTS
           for (const [objectName, objectResult] of Object.entries(finalChecksReport.entity.objects || {})) {
-            // Collect issues from both new byClothing structure and legacy flat structure
+            // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
             const allIssues: typeof objectResult.issues = [];
-
-            // New structure: byClothing[category].issues (objects may have this too)
-            if (objectResult.byClothing) {
+            if (objectResult.byClothing && Object.keys(objectResult.byClothing).length > 0) {
               for (const clothingResult of Object.values(objectResult.byClothing)) {
                 if (clothingResult.issues) {
                   allIssues.push(...clothingResult.issues);
                 }
               }
-            }
-
-            // Legacy structure: issues at root level
-            if (objectResult.issues) {
+            } else if (objectResult.issues) {
               allIssues.push(...objectResult.issues);
             }
 
@@ -331,6 +327,7 @@ export function useRepairWorkflow({
                 object: objectName,
                 issue: issue.description,
                 severity: issue.severity,
+                source: 'entity check',
               });
             }
           }
@@ -350,6 +347,7 @@ export function useRepairWorkflow({
                   severity: issue.severity,
                   characterInvolved: issue.characterInvolved,
                   recommendation: issue.recommendation,
+                  source: 'image checks',
                 });
               }
             }
@@ -458,6 +456,13 @@ export function useRepairWorkflow({
 
     const pagesCompleted: number[] = [];
     const newVersions: Record<number, number> = {};
+    const pageDetails: Record<number, {
+      previousScore: number | null;
+      newScore: number | null;
+      previousImage: string | null;
+      newImage: string | null;
+      blackoutImage: string | null;
+    }> = {};
 
     try {
       for (let i = 0; i < pageNumbers.length; i++) {
@@ -479,6 +484,15 @@ export function useRepairWorkflow({
             const versionIndex = (scene?.imageVersions?.length ?? 0);
             newVersions[pageNumber] = versionIndex;
 
+            // Capture before/after details for comparison display
+            pageDetails[pageNumber] = {
+              previousScore: result.previousScore ?? null,
+              newScore: result.qualityScore ?? null,
+              previousImage: result.previousImage ?? null,
+              newImage: result.imageData ?? null,
+              blackoutImage: result.blackoutImage ?? null,
+            };
+
             // Notify parent of image update
             if (onImageUpdate) {
               onImageUpdate(pageNumber, result.imageData, versionIndex);
@@ -495,6 +509,7 @@ export function useRepairWorkflow({
         redoResults: {
           pagesCompleted,
           newVersions,
+          pageDetails,
         },
         stepStatus: {
           ...prev.stepStatus,
@@ -963,6 +978,7 @@ export function useRepairWorkflow({
           redoResults: {
             pagesCompleted,
             newVersions: Object.fromEntries(Object.entries(bestResults).map(([p, r]) => [p, r.versionIndex])),
+            pageDetails: {},  // Auto-repair doesn't capture per-page details
           },
           stepStatus: { ...prev.stepStatus, 'redo-pages': 'completed' },
         }));

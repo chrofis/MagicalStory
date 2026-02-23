@@ -137,6 +137,9 @@ function PageFeedbackCard({
               <ul className="text-xs text-gray-600 space-y-1">
                 {feedback.fixableIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-1">
+                    {issue.source && (
+                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
+                    )}
                     <span className={`px-1 rounded ${
                       issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
                       issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
@@ -155,6 +158,9 @@ function PageFeedbackCard({
               <ul className="text-xs text-gray-600 space-y-1">
                 {feedback.entityIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-1">
+                    {issue.source && (
+                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
+                    )}
                     <span className="px-1 rounded bg-purple-100 text-purple-700">{issue.character}</span>
                     <span className={`px-1 rounded ${
                       issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
@@ -174,6 +180,9 @@ function PageFeedbackCard({
               <ul className="text-xs text-gray-600 space-y-1">
                 {feedback.objectIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-1">
+                    {issue.source && (
+                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
+                    )}
                     <span className="px-1 rounded bg-blue-100 text-blue-700">{issue.object}</span>
                     <span className={`px-1 rounded ${
                       issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
@@ -193,6 +202,9 @@ function PageFeedbackCard({
               <ul className="text-xs text-gray-600 space-y-1">
                 {feedback.semanticIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-1">
+                    {issue.source && (
+                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
+                    )}
                     <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.type.replace(/_/g, ' ')}</span>
                     {issue.characterInvolved && (
                       <span className="px-1 rounded bg-purple-100 text-purple-700">{issue.characterInvolved}</span>
@@ -756,12 +768,46 @@ export function RepairWorkflowPanel({
                     <h5 className="text-sm font-medium text-green-800 mb-2">
                       Completed: {workflowState.redoResults.pagesCompleted.length} pages
                     </h5>
-                    <div className="flex flex-wrap gap-2">
-                      {workflowState.redoResults.pagesCompleted.map(page => (
-                        <span key={page} className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded">
-                          Page {page} (v{workflowState.redoResults.newVersions[page] ?? '?'})
-                        </span>
-                      ))}
+                    <div className="flex flex-wrap gap-3">
+                      {workflowState.redoResults.pagesCompleted.map(page => {
+                        const detail = workflowState.redoResults.pageDetails?.[page];
+                        return (
+                          <div key={page} className="p-2 bg-green-50 border border-green-200 rounded-lg">
+                            <div className="text-xs font-medium text-green-800 mb-1">
+                              Page {page} (v{workflowState.redoResults.newVersions[page] ?? '?'})
+                            </div>
+                            {detail && (detail.previousImage || detail.newImage) ? (
+                              <div className="flex gap-2 items-end">
+                                {detail.previousImage && (
+                                  <div className="text-center">
+                                    <img src={`data:image/jpeg;base64,${detail.previousImage}`}
+                                         className="w-16 h-16 object-cover rounded cursor-pointer hover:ring-2 hover:ring-gray-400"
+                                         onClick={() => setGridLightbox(`data:image/jpeg;base64,${detail.previousImage}`)} />
+                                    <span className="text-[10px] text-gray-500">Before{detail.previousScore != null ? ` (${detail.previousScore})` : ''}</span>
+                                  </div>
+                                )}
+                                {detail.blackoutImage && (
+                                  <div className="text-center">
+                                    <img src={`data:image/jpeg;base64,${detail.blackoutImage}`}
+                                         className="w-16 h-16 object-cover rounded cursor-pointer border-2 border-purple-300 hover:ring-2 hover:ring-purple-400"
+                                         onClick={() => setGridLightbox(`data:image/jpeg;base64,${detail.blackoutImage}`)} />
+                                    <span className="text-[10px] text-purple-500">Blackout</span>
+                                  </div>
+                                )}
+                                <span className="text-gray-400 self-center">&rarr;</span>
+                                {detail.newImage && (
+                                  <div className="text-center">
+                                    <img src={`data:image/jpeg;base64,${detail.newImage}`}
+                                         className="w-16 h-16 object-cover rounded cursor-pointer hover:ring-2 hover:ring-green-400"
+                                         onClick={() => setGridLightbox(`data:image/jpeg;base64,${detail.newImage}`)} />
+                                    <span className="text-[10px] text-green-600">After{detail.newScore != null ? ` (${detail.newScore})` : ''}</span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

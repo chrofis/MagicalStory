@@ -1126,6 +1126,8 @@ export const storyService = {
     // Previous version
     previousImage?: string;
     previousScore?: number;
+    // Blackout image (masked image sent to generator, only in blackout mode)
+    blackoutImage?: string;
     // Image versions for history
     imageVersions?: Array<{
       description?: string;
@@ -1161,6 +1163,7 @@ export const storyService = {
       totalAttempts?: number;
       previousImage?: string;
       previousScore?: number;
+      blackoutImage?: string;
       imageVersions?: Array<{
         description?: string;
         prompt?: string;
