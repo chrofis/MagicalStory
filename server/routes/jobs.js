@@ -133,7 +133,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
         let emailSent = false;
         try {
           const userResult = await getDbPool().query(
-            'SELECT id, username, email FROM users WHERE id = $1',
+            'SELECT id, username, email, preferred_language FROM users WHERE id = $1',
             [userId]
           );
           if (userResult.rows.length > 0) {
@@ -148,7 +148,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
 
             const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
             console.log(`📧 Attempting to send verification email to: ${user.email}`);
-            const result = await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl);
+            const result = await email.sendEmailVerificationEmail(user.email, user.username, verifyUrl, user.preferred_language);
             if (result) {
               console.log(`📧 ✓ Verification email sent successfully to: ${user.email}`);
               emailSent = true;

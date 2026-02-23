@@ -341,7 +341,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     // Send failure emails: customer notification + admin alert
     try {
       const { sendOrderFailedEmail, sendAdminOrderFailureAlert } = require('../../email.js');
-      await sendOrderFailedEmail(customerInfo.email, customerInfo.name, error.message);
+      await sendOrderFailedEmail(customerInfo.email, customerInfo.name, error.message, customerInfo.language);
       await sendAdminOrderFailureAlert(sessionId, customerInfo.email, customerInfo.name, error.message);
     } catch (emailError) {
       log.error('❌ [BACKGROUND] Failed to send failure emails:', emailError);

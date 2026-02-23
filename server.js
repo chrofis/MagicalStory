@@ -772,6 +772,15 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             throw new Error('Invalid userId in session metadata');
           }
 
+          // Look up user's preferred language for emails
+          try {
+            const langResult = await dbPool.query('SELECT preferred_language FROM users WHERE id = $1', [userId]);
+            customerInfo.language = langResult.rows[0]?.preferred_language || 'English';
+          } catch (langErr) {
+            log.warn('⚠️ [STRIPE WEBHOOK] Failed to look up user language, defaulting to English:', langErr.message);
+            customerInfo.language = 'English';
+          }
+
           // Parse story IDs - support both new storyIds array and legacy storyId
           let allStoryIds = [];
           if (fullSession.metadata?.storyIds) {
