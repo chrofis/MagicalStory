@@ -780,26 +780,26 @@ export function RepairWorkflowPanel({
                               <div className="flex gap-2 items-end">
                                 {detail.previousImage && (
                                   <div className="text-center">
-                                    <img src={`data:image/jpeg;base64,${detail.previousImage}`}
+                                    <img src={detail.previousImage.startsWith('data:') ? detail.previousImage : `data:image/jpeg;base64,${detail.previousImage}`}
                                          className="w-16 h-16 object-cover rounded cursor-pointer hover:ring-2 hover:ring-gray-400"
-                                         onClick={() => setGridLightbox(`data:image/jpeg;base64,${detail.previousImage}`)} />
+                                         onClick={() => setGridLightbox(detail.previousImage!.startsWith('data:') ? detail.previousImage! : `data:image/jpeg;base64,${detail.previousImage}`)} />
                                     <span className="text-[10px] text-gray-500">Before{detail.previousScore != null ? ` (${detail.previousScore})` : ''}</span>
                                   </div>
                                 )}
                                 {detail.blackoutImage && (
                                   <div className="text-center">
-                                    <img src={`data:image/jpeg;base64,${detail.blackoutImage}`}
+                                    <img src={detail.blackoutImage.startsWith('data:') ? detail.blackoutImage : `data:image/jpeg;base64,${detail.blackoutImage}`}
                                          className="w-16 h-16 object-cover rounded cursor-pointer border-2 border-purple-300 hover:ring-2 hover:ring-purple-400"
-                                         onClick={() => setGridLightbox(`data:image/jpeg;base64,${detail.blackoutImage}`)} />
+                                         onClick={() => setGridLightbox(detail.blackoutImage!.startsWith('data:') ? detail.blackoutImage! : `data:image/jpeg;base64,${detail.blackoutImage}`)} />
                                     <span className="text-[10px] text-purple-500">Blackout</span>
                                   </div>
                                 )}
                                 <span className="text-gray-400 self-center">&rarr;</span>
                                 {detail.newImage && (
                                   <div className="text-center">
-                                    <img src={`data:image/jpeg;base64,${detail.newImage}`}
+                                    <img src={detail.newImage.startsWith('data:') ? detail.newImage : `data:image/jpeg;base64,${detail.newImage}`}
                                          className="w-16 h-16 object-cover rounded cursor-pointer hover:ring-2 hover:ring-green-400"
-                                         onClick={() => setGridLightbox(`data:image/jpeg;base64,${detail.newImage}`)} />
+                                         onClick={() => setGridLightbox(detail.newImage!.startsWith('data:') ? detail.newImage! : `data:image/jpeg;base64,${detail.newImage}`)} />
                                     <span className="text-[10px] text-green-600">After{detail.newScore != null ? ` (${detail.newScore})` : ''}</span>
                                   </div>
                                 )}

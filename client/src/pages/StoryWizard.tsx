@@ -3985,11 +3985,20 @@ export default function StoryWizard() {
                     // Update local state with new image version
                     setSceneImages(prev => prev.map(img => {
                       if (img.pageNumber === pageNumber) {
+                        // If no existing versions, create v0 for the original image first
+                        const existingVersions = img.imageVersions && img.imageVersions.length > 0
+                          ? img.imageVersions
+                          : [{
+                              imageData: img.imageData || '',
+                              createdAt: new Date().toISOString(),
+                              isActive: false,
+                              type: 'original' as const
+                            }];
                         return {
                           ...img,
                           imageData,
                           imageVersions: [
-                            ...(img.imageVersions || []),
+                            ...existingVersions,
                             {
                               imageData,
                               createdAt: new Date().toISOString(),
