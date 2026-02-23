@@ -176,22 +176,23 @@ export function GenerationProgress({
   // Current character display state (computed on rotation change)
   const [currentCharDisplay, setCurrentCharDisplay] = useState<{ avatarUrl: string; message: string } | null>(null);
 
-  // Get all available avatar URLs for a character (face thumbnails + full body)
+  // Get all available avatar URLs for a character (individual face + body crops, no 2x2 grids)
   const getAllAvatarUrls = (char: Character): string[] => {
     const avatars = char.avatars;
     if (!avatars) return [];
     const urls: string[] = [];
-    // Face thumbnails (all clothing variants)
+    // Face thumbnails (individual face crops)
     if (avatars.faceThumbnails) {
       for (const url of Object.values(avatars.faceThumbnails)) {
         if (url && typeof url === 'string') urls.push(url);
       }
     }
-    // Full body avatars (all clothing variants)
-    if (avatars.standard) urls.push(avatars.standard);
-    if (avatars.summer) urls.push(avatars.summer);
-    if (avatars.winter) urls.push(avatars.winter);
-    if (avatars.formal) urls.push(avatars.formal);
+    // Body thumbnails (individual full body front crops)
+    if (avatars.bodyThumbnails) {
+      for (const url of Object.values(avatars.bodyThumbnails)) {
+        if (url && typeof url === 'string') urls.push(url);
+      }
+    }
     return urls;
   };
 

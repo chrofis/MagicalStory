@@ -188,7 +188,7 @@ function createLightCharacter(char) {
       status: lightChar.avatars.status,
       stale: lightChar.avatars.stale,
       generatedAt: lightChar.avatars.generatedAt,
-      hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+      hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer),
       faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
       clothing: lightChar.avatars.clothing
     };

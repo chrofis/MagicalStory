@@ -1958,7 +1958,7 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
               status: lightChar.avatars.status,
               stale: lightChar.avatars.stale,
               generatedAt: lightChar.avatars.generatedAt,
-              hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+              hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer),
               faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
               clothing: lightChar.avatars.clothing
             };
@@ -2415,10 +2415,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         // Extract face thumbnail from 2x2 grid (same as sync endpoint)
         try {
           const splitResult = await splitGridAndExtractFace(imageData);
-          if (splitResult.success && splitResult.faceThumbnail) {
-            if (!results.faceThumbnails) results.faceThumbnails = {};
-            results.faceThumbnails[category] = splitResult.faceThumbnail;
-            log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
+          if (splitResult.success) {
+            if (splitResult.faceThumbnail) {
+              if (!results.faceThumbnails) results.faceThumbnails = {};
+              results.faceThumbnails[category] = splitResult.faceThumbnail;
+              log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
+            }
+            if (splitResult.quadrants?.bodyFront) {
+              if (!results.bodyThumbnails) results.bodyThumbnails = {};
+              results.bodyThumbnails[category] = splitResult.quadrants.bodyFront;
+              log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} body thumbnail`);
+            }
           }
         } catch (err) {
           log.warn(`[AVATAR JOB ${jobId}] Face thumbnail extraction failed for ${category}: ${err.message}`);
@@ -2651,6 +2658,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               status: 'complete',
               generatedAt: new Date().toISOString(),
               ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
+              ...(results.bodyThumbnails && { bodyThumbnails: results.bodyThumbnails }),
               ...(results.standard && { standard: results.standard }),
               ...(results.winter && { winter: results.winter }),
               ...(results.summer && { summer: results.summer }),
@@ -2663,6 +2671,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               generatedAt: newAvatarData.generatedAt,
               hasFullAvatars: true,
               faceThumbnails: results.faceThumbnails?.standard ? { standard: results.faceThumbnails.standard } : undefined,
+              bodyThumbnails: results.bodyThumbnails?.standard ? { standard: results.bodyThumbnails.standard } : undefined,
               clothing: results.clothing,
             };
 
@@ -3236,22 +3245,29 @@ These corrections OVERRIDE what is visible in the reference photo.
             const compressedSize = Math.round(compressedImage.length / 1024);
             log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated and compressed (${originalSize}KB -> ${compressedSize}KB)`);
 
-            // Extract face thumbnail from 2x2 grid for display (original image kept for generation)
+            // Extract face + body thumbnails from 2x2 grid for display (original image kept for generation)
             let faceThumbnail = null;
+            let bodyThumbnail = null;
             try {
               const splitResult = await splitGridAndExtractFace(compressedImage);
-              if (splitResult.success && splitResult.faceThumbnail) {
-                faceThumbnail = splitResult.faceThumbnail;
-                log.debug(`✅ [CLOTHING AVATARS] ${category} face thumbnail extracted`);
+              if (splitResult.success) {
+                if (splitResult.faceThumbnail) {
+                  faceThumbnail = splitResult.faceThumbnail;
+                  log.debug(`✅ [CLOTHING AVATARS] ${category} face thumbnail extracted`);
+                }
+                if (splitResult.quadrants?.bodyFront) {
+                  bodyThumbnail = splitResult.quadrants.bodyFront;
+                  log.debug(`✅ [CLOTHING AVATARS] ${category} body thumbnail extracted`);
+                }
               } else {
-                log.warn(`[CLOTHING AVATARS] Face thumbnail extraction failed for ${category}: ${splitResult.error || 'no thumbnail'}`);
+                log.warn(`[CLOTHING AVATARS] Thumbnail extraction failed for ${category}: ${splitResult.error || 'no thumbnail'}`);
               }
             } catch (splitErr) {
               log.warn(`[CLOTHING AVATARS] Split failed for ${category}:`, splitErr.message);
             }
 
-            // Return original compressed image (unchanged) + optional face thumbnail
-            return { category, prompt: avatarPrompt, imageData: compressedImage, faceThumbnail };
+            // Return original compressed image (unchanged) + optional face/body thumbnails
+            return { category, prompt: avatarPrompt, imageData: compressedImage, faceThumbnail, bodyThumbnail };
           } catch (compressErr) {
             log.warn(`[CLOTHING AVATARS] Compression failed for ${category}, using original:`, compressErr.message);
             return { category, prompt: avatarPrompt, imageData };
@@ -3277,8 +3293,8 @@ These corrections OVERRIDE what is visible in the reference photo.
     const generationTime = Date.now() - generationStart;
     log.debug(`⚡ [CLOTHING AVATARS] ${categoryCount} avatars generated in ${generationTime}ms (parallel)`);
 
-    // Store prompts, images, and face thumbnails
-    for (const { category, prompt, imageData, faceThumbnail } of generatedAvatars) {
+    // Store prompts, images, face thumbnails, and body thumbnails
+    for (const { category, prompt, imageData, faceThumbnail, bodyThumbnail } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
       if (imageData) {
         // Store original 2x2 grid image (unchanged - used for story generation)
@@ -3290,6 +3306,12 @@ These corrections OVERRIDE what is visible in the reference photo.
         if (!results.faceThumbnails) results.faceThumbnails = {};
         results.faceThumbnails[category] = faceThumbnail;
         log.debug(`📦 [CLOTHING AVATARS] Stored ${category} face thumbnail`);
+      }
+      // Store body thumbnail separately (for display only)
+      if (bodyThumbnail) {
+        if (!results.bodyThumbnails) results.bodyThumbnails = {};
+        results.bodyThumbnails[category] = bodyThumbnail;
+        log.debug(`📦 [CLOTHING AVATARS] Stored ${category} body thumbnail`);
       }
     }
 
@@ -3529,6 +3551,7 @@ These corrections OVERRIDE what is visible in the reference photo.
               status: 'complete',
               generatedAt: new Date().toISOString(),
               ...(results.faceThumbnails && { faceThumbnails: results.faceThumbnails }),
+              ...(results.bodyThumbnails && { bodyThumbnails: results.bodyThumbnails }),
               ...(results.standard && { standard: results.standard }),
               ...(results.winter && { winter: results.winter }),
               ...(results.summer && { summer: results.summer }),
@@ -3541,6 +3564,7 @@ These corrections OVERRIDE what is visible in the reference photo.
               generatedAt: newAvatarData.generatedAt,
               hasFullAvatars: true,
               faceThumbnails: results.faceThumbnails?.standard ? { standard: results.faceThumbnails.standard } : undefined,
+              bodyThumbnails: results.bodyThumbnails?.standard ? { standard: results.bodyThumbnails.standard } : undefined,
               clothing: results.clothing,
             };
 

@@ -60,7 +60,7 @@ router.get('/', authenticateToken, async (req, res) => {
                 const stdThumb = light.avatars.faceThumbnails?.standard;
                 light.avatars = {
                   status: light.avatars.status, stale: light.avatars.stale, generatedAt: light.avatars.generatedAt,
-                  hasFullAvatars: !!(light.avatars.winter || light.avatars.standard || light.avatars.summer || light.avatars.formal),
+                  hasFullAvatars: !!(light.avatars.winter || light.avatars.standard || light.avatars.summer),
                   faceThumbnails: stdThumb ? { standard: stdThumb } : undefined,
                   clothing: light.avatars.clothing
                 };
@@ -182,7 +182,7 @@ router.put('/roles', authenticateToken, async (req, res) => {
         avatars: avatars ? {
           // Don't include full avatars in metadata - use hasFullAvatars flag instead
           // Full avatars are loaded on-demand via /api/characters/:id/avatars
-          hasFullAvatars: !!(avatars.standard || avatars.winter || avatars.summer || avatars.formal),
+          hasFullAvatars: !!(avatars.standard || avatars.winter || avatars.summer),
           status: avatars.status,
           faceThumbnails: avatars.faceThumbnails,
           // Include clothing descriptions (lightweight text, needed for story generation)
@@ -540,7 +540,7 @@ router.post('/', authenticateToken, async (req, res) => {
             status: lightChar.avatars.status,
             stale: lightChar.avatars.stale,
             generatedAt: lightChar.avatars.generatedAt,
-            hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer || lightChar.avatars.formal),
+            hasFullAvatars: !!(lightChar.avatars.winter || lightChar.avatars.standard || lightChar.avatars.summer),
             // Keep only standard thumbnail for list view (~70KB per char instead of 273KB)
             faceThumbnails: standardThumb ? { standard: standardThumb } : undefined,
             // Keep clothing descriptions (small text, needed for display and preservation)

@@ -1930,12 +1930,11 @@ export function CharacterForm({
                 'storybook': { en: 'Storybook', de: 'Bilderbuch', emoji: '📖' },
               };
               const styleInfo = styleLabels[artStyle] || { en: artStyle, de: artStyle, emoji: '🎭' };
-              const clothingOrder = ['standard', 'winter', 'summer', 'formal'] as const;
+              const clothingOrder = ['standard', 'winter', 'summer'] as const;
               const clothingEmojis: Record<string, string> = {
                 'standard': '👕',
                 'winter': '❄️',
                 'summer': '☀️',
-                'formal': '👔'
               };
 
               // Get costumed avatars if they exist
@@ -2045,7 +2044,7 @@ export function CharacterForm({
             // If no avatars yet and we can generate them, save + generate
             // Otherwise just save
             // Also check if avatars are currently being generated (don't start a second generation)
-            const hasAvatars = !!(character.avatars?.winter || character.avatars?.standard || character.avatars?.summer || character.avatars?.formal);
+            const hasAvatars = !!(character.avatars?.winter || character.avatars?.standard || character.avatars?.summer);
             const isCurrentlyGenerating = character.avatars?.status === 'generating';
             if (!hasAvatars && !isCurrentlyGenerating && onSaveAndRegenerateWithTraits) {
               onSaveAndRegenerateWithTraits();
