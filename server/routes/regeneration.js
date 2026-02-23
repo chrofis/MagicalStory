@@ -51,6 +51,8 @@ const {
   generateImageCacheKey,
   buildVisualBibleGrid,
   blackoutIssueRegions,
+  enrichWithBoundingBoxes,
+  collectAllIssuesForPage,
   IMAGE_QUALITY_THRESHOLD
 } = require('../lib/images');
 const { callClaudeAPI } = require('../lib/textModels');
@@ -553,6 +555,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
         qualityScore: existingImage.qualityScore ?? null,
         qualityReasoning: existingImage.qualityReasoning || null,
         fixTargets: existingImage.fixTargets || [],
+        fixableIssues: existingImage.fixableIssues || [],
         totalAttempts: existingImage.totalAttempts || null,
         referencePhotoNames: (existingImage.referencePhotos || []).map(p => ({
           name: p.name, photoType: p.photoType,
@@ -573,6 +576,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       qualityScore: imageResult.score ?? null,
       qualityReasoning: imageResult.reasoning || null,
       fixTargets: imageResult.fixTargets || [],
+      fixableIssues: imageResult.fixableIssues || [],
       totalAttempts: imageResult.totalAttempts || null,
       referencePhotoNames: (referencePhotos || []).map(p => ({
         name: p.name, photoType: p.photoType,
@@ -1064,6 +1068,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         qualityScore: currentImage.qualityScore ?? null,
         qualityReasoning: currentImage.qualityReasoning || null,
         fixTargets: currentImage.fixTargets || [],
+        fixableIssues: currentImage.fixableIssues || [],
         totalAttempts: currentImage.totalAttempts || null,
         referencePhotoNames: (currentImage.referencePhotos || []).map(p => ({
           name: p.name, photoType: p.photoType,
@@ -1086,6 +1091,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       qualityScore: imageResult.score ?? null,
       qualityReasoning: imageResult.reasoning || null,
       fixTargets: imageResult.fixTargets || [],
+      fixableIssues: imageResult.fixableIssues || [],
       totalAttempts: imageResult.totalAttempts || null,
       referencePhotoNames: (referencePhotos || []).map(p => ({
         name: p.name, photoType: p.photoType,
@@ -2541,6 +2547,7 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
               qualityScore: scene.qualityScore,
               qualityReasoning: scene.qualityReasoning || null,
               fixTargets: scene.fixTargets || [],
+              fixableIssues: scene.fixableIssues || [],
               totalAttempts: scene.totalAttempts || null,
               referencePhotoNames: (scene.referencePhotos || []).map(p => ({
                 name: p.name, photoType: p.photoType,
@@ -2560,6 +2567,7 @@ router.post('/:id/repair-workflow/redo-pages', authenticateToken, imageRegenerat
             qualityScore: result.score,
             qualityReasoning: result.reasoning || null,
             fixTargets: result.fixTargets || [],
+            fixableIssues: result.fixableIssues || [],
             totalAttempts: result.totalAttempts || null,
           });
 
@@ -2725,6 +2733,39 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         scene.fixTargets = evaluation.fixTargets || evaluation.enrichedFixTargets || [];
         scene.fixableIssues = evaluation.fixableIssues || [];
 
+        // Collect ALL issues for this page (quality eval + entity + imageChecks + retries)
+        const allIssues = collectAllIssuesForPage(scene, storyData, pageNumber);
+
+        // Run bbox enrichment if there are any issues
+        if (allIssues.length > 0) {
+          const characterDescriptions = {};
+          for (const char of (storyData.characters || [])) {
+            characterDescriptions[char.name] = {
+              richDescription: buildCharacterPhysicalDescription(char)
+            };
+          }
+          const sceneMetadata = scene.sceneMetadata || extractSceneMetadata(scene.description || '');
+          const expectedPositions = sceneMetadata?.characterPositions || {};
+          const expectedClothing = sceneMetadata?.characterClothing || {};
+          const expectedObjects = sceneMetadata?.objects || [];
+
+          const enrichResult = await enrichWithBoundingBoxes(
+            imageData, allIssues, [], [],
+            expectedPositions, expectedObjects, characterDescriptions, expectedClothing
+          );
+          scene.fixTargets = enrichResult.targets || [];
+          scene.bboxDetection = enrichResult.detectionHistory || null;
+          log.info(`🎯 [RE-EVALUATE] Page ${pageNumber} - bbox enrichment: ${scene.fixTargets.length} targets from ${allIssues.length} issues`);
+        }
+
+        // Store combined issues + bbox results on scene and active version
+        scene.fixableIssues = allIssues;
+        const activeVersion = scene.imageVersions?.find(v => v.isActive);
+        if (activeVersion) {
+          activeVersion.fixTargets = scene.fixTargets;
+          activeVersion.fixableIssues = allIssues;
+        }
+
         pages[pageNumber] = {
           score: evaluation.score,                    // Combined final score
           qualityScore: evaluation.qualityScore ?? evaluation.score,  // Visual quality only
@@ -2733,7 +2774,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           verdict: evaluation.verdict,
           issuesSummary: evaluation.issuesSummary || '',
           reasoning: evaluation.reasoning,
-          fixableIssues: evaluation.fixableIssues || [],
+          fixableIssues: allIssues,                   // ALL sources, not just quality eval
+          fixTargets: scene.fixTargets,               // bbox-enriched
           semanticResult: evaluation.semanticResult || null
         };
       } catch (evalErr) {
@@ -3185,6 +3227,7 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
               qualityScore: scene.qualityScore,
               qualityReasoning: scene.qualityReasoning || null,
               fixTargets: scene.fixTargets || [],
+              fixableIssues: scene.fixableIssues || [],
               totalAttempts: scene.totalAttempts || null,
               referencePhotoNames: (scene.referencePhotos || []).map(p => ({
                 name: p.name, photoType: p.photoType,
@@ -3203,6 +3246,7 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
             qualityScore: repairResult.score,
             qualityReasoning: repairResult.reasoning || null,
             fixTargets: repairResult.fixTargets || [],
+            fixableIssues: repairResult.fixableIssues || [],
             totalAttempts: null,
           });
 

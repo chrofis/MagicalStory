@@ -8243,6 +8243,102 @@ async function buildVisualBibleGrid(vbElements = [], secondaryLandmarks = []) {
   }
 }
 
+/**
+ * Collect ALL fixable issues for a given page from every source:
+ * quality eval, retry history, entity consistency (characters + objects), and image checks.
+ * Returns a unified array of issue objects suitable for enrichWithBoundingBoxes.
+ */
+function collectAllIssuesForPage(scene, storyData, pageNumber) {
+  const issues = [];
+
+  // Source 1: Quality eval fixableIssues (on scene)
+  if (scene.fixableIssues?.length) {
+    issues.push(...scene.fixableIssues.map(i => ({ ...i, source: 'quality eval' })));
+  }
+
+  // Source 2: Retry history evals
+  const latestRetry = scene.retryHistory?.slice(-1)[0];
+  if (latestRetry?.postRepairEval?.fixableIssues?.length) {
+    issues.push(...latestRetry.postRepairEval.fixableIssues.map(i => ({ ...i, source: 'post-repair eval' })));
+  }
+  if (latestRetry?.preRepairEval?.fixableIssues?.length) {
+    issues.push(...latestRetry.preRepairEval.fixableIssues.map(i => ({ ...i, source: 'pre-repair eval' })));
+  }
+
+  // Source 3: Entity consistency issues (characters)
+  const entity = storyData.finalChecksReport?.entity;
+  if (entity?.characters) {
+    for (const [charName, charResult] of Object.entries(entity.characters)) {
+      const charIssues = [];
+      if (charResult.byClothing && Object.keys(charResult.byClothing).length > 0) {
+        for (const cr of Object.values(charResult.byClothing)) {
+          if (cr.issues) charIssues.push(...cr.issues);
+        }
+      } else if (charResult.issues) {
+        charIssues.push(...charResult.issues);
+      }
+      for (const issue of charIssues) {
+        if (issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+          issues.push({
+            description: issue.fixInstruction || issue.description,
+            severity: issue.severity,
+            type: 'consistency',
+            fix: issue.canonicalVersion || issue.fixInstruction || '',
+            character: charName,
+            source: 'entity check',
+          });
+        }
+      }
+    }
+  }
+
+  // Source 4: Entity consistency issues (objects)
+  if (entity?.objects) {
+    for (const [objName, objResult] of Object.entries(entity.objects)) {
+      const objIssues = [];
+      if (objResult.byClothing && Object.keys(objResult.byClothing).length > 0) {
+        for (const cr of Object.values(objResult.byClothing)) {
+          if (cr.issues) objIssues.push(...cr.issues);
+        }
+      } else if (objResult.issues) {
+        objIssues.push(...objResult.issues);
+      }
+      for (const issue of objIssues) {
+        if (issue.pagesToFix?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+          issues.push({
+            description: issue.fixInstruction || issue.description,
+            severity: issue.severity,
+            type: 'consistency',
+            fix: issue.canonicalVersion || issue.fixInstruction || '',
+            character: objName,
+            source: 'entity check',
+          });
+        }
+      }
+    }
+  }
+
+  // Source 5: Image checks (cross-page consistency)
+  if (storyData.finalChecksReport?.imageChecks) {
+    for (const check of storyData.finalChecksReport.imageChecks) {
+      for (const issue of check.issues || []) {
+        if (issue.pagesToFix?.includes(pageNumber) || issue.images?.includes(pageNumber)) {
+          issues.push({
+            description: issue.description,
+            severity: issue.severity,
+            type: issue.type || 'consistency',
+            fix: issue.recommendation || issue.description,
+            character: issue.characterInvolved || check.characterName || null,
+            source: 'image checks',
+          });
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
 module.exports = {
   // Utility functions
   hashImageData,
@@ -8313,6 +8409,9 @@ module.exports = {
   splitGridIntoReferences,
   buildReferenceSheetPrompt,
   generateReferenceSheet,
+
+  // Issue collection
+  collectAllIssuesForPage,
 
   // Constants (for external access if needed)
   IMAGE_QUALITY_THRESHOLD,

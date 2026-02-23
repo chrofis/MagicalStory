@@ -624,6 +624,14 @@ export interface ImageVersion {
   qualityScore?: number;
   qualityReasoning?: string;
   fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
+  fixableIssues?: Array<{
+    description: string;
+    severity: string;
+    type: string;
+    fix: string;
+    source?: string;
+    character?: string;
+  }>;
   totalAttempts?: number;
   referencePhotoNames?: Array<{ name: string; photoType?: string; clothingCategory?: string; clothingDescription?: string }>;
   // Entity repair specific
