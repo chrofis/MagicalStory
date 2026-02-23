@@ -17,8 +17,13 @@ const { log } = require('../utils/logger');
 const { compressImageToJPEG, callGeminiAPIForImage } = require('./images');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { buildHairDescription } = require('./storyHelpers');
-const { generateStyledCostumedAvatar } = require('../routes/avatars');
+const { generateStyledCostumedAvatar, evaluateAvatarFaceMatch } = require('../routes/avatars');
 const { getFacePhoto, getPrimaryPhoto } = require('./characterPhotos');
+
+// Quality gate constants for styled avatar evaluation
+const MAX_STYLED_AVATAR_RETRIES = 2;
+const MIN_FACE_MATCH_SCORE = 5;
+const MIN_CLOTHING_MATCH_SCORE = 5;
 
 // Art style ID to sample image file mapping
 const ART_STYLE_SAMPLES = {
@@ -266,24 +271,63 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       log.debug(`🎨 [STYLED AVATAR] Added style sample as Image ${referencePhotos.length}`);
     }
 
-    // Call image API to convert the avatar
-    // Use 'avatar' evaluation type (lightweight, no quality retry)
-    const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar');
+    // Retry loop: generate image, evaluate face/clothing match, retry if poor quality
+    let downsized = null;
+    let faceMatchScore = null;
+    let clothingMatchScore = null;
+    let successAttempt = 1;
 
-    if (!result || !result.imageData || typeof result.imageData !== 'string') {
-      throw new Error(`No valid image returned from API (got ${typeof result?.imageData})`);
+    for (let attempt = 1; attempt <= MAX_STYLED_AVATAR_RETRIES; attempt++) {
+      // Call image API to convert the avatar
+      // Use 'avatar' evaluation type (lightweight, no quality retry)
+      const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar');
+
+      if (!result || !result.imageData || typeof result.imageData !== 'string') {
+        log.warn(`⚠️ [STYLED AVATAR] No valid image returned (attempt ${attempt}/${MAX_STYLED_AVATAR_RETRIES})`);
+        continue;
+      }
+
+      // Track usage if callback provided
+      if (addUsage && result.imageUsage) {
+        addUsage('gemini_image', result.imageUsage, 'avatar_styled', result.modelId);
+      }
+
+      // Downsize the result for efficient storage (512px is enough for reference)
+      downsized = await compressImageToJPEG(result.imageData, 85, 512);
+
+      // Evaluate face/clothing match if we have a face photo to compare against
+      if (hasMultipleRefs && facePhoto) {
+        const evalResult = await evaluateAvatarFaceMatch(facePhoto, downsized, process.env.GEMINI_API_KEY, clothingDescription);
+        if (evalResult) {
+          faceMatchScore = evalResult.score || null;
+          clothingMatchScore = evalResult.clothingMatch?.score || null;
+
+          const faceFail = faceMatchScore != null && faceMatchScore < MIN_FACE_MATCH_SCORE;
+          const clothingFail = clothingMatchScore != null && clothingMatchScore < MIN_CLOTHING_MATCH_SCORE;
+
+          if ((faceFail || clothingFail) && attempt < MAX_STYLED_AVATAR_RETRIES) {
+            log.warn(`⚠️ [STYLED AVATAR] Quality gate failed for ${characterName} (attempt ${attempt}): face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10 — retrying`);
+            downsized = null; // Clear so we retry
+            continue;
+          }
+
+          if (faceFail || clothingFail) {
+            log.warn(`⚠️ [STYLED AVATAR] Quality gate failed for ${characterName} (final attempt ${attempt}): face=${faceMatchScore}/10, clothing=${clothingMatchScore}/10 — accepting`);
+          }
+        }
+      }
+
+      // Accept this result
+      successAttempt = attempt;
+      break;
     }
 
-    // Track usage if callback provided
-    if (addUsage && result.imageUsage) {
-      addUsage('gemini_image', result.imageUsage, 'avatar_styled', result.modelId);
+    if (!downsized) {
+      throw new Error(`All ${MAX_STYLED_AVATAR_RETRIES} attempts failed to produce a valid image`);
     }
-
-    // Downsize the result for efficient storage (512px is enough for reference)
-    const downsized = await compressImageToJPEG(result.imageData, 85, 512);
 
     const duration = Date.now() - startTime;
-    log.debug(`✅ [STYLED AVATAR] ${characterName} converted to ${artStyle} in ${duration}ms`);
+    log.debug(`✅ [STYLED AVATAR] ${characterName} converted to ${artStyle} in ${duration}ms${successAttempt > 1 ? ` (attempt ${successAttempt})` : ''}${faceMatchScore != null ? ` face=${faceMatchScore}/10` : ''}${clothingMatchScore != null ? ` clothing=${clothingMatchScore}/10` : ''}`);
 
     // Log generation details for developer mode auditing
     styledAvatarGenerationLog.push({
@@ -293,6 +337,9 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       clothingCategory,
       durationMs: duration,
       success: true,
+      faceMatchScore,
+      clothingMatchScore,
+      attempt: successAttempt,
       inputs: {
         facePhoto: hasMultipleRefs ? {
           identifier: getImageIdentifier(facePhoto),

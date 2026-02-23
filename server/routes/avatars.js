@@ -510,7 +510,7 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
  * Runs both Gemini LLM evaluation AND LPIPS perceptual comparison
  * Returns { score, details, physicalTraits, clothing, lpips } or null on error
  */
-async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey) {
+async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApiKey, requestedClothing = null) {
   try {
     const originalBase64 = originalPhoto.replace(/^data:image\/\w+;base64,/, '');
     const originalMime = originalPhoto.match(/^data:(image\/\w+);base64,/) ?
@@ -520,7 +520,12 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
     const avatarMime = generatedAvatar.match(/^data:(image\/\w+);base64,/) ?
       generatedAvatar.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
 
-    const evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]';
+    let evalPrompt = PROMPT_TEMPLATES.avatarEvaluation || 'Compare these two faces. Rate similarity 1-10. Output: FINAL SCORE: [number]';
+
+    // Append clothing match task when requested clothing description is provided
+    if (requestedClothing) {
+      evalPrompt += `\n\nTASK 5: CLOTHING MATCH\nThe avatar was requested to wear: "${requestedClothing}"\nScore 1-10 how well the generated avatar's clothing matches this request (10 = perfect match).\nAdd to your JSON response: "clothingMatch": {"score": 8, "reason": "explanation"}`;
+    }
 
     const requestBody = {
       contents: [{
@@ -608,6 +613,9 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       // Extract detailed hair analysis (from generated avatar)
       const detailedHairAnalysis = evalResult.detailedHairAnalysis || null;
 
+      // Extract clothing match score (only present when requestedClothing was provided)
+      const clothingMatch = evalResult.clothingMatch || null;
+
       if (typeof score === 'number' && score >= 1 && score <= 10) {
         const fm = faceMatch;
         const details = [
@@ -619,16 +627,16 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
           `Final Score: ${score}/10`
         ].join('\n');
 
-        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10, traits: ${!!physicalTraits}, clothing: ${!!clothing}, hair: ${!!detailedHairAnalysis}${lpipsResult ? `, LPIPS: ${lpipsResult.lpipsScore?.toFixed(4)}` : ''}${arcfaceResult ? `, ArcFace: ${arcfaceResult.similarity?.toFixed(4)}` : ''}`);
+        log.debug(`🔍 [AVATAR EVAL] Score: ${score}/10, traits: ${!!physicalTraits}, clothing: ${!!clothing}, hair: ${!!detailedHairAnalysis}${clothingMatch ? `, clothingMatch: ${clothingMatch.score}/10` : ''}${lpipsResult ? `, LPIPS: ${lpipsResult.lpipsScore?.toFixed(4)}` : ''}${arcfaceResult ? `, ArcFace: ${arcfaceResult.similarity?.toFixed(4)}` : ''}`);
 
-        return { score, details, physicalTraits, clothing, detailedHairAnalysis, lpips: lpipsResult, arcface: arcfaceResult, raw: evalResult };
+        return { score, details, physicalTraits, clothing, clothingMatch, detailedHairAnalysis, lpips: lpipsResult, arcface: arcfaceResult, raw: evalResult };
       }
     } catch (parseErr) {
       log.warn(`[AVATAR EVAL] JSON parse failed, trying text fallback: ${parseErr.message}`);
       const scoreMatch = responseText.match(/finalScore["']?\s*:\s*(\d+)/i);
       if (scoreMatch) {
         const score = parseInt(scoreMatch[1], 10);
-        return { score, details: responseText, physicalTraits: null, clothing: null, lpips: lpipsResult, arcface: arcfaceResult };
+        return { score, details: responseText, physicalTraits: null, clothing: null, clothingMatch: null, lpips: lpipsResult, arcface: arcfaceResult };
       }
     }
 
@@ -1396,8 +1404,9 @@ Your task is to create a 2x2 grid:
     // Evaluate face match to get clothing description (optional)
     // Use standardAvatar as reference (it contains the face we're matching against)
     let clothingDescription = null;
+    let faceMatchResult = null;
     if (ENABLE_AVATAR_EVALUATION) {
-      const faceMatchResult = await evaluateAvatarFaceMatch(standardAvatar, finalImageData, geminiApiKey);
+      faceMatchResult = await evaluateAvatarFaceMatch(standardAvatar, finalImageData, geminiApiKey);
       if (faceMatchResult?.clothing) {
         clothingDescription = faceMatchResult.clothing;
         log.debug(`👕 [STYLED COSTUME] Clothing extracted: ${JSON.stringify(clothingDescription)}`);
@@ -1416,6 +1425,7 @@ Your task is to create a 2x2 grid:
       costumeDescription: config.description || '',
       durationMs: duration,
       success: true,
+      faceMatchScore: faceMatchResult?.score || null,
       costumeEvaluation: costumeEvalResult ? {
         pass: costumeEvalResult.pass,
         confidence: costumeEvalResult.confidence,
@@ -3700,4 +3710,5 @@ module.exports.generateStyledCostumedAvatar = generateStyledCostumedAvatar;
 module.exports.generateStyledAvatarWithSignature = generateStyledAvatarWithSignature;
 module.exports.getCostumedAvatarGenerationLog = getCostumedAvatarGenerationLog;
 module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationLog;
+module.exports.evaluateAvatarFaceMatch = evaluateAvatarFaceMatch;
 module.exports.avatarJobs = avatarJobs; // Export for testing

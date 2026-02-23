@@ -28,6 +28,9 @@ interface StyledAvatarGenerationEntry {
   durationMs: number;
   success: boolean;
   error?: string;
+  faceMatchScore?: number | null;
+  clothingMatchScore?: number | null;
+  attempt?: number;
   inputs: {
     facePhoto: { identifier: string; sizeKB: number; imageData?: string } | null;
     originalAvatar: { identifier: string; sizeKB: number; imageData?: string };
@@ -46,6 +49,7 @@ interface CostumedAvatarGenerationEntry {
   durationMs: number;
   success: boolean;
   error?: string;
+  faceMatchScore?: number | null;
   inputs: {
     facePhoto?: { identifier: string; sizeKB: number; imageData?: string } | null;
     standardAvatar?: { identifier: string; sizeKB: number; imageData?: string } | null;
@@ -2158,9 +2162,28 @@ export function StoryDisplay({
                 })()}
                 {styledAvatarGeneration.map((entry, index) => (
                   <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-pink-200' : 'bg-red-50 border-red-300'}`}>
-                    <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-800 flex items-center gap-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-pink-700 hover:text-pink-800 flex items-center gap-2 flex-wrap">
                       <span className={`w-2 h-2 rounded-full ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}></span>
                       {entry.characterName} - {entry.artStyle} ({entry.clothingCategory || 'standard'})
+                      {entry.faceMatchScore != null && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          entry.faceMatchScore >= 7 ? 'bg-green-100 text-green-700' :
+                          entry.faceMatchScore >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>Face: {entry.faceMatchScore}/10</span>
+                      )}
+                      {entry.clothingMatchScore != null && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          entry.clothingMatchScore >= 7 ? 'bg-green-100 text-green-700' :
+                          entry.clothingMatchScore >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>Clothing: {entry.clothingMatchScore}/10</span>
+                      )}
+                      {entry.attempt && entry.attempt > 1 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700">
+                          Attempt {entry.attempt}
+                        </span>
+                      )}
                       <span className="text-xs text-gray-500 ml-auto">
                         {(entry.durationMs / 1000).toFixed(1)}s
                       </span>
@@ -2248,9 +2271,16 @@ export function StoryDisplay({
                 })()}
                 {costumedAvatarGeneration.map((entry, index) => (
                   <details key={index} className={`border rounded-lg p-3 ${entry.success ? 'bg-white border-orange-200' : 'bg-red-50 border-red-300'}`}>
-                    <summary className="cursor-pointer text-sm font-semibold text-orange-700 hover:text-orange-800 flex items-center gap-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-orange-700 hover:text-orange-800 flex items-center gap-2 flex-wrap">
                       <span className={`w-2 h-2 rounded-full ${entry.success ? 'bg-green-500' : 'bg-red-500'}`}></span>
                       {entry.characterName} - {entry.costumeType} ({entry.artStyle})
+                      {entry.faceMatchScore != null && (
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          entry.faceMatchScore >= 7 ? 'bg-green-100 text-green-700' :
+                          entry.faceMatchScore >= 5 ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>Face: {entry.faceMatchScore}/10</span>
+                      )}
                       <span className="text-xs text-gray-500 ml-auto">
                         {(entry.durationMs / 1000).toFixed(1)}s
                       </span>
