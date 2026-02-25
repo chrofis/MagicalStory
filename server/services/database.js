@@ -387,6 +387,15 @@ async function initializeDatabase() {
       console.log('✓ Default pricing tiers seeded');
     }
 
+    // Fix NULL page_number breaking UNIQUE constraint for covers.
+    // PostgreSQL treats NULL != NULL in UNIQUE, so ON CONFLICT never fires for covers.
+    // Replace the broken constraint with two partial unique indexes.
+    await dbPool.query(`ALTER TABLE story_images DROP CONSTRAINT IF EXISTS story_images_story_id_image_type_page_number_version_index_key`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_with_page
+      ON story_images(story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL`);
+    await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_without_page
+      ON story_images(story_id, image_type, version_index) WHERE page_number IS NULL`);
+
     console.log('✓ Database tables initialized');
 
   } catch (err) {
@@ -466,30 +475,43 @@ async function saveStoryData(storyId, storyData) {
   const dataForStorage = JSON.parse(JSON.stringify(storyData));
   let imagesSaved = 0;
 
+  // Check if this story already has images in the separate story_images table.
+  // If so, DON'T re-save v0 imageData (it would overwrite originals with rehydrated active versions).
+  // Only save NEW imageVersions entries and strip all imageData from the blob.
+  const hasSeparateImages = await hasStorySeparateImages(storyId);
+
   // Extract and save scene images to story_images table
   if (dataForStorage.sceneImages && Array.isArray(dataForStorage.sceneImages)) {
     for (const img of dataForStorage.sceneImages) {
       if (img.imageData) {
-        await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
-          qualityScore: img.qualityScore || img.score,
-          generatedAt: img.generatedAt,
-          versionIndex: 0
-        });
-        imagesSaved++;
+        if (!hasSeparateImages) {
+          // First-time extraction: save v0 to story_images
+          await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
+            qualityScore: img.qualityScore || img.score,
+            generatedAt: img.generatedAt,
+            versionIndex: 0
+          });
+          imagesSaved++;
+        }
+        // Always strip from blob
         delete img.imageData;
       }
       if (img.imageVersions && Array.isArray(img.imageVersions)) {
         for (let i = 0; i < img.imageVersions.length; i++) {
           const version = img.imageVersions[i];
           if (version.imageData) {
-            await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
-              qualityScore: version.qualityScore || version.score,
-              generatedAt: version.generatedAt,
-              versionIndex: arrayToDbIndex(i, 'scene')
-            });
-            imagesSaved++;
+            // Skip versions that were rehydrated from DB (marked by rehydrateStoryImages)
+            if (!version._rehydrated) {
+              await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
+                qualityScore: version.qualityScore || version.score,
+                generatedAt: version.generatedAt,
+                versionIndex: arrayToDbIndex(i, 'scene')
+              });
+              imagesSaved++;
+            }
             delete version.imageData;
           }
+          delete version._rehydrated;
         }
       }
 
@@ -525,15 +547,17 @@ async function saveStoryData(storyId, storyData) {
     }
     const coverData = dataForStorage.coverImages?.[coverType];
     if (coverData) {
-      // Save main imageData as version 0 (for backwards compatibility)
-      const imageData = coverData.imageData;
-      if (imageData) {
-        await saveStoryImage(storyId, coverType, null, imageData, {
-          qualityScore: coverData.qualityScore || null,
-          generatedAt: coverData.generatedAt || null,
-          versionIndex: 0
-        });
-        imagesSaved++;
+      if (coverData.imageData) {
+        if (!hasSeparateImages) {
+          // First-time extraction: save v0 to story_images
+          await saveStoryImage(storyId, coverType, null, coverData.imageData, {
+            qualityScore: coverData.qualityScore || null,
+            generatedAt: coverData.generatedAt || null,
+            versionIndex: 0
+          });
+          imagesSaved++;
+        }
+        // Always strip from blob
         delete coverData.imageData;
       }
 
@@ -542,19 +566,18 @@ async function saveStoryData(storyId, storyData) {
         for (let i = 0; i < coverData.imageVersions.length; i++) {
           const version = coverData.imageVersions[i];
           if (version.imageData) {
-            // Save each version with its index
-            // Note: version 0 is the main image (already saved above), versions 1+ are regenerations
-            // However, the regeneration endpoint saves new versions separately with setActiveVersion
-            // Here we just strip the imageData from blob while ensuring versions are in story_images
-            await saveStoryImage(storyId, coverType, null, version.imageData, {
-              qualityScore: version.qualityScore,
-              generatedAt: version.createdAt || version.generatedAt,
-              versionIndex: arrayToDbIndex(i, coverType)
-            });
-            imagesSaved++;
-            // Strip imageData from version but keep metadata
+            // Skip versions that were rehydrated from DB (marked by rehydrateStoryImages)
+            if (!version._rehydrated) {
+              await saveStoryImage(storyId, coverType, null, version.imageData, {
+                qualityScore: version.qualityScore,
+                generatedAt: version.createdAt || version.generatedAt,
+                versionIndex: arrayToDbIndex(i, coverType)
+              });
+              imagesSaved++;
+            }
             delete version.imageData;
           }
+          delete version._rehydrated;
         }
       }
     }
@@ -590,6 +613,7 @@ async function updateStoryDataOnly(storyId, storyData) {
       if (img.imageVersions && Array.isArray(img.imageVersions)) {
         for (const version of img.imageVersions) {
           delete version.imageData;
+          delete version._rehydrated;
         }
       }
       // Strip retry history images (they're already in story_retry_images)
@@ -620,6 +644,12 @@ async function updateStoryDataOnly(storyId, storyData) {
     if (dataForStorage.coverImages?.[coverType]) {
       dataForStorage.coverImages[coverType] = normalizeCoverValue(dataForStorage.coverImages[coverType]);
       delete dataForStorage.coverImages[coverType].imageData;
+      // Strip _rehydrated flags from cover versions
+      if (dataForStorage.coverImages[coverType].imageVersions) {
+        for (const version of dataForStorage.coverImages[coverType].imageVersions) {
+          delete version._rehydrated;
+        }
+      }
     }
   }
 
@@ -758,13 +788,25 @@ async function saveStoryImage(storyId, imageType, pageNumber, imageData, options
 
   const { qualityScore = null, generatedAt = null, versionIndex = 0 } = options;
 
-  await dbQuery(
-    `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, quality_score, generated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (story_id, image_type, page_number, version_index)
-     DO UPDATE SET image_data = EXCLUDED.image_data, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
-    [storyId, imageType, pageNumber, versionIndex, imageData, qualityScore, generatedAt]
-  );
+  if (pageNumber == null) {
+    // Covers: use partial index ON CONFLICT for NULL page_number
+    await dbQuery(
+      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, quality_score, generated_at)
+       VALUES ($1, $2, NULL, $3, $4, $5, $6)
+       ON CONFLICT (story_id, image_type, version_index) WHERE page_number IS NULL
+       DO UPDATE SET image_data = EXCLUDED.image_data, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
+      [storyId, imageType, versionIndex, imageData, qualityScore, generatedAt]
+    );
+  } else {
+    // Scenes: use partial index ON CONFLICT for non-NULL page_number
+    await dbQuery(
+      `INSERT INTO story_images (story_id, image_type, page_number, version_index, image_data, quality_score, generated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL
+       DO UPDATE SET image_data = EXCLUDED.image_data, quality_score = EXCLUDED.quality_score, generated_at = EXCLUDED.generated_at`,
+      [storyId, imageType, pageNumber, versionIndex, imageData, qualityScore, generatedAt]
+    );
+  }
 }
 
 /**
@@ -1062,33 +1104,7 @@ async function rehydrateStoryImages(storyId, storyData) {
     [storyId]
   );
 
-  // Also load active versions from image_version_meta
-  const metaResult = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
-  const versionMeta = metaResult[0]?.image_version_meta || {};
-
-  // For pages/covers with non-zero active version, load that version's image instead
-  const coverTypes = ['frontCover', 'backCover', 'initialPage'];
-  for (const [key, meta] of Object.entries(versionMeta)) {
-    if (meta.activeVersion && meta.activeVersion > 0) {
-      const isCover = coverTypes.includes(key);
-      const activeImg = await dbQuery(
-        `SELECT image_data FROM story_images
-         WHERE story_id = $1 AND image_type = $2 AND ${isCover ? 'page_number IS NULL' : 'page_number = $3'} AND version_index = $${isCover ? '3' : '4'}`,
-        isCover ? [storyId, key, meta.activeVersion] : [storyId, 'scene', parseInt(key), meta.activeVersion]
-      );
-      if (activeImg.length > 0) {
-        // Replace the main image entry with the active version
-        const existing = isCover
-          ? images.find(i => i.image_type === key)
-          : images.find(i => i.image_type === 'scene' && i.page_number === parseInt(key));
-        if (existing) {
-          existing.image_data = activeImg[0].image_data;
-        }
-      }
-    }
-  }
-
-  // Load ALL version images for populating imageVersions arrays
+  // Load ALL version images (used for imageVersions population AND active overrides)
   const allVersionImages = await dbQuery(
     `SELECT image_type, page_number, version_index, image_data
      FROM story_images WHERE story_id = $1
@@ -1096,12 +1112,41 @@ async function rehydrateStoryImages(storyId, storyData) {
     [storyId]
   );
 
+  // Load active versions from image_version_meta
+  const metaResult = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [storyId]);
+  const versionMeta = metaResult[0]?.image_version_meta || {};
+
+  // Build a map of active overrides (keyed by "type:page" or "type:null" for covers).
+  // This avoids mutating the v0 entries in the images array, which would cause
+  // saveStoryData to overwrite the original v0 with the active version's data.
+  // Derived from allVersionImages (already loaded) to avoid N extra queries.
+  const activeOverrides = {};
+  const coverTypes = ['frontCover', 'backCover', 'initialPage'];
+  for (const [key, meta] of Object.entries(versionMeta)) {
+    if (meta.activeVersion && meta.activeVersion > 0) {
+      const isCover = coverTypes.includes(key);
+      const activeImg = isCover
+        ? allVersionImages.find(i => i.image_type === key && i.page_number == null && i.version_index === meta.activeVersion)
+        : allVersionImages.find(i => i.image_type === 'scene' && i.page_number === parseInt(key) && i.version_index === meta.activeVersion);
+      if (activeImg) {
+        const overrideKey = isCover ? `${key}:null` : `scene:${parseInt(key)}`;
+        activeOverrides[overrideKey] = activeImg.image_data;
+      }
+    }
+  }
+
   // Populate sceneImages
   if (storyData.sceneImages) {
     for (const scene of storyData.sceneImages) {
       if (!scene.imageData) {
-        const img = images.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
-        if (img) scene.imageData = img.image_data;
+        // Use active override if available, otherwise use v0
+        const overrideKey = `scene:${scene.pageNumber}`;
+        if (activeOverrides[overrideKey]) {
+          scene.imageData = activeOverrides[overrideKey];
+        } else {
+          const img = images.find(i => i.image_type === 'scene' && i.page_number === scene.pageNumber);
+          if (img) scene.imageData = img.image_data;
+        }
       }
 
       // Populate imageVersions with their imageData from database
@@ -1116,6 +1161,7 @@ async function rehydrateStoryImages(storyId, storyData) {
             );
             if (versionImg) {
               version.imageData = versionImg.image_data;
+              version._rehydrated = true; // Mark so saveStoryData won't re-save to DB
             }
           }
         }
@@ -1132,9 +1178,15 @@ async function rehydrateStoryImages(storyId, storyData) {
       const cover = storyData.coverImages[coverType];
 
       if (cover && !getCoverData(cover)) {
-        const img = images.find(i => i.image_type === coverType);
-        if (img) {
-          cover.imageData = img.image_data;
+        // Use active override if available, otherwise use v0
+        const overrideKey = `${coverType}:null`;
+        if (activeOverrides[overrideKey]) {
+          cover.imageData = activeOverrides[overrideKey];
+        } else {
+          const img = images.find(i => i.image_type === coverType);
+          if (img) {
+            cover.imageData = img.image_data;
+          }
         }
       }
 
@@ -1150,6 +1202,7 @@ async function rehydrateStoryImages(storyId, storyData) {
             );
             if (versionImg) {
               version.imageData = versionImg.image_data;
+              version._rehydrated = true; // Mark so saveStoryData won't re-save to DB
             }
           }
         }

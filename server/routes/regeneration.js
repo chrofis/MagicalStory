@@ -1768,6 +1768,12 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
       };
     }
 
+    // Persist edited image directly to story_images (saveStoryData won't re-save v0)
+    await saveStoryImage(id, 'scene', pageNumber, editResult.imageData, {
+      qualityScore,
+      versionIndex: 0
+    });
+
     // Save updated story with metadata
     storyData.sceneImages = sceneImages;
     await saveStoryData(id, storyData);
@@ -1997,6 +2003,13 @@ router.post('/:id/repair/image/:pageNum', authenticateToken, imageRegenerationLi
         repairHistory: allRepairHistory,
         repairedAt: anyRepaired ? new Date().toISOString() : currentScene.repairedAt
       };
+
+      // Persist repaired image directly to story_images (saveStoryData won't re-save v0)
+      if (anyRepaired) {
+        const lastEntry = newRetryEntries[newRetryEntries.length - 1];
+        const repairScore = lastEntry?.postRepairScore || null;
+        await saveStoryImage(id, 'scene', pageNumber, currentImageData, { qualityScore: repairScore, versionIndex: 0 });
+      }
 
       // Save updated story
       storyData.sceneImages = sceneImages;
@@ -3393,6 +3406,12 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
       } : {})
     };
     coverImages[coverKey] = updatedCover;
+
+    // Persist edited cover image directly to story_images (saveStoryData won't re-save v0)
+    await saveStoryImage(id, coverKey, null, editResult.imageData, {
+      qualityScore,
+      versionIndex: 0
+    });
 
     // Save updated story with metadata
     storyData.coverImages = coverImages;
