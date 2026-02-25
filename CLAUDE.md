@@ -8,6 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **No Laziness**: Find root causes. No temporary fixes. Senior developer standards.
 - **Minimal Impact**: Changes should only touch what's necessary. Avoid introducing bugs.
 
+## Memory Safety (16GB System)
+
+- **NEVER run 3D mesh generation scripts locally** (TRELLIS, TripoSG, Hunyuan3D, trimesh heavy ops). This system only has 16GB RAM and will BSOD.
+- **Always use remote APIs** for 3D work: Tripo3D API, Hugging Face Spaces (ZeroGPU).
+- **Before launching any Python script**, consider its memory footprint. If it loads large ML models or processes 3D meshes, it MUST run remotely.
+- **Max local Python memory**: If a local Python script is necessary, limit it with `resource.setrlimit` or launch with a memory cap.
+
 ## Working Principles
 
 ### 1. Plan Mode Default
