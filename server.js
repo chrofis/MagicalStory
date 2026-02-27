@@ -4392,6 +4392,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.finalize();
     log.debug(`📊 [UNIFIED] genLog now has ${genLog.getEntries().length} entries (including API usage)`);
 
+    // Compute quality aggregates for analytics
+    const qualityScores = allImages
+      .map(img => img.qualityScore)
+      .filter(s => s != null && !isNaN(s));
+    const avgQualityScore = qualityScores.length > 0
+      ? Math.round(qualityScores.reduce((a, b) => a + b, 0) / qualityScores.length)
+      : null;
+    const minQualityScore = qualityScores.length > 0 ? Math.min(...qualityScores) : null;
+    const maxQualityScore = qualityScores.length > 0 ? Math.max(...qualityScores) : null;
+    const firstAttemptPassRate = allImages.length > 0
+      ? Math.round(allImages.filter(img => !img.totalAttempts || img.totalAttempts <= 1).length / allImages.length * 100)
+      : null;
+    const totalRetries = allImages.reduce((sum, img) => sum + Math.max(0, (img.totalAttempts || 1) - 1), 0);
+    const pagesWithIssues = qualityScores.filter(s => s < 70).length;
+    const contentBlocked = allImages.reduce((sum, img) =>
+      sum + (img.retryHistory?.filter(r => r.blocked)?.length || 0), 0);
+
     // Save story to stories table so it appears in My Stories
     const storyId = jobId; // Use jobId as storyId for consistency
     const storyData = {
@@ -4432,6 +4449,45 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       tokenUsage: JSON.parse(JSON.stringify(tokenUsage, (k, v) => v instanceof Set ? [...v] : v)), // Token usage (Sets to Arrays)
       generationLog: genLog.getEntries(), // Generation log for dev mode
       finalChecksReport: finalChecksReport || null, // Final consistency checks report (dev mode)
+      analytics: {
+        // Cost
+        totalCost,
+        // Timing (ms)
+        totalDurationMs: timing.end - timing.start,
+        storyGenDurationMs: timing.storyGenEnd - timing.storyGenStart,
+        imagesDurationMs: timing.pagesEnd - timing.pagesStart,
+        coversDurationMs: timing.coversEnd ? timing.coversEnd - (timing.coversStart || timing.storyGenEnd) : null,
+        // Quality
+        avgQualityScore,
+        minQualityScore,
+        maxQualityScore,
+        firstAttemptPassRate,
+        totalRetries,
+        pagesWithIssues,
+        contentBlocked,
+        // Counts
+        characterCount: (inputData.characters || []).length,
+        sceneCount: allImages.length,
+        coverCount: Object.keys(coverImages || {}).filter(k => coverImages[k]?.imageData || coverImages[k]?.hasImage).length,
+        // Pipeline config
+        pipelineConfig: {
+          enableQualityRetry,
+          enableAutoRepair,
+          useGridRepair,
+          enableFinalChecks,
+          separatedEvaluation,
+          enableSceneValidation,
+          incrementalConsistency: !!incrementalConsistencyConfig,
+          checkOnlyMode,
+        },
+        // Models used
+        models: {
+          text: unifiedModelId,
+          image: byFunc.page_images?.models ? Array.from(byFunc.page_images.models) : [],
+          quality: byFunc.page_quality?.models ? Array.from(byFunc.page_quality.models) : [],
+          sceneExpansion: byFunc.scene_expansion?.models ? Array.from(byFunc.scene_expansion.models) : [],
+        },
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };

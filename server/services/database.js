@@ -458,6 +458,15 @@ function buildStoryMetadata(story) {
     sceneCount,
     hasThumbnail,
     characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
+    // Analytics fields for fast filtering/aggregation
+    artStyle: story.artStyle,
+    storyType: story.storyType,
+    storyCategory: story.storyCategory,
+    season: story.season,
+    characterCount: (story.characters || []).length,
+    totalCost: story.analytics?.totalCost ?? null,
+    avgQualityScore: story.analytics?.avgQualityScore ?? null,
+    totalDurationMs: story.analytics?.totalDurationMs ?? null,
   };
 }
 
