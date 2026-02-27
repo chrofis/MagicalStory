@@ -1110,6 +1110,7 @@ class UnifiedStoryParser {
       this._cache.title = match[1].trim()
         .replace(/^\*{1,2}|\*{1,2}$/g, '')  // Strip markdown bold
         .replace(/^#+\s*/, '')               // Strip heading markers
+        .replace(/^TITLE:\s*/i, '')          // Strip TITLE: prefix (when inside bold markers)
         .trim();
       log.debug(`[UNIFIED-PARSER] Title: "${this._cache.title}"`);
       return this._cache.title;
@@ -1582,7 +1583,10 @@ class ProgressiveUnifiedParser {
 
     const match = this.fullText.match(/---\s*TITLE\s*---\s*(?:TITLE:\s*)?(.+?)(?:\n|---\s*CLOTHING)/i);
     if (match) {
-      const title = match[1].trim();
+      const title = match[1].trim()
+        .replace(/^\*{1,2}|\*{1,2}$/g, '')  // Strip markdown bold
+        .replace(/^TITLE:\s*/i, '')          // Strip TITLE: prefix (when inside bold markers)
+        .trim();
       this.emitted.title = true;
       log.debug(`🌊 [STREAM-UNIFIED] Title detected: "${title}"`);
 
