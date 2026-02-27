@@ -509,6 +509,74 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
 }
 
 /**
+ * Consensus voting across photo traits (ground truth) and multiple avatar evaluations.
+ * Face-related fields use majority vote with photo as tiebreaker.
+ * Clothing stays from avatar evals (handled separately).
+ *
+ * @param {Object} photoTraits - Traits extracted from original photo via extractTraitsWithGemini
+ * @param {Object[]} avatarTraitsArray - Array of physicalTraits from avatar evaluations
+ * @returns {{ traits: Object, sources: Object }} Merged traits + per-field source info
+ */
+function consensusTraits(photoTraits, avatarTraitsArray) {
+  // Face-related fields that use consensus voting
+  const CONSENSUS_FIELDS = [
+    'apparentAge', 'build', 'skinTone', 'eyeColor',
+    'hairColor', 'hairDensity', 'hairLength', 'hairStyle', 'facialHair'
+  ];
+
+  // Fields that just copy from photo (no avatar equivalent or photo is definitive)
+  const PHOTO_ONLY_FIELDS = ['face', 'other'];
+
+  // Fields that copy best value available (hex codes — take from photo if available)
+  const HEX_FIELDS = ['skinToneHex', 'eyeColorHex', 'hairColorHex'];
+
+  const result = {};
+  const sources = {}; // Track which source won for each field
+
+  for (const field of CONSENSUS_FIELDS) {
+    const votes = [];
+    if (photoTraits?.[field]) votes.push({ value: photoTraits[field], source: 'photo' });
+    for (const avatarTraits of avatarTraitsArray) {
+      if (avatarTraits?.[field]) votes.push({ value: avatarTraits[field], source: 'avatar' });
+    }
+
+    if (votes.length === 0) continue;
+
+    // Count occurrences of each value
+    const counts = {};
+    for (const { value } of votes) {
+      counts[value] = (counts[value] || 0) + 1;
+    }
+
+    // Find majority (most common value)
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    const topValue = sorted[0][0];
+    const topCount = sorted[0][1];
+
+    // If tie, photo value wins (ground truth)
+    if (sorted.length > 1 && topCount === sorted[1][1] && photoTraits?.[field]) {
+      result[field] = photoTraits[field];
+      sources[field] = 'photo (tiebreaker)';
+    } else {
+      result[field] = topValue;
+      sources[field] = topCount >= 3 ? 'consensus' : (topValue === photoTraits?.[field] ? 'photo' : 'avatar');
+    }
+  }
+
+  // Photo-only fields
+  for (const field of PHOTO_ONLY_FIELDS) {
+    if (photoTraits?.[field]) result[field] = photoTraits[field];
+  }
+
+  // Hex fields — prefer photo
+  for (const field of HEX_FIELDS) {
+    result[field] = photoTraits?.[field] || avatarTraitsArray.find(a => a?.[field])?.[field];
+  }
+
+  return { traits: result, sources };
+}
+
+/**
  * Evaluate face match between original photo and generated avatar
  * Also extracts physical traits and clothing from the generated avatar
  * Runs both Gemini LLM evaluation AND LPIPS perceptual comparison
@@ -2447,12 +2515,23 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       job.message = 'Extracting traits and clothing...';
 
       try {
+        // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
+        const photoTraitsPromise = extractTraitsWithGemini(facePhoto);
+
         // Evaluate all avatars in parallel
         const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
           const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
           return { category, faceMatchResult };
         });
-        const evalResults = await Promise.all(evalPromises);
+
+        // Wait for both photo analysis and avatar evaluations (zero added latency)
+        const [photoTraitsResult, ...evalResults] = await Promise.all([
+          photoTraitsPromise,
+          ...evalPromises
+        ]);
+
+        // Collect physical traits from ALL avatar evaluations for consensus voting
+        const allAvatarTraits = [];
 
         // Process results for each category
         for (const { category, faceMatchResult } of evalResults) {
@@ -2491,26 +2570,50 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
             log.debug(`👕 [AVATAR JOB] ${category} clothing: ${results.clothing[category]}`);
           }
 
-          // Only extract physical traits from standard avatar (same traits for all)
-          if (category === 'standard' && faceMatchResult.physicalTraits) {
-            results.extractedTraits = faceMatchResult.physicalTraits;
-            // Normalize apparentAge field names
-            if (!results.extractedTraits.apparentAge) {
-              if (results.extractedTraits.apparent_age) {
-                results.extractedTraits.apparentAge = results.extractedTraits.apparent_age;
-                delete results.extractedTraits.apparent_age;
-                log.debug(`📋 [AVATAR JOB] Normalized 'apparent_age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
-              } else if (results.extractedTraits.age) {
-                results.extractedTraits.apparentAge = results.extractedTraits.age;
-                delete results.extractedTraits.age;
-                log.debug(`📋 [AVATAR JOB] Normalized 'age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
-              }
+          // Collect physical traits from ALL categories for consensus voting
+          if (faceMatchResult.physicalTraits) {
+            // Normalize apparentAge field names before collecting
+            const traits = { ...faceMatchResult.physicalTraits };
+            if (!traits.apparentAge) {
+              if (traits.apparent_age) { traits.apparentAge = traits.apparent_age; delete traits.apparent_age; }
+              else if (traits.age) { traits.apparentAge = traits.age; delete traits.age; }
             }
-            if (faceMatchResult.detailedHairAnalysis) {
-              results.extractedTraits.detailedHairAnalysis = faceMatchResult.detailedHairAnalysis;
-            }
-            log.debug(`📋 [AVATAR JOB] Extracted traits: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
+            allAvatarTraits.push(traits);
           }
+        }
+
+        // Apply consensus voting: photo traits (ground truth) + all avatar traits
+        const photoTraits = photoTraitsResult?.traits || {};
+        // Normalize photo trait field names (character-analysis.txt uses 'age' for numeric, 'apparentAge' for category)
+        if (!photoTraits.apparentAge && photoTraits.apparent_age) {
+          photoTraits.apparentAge = photoTraits.apparent_age;
+          delete photoTraits.apparent_age;
+        }
+        // Map 'distinctive markings' to 'other' for consensus compatibility
+        if (photoTraits['distinctive markings'] && !photoTraits.other) {
+          photoTraits.other = photoTraits['distinctive markings'];
+        }
+
+        if (allAvatarTraits.length > 0 || Object.keys(photoTraits).length > 0) {
+          const { traits: consensusResult, sources } = consensusTraits(photoTraits, allAvatarTraits);
+          results.extractedTraits = consensusResult;
+          results.traitSources = sources; // For debugging
+
+          // Use detailedHairAnalysis from photo (ground truth), fall back to avatar
+          results.extractedTraits.detailedHairAnalysis =
+            photoTraitsResult?.detailedHairAnalysis ||
+            photoTraitsResult?.traits?.detailedHairAnalysis ||
+            evalResults.find(r => r.faceMatchResult?.detailedHairAnalysis)?.faceMatchResult.detailedHairAnalysis;
+
+          // Log consensus decisions where photo won (highlights "beautification" corrections)
+          for (const [field, source] of Object.entries(sources)) {
+            if (source.includes('photo')) {
+              log.info(`📋 [CONSENSUS] ${field}: "${consensusResult[field]}" (${source})`);
+            }
+          }
+          log.debug(`📋 [AVATAR JOB] Consensus traits: apparentAge=${consensusResult.apparentAge}, build=${consensusResult.build}, hairDensity=${consensusResult.hairDensity || 'N/A'}`);
+        } else {
+          log.warn(`📋 [AVATAR JOB ${jobId}] No traits from photo or avatars — skipping consensus`);
         }
 
         // Auto-retry categories with low face scores
@@ -2809,6 +2912,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               if (t.hairColor) physical.hairColor = t.hairColor;
               if (t.hairLength) physical.hairLength = t.hairLength;
               if (t.hairStyle) physical.hairStyle = t.hairStyle;
+              if (t.hairDensity) physical.hairDensity = t.hairDensity;
               if (t.skinTone) physical.skinTone = t.skinTone;
               if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
               if (t.facialHair) physical.facialHair = t.facialHair;
@@ -3427,13 +3531,25 @@ These corrections OVERRIDE what is visible in the reference photo.
     if (avatarsToEvaluate.length > 0) {
       log.debug(`🔍 [CLOTHING AVATARS] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
       const evalStart = Date.now();
+
+      // Extract traits from ORIGINAL PHOTO (ground truth for face) in parallel with avatar evals
+      const photoTraitsPromise = extractTraitsWithGemini(facePhoto);
+
       const evalPromises = avatarsToEvaluate.map(async ({ category, imageData }) => {
         const faceMatchResult = await evaluateAvatarFaceMatch(facePhoto, imageData, geminiApiKey);
         return { category, faceMatchResult };
       });
-      const evalResults = await Promise.all(evalPromises);
+
+      // Wait for both photo analysis and avatar evaluations (zero added latency)
+      const [photoTraitsResult, ...evalResults] = await Promise.all([
+        photoTraitsPromise,
+        ...evalPromises
+      ]);
       const evalTime = Date.now() - evalStart;
       log.debug(`⚡ [CLOTHING AVATARS] All evaluations completed in ${evalTime}ms (parallel)`);
+
+      // Collect physical traits from ALL avatar evaluations for consensus voting
+      const allAvatarTraits = [];
 
       // Store evaluation results
       for (const { category, faceMatchResult } of evalResults) {
@@ -3449,30 +3565,14 @@ These corrections OVERRIDE what is visible in the reference photo.
             results.rawEvaluation = faceMatchResult.raw;
           }
 
-          // Store extracted physical traits (from generated avatar - reflects user corrections)
-          if (faceMatchResult.physicalTraits && !results.extractedTraits) {
-            results.extractedTraits = faceMatchResult.physicalTraits;
-            // Normalize apparentAge: AI might return different field names
-            // Handle: 'apparent_age' (snake_case) or 'age' instead of 'apparentAge'
-            if (!results.extractedTraits.apparentAge) {
-              if (results.extractedTraits.apparent_age) {
-                // AI returned snake_case version
-                results.extractedTraits.apparentAge = results.extractedTraits.apparent_age;
-                delete results.extractedTraits.apparent_age;
-                log.debug(`📋 [AVATAR EVAL] Normalized 'apparent_age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
-              } else if (results.extractedTraits.age) {
-                // AI returned simple 'age'
-                results.extractedTraits.apparentAge = results.extractedTraits.age;
-                delete results.extractedTraits.age;
-                log.debug(`📋 [AVATAR EVAL] Normalized 'age' to 'apparentAge': ${results.extractedTraits.apparentAge}`);
-              }
+          // Collect physical traits from ALL categories for consensus voting
+          if (faceMatchResult.physicalTraits) {
+            const traits = { ...faceMatchResult.physicalTraits };
+            if (!traits.apparentAge) {
+              if (traits.apparent_age) { traits.apparentAge = traits.apparent_age; delete traits.apparent_age; }
+              else if (traits.age) { traits.apparentAge = traits.age; delete traits.age; }
             }
-            // Include detailed hair analysis if available
-            if (faceMatchResult.detailedHairAnalysis) {
-              results.extractedTraits.detailedHairAnalysis = faceMatchResult.detailedHairAnalysis;
-              log.debug(`💇 [AVATAR EVAL] Stored detailed hair: lengthTop=${faceMatchResult.detailedHairAnalysis.lengthTop}, lengthSides=${faceMatchResult.detailedHairAnalysis.lengthSides}, bangs=${faceMatchResult.detailedHairAnalysis.bangsEndAt}`);
-            }
-            log.debug(`📋 [AVATAR EVAL] Extracted traits from avatar: apparentAge=${results.extractedTraits.apparentAge}, build=${results.extractedTraits.build}`);
+            allAvatarTraits.push(traits);
           }
 
           // Store structured clothing (from generated avatar)
@@ -3500,6 +3600,37 @@ These corrections OVERRIDE what is visible in the reference photo.
 
           log.debug(`🔍 [AVATAR EVAL] ${category} score: ${faceMatchResult.score}/10`);
         }
+      }
+
+      // Apply consensus voting: photo traits (ground truth) + all avatar traits
+      const photoTraits = photoTraitsResult?.traits || {};
+      if (!photoTraits.apparentAge && photoTraits.apparent_age) {
+        photoTraits.apparentAge = photoTraits.apparent_age;
+        delete photoTraits.apparent_age;
+      }
+      if (photoTraits['distinctive markings'] && !photoTraits.other) {
+        photoTraits.other = photoTraits['distinctive markings'];
+      }
+
+      if (allAvatarTraits.length > 0 || Object.keys(photoTraits).length > 0) {
+        const { traits: consensusResult, sources } = consensusTraits(photoTraits, allAvatarTraits);
+        results.extractedTraits = consensusResult;
+        results.traitSources = sources;
+
+        // Use detailedHairAnalysis from photo (ground truth), fall back to avatar
+        results.extractedTraits.detailedHairAnalysis =
+          photoTraitsResult?.detailedHairAnalysis ||
+          photoTraitsResult?.traits?.detailedHairAnalysis ||
+          evalResults.find(r => r.faceMatchResult?.detailedHairAnalysis)?.faceMatchResult.detailedHairAnalysis;
+
+        for (const [field, source] of Object.entries(sources)) {
+          if (source.includes('photo')) {
+            log.info(`📋 [CONSENSUS] ${field}: "${consensusResult[field]}" (${source})`);
+          }
+        }
+        log.debug(`📋 [CLOTHING AVATARS] Consensus traits: apparentAge=${consensusResult.apparentAge}, build=${consensusResult.build}, hairDensity=${consensusResult.hairDensity || 'N/A'}`);
+      } else {
+        log.warn(`📋 [CLOTHING AVATARS] No traits from photo or avatars — skipping consensus`);
       }
 
       // PHASE 2b: Auto-retry categories with low face scores
@@ -3780,6 +3911,7 @@ These corrections OVERRIDE what is visible in the reference photo.
               if (t.hairColor) physical.hairColor = t.hairColor;
               if (t.hairLength) physical.hairLength = t.hairLength;
               if (t.hairStyle) physical.hairStyle = t.hairStyle;
+              if (t.hairDensity) physical.hairDensity = t.hairDensity;
               if (t.skinTone) physical.skinTone = t.skinTone;
               if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
               if (t.facialHair) physical.facialHair = t.facialHair;

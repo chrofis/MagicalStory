@@ -46,6 +46,7 @@ Return a JSON object with this EXACT structure:
     "eyeColorHex": "<iris color as HEX code, e.g. '#6B4423'>",
     "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
     "hairColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
+    "hairDensity": "<MUST be one of: full | thinning | balding | bald>",
     "hairLength": "<MUST be one of: bald | balding | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
     "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
     "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
