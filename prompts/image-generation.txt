@@ -1,4 +1,4 @@
-Generate a SINGLE illustration. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, or watermarks to the image.
+Generate a SINGLE illustration. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, signatures, or watermarks to the image.
 
 {CHARACTER_REFERENCE_LIST}
 
