@@ -455,11 +455,11 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
           }],
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 2048,
+            maxOutputTokens: 4096,
             responseMimeType: 'application/json'
           }
         }),
-        signal: AbortSignal.timeout(20000)
+        signal: AbortSignal.timeout(30000)
       }
     );
 
@@ -484,7 +484,6 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const result = JSON.parse(jsonMatch[0]);
-        // Always include raw response for debugging
         const rawResponse = text;
         if (result.traits) {
           log.debug('📸 [GEMINI] Extracted traits:', result.traits);
@@ -494,14 +493,26 @@ async function extractTraitsWithGemini(imageData, languageInstruction = '') {
           return { traits: result, _rawResponse: rawResponse };
         }
       } else {
-        log.error('📸 [GEMINI] No JSON found in response:', text.substring(0, 200));
+        // JSON was truncated (no closing brace) — salvage partial traits via key-value extraction
+        log.warn(`📸 [GEMINI] Truncated JSON response (${text.length} chars, ${outputTokens} tokens), attempting partial extraction`);
+        const partialTraits = {};
+        // Extract simple key-value pairs from the truncated text
+        const kvPattern = /"(apparentAge|build|skinTone|eyeColor|hairColor|hairDensity|hairLength|hairStyle|facialHair|face|other|skinToneHex|eyeColorHex|hairColorHex)"\s*:\s*"([^"]+)"/g;
+        let match;
+        while ((match = kvPattern.exec(text)) !== null) {
+          partialTraits[match[1]] = match[2];
+        }
+        if (Object.keys(partialTraits).length > 0) {
+          log.info(`📸 [GEMINI] Salvaged ${Object.keys(partialTraits).length} traits from truncated response: ${Object.keys(partialTraits).join(', ')}`);
+          return { traits: partialTraits, _rawResponse: text, _partial: true };
+        }
+        log.error('📸 [GEMINI] No JSON and no salvageable traits in response:', text.substring(0, 200));
         return { _rawResponse: text, _error: 'No JSON found in response' };
       }
     } else {
       log.error('📸 [GEMINI] Unexpected response structure:', JSON.stringify(data).substring(0, 200));
       return { _rawResponse: JSON.stringify(data), _error: 'Unexpected response structure' };
     }
-    return null;
   } catch (err) {
     log.error('📸 [GEMINI] Trait extraction error:', err.message);
     return null;
