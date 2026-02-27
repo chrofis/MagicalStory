@@ -409,11 +409,11 @@ export function GenerationProgress({
               if (currentItem.type === 'character' && currentCharDisplay) {
                 return (
                   <div key={`char-${currentItem.char.id}-${rotationIndex}`} className="flex flex-col items-center gap-3 animate-fade-in">
-                    <div className="w-32 md:w-40 rounded-xl overflow-hidden border-4 border-indigo-200 shadow-lg bg-gradient-to-b from-indigo-50 to-purple-50">
+                    <div className="w-32 md:w-40 h-44 md:h-56 rounded-xl overflow-hidden border-4 border-indigo-200 shadow-lg bg-gradient-to-b from-indigo-50 to-purple-50">
                       <img
                         src={currentCharDisplay.avatarUrl}
                         alt={currentItem.char.name}
-                        className="w-full h-auto max-h-52 md:max-h-64 object-contain object-top"
+                        className="w-full h-full object-cover object-top"
                       />
                     </div>
                     <p className="text-sm text-center text-gray-600 max-w-xs italic">{currentCharDisplay.message}</p>
