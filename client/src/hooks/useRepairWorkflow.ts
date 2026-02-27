@@ -256,25 +256,80 @@ export function useRepairWorkflow({
           needsFullRedo: false,
         };
 
-        // Collect fixable issues from ALL sources (tagged with source)
-        const latestRetry = scene.retryHistory?.slice(-1)[0];
-        if (latestRetry?.postRepairEval?.fixableIssues?.length) {
-          feedback.fixableIssues.push(...latestRetry.postRepairEval.fixableIssues.map(i => ({ ...i, source: 'post-repair eval' })));
-        }
-        if (latestRetry?.preRepairEval?.fixableIssues?.length) {
-          feedback.fixableIssues.push(...latestRetry.preRepairEval.fixableIssues.map(i => ({ ...i, source: 'pre-repair eval' })));
-        }
+        // Collect fixable issues from ALL evaluation sources (tagged with source)
+        // Use a Set to deduplicate by description
+        const seenDescriptions = new Set<string>();
+        const addIssue = (issue: any, source: string) => {
+          const desc = issue.description || issue.issue || '';
+          if (desc && seenDescriptions.has(desc)) return;
+          if (desc) seenDescriptions.add(desc);
+          feedback.fixableIssues.push({ ...issue, source });
+        };
+
+        // Source 1: Scene-level fixableIssues (set by generation and re-evaluate)
         if ((scene as any).fixableIssues?.length) {
-          feedback.fixableIssues.push(...(scene as any).fixableIssues.map((i: any) => ({ ...i, source: 'quality eval' })));
+          for (const i of (scene as any).fixableIssues) addIssue(i, i.source || 'quality eval');
         }
+
+        // Source 2: Active imageVersion fixableIssues (set by re-evaluate)
+        const activeVersion = scene.imageVersions?.find(v => v.isActive);
+        if (activeVersion?.fixableIssues?.length) {
+          for (const i of activeVersion.fixableIssues) addIssue(i, i.source || 'active version eval');
+        }
+
+        // Source 3: All retry history entries (not just latest)
+        for (const retry of (scene.retryHistory || [])) {
+          if (retry.postRepairEval?.fixableIssues?.length) {
+            for (const i of retry.postRepairEval.fixableIssues) addIssue(i, 'post-repair eval');
+          }
+          if (retry.preRepairEval?.fixableIssues?.length) {
+            for (const i of retry.preRepairEval.fixableIssues) addIssue(i, 'pre-repair eval');
+          }
+        }
+
+        // Source 4: Fix targets with bounding boxes
         if (scene.fixTargets?.length) {
-          feedback.fixableIssues.push(...scene.fixTargets.map(t => ({
-            description: t.issue || 'Quality issue detected',
-            severity: 'medium',
-            type: 'visual',
-            fix: t.fixPrompt || '',
-            source: 'fix targets',
-          })));
+          for (const t of scene.fixTargets) {
+            addIssue({
+              description: t.issue || 'Quality issue detected',
+              severity: 'medium',
+              type: 'visual',
+              fix: t.fixPrompt || '',
+            }, 'fix targets');
+          }
+        }
+
+        // Source 5: Semantic evaluation issues (on scene)
+        if (scene.semanticResult) {
+          for (const si of (scene.semanticResult.semanticIssues || [])) {
+            addIssue({
+              description: si.problem || `${si.type || 'semantic'}: ${si.item || ''}`,
+              severity: si.severity?.toLowerCase() || 'medium',
+              type: si.type || 'semantic',
+              fix: si.expected ? `Expected: ${si.expected}` : '',
+            }, 'semantic eval');
+          }
+          for (const si of (scene.semanticResult.issues || [])) {
+            addIssue({
+              description: si.problem || `${si.type}: ${si.item || ''}`,
+              severity: si.severity?.toLowerCase() || 'medium',
+              type: si.type || 'semantic',
+              fix: '',
+            }, 'semantic eval');
+          }
+        }
+
+        // Source 6: Consistency regen issues
+        if (scene.consistencyRegen?.issues?.length) {
+          for (const ci of scene.consistencyRegen.issues) {
+            addIssue({
+              description: ci.description,
+              severity: ci.severity,
+              type: ci.type || 'consistency',
+              fix: ci.recommendation || '',
+              character: ci.characterInvolved,
+            }, 'consistency regen');
+          }
         }
 
         // Get entity issues from finalChecksReport - CHARACTERS

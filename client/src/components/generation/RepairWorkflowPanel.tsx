@@ -680,7 +680,7 @@ export function RepairWorkflowPanel({
                       {/* Summary Statistics */}
                       <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
                         <h5 className="text-sm font-medium text-gray-800 mb-2">
-                          Feedback Summary: {collectedTotal} issues from generation + {hasReEvalData ? `${reEvalIssues} from re-evaluation` : 're-evaluate for fresh data'}
+                          Feedback Summary: {collectedTotal} issue{collectedTotal !== 1 ? 's' : ''}{hasReEvalData ? ` + ${reEvalIssues} from re-evaluation` : ''}
                         </h5>
                         <div className="flex flex-wrap gap-3 text-xs">
                           {qualityIssues > 0 && (
@@ -708,12 +708,7 @@ export function RepairWorkflowPanel({
                               Re-eval Issues: {reEvalIssues}
                             </span>
                           )}
-                          {collectedTotal === 0 && !hasReEvalData && (
-                            <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                              No issues detected (run re-evaluate for fresh assessment)
-                            </span>
-                          )}
-                          {collectedTotal === 0 && hasReEvalData && reEvalIssues === 0 && (
+                          {collectedTotal === 0 && (
                             <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
                               All pages pass quality checks
                             </span>
