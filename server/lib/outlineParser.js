@@ -71,11 +71,11 @@ function parseCharacterClothingBlock(content) {
     // Match "Name: category" entries - supports both multi-line (with bullets) and single-line comma-separated
     // (?:^|,\s*) - start of line OR after comma (for single-line format)
     // [-*]?\s* - optional bullet point
-    // ([^:\n,]+) - name (no colon, newline, or comma)
+    // ((?:[^:\r\n,(]+|\([^)]*\))+) - name: non-special chars OR parenthesized groups (allows commas inside parens)
     // :\s* - colon separator
     // (standard|winter|summer|formal|costumed:[^\r\n,]+) - clothing category (stops at comma or newline)
     // Note: [^\r\n,] handles both Unix (\n) and Windows (\r\n) line endings
-    const linePattern = /(?:^|,\s*)[-*]?\s*([^:\r\n,]+):\s*(standard|winter|summer|formal|costumed:[^\r\n,]+)/gim;
+    const linePattern = /(?:^|,\s*)[-*]?\s*((?:[^:\r\n,(]+|\([^)]*\))+):\s*(standard|winter|summer|formal|costumed:[^\r\n,]+)/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();

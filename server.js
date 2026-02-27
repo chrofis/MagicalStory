@@ -2553,6 +2553,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const coverModelOverrides = { imageModel: modelOverrides.coverImageModel, qualityModel: modelOverrides.qualityModel };
         const coverLabel = coverType === 'titlePage' ? 'FRONT COVER' : coverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
 
+        // Get landmark photos for cover scene (same as regular pages)
+        // Cover hints are plain text (no JSON), so extractSceneMetadata may return null.
+        // Fallback: scan plain text for landmark names from the visual bible.
+        let coverSceneMetadata = extractSceneMetadata(sceneDescription);
+        if (!coverSceneMetadata && streamingVisualBible?.locations) {
+          const matchedObjects = [];
+          for (const loc of streamingVisualBible.locations) {
+            if (loc.isRealLandmark && loc.name && sceneDescription.toLowerCase().includes(loc.name.toLowerCase())) {
+              matchedObjects.push(loc.id ? `${loc.name} [${loc.id}]` : loc.name);
+            }
+          }
+          if (matchedObjects.length > 0) {
+            coverSceneMetadata = { objects: matchedObjects };
+          }
+        }
+        const coverLandmarkPhotos = await getLandmarkPhotosForScene(streamingVisualBible, coverSceneMetadata);
+        if (coverLandmarkPhotos.length > 0) {
+          log.info(`🌍 [COVER] ${coverLabel} has ${coverLandmarkPhotos.length} landmark(s): ${coverLandmarkPhotos.map(l => `${l.name}${l.variantNumber > 1 ? ` (v${l.variantNumber})` : ''}`).join(', ')}`);
+        }
+
         // Usage tracker for cover images
         const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
           if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
@@ -2560,7 +2580,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: coverLandmarkPhotos }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
