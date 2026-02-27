@@ -181,7 +181,8 @@ Return JSON only (no other text):
   "issues_summary": "Manuel missing; pants missing green accents",
   "fixable_issues": [
     {
-      "description": "figure in center has pants missing green accents",
+      "character": "Lukas",
+      "description": "Lukas in center has pants missing green accents",
       "severity": "MODERATE",
       "type": "clothing",
       "fix": "Add green stripe accents to dark pants of figure with blonde hair in center"
@@ -201,10 +202,11 @@ Return JSON only (no other text):
 - `rendering.physics_ok`: false if floating people, impossible poses, detached limbs
 - `rendering.issues`: list specific problems (e.g., "figure on left has three arms", "child in center has cross-eyes")
 - `fixable_issues`: only if score < 9 and issues are fixable by inpainting. ONE entry per issue.
-  - `description`: What is WRONG in the generated image (visual description only, NO names)
+  - `character`: REQUIRED for any character-related issue. Use the EXACT character name from the reference list above (e.g. "Lukas", "Werner"). Only null for non-character issues (environment, background). NEVER leave null when a specific character is affected.
+  - `description`: What is WRONG — ALWAYS use the character's name, NEVER describe them by appearance or position alone. GOOD: "Werner has wrong coat color". BAD: "The elderly man on the left has wrong coat color".
   - `severity`: CRITICAL, MAJOR, MODERATE, MINOR
   - `type`: face, limb, clothing, object, environment, physics
-  - `fix`: How to fix THIS EXACT issue described above (visual description only, NO names)
+  - `fix`: How to fix THIS EXACT issue described above (visual description only, NO character names — use position and appearance)
   - CRITICAL: `description` and `fix` MUST refer to the SAME issue. If pants are wrong, fix the pants. If hair clips are missing, add hair clips. Never mix issues between entries.
 - Physics/anatomy issues (extra limbs, floating) usually require REGENERATION, not inpainting
 - Spatial issues (wrong pointing/looking direction) are usually NOT fixable - require regeneration
