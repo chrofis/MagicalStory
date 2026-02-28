@@ -2945,6 +2945,26 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       return res.status(400).json({ error: 'repairs array is required' });
     }
 
+    // Limit total repair attempts: count all pages across all characters
+    const MAX_REPAIR_PAGES = 3;
+    let totalPageCount = 0;
+    for (const repair of repairs) {
+      totalPageCount += (repair.pages?.length || 0);
+    }
+    if (totalPageCount > MAX_REPAIR_PAGES) {
+      log.info(`👤 [REPAIR-WORKFLOW] Limiting character repairs: ${totalPageCount} pages requested, capping at ${MAX_REPAIR_PAGES}`);
+      // Trim pages from each repair, keeping lowest page numbers first (worst pages tend to be processed first)
+      let remaining = MAX_REPAIR_PAGES;
+      for (const repair of repairs) {
+        if (remaining <= 0) {
+          repair.pages = [];
+        } else {
+          repair.pages = repair.pages.slice(0, remaining);
+          remaining -= repair.pages.length;
+        }
+      }
+    }
+
     const repairMethod = useMagicApiRepair ? 'MagicAPI' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 

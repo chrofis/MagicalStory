@@ -1051,34 +1051,69 @@ export function useRepairWorkflow({
 
         if (charsWithIssues.length > 0) {
           onProgress?.('character-repair', `Repairing ${charsWithIssues.length} characters...`);
+
+          // Collect all repair tasks with severity, then prioritize critical > major
+          const allRepairTasks: { charName: string; pageNumber: number; severity: 'critical' | 'major' }[] = [];
           for (const charName of charsWithIssues) {
-            checkAborted();
-            // Compute severe pages locally from consistency report
             const charResult = consistencyReport.characters[charName] as EntityCheckResult;
-            const severePages = new Set<number>();
+            const collectIssues = (issues: { severity?: string; pagesToFix?: number[]; pageNumber?: number | null }[]) => {
+              for (const issue of issues) {
+                if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
+                const sev = issue.severity as 'critical' | 'major';
+                const pages = new Set<number>();
+                for (const page of issue.pagesToFix || []) pages.add(page);
+                if (issue.pageNumber) pages.add(issue.pageNumber);
+                for (const p of pages) {
+                  allRepairTasks.push({ charName, pageNumber: p, severity: sev });
+                }
+              }
+            };
             if (charResult.byClothing) {
               for (const clothingResult of Object.values(charResult.byClothing)) {
-                for (const issue of clothingResult.issues || []) {
-                  if (issue.severity === 'major' || issue.severity === 'critical') {
-                    for (const page of issue.pagesToFix || []) severePages.add(page);
-                    if (issue.pageNumber) severePages.add(issue.pageNumber);
-                  }
-                }
+                collectIssues(clothingResult.issues || []);
               }
             }
             if (charResult.issues) {
-              for (const issue of charResult.issues) {
-                if (issue.severity === 'major' || issue.severity === 'critical') {
-                  for (const page of issue.pagesToFix || []) severePages.add(page);
-                  if (issue.pageNumber) severePages.add(issue.pageNumber);
-                }
-              }
+              collectIssues(charResult.issues);
             }
-            const pages = Array.from(severePages).sort((a, b) => a - b);
-            if (pages.length > 0) {
-              onProgress?.('character-repair', `Repairing ${charName} on ${pages.length} pages...`);
-              await repairCharacter(charName, pages);
+          }
+
+          // Deduplicate (same char+page may appear from multiple issues) and keep highest severity
+          const taskKey = (t: { charName: string; pageNumber: number }) => `${t.charName}:${t.pageNumber}`;
+          const bestTask = new Map<string, typeof allRepairTasks[0]>();
+          for (const task of allRepairTasks) {
+            const key = taskKey(task);
+            const existing = bestTask.get(key);
+            if (!existing || (task.severity === 'critical' && existing.severity !== 'critical')) {
+              bestTask.set(key, task);
             }
+          }
+
+          // Sort: critical first, then major
+          const sortedTasks = Array.from(bestTask.values()).sort((a, b) => {
+            if (a.severity !== b.severity) return a.severity === 'critical' ? -1 : 1;
+            return a.pageNumber - b.pageNumber;
+          });
+
+          // Apply budget limit
+          const MAX_AUTO_REPAIR_PAGES = 3;
+          const selectedTasks = sortedTasks.slice(0, MAX_AUTO_REPAIR_PAGES);
+          if (sortedTasks.length > MAX_AUTO_REPAIR_PAGES) {
+            console.log(`[RepairWorkflow] Limiting character repairs: ${sortedTasks.length} tasks → ${MAX_AUTO_REPAIR_PAGES} (critical first)`);
+          }
+
+          // Group selected tasks by character for API calls
+          const tasksByChar = new Map<string, number[]>();
+          for (const task of selectedTasks) {
+            const pages = tasksByChar.get(task.charName) || [];
+            pages.push(task.pageNumber);
+            tasksByChar.set(task.charName, pages);
+          }
+
+          for (const [charName, pages] of tasksByChar) {
+            checkAborted();
+            onProgress?.('character-repair', `Repairing ${charName} on ${pages.length} pages...`);
+            await repairCharacter(charName, pages);
           }
         }
       }
