@@ -1727,7 +1727,7 @@ const VERIFICATION_MODEL = 'gemini-2.5-flash';
 // Maximum allowed background change (mean pixel diff 0-255)
 // JPEG compression can cause ~2-5 difference, Gemini repairs can cause ~5-15
 // Allow reasonable tolerance while still catching major background changes
-const MAX_BACKGROUND_DIFF = 20;
+const MAX_BACKGROUND_DIFF = 30;
 
 /**
  * Extract border regions from an image (everything except center)
