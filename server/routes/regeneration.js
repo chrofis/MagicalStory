@@ -15,7 +15,7 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS } = require('../config/models');
+const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING } = require('../config/models');
 
 // Services
 const { log } = require('../utils/logger');
@@ -67,6 +67,34 @@ const { getActiveIndexAfterPush } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 
 function getDbPool() { return getPool(); }
+
+// Calculate token-based API cost for Gemini models
+function calculateTokenCost(modelId, inputTokens, outputTokens) {
+  const pricing = MODEL_PRICING[modelId] || { input: 0.10, output: 0.40 };
+  if (pricing.perImage) return 0; // Image models use per-image pricing
+  return ((inputTokens / 1_000_000) * pricing.input) + ((outputTokens / 1_000_000) * pricing.output);
+}
+
+// Atomically add repair cost to story analytics
+async function addRepairCost(storyId, cost, stepName) {
+  if (cost <= 0) return;
+  try {
+    await getDbPool().query(`
+      UPDATE stories SET data = jsonb_set(
+        jsonb_set(
+          data::jsonb,
+          '{analytics,totalCost}',
+          to_jsonb(COALESCE((data::jsonb->'analytics'->>'totalCost')::numeric, 0) + $1)
+        ),
+        '{analytics,repairCost}',
+        to_jsonb(COALESCE((data::jsonb->'analytics'->>'repairCost')::numeric, 0) + $1)
+      ) WHERE id = $2
+    `, [cost, storyId]);
+    log.info(`💰 [REPAIR-COST] ${stepName}: $${cost.toFixed(4)} added to story ${storyId}`);
+  } catch (err) {
+    log.warn(`⚠️ [REPAIR-COST] Failed to update analytics: ${err.message}`);
+  }
+}
 
 // =============================================================================
 // STORY REGENERATION ENDPOINTS - Regenerate individual components
@@ -2795,7 +2823,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           reasoning: evaluation.reasoning,
           fixableIssues: allIssues,                   // ALL sources, not just quality eval
           fixTargets: scene.fixTargets,               // bbox-enriched
-          semanticResult: evaluation.semanticResult || null
+          semanticResult: evaluation.semanticResult || null,
+          usage: evaluation.usage || null
         };
       } catch (evalErr) {
         log.error(`❌ [RE-EVALUATE] Page ${pageNumber} evaluation failed:`, evalErr);
@@ -2810,8 +2839,19 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     // Save updated story
     await saveStoryData(id, storyData);
 
+    // Calculate and persist repair cost
+    let totalInput = 0, totalOutput = 0;
+    for (const pageData of Object.values(pages)) {
+      if (pageData.usage) {
+        totalInput += pageData.usage.input_tokens || 0;
+        totalOutput += pageData.usage.output_tokens || 0;
+      }
+    }
+    const apiCost = calculateTokenCost('gemini-2.5-flash', totalInput, totalOutput);
+    await addRepairCost(id, apiCost, 'Re-evaluate');
+
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
-    res.json({ pages });
+    res.json({ pages, apiCost });
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
     res.status(500).json({ error: 'Failed to re-evaluate: ' + err.message });
@@ -2882,8 +2922,13 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
 
     await saveStoryData(id, storyData);
 
+    // Calculate and persist repair cost
+    const { inputTokens = 0, outputTokens = 0, model: checkModel } = report.tokenUsage || {};
+    const apiCost = calculateTokenCost(checkModel || 'gemini-2.5-flash', inputTokens, outputTokens);
+    await addRepairCost(id, apiCost, 'Consistency check');
+
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
-    res.json({ report });
+    res.json({ report, apiCost });
   } catch (err) {
     log.error('Error in consistency check:', err);
     res.status(500).json({ error: 'Failed to run consistency check: ' + err.message });
@@ -2905,6 +2950,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
     const { repairSinglePage } = require('../lib/entityConsistency');
     const results = [];
+    let totalGeminiRepairs = 0, totalMagicApiRepairs = 0;
+    let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
 
     for (const repair of repairs) {
       const { character: characterName, pages } = repair;
@@ -3102,6 +3149,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
             }
 
+            // Track repair cost: count attempts and accumulate verification tokens
+            if (repairResult.method === 'magicapi') {
+              totalMagicApiRepairs++;
+            } else {
+              totalGeminiRepairs++;
+            }
+            if (repairResult.usage) {
+              totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
+              totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
+            }
+
             if (!repairResult.success) {
               const reason = repairResult.reason || repairResult.error || 'Unknown error';
               log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${reason}`);
@@ -3195,8 +3253,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
+    // Calculate and persist repair cost (only Gemini repairs have per-image cost)
+    const perImageCost = MODEL_PRICING['gemini-2.5-flash-image']?.perImage ?? 0.04;
+    const imageGenCost = totalGeminiRepairs * perImageCost;
+    const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
+    const apiCost = imageGenCost + verifyTokenCost;
+    const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs;
+    await addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini)`);
+
     log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
-    res.json({ results });
+    res.json({ results, apiCost });
   } catch (err) {
     log.error('Error in character repair:', err);
     res.status(500).json({ error: 'Failed to repair characters: ' + err.message });
