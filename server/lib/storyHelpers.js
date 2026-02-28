@@ -1676,7 +1676,11 @@ function buildCharacterPhysicalDescription(char) {
   // Facial hair for males (skip if "none")
   const facialHair = physical.facialHair || char.physical?.facialHair;
   if (gender === 'male' && facialHair && facialHair.toLowerCase() !== 'none') {
-    description += `. Facial hair: ${facialHair}`;
+    if (facialHair.toLowerCase() === 'clean-shaven') {
+      description += `. Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`;
+    } else {
+      description += `. Facial hair: ${facialHair}`;
+    }
   }
   if (face) {
     description += `, ${face}`;
@@ -1807,8 +1811,12 @@ function buildCharacterReferenceList(photos, characters = null) {
       // Face shape removed - let reference image handle facial geometry
       physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
       hairDesc,
-      // Facial hair for males (skip if "none")
-      char?.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none' ? `Facial hair: ${physical.facialHair}` : '',
+      // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
+      char?.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none'
+        ? (physical.facialHair.toLowerCase() === 'clean-shaven'
+          ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
+          : `Facial hair: ${physical.facialHair}`)
+        : '',
       physical.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
       // Include clothing description from avatar if available
       photo.clothingDescription ? `Wearing: ${photo.clothingDescription}` : ''
@@ -2761,8 +2769,12 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
         // Face shape removed - let reference image handle facial geometry
         physical.eyeColor ? `Eyes: ${physical.eyeColor}` : '',
         hairDesc,
-        // Facial hair for males (skip if "none")
-        char.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none' ? `Facial hair: ${physical.facialHair}` : '',
+        // Facial hair for males (skip if "none"); emphasize clean-shaven to prevent model adding beards
+        char.gender === 'male' && physical.facialHair && physical.facialHair.toLowerCase() !== 'none'
+          ? (physical.facialHair.toLowerCase() === 'clean-shaven'
+            ? `Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`
+            : `Facial hair: ${physical.facialHair}`)
+          : '',
         physical.other && physical.other.toLowerCase() !== 'none' ? `Other: ${physical.other}` : '',
         // Prefer avatar clothing description if available, otherwise use clothing style
         avatarClothing ? `Wearing: ${avatarClothing}` : (clothingStyle ? `Clothing style: ${clothingStyle}` : '')
