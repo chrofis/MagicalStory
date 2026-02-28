@@ -1230,8 +1230,12 @@ function buildPhysicalTraitsForAvatar(character) {
   if (hairDesc) parts.push(`Hair: ${hairDesc}`);
 
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
-  if (traits.facialHair && traits.facialHair !== 'none' && traits.facialHair !== 'clean-shaven') {
-    parts.push(`Facial hair: ${traits.facialHair}`);
+  if (traits.facialHair && traits.facialHair !== 'none') {
+    if (traits.facialHair.toLowerCase() === 'clean-shaven') {
+      parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
+    } else {
+      parts.push(`Facial hair: ${traits.facialHair}`);
+    }
   }
   if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
   if (traits.other && traits.other !== 'none') {
@@ -2310,7 +2314,13 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
       if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
       if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
-      if (physicalTraits.facialHair) traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
+      if (physicalTraits.facialHair) {
+        if (physicalTraits.facialHair.toLowerCase() === 'clean-shaven') {
+          traitLines.push(`- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
+        } else if (physicalTraits.facialHair.toLowerCase() !== 'none') {
+          traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
+        }
+      }
       if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
       if (traitLines.length > 0) {
         userTraitsSection = `\n\nPHYSICAL TRAIT CORRECTIONS (CRITICAL - MUST APPLY):\n${traitLines.join('\n')}`;
@@ -3185,7 +3195,13 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
       if (physicalTraits.build) traitLines.push(`- Body build: ${physicalTraits.build}`);
       if (physicalTraits.skinTone) traitLines.push(`- Skin tone: ${physicalTraits.skinTone}`);
       if (physicalTraits.face) traitLines.push(`- Face shape: ${physicalTraits.face}`);
-      if (physicalTraits.facialHair) traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
+      if (physicalTraits.facialHair) {
+        if (physicalTraits.facialHair.toLowerCase() === 'clean-shaven') {
+          traitLines.push(`- Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
+        } else if (physicalTraits.facialHair.toLowerCase() !== 'none') {
+          traitLines.push(`- Facial hair: ${physicalTraits.facialHair}`);
+        }
+      }
       if (physicalTraits.other) traitLines.push(`- Other: ${physicalTraits.other}`);
 
       if (traitLines.length > 0) {

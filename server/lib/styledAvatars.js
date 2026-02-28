@@ -160,9 +160,14 @@ function buildPhysicalTraitsString(character) {
   const hairDesc = buildHairDescription(traits, character?.physicalTraitsSource);
   if (hairDesc) parts.push(`Hair: ${hairDesc}`);
 
+  if (traits.build) parts.push(`Build: ${traits.build}`);
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
-  if (traits.facialHair && traits.facialHair !== 'none' && traits.facialHair !== 'clean-shaven') {
-    parts.push(`Facial hair: ${traits.facialHair}`);
+  if (traits.facialHair && traits.facialHair !== 'none') {
+    if (traits.facialHair.toLowerCase() === 'clean-shaven') {
+      parts.push(`Facial hair: NO beard, NO mustache, NO stubble — clean-shaven face`);
+    } else {
+      parts.push(`Facial hair: ${traits.facialHair}`);
+    }
   }
   if (traits.other && traits.other !== 'none') {
     parts.push(`Other features: ${traits.other}`);
