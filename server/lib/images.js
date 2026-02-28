@@ -4300,7 +4300,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           const key = `${pageNum}-${charName}`;
           if (seenPairs.has(key)) continue;
           seenPairs.add(key);
-          fixTasks.push({ pageNumber: pageNum, charName, severity: issue.severity });
+          fixTasks.push({ pageNumber: pageNum, charName, severity: issue.severity, issueDescription: issue.description || issue.fixInstruction || '' });
         }
       }
     }
@@ -4382,7 +4382,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
         try {
           log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber} (bbox: [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
-          const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, bbox, fix.charName);
+          const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, bbox, fix.charName, {
+            issueDescription: fix.issueDescription
+          });
 
           if (repairResult?.imageData) {
             currentImageData = repairResult.imageData;
@@ -4895,35 +4897,50 @@ async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName
   const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
   const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
 
-  const prompt = `Replace the figure in the marked region with this character.
+  // Build issue context if provided
+  const issueDescription = options.issueDescription || '';
+  const issueContext = issueDescription
+    ? `\nSPECIFIC ISSUE: ${issueDescription}\n`
+    : '';
 
-CHARACTER REFERENCE: ${charName}
-- The first image shows exactly how ${charName} should look
-- Match their face, hair color/style, and body proportions
-- This is the AUTHORITATIVE reference for this character's appearance
+  // Calculate region description for spatial awareness
+  const regionWidth = Math.round((xmax - xmin) * 100);
+  const regionHeight = Math.round((ymax - ymin) * 100);
+  const centerX = Math.round(((xmin + xmax) / 2) * 100);
+  const centerY = Math.round(((ymin + ymax) / 2) * 100);
+  const horizontalPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
+  const verticalPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
+  const regionDesc = `${verticalPos} ${horizontalPos}`;
 
-MARKED REGION: The figure located approximately between coordinates:
-- Left edge: ${Math.round(xmin * 100)}% from left
-- Right edge: ${Math.round(xmax * 100)}% from left
-- Top edge: ${Math.round(ymin * 100)}% from top
-- Bottom edge: ${Math.round(ymax * 100)}% from top
+  const prompt = `FIX the character in this illustration. The character at the ${regionDesc} of the scene does NOT correctly match ${charName}'s reference appearance. You MUST change their face to match the reference.
 
-YOUR TASK: Replace ONLY the figure in the marked region.
-- Keep the exact same pose and body position
-- Keep the same action/gesture they are performing
-- Keep the same clothing style but adjust to match character's typical appearance
-- Make the face match ${charName}'s face from the reference photo
-- Keep everything else in the image COMPLETELY unchanged
-- The replacement should blend seamlessly with the rest of the image
+IMAGE 1 (Reference): Shows the CORRECT appearance of ${charName}. This is the ground truth.
+IMAGE 2 (Scene to fix): The illustration where the character at the ${regionDesc} needs to be corrected.
+${issueContext}
+THE CHARACTER TO FIX is located at the ${regionDesc} of the scene (approximately ${regionWidth}% wide, ${regionHeight}% tall, centered at ${centerX}% from left, ${centerY}% from top).
 
-OUTPUT: A single image with the replaced character.`;
+YOU MUST CHANGE the following to match the reference photo:
+1. FACE - Match the exact facial features: eyes, nose, mouth shape, face shape from the reference
+2. HAIR - Match the exact hair color, style, length, and texture from the reference
+3. SKIN TONE - Match the exact skin complexion from the reference
+4. BODY PROPORTIONS - Match the age appearance and build from the reference
 
-  // Build parts: prompt, character reference, scene image
+KEEP UNCHANGED:
+- The character's current pose, position, and gesture
+- The background and all other elements in the scene
+- The art style and lighting
+- All other characters in the scene
+
+CRITICAL: The current face is WRONG. You MUST produce a visibly different result where ${charName}'s face matches the reference. If you return the image unchanged, the repair has FAILED.
+
+Output a single corrected image.`;
+
+  // Build parts: prompt, reference image (IMAGE 1), scene to fix (IMAGE 2)
   const parts = [
     { text: prompt },
-    { text: `${charName} reference photo:` },
+    { text: `IMAGE 1 — ${charName} reference (CORRECT appearance):` },
     { inline_data: { mime_type: 'image/jpeg', data: avatarBase64 } },
-    { text: 'Scene to fix:' },
+    { text: `IMAGE 2 — Scene to fix (character at ${regionDesc} has WRONG face):` },
     { inline_data: { mime_type: 'image/jpeg', data: currentBase64 } }
   ];
 
@@ -4939,7 +4956,7 @@ OUTPUT: A single image with the replaced character.`;
       contents: [{ parts }],
       generationConfig: {
         responseModalities: ["TEXT", "IMAGE"],
-        temperature: 0.4,  // Lower temperature for more faithful reproduction
+        temperature: 0.7,  // Moderate temperature to encourage actual changes while staying faithful
         ...(modelSupportsThinking(modelId) && { thinkingConfig: { includeThoughts: true } })
       }
     })
