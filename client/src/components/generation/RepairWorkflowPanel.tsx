@@ -732,12 +732,12 @@ export function RepairWorkflowPanel({
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => autoIdentifyRedoPages(6, 3)}
+                    onClick={() => autoIdentifyRedoPages(60, 5)}
                     disabled={isRunning || workflowState.stepStatus['collect-feedback'] !== 'completed'}
                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                   >
                     <Zap className="w-4 h-4" />
-                    Auto-Identify (score &lt; 6 or 3+ issues)
+                    Auto-Identify (score &lt; 60 or 5+ issues)
                   </button>
                 </div>
 
