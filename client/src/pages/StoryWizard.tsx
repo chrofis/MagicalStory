@@ -3608,8 +3608,25 @@ export default function StoryWizard() {
           setGeneratedStory(status.result.story);
           setOriginalStory(status.result.story); // Store original for restore functionality
           setSceneDescriptions(status.result.sceneDescriptions || []);
-          setSceneImages(status.result.sceneImages || []);
-          setCoverImages(status.result.coverImages || { frontCover: null, initialPage: null, backCover: null });
+          // result_data has scene metadata but no imageData (stripped for performance)
+          // Merge with any imageData from progressive display or loadSavedStory
+          const resultSceneImages = status.result.sceneImages || [];
+          const resultCoverImages = status.result.coverImages || { frontCover: null, initialPage: null, backCover: null };
+          setSceneImages(prev => {
+            if (resultSceneImages.length === 0) return prev;
+            return resultSceneImages.map(img => {
+              const existing = prev.find(p => p.pageNumber === img.pageNumber);
+              return {
+                ...img,
+                imageData: existing?.imageData || img.imageData,
+              };
+            });
+          });
+          setCoverImages(prev => ({
+            frontCover: resultCoverImages.frontCover ? { ...resultCoverImages.frontCover, imageData: prev.frontCover?.imageData || resultCoverImages.frontCover?.imageData } : null,
+            initialPage: resultCoverImages.initialPage ? { ...resultCoverImages.initialPage, imageData: prev.initialPage?.imageData || resultCoverImages.initialPage?.imageData } : null,
+            backCover: resultCoverImages.backCover ? { ...resultCoverImages.backCover, imageData: prev.backCover?.imageData || resultCoverImages.backCover?.imageData } : null,
+          }));
           // Clear progressive state now that we have final data
           setProgressiveStoryData(null);
           setCompletedPageImages({});
@@ -3645,8 +3662,9 @@ export default function StoryWizard() {
             userLocation: userLocation || undefined,
           });
 
-          // Mark that we just finished generating (skip server reload since data is in state)
-          justFinishedGenerating.current = true;
+          // Don't set justFinishedGenerating - let loadSavedStory handle image loading
+          // result_data doesn't include imageData (stripped for performance),
+          // so we need the two-phase loading to fetch images from story_images table
 
           // If full repair after generation is enabled, mark this story for auto-repair
           if (enableFullRepairAfterGeneration) {

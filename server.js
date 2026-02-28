@@ -4628,13 +4628,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     };
 
     // Mark job as completed
+    // Strip imageData from result_data to keep it lightweight (~10KB vs ~10MB)
+    // Images are already saved in story_images table via upsertStory
+    const stripImageData = (img) => {
+      if (!img) return img;
+      const { imageData, ...metadata } = img;
+      const stripped = { ...metadata, hasImage: !!imageData };
+      // Also strip imageData from imageVersions
+      if (stripped.imageVersions) {
+        stripped.imageVersions = stripped.imageVersions.map(v => {
+          const { imageData: vData, ...vMeta } = v;
+          return { ...vMeta, hasImage: !!vData };
+        });
+      }
+      return stripped;
+    };
+    const resultDataForStorage = {
+      ...resultData,
+      sceneImages: allImages.map(stripImageData),
+      coverImages: coverImages ? {
+        frontCover: stripImageData(coverImages.frontCover),
+        initialPage: stripImageData(coverImages.initialPage),
+        backCover: stripImageData(coverImages.backCover),
+      } : coverImages,
+    };
     log.debug(`📊 [UNIFIED] resultData generationLog has ${resultData.generationLog?.length || 0} entries`);
+    const resultJson = JSON.stringify(resultDataForStorage);
+    log.debug(`📊 [UNIFIED] result_data size: ${(resultJson.length / 1024).toFixed(1)}KB (images stripped)`);
     await dbPool.query(
       `UPDATE story_jobs
        SET status = $1, progress = $2, progress_message = $3, result_data = $4,
            credits_reserved = 0, completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
        WHERE id = $5`,
-      ['completed', 100, 'Story generation complete!', JSON.stringify(resultData), jobId]
+      ['completed', 100, 'Story generation complete!', resultJson, jobId]
     );
 
     // Clean up checkpoints immediately - story is saved, no longer needed
