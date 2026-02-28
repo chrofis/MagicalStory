@@ -4527,23 +4527,40 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     };
 
     // Mark job as completed
-    // Strip imageData from result_data to keep it lightweight (~10KB vs ~10MB)
+    // Strip ALL base64 image data from result_data to keep it lightweight
     // Images are already saved in story_images table via upsertStory
+    // The client only needs metadata from result_data to navigate to the story
     const stripImageData = (img) => {
       if (!img) return img;
-      const { imageData, ...metadata } = img;
+      const { imageData, referencePhotos, landmarkPhotos, visualBibleGrid, bboxOverlayImage, ...metadata } = img;
       const stripped = { ...metadata, hasImage: !!imageData };
-      // Also strip imageData from imageVersions
+      // Strip imageData from imageVersions
       if (stripped.imageVersions) {
         stripped.imageVersions = stripped.imageVersions.map(v => {
           const { imageData: vData, ...vMeta } = v;
           return { ...vMeta, hasImage: !!vData };
         });
       }
+      // Strip imageData from retryHistory
+      if (stripped.retryHistory) {
+        stripped.retryHistory = stripped.retryHistory.map(r => {
+          const { imageData: rData, ...rMeta } = r;
+          return { ...rMeta, hasImage: !!rData };
+        });
+      }
       return stripped;
     };
+    // Strip photo data from visualBible locations
+    const strippedVisualBible = resultData.visualBible ? {
+      ...resultData.visualBible,
+      locations: (resultData.visualBible.locations || []).map(loc => {
+        const { referencePhotoData, ...locMeta } = loc;
+        return { ...locMeta, hasPhoto: !!referencePhotoData };
+      })
+    } : resultData.visualBible;
     const resultDataForStorage = {
       ...resultData,
+      visualBible: strippedVisualBible,
       sceneImages: allImages.map(stripImageData),
       coverImages: coverImages ? {
         frontCover: stripImageData(coverImages.frontCover),
