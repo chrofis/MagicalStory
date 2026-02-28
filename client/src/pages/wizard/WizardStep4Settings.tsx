@@ -15,8 +15,6 @@ interface WizardStep4Props {
   storyDetails: string;
   onStoryDetailsChange: (details: string) => void;
   developerMode: boolean;
-  imageGenMode: 'parallel' | 'sequential' | null;
-  onImageGenModeChange: (mode: 'parallel' | 'sequential' | null) => void;
   onGenerateIdeas: () => Promise<void>;
   isGeneratingIdeas: boolean;
   ideaPrompt: { prompt: string; model: string } | null;
@@ -51,8 +49,6 @@ export function WizardStep4Settings(props: WizardStep4Props) {
       storyDetails={props.storyDetails}
       onStoryDetailsChange={props.onStoryDetailsChange}
       developerMode={props.developerMode}
-      imageGenMode={props.imageGenMode}
-      onImageGenModeChange={props.onImageGenModeChange}
       onGenerateIdeas={props.onGenerateIdeas}
       isGeneratingIdeas={props.isGeneratingIdeas}
       ideaPrompt={props.ideaPrompt}

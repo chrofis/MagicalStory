@@ -95,8 +95,6 @@ interface WizardStep6Props {
   onEditStep: (step: number) => void;
   // Developer options
   developerMode: boolean;
-  imageGenMode: 'parallel' | 'sequential' | null;
-  onImageGenModeChange: (mode: 'parallel' | 'sequential' | null) => void;
   generationMode?: GenerationMode;
   onGenerationModeChange?: (mode: GenerationMode) => void;
 }
@@ -137,8 +135,6 @@ export function WizardStep6Summary({
   onUseDirectly,
   onEditStep,
   developerMode,
-  imageGenMode,
-  onImageGenModeChange,
   generationMode = 'auto',
   onGenerationModeChange,
 }: WizardStep6Props) {
@@ -570,44 +566,6 @@ export function WizardStep6Summary({
           <h3 className="text-base font-bold text-gray-800 mb-3 flex items-center gap-2">
             {language === 'de' ? 'Entwickler-Optionen' : language === 'fr' ? 'Options développeur' : 'Developer Options'}
           </h3>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              {language === 'de' ? 'Bildgenerierungsmodus' : language === 'fr' ? 'Mode de génération d\'images' : 'Image Generation Mode'}
-            </label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => onImageGenModeChange(null)}
-                className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                  imageGenMode === null
-                    ? 'bg-yellow-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {language === 'de' ? 'Server-Standard' : language === 'fr' ? 'Par défaut serveur' : 'Server Default'}
-              </button>
-              <button
-                onClick={() => onImageGenModeChange('parallel')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                  imageGenMode === 'parallel'
-                    ? 'bg-yellow-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {language === 'de' ? 'Parallel (schnell)' : language === 'fr' ? 'Parallèle (rapide)' : 'Parallel (fast)'}
-              </button>
-              <button
-                onClick={() => onImageGenModeChange('sequential')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium ${
-                  imageGenMode === 'sequential'
-                    ? 'bg-yellow-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-              >
-                {language === 'de' ? 'Sequenziell (konsistent)' : language === 'fr' ? 'Séquentiel (cohérent)' : 'Sequential (consistent)'}
-              </button>
-            </div>
-          </div>
 
           {/* Generation Pipeline */}
           {onGenerationModeChange && (

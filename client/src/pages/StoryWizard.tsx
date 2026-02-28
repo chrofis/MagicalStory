@@ -89,25 +89,13 @@ export default function StoryWizard() {
   // Developer mode settings (extracted to hook)
   const {
     developerMode, setDeveloperMode,
-    imageGenMode, setImageGenMode,
     generationMode, setGenerationMode,
     devSkipOutline, setDevSkipOutline,
     devSkipText, setDevSkipText,
     devSkipSceneDescriptions, setDevSkipSceneDescriptions,
     devSkipImages, setDevSkipImages,
     devSkipCovers, setDevSkipCovers,
-    enableQualityRetry, setEnableQualityRetry,
-    enableAutoRepair, setEnableAutoRepair,
-    useGridRepair, setUseGridRepair,
-    forceRepairThreshold, setForceRepairThreshold,
-    enableFinalChecks, setEnableFinalChecks,
-    incrementalConsistency, setIncrementalConsistency,
-    incrementalConsistencyDryRun, setIncrementalConsistencyDryRun,
-    lookbackCount, setLookbackCount,
-    checkOnlyMode, setCheckOnlyMode,
-    enableSceneValidation, setEnableSceneValidation,
-    separatedEvaluation, setSeparatedEvaluation,
-    enableFullRepairAfterGeneration, setEnableFullRepairAfterGeneration,
+    enableFullRepair, setEnableFullRepair,
     loadAllAvatars, setLoadAllAvatars,
     useMagicApiRepair, setUseMagicApiRepair,
     modelSelections, setModelSelections,
@@ -333,7 +321,7 @@ export default function StoryWizard() {
   const [savedGenerationSettings, setSavedGenerationSettings] = useState<GenerationSettings | null>(null);
   // Flag to skip server reload when we just finished generating (data is already in state)
   const justFinishedGenerating = useRef(false);
-  // Track which story should auto-run the full repair workflow (set when generation completes with enableFullRepairAfterGeneration)
+  // Track which story should auto-run the full repair workflow (set when generation completes with enableFullRepair)
   const [autoRunRepairForStoryId, setAutoRunRepairForStoryId] = useState<string | null>(null);
   // Flag to track if dev metadata has been loaded (prevents duplicate fetches)
   const devMetadataLoadedRef = useRef(false);
@@ -3416,7 +3404,6 @@ export default function StoryWizard() {
         relationships,
         relationshipTexts,
         skipImages: overrides?.skipImages ?? devSkipImages,
-        imageGenMode,
         // Developer generation mode override (auto = use reading level default)
         generationMode: generationMode !== 'auto' ? generationMode : undefined,
         // Developer skip options
@@ -3424,21 +3411,8 @@ export default function StoryWizard() {
         skipText: devSkipText,
         skipSceneDescriptions: devSkipSceneDescriptions,
         skipCovers: devSkipCovers,
-        // Developer feature options
-        enableQualityRetry: enableQualityRetry,
-        enableAutoRepair: enableAutoRepair,
-        useGridRepair: useGridRepair,
-        forceRepairThreshold: forceRepairThreshold,
-        enableFinalChecks: enableFinalChecks,
-        checkOnlyMode: checkOnlyMode,  // Skip all regeneration, only run checks
-        enableSceneValidation: enableSceneValidation,  // Cheap preview + geometry check
-        separatedEvaluation: separatedEvaluation,  // Generate all images first, then batch evaluate
-        // Incremental consistency check (check each image against previous images)
-        incrementalConsistency: incrementalConsistency ? {
-          enabled: true,
-          dryRun: incrementalConsistencyDryRun,
-          lookbackCount,
-        } : undefined,
+        // Full repair: evaluate + regen low-scoring + character fix (default: ON)
+        enableFullRepair,
         // Developer model overrides (admin only)
         modelOverrides: (user?.role === 'admin' || isImpersonating) ? {
           outlineModel: modelSelections.outlineModel,
@@ -3667,7 +3641,7 @@ export default function StoryWizard() {
           // so we need the two-phase loading to fetch images from story_images table
 
           // If full repair after generation is enabled, mark this story for auto-repair
-          if (enableFullRepairAfterGeneration) {
+          if (enableFullRepair) {
             setAutoRunRepairForStoryId(status.result.storyId);
           }
 
@@ -3940,8 +3914,6 @@ export default function StoryWizard() {
             onUseDirectly={() => generateStory()}
             onEditStep={safeSetStep}
             developerMode={developerMode}
-            imageGenMode={imageGenMode}
-            onImageGenModeChange={setImageGenMode}
             generationMode={generationMode}
             onGenerationModeChange={setGenerationMode}
           />
@@ -4039,11 +4011,23 @@ export default function StoryWizard() {
                   onRefreshStory={storyId ? async () => {
                     try {
                       log.info('Refreshing story data after repair...');
-                      const story = await storyService.getStory(storyId);
-                      if (story) {
-                        setSceneImages(story.sceneImages || []);
-                        setFinalChecksReport(story.finalChecksReport || null);
-                        log.success('Story data refreshed');
+                      // Use /images endpoint (not getStory blob) to get properly built
+                      // imageVersions with imageData from story_images table.
+                      // The blob's rehydration has an off-by-one mapping that leaves
+                      // original version imageData undefined.
+                      const allImagesResult = await storyService.getAllImages(storyId, false);
+                      if (allImagesResult) {
+                        setSceneImages(prev => {
+                          const newImages = allImagesResult.images || [];
+                          return prev.map(existing => {
+                            const updated = newImages.find(img => img.pageNumber === existing.pageNumber);
+                            if (updated) {
+                              return { ...existing, ...updated };
+                            }
+                            return existing;
+                          });
+                        });
+                        log.success(`Story images refreshed (${allImagesResult.images?.length || 0} pages)`);
                       }
                     } catch (error) {
                       log.error('Failed to refresh story:', error);
@@ -4953,191 +4937,35 @@ export default function StoryWizard() {
                         {language === 'de' ? 'Hinweis: Übersprungene Schritte verwenden Platzhalter/leere Daten' : language === 'fr' ? 'Note: Les étapes sautées utiliseront des données vides/provisoires' : 'Note: Skipped steps will use placeholder/empty data'}
                       </p>
 
-                      {/* Feature Toggles */}
+                      {/* Pipeline Options */}
                       <h3 className="text-sm font-semibold text-orange-700 mt-4 mb-2">
-                        🔧 {language === 'de' ? 'Feature-Optionen' : language === 'fr' ? 'Options de fonctionnalités' : 'Feature Options'}
+                        🔧 {language === 'de' ? 'Pipeline-Optionen' : language === 'fr' ? 'Options du pipeline' : 'Pipeline Options'}
                       </h3>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={enableQualityRetry}
-                          onChange={(e) => setEnableQualityRetry(e.target.checked)}
-                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Qualitäts-Retry' : language === 'fr' ? 'Réessai qualité' : 'Quality retry (regenerate if score < 50%)'}</span>
-                      </label>
-                      <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Regeneriert Bilder automatisch bis zu 3x wenn Qualitätsscore unter 50%' : language === 'fr' ? 'Régénère automatiquement les images jusqu\'à 3x si le score qualité est inférieur à 50%' : 'Automatically regenerates images up to 3x when quality score is below 50%'}
-                      </p>
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={enableAutoRepair}
-                          onChange={(e) => setEnableAutoRepair(e.target.checked)}
-                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Auto-Reparatur aktivieren' : language === 'fr' ? 'Activer la réparation auto' : 'Enable auto-repair'}</span>
-                      </label>
-                      <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Versucht erkannte Bildfehler automatisch zu korrigieren (z.B. fehlende Finger)' : language === 'fr' ? 'Essaie de corriger automatiquement les erreurs d\'image détectées' : 'Attempts to automatically fix detected image issues (e.g., missing fingers)'}
-                      </p>
-
-                      {enableAutoRepair && (
-                        <label className="flex items-center gap-2 cursor-pointer mt-2 ml-6">
-                          <input
-                            type="checkbox"
-                            checked={useGridRepair}
-                            onChange={(e) => setUseGridRepair(e.target.checked)}
-                            className="rounded border-violet-300 text-violet-600 focus:ring-violet-500"
-                          />
-                          <span className="text-gray-700">{language === 'de' ? 'Grid-Reparatur verwenden' : language === 'fr' ? 'Utiliser la réparation en grille' : 'Use grid repair'}</span>
-                        </label>
-                      )}
-                      {enableAutoRepair && (
-                        <p className="text-xs text-gray-500 ml-12">
-                          {language === 'de' ? 'Extrahiert Problemregionen in ein Grid, repariert mit Gemini, verifiziert mit LPIPS+LLM' : language === 'fr' ? 'Extrait les régions problématiques dans une grille, répare avec Gemini, vérifie avec LPIPS+LLM' : 'Extracts issue regions to grid, repairs with Gemini, verifies with LPIPS+LLM'}
-                        </p>
-                      )}
-                      {enableAutoRepair && (
-                        <div className="mt-2 ml-6">
-                          <label className="flex items-center gap-2 text-gray-700">
-                            <span>{language === 'de' ? 'Reparatur-Schwelle:' : language === 'fr' ? 'Seuil de réparation:' : 'Force repair threshold:'}</span>
-                            <select
-                              value={forceRepairThreshold === null ? 'default' : forceRepairThreshold}
-                              onChange={(e) => setForceRepairThreshold(e.target.value === 'default' ? null : parseInt(e.target.value))}
-                              className="border border-gray-300 rounded px-2 py-1 text-sm"
-                            >
-                              <option value="default">{language === 'de' ? 'Standard (nur bei Fehler)' : language === 'fr' ? 'Défaut (seulement si erreur)' : 'Default (only on failure)'}</option>
-                              <option value="100">{language === 'de' ? '100% (immer reparieren)' : language === 'fr' ? '100% (toujours réparer)' : '100% (always repair)'}</option>
-                              <option value="90">90%</option>
-                              <option value="80">80%</option>
-                              <option value="75">75%</option>
-                            </select>
-                          </label>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {language === 'de' ? 'Bei 100% werden alle Seiten mit Problemen repariert, auch wenn sie die Qualitätsprüfung bestehen' : language === 'fr' ? 'À 100%, toutes les pages avec des problèmes sont réparées, même si elles passent le contrôle qualité' : 'At 100%, all pages with issues are repaired even if they pass quality check'}
-                          </p>
-                        </div>
-                      )}
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={enableFinalChecks}
-                          onChange={(e) => setEnableFinalChecks(e.target.checked)}
-                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Konsistenzprüfung aktivieren' : language === 'fr' ? 'Activer la vérification de cohérence' : 'Enable final checks'}</span>
-                      </label>
-                      <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Prüft Bilder und Text auf Konsistenz am Ende der Generierung' : language === 'fr' ? 'Vérifie la cohérence des images et du texte à la fin de la génération' : 'Checks images and text for consistency at end of generation'}
-                      </p>
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={enableSceneValidation}
-                          onChange={(e) => setEnableSceneValidation(e.target.checked)}
-                          className="rounded border-cyan-300 text-cyan-600 focus:ring-cyan-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Szenen-Validierung' : language === 'fr' ? 'Validation de scène' : 'Scene validation'}</span>
-                      </label>
-                      <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Erzeugt günstige Vorschau, prüft Geometrie, repariert Kompositionsprobleme' : language === 'fr' ? 'Génère un aperçu économique, vérifie la géométrie, répare les problèmes de composition' : 'Generates cheap preview, checks geometry, repairs composition issues'}
-                      </p>
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={separatedEvaluation}
-                          onChange={(e) => setSeparatedEvaluation(e.target.checked)}
-                          className="rounded border-violet-300 text-violet-600 focus:ring-violet-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Getrennte Auswertung' : language === 'fr' ? 'Évaluation séparée' : 'Separated evaluation'}</span>
-                      </label>
-                      <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Erzeugt alle Bilder zuerst, dann wertet alle parallel aus und repariert' : language === 'fr' ? 'Génère toutes les images d\'abord, puis évalue et répare en parallèle' : 'Generates all images first, then evaluates and repairs in batch'}
-                      </p>
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={enableFullRepairAfterGeneration}
-                          onChange={(e) => setEnableFullRepairAfterGeneration(e.target.checked)}
+                          checked={enableFullRepair}
+                          onChange={(e) => setEnableFullRepair(e.target.checked)}
                           className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
                         />
                         <span className="text-gray-700">{language === 'de' ? 'Volle Reparatur nach Generierung' : language === 'fr' ? 'Réparation complète après génération' : 'Full repair after generation'}</span>
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Führt nach der Generierung den kompletten Reparatur-Workflow aus (bis zu 2 Versuche pro Seite)' : language === 'fr' ? 'Exécute le workflow de réparation complet après la génération (jusqu\'à 2 tentatives par page)' : 'Runs the full repair workflow after generation (up to 2 retries per page)'}
+                        {language === 'de'
+                          ? 'AN: Generiert alle Bilder → Bewertet → Regeneriert schlechte Seiten (bis 2x) → Wählt beste Version → Charakter-Reparatur'
+                          : language === 'fr'
+                          ? 'ON: Génère toutes les images → Évalue → Régénère les pages faibles (jusqu\'à 2x) → Sélectionne la meilleure version → Réparation des personnages'
+                          : 'ON: Generate all → Evaluate → Regen low-scoring (up to 2x) → Pick best → Character fix'}
                       </p>
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
-                        <input
-                          type="checkbox"
-                          checked={incrementalConsistency}
-                          onChange={(e) => setIncrementalConsistency(e.target.checked)}
-                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Inkrementelle Konsistenz' : language === 'fr' ? 'Cohérence incrémentielle' : 'Incremental consistency'}</span>
-                      </label>
                       <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Prüft jedes Bild gegen vorherige Bilder während der Generierung' : language === 'fr' ? 'Vérifie chaque image par rapport aux images précédentes pendant la génération' : 'Checks each image against previous images during generation'}
+                        {language === 'de'
+                          ? 'AUS: Nur generieren und bewerten (Scores sichtbar, keine Regenerierung)'
+                          : language === 'fr'
+                          ? 'OFF: Génère et évalue uniquement (scores visibles, pas de régénération)'
+                          : 'OFF: Generate and evaluate only (scores visible, no regeneration)'}
                       </p>
-
-                      {incrementalConsistency && (
-                        <label className="flex items-center gap-2 cursor-pointer mt-2 ml-6">
-                          <input
-                            type="checkbox"
-                            checked={incrementalConsistencyDryRun}
-                            onChange={(e) => setIncrementalConsistencyDryRun(e.target.checked)}
-                            className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                          />
-                          <span className="text-gray-700">{language === 'de' ? 'Nur Protokoll (Dry Run)' : language === 'fr' ? 'Journaliser seulement (Dry Run)' : 'Dry run (log only)'}</span>
-                        </label>
-                      )}
-                      {incrementalConsistency && (
-                        <p className="text-xs text-gray-500 ml-12">
-                          {language === 'de' ? 'Zeigt nur an, was repariert würde, ohne tatsächlich zu reparieren' : language === 'fr' ? 'Affiche uniquement ce qui serait réparé sans effectuer de réparations' : 'Shows what would be fixed without actually fixing'}
-                        </p>
-                      )}
-                      {incrementalConsistency && (
-                        <div className="mt-2 ml-6">
-                          <label className="flex items-center gap-2">
-                            <span className="text-gray-700 text-sm">
-                              {language === 'de' ? 'Vergleichsfenster:' : language === 'fr' ? 'Fenêtre de comparaison:' : 'Lookback window:'}
-                            </span>
-                            <input
-                              type="range"
-                              min="1"
-                              max="5"
-                              value={lookbackCount}
-                              onChange={(e) => setLookbackCount(parseInt(e.target.value, 10))}
-                              className="w-20 h-2 bg-orange-200 rounded-lg appearance-none cursor-pointer"
-                            />
-                            <span className="text-gray-600 font-medium w-4">{lookbackCount}</span>
-                          </label>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {language === 'de' ? `Vergleicht jedes Bild mit den ${lookbackCount} vorherigen` : language === 'fr' ? `Compare chaque image avec les ${lookbackCount} précédentes` : `Compares each image with the previous ${lookbackCount}`}
-                          </p>
-                        </div>
-                      )}
 
                       <label className="flex items-center gap-2 cursor-pointer mt-4">
-                        <input
-                          type="checkbox"
-                          checked={checkOnlyMode}
-                          onChange={(e) => setCheckOnlyMode(e.target.checked)}
-                          className="rounded border-orange-300 text-orange-600 focus:ring-orange-500"
-                        />
-                        <span className="text-gray-700">{language === 'de' ? 'Nur Prüfung (keine Regenerierung)' : language === 'fr' ? 'Vérification seule (pas de régénération)' : 'Check only (no regeneration)'}</span>
-                      </label>
-                      <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Führt alle Qualitätsprüfungen durch, überspringt aber Regenerierung/Reparatur' : language === 'fr' ? 'Exécute toutes les vérifications de qualité mais ignore la régénération/réparation' : 'Runs all quality checks but skips regeneration/repair'}
-                      </p>
-
-                      <label className="flex items-center gap-2 cursor-pointer mt-2">
                         <input
                           type="checkbox"
                           checked={loadAllAvatars}

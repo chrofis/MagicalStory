@@ -2097,7 +2097,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
 // UNIFIED STORY GENERATION
 // Single prompt generates complete story, Art Director expands scenes, then images
 // ============================================================================
-async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableAutoRepair = false, useGridRepair = true, enableFinalChecks = false, incrementalConsistencyConfig = null, checkOnlyMode = false, enableSceneValidation = false, separatedEvaluation = false, enableQualityRetry = true) {
+async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, userId, modelOverrides = {}, isAdmin = false, enableFullRepair = true) {
   const timingStart = Date.now();
   log.debug(`📖 [UNIFIED] Starting unified story generation for job ${jobId}`);
 
@@ -2313,9 +2313,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         log.debug(`✅ [STREAM-SCENE] Page ${page.pageNumber} scene expanded`);
         genLog.info('scene_expanded', `Page ${page.pageNumber} scene expanded`, null, { pageNumber: page.pageNumber, model: expansionResult.modelId });
 
-        // Post-expansion validation: validate and repair scene composition if enabled
+        // Post-expansion validation: validate and repair scene composition (disabled — was enableSceneValidation)
         let finalSceneDescription = expansionResult.text;
-        if (enableSceneValidation) {
+        if (false) {
           try {
             const { validateAndRepairScene, isValidationAvailable } = require('./server/lib/sceneValidator');
             const { extractSceneMetadata } = require('./server/lib/storyHelpers');
@@ -2582,7 +2582,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
 
         const coverResult = await generateImageWithQualityRetry(
-          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: coverLandmarkPhotos }
+          coverPrompt, coverPhotos, null, 'cover', null, coverUsageTracker, null, coverModelOverrides, coverLabel, { isAdmin, landmarkPhotos: coverLandmarkPhotos }
         );
         log.debug(`✅ [STREAM-COVER] ${coverLabel} generated (score: ${coverResult.score})`);
         // Track scene rewrite usage if a safety block triggered a rewrite
@@ -2795,22 +2795,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     genLog.info('story_parsed', `"${title}" - ${storyPages.length} pages, ${Object.keys(clothingRequirements || {}).length} clothing reqs`, null, { title, pageCount: storyPages.length });
     log.debug(`📖 [UNIFIED] Visual Bible: ${visualBible.secondaryCharacters?.length || 0} chars, ${visualBible.locations?.length || 0} locs, ${visualBible.animals?.length || 0} animals, ${visualBible.artifacts?.length || 0} artifacts`);
 
-    // Start text consistency check early (runs in parallel with image generation)
-    // Only needs the story text, so we can fire it as soon as the outline is parsed
-    let textCheckPromise = null;
-    if (enableFinalChecks && fullStoryText && fullStoryText.length > 100) {
-      const characterNames = (inputData.characters || []).map(c => c.name).filter(Boolean);
-      const langCode = inputData.language || 'en';
-      const { getLanguageInstruction } = require('./server/lib/languages');
-      const languageInstruction = getLanguageInstruction(langCode);
-      const languageLevel = inputData.languageLevel || 'standard';
-      log.info(`📝 [UNIFIED] Starting text consistency check in background (parallel with images)...`);
-      textCheckPromise = evaluateTextConsistency(fullStoryText, langCode, characterNames, languageInstruction, languageLevel, unifiedModelId)
-        .catch(err => {
-          log.warn(`⚠️ [UNIFIED] Early text check failed: ${err.message}`);
-          return null;
-        });
-    }
+    // Text consistency check removed (now handled by unified repair pipeline)
 
     // Compare streaming vs final parse results
     if (streamingPagesDetected !== storyPages.length) {
@@ -3165,7 +3150,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               totalAttempts: result.totalAttempts,
               retryHistory: result.retryHistory,
               referencePhotos: result.referencePhotos,
-              modelId: result.modelId
+              modelId: result.modelId,
+              generatedAt: new Date().toISOString()
             };
           }
         }
@@ -3202,207 +3188,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     timing.pagesStart = Date.now();
     let allImages;
 
-    // Helper function to generate a single page image (shared between parallel and sequential modes)
-    const generatePageImage = async (scene, index, incrConfig = null) => {
-      const pageNum = scene.pageNumber;
-      const progressPercent = 50 + Math.floor((index / expandedScenes.length) * 40);
-
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [progressPercent, `Generating illustration ${pageNum}/${expandedScenes.length}...`, jobId]
-      );
-
-      const sceneCharacters = getCharactersInScene(scene.sceneDescription, inputData.characters);
-
-      // Extract clothing from scene expansion's JSON output AND from Characters section (streaming parser)
-      // Characters section (scene.characterClothing) takes priority — it's the explicit per-page assignment
-      // Scene metadata JSON may carry stale costume data from other pages
-      const sceneMetadataForClothing = extractSceneMetadata(scene.sceneDescription);
-      const perCharClothing = {
-        ...(sceneMetadataForClothing?.characterClothing || {}),
-        ...(scene.characterClothing || {})
-      };
-
-      // Always default to 'standard' for unlisted characters (not first character's costume)
-      // This prevents inheriting costumes from other characters
-      const defaultClothing = 'standard';
-      let defaultCategory = defaultClothing;
-      let defaultCostumeType = null;
-
-      // Pass per-character clothing requirements merged with story-level requirements
-      // Each character's clothing category from scene.characterClothing
-      const sceneClothingRequirements = { ...clothingRequirements };
-      for (const char of sceneCharacters) {
-        // Find clothing using trimmed name comparison (handles trailing whitespace)
-        const charNameTrimmed = char.name.trim().toLowerCase();
-        const charClothing = Object.entries(perCharClothing).find(
-          ([name]) => name.trim().toLowerCase() === charNameTrimmed
-        )?.[1] || defaultClothing;
-        if (!sceneClothingRequirements[char.name]) {
-          sceneClothingRequirements[char.name] = {};
-        }
-        // Add the current scene's clothing selection
-        sceneClothingRequirements[char.name]._currentClothing = charClothing;
-      }
-
-      let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultCategory, defaultCostumeType, inputData.artStyle, sceneClothingRequirements);
-      // Apply styled avatars for non-costumed characters
-      if (defaultCategory !== 'costumed') {
-        pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
-      }
-
-      // Log avatar selections for each character
-      for (const photo of pagePhotos) {
-        if (photo.photoType === 'none' || !photo.hasPhoto) {
-          genLog.avatarFallback(photo.name, `No avatar found for ${defaultCategory}`, {
-            pageNumber: pageNum,
-            requestedCategory: defaultCategory,
-            costumeType: defaultCostumeType
-          });
-        } else {
-          genLog.avatarLookup(photo.name, `Using ${photo.photoType}${photo.isStyled ? ' (styled)' : ''}`, {
-            pageNumber: pageNum,
-            photoType: photo.photoType,
-            isStyled: photo.isStyled,
-            clothingCategory: photo.clothingCategory
-          });
-        }
-      }
-
-      // Get landmark photos for this scene from metadata objects like "Burgruine Stein [LOC002]"
-      // This loads the selected photo variant on-demand for Swiss landmarks
-      const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
-      const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
-      if (pageLandmarkPhotos.length > 0) {
-        log.info(`🌍 [UNIFIED] Page ${pageNum} has ${pageLandmarkPhotos.length} landmark(s): ${pageLandmarkPhotos.map(l => `${l.name}${l.variantNumber > 1 ? ` (v${l.variantNumber})` : ''}`).join(', ')}`);
-      }
-
-      // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
-      // VB elements are NO LONGER added individually to referencePhotos
-      const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
-      const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
-      let vbGrid = null;
-      if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-        vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-        log.debug(`🔲 [UNIFIED] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
-      }
-
-      // Only character photos go in allReferencePhotos (no VB elements)
-      const allReferencePhotos = pagePhotos;
-
-      const imagePrompt = buildImagePrompt(
-        scene.sceneDescription,
-        inputData,
-        sceneCharacters,
-        false,
-        visualBible,
-        pageNum,
-        true,
-        allReferencePhotos
-      );
-
-      const pageModelOverrides = { imageModel: modelOverrides.imageModel, qualityModel: modelOverrides.qualityModel };
-
-      // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
-      const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
-        if (imgUsage) {
-          // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
-          const isRunware = imgModel && imgModel.startsWith('runware:');
-          const provider = isRunware ? 'runware' : 'gemini_image';
-          const funcName = isInpaint ? 'inpaint' : 'page_images';
-          addUsage(provider, imgUsage, funcName, imgModel);
-        }
-        if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
-      };
-
-      // Add current page's characters to incremental consistency config
-      // This tells the model which characters should actually be in this scene
-      const incrConfigWithCurrentChars = incrConfig ? {
-        ...incrConfig,
-        currentCharacters: sceneCharacters.map(c => c.name)
-      } : null;
-
-      const imageResult = await generateImageWithQualityRetry(
-        imagePrompt,
-        allReferencePhotos,
-        null,
-        'scene',
-        null,
-        pageUsageTracker,
-        null,
-        pageModelOverrides,
-        `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, incrementalConsistency: incrConfigWithCurrentChars, storyText: scene.text, sceneHint: scene.outlineExtract || scene.sceneHint || null }
-      );
-
-      // Track scene rewrite usage if a safety block triggered a rewrite
-      if (imageResult?.rewriteUsage) {
-        addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
-      }
-
-      if (imageResult?.imageData) {
-        genLog.imageGenerated(pageNum, true, { model: imageResult.modelId, score: imageResult.score, attempts: imageResult.totalAttempts || 1 });
-
-        // Save partial_page checkpoint for progressive display
-        await saveCheckpoint(jobId, 'partial_page', {
-          pageNumber: pageNum,
-          text: scene.text,
-          sceneDescription: scene.sceneDescription,
-          imageData: imageResult.imageData,
-          qualityScore: imageResult.score,
-          modelId: imageResult.modelId
-        }, pageNum);
-        log.debug(`💾 [UNIFIED] Saved page ${pageNum} for progressive display`);
-      } else {
-        genLog.imageGenerated(pageNum, false, { model: imageResult?.modelId });
-      }
-
-      return {
-        pageNumber: pageNum,
-        text: scene.text,
-        description: scene.sceneDescription,
-        outlineExtract: scene.outlineExtract || scene.sceneHint || '',  // Short scene hint for re-expansion
-        imageData: imageResult?.imageData || null,
-        prompt: imagePrompt,
-        // Dev mode: Art Director prompt used to create scene description
-        sceneDescriptionPrompt: scene.sceneDescriptionPrompt,
-        sceneDescriptionModelId: scene.sceneDescriptionModelId,
-        // Include quality info if available
-        qualityScore: imageResult?.score,
-        qualityReasoning: imageResult?.reasoning,
-        fixTargets: imageResult?.fixTargets || [],
-        fixableIssues: imageResult?.fixableIssues || [],
-        thinkingText: imageResult?.thinkingText || null,
-        // Semantic evaluation (text-to-image fidelity)
-        semanticResult: imageResult?.semanticResult || null,
-        semanticScore: imageResult?.semanticScore ?? null,
-        issuesSummary: imageResult?.issuesSummary || null,
-        verdict: imageResult?.verdict || null,
-        wasRegenerated: imageResult?.wasRegenerated,
-        totalAttempts: imageResult?.totalAttempts,
-        retryHistory: imageResult?.retryHistory,
-        // Dev mode: which reference photos/avatars were used (includes element references)
-        referencePhotos: allReferencePhotos,
-        // Landmark photos (separate for frontend display)
-        landmarkPhotos: pageLandmarkPhotos,
-        // Visual Bible grid (combined VB elements + secondary landmarks)
-        visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
-        // Include characters info for incremental consistency tracking
-        sceneCharacters,
-        // Per-character clothing selections for this scene (e.g., {"Lukas": "costumed:pirate", "Franziska": "standard"})
-        sceneCharacterClothing: perCharClothing
-      };
-    };
-
-    if (separatedEvaluation && !incrementalConsistencyConfig?.enabled) {
+    {
       // =======================================================================
-      // SEPARATED EVALUATION PIPELINE (NEW ARCHITECTURE)
-      // Phase 5a: Generate ALL images first (no retry)
-      // Phase 5b: Evaluate ALL in parallel
-      // Phase 5c: Build repair plan
-      // Phase 5d: Execute repairs
+      // UNIFIED PIPELINE: Generate all → Evaluate → Repair (if enabled)
       // =======================================================================
-      log.info(`🚀 [UNIFIED] Using SEPARATED EVALUATION pipeline`);
+      log.info(`🚀 [UNIFIED] Using unified pipeline (fullRepair=${enableFullRepair})`);
 
       // Helper function to prepare page data without generation (for later use by pipeline)
       const preparePageData = async (scene, index) => {
@@ -3557,7 +3347,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         dbPool
       }, {
         regenThreshold: 50,
-        maxRegenAttempts: 2,
+        maxRegenAttempts: enableFullRepair ? 2 : 0,  // 0 = evaluate only, 2 = full repair
         evalConcurrency: 10,
         qualityModelOverride: modelOverrides.qualityModel,
         useIteratePage: false  // Fresh generation by default during story creation
@@ -3570,6 +3360,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         description: img.sceneDescription,
         outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
         imageData: img.imageData,
+        generatedAt: new Date().toISOString(),
         prompt: img.prompt,
         sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
         sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
@@ -3597,61 +3388,6 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         entityReport: img.entityReport || null
       }));
 
-    } else if (incrementalConsistencyConfig?.enabled) {
-      // SEQUENTIAL MODE for incremental consistency
-      // Generate images one at a time, comparing each against previous images
-      log.info(`🔍 [UNIFIED] Using SEQUENTIAL image generation for incremental consistency (lookback: ${incrementalConsistencyConfig.lookbackCount})`);
-      const previousImagesForConsistency = [];
-      allImages = [];
-
-      for (let index = 0; index < expandedScenes.length; index++) {
-        const scene = expandedScenes[index];
-        const pageNum = scene.pageNumber;
-
-        // Build incremental consistency config with previous images
-        let incrConfig = null;
-        if (previousImagesForConsistency.length > 0) {
-          const lookbackImages = previousImagesForConsistency.slice(-incrementalConsistencyConfig.lookbackCount);
-          incrConfig = {
-            enabled: true,
-            dryRun: incrementalConsistencyConfig.dryRun,
-            lookbackCount: incrementalConsistencyConfig.lookbackCount,
-            previousImages: lookbackImages,
-            forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold
-          };
-          log.debug(`🔍 [UNIFIED] Page ${pageNum}: checking against ${lookbackImages.length} previous page(s)`);
-        } else if (incrementalConsistencyConfig?.forceRepairThreshold != null) {
-          // Even without previous images (first page), pass forceRepairThreshold if set
-          incrConfig = { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold };
-        }
-
-        // Generate image with incremental consistency
-        const pageResult = await generatePageImage(scene, index, incrConfig);
-        allImages.push(pageResult);
-
-        // Track this image for future consistency checks
-        if (pageResult.imageData) {
-          // Use per-character clothing from the scene (e.g., {"Lukas": "costumed:pirate", "Franziska": "standard"})
-          // This is the actual clothing category selected for each character in this specific scene
-          previousImagesForConsistency.push({
-            imageData: pageResult.imageData,
-            pageNumber: pageNum,
-            characters: (pageResult.sceneCharacters || []).map(c => c.name),
-            characterClothing: pageResult.sceneCharacterClothing || {}
-          });
-        }
-      }
-    } else {
-      // PARALLEL MODE (default) - faster but no incremental consistency
-      log.debug(`🖼️ [UNIFIED] Using PARALLEL image generation (5 concurrent)`);
-      const imageLimit = pLimit(5);
-      // Even in parallel mode, pass forceRepairThreshold if set
-      const parallelIncrConfig = incrementalConsistencyConfig?.forceRepairThreshold != null
-        ? { forceRepairThreshold: incrementalConsistencyConfig.forceRepairThreshold }
-        : null;
-      allImages = await Promise.all(
-        expandedScenes.map((scene, index) => imageLimit(() => generatePageImage(scene, index, parallelIncrConfig)))
-      );
     }
 
     timing.pagesEnd = Date.now();
@@ -3762,517 +3498,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [95, 'Finalizing story...', jobId]
     );
 
-    // =========================================================================
-    // FINAL CONSISTENCY CHECKS (if enabled)
-    // =========================================================================
+    // Final consistency checks removed — entity checks now run inside runUnifiedRepairPipeline
     let finalChecksReport = null;
-    let originalStoryText = null; // Will store original text if corrections are applied
-    if (enableFinalChecks && !separatedEvaluation && !skipImages && allImages.length >= 2) {
-      try {
-        genLog.setStage('final_checks');
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [97, 'Running final consistency checks...', jobId]
-        );
-        log.info(`🔍 [UNIFIED] Running final consistency checks...`);
-
-        // Run image consistency checks - include scene context for accurate evaluation
-        const imageCheckData = {
-          sceneImages: allImages.map((img, idx) => {
-            // Extract metadata from scene description (characters, clothing, objects)
-            const metadata = extractSceneMetadata(img.description) || {};
-
-            // Extract scene summary
-            // New JSON format: use imageSummary from fullData
-            // Legacy format: text before the ```json block
-            let sceneSummary = '';
-            if (metadata.fullData?.imageSummary) {
-              sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
-            } else if (img.description) {
-              const beforeJson = img.description.split('```json')[0].trim();
-              const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
-              sceneSummary = lines[0]?.substring(0, 150) || '';
-            }
-
-            // Prefer stored sceneCharacterClothing (from page generation) over metadata extraction
-            // sceneCharacterClothing has the actual clothing used, e.g., {"Lukas": "costumed:pirate", "Sophie": "winter"}
-            const perCharClothing = img.sceneCharacterClothing || metadata.characterClothing || {};
-
-            return {
-              imageData: img.imageData,
-              pageNumber: img.pageNumber || idx + 1,
-              characters: metadata.characters || [],  // Which characters appear in this scene
-              clothing: metadata.clothing || 'standard',  // Clothing category for this scene (legacy)
-              characterClothing: perCharClothing,  // Per-character clothing for entity grouping
-              sceneSummary,  // Brief description of what's in the scene
-              // Also include character names from reference photos as fallback
-              referenceCharacters: (img.referencePhotos || []).map(p => p.name).filter(Boolean),
-              // Include per-character clothing from referencePhotos if available
-              referenceClothing: (img.referencePhotos || []).reduce((acc, p) => {
-                if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
-                return acc;
-              }, {}),
-              // Include retryHistory for entity consistency check (has bbox detection)
-              retryHistory: img.retryHistory || []
-            };
-          })
-        };
-
-        // Add cover images to consistency check (use page numbers after story pages)
-        const coverSceneImages = buildCoverSceneImages(
-          coverImages,
-          inputData.characters || [],
-          allImages.length  // Base: frontCover = length+1, initialPage = length+2, backCover = length+3
-        );
-        if (coverSceneImages.length > 0) {
-          imageCheckData.sceneImages.push(...coverSceneImages);
-          log.debug(`📊 [UNIFIED FINAL CHECKS] Added ${coverSceneImages.length} cover images to consistency check (pages ${coverSceneImages.map(c => c.pageNumber).join(', ')})`);
-        }
-
-        // LEGACY: Full-image consistency check
-        const legacyReport = await runFinalConsistencyChecks(imageCheckData, inputData.characters || [], {
-          checkCharacters: true
-        });
-
-        // Track legacy check token usage
-        if (legacyReport?.tokenUsage) {
-          addUsage('gemini_quality', {
-            input_tokens: legacyReport.tokenUsage.inputTokens || 0,
-            output_tokens: legacyReport.tokenUsage.outputTokens || 0
-          }, 'consistency_check', legacyReport.tokenUsage.model || 'gemini-2.5-flash');
-        }
-
-        // NEW: Entity-grouped consistency check (stores grids for review)
-        log.info('🔍 [UNIFIED] Running entity-grouped consistency checks...');
-        const entityReport = await runEntityConsistencyChecks(imageCheckData, inputData.characters || [], {
-          checkCharacters: true,
-          checkObjects: false,  // Objects not yet implemented
-          minAppearances: 2,
-          saveGrids: false  // Grids stored in report instead
-        });
-
-        // Track entity check token usage
-        if (entityReport?.tokenUsage) {
-          addUsage('gemini_quality', {
-            input_tokens: entityReport.tokenUsage.inputTokens || 0,
-            output_tokens: entityReport.tokenUsage.outputTokens || 0
-          }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
-        }
-
-        // Combine reports: entity as primary, legacy as fallback
-        finalChecksReport = {
-          ...legacyReport,
-          entity: entityReport,
-          legacy: {
-            imageChecks: legacyReport.imageChecks,
-            summary: legacyReport.summary
-          },
-          // Use entity issues as primary if available
-          totalIssues: (entityReport?.totalIssues || 0) + (legacyReport?.totalIssues || 0),
-          overallConsistent: (entityReport?.overallConsistent ?? true) && (legacyReport?.overallConsistent ?? true),
-          summary: entityReport?.summary || legacyReport?.summary
-        };
-
-        // =====================================================================
-        // AUTO-REGENERATE IMAGES WITH CONSISTENCY ISSUES
-        // =====================================================================
-        if (finalChecksReport?.imageChecks?.length > 0 && !inputData.skipConsistencyRegen) {
-          const pagesToRegenerate = new Set();
-          const pageIssueMap = new Map(); // pageNum -> issues[]
-
-          // Collect pages with high severity issues only (medium severity not auto-regenerated)
-          // Use pagesToFix (new) or fall back to images (legacy) for which pages to regenerate
-          for (const check of finalChecksReport.imageChecks) {
-            for (const issue of (check.issues || [])) {
-              const pagesToFix = issue.pagesToFix || issue.images || [];
-              log.debug(`🔍 [CONSISTENCY REGEN] Issue: type=${issue.type}, severity=${issue.severity || 'MISSING'}, pagesToFix=${JSON.stringify(pagesToFix)}, images=${JSON.stringify(issue.images)}`);
-              if (!issue.severity) {
-                log.warn(`⚠️ [CONSISTENCY] Issue ${issue.type} missing severity field, skipping`);
-              }
-              if (issue.severity === 'high') {
-                for (const pageNum of pagesToFix) {
-                  pagesToRegenerate.add(pageNum);
-                  if (!pageIssueMap.has(pageNum)) pageIssueMap.set(pageNum, []);
-                  pageIssueMap.get(pageNum).push(issue);
-                }
-              }
-            }
-          }
-
-          // Filter out cover pages (those beyond story pages) - covers use different generation flow
-          const totalStoryPages = allImages.length;
-          const coverPageNumbers = [...pagesToRegenerate].filter(p => p > totalStoryPages);
-          if (coverPageNumbers.length > 0) {
-            log.info(`📋 [CONSISTENCY REGEN] Skipping ${coverPageNumbers.length} cover page(s) (${coverPageNumbers.join(', ')}) - covers require separate regeneration`);
-            for (const coverPage of coverPageNumbers) {
-              pagesToRegenerate.delete(coverPage);
-            }
-          }
-
-          if (pagesToRegenerate.size === 0 && finalChecksReport.totalIssues > 0) {
-            log.info(`📋 [CONSISTENCY REGEN] No pages selected for regeneration (${finalChecksReport.totalIssues} issues found but none with high severity)`);
-          }
-
-          if (pagesToRegenerate.size > 0) {
-            log.info(`🔄 [CONSISTENCY REGEN] Regenerating ${pagesToRegenerate.size} page(s) with issues: ${[...pagesToRegenerate].join(', ')}`);
-            await dbPool.query(
-              'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-              [98, `Fixing ${pagesToRegenerate.size} consistency issue(s)...`, jobId]
-            );
-
-            for (const pageNum of pagesToRegenerate) {
-              try {
-              const pageIssues = pageIssueMap.get(pageNum);
-              const pageIndex = pageNum - 1;
-              const existingImage = allImages.find(img => img.pageNumber === pageNum);
-
-              if (!existingImage) {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} not found, skipping`);
-                continue;
-              }
-
-              // Build correction notes from issues (include canonicalVersion for clear target)
-              const correctionNotes = pageIssues.map(issue => {
-                let note = `- ${issue.type.toUpperCase()}${issue.characterInvolved ? ` (${issue.characterInvolved})` : ''}: ${issue.description}`;
-                if (issue.canonicalVersion) {
-                  note += `\n  TARGET: ${issue.canonicalVersion}`;
-                }
-                note += `\n  FIX: ${issue.recommendation}`;
-                return note;
-              }).join('\n\n');
-
-              // Re-expand scene using unified 3-step prompt with correction notes
-              log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Re-expanding with unified 3-step prompt and corrections...`);
-
-              // Reuse existing quality evaluation as preview feedback (avoids duplicate vision call)
-              let previewFeedback = null;
-              if (existingImage.qualityReasoning) {
-                previewFeedback = { composition: existingImage.qualityReasoning };
-                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using existing evaluation as preview feedback`);
-              }
-
-              // Get short scene hint for re-expansion (NOT the already-expanded description)
-              // The outlineExtract contains the original short scene summary like "Sophie finds a magic key"
-              // Using the expanded description would cause "double expansion" - distorting the scene
-              let sceneHint = existingImage.outlineExtract || '';
-              if (sceneHint) {
-                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using original scene hint for re-expansion`);
-              } else {
-                // Fallback to description/prompt if no scene hint available (shouldn't happen in unified flow)
-                sceneHint = existingImage.description || existingImage.prompt || '';
-                log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] No scene hint available, using expanded description as fallback`);
-              }
-              if (typeof sceneHint !== 'string') {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has non-string scene hint (${typeof sceneHint}), using prompt instead`);
-                sceneHint = typeof existingImage.prompt === 'string' ? existingImage.prompt : '';
-              }
-              if (!sceneHint) {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} has no scene hint or description, skipping`);
-                continue;
-              }
-
-              // Use the full description (not hint) for character detection since it has more detail
-              const fullDescription = existingImage.description || sceneHint;
-              const sceneCharacters = getCharactersInScene(fullDescription, inputData.characters);
-
-              // Build context for unified 3-step scene description prompt (same as original generation)
-              const pageText = existingImage.text || '';
-              // Build previous scenes context from allImages (which have descriptions)
-              const previousScenes = allImages
-                .filter(img => img.pageNumber < pageNum)
-                .sort((a, b) => b.pageNumber - a.pageNumber)
-                .slice(0, 2)
-                .map(img => ({
-                  pageNumber: img.pageNumber,
-                  summary: img.description?.substring(0, 200) || ''
-                }));
-              const clothingDataForPrompt = clothingRequirements || {};
-              // Build available avatars - only show clothing categories used in this story
-              const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters || [], clothingRequirements);
-              const expansionPrompt = buildSceneDescriptionPrompt(
-                pageNum,
-                pageText || sceneHint,  // Fallback to scene hint if no page text
-                sceneCharacters,
-                sceneHint,  // Use as shortSceneDesc
-                inputData.language,
-                visualBible,
-                previousScenes,
-                clothingDataForPrompt,
-                correctionNotes,
-                availableAvatars,
-                null,  // rawOutlineContext
-                previewFeedback  // Pass existing image analysis for comparison
-              );
-
-              const expandedDescriptionResult = await callClaudeAPI(expansionPrompt, 10000, modelOverrides?.sceneIterationModel, { prefill: '{"previewMismatches":[' });
-
-              // Track token usage for scene expansion (Issue #1 fix)
-              if (expandedDescriptionResult?.usage) {
-                addUsage('anthropic', expandedDescriptionResult.usage, 'consistency_regen_expansion', expandedDescriptionResult.modelId);
-              }
-
-              // Validate expansion result (Issue #2 fix)
-              if (!expandedDescriptionResult?.text) {
-                log.warn(`⚠️ [CONSISTENCY REGEN] Page ${pageNum} expansion failed, skipping`);
-                continue;
-              }
-              const expandedDescription = expandedDescriptionResult.text;
-
-              // Get reference photos for this scene with CORRECT clothing
-              // Use NEW expanded description for metadata (Issue #3 fix)
-              const sceneMetadataForClothing = extractSceneMetadata(expandedDescription) || {};
-
-              // Build per-character clothing requirements for this page
-              // Priority: 1) per-character from scene metadata, 2) story-level clothingRequirements, 3) existingImage.clothing, 4) 'standard'
-              const pageClothingReqs = {};
-
-              // First, add story-level requirements
-              if (clothingRequirements) {
-                for (const [charName, reqs] of Object.entries(clothingRequirements)) {
-                  if (reqs && reqs._currentClothing) {
-                    pageClothingReqs[charName] = { _currentClothing: reqs._currentClothing };
-                  }
-                }
-              }
-
-              // Override with per-character clothing from scene metadata (new JSON format)
-              if (sceneMetadataForClothing.characterClothing && Object.keys(sceneMetadataForClothing.characterClothing).length > 0) {
-                for (const [charName, clothing] of Object.entries(sceneMetadataForClothing.characterClothing)) {
-                  pageClothingReqs[charName] = { _currentClothing: clothing };
-                }
-              }
-
-              // Determine default clothing for getCharacterPhotoDetails (for characters not in the map)
-              // Priority: existingImage.clothing, first character's clothing from metadata, or 'standard'
-              let originalClothing = existingImage.clothing;
-              if (!originalClothing && sceneMetadataForClothing.characterClothing) {
-                const firstCharClothing = Object.values(sceneMetadataForClothing.characterClothing)[0];
-                originalClothing = firstCharClothing || 'standard';
-              }
-              if (!originalClothing) {
-                originalClothing = sceneMetadataForClothing.clothing || 'standard'; // Legacy fallback
-              }
-
-              let clothingCategory = originalClothing;
-              let costumeType = null;
-              if (originalClothing.startsWith('costumed:')) {
-                clothingCategory = 'costumed';
-                costumeType = originalClothing.split(':')[1];
-              }
-
-              const clothingDebug = Object.keys(pageClothingReqs).length > 0
-                ? Object.entries(pageClothingReqs).map(([n, r]) => `${n}:${r._currentClothing}`).join(', ')
-                : originalClothing;
-              log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Using clothing: ${clothingDebug}`);
-              let pagePhotos = getCharacterPhotoDetails(sceneCharacters, clothingCategory, costumeType, inputData.artStyle, pageClothingReqs);
-              pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
-
-              // Get landmark photos (loads selected variant on-demand for Swiss landmarks)
-              const sceneMetadata = extractSceneMetadata(expandedDescription);
-              const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
-
-              // Build Visual Bible grid (combines VB elements + secondary landmarks into single image)
-              // VB elements are NO LONGER added individually to referencePhotos
-              const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
-              const secondaryLandmarks = pageLandmarkPhotos.slice(1); // 2nd+ landmarks go in grid
-              let vbGrid = null;
-              if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
-                vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
-                log.debug(`🔲 [CONSISTENCY REGEN] Page ${pageNum} VB grid: ${elementReferences.length} elements + ${secondaryLandmarks.length} secondary landmarks`);
-              }
-
-              // Only character photos go in allReferencePhotos (no VB elements)
-              const allReferencePhotos = pagePhotos;
-
-              // Build new image prompt
-              const imagePrompt = buildImagePrompt(
-                expandedDescription,
-                inputData,
-                sceneCharacters,
-                false,
-                visualBible,
-                pageNum,
-                true,
-                allReferencePhotos
-              );
-
-              // Usage tracker for consistency regen
-              const regenUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-                if (imgUsage) addUsage('gemini_image', imgUsage, 'consistency_regen', imgModel);
-                if (qualUsage) addUsage('gemini_quality', qualUsage, 'consistency_regen_quality', qualModel);
-              };
-
-              // Regenerate with quality retry
-              // Pass vbGrid for combined reference (instead of individual VB element photos)
-              log.info(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Generating new image...`);
-              const imageResult = await generateImageWithQualityRetry(
-                imagePrompt,
-                allReferencePhotos,
-                pageNum > 1 ? allImages[pageIndex - 1]?.imageData : null,
-                'scene',
-                null,
-                regenUsageTracker,
-                null,
-                { imageModel: modelOverrides?.imageModel, qualityModel: modelOverrides?.qualityModel },
-                `PAGE ${pageNum} (consistency fix)`,
-                { isAdmin: false, enableAutoRepair: false, useGridRepair: false, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata: sceneMetadataForClothing }
-              );
-
-              // Track scene rewrite usage if a safety block triggered a rewrite
-              if (imageResult?.rewriteUsage) {
-                addUsage('anthropic', imageResult.rewriteUsage, 'scene_rewrite');
-              }
-
-              if (imageResult?.imageData) {
-                // Summarize avatar info (without base64 data)
-                const avatarsUsed = pagePhotos.map(p => ({
-                  name: p.name,
-                  hasPhoto: p.hasPhoto,
-                  category: p.category,
-                  photoType: p.photoType
-                }));
-
-                // Store original image and prompt before replacing (with retry history for dev mode)
-                existingImage.consistencyRegen = {
-                  originalImage: existingImage.imageData,
-                  originalPrompt: existingImage.prompt,
-                  originalDescription: existingImage.description,
-                  fixedImage: imageResult.imageData,
-                  fixedPrompt: imagePrompt,
-                  fixedDescription: expandedDescription,
-                  correctionNotes: correctionNotes,
-                  issues: pageIssues,
-                  score: imageResult.score,
-                  timestamp: new Date().toISOString(),
-                  retryHistory: imageResult.retryHistory || [],
-                  totalAttempts: imageResult.totalAttempts || 1,
-                  wasRegenerated: imageResult.wasRegenerated || false,
-                  clothing: originalClothing,
-                  avatarsUsed: avatarsUsed
-                };
-
-                // Replace with fixed image
-                // Debug: Log image data hash to verify different images are generated
-                const oldHash = existingImage.imageData ? existingImage.imageData.slice(-20) : 'none';
-                const newHash = imageResult.imageData ? imageResult.imageData.slice(-20) : 'none';
-                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] existingImage.pageNumber=${existingImage.pageNumber}, arrayIndex=${allImages.indexOf(existingImage)}`);
-                log.debug(`🔄 [CONSISTENCY REGEN] [PAGE ${pageNum}] Image hash: ${oldHash} -> ${newHash}`);
-
-                // Add consistency regen as a new version
-                // Note: original image is already saved as versionIndex 0 via img.imageData
-                // in saveStoryData, so we don't duplicate it into imageVersions
-                if (!existingImage.imageVersions) {
-                  existingImage.imageVersions = [];
-                }
-                // Add consistency-fixed image as new version
-                existingImage.imageVersions.push({
-                  imageData: imageResult.imageData,
-                  prompt: imagePrompt,
-                  description: expandedDescription,
-                  qualityScore: imageResult.score,
-                  qualityReasoning: imageResult.reasoning || null,
-                  fixTargets: imageResult.fixTargets || [],
-                  totalAttempts: imageResult.totalAttempts || null,
-                  generatedAt: new Date().toISOString(),
-                  source: 'consistency-regen'
-                });
-
-                // NOTE: Do NOT copy to existingImage.imageData - that would cause the image
-                // to be saved twice (once as version 0, once in imageVersions). The new image
-                // is stored in imageVersions and activeVersion meta points to it.
-                // Keep metadata on main object for display purposes.
-                existingImage.prompt = imagePrompt;
-                existingImage.description = expandedDescription;
-                existingImage.qualityScore = imageResult.score;
-                log.info(`✅ [CONSISTENCY REGEN] [PAGE ${pageNum}] Added new version (score: ${imageResult.score || 'N/A'}%, version ${existingImage.imageVersions.length})`);
-
-                log.debug(`💾 [CONSISTENCY REGEN] [PAGE ${pageNum}] New version added to imageVersions (will be saved with story)`);
-              } else {
-                log.warn(`⚠️ [CONSISTENCY REGEN] [PAGE ${pageNum}] Regeneration failed, keeping original`);
-              }
-              } catch (pageErr) {
-                // Issue #4 fix: Catch per-page errors so other pages can still regenerate
-                log.error(`❌ [CONSISTENCY REGEN] [PAGE ${pageNum}] Error during regeneration: ${pageErr.message}`);
-                log.debug(`   Stack: ${pageErr.stack?.split('\n').slice(0, 3).join(' -> ')}`);
-                // Continue to next page
-              }
-            }
-
-            // Track which pages were regenerated (skip redundant re-check - each image already evaluated)
-            finalChecksReport.pagesRegenerated = [...pagesToRegenerate];
-            log.info(`📋 [CONSISTENCY REGEN] Regeneration complete for ${pagesToRegenerate.size} page(s)`);
-
-            // Note: story_images cleanup skipped during initial generation
-            // The story doesn't exist in the database yet, so there are no stale entries to delete
-            // story_images entries are only created when explicitly saving individual images later
-
-            // Debug: Verify all images have unique data after consistency regen
-            const imageHashes = allImages.map(img => ({
-              page: img.pageNumber,
-              hash: img.imageData ? img.imageData.slice(-20) : 'none'
-            }));
-            const hashGroups = {};
-            for (const { page, hash } of imageHashes) {
-              if (!hashGroups[hash]) hashGroups[hash] = [];
-              hashGroups[hash].push(page);
-            }
-            const duplicates = Object.entries(hashGroups).filter(([, pages]) => pages.length > 1);
-            if (duplicates.length > 0) {
-              log.warn(`⚠️ [CONSISTENCY REGEN] DUPLICATE IMAGES DETECTED: ${JSON.stringify(duplicates.map(([hash, pages]) => ({ hash, pages })))}`);
-            } else {
-              log.debug(`✅ [CONSISTENCY REGEN] All ${allImages.length} images have unique data`);
-            }
-          }
-        }
-
-        // Await text consistency check (started early, in parallel with image generation)
-        if (textCheckPromise) {
-          log.debug(`📝 [UNIFIED] Awaiting early text consistency check result...`);
-          const textCheck = await textCheckPromise;
-          if (textCheck) {
-            // Track token usage for text check
-            if (textCheck.usage) {
-              const textCheckProvider = unifiedModelId?.startsWith('gemini') ? 'gemini_text' : 'anthropic';
-              addUsage(textCheckProvider, {
-                input_tokens: textCheck.usage.input_tokens || 0,
-                output_tokens: textCheck.usage.output_tokens || 0
-              }, 'text_check', unifiedModelId);
-            }
-            // Add original text to textCheck for display
-            textCheck.fullOriginalText = fullStoryText;
-            finalChecksReport.textCheck = textCheck;
-            if (textCheck.quality !== 'good') {
-              finalChecksReport.overallConsistent = false;
-            }
-            finalChecksReport.totalIssues += textCheck.issues?.length || 0;
-
-            // Auto-apply text corrections if available
-            if (textCheck.fullCorrectedText && textCheck.issues?.length > 0) {
-              log.info(`✏️  [UNIFIED] Applying ${textCheck.issues.length} text correction(s) to story`);
-              originalStoryText = fullStoryText; // Preserve original for dev mode
-              fullStoryText = textCheck.fullCorrectedText; // Apply corrected text
-              finalChecksReport.textCorrectionApplied = true;
-            }
-          }
-        }
-
-        // Log results to generation log
-        genLog.info('final_checks_result', `Final checks: ${finalChecksReport.summary}`, null, {
-          imageChecks: finalChecksReport.imageChecks?.length || 0,
-          textCheck: finalChecksReport.textCheck ? 'completed' : 'skipped',
-          textCorrectionApplied: finalChecksReport.textCorrectionApplied || false,
-          totalIssues: finalChecksReport.totalIssues || 0,
-          overallConsistent: finalChecksReport.overallConsistent,
-          summary: finalChecksReport.summary
-        });
-
-        log.info(`📋 [UNIFIED] Final checks complete: ${finalChecksReport.summary}`);
-      } catch (checkErr) {
-        log.error('❌ [UNIFIED] Final checks failed:', checkErr.message);
-        genLog.error('final_checks_failed', checkErr.message);
-        // Non-fatal - story generation continues
-      }
-    }
+    let originalStoryText = null;
 
     // Log API usage to generationLog BEFORE saving story (so it's included in the saved data)
     genLog.setStage('finalize');
@@ -4390,14 +3618,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         coverCount: Object.keys(coverImages || {}).filter(k => coverImages[k]?.imageData || coverImages[k]?.hasImage).length,
         // Pipeline config
         pipelineConfig: {
-          enableQualityRetry,
-          enableAutoRepair,
-          useGridRepair,
-          enableFinalChecks,
-          separatedEvaluation,
-          enableSceneValidation,
-          incrementalConsistency: !!incrementalConsistencyConfig,
-          checkOnlyMode,
+          enableFullRepair,
         },
         // Models used
         models: {
@@ -4870,41 +4091,9 @@ async function processStoryJob(jobId) {
 
     const skipImages = inputData.skipImages === true; // Developer mode: text only
     const skipCovers = inputData.skipCovers === true; // Developer mode: skip cover generation
-    const enableQualityRetry = inputData.enableQualityRetry === true; // Developer mode: retry on low quality scores (default: OFF)
-    const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
-    const useGridRepair = inputData.useGridRepair !== false; // Use grid-based repair (default: ON when autoRepair is on)
-    const forceRepairThreshold = typeof inputData.forceRepairThreshold === 'number' ? inputData.forceRepairThreshold : null; // Force repair on pages with issues below this score
-    const enableFinalChecks = inputData.enableFinalChecks !== false; // Final consistency checks (default: ON, disable with enableFinalChecks: false)
-    const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
-    const enableSceneValidation = inputData.enableSceneValidation === true; // Developer mode: validate scene composition with cheap preview (default: OFF)
-    // Separated Evaluation: Generate all images first, then evaluate/repair in batch
-    // This reduces latency and allows smarter repair decisions across all pages
-    const separatedEvaluation = inputData.separatedEvaluation === true || MODEL_DEFAULTS.separatedEvaluation === true;
-    log.debug(`🔧 [PIPELINE] Scene validation input: ${inputData.enableSceneValidation} (type: ${typeof inputData.enableSceneValidation}), resolved: ${enableSceneValidation}`);
-    if (separatedEvaluation) {
-      log.info(`🔧 [PIPELINE] Separated evaluation ENABLED - will generate all images first, then batch evaluate`);
-    }
+    const enableFullRepair = inputData.enableFullRepair !== false; // Full repair after generation (default: ON)
 
-    // Incremental consistency check options (check each image against previous N images)
-    const incrementalConsistencyOptions = inputData.incrementalConsistency || {};
-    const enableIncrementalConsistency = incrementalConsistencyOptions.enabled === true;
-    const incrementalConsistencyDryRun = incrementalConsistencyOptions.dryRun === true;
-    const incrementalConsistencyLookback = incrementalConsistencyOptions.lookbackCount || 3;
-    if (enableIncrementalConsistency) {
-      log.debug(`🔍 [PIPELINE] Incremental consistency check ENABLED (lookback: ${incrementalConsistencyLookback}, dryRun: ${incrementalConsistencyDryRun})`);
-    }
-    if (checkOnlyMode) {
-      log.debug(`🔍 [PIPELINE] Check-only mode ENABLED - all regeneration will be skipped`);
-    }
-    if (enableSceneValidation) {
-      log.debug(`🔍 [PIPELINE] Scene validation ENABLED - will generate preview images for composition checks`);
-    }
-
-    log.info(`🔧 [PIPELINE] Settings: qualityRetry=${enableQualityRetry}, autoRepair=${enableAutoRepair}, gridRepair=${useGridRepair}, ` +
-      `forceRepairThreshold=${forceRepairThreshold}, finalChecks=${enableFinalChecks}, ` +
-      `checkOnly=${checkOnlyMode}, sceneValidation=${enableSceneValidation}, ` +
-      `separatedEval=${separatedEvaluation}, skipImages=${skipImages}, skipCovers=${skipCovers}, ` +
-      `incrementalConsistency=${enableIncrementalConsistency}${enableIncrementalConsistency ? ` (dryRun=${incrementalConsistencyDryRun}, lookback=${incrementalConsistencyLookback})` : ''}`);
+    log.info(`🔧 [PIPELINE] Settings: enableFullRepair=${enableFullRepair}, skipImages=${skipImages}, skipCovers=${skipCovers}`);
 
     // Check if user is admin (for including debug images in repair history)
     const userResult = await dbPool.query('SELECT role FROM users WHERE id = $1', [job.user_id]);
@@ -4989,28 +4178,20 @@ async function processStoryJob(jobId) {
       ['processing', 5, 'Starting story generation...', jobId]
     );
 
-    // Build incremental consistency config for passing to processing functions
-    const incrementalConsistencyConfig = enableIncrementalConsistency ? {
-      enabled: true,
-      dryRun: incrementalConsistencyDryRun,
-      lookbackCount: incrementalConsistencyLookback,
-      forceRepairThreshold  // Pass through for image generation
-    } : { forceRepairThreshold };  // Even without incremental consistency, pass repair threshold
-
     // Route to appropriate processing function based on generation mode
     if (generationMode === 'unified') {
       log.debug(`📚 [PIPELINE] Unified mode - single prompt + Art Director scene expansion`);
-      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation, separatedEvaluation, enableQualityRetry);
+      return await processUnifiedStoryJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableFullRepair);
     }
 
     if (generationMode === 'pictureBook') {
       log.debug(`📚 [PIPELINE] Picture Book mode - using combined text+scene generation`);
-      return await legacyPipelines.processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation);
+      return await legacyPipelines.processStorybookJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin);
     }
 
     // outlineAndText mode (legacy): Separate outline + text generation
     log.debug(`📚 [PIPELINE] OutlineAndText mode - using legacy outline+text pipeline`);
-    return await legacyPipelines.processOutlineAndTextJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin, enableAutoRepair, useGridRepair, enableFinalChecks, incrementalConsistencyConfig, checkOnlyMode, enableSceneValidation);
+    return await legacyPipelines.processOutlineAndTextJob(jobId, inputData, characterPhotos, skipImages, skipCovers, job.user_id, modelOverrides, isAdmin);
 
   } catch (error) {
     // Clear styled avatar cache on error too

@@ -565,13 +565,15 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     }
 
     // Create new version entry
+    const regenTimestamp = new Date().toISOString();
     const newVersion = {
       imageData: imageResult.imageData,
       userInput: inputDescription !== expandedDescription ? inputDescription : null,  // User's input before expansion
       description: expandedDescription,  // Full expanded scene description used for this version
       prompt: imagePrompt,
       modelId: imageResult.modelId || null,
-      createdAt: new Date().toISOString(),
+      createdAt: regenTimestamp,
+      generatedAt: regenTimestamp,  // saveStoryData uses generatedAt for story_images.generated_at
       isActive: true,
       qualityScore: imageResult.score ?? null,
       qualityReasoning: imageResult.reasoning || null,
@@ -1078,12 +1080,14 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     }
 
     // Create new version entry
+    const timestamp = new Date().toISOString();
     const newVersion = {
       imageData: imageResult.imageData,
       description: newSceneDescription,
       prompt: imagePrompt,
       modelId: imageResult.modelId || null,
-      createdAt: new Date().toISOString(),
+      createdAt: timestamp,
+      generatedAt: timestamp,  // saveStoryData uses generatedAt for story_images.generated_at
       isActive: true,
       type: 'iteration',
       iterationFeedback: previewFeedback.composition,
@@ -1533,13 +1537,15 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     console.log(`💰 [COVER REGEN] API Cost: ${formatCostSummary(coverImageModelId, { imageCount: coverResult.totalAttempts || 1 }, coverImageCost)} (${coverResult.totalAttempts || 1} attempt(s))`);
 
     // Create new version entry
+    const coverRegenTimestamp = new Date().toISOString();
     const newVersion = {
       imageData: coverResult.imageData,
       qualityScore: coverResult.score,
       description: sceneDescription,
       prompt: coverPrompt,
       modelId: coverResult.modelId || coverImageModelId,
-      createdAt: new Date().toISOString(),
+      createdAt: coverRegenTimestamp,
+      generatedAt: coverRegenTimestamp,
       type: 'regeneration',
       isActive: true
     };

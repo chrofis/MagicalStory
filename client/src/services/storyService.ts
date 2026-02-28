@@ -1439,7 +1439,6 @@ export const storyService = {
     relationships: RelationshipMap;
     relationshipTexts: RelationshipTextMap;
     skipImages?: boolean;
-    imageGenMode?: 'parallel' | 'sequential' | null;
     // Developer generation mode override (pictureBook = single prompt, outlineAndText = outline+text)
     generationMode?: 'pictureBook' | 'outlineAndText';
     // Developer skip options
@@ -1447,21 +1446,8 @@ export const storyService = {
     skipText?: boolean;
     skipSceneDescriptions?: boolean;
     skipCovers?: boolean;
-    // Developer feature options
-    enableQualityRetry?: boolean;  // Retry on low quality scores (default: ON)
-    enableAutoRepair?: boolean;
-    useGridRepair?: boolean;  // Use grid-based repair instead of legacy inpainting
-    forceRepairThreshold?: number | null;  // Force repair on pages with issues below this score (100 = always)
-    enableFinalChecks?: boolean;
-    checkOnlyMode?: boolean;  // Skip all regeneration, only run checks
-    enableSceneValidation?: boolean;  // Cheap preview + geometry check
-    separatedEvaluation?: boolean;  // Generate all images first, then batch evaluate
-    // Incremental consistency check (check each image against previous images)
-    incrementalConsistency?: {
-      enabled: boolean;
-      dryRun: boolean;
-      lookbackCount: number;
-    };
+    // Full repair: evaluate + regen low-scoring + character fix (default: ON)
+    enableFullRepair?: boolean;
     // Developer model overrides (admin only)
     modelOverrides?: {
       outlineModel?: string | null;
@@ -1519,24 +1505,14 @@ export const storyService = {
       relationships: data.relationships,
       relationshipTexts: data.relationshipTexts,
       skipImages: data.skipImages,
-      imageGenMode: data.imageGenMode,
       generationMode: data.generationMode,
       // Developer skip options
       skipOutline: data.skipOutline,
       skipText: data.skipText,
       skipSceneDescriptions: data.skipSceneDescriptions,
       skipCovers: data.skipCovers,
-      // Developer feature options
-      enableQualityRetry: data.enableQualityRetry,
-      enableAutoRepair: data.enableAutoRepair,
-      useGridRepair: data.useGridRepair,
-      forceRepairThreshold: data.forceRepairThreshold,
-      enableFinalChecks: data.enableFinalChecks,
-      checkOnlyMode: data.checkOnlyMode,  // Skip all regeneration, only run checks
-      enableSceneValidation: data.enableSceneValidation,  // Cheap preview + geometry check
-      separatedEvaluation: data.separatedEvaluation,  // Generate all images first, then batch evaluate
-      // Incremental consistency check
-      incrementalConsistency: data.incrementalConsistency,
+      // Full repair pipeline option
+      enableFullRepair: data.enableFullRepair,
       // Developer model overrides
       modelOverrides: data.modelOverrides,
       // User location for landmark discovery

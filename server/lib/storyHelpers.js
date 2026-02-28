@@ -338,8 +338,15 @@ function stripSceneMetadata(sceneDescription) {
 
   // Try NEW JSON format first using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
-  // Support all wrapper formats: "scene" (critique-only), "output" (old), "draft" (unified), or raw
-  const sceneData = parsed?.scene || parsed?.output || parsed?.draft || parsed;
+  // Support all wrapper formats: "scene" (critique-only), "output" (old), "draft" (unified),
+  // "previewMismatches" (iteration/consistency regen), or raw
+  let sceneData = parsed?.scene || parsed?.output || parsed?.draft;
+  // Handle previewMismatches wrapper: scene is nested inside previewMismatches[0].scene
+  if (!sceneData && parsed?.previewMismatches?.[0]?.scene) {
+    sceneData = parsed.previewMismatches[0].scene;
+  }
+  // Fallback: use parsed directly if it has scene fields
+  if (!sceneData) sceneData = parsed;
   if (sceneData && (sceneData.imageSummary || sceneData.characters)) {
     // Convert structured JSON to prose for image prompt
     return buildTextFromJson(sceneData);
@@ -516,8 +523,13 @@ function extractSceneMetadata(sceneDescription) {
 
   // Try NEW JSON format first using robust extraction
   const parsed = extractJsonFromText(sceneDescription);
-  // Support all wrapper formats: "scene" (critique-only mode), "output" (old format), "draft" (unified prompt format), or raw JSON
-  const parsedData = parsed?.scene || parsed?.output || parsed?.draft || parsed;
+  // Support all wrapper formats: "scene" (critique-only mode), "output" (old format), "draft" (unified prompt format),
+  // "previewMismatches" (iteration/consistency regen), or raw JSON
+  let parsedData = parsed?.scene || parsed?.output || parsed?.draft;
+  if (!parsedData && parsed?.previewMismatches?.[0]?.scene) {
+    parsedData = parsed.previewMismatches[0].scene;
+  }
+  if (!parsedData) parsedData = parsed;
   if (parsed && parsedData && parsedData.characters) {
     // Extract per-character clothing and positions
     const characterClothing = {};
