@@ -2578,7 +2578,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     landmarkPhotos = [],
     visualBibleGrid = null,
     pageNumber = null,
-    onImageReady = null
+    onImageReady = null,
+    skipCache = false
   } = options;
 
   // Check cache first (include previousImage presence and page number in cache key)
@@ -2587,7 +2588,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
   // For generateImageOnly, we use a separate cache namespace to avoid conflicts with evaluated images
   const genOnlyCacheKey = `genonly_${cacheKey}`;
 
-  if (imageCache.has(genOnlyCacheKey)) {
+  if (!skipCache && imageCache.has(genOnlyCacheKey)) {
     log.debug(`💾 [IMAGE GEN-ONLY] Cache HIT (${imageCache.size} cached)`);
     const cachedResult = imageCache.get(genOnlyCacheKey);
     if (onImageReady && cachedResult.imageData) {
@@ -2642,7 +2643,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         usage: result.usage
       };
 
-      imageCache.set(genOnlyCacheKey, finalResult);
+      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
       return finalResult;
     } catch (runwareError) {
       log.error(`❌ [IMAGE GEN-ONLY] Runware failed, falling back to Gemini: ${runwareError.message}`);
@@ -2820,7 +2821,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         usage: result.usage
       };
 
-      imageCache.set(genOnlyCacheKey, finalResult);
+      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
       return finalResult;
     } catch (runwareError) {
       log.error('❌ [IMAGE GEN-ONLY] Runware generation failed:', runwareError.message);
@@ -2912,7 +2913,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
           usage
         };
 
-        imageCache.set(genOnlyCacheKey, result);
+        if (!skipCache) imageCache.set(genOnlyCacheKey, result);
         log.info(`✅ [IMAGE GEN-ONLY] Image generated successfully`);
         return result;
       }
@@ -3877,6 +3878,23 @@ function selectBestVersion(versions) {
 }
 
 /**
+ * Build a feedback suffix from evaluation results to inject into regen prompts.
+ * Tells the image model what quality issues to fix in the next attempt.
+ */
+function buildRegenFeedback(evaluation) {
+  if (!evaluation?.evaluated) return '';
+  const parts = [];
+  if (evaluation.reasoning) {
+    parts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluation.reasoning}`);
+  }
+  if (evaluation.fixableIssues?.length > 0) {
+    parts.push('Specific problems to avoid:\n' +
+      evaluation.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
+  }
+  return parts.join('\n\n');
+}
+
+/**
  * Unified repair pipeline — replaces phases 5b-5d and final consistency checks.
  *
  * Flow:
@@ -4082,12 +4100,20 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               }
             }
           } else {
-            result = await generateImageOnly(img.prompt, img.characterPhotos, {
+            // Inject evaluation feedback so the model knows what to fix
+            const ev = evalMap.get(img.pageNumber);
+            const feedbackSuffix = buildRegenFeedback(ev);
+            const regenPrompt = feedbackSuffix
+              ? `${img.prompt}\n\n${feedbackSuffix}`
+              : img.prompt;
+
+            result = await generateImageOnly(regenPrompt, img.characterPhotos, {
               imageModelOverride: modelOverrides.imageModel,
               imageBackendOverride: modelOverrides.imageBackend,
               landmarkPhotos: img.landmarkPhotos,
               visualBibleGrid: img.visualBibleGrid,
-              pageNumber: img.pageNumber
+              pageNumber: img.pageNumber,
+              skipCache: true
             });
             if (result?.usage && usageTracker) {
               const isRunware = result.modelId && result.modelId.startsWith('runware:');
@@ -4182,12 +4208,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 usageTracker('gemini_image', result.usage, 'unified_pipeline_regen2', result.modelId);
               }
             } else {
-              result = await generateImageOnly(img.prompt, img.characterPhotos, {
+              // Use latest evaluation (from pass 1 if available) for feedback
+              const versions = pageVersions.get(img.pageNumber) || [];
+              const latestVersion = versions[versions.length - 1];
+              const latestEval = latestVersion?.evaluation || evalMap.get(img.pageNumber);
+              const feedbackSuffix = buildRegenFeedback(latestEval);
+              const regenPrompt = feedbackSuffix
+                ? `${img.prompt}\n\n${feedbackSuffix}`
+                : img.prompt;
+
+              result = await generateImageOnly(regenPrompt, img.characterPhotos, {
                 imageModelOverride: modelOverrides.imageModel,
                 imageBackendOverride: modelOverrides.imageBackend,
                 landmarkPhotos: img.landmarkPhotos,
                 visualBibleGrid: img.visualBibleGrid,
-                pageNumber: img.pageNumber
+                pageNumber: img.pageNumber,
+                skipCache: true
               });
               if (result?.usage && usageTracker) {
                 const isRunware = result.modelId && result.modelId.startsWith('runware:');
