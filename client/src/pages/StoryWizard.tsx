@@ -3673,6 +3673,13 @@ export default function StoryWizard() {
 
           // Stop tracking in global context
           stopTracking();
+
+          // Navigate directly to the story — don't rely on GenerationContext auto-nav
+          // because stopTracking() kills its polling before it detects completion.
+          // This triggers loadSavedStory which fetches images from story_images table.
+          if (status.result.storyId) {
+            setSearchParams({ storyId: status.result.storyId }, { replace: true });
+          }
         } else if (status.status === 'failed') {
           throw new Error(status.error || 'Story generation failed');
         }
