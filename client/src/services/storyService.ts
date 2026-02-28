@@ -717,6 +717,12 @@ export const storyService = {
         imageData: string;
         qualityScore?: number;
         isActive?: boolean;
+        createdAt?: string;
+        generatedAt?: string;
+        description?: string;
+        prompt?: string;
+        modelId?: string;
+        type?: string;
       }>;
     }>;
     covers: {
@@ -741,6 +747,12 @@ export const storyService = {
             imageData: string;
             qualityScore?: number;
             isActive?: boolean;
+            createdAt?: string;
+            generatedAt?: string;
+            description?: string;
+            prompt?: string;
+            modelId?: string;
+            type?: string;
           }>;
         }>;
         covers: {

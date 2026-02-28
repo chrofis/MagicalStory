@@ -4022,7 +4022,7 @@ export default function StoryWizard() {
                           return prev.map(existing => {
                             const updated = newImages.find(img => img.pageNumber === existing.pageNumber);
                             if (updated) {
-                              return { ...existing, ...updated };
+                              return { ...existing, ...updated } as SceneImage;
                             }
                             return existing;
                           });
