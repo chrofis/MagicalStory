@@ -4307,6 +4307,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages`);
 
+    // Limit: max 30% of total pages including covers (rounded up)
+    const totalPagesWithCovers = rawImages.length + 3; // 3 covers: front, initial, back
+    const maxCharFixes = Math.ceil(totalPagesWithCovers * 0.3);
+    if (fixTasks.length > maxCharFixes) {
+      // Sort by page quality score (ascending) — fix worst-scoring pages first
+      fixTasks.sort((a, b) => {
+        const scoreA = bestPerPage.get(a.pageNumber)?.score ?? 100;
+        const scoreB = bestPerPage.get(b.pageNumber)?.score ?? 100;
+        return scoreA - scoreB;
+      });
+      const dropped = fixTasks.length - maxCharFixes;
+      fixTasks.length = maxCharFixes;
+      log.info(`👤 [UNIFIED PIPELINE] Limited to ${maxCharFixes} fixes (${rawImages.length} pages × 30% = ${Math.ceil(rawImages.length * 0.3)}, cap 5). Dropped ${dropped} lower-priority fixes.`);
+    }
+
     // Group fix tasks by page for sequential application
     const fixesByPage = new Map();
     for (const task of fixTasks) {
