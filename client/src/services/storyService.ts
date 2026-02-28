@@ -506,6 +506,25 @@ export const storyService = {
     }
   },
 
+  // Get evaluation data for repair workflow (fixableIssues, fixTargets, semanticResult, etc.)
+  async getEvaluationData(storyId: string): Promise<{
+    sceneEvaluations: Array<{
+      pageNumber: number;
+      qualityScore: number | null;
+      verdict: string | null;
+      issuesSummary: string | null;
+      semanticScore: number | null;
+      semanticResult: any | null;
+      fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }> | null;
+      fixTargets: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }> | null;
+      consistencyRegen: any | null;
+    }>;
+    finalChecksReport: FinalChecksReport | null;
+  }> {
+    const response = await api.get<any>(`/api/stories/${storyId}/evaluation-data`);
+    return response;
+  },
+
   // Lazy load dev mode images on demand
   async getDevImage(
     storyId: string,
@@ -2018,7 +2037,6 @@ export const storyService = {
       qualityScore?: number;
       fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }>;
       entityIssues: Array<{ character: string; issue: string; severity: string }>;
-      manualNotes: string;
       needsFullRedo: boolean;
     }>;
     totalIssues: number;
@@ -2029,7 +2047,6 @@ export const storyService = {
         qualityScore?: number;
         fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }>;
         entityIssues: Array<{ character: string; issue: string; severity: string }>;
-        manualNotes: string;
         needsFullRedo: boolean;
       }>;
       totalIssues: number;

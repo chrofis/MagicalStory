@@ -921,6 +921,75 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/stories/:id/evaluation-data - Get evaluation fields from scene images
+// Used by Repair Workflow to populate Collect Feedback without loading full story blob
+router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Extract evaluation fields from sceneImages using jsonb_array_elements
+    const evalRows = await dbQuery(`
+      SELECT
+        (s->>'pageNumber')::int as page_number,
+        s->'qualityScore' as quality_score,
+        s->>'verdict' as verdict,
+        s->>'issuesSummary' as issues_summary,
+        s->'semanticScore' as semantic_score,
+        s->'semanticResult' as semantic_result,
+        s->'fixableIssues' as fixable_issues,
+        s->'fixTargets' as fix_targets,
+        s->'consistencyRegen' as consistency_regen
+      FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') s
+      WHERE id = $1
+      ORDER BY (s->>'pageNumber')::int
+    `, [id]);
+
+    // Extract finalChecksReport separately
+    const reportRows = await dbQuery(
+      `SELECT data::jsonb->'finalChecksReport' as final_checks_report FROM stories WHERE id = $1`,
+      [id]
+    );
+
+    const sceneEvaluations = evalRows.map(row => ({
+      pageNumber: row.page_number,
+      qualityScore: row.quality_score,
+      verdict: row.verdict,
+      issuesSummary: row.issues_summary,
+      semanticScore: row.semantic_score,
+      semanticResult: row.semantic_result,
+      fixableIssues: row.fixable_issues,
+      fixTargets: row.fix_targets,
+      consistencyRegen: row.consistency_regen,
+    }));
+
+    const finalChecksReport = reportRows[0]?.final_checks_report || null;
+
+    res.json({ sceneEvaluations, finalChecksReport });
+  } catch (err) {
+    console.error('❌ Error fetching evaluation data:', err);
+    res.status(500).json({ error: 'Failed to fetch evaluation data', details: err.message });
+  }
+});
+
 // GET /api/stories/:id/entity-grid-image - Lazy load entity consistency grid images
 // Query params:
 //   entityName: character name (required)

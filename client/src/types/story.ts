@@ -924,7 +924,6 @@ export interface PageFeedback {
     recommendation?: string;
     source?: string;
   }>;
-  manualNotes: string;
   needsFullRedo: boolean;
 }
 

@@ -97,7 +97,6 @@ export interface UseRepairWorkflowReturn {
 
   // Step 1: Collect feedback
   collectFeedback: () => Promise<void>;
-  updatePageFeedback: (pageNumber: number, feedback: Partial<PageFeedback>) => void;
 
   // Step 2: Identify redo pages
   toggleRedoPage: (pageNumber: number, reason?: string) => void;
@@ -147,7 +146,7 @@ export function useRepairWorkflow({
   storyId,
   sceneImages,
   characters: _characters,
-  finalChecksReport,
+  finalChecksReport: _finalChecksReport,
   imageModel,
   onImageUpdate,
 }: UseRepairWorkflowProps): UseRepairWorkflowReturn {
@@ -229,30 +228,37 @@ export function useRepairWorkflow({
   }, []);
 
   // Step 1: Collect feedback from existing evaluation data
+  // Fetches evaluation fields from the server (fixableIssues, fixTargets, semanticResult, etc.)
+  // since these are stored in the story JSONB blob but not loaded by the fast metadata path.
   const collectFeedback = useCallback(async () => {
     if (!storyId) return;
 
     startStep('collect-feedback');
 
     try {
-      // Collect from existing data (sceneImages and finalChecksReport)
+      // Fetch evaluation data from the server (not available in scene metadata)
+      const evalData = await storyService.getEvaluationData(storyId);
+      const evalByPage = new Map(evalData.sceneEvaluations.map(e => [e.pageNumber, e]));
+      const fcReport = evalData.finalChecksReport;
+
       const pages: Record<number, PageFeedback> = {};
       let totalIssues = 0;
 
-      // Process each scene image
+      // Process each scene image, enriching with server-side evaluation data
       for (const scene of sceneImages) {
+        const evalPage = evalByPage.get(scene.pageNumber);
+
         const feedback: PageFeedback = {
           pageNumber: scene.pageNumber,
-          qualityScore: scene.qualityScore,
-          semanticScore: scene.semanticScore ?? null,
-          verdict: scene.verdict,
-          issuesSummary: scene.issuesSummary,
-          semanticResult: scene.semanticResult ?? null,
+          qualityScore: evalPage?.qualityScore ?? scene.qualityScore,
+          semanticScore: evalPage?.semanticScore ?? scene.semanticScore ?? null,
+          verdict: evalPage?.verdict ?? scene.verdict,
+          issuesSummary: evalPage?.issuesSummary ?? scene.issuesSummary,
+          semanticResult: evalPage?.semanticResult ?? scene.semanticResult ?? null,
           fixableIssues: [],
           entityIssues: [],
           objectIssues: [],
           semanticIssues: [],
-          manualNotes: '',
           needsFullRedo: false,
         };
 
@@ -266,30 +272,14 @@ export function useRepairWorkflow({
           feedback.fixableIssues.push({ ...issue, source });
         };
 
-        // Source 1: Scene-level fixableIssues (set by generation and re-evaluate)
-        if ((scene as any).fixableIssues?.length) {
-          for (const i of (scene as any).fixableIssues) addIssue(i, i.source || 'quality eval');
+        // Source 1: Scene-level fixableIssues (from server evaluation data)
+        if (evalPage?.fixableIssues?.length) {
+          for (const i of evalPage.fixableIssues) addIssue(i, (i as any).source || 'quality eval');
         }
 
-        // Source 2: Active imageVersion fixableIssues (set by re-evaluate)
-        const activeVersion = scene.imageVersions?.find(v => v.isActive);
-        if (activeVersion?.fixableIssues?.length) {
-          for (const i of activeVersion.fixableIssues) addIssue(i, i.source || 'active version eval');
-        }
-
-        // Source 3: All retry history entries (not just latest)
-        for (const retry of (scene.retryHistory || [])) {
-          if (retry.postRepairEval?.fixableIssues?.length) {
-            for (const i of retry.postRepairEval.fixableIssues) addIssue(i, 'post-repair eval');
-          }
-          if (retry.preRepairEval?.fixableIssues?.length) {
-            for (const i of retry.preRepairEval.fixableIssues) addIssue(i, 'pre-repair eval');
-          }
-        }
-
-        // Source 4: Fix targets with bounding boxes
-        if (scene.fixTargets?.length) {
-          for (const t of scene.fixTargets) {
+        // Source 2: Fix targets with bounding boxes (from server evaluation data)
+        if (evalPage?.fixTargets?.length) {
+          for (const t of evalPage.fixTargets) {
             addIssue({
               description: t.issue || 'Quality issue detected',
               severity: 'medium',
@@ -299,9 +289,9 @@ export function useRepairWorkflow({
           }
         }
 
-        // Source 5: Semantic evaluation issues (on scene)
-        if (scene.semanticResult) {
-          for (const si of (scene.semanticResult.semanticIssues || [])) {
+        // Source 3: Semantic evaluation issues (from server evaluation data)
+        if (evalPage?.semanticResult) {
+          for (const si of (evalPage.semanticResult.semanticIssues || [])) {
             addIssue({
               description: si.problem || `${si.type || 'semantic'}: ${si.item || ''}`,
               severity: si.severity?.toLowerCase() || 'medium',
@@ -309,7 +299,7 @@ export function useRepairWorkflow({
               fix: si.expected ? `Expected: ${si.expected}` : '',
             }, 'semantic eval');
           }
-          for (const si of (scene.semanticResult.issues || [])) {
+          for (const si of (evalPage.semanticResult.issues || [])) {
             addIssue({
               description: si.problem || `${si.type}: ${si.item || ''}`,
               severity: si.severity?.toLowerCase() || 'medium',
@@ -319,9 +309,9 @@ export function useRepairWorkflow({
           }
         }
 
-        // Source 6: Consistency regen issues
-        if (scene.consistencyRegen?.issues?.length) {
-          for (const ci of scene.consistencyRegen.issues) {
+        // Source 4: Consistency regen issues (from server evaluation data)
+        if (evalPage?.consistencyRegen?.issues?.length) {
+          for (const ci of evalPage.consistencyRegen.issues) {
             addIssue({
               description: ci.description,
               severity: ci.severity,
@@ -333,22 +323,23 @@ export function useRepairWorkflow({
         }
 
         // Get entity issues from finalChecksReport - CHARACTERS
-        if (finalChecksReport?.entity) {
-          for (const [charName, charResult] of Object.entries(finalChecksReport.entity.characters || {})) {
+        if (fcReport?.entity) {
+          for (const [charName, charResult] of Object.entries((fcReport.entity as any).characters || {})) {
+            const cr = charResult as any;
             // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
-            const allIssues: typeof charResult.issues = [];
-            if (charResult.byClothing && Object.keys(charResult.byClothing).length > 0) {
-              for (const clothingResult of Object.values(charResult.byClothing)) {
+            const allIssues: any[] = [];
+            if (cr.byClothing && Object.keys(cr.byClothing).length > 0) {
+              for (const clothingResult of Object.values(cr.byClothing) as any[]) {
                 if (clothingResult.issues) {
                   allIssues.push(...clothingResult.issues);
                 }
               }
-            } else if (charResult.issues) {
-              allIssues.push(...charResult.issues);
+            } else if (cr.issues) {
+              allIssues.push(...cr.issues);
             }
 
             // Filter to issues affecting this page
-            const charIssues = allIssues.filter(i =>
+            const charIssues = allIssues.filter((i: any) =>
               i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
             );
 
@@ -363,21 +354,21 @@ export function useRepairWorkflow({
           }
 
           // Get entity issues from finalChecksReport - OBJECTS
-          for (const [objectName, objectResult] of Object.entries(finalChecksReport.entity.objects || {})) {
-            // Mutually exclusive: prefer byClothing (detailed), fall back to root issues (legacy flattening)
-            const allIssues: typeof objectResult.issues = [];
-            if (objectResult.byClothing && Object.keys(objectResult.byClothing).length > 0) {
-              for (const clothingResult of Object.values(objectResult.byClothing)) {
+          for (const [objectName, objectResult] of Object.entries((fcReport.entity as any).objects || {})) {
+            const or = objectResult as any;
+            const allIssues: any[] = [];
+            if (or.byClothing && Object.keys(or.byClothing).length > 0) {
+              for (const clothingResult of Object.values(or.byClothing) as any[]) {
                 if (clothingResult.issues) {
                   allIssues.push(...clothingResult.issues);
                 }
               }
-            } else if (objectResult.issues) {
-              allIssues.push(...objectResult.issues);
+            } else if (or.issues) {
+              allIssues.push(...or.issues);
             }
 
             // Filter to issues affecting this page
-            const objectIssues = allIssues.filter(i =>
+            const objectIssues = allIssues.filter((i: any) =>
               i.pagesToFix?.includes(scene.pageNumber) || i.pageNumber === scene.pageNumber
             );
 
@@ -393,8 +384,8 @@ export function useRepairWorkflow({
         }
 
         // Get semantic/legacy image check issues from finalChecksReport.imageChecks
-        if (finalChecksReport?.imageChecks) {
-          for (const imageCheck of finalChecksReport.imageChecks) {
+        if (fcReport?.imageChecks) {
+          for (const imageCheck of (fcReport.imageChecks as any[])) {
             for (const issue of imageCheck.issues || []) {
               // Check if this issue affects this page
               const affectsPage = issue.pagesToFix?.includes(scene.pageNumber) ||
@@ -423,24 +414,7 @@ export function useRepairWorkflow({
       console.error('Failed to collect feedback:', error);
       failStep('collect-feedback', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, sceneImages, finalChecksReport, startStep, completeStep, failStep]);
-
-  // Update feedback for a specific page
-  const updatePageFeedback = useCallback((pageNumber: number, feedback: Partial<PageFeedback>) => {
-    setWorkflowState(prev => ({
-      ...prev,
-      collectedFeedback: {
-        ...prev.collectedFeedback,
-        pages: {
-          ...prev.collectedFeedback.pages,
-          [pageNumber]: {
-            ...prev.collectedFeedback.pages[pageNumber],
-            ...feedback,
-          },
-        },
-      },
-    }));
-  }, []);
+  }, [storyId, sceneImages, startStep, completeStep, failStep]);
 
   // Step 2: Toggle page for redo
   const toggleRedoPage = useCallback((pageNumber: number, reason?: string) => {
@@ -1153,7 +1127,6 @@ export function useRepairWorkflow({
     resetWorkflow,
 
     collectFeedback,
-    updatePageFeedback,
 
     toggleRedoPage,
     autoIdentifyRedoPages,

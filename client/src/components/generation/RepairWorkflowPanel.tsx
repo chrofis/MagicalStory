@@ -81,12 +81,10 @@ function PageFeedbackCard({
   feedback,
   isMarkedForRedo,
   onToggleRedo,
-  onUpdateNotes,
 }: {
   feedback: PageFeedback;
   isMarkedForRedo: boolean;
   onToggleRedo: () => void;
-  onUpdateNotes: (notes: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length +
@@ -307,16 +305,6 @@ function PageFeedbackCard({
             </div>
           )}
 
-          <div>
-            <h5 className="text-xs font-medium text-gray-600 mb-1">Manual Notes:</h5>
-            <textarea
-              value={feedback.manualNotes}
-              onChange={(e) => onUpdateNotes(e.target.value)}
-              placeholder="Add notes about issues not captured automatically..."
-              className="w-full text-xs p-2 border rounded resize-none"
-              rows={2}
-            />
-          </div>
         </div>
       )}
     </div>
@@ -349,7 +337,6 @@ export function RepairWorkflowPanel({
     isRunning,
     resetWorkflow,
     collectFeedback,
-    updatePageFeedback,
     toggleRedoPage,
     autoIdentifyRedoPages,
     redoMarkedPages,
@@ -726,7 +713,6 @@ export function RepairWorkflowPanel({
                               feedback={feedback}
                               isMarkedForRedo={workflowState.redoPages.pageNumbers.includes(feedback.pageNumber)}
                               onToggleRedo={() => toggleRedoPage(feedback.pageNumber)}
-                              onUpdateNotes={(notes) => updatePageFeedback(feedback.pageNumber, { manualNotes: notes })}
                             />
                           ))}
                       </div>
