@@ -25,7 +25,7 @@ const userLandmarkCache = new Map();
 // Generate story ideas endpoint - FREE, no credits
 router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
 
     log.debug(`💡 Generating story ideas for user ${req.user.username}`);
 
@@ -172,6 +172,10 @@ ${historicalGuide}`;
       } else {
         categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
       }
+    } else if (effectiveCategory === 'custom') {
+      categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:
+"${customThemeText || ''}"
+Follow the user's vision closely while keeping the story age-appropriate and engaging.`;
     } else {
       categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
     }
@@ -251,9 +255,9 @@ ${landmarkEntries}`;
     const storyRequirements = storyRequirements1 + '\n\n' + storyRequirements2;
 
     const prompt = promptTemplate
-      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
-      .replace('{STORY_TYPE_NAME}', effectiveTheme)
-      .replace('{STORY_TOPIC}', storyTopic || 'None')
+      .replace('{STORY_CATEGORY}', effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
+      .replace('{STORY_TYPE_NAME}', effectiveCategory === 'custom' ? 'custom' : effectiveTheme)
+      .replace('{STORY_TOPIC}', storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None'))
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
       .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
       .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
@@ -333,7 +337,7 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
   res.flushHeaders();
 
   try {
-    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
+    const { storyType, storyTypeName, storyCategory, storyTopic, storyTheme, customThemeText, language, languageLevel, characters, relationships, ideaModel, pages = 10, userLocation, season } = req.body;
 
     log.debug(`💡 [STREAM] Generating story ideas for user ${req.user.username}`);
 
@@ -487,6 +491,10 @@ ${historicalGuide}`;
       } else {
         categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
       }
+    } else if (effectiveCategory === 'custom') {
+      categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:
+"${customThemeText || ''}"
+Follow the user's vision closely while keeping the story age-appropriate and engaging.`;
     } else {
       categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
     }
@@ -563,9 +571,9 @@ ${landmarkEntries}`;
     const storyRequirements = storyRequirements1 + '\n\n' + storyRequirements2;
 
     const prompt = promptTemplate
-      .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
-      .replace('{STORY_TYPE_NAME}', effectiveTheme)
-      .replace('{STORY_TOPIC}', storyTopic || 'None')
+      .replace('{STORY_CATEGORY}', effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
+      .replace('{STORY_TYPE_NAME}', effectiveCategory === 'custom' ? 'custom' : effectiveTheme)
+      .replace('{STORY_TOPIC}', storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None'))
       .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
       .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
       .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
@@ -606,9 +614,9 @@ ${landmarkEntries}`;
     const buildSinglePrompt = (storyNum, variantInstruction) => {
       const requirements = storyNum === 1 ? storyRequirements1 : storyRequirements2;
       return singlePromptTemplate
-        .replace('{STORY_CATEGORY}', effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
-        .replace('{STORY_TYPE_NAME}', effectiveTheme)
-        .replace('{STORY_TOPIC}', storyTopic || 'None')
+        .replace('{STORY_CATEGORY}', effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
+        .replace('{STORY_TYPE_NAME}', effectiveCategory === 'custom' ? 'custom' : effectiveTheme)
+        .replace('{STORY_TOPIC}', storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None'))
         .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
         .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
         .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])

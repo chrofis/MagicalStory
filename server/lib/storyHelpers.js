@@ -2166,6 +2166,17 @@ ${historicalGuide}${locationsSection}
 - Make history accessible and engaging for children
 - Balance education with entertainment`;
     }
+  } else if (storyCategory === 'custom') {
+    const customText = inputData.customThemeText || '';
+    categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
+
+"${customText}"
+
+**IMPORTANT GUIDELINES for Custom Stories:**
+- Follow the user's concept closely - this is their creative vision
+- Build the story around the description provided above
+- Maintain age-appropriate content while honoring the user's idea
+- Create engaging characters and plot points that serve the user's concept`;
   } else {
     categoryGuidelines = `This is an ADVENTURE story with a ${storyTheme || inputData.storyType || 'adventure'} theme.
 
@@ -2196,8 +2207,8 @@ ${historicalGuide}${locationsSection}
       CHARACTER_NAMES: characterNames,  // For Visual Bible exclusion warning
       CHARACTER_CLOTHING: characterClothing || 'No clothing info available',
       STORY_CATEGORY: storyCategory,
-      STORY_TYPE: storyTheme || inputData.storyType || 'adventure',
-      STORY_TOPIC: storyTopic || 'None',
+      STORY_TYPE: storyCategory === 'custom' ? 'custom' : (storyTheme || inputData.storyType || 'adventure'),
+      STORY_TOPIC: storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None'),
       CATEGORY_GUIDELINES: categoryGuidelines,
       STORY_DETAILS: inputData.storyDetails || 'None',
       SEASON: inputData.season ? `${inputData.season.charAt(0).toUpperCase() + inputData.season.slice(1)} - include seasonal weather, activities, and atmosphere` : 'Not specified',
@@ -3159,6 +3170,17 @@ ${historicalGuide}${locationsSection}
 - Make history accessible and engaging for children
 - Balance education with entertainment`;
     }
+  } else if (storyCategory === 'custom') {
+    const customText = inputData.customThemeText || '';
+    categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
+
+"${customText}"
+
+**IMPORTANT GUIDELINES for Custom Stories:**
+- Follow the user's concept closely - this is their creative vision
+- Build the story around the description provided above
+- Maintain age-appropriate content while honoring the user's idea
+- Create engaging characters and plot points that serve the user's concept`;
   } else {
     // Adventure category - get theme-specific guide
     const adventureGuide = getTeachingGuide('adventure', storyTheme);
@@ -3194,8 +3216,8 @@ ${adventureGuide}` : ''}`;
       LANGUAGE_NOTE: getLanguageNote(language),
       READING_LEVEL: readingLevel,
       STORY_CATEGORY: storyCategory,
-      STORY_TYPE: storyTheme,
-      STORY_TOPIC: storyTopic || 'None',
+      STORY_TYPE: storyCategory === 'custom' ? 'custom' : storyTheme,
+      STORY_TOPIC: storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None'),
       STORY_DETAILS: inputData.storyDetails || 'None',
       CHARACTERS: charactersJson,
       CHARACTER_NAMES: characterNames,

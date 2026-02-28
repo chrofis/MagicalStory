@@ -112,7 +112,7 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
     log.debug(`📝 Creating story job ${jobId} for user ${req.user.username}${idempotencyKey ? ` (idempotency: ${idempotencyKey})` : ''}`);
     log.debug(`📝 [JOB INPUT] pages: ${req.body.pages} → ${inputData.pages}${req.body.pages !== inputData.pages ? ' (clamped!)' : ''}, level: ${inputData.languageLevel}`);
     log.debug(`📝 [JOB INPUT] language: ${req.body.language} → ${inputData.language}`);
-    log.debug(`📝 [JOB INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"`);
+    log.debug(`📝 [JOB INPUT] storyCategory: "${inputData.storyCategory}", storyTopic: "${inputData.storyTopic}", storyTheme: "${inputData.storyTheme}"${inputData.customThemeText ? `, customThemeText: "${inputData.customThemeText.substring(0, 100)}..."` : ''}`);
     if (inputData.ideaGeneration) {
       log.debug(`📝 [JOB INPUT] ideaGeneration: model=${inputData.ideaGeneration.model}, selectedIndex=${inputData.ideaGeneration.selectedIndex}, ideas=${inputData.ideaGeneration.output?.length || 0}`);
     }
