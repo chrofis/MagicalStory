@@ -442,7 +442,7 @@ export function useRepairWorkflow({
   }, []);
 
   // Auto-identify pages needing redo based on thresholds
-  const autoIdentifyRedoPages = useCallback((scoreThreshold = 60, issueThreshold = 3) => {
+  const autoIdentifyRedoPages = useCallback((scoreThreshold = 60, issueThreshold = 5) => {
     startStep('identify-redo-pages');
 
     const pagesToRedo: number[] = [];
@@ -891,7 +891,7 @@ export function useRepairWorkflow({
 
     // Default thresholds for repair decisions
     const DEFAULT_SCORE_THRESHOLD = 6;      // Out of 10 - pages below this need redo
-    const DEFAULT_ISSUE_THRESHOLD = 3;      // Number of fixable issues triggering redo
+    const DEFAULT_ISSUE_THRESHOLD = 5;      // Number of fixable issues triggering redo
     const DEFAULT_MAX_RETRIES = 4;          // Max iterations per page
 
     const { scoreThreshold = DEFAULT_SCORE_THRESHOLD, issueThreshold = DEFAULT_ISSUE_THRESHOLD, maxRetries = DEFAULT_MAX_RETRIES, onProgress } = options;

@@ -3330,7 +3330,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         null,
         pageModelOverrides,
         `PAGE ${pageNum}`,
-        { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, incrementalConsistency: incrConfigWithCurrentChars }
+        { isAdmin, enableAutoRepair, enableQualityRetry, useGridRepair, checkOnlyMode, landmarkPhotos: pageLandmarkPhotos, visualBibleGrid: vbGrid, sceneCharacterCount: sceneCharacters.length, sceneCharacters, sceneMetadata, incrementalConsistency: incrConfigWithCurrentChars, storyText: scene.text, sceneHint: scene.outlineExtract || scene.sceneHint || null }
       );
 
       // Track scene rewrite usage if a safety block triggered a rewrite
@@ -3371,6 +3371,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         fixTargets: imageResult?.fixTargets || [],
         fixableIssues: imageResult?.fixableIssues || [],
         thinkingText: imageResult?.thinkingText || null,
+        // Semantic evaluation (text-to-image fidelity)
+        semanticResult: imageResult?.semanticResult || null,
+        semanticScore: imageResult?.semanticScore ?? null,
+        issuesSummary: imageResult?.issuesSummary || null,
+        verdict: imageResult?.verdict || null,
         wasRegenerated: imageResult?.wasRegenerated,
         totalAttempts: imageResult?.totalAttempts,
         retryHistory: imageResult?.retryHistory,
@@ -3651,6 +3656,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           bboxOverlayImage: img.bboxOverlayImage,
           fixTargets: img.fixTargets || [],
           fixableIssues: img.fixableIssues || [],
+          semanticResult: img.semanticResult || null,
+          semanticScore: img.semanticScore ?? null,
+          issuesSummary: img.issuesSummary || null,
+          verdict: img.verdict || null,
           imageVersions: img.imageVersions || [],
           retryHistory: [{
             attempt: 1,
@@ -3678,6 +3687,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             qualityReasoning: evalResult?.reasoning,
             fixTargets: evalResult?.fixTargets || evalResult?.enrichedFixTargets || [],
             fixableIssues: evalResult?.fixableIssues || [],
+            semanticResult: evalResult?.semanticResult || null,
+            semanticScore: evalResult?.semanticScore ?? null,
+            issuesSummary: evalResult?.issuesSummary || null,
+            verdict: evalResult?.verdict || null,
             thinkingText: img.thinkingText || null,
             referencePhotos: img.characterPhotos,
             landmarkPhotos: img.landmarkPhotos,
@@ -4958,7 +4971,7 @@ async function processStoryJob(jobId) {
     const enableAutoRepair = inputData.enableAutoRepair === true; // Developer mode: auto-repair images (default: OFF)
     const useGridRepair = inputData.useGridRepair !== false; // Use grid-based repair (default: ON when autoRepair is on)
     const forceRepairThreshold = typeof inputData.forceRepairThreshold === 'number' ? inputData.forceRepairThreshold : null; // Force repair on pages with issues below this score
-    const enableFinalChecks = inputData.enableFinalChecks === true; // Developer mode: final consistency checks (default: OFF)
+    const enableFinalChecks = inputData.enableFinalChecks !== false; // Final consistency checks (default: ON, disable with enableFinalChecks: false)
     const checkOnlyMode = inputData.checkOnlyMode === true; // Developer mode: run checks but skip all regeneration
     const enableSceneValidation = inputData.enableSceneValidation === true; // Developer mode: validate scene composition with cheap preview (default: OFF)
     // Separated Evaluation: Generate all images first, then evaluate/repair in batch

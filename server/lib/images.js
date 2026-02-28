@@ -2014,7 +2014,7 @@ async function rewriteBlockedScene(sceneDescription, callTextModel) {
  * @param {Buffer|null} visualBibleGrid - Combined grid image of VB elements and secondary landmarks
  * @returns {Promise<{imageData, score, reasoning, modelId, ...}>}
  */
-async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null) {
+async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage = null, evaluationType = 'scene', onImageReady = null, imageModelOverride = null, qualityModelOverride = null, pageContext = '', imageBackendOverride = null, landmarkPhotos = [], sceneCharacterCount = 0, visualBibleGrid = null, storyText = null, sceneHint = null) {
   // Extract page number from pageContext (e.g., "PAGE 5" or "PAGE 5 (consistency fix)")
   const pageMatch = pageContext.match(/PAGE\s*(\d+)/i);
   const pageNumber = pageMatch ? parseInt(pageMatch[1], 10) : null;
@@ -2081,7 +2081,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         prompt,              // originalPrompt (string)
         characterPhotos,     // referenceImages (array)
         evaluationType,
-        qualityModelOverride
+        qualityModelOverride,
+        pageContext,
+        storyText,
+        sceneHint
       );
 
       const finalResult = {
@@ -2095,6 +2098,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         objectMatches: qualityResult.object_matches || [],
         fixTargets: qualityResult.fixTargets || [],
         fixableIssues: qualityResult.fixableIssues || [],
+        semanticResult: qualityResult?.semanticResult || null,
+        semanticScore: qualityResult?.semanticScore ?? null,
+        issuesSummary: qualityResult?.issuesSummary || null,
+        verdict: qualityResult?.verdict || null,
         usage: result.usage
       };
 
@@ -2343,7 +2350,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         prompt,              // originalPrompt (string)
         characterPhotos,     // referenceImages (array)
         evaluationType,
-        qualityModelOverride
+        qualityModelOverride,
+        pageContext,
+        storyText,
+        sceneHint
       );
 
       return {
@@ -2354,6 +2364,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         reasoning: qualityResult.reasoning,
         verdict: qualityResult.verdict,
         fixTargets: qualityResult.fixTargets,
+        fixableIssues: qualityResult.fixableIssues || [],
+        semanticResult: qualityResult?.semanticResult || null,
+        semanticScore: qualityResult?.semanticScore ?? null,
+        issuesSummary: qualityResult?.issuesSummary || null,
         qualityModelId: qualityResult.qualityModelId,
         imageUsage: result.usage,
         qualityUsage: qualityResult.usage
@@ -2470,7 +2484,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
         // Evaluate image quality with prompt and reference images
         log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
-        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext);
+        const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint);
 
         // Extract score, reasoning, and text error info from quality result
         const score = qualityResult ? qualityResult.score : null;
@@ -2501,6 +2515,10 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
           figures, // Figure detection results from evaluation
           matches, // Character-to-figure matches from evaluation
           objectMatches, // Object/animal/landmark matches from evaluation
+          semanticResult: qualityResult?.semanticResult || null,
+          semanticScore: qualityResult?.semanticScore ?? null,
+          issuesSummary: qualityResult?.issuesSummary || null,
+          verdict: qualityResult?.verdict || null,
           modelId,  // Include which model was used for image generation
           qualityModelId,  // Include which model was used for quality evaluation
           thinkingText, // Gemini thinking/reasoning text (if available)
@@ -3040,6 +3058,7 @@ async function evaluateImageBatch(images, options = {}) {
         qualityScore: qualityResult?.qualityScore ?? qualityResult?.score ?? null,  // Visual quality only
         semanticScore: qualityResult?.semanticScore ?? null,    // Semantic fidelity only
         reasoning: qualityResult?.reasoning || null,
+        verdict: qualityResult?.verdict || null,
         issuesSummary: qualityResult?.issuesSummary || null,
         fixableIssues: qualityResult?.fixableIssues || [],
         fixTargets: qualityResult?.fixTargets || [],
@@ -3590,7 +3609,9 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
               page.characterPhotos || [],
               'scene',
               modelOverrides?.qualityModel,
-              `PAGE ${pageNum} (post-repair)`
+              `PAGE ${pageNum} (post-repair)`,
+              page.text || null,
+              page.scene?.outlineExtract || page.scene?.sceneHint || null
             );
             const repairedScore = reEvalResult?.score ?? 0;
 
@@ -3648,7 +3669,9 @@ async function executeRepairPlan(plan, pageData, evaluations, context, options =
               page.characterPhotos || [],
               'scene',
               modelOverrides?.qualityModel,
-              `PAGE ${pageNum} (post-repair)`
+              `PAGE ${pageNum} (post-repair)`,
+              page.text || null,
+              page.scene?.outlineExtract || page.scene?.sceneHint || null
             );
             const repairedScore = reEvalResult?.score ?? 0;
 
@@ -4872,6 +4895,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
     sceneCharacters = [],
     // Pre-extracted scene metadata with character positions (avoids re-parsing from flattened prompt)
     sceneMetadata: sceneMetadataInput = null,
+    // Story text and scene hint for semantic evaluation (text-to-image fidelity)
+    storyText = null,
+    sceneHint = null,
   } = options;
 
   // Extract forceRepairThreshold from incrementalConsistency if not provided directly
@@ -4934,7 +4960,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       const imageModelOverride = modelOverrides?.imageModel || null;
       const qualityModelOverride = modelOverrides?.qualityModel || null;
       const imageBackendOverride = modelOverrides?.imageBackend || null;
-      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid);
+      result = await callGeminiAPIForImage(currentPrompt, characterPhotos, previousImage, evaluationType, onImageReady, imageModelOverride, qualityModelOverride, pageContext, imageBackendOverride, landmarkPhotos, sceneCharacterCount, visualBibleGrid, storyText, sceneHint);
       // Track usage if tracker provided
       if (usageTracker && result) {
         usageTracker(result.imageUsage, result.qualityUsage, result.modelId, result.qualityModelId);
@@ -5344,7 +5370,9 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
             characterPhotos,
             evaluationType,
             qualityModelOverride,
-            pageContext
+            pageContext,
+            storyText,
+            sceneHint
           );
 
           if (reEvalResult && reEvalResult.score !== null) {

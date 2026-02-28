@@ -422,7 +422,7 @@ export function RepairWorkflowPanel({
     try {
       await runFullWorkflow({
         scoreThreshold: 6,
-        issueThreshold: 3,
+        issueThreshold: 5,
         maxRetries: 4,
         onProgress: (step, detail) => {
           setFullWorkflowProgress({ step, detail });
