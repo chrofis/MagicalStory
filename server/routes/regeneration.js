@@ -19,7 +19,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS } = require('../co
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, rehydrateStoryImages, saveStoryImage, setActiveVersion, getPool } = require('../services/database');
+const { saveStoryData, rehydrateStoryImages, saveStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Lib modules
