@@ -5010,7 +5010,7 @@ export default function StoryWizard() {
           total={generationProgress.total}
           message={generationProgress.message}
           coverImages={coverImages}
-          characters={characters}
+          characters={characters.filter(c => !excludedCharacters.includes(c.id))}
           jobId={jobId || undefined}
           isStalled={isProgressStalled}
           onDismissStalled={() => setIsProgressStalled(false)}

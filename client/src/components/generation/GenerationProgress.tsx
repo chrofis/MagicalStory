@@ -179,19 +179,29 @@ export function GenerationProgress({
   // Get all available avatar URLs for a character (individual face + body crops, no 2x2 grids)
   const getAllAvatarUrls = (char: Character): string[] => {
     const avatars = char.avatars;
-    if (!avatars) return [];
     const urls: string[] = [];
-    // Face thumbnails (individual face crops)
-    if (avatars.faceThumbnails) {
-      for (const url of Object.values(avatars.faceThumbnails)) {
-        if (url && typeof url === 'string') urls.push(url);
+    if (avatars) {
+      // Face thumbnails (individual face crops)
+      if (avatars.faceThumbnails) {
+        for (const url of Object.values(avatars.faceThumbnails)) {
+          if (url && typeof url === 'string') urls.push(url);
+        }
+      }
+      // Body thumbnails (individual full body front crops)
+      if (avatars.bodyThumbnails) {
+        for (const url of Object.values(avatars.bodyThumbnails)) {
+          if (url && typeof url === 'string') urls.push(url);
+        }
+      }
+      // Fallback: standard avatar (2x2 grid, but better than nothing)
+      if (urls.length === 0 && avatars.standard && typeof avatars.standard === 'string') {
+        urls.push(avatars.standard);
       }
     }
-    // Body thumbnails (individual full body front crops)
-    if (avatars.bodyThumbnails) {
-      for (const url of Object.values(avatars.bodyThumbnails)) {
-        if (url && typeof url === 'string') urls.push(url);
-      }
+    // Fallback: uploaded photos
+    if (urls.length === 0) {
+      const photo = char.photos?.face || char.photos?.original;
+      if (photo && typeof photo === 'string') urls.push(photo);
     }
     return urls;
   };
