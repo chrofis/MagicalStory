@@ -2988,6 +2988,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                 const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
                 if (!sceneImage || !sceneImage.imageData) {
                   log.warn(`[REPAIR-WORKFLOW] No scene image for page ${pageNumber}`);
+                  pagesFailed.push({ pageNumber, reason: 'No scene image data for this page' });
                   continue;
                 }
 
@@ -3031,54 +3032,61 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
                     log.info(`[REPAIR-WORKFLOW] MagicAPI repair: bbox=${JSON.stringify(bbox)}, hair=${JSON.stringify(hairConfig)}`);
 
-                    // Call MagicAPI repair
-                    const magicResult = await repairFaceWithMagicApi(sceneBuffer, avatarBuffer, bbox, hairConfig);
+                    try {
+                      // Call MagicAPI repair
+                      const magicResult = await repairFaceWithMagicApi(sceneBuffer, avatarBuffer, bbox, hairConfig);
 
-                    // Build comparison reference from avatar
-                    const avatarDataUri = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
+                      // Build comparison reference from avatar
+                      const avatarDataUri = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
 
-                    if (magicResult.success && magicResult.repairedBuffer) {
-                      // Convert result to base64 data URI
-                      const repairedDataUri = `data:image/png;base64,${magicResult.repairedBuffer.toString('base64')}`;
+                      if (magicResult.success && magicResult.repairedBuffer) {
+                        // Convert result to base64 data URI
+                        const repairedDataUri = `data:image/png;base64,${magicResult.repairedBuffer.toString('base64')}`;
 
-                      // Extract bbox crop as "before" image for comparison
-                      let beforeDataUri = null;
-                      try {
-                        const sharp = require('sharp');
-                        const imgMeta = await sharp(sceneBuffer).metadata();
-                        const cropX = Math.round(bbox.x * imgMeta.width);
-                        const cropY = Math.round(bbox.y * imgMeta.height);
-                        const cropW = Math.round(bbox.width * imgMeta.width);
-                        const cropH = Math.round(bbox.height * imgMeta.height);
-                        if (cropW > 0 && cropH > 0) {
-                          const cropBuf = await sharp(sceneBuffer)
-                            .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
-                            .jpeg({ quality: 80 })
-                            .toBuffer();
-                          beforeDataUri = `data:image/jpeg;base64,${cropBuf.toString('base64')}`;
+                        // Extract bbox crop as "before" image for comparison
+                        let beforeDataUri = null;
+                        try {
+                          const sharp = require('sharp');
+                          const imgMeta = await sharp(sceneBuffer).metadata();
+                          const cropX = Math.round(bbox.x * imgMeta.width);
+                          const cropY = Math.round(bbox.y * imgMeta.height);
+                          const cropW = Math.round(bbox.width * imgMeta.width);
+                          const cropH = Math.round(bbox.height * imgMeta.height);
+                          if (cropW > 0 && cropH > 0) {
+                            const cropBuf = await sharp(sceneBuffer)
+                              .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
+                              .jpeg({ quality: 80 })
+                              .toBuffer();
+                            beforeDataUri = `data:image/jpeg;base64,${cropBuf.toString('base64')}`;
+                          }
+                        } catch (cropErr) {
+                          log.debug(`[REPAIR-WORKFLOW] Could not extract bbox crop for comparison: ${cropErr.message}`);
                         }
-                      } catch (cropErr) {
-                        log.debug(`[REPAIR-WORKFLOW] Could not extract bbox crop for comparison: ${cropErr.message}`);
-                      }
 
-                      repairResult = {
-                        success: true,
-                        updatedImages: [{
-                          pageNumber,
-                          imageData: repairedDataUri
-                        }],
-                        method: 'magicapi',
-                        clothingCategory,
-                        cropHistory: magicResult.cropHistory,
-                        comparison: {
-                          before: beforeDataUri,
-                          after: repairedDataUri,
-                          reference: avatarDataUri,
-                        },
-                      };
-                    } else {
-                      log.warn(`[REPAIR-WORKFLOW] MagicAPI repair failed, falling back to Gemini`);
-                      repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+                        repairResult = {
+                          success: true,
+                          updatedImages: [{
+                            pageNumber,
+                            imageData: repairedDataUri
+                          }],
+                          method: 'magicapi',
+                          clothingCategory,
+                          cropHistory: magicResult.cropHistory,
+                          comparison: {
+                            before: beforeDataUri,
+                            after: repairedDataUri,
+                            reference: avatarDataUri,
+                          },
+                        };
+                      } else {
+                        log.error(`[REPAIR-WORKFLOW] MagicAPI returned no result for ${characterName} on page ${pageNumber}`);
+                        pagesFailed.push({ pageNumber, reason: 'MagicAPI returned no result' });
+                        continue;
+                      }
+                    } catch (magicErr) {
+                      log.error(`[REPAIR-WORKFLOW] MagicAPI repair failed for ${characterName} on page ${pageNumber}: ${magicErr.message}`);
+                      pagesFailed.push({ pageNumber, reason: `MagicAPI: ${magicErr.message}` });
+                      continue;
                     }
                   }
                 }
@@ -3170,6 +3178,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           } catch (pageErr) {
             log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
+            pagesFailed.push({ pageNumber, reason: pageErr.message });
           }
         }
 
