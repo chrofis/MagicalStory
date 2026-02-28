@@ -3856,6 +3856,663 @@ function mergeRepairResults(originalImages, evaluations, repairResults) {
 }
 
 // ============================================================================
+// UNIFIED REPAIR PIPELINE
+// Single pipeline: evaluate → regenerate (max 2) → pick best → character fix
+// ============================================================================
+
+/**
+ * Select the best version from multiple image versions by score.
+ * On tie, prefers the earlier version (less API cost).
+ *
+ * @param {Array<{imageData: string, score: number|null, source: string}>} versions
+ * @returns {Object} The version with the highest score
+ */
+function selectBestVersion(versions) {
+  if (!versions || versions.length === 0) return null;
+  if (versions.length === 1) return versions[0];
+
+  return versions.reduce((best, v) =>
+    (v.score != null && (best.score == null || v.score > best.score)) ? v : best
+  , versions[0]);
+}
+
+/**
+ * Unified repair pipeline — replaces phases 5b-5d and final consistency checks.
+ *
+ * Flow:
+ *   1. Evaluate all images + entity consistency (parallel)
+ *   2. Regenerate low-scoring images (1st attempt, re-evaluate)
+ *   3. 2nd regenerate of still-low images (re-evaluate)
+ *   4. Select best version per page
+ *   5. One character fix pass (entity issues → repairCharacterMismatch)
+ *
+ * @param {Array<Object>} rawImages - Array from Phase 5a, each with imageData, prompt, characterPhotos, etc.
+ * @param {Object} context
+ * @param {Array} context.characters - Character array
+ * @param {Object} context.modelOverrides - Model overrides
+ * @param {Function} context.usageTracker - (provider, usage, funcName, modelId) => void
+ * @param {Object} context.visualBible - Visual bible object
+ * @param {string} context.artStyle - Art style string
+ * @param {string} context.jobId - Job ID for progress updates
+ * @param {Object} context.dbPool - Database pool for progress updates
+ * @param {Object} context.storyData - Full story data (needed for iteratePage mode)
+ * @param {Object} [options]
+ * @param {number} [options.regenThreshold=50] - Score below which to regenerate
+ * @param {number} [options.maxRegenAttempts=2] - Max regeneration attempts per page
+ * @param {number} [options.evalConcurrency=10] - Concurrency for evaluations
+ * @param {string} [options.qualityModelOverride] - Model override for quality evaluation
+ * @param {boolean} [options.useIteratePage=false] - Use iteratePage (re-expansion) instead of generateImageOnly
+ * @returns {Promise<Array<Object>>} Array matching rawImages, each with best imageData, imageVersions, qualityScore, etc.
+ */
+async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
+  const {
+    characters = [],
+    modelOverrides = {},
+    usageTracker,
+    visualBible,
+    artStyle,
+    jobId,
+    dbPool,
+    storyData
+  } = context;
+
+  const {
+    regenThreshold = 50,
+    maxRegenAttempts = 2,
+    evalConcurrency = 10,
+    qualityModelOverride = null,
+    useIteratePage = false
+  } = options;
+
+  const { runEntityConsistencyChecks, getStyledAvatarForClothing } = require('./entityConsistency');
+  const { getFacePhoto } = require('./characterPhotos');
+  const { extractSceneMetadata } = getStoryHelpers();
+
+  const imagesWithData = rawImages.filter(r => r.imageData);
+  const effectiveUseIteratePage = useIteratePage && !!storyData;
+  if (useIteratePage && !storyData) {
+    log.warn('[UNIFIED PIPELINE] useIteratePage=true but storyData not provided; falling back to generateImageOnly');
+  }
+  log.info(`🔧 [UNIFIED PIPELINE] Starting: ${imagesWithData.length} images, threshold=${regenThreshold}, maxAttempts=${maxRegenAttempts}, mode=${effectiveUseIteratePage ? 'iteratePage' : 'generateImageOnly'}`);
+
+  // Helper for progress updates
+  const updateProgress = async (percent, message) => {
+    if (jobId && dbPool) {
+      try {
+        await dbPool.query(
+          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+          [percent, message, jobId]
+        );
+      } catch (e) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Progress update failed: ${e.message}`);
+      }
+    }
+  };
+
+  // =========================================================================
+  // Step 1: Evaluate all images + entity consistency (parallel)
+  // =========================================================================
+  await updateProgress(82, 'Evaluating image quality...');
+  log.info(`🔍 [UNIFIED PIPELINE] Step 1: Evaluating ${imagesWithData.length} images + entity consistency...`);
+  const step1Start = Date.now();
+
+  // Prepare eval inputs
+  const evalInputs = imagesWithData.map(img => ({
+    imageData: img.imageData,
+    pageNumber: img.pageNumber,
+    prompt: img.prompt,
+    characterPhotos: img.characterPhotos,
+    sceneDescription: img.sceneDescription,
+    sceneCharacters: img.sceneCharacters,
+    sceneMetadata: img.sceneMetadata,
+    pageText: img.text,
+    sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null
+  }));
+
+  // Build entity check data (same structure as final checks in server.js)
+  const imageCheckData = {
+    sceneImages: imagesWithData.map(img => {
+      const metadata = extractSceneMetadata(img.sceneDescription) || {};
+      const perCharClothing = img.perCharClothing || metadata.characterClothing || {};
+      let sceneSummary = '';
+      if (metadata.fullData?.imageSummary) {
+        sceneSummary = metadata.fullData.imageSummary.substring(0, 150);
+      } else if (img.sceneDescription) {
+        const beforeJson = img.sceneDescription.split('```json')[0].trim();
+        const lines = beforeJson.split('\n').filter(l => l.trim() && !l.startsWith('#'));
+        sceneSummary = lines[0]?.substring(0, 150) || '';
+      }
+      return {
+        imageData: img.imageData,
+        pageNumber: img.pageNumber,
+        characters: metadata.characters || [],
+        clothing: metadata.clothing || 'standard',
+        characterClothing: perCharClothing,
+        sceneSummary,
+        referenceCharacters: (img.characterPhotos || []).map(p => p.name).filter(Boolean),
+        referenceClothing: (img.characterPhotos || []).reduce((acc, p) => {
+          if (p.name && p.clothingCategory) acc[p.name] = p.clothingCategory;
+          return acc;
+        }, {}),
+        retryHistory: []
+      };
+    }),
+    artStyle: artStyle || 'pixar'
+  };
+
+  // Run both in parallel
+  const [evaluations, entityReport] = await Promise.all([
+    evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride }),
+    runEntityConsistencyChecks(imageCheckData, characters, {
+      checkCharacters: true,
+      checkObjects: false,
+      minAppearances: 2,
+      saveGrids: false
+    }).catch(err => {
+      log.error(`❌ [UNIFIED PIPELINE] Entity consistency check failed: ${err.message}`);
+      return { characters: {}, totalIssues: 0, overallConsistent: true, summary: 'Entity check failed', grids: [] };
+    })
+  ]);
+
+  // Track usage
+  for (const evalResult of evaluations) {
+    if (evalResult.usage && usageTracker) {
+      usageTracker('gemini_quality', evalResult.usage, 'page_quality', evalResult.modelId);
+    }
+  }
+  if (entityReport?.tokenUsage && usageTracker) {
+    usageTracker('gemini_quality', {
+      input_tokens: entityReport.tokenUsage.inputTokens || 0,
+      output_tokens: entityReport.tokenUsage.outputTokens || 0
+    }, 'entity_consistency_check', entityReport.tokenUsage.model || 'gemini-2.5-flash');
+  }
+
+  const step1Duration = ((Date.now() - step1Start) / 1000).toFixed(1);
+  const avgScore = evaluations.reduce((sum, e) => sum + (e.qualityScore || 0), 0) / Math.max(1, evaluations.length);
+  log.info(`✅ [UNIFIED PIPELINE] Step 1 complete in ${step1Duration}s: avg score ${avgScore.toFixed(0)}%, entity issues: ${entityReport.totalIssues}`);
+
+  // Build eval map for quick lookup
+  const evalMap = new Map();
+  for (const ev of evaluations) {
+    evalMap.set(ev.pageNumber, ev);
+  }
+
+  // Track all versions per page: { pageNumber -> [{ imageData, score, source, evaluation }] }
+  const pageVersions = new Map();
+  for (const img of rawImages) {
+    const ev = evalMap.get(img.pageNumber);
+    pageVersions.set(img.pageNumber, [{
+      imageData: img.imageData,
+      score: ev?.qualityScore ?? null,
+      source: 'original',
+      evaluation: ev || null,
+      modelId: img.modelId
+    }]);
+  }
+
+  // =========================================================================
+  // Step 2: First regeneration of low-scoring pages
+  // =========================================================================
+  const lowScoringPages = rawImages.filter(img => {
+    if (!img.imageData) return false;
+    const ev = evalMap.get(img.pageNumber);
+    return ev?.evaluated && ev.qualityScore != null && ev.qualityScore < regenThreshold;
+  });
+
+  if (lowScoringPages.length > 0 && maxRegenAttempts >= 1) {
+    await updateProgress(85, `Improving ${lowScoringPages.length} low-scoring images (pass 1)...`);
+    log.info(`🔄 [UNIFIED PIPELINE] Step 2: Regenerating ${lowScoringPages.length} low-scoring pages (pass 1)...`);
+    const regen1Start = Date.now();
+
+    const regenLimit = pLimit(5);
+    const regen1Results = await Promise.all(
+      lowScoringPages.map(img => regenLimit(async () => {
+        try {
+          let result;
+          if (effectiveUseIteratePage) {
+            result = await iteratePage(img.imageData, img.pageNumber, storyData, {
+              modelOverrides,
+              usageTracker: null
+            });
+            if (result?.imageData && usageTracker) {
+              // iteratePage tracks its own usage internally via Claude + Gemini calls
+              // We track the image generation portion here
+              if (result.usage) {
+                usageTracker('gemini_image', result.usage, 'unified_pipeline_regen', result.modelId);
+              }
+            }
+          } else {
+            result = await generateImageOnly(img.prompt, img.characterPhotos, {
+              imageModelOverride: modelOverrides.imageModel,
+              imageBackendOverride: modelOverrides.imageBackend,
+              landmarkPhotos: img.landmarkPhotos,
+              visualBibleGrid: img.visualBibleGrid,
+              pageNumber: img.pageNumber
+            });
+            if (result?.usage && usageTracker) {
+              const isRunware = result.modelId && result.modelId.startsWith('runware:');
+              usageTracker(isRunware ? 'runware' : 'gemini_image', result.usage, 'unified_pipeline_regen', result.modelId);
+            }
+          }
+
+          return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId };
+        } catch (err) {
+          log.error(`❌ [UNIFIED PIPELINE] Regen pass 1 failed for page ${img.pageNumber}: ${err.message}`);
+          return { pageNumber: img.pageNumber, imageData: null, error: err.message };
+        }
+      }))
+    );
+
+    const regen1Success = regen1Results.filter(r => r.imageData);
+    log.info(`✅ [UNIFIED PIPELINE] Pass 1: ${regen1Success.length}/${lowScoringPages.length} regenerated in ${((Date.now() - regen1Start) / 1000).toFixed(1)}s`);
+
+    // Re-evaluate regenerated images
+    if (regen1Success.length > 0) {
+      await updateProgress(88, 'Re-evaluating improved images...');
+      log.info(`🔍 [UNIFIED PIPELINE] Step 2b: Re-evaluating ${regen1Success.length} regenerated images...`);
+
+      const regen1EvalInputs = regen1Success.map(r => {
+        const orig = rawImages.find(img => img.pageNumber === r.pageNumber);
+        return {
+          imageData: r.imageData,
+          pageNumber: r.pageNumber,
+          prompt: orig?.prompt,
+          characterPhotos: orig?.characterPhotos,
+          sceneDescription: orig?.sceneDescription,
+          sceneCharacters: orig?.sceneCharacters,
+          sceneMetadata: orig?.sceneMetadata,
+          pageText: orig?.text,
+          sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null
+        };
+      });
+
+      const regen1Evals = await evaluateImageBatch(regen1EvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+
+      for (const ev of regen1Evals) {
+        if (ev.usage && usageTracker) {
+          usageTracker('gemini_quality', ev.usage, 'unified_pipeline_quality', ev.modelId);
+        }
+        // Add to page versions
+        const versions = pageVersions.get(ev.pageNumber);
+        const regenResult = regen1Success.find(r => r.pageNumber === ev.pageNumber);
+        if (versions && regenResult) {
+          versions.push({
+            imageData: regenResult.imageData,
+            score: ev.qualityScore ?? null,
+            source: 'regen-attempt-1',
+            evaluation: ev,
+            modelId: regenResult.modelId
+          });
+        }
+      }
+    }
+  }
+
+  // =========================================================================
+  // Step 3: Second regeneration of still-low pages
+  // =========================================================================
+  if (maxRegenAttempts >= 2) {
+    const stillLowPages = rawImages.filter(img => {
+      if (!img.imageData) return false;
+      const versions = pageVersions.get(img.pageNumber) || [];
+      const bestSoFar = selectBestVersion(versions);
+      return bestSoFar && bestSoFar.score != null && bestSoFar.score < regenThreshold;
+    });
+
+    if (stillLowPages.length > 0) {
+      await updateProgress(90, `Improving ${stillLowPages.length} low-scoring images (pass 2)...`);
+      log.info(`🔄 [UNIFIED PIPELINE] Step 3: Regenerating ${stillLowPages.length} still-low pages (pass 2)...`);
+      const regen2Start = Date.now();
+
+      const regenLimit2 = pLimit(5);
+      const regen2Results = await Promise.all(
+        stillLowPages.map(img => regenLimit2(async () => {
+          try {
+            let result;
+            if (effectiveUseIteratePage) {
+              // For pass 2 with iteratePage, use the best version so far as input
+              const versions = pageVersions.get(img.pageNumber) || [];
+              const bestSoFar = selectBestVersion(versions);
+              const inputImage = bestSoFar?.imageData || img.imageData;
+              result = await iteratePage(inputImage, img.pageNumber, storyData, {
+                modelOverrides,
+                usageTracker: null
+              });
+              if (result?.usage && usageTracker) {
+                usageTracker('gemini_image', result.usage, 'unified_pipeline_regen2', result.modelId);
+              }
+            } else {
+              result = await generateImageOnly(img.prompt, img.characterPhotos, {
+                imageModelOverride: modelOverrides.imageModel,
+                imageBackendOverride: modelOverrides.imageBackend,
+                landmarkPhotos: img.landmarkPhotos,
+                visualBibleGrid: img.visualBibleGrid,
+                pageNumber: img.pageNumber
+              });
+              if (result?.usage && usageTracker) {
+                const isRunware = result.modelId && result.modelId.startsWith('runware:');
+                usageTracker(isRunware ? 'runware' : 'gemini_image', result.usage, 'unified_pipeline_regen2', result.modelId);
+              }
+            }
+
+            return { pageNumber: img.pageNumber, imageData: result?.imageData || null, modelId: result?.modelId };
+          } catch (err) {
+            log.error(`❌ [UNIFIED PIPELINE] Regen pass 2 failed for page ${img.pageNumber}: ${err.message}`);
+            return { pageNumber: img.pageNumber, imageData: null, error: err.message };
+          }
+        }))
+      );
+
+      const regen2Success = regen2Results.filter(r => r.imageData);
+      log.info(`✅ [UNIFIED PIPELINE] Pass 2: ${regen2Success.length}/${stillLowPages.length} regenerated in ${((Date.now() - regen2Start) / 1000).toFixed(1)}s`);
+
+      // Evaluate pass 2 results
+      if (regen2Success.length > 0) {
+        const regen2EvalInputs = regen2Success.map(r => {
+          const orig = rawImages.find(img => img.pageNumber === r.pageNumber);
+          return {
+            imageData: r.imageData,
+            pageNumber: r.pageNumber,
+            prompt: orig?.prompt,
+            characterPhotos: orig?.characterPhotos,
+            sceneDescription: orig?.sceneDescription,
+            sceneCharacters: orig?.sceneCharacters,
+            sceneMetadata: orig?.sceneMetadata,
+            pageText: orig?.text,
+            sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null
+          };
+        });
+
+        const regen2Evals = await evaluateImageBatch(regen2EvalInputs, { concurrency: evalConcurrency, qualityModelOverride });
+
+        for (const ev of regen2Evals) {
+          if (ev.usage && usageTracker) {
+            usageTracker('gemini_quality', ev.usage, 'unified_pipeline_quality2', ev.modelId);
+          }
+          const versions = pageVersions.get(ev.pageNumber);
+          const regenResult = regen2Success.find(r => r.pageNumber === ev.pageNumber);
+          if (versions && regenResult) {
+            versions.push({
+              imageData: regenResult.imageData,
+              score: ev.qualityScore ?? null,
+              source: 'regen-attempt-2',
+              evaluation: ev,
+              modelId: regenResult.modelId
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // =========================================================================
+  // Step 4: Select best version per page
+  // =========================================================================
+  await updateProgress(92, 'Selecting best versions...');
+  log.info(`📊 [UNIFIED PIPELINE] Step 4: Selecting best version per page...`);
+
+  const bestPerPage = new Map();
+  let upgradedCount = 0;
+
+  for (const [pageNumber, versions] of pageVersions) {
+    const best = selectBestVersion(versions);
+    bestPerPage.set(pageNumber, best);
+
+    if (best.source !== 'original') {
+      upgradedCount++;
+      log.debug(`📊 [UNIFIED PIPELINE] Page ${pageNumber}: selected ${best.source} (score ${best.score}) over original (score ${versions[0].score})`);
+    }
+  }
+
+  log.info(`✅ [UNIFIED PIPELINE] Step 4: ${upgradedCount} pages upgraded from regeneration`);
+
+  // =========================================================================
+  // Step 5: One character fix pass (entity consistency → repairCharacterMismatch)
+  // =========================================================================
+  const charFixResults = new Map(); // pageNumber -> { imageData, source }
+
+  if (entityReport && entityReport.totalIssues > 0) {
+    await updateProgress(93, 'Fixing character consistency...');
+    log.info(`👤 [UNIFIED PIPELINE] Step 5: Character fix pass (${entityReport.totalIssues} entity issues)...`);
+
+    // Collect all (page, character) pairs that need fixing from entity report
+    const fixTasks = []; // [{ pageNumber, charName, severity }]
+    const seenPairs = new Set();
+
+    for (const [charName, charResult] of Object.entries(entityReport.characters || {})) {
+      const allIssues = [...(charResult.issues || [])];
+      // Also collect from byClothing
+      if (charResult.byClothing) {
+        for (const clothingResult of Object.values(charResult.byClothing)) {
+          for (const issue of (clothingResult.issues || [])) {
+            if (!allIssues.some(i => i.id === issue.id)) {
+              allIssues.push(issue);
+            }
+          }
+        }
+      }
+
+      for (const issue of allIssues) {
+        if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
+
+        const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
+        for (const pageNum of pagesToFix) {
+          const key = `${pageNum}-${charName}`;
+          if (seenPairs.has(key)) continue;
+          seenPairs.add(key);
+          fixTasks.push({ pageNumber: pageNum, charName, severity: issue.severity });
+        }
+      }
+    }
+
+    log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages`);
+
+    // Group fix tasks by page for sequential application
+    const fixesByPage = new Map();
+    for (const task of fixTasks) {
+      if (!fixesByPage.has(task.pageNumber)) {
+        fixesByPage.set(task.pageNumber, []);
+      }
+      fixesByPage.get(task.pageNumber).push(task);
+    }
+
+    for (const [pageNumber, pageFixes] of fixesByPage) {
+      const best = bestPerPage.get(pageNumber);
+      if (!best?.imageData) {
+        log.warn(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: no image data for character fix, skipping`);
+        continue;
+      }
+
+      let currentImageData = best.imageData;
+      let anyFixApplied = false;
+
+      for (const fix of pageFixes) {
+        // Find bbox for this character on this page
+        // Priority 1: quality eval matches[].face_bbox from best version
+        // Priority 2: bboxDetection.figures[].faceBox from best version
+        let bbox = null;
+        const bestEval = best.evaluation;
+
+        if (bestEval?.matches) {
+          const charMatch = bestEval.matches.find(m =>
+            m.name?.toLowerCase() === fix.charName.toLowerCase() ||
+            m.character?.toLowerCase() === fix.charName.toLowerCase()
+          );
+          if (charMatch?.face_bbox) {
+            bbox = charMatch.face_bbox;
+          } else if (charMatch?.bbox) {
+            bbox = charMatch.bbox;
+          }
+        }
+
+        if (!bbox && bestEval?.bboxDetection?.figures) {
+          const figure = bestEval.bboxDetection.figures.find(f =>
+            f.name?.toLowerCase() === fix.charName.toLowerCase() ||
+            f.label?.toLowerCase() === fix.charName.toLowerCase()
+          );
+          if (figure?.faceBox) {
+            bbox = figure.faceBox;
+          } else if (figure?.box) {
+            bbox = figure.box;
+          }
+        }
+
+        if (!bbox) {
+          log.warn(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}, ${fix.charName}: no bbox found, skipping character fix`);
+          continue;
+        }
+
+        // Get character avatar for repair
+        const character = characters.find(c => c.name === fix.charName);
+        if (!character) {
+          log.warn(`⚠️ [UNIFIED PIPELINE] Character ${fix.charName} not found, skipping`);
+          continue;
+        }
+
+        // Get clothing for this page from rawImage data
+        const rawImg = rawImages.find(img => img.pageNumber === pageNumber);
+        const clothingCategory = rawImg?.perCharClothing?.[fix.charName] || 'standard';
+        const avatarPhoto = getStyledAvatarForClothing(character, artStyle, clothingCategory)
+          || getFacePhoto(character);
+
+        if (!avatarPhoto) {
+          log.warn(`⚠️ [UNIFIED PIPELINE] No avatar photo for ${fix.charName}, skipping character fix`);
+          continue;
+        }
+
+        try {
+          log.info(`👤 [UNIFIED PIPELINE] Fixing ${fix.charName} on page ${pageNumber} (bbox: [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}])`);
+          const repairResult = await repairCharacterMismatch(currentImageData, avatarPhoto, bbox, fix.charName);
+
+          if (repairResult?.imageData) {
+            currentImageData = repairResult.imageData;
+            anyFixApplied = true;
+
+            if (repairResult.usage && usageTracker) {
+              usageTracker('gemini_image', {
+                input_tokens: repairResult.usage.inputTokens || 0,
+                output_tokens: repairResult.usage.outputTokens || 0
+              }, 'unified_pipeline_char_fix', repairResult.usage.model);
+            }
+          }
+        } catch (repairErr) {
+          log.error(`❌ [UNIFIED PIPELINE] Character fix failed for ${fix.charName} on page ${pageNumber}: ${repairErr.message}`);
+        }
+      }
+
+      if (anyFixApplied) {
+        charFixResults.set(pageNumber, { imageData: currentImageData, source: 'character-fix' });
+        log.info(`✅ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied`);
+      }
+    }
+
+    log.info(`✅ [UNIFIED PIPELINE] Step 5: ${charFixResults.size} pages had character fixes applied`);
+  } else {
+    log.info(`✅ [UNIFIED PIPELINE] Step 5: No entity issues, skipping character fix`);
+  }
+
+  await updateProgress(96, 'Finalizing repair results...');
+
+  // =========================================================================
+  // Build final results
+  // =========================================================================
+  log.info(`📦 [UNIFIED PIPELINE] Building final results...`);
+
+  const results = rawImages.map(img => {
+    const pageNumber = img.pageNumber;
+    const versions = pageVersions.get(pageNumber) || [];
+    const best = bestPerPage.get(pageNumber) || versions[0];
+    const charFix = charFixResults.get(pageNumber);
+
+    // Final image: character fix if available, otherwise best version
+    const finalImageData = charFix?.imageData || best?.imageData || img.imageData;
+    const finalEval = best?.evaluation;
+
+    // Build imageVersions array (all non-primary versions)
+    const imageVersions = [];
+    for (const v of versions) {
+      if (v === best && !charFix) continue; // Primary version, skip unless char fix replaced it
+      imageVersions.push({
+        imageData: v.imageData,
+        qualityScore: v.score,
+        source: v.source,
+        modelId: v.modelId,
+        generatedAt: new Date().toISOString()
+      });
+    }
+
+    // If best is not original, add original to versions for comparison in UI
+    if (best !== versions[0] && versions[0]?.imageData) {
+      imageVersions.push({
+        imageData: versions[0].imageData,
+        qualityScore: versions[0].score,
+        source: versions[0].source,
+        modelId: versions[0].modelId,
+        generatedAt: new Date().toISOString()
+      });
+    }
+
+    // If character fix was applied, add it as a version too
+    if (charFix) {
+      imageVersions.push({
+        imageData: charFix.imageData,
+        source: 'character-fix',
+        generatedAt: new Date().toISOString()
+      });
+    }
+
+    // Build retryHistory
+    const retryHistory = versions.map((v, idx) => ({
+      attempt: idx + 1,
+      type: 'unified_pipeline',
+      source: v.source,
+      score: v.score,
+      bboxDetection: v.evaluation?.bboxDetection,
+      bboxOverlayImage: v.evaluation?.bboxOverlayImage,
+      timestamp: new Date().toISOString()
+    }));
+
+    return {
+      pageNumber,
+      imageData: finalImageData,
+      text: img.text,
+      sceneDescription: img.sceneDescription,
+      scene: img.scene,
+      prompt: img.prompt,
+      characterPhotos: img.characterPhotos,
+      landmarkPhotos: img.landmarkPhotos,
+      visualBibleGrid: img.visualBibleGrid,
+      sceneCharacters: img.sceneCharacters,
+      sceneMetadata: img.sceneMetadata,
+      perCharClothing: img.perCharClothing,
+      modelId: best?.modelId || img.modelId,
+      thinkingText: img.thinkingText || null,
+      qualityScore: finalEval?.qualityScore ?? null,
+      qualityReasoning: finalEval?.reasoning ?? null,
+      semanticScore: finalEval?.semanticScore ?? null,
+      semanticResult: finalEval?.semanticResult ?? null,
+      issuesSummary: finalEval?.issuesSummary ?? null,
+      verdict: finalEval?.verdict ?? null,
+      fixTargets: finalEval?.enrichedFixTargets || finalEval?.fixTargets || [],
+      fixableIssues: finalEval?.fixableIssues || [],
+      bboxDetection: finalEval?.bboxDetection ?? null,
+      bboxOverlayImage: finalEval?.bboxOverlayImage ?? null,
+      figures: finalEval?.figures || [],
+      matches: finalEval?.matches || [],
+      imageVersions,
+      retryHistory,
+      entityReport: entityReport || null,
+      wasRegenerated: best?.source !== 'original',
+      wasCharacterFixed: !!charFix,
+      bestSource: best?.source || 'original'
+    };
+  });
+
+  log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${upgradedCount} upgraded, ${charFixResults.size} character-fixed`);
+  return results;
+}
+
+// ============================================================================
 // CATEGORIZED REPAIR FUNCTIONS
 // Different repair methods for different issue types
 // ============================================================================
@@ -8388,6 +9045,10 @@ module.exports = {
   buildRepairPlan,
   executeRepairPlan,
   mergeRepairResults,
+
+  // Unified repair pipeline
+  selectBestVersion,
+  runUnifiedRepairPipeline,
 
   // Categorized repair system (new)
   classifyIssues,

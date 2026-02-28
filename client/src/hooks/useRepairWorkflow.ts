@@ -892,7 +892,7 @@ export function useRepairWorkflow({
     // Default thresholds for repair decisions
     const DEFAULT_SCORE_THRESHOLD = 6;      // Out of 10 - pages below this need redo
     const DEFAULT_ISSUE_THRESHOLD = 5;      // Number of fixable issues triggering redo
-    const DEFAULT_MAX_RETRIES = 4;          // Max iterations per page
+    const DEFAULT_MAX_RETRIES = 2;          // Max iterations per page
 
     const { scoreThreshold = DEFAULT_SCORE_THRESHOLD, issueThreshold = DEFAULT_ISSUE_THRESHOLD, maxRetries = DEFAULT_MAX_RETRIES, onProgress } = options;
 
@@ -1083,19 +1083,7 @@ export function useRepairWorkflow({
         }
       }
 
-      // Step 7: Auto-repair artifacts
-      checkAborted();
-      // Get pages with artifact/distortion issues from evaluation results
-      const artifactPages: number[] = [];
-      for (const [pageStr, result] of Object.entries(evalPages)) {
-        if (result.fixableIssues?.some(i => i.type === 'artifact' || i.type === 'distortion')) {
-          artifactPages.push(parseInt(pageStr));
-        }
-      }
-      if (artifactPages.length > 0) {
-        onProgress?.('artifact-repair', `Repairing artifacts on ${artifactPages.length} pages...`);
-        await repairArtifacts(artifactPages);
-      }
+      // Step 7: Artifact repair removed — unified pipeline handles quality via regen+pick-best
 
       onProgress?.('complete', 'Workflow complete!');
     } catch (error) {
@@ -1112,7 +1100,7 @@ export function useRepairWorkflow({
   }, [
     storyId, sceneImages, imageModel, onImageUpdate,
     collectFeedback, reEvaluatePages, startStep, setRedoProgress,
-    runConsistencyCheck, repairCharacter, repairArtifacts
+    runConsistencyCheck, repairCharacter
   ]);
 
   return {

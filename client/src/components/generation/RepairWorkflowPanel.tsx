@@ -572,7 +572,7 @@ export function RepairWorkflowPanel({
               <div>
                 <h4 className="font-bold text-purple-800">Automated Full Repair</h4>
                 <p className="text-sm text-purple-600">
-                  Runs all steps automatically. Pages retry up to 4 times, keeping the best result.
+                  Runs all steps automatically. Pages retry up to 2 times, keeping the best result.
                 </p>
               </div>
               <div className="flex items-center gap-2">

@@ -5070,7 +5070,7 @@ export default function StoryWizard() {
                         <span className="text-gray-700">{language === 'de' ? 'Volle Reparatur nach Generierung' : language === 'fr' ? 'Réparation complète après génération' : 'Full repair after generation'}</span>
                       </label>
                       <p className="text-xs text-gray-500 ml-6">
-                        {language === 'de' ? 'Führt nach der Generierung den kompletten Reparatur-Workflow aus (bis zu 4 Versuche pro Seite)' : language === 'fr' ? 'Exécute le workflow de réparation complet après la génération (jusqu\'à 4 tentatives par page)' : 'Runs the full repair workflow after generation (up to 4 retries per page)'}
+                        {language === 'de' ? 'Führt nach der Generierung den kompletten Reparatur-Workflow aus (bis zu 2 Versuche pro Seite)' : language === 'fr' ? 'Exécute le workflow de réparation complet après la génération (jusqu\'à 2 tentatives par page)' : 'Runs the full repair workflow after generation (up to 2 retries per page)'}
                       </p>
 
                       <label className="flex items-center gap-2 cursor-pointer mt-2">

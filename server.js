@@ -102,6 +102,8 @@ const {
   buildRepairPlan,
   executeRepairPlan,
   mergeRepairResults,
+  // Unified repair pipeline
+  runUnifiedRepairPipeline,
   // Bbox detection for covers
   detectAllBoundingBoxes,
   createBboxOverlayImage
@@ -3541,175 +3543,59 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const successCount = rawImages.filter(r => r.imageData).length;
       log.info(`✅ [UNIFIED] Phase 5a complete: ${successCount}/${rawImages.length} images generated in ${genDuration}s`);
 
-      // Phase 5b: Evaluate ALL images in parallel
-      await dbPool.query(
-        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-        [85, 'Evaluating image quality...', jobId]
-      );
+      // Phases 5b-5g: Unified repair pipeline
+      // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
+      log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
 
-      log.info(`🔍 [UNIFIED] Phase 5b: Evaluating all ${successCount} images...`);
-      const evalStartTime = Date.now();
-
-      const evaluations = await evaluateImageBatch(
-        rawImages.filter(r => r.imageData).map(img => ({
-          imageData: img.imageData,
-          pageNumber: img.pageNumber,
-          prompt: img.prompt,
-          characterPhotos: img.characterPhotos,
-          sceneDescription: img.sceneDescription,
-          sceneCharacters: img.sceneCharacters,
-          sceneMetadata: img.sceneMetadata,
-          pageText: img.text,  // Story text for semantic fidelity check
-          sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null  // Scene hint for semantic evaluation
-        })),
-        {
-          concurrency: 10,
-          qualityModelOverride: modelOverrides.qualityModel
-        }
-      );
-
-      // Track quality eval usage
-      for (const evalResult of evaluations) {
-        if (evalResult.usage) {
-          addUsage('gemini_quality', evalResult.usage, 'page_quality', evalResult.modelId);
-        }
-      }
-
-      const evalDuration = ((Date.now() - evalStartTime) / 1000).toFixed(1);
-      const avgScore = evaluations.reduce((sum, e) => sum + (e.qualityScore || 0), 0) / Math.max(1, evaluations.length);
-      log.info(`✅ [UNIFIED] Phase 5b complete: ${evaluations.length} evaluations in ${evalDuration}s (avg score: ${avgScore.toFixed(0)}%)`);
-
-      // Phase 5c: Build repair plan
-      log.info(`📋 [UNIFIED] Phase 5c: Building repair plan...`);
-      const repairPlan = buildRepairPlan(evaluations, {
-        regenerateThreshold: 30,
-        repairThreshold: enableAutoRepair ? 70 : 0,  // Only plan repairs if autoRepair is enabled
-        keepThreshold: 50
+      const pipelineResult = await runUnifiedRepairPipeline(rawImages, {
+        characters: inputData.characters,
+        modelOverrides,
+        usageTracker: (provider, usage, funcName, modelId) => addUsage(provider, usage, funcName, modelId),
+        visualBible,
+        artStyle: inputData.artStyle,
+        jobId,
+        dbPool
+      }, {
+        regenThreshold: 50,
+        maxRegenAttempts: 2,
+        evalConcurrency: 10,
+        qualityModelOverride: modelOverrides.qualityModel,
+        useIteratePage: false  // Fresh generation by default during story creation
       });
 
-      log.info(`📋 [UNIFIED] Repair plan: ${repairPlan.pagesToRegenerate.length} regen, ${repairPlan.pagesToRepair.length} repair, ${repairPlan.pagesToKeep.length} keep`);
-
-      // Phase 5d: Execute repair plan (if enabled)
-      if (enableAutoRepair && (repairPlan.pagesToRegenerate.length > 0 || repairPlan.pagesToRepair.length > 0)) {
-        await dbPool.query(
-          'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-          [90, 'Repairing images...', jobId]
-        );
-
-        log.info(`🔧 [UNIFIED] Phase 5d: Executing repair plan...`);
-
-        // Build page data and evaluation maps
-        const pageDataMap = new Map();
-        const evalMap = new Map();
-        for (const img of rawImages) {
-          pageDataMap.set(img.pageNumber, img);
-        }
-        for (const evalResult of evaluations) {
-          evalMap.set(evalResult.pageNumber, evalResult);
-        }
-
-        const repairResults = await executeRepairPlan(
-          repairPlan,
-          pageDataMap,
-          evalMap,
-          {
-            modelOverrides,
-            usageTracker: (imgUsage, qualUsage, imgModel, qualModel, isInpaint) => {
-              if (imgUsage) {
-                const isRunware = imgModel && imgModel.startsWith('runware:');
-                const provider = isRunware ? 'runware' : 'gemini_image';
-                const funcName = isInpaint ? 'inpaint' : 'page_images';
-                addUsage(provider, imgUsage, funcName, imgModel);
-              }
-              if (qualUsage) addUsage('gemini_quality', qualUsage, 'page_quality', qualModel);
-            },
-            visualBible,
-            isAdmin
-          },
-          { repairFirst: true, useGridRepair }
-        );
-
-        log.info(`✅ [UNIFIED] Phase 5d complete: ${repairResults.repaired.size} repaired, ${repairResults.regenerated.size} regenerated`);
-
-        // Merge results
-        allImages = mergeRepairResults(rawImages, evaluations, repairResults).map(img => ({
-          pageNumber: img.pageNumber,
-          text: img.text,
-          description: img.sceneDescription,
-          outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
-          imageData: img.imageData,
-          prompt: img.prompt,
-          sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
-          sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
-          qualityScore: img.qualityScore,
-          qualityReasoning: img.qualityReasoning,
-          thinkingText: img.thinkingText || null,
-          wasRegenerated: img.wasRegenerated,
-          wasRepaired: img.wasRepaired,
-          repairMethod: img.repairMethod,
-          referencePhotos: img.characterPhotos,
-          landmarkPhotos: img.landmarkPhotos,
-          visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
-          sceneCharacters: img.sceneCharacters,
-          sceneCharacterClothing: img.perCharClothing,
-          bboxDetection: img.bboxDetection,
-          bboxOverlayImage: img.bboxOverlayImage,
-          fixTargets: img.fixTargets || [],
-          fixableIssues: img.fixableIssues || [],
-          semanticResult: img.semanticResult || null,
-          semanticScore: img.semanticScore ?? null,
-          issuesSummary: img.issuesSummary || null,
-          verdict: img.verdict || null,
-          imageVersions: img.imageVersions || [],
-          retryHistory: [{
-            attempt: 1,
-            type: 'separated_evaluation',
-            score: img.qualityScore,
-            bboxDetection: img.bboxDetection,
-            bboxOverlayImage: img.bboxOverlayImage,
-            timestamp: new Date().toISOString()
-          }]
-        }));
-      } else {
-        // No repair needed - just merge raw images with evaluation data
-        allImages = rawImages.map(img => {
-          const evalResult = evaluations.find(e => e.pageNumber === img.pageNumber);
-          return {
-            pageNumber: img.pageNumber,
-            text: img.text,
-            description: img.sceneDescription,
-            outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
-            imageData: img.imageData,
-            prompt: img.prompt,
-            sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
-            sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
-            qualityScore: evalResult?.qualityScore,
-            qualityReasoning: evalResult?.reasoning,
-            fixTargets: evalResult?.fixTargets || evalResult?.enrichedFixTargets || [],
-            fixableIssues: evalResult?.fixableIssues || [],
-            semanticResult: evalResult?.semanticResult || null,
-            semanticScore: evalResult?.semanticScore ?? null,
-            issuesSummary: evalResult?.issuesSummary || null,
-            verdict: evalResult?.verdict || null,
-            thinkingText: img.thinkingText || null,
-            referencePhotos: img.characterPhotos,
-            landmarkPhotos: img.landmarkPhotos,
-            visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
-            sceneCharacters: img.sceneCharacters,
-            sceneCharacterClothing: img.perCharClothing,
-            bboxDetection: evalResult?.bboxDetection,
-            bboxOverlayImage: evalResult?.bboxOverlayImage,
-            retryHistory: [{
-              attempt: 1,
-              type: 'separated_evaluation',
-              score: evalResult?.qualityScore,
-              bboxDetection: evalResult?.bboxDetection,
-              bboxOverlayImage: evalResult?.bboxOverlayImage,
-              timestamp: new Date().toISOString()
-            }]
-          };
-        });
-      }
+      // Map pipeline results to allImages format
+      allImages = pipelineResult.map(img => ({
+        pageNumber: img.pageNumber,
+        text: img.text,
+        description: img.sceneDescription,
+        outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+        imageData: img.imageData,
+        prompt: img.prompt,
+        sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+        sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
+        qualityScore: img.qualityScore,
+        qualityReasoning: img.qualityReasoning,
+        thinkingText: img.thinkingText || null,
+        wasRegenerated: img.wasRegenerated,
+        wasCharacterFixed: img.wasCharacterFixed,
+        bestSource: img.bestSource,
+        referencePhotos: img.characterPhotos,
+        landmarkPhotos: img.landmarkPhotos,
+        visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
+        sceneCharacters: img.sceneCharacters,
+        sceneCharacterClothing: img.perCharClothing,
+        bboxDetection: img.bboxDetection,
+        bboxOverlayImage: img.bboxOverlayImage,
+        fixTargets: img.fixTargets || [],
+        fixableIssues: img.fixableIssues || [],
+        semanticResult: img.semanticResult || null,
+        semanticScore: img.semanticScore ?? null,
+        issuesSummary: img.issuesSummary || null,
+        verdict: img.verdict || null,
+        imageVersions: img.imageVersions || [],
+        retryHistory: img.retryHistory || [],
+        entityReport: img.entityReport || null
+      }));
 
     } else if (incrementalConsistencyConfig?.enabled) {
       // SEQUENTIAL MODE for incremental consistency
@@ -3881,7 +3767,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // =========================================================================
     let finalChecksReport = null;
     let originalStoryText = null; // Will store original text if corrections are applied
-    if (enableFinalChecks && !skipImages && allImages.length >= 2) {
+    if (enableFinalChecks && !separatedEvaluation && !skipImages && allImages.length >= 2) {
       try {
         genLog.setStage('final_checks');
         await dbPool.query(
