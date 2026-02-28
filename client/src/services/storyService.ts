@@ -1506,6 +1506,7 @@ export const storyService = {
       storyCategory: data.storyCategory,
       storyTopic: data.storyTopic,
       storyTheme: data.storyTheme,
+      customThemeText: data.customThemeText,
       artStyle: data.artStyle,
       language: data.language,
       languageLevel: data.languageLevel,
