@@ -967,25 +967,36 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
     console.log(`   Covers: ${imageStats.covers.count > 0 ? 'Generated' : 'Not generated'}`);
   }
 
-  // Image Retries
-  const totalImages = imageStats.retries.attempt1 + imageStats.retries.attempt2 + imageStats.retries.attempt3;
-  const retriedImages = imageStats.retries.attempt2 + imageStats.retries.attempt3;
-  console.log(`   Page Images: ${totalImages} total`);
-  console.log(`   - First attempt success: ${imageStats.retries.attempt1}`);
-  if (imageStats.retries.attempt2 > 0) {
-    console.log(`   - Needed 2nd attempt: ${imageStats.retries.attempt2}`);
-  }
-  if (imageStats.retries.attempt3 > 0) {
-    console.log(`   - Needed 3rd attempt: ${imageStats.retries.attempt3}`);
-  }
-  if (retriedImages > 0) {
-    const retriedPages = Object.entries(imageStats.retries.pages)
-      .filter(([_, attempts]) => attempts > 1)
-      .map(([page, attempts]) => `p${page}(${attempts} attempts)`)
-      .join(', ');
-    if (retriedPages) {
-      console.log(`   - Retried pages: ${retriedPages}`);
+  // Image count: prefer gen-only (unified pipeline) over quality-retry (legacy)
+  const qualityRetryTotal = imageStats.retries.attempt1 + imageStats.retries.attempt2 + imageStats.retries.attempt3;
+  const genOnlyTotal = imageStats.genOnly.totalFromLog || imageStats.genOnly.count;
+  const totalImages = genOnlyTotal || qualityRetryTotal;
+
+  if (genOnlyTotal > 0) {
+    // Unified pipeline mode (gen-only, no per-image quality retry)
+    console.log(`   Page Images: ${genOnlyTotal} generated`);
+  } else if (qualityRetryTotal > 0) {
+    // Legacy quality-retry mode
+    const retriedImages = imageStats.retries.attempt2 + imageStats.retries.attempt3;
+    console.log(`   Page Images: ${qualityRetryTotal} total`);
+    console.log(`   - First attempt success: ${imageStats.retries.attempt1}`);
+    if (imageStats.retries.attempt2 > 0) {
+      console.log(`   - Needed 2nd attempt: ${imageStats.retries.attempt2}`);
     }
+    if (imageStats.retries.attempt3 > 0) {
+      console.log(`   - Needed 3rd attempt: ${imageStats.retries.attempt3}`);
+    }
+    if (retriedImages > 0) {
+      const retriedPages = Object.entries(imageStats.retries.pages)
+        .filter(([_, attempts]) => attempts > 1)
+        .map(([page, attempts]) => `p${page}(${attempts} attempts)`)
+        .join(', ');
+      if (retriedPages) {
+        console.log(`   - Retried pages: ${retriedPages}`);
+      }
+    }
+  } else {
+    console.log(`   Page Images: (count not detected)`);
   }
 
   // Content blocked
@@ -1030,6 +1041,48 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
     console.log(`\n🔍 SCENE PREVIEWS`);
     console.log(`   Count: ${imageStats.scenePreviews.count}`);
     console.log(`   Total cost: $${imageStats.scenePreviews.totalCost.toFixed(4)}`);
+  }
+
+  // Repair Pipeline
+  if (imageStats.repairPipeline.ran) {
+    const rp = imageStats.repairPipeline;
+    const hadRepairs = rp.passes.length > 0;
+    console.log(`\n🔧 AUTO-REPAIR PIPELINE`);
+    console.log(`   Images: ${rp.imageCount}, Threshold: ${rp.threshold}%, Max passes: ${rp.maxAttempts}`);
+    if (rp.evalDuration) {
+      console.log(`   Evaluation: ${rp.evalDuration}s, Avg score: ${rp.avgScore}%, Entity issues: ${rp.entityIssues}`);
+    }
+
+    if (hadRepairs) {
+      for (const pass of rp.passes) {
+        const dur = pass.duration ? ` in ${pass.duration}s` : '';
+        console.log(`   Pass ${pass.pass}: Regenerated ${pass.pagesRegenerated} pages${dur}`);
+      }
+      if (rp.upgradedDetails.length > 0) {
+        console.log(`   Upgrades:`);
+        for (const u of rp.upgradedDetails) {
+          console.log(`   - Page ${u.page}: ${u.from} (${u.fromScore}%) → ${u.to} (${u.toScore}%)`);
+        }
+      }
+      console.log(`   Result: ${rp.upgradedPages} upgraded, ${rp.charFixed} character-fixed`);
+    } else {
+      console.log(`   Result: All pages above threshold, no repairs needed`);
+    }
+
+    // Show per-page scores (only last evaluation round, sorted by page)
+    if (rp.pageScores.length > 0) {
+      // Deduplicate: keep last score per page (re-evaluation overwrites)
+      const lastScores = new Map();
+      for (const s of rp.pageScores) lastScores.set(s.page, s);
+      const sorted = [...lastScores.values()].sort((a, b) => a.page - b.page);
+      const low = sorted.filter(s => s.final < rp.threshold);
+      if (low.length > 0) {
+        console.log(`   Below threshold: ${low.map(s => `p${s.page}(${s.final}%)`).join(', ')}`);
+      }
+      // Compact score line
+      const scoreStr = sorted.map(s => `${s.final}`).join(' ');
+      console.log(`   Final scores: [${scoreStr}]`);
+    }
   }
 
   // Costs
