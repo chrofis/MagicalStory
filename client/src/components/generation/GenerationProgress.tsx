@@ -172,9 +172,8 @@ export function GenerationProgress({
 
   // Track which message was shown for each character to avoid repeats (useRef to avoid dependency issues)
   const messageIndicesRef = useRef<Record<number, number>>({});
-
-  // Current character display state (computed on rotation change)
-  const [currentCharDisplay, setCurrentCharDisplay] = useState<{ avatarUrl: string; message: string } | null>(null);
+  // Track which rotationIndex we last generated a message for (to avoid double-advancing on re-renders)
+  const lastMessageRotationRef = useRef<number>(-1);
 
   // Get all available avatar URLs for a character (individual face + body crops, no 2x2 grids)
   const getAllAvatarUrls = (char: Character): string[] => {
@@ -205,6 +204,15 @@ export function GenerationProgress({
     }
     return urls;
   };
+
+  // Stable key for characters — only recompute rotation when IDs or avatar URLs actually change
+  const charactersKey = useMemo(() => {
+    return characters.map(c => {
+      const urls = getAllAvatarUrls(c);
+      return `${c.id}:${urls.join(',')}`;
+    }).join('|');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characters]);
 
   // Build rotation items: always alternate tip, char, tip, char...
   // Each character × avatar pair is a separate entry for maximum variety
@@ -255,7 +263,7 @@ export function GenerationProgress({
 
     return items;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [characters]);
+  }, [charactersKey]);
 
   // Rotate every 8 seconds
   useEffect(() => {
@@ -268,31 +276,29 @@ export function GenerationProgress({
     return () => clearInterval(interval);
   }, [rotationItems.length]);
 
-  // Update character display when rotation changes to a character
-  useEffect(() => {
-    if (rotationItems.length === 0) return;
+  // Derive character display directly from rotation state (no useEffect delay = perfect sync)
+  const currentCharDisplay = useMemo(() => {
+    if (rotationItems.length === 0) return null;
 
     const currentItem = rotationItems[rotationIndex];
-    if (currentItem.type === 'character') {
-      const char = currentItem.char;
-      const avatarUrl = currentItem.avatarUrl;
+    if (currentItem.type !== 'character') return null;
 
-      // Get next message index for this character (using ref to avoid dependency issues)
+    const char = currentItem.char;
+    const avatarUrl = currentItem.avatarUrl;
+
+    // Only advance message counter when rotationIndex actually changes (not on re-renders)
+    if (lastMessageRotationRef.current !== rotationIndex) {
+      lastMessageRotationRef.current = rotationIndex;
       const currentIndex = messageIndicesRef.current[char.id] ?? -1;
-      const nextIndex = (currentIndex + 1) % funnyMessageTemplates.length;
-
-      // Update message index for next time
-      messageIndicesRef.current[char.id] = nextIndex;
-
-      // Get the message text
-      const template = funnyMessageTemplates[nextIndex];
-      const msg = language === 'de' ? template.de : language === 'fr' ? template.fr : template.en;
-      const message = msg.replace('{name}', char.name);
-
-      setCurrentCharDisplay({ avatarUrl, message });
-    } else {
-      setCurrentCharDisplay(null);
+      messageIndicesRef.current[char.id] = (currentIndex + 1) % funnyMessageTemplates.length;
     }
+
+    const idx = messageIndicesRef.current[char.id] ?? 0;
+    const template = funnyMessageTemplates[idx];
+    const msg = language === 'de' ? template.de : language === 'fr' ? template.fr : template.en;
+    const message = msg.replace('{name}', char.name);
+
+    return { avatarUrl, message };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rotationIndex, rotationItems, language]);
 
