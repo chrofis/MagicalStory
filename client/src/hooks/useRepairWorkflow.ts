@@ -423,6 +423,16 @@ export function useRepairWorkflow({
       }
 
       completeStep('collect-feedback', { pages, totalIssues });
+
+      // Seed consistency results from existing entity report so the
+      // consistency step shows data without requiring a manual re-run
+      if (fcReport?.entity) {
+        setWorkflowState(prev => ({
+          ...prev,
+          consistencyResults: { report: fcReport.entity as any },
+          stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
+        }));
+      }
     } catch (error) {
       console.error('Failed to collect feedback:', error);
       failStep('collect-feedback', error instanceof Error ? error.message : 'Unknown error');

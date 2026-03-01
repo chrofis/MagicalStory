@@ -3053,8 +3053,8 @@ export function StoryDisplay({
             </details>
           )}
 
-          {/* Other Consistency Checks (Image, Text) */}
-          {finalChecksReport && (
+          {/* Other Consistency Checks (Image, Text) - only shown for legacy pipelines */}
+          {finalChecksReport && (finalChecksReport.imageChecks?.length > 0 || finalChecksReport.textCheck) && (
             <details className={`border-2 rounded-xl p-4 ${
               finalChecksReport.overallConsistent
                 ? 'bg-green-50 border-green-200'
