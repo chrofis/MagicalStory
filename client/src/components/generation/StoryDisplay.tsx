@@ -2969,14 +2969,20 @@ export function StoryDisplay({
                                           className="w-full h-auto rounded cursor-pointer hover:opacity-80"
                                           onClick={() => pageData.comparison?.after && setEnlargedImage({ src: pageData.comparison.after, title: `${grid.entityName} - Page ${pageNum} After${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
                                         />
-                                        <div className="bg-gray-900 rounded">
-                                          <img
-                                            src={pageData.comparison?.diff}
-                                            alt={`P${pageNum} diff`}
-                                            className="w-full h-auto rounded cursor-pointer hover:opacity-80"
-                                            onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
-                                          />
-                                        </div>
+                                        {pageData.comparison?.diff ? (
+                                          <div className="bg-gray-900 rounded">
+                                            <img
+                                              src={pageData.comparison.diff}
+                                              alt={`P${pageNum} diff`}
+                                              className="w-full h-auto rounded cursor-pointer hover:opacity-80"
+                                              onClick={() => pageData.comparison?.diff && setEnlargedImage({ src: pageData.comparison.diff, title: `${grid.entityName} - Page ${pageNum} Diff${pageData.clothingCategory ? ` (${pageData.clothingCategory})` : ''}` })}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div className="bg-gray-100 rounded flex items-center justify-center text-[8px] text-gray-400 aspect-[3/4]">
+                                            N/A
+                                          </div>
+                                        )}
                                       </div>
                                       {pageData.promptUsed && (
                                         <details className="text-[10px]">

@@ -4306,6 +4306,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Step 5: One character fix pass (entity consistency → repairCharacterMismatch)
   // =========================================================================
   const charFixResults = new Map(); // pageNumber -> { imageData, source }
+  const charFixDetails = new Map(); // charName -> Map(pageNumber -> { before, after })
 
   if (entityReport && entityReport.totalIssues > 0) {
     await updateProgress(93, 'Fixing character consistency...');
@@ -4438,8 +4439,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           });
 
           if (repairResult?.imageData) {
+            // Track per-character before/after for entityRepairs visualization
+            const beforeImageData = currentImageData;
             currentImageData = repairResult.imageData;
             anyFixApplied = true;
+
+            if (!charFixDetails.has(fix.charName)) charFixDetails.set(fix.charName, new Map());
+            charFixDetails.get(fix.charName).set(pageNumber, {
+              before: beforeImageData,
+              after: currentImageData
+            });
 
             if (repairResult.usage && usageTracker) {
               usageTracker('gemini_image', {
@@ -4562,7 +4571,22 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   });
 
   log.info(`✅ [UNIFIED PIPELINE] Complete: ${results.length} pages, ${upgradedCount} upgraded, ${charFixResults.size} character-fixed`);
-  return results;
+
+  // Convert charFixDetails Map to plain object for serialization
+  const charFixDetailsObj = {};
+  for (const [charName, pages] of charFixDetails) {
+    charFixDetailsObj[charName] = { pages: {} };
+    for (const [pageNum, data] of pages) {
+      charFixDetailsObj[charName].pages[pageNum] = {
+        comparison: {
+          before: data.before.startsWith('data:') ? data.before : `data:image/png;base64,${data.before}`,
+          after: data.after.startsWith('data:') ? data.after : `data:image/png;base64,${data.after}`
+        }
+      };
+    }
+  }
+
+  return { results, charFixDetails: charFixDetailsObj };
 }
 
 // ============================================================================

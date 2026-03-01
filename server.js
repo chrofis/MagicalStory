@@ -3337,7 +3337,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
       log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
 
-      const pipelineResult = await runUnifiedRepairPipeline(rawImages, {
+      const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
         characters: inputData.characters,
         modelOverrides,
         usageTracker: (provider, usage, funcName, modelId) => addUsage(provider, usage, funcName, modelId),
@@ -3508,8 +3508,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [95, 'Finalizing story...', jobId]
     );
 
-    // Final consistency checks removed — entity checks now run inside runUnifiedRepairPipeline
-    let finalChecksReport = null;
+    // Extract entity report from unified pipeline results (same on every page)
+    const entityReport = pipelineResult[0]?.entityReport || null;
+    let finalChecksReport = entityReport ? { entity: entityReport } : null;
+
+    // Build entityRepairs from character fix data for StoryDisplay before/after visualization
+    if (finalChecksReport?.entity && charFixDetails && Object.keys(charFixDetails).length > 0) {
+      finalChecksReport.entityRepairs = {};
+      for (const [charName, charData] of Object.entries(charFixDetails)) {
+        finalChecksReport.entityRepairs[charName] = {
+          timestamp: new Date().toISOString(),
+          pages: charData.pages,
+          cellsRepaired: Object.keys(charData.pages).length
+        };
+      }
+    }
+
     let originalStoryText = null;
 
     // Log API usage to generationLog BEFORE saving story (so it's included in the saved data)
