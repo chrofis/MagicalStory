@@ -5,12 +5,12 @@ import type {
   PageFeedback,
   SceneImage,
   EntityConsistencyReport,
-  EntityCheckResult,
   EvaluationData,
   FinalChecksImageCheck,
 } from '../types/story';
 import type { Character } from '../types/character';
 import { storyService } from '../services/storyService';
+import { REPAIR_DEFAULTS } from '../config/repairDefaults';
 
 // Initial state factory
 function createInitialState(): RepairWorkflowState {
@@ -100,11 +100,14 @@ export interface UseRepairWorkflowReturn {
   redoProgress: { current: number; total: number; currentPage?: number };
 
   // Step 4: Re-evaluate
-  reEvaluatePages: (pageNumbers?: number[]) => Promise<Record<number, {
-    score?: number;
-    qualityScore: number;
-    fixableIssues?: unknown[];
-  }> | undefined>;
+  reEvaluatePages: (pageNumbers?: number[]) => Promise<{
+    evalPages: Record<number, {
+      score?: number;
+      qualityScore: number;
+      fixableIssues?: unknown[];
+    }>;
+    badPages: number[];
+  } | undefined>;
 
   // Step 5: Consistency check
   runConsistencyCheck: () => Promise<void>;
@@ -454,7 +457,7 @@ export function useRepairWorkflow({
   }, []);
 
   // Auto-identify pages needing redo based on thresholds
-  const autoIdentifyRedoPages = useCallback((scoreThreshold = 60, issueThreshold = 5) => {
+  const autoIdentifyRedoPages = useCallback((scoreThreshold: number = REPAIR_DEFAULTS.scoreThreshold, issueThreshold: number = REPAIR_DEFAULTS.issueThreshold) => {
     startStep('identify-redo-pages');
 
     const pagesToRedo: number[] = [];
@@ -588,7 +591,7 @@ export function useRepairWorkflow({
     fixableIssues: EvaluationData['fixableIssues'];
   };
 
-  const reEvaluatePages = useCallback(async (pageNumbers?: number[]): Promise<Record<number, EvalPageResult> | undefined> => {
+  const reEvaluatePages = useCallback(async (pageNumbers?: number[]): Promise<{ evalPages: Record<number, EvalPageResult>; badPages: number[] } | undefined> => {
     if (!storyId) return undefined;
 
     startStep('re-evaluate');
@@ -622,7 +625,7 @@ export function useRepairWorkflow({
       }
 
       completeStep('re-evaluate', { pages: evalResults });
-      return evalResults;
+      return { evalPages: evalResults, badPages: result.badPages ?? [] };
     } catch (error) {
       console.error('Re-evaluation failed:', error);
       failStep('re-evaluate', error instanceof Error ? error.message : 'Unknown error');
@@ -853,12 +856,7 @@ export function useRepairWorkflow({
   } = {}) => {
     if (!storyId) return;
 
-    // Default thresholds for repair decisions
-    const DEFAULT_SCORE_THRESHOLD = 60;     // Out of 100 - pages below this need redo
-    const DEFAULT_ISSUE_THRESHOLD = 5;      // Number of fixable issues triggering redo
-    const DEFAULT_MAX_PASSES = 2;           // Global passes over all pages
-
-    const { scoreThreshold = DEFAULT_SCORE_THRESHOLD, issueThreshold = DEFAULT_ISSUE_THRESHOLD, maxPasses = DEFAULT_MAX_PASSES, onProgress } = options;
+    const { maxPasses = REPAIR_DEFAULTS.maxPasses, onProgress } = options;
 
     // Create abort controller for this workflow run
     abortControllerRef.current = new AbortController();
@@ -874,20 +872,6 @@ export function useRepairWorkflow({
     };
 
     const allPageNumbers = sceneImages.map(s => s.pageNumber);
-
-    // Helper: identify bad pages from eval results
-    const findBadPages = (evalPages: Record<number, EvalPageResult>): number[] => {
-      const bad: number[] = [];
-      for (const [pageNumStr, result] of Object.entries(evalPages)) {
-        const pageNum = parseInt(pageNumStr);
-        const score = result.score ?? result.qualityScore ?? 100;
-        const issueCount = result.fixableIssues?.length ?? 0;
-        if (score < scoreThreshold || issueCount >= issueThreshold) {
-          bad.push(pageNum);
-        }
-      }
-      return bad.sort((a, b) => a - b);
-    };
 
     try {
       // Step 1: Collect feedback (populates UI state; pass logic uses fresh API data)
@@ -917,12 +901,12 @@ export function useRepairWorkflow({
         // Pass 1: entity data from generation. Pass 2+: freshly updated entity data.
         checkAborted();
         onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
-        const evalPages = await reEvaluatePages(allPageNumbers) ?? {};
+        const evalResult = await reEvaluatePages(allPageNumbers);
 
-        // 3. Identify bad pages
+        // 3. Identify bad pages (server computes these using shared findBadPages)
         checkAborted();
         onProgress?.('identify-redo-pages', `Pass ${pass}: Identifying pages needing redo...`);
-        const pagesToRedo = findBadPages(evalPages);
+        const pagesToRedo = evalResult?.badPages ?? [];
 
         setWorkflowState(prev => ({
           ...prev,
@@ -991,84 +975,68 @@ export function useRepairWorkflow({
       await reEvaluatePages(allPageNumbers);
 
       // Character repair (before pick-best so repair versions are also considered)
+      // Server handles task selection via autoSelect (shared selectCharRepairTasks logic)
       checkAborted();
-      if (consistencyReport?.characters) {
-        const charsWithIssues = Object.entries(consistencyReport.characters)
-          .filter(([_, result]) => {
-            if ('overallConsistent' in result) {
-              return !result.overallConsistent || (result.totalIssues ?? 0) > 0;
-            }
-            return !result.consistent || (result.issues?.length ?? 0) > 0;
-          })
-          .map(([name]) => name);
+      onProgress?.('character-repair', 'Auto-selecting and repairing characters...');
+      startStep('character-repair');
+      try {
+        const repairResult = await storyService.repairCharacters(storyId, [], { autoSelect: true });
 
-        if (charsWithIssues.length > 0) {
-          onProgress?.('character-repair', `Repairing ${charsWithIssues.length} characters...`);
+        // Process results for UI state and image updates
+        for (const charResult of (repairResult.results || [])) {
+          const charName = charResult.character;
+          const pagesRepaired = charResult.pagesRepaired || [];
+          const pagesFailed = charResult.pagesFailed || [];
 
-          // Collect all repair tasks with severity, then prioritize critical > major
-          const allRepairTasks: { charName: string; pageNumber: number; severity: 'critical' | 'major' }[] = [];
-          for (const charName of charsWithIssues) {
-            const charResult = consistencyReport.characters[charName] as EntityCheckResult;
-            const collectIssues = (issues: { severity?: string; pagesToFix?: number[]; pageNumber?: number | null }[]) => {
-              for (const issue of issues) {
-                if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
-                const sev = issue.severity as 'critical' | 'major';
-                const pages = new Set<number>();
-                for (const page of issue.pagesToFix || []) pages.add(page);
-                if (issue.pageNumber) pages.add(issue.pageNumber);
-                for (const p of pages) {
-                  allRepairTasks.push({ charName, pageNumber: p, severity: sev });
-                }
-              }
-            };
-            if (charResult.byClothing) {
-              for (const clothingResult of Object.values(charResult.byClothing)) {
-                collectIssues(clothingResult.issues || []);
+          // Notify parent of image updates
+          for (const repair of pagesRepaired) {
+            if (repair.imageData && onImageUpdate) {
+              try {
+                onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex);
+              } catch (err) {
+                console.error(`[RepairWorkflow] Failed to notify image update for page ${repair.pageNumber}:`, err);
               }
             }
-            if (charResult.issues) {
-              collectIssues(charResult.issues);
-            }
           }
 
-          // Deduplicate (same char+page may appear from multiple issues) and keep highest severity
-          const taskKey = (t: { charName: string; pageNumber: number }) => `${t.charName}:${t.pageNumber}`;
-          const bestTask = new Map<string, typeof allRepairTasks[0]>();
-          for (const task of allRepairTasks) {
-            const key = taskKey(task);
-            const existing = bestTask.get(key);
-            if (!existing || (task.severity === 'critical' && existing.severity !== 'critical')) {
-              bestTask.set(key, task);
-            }
+          if (pagesFailed.length > 0) {
+            console.warn(`[RepairWorkflow] ${pagesFailed.length} pages failed repair for ${charName}:`,
+              pagesFailed.map(f => `page ${f.pageNumber}: ${f.reason}`).join(', '));
           }
 
-          // Sort: critical first, then major
-          const sortedTasks = Array.from(bestTask.values()).sort((a, b) => {
-            if (a.severity !== b.severity) return a.severity === 'critical' ? -1 : 1;
-            return a.pageNumber - b.pageNumber;
-          });
+          const repairedDetails = pagesRepaired.map(r => ({
+            pageNumber: typeof r === 'number' ? r : r.pageNumber,
+            comparison: r.comparison || null,
+            verification: r.verification || null,
+            method: r.method || 'gemini',
+          }));
+          const failedPages = pagesFailed.map(f => ({
+            pageNumber: f.pageNumber,
+            reason: f.reason,
+            rejected: f.rejected,
+            comparison: f.comparison || null,
+          }));
 
-          // Apply budget limit
-          const MAX_AUTO_REPAIR_PAGES = 3;
-          const selectedTasks = sortedTasks.slice(0, MAX_AUTO_REPAIR_PAGES);
-          if (sortedTasks.length > MAX_AUTO_REPAIR_PAGES) {
-            console.log(`[RepairWorkflow] Limiting character repairs: ${sortedTasks.length} tasks → ${MAX_AUTO_REPAIR_PAGES} (critical first)`);
-          }
-
-          // Group selected tasks by character for API calls
-          const tasksByChar = new Map<string, number[]>();
-          for (const task of selectedTasks) {
-            const pages = tasksByChar.get(task.charName) || [];
-            pages.push(task.pageNumber);
-            tasksByChar.set(task.charName, pages);
-          }
-
-          for (const [charName, pages] of tasksByChar) {
-            checkAborted();
-            onProgress?.('character-repair', `Repairing ${charName} on ${pages.length} pages...`);
-            await repairCharacter(charName, pages);
-          }
+          setWorkflowState(prev => ({
+            ...prev,
+            characterRepairResults: {
+              charactersProcessed: [...prev.characterRepairResults.charactersProcessed, charName],
+              pagesRepaired: { ...prev.characterRepairResults.pagesRepaired, [charName]: repairedDetails },
+              pagesFailed: { ...prev.characterRepairResults.pagesFailed, [charName]: failedPages },
+            },
+          }));
         }
+
+        setWorkflowState(prev => ({
+          ...prev,
+          stepStatus: { ...prev.stepStatus, 'character-repair': 'completed' },
+        }));
+      } catch (err) {
+        console.error('[RepairWorkflow] Auto character repair failed:', err);
+        setWorkflowState(prev => ({
+          ...prev,
+          stepStatus: { ...prev.stepStatus, 'character-repair': 'failed' },
+        }));
       }
 
       // Pick best versions last (considers all versions including character repairs)
@@ -1100,7 +1068,6 @@ export function useRepairWorkflow({
   }, [
     storyId, sceneImages, imageModel, onImageUpdate,
     collectFeedback, reEvaluatePages, startStep, setRedoProgress,
-    repairCharacter
   ]);
 
   return {

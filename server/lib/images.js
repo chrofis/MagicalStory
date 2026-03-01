@@ -15,6 +15,7 @@ const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
+const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
 // Grid-based repair (lazy-loaded to avoid circular dependencies)
 let gridBasedRepairModule = null;
 function getGridBasedRepair() {
@@ -4080,13 +4081,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 2: First regeneration of low-scoring pages
   // =========================================================================
-  const lowScoringPages = rawImages.filter(img => {
-    if (!img.imageData) return false;
+  // Build eval map for findBadPages: only include evaluated pages with images
+  const pass1EvalPages = {};
+  for (const img of rawImages) {
+    if (!img.imageData) continue;
     const ev = evalMap.get(img.pageNumber);
-    const issueCount = ev?.fixableIssues?.length ?? 0;
-    return ev?.evaluated && ev.qualityScore != null &&
-      (ev.qualityScore < regenThreshold || issueCount >= REPAIR_DEFAULTS.issueThreshold);
-  });
+    if (ev?.evaluated && ev.qualityScore != null) {
+      pass1EvalPages[img.pageNumber] = ev;
+    }
+  }
+  const pass1BadPageNums = findBadPages(pass1EvalPages, { scoreThreshold: regenThreshold });
+  const lowScoringPages = rawImages.filter(img => pass1BadPageNums.includes(img.pageNumber));
 
   if (lowScoringPages.length > 0 && maxRegenAttempts >= 1) {
     await updateProgress(85, `Improving ${lowScoringPages.length} low-scoring images (pass 1)...`);
@@ -4189,14 +4194,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // Step 3: Second regeneration of still-low pages
   // =========================================================================
   if (maxRegenAttempts >= 2) {
-    const stillLowPages = rawImages.filter(img => {
-      if (!img.imageData) return false;
+    // Build eval map from best versions for findBadPages
+    const pass2EvalPages = {};
+    for (const img of rawImages) {
+      if (!img.imageData) continue;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
-      const issueCount = bestSoFar?.evaluation?.fixableIssues?.length ?? 0;
-      return bestSoFar && bestSoFar.score != null &&
-        (bestSoFar.score < regenThreshold || issueCount >= REPAIR_DEFAULTS.issueThreshold);
-    });
+      if (bestSoFar && bestSoFar.score != null) {
+        pass2EvalPages[img.pageNumber] = {
+          qualityScore: bestSoFar.score,
+          fixableIssues: bestSoFar.evaluation?.fixableIssues,
+        };
+      }
+    }
+    const pass2BadPageNums = findBadPages(pass2EvalPages, { scoreThreshold: regenThreshold });
+    const stillLowPages = rawImages.filter(img => pass2BadPageNums.includes(img.pageNumber));
 
     if (stillLowPages.length > 0) {
       await updateProgress(90, `Improving ${stillLowPages.length} low-scoring images (pass 2)...`);
@@ -4325,50 +4337,16 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     await updateProgress(93, 'Fixing character consistency...');
     log.info(`👤 [UNIFIED PIPELINE] Step 5: Character fix pass (${entityReport.totalIssues} entity issues)...`);
 
-    // Collect all (page, character) pairs that need fixing from entity report
-    const fixTasks = []; // [{ pageNumber, charName, severity }]
-    const seenPairs = new Set();
-
-    for (const [charName, charResult] of Object.entries(entityReport.characters || {})) {
-      const allIssues = [...(charResult.issues || [])];
-      // Also collect from byClothing
-      if (charResult.byClothing) {
-        for (const clothingResult of Object.values(charResult.byClothing)) {
-          for (const issue of (clothingResult.issues || [])) {
-            if (!allIssues.some(i => i.id === issue.id)) {
-              allIssues.push(issue);
-            }
-          }
-        }
-      }
-
-      for (const issue of allIssues) {
-        if (issue.severity !== 'major' && issue.severity !== 'critical') continue;
-
-        const pagesToFix = issue.pagesToFix || (issue.pageNumber ? [issue.pageNumber] : []);
-        for (const pageNum of pagesToFix) {
-          const key = `${pageNum}-${charName}`;
-          if (seenPairs.has(key)) continue;
-          seenPairs.add(key);
-          fixTasks.push({ pageNumber: pageNum, charName, severity: issue.severity, issueDescription: issue.description || issue.fixInstruction || '' });
-        }
-      }
+    // Build page scores map for task prioritization
+    const pageScores = new Map();
+    for (const [pageNumber, best] of bestPerPage) {
+      pageScores.set(pageNumber, best?.score ?? 100);
     }
 
+    const { tasks: fixTasks, dropped } = selectCharRepairTasks(entityReport, { pageScores });
     log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages`);
-
-    // Limit character fixes to a flat cap
-    const maxCharFixes = REPAIR_DEFAULTS.maxCharRepairPages;
-    if (fixTasks.length > maxCharFixes) {
-      // Sort by page quality score (ascending) — fix worst-scoring pages first
-      fixTasks.sort((a, b) => {
-        const scoreA = bestPerPage.get(a.pageNumber)?.score ?? 100;
-        const scoreB = bestPerPage.get(b.pageNumber)?.score ?? 100;
-        return scoreA - scoreB;
-      });
-      const dropped = fixTasks.length - maxCharFixes;
-      fixTasks.length = maxCharFixes;
-      log.info(`👤 [UNIFIED PIPELINE] Limited to ${maxCharFixes} fixes (cap ${REPAIR_DEFAULTS.maxCharRepairPages}). Dropped ${dropped} lower-priority fixes.`);
+    if (dropped > 0) {
+      log.info(`👤 [UNIFIED PIPELINE] Dropped ${dropped} lower-priority fixes (cap ${REPAIR_DEFAULTS.maxCharRepairPages}).`);
     }
 
     // Group fix tasks by page for sequential application

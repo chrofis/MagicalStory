@@ -15,12 +15,15 @@ const { imageRegenerationLimiter } = require('../middleware/rateLimit');
 
 // Config
 const { CREDIT_CONFIG, CREDIT_COSTS } = require('../config/credits');
-const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING } = require('../config/models');
+const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, REPAIR_DEFAULTS } = require('../config/models');
 
 // Services
 const { log } = require('../utils/logger');
 const { saveStoryData, rehydrateStoryImages, saveStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+
+// Shared repair logic
+const { findBadPages, selectCharRepairTasks } = require('../lib/repairLogic');
 
 // Lib modules
 const {
@@ -2664,7 +2667,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     await addRepairCost(id, apiCost, 'Re-evaluate');
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
-    res.json({ pages, apiCost });
+    const badPages = findBadPages(pages);
+    res.json({ pages, badPages, apiCost });
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
     res.status(500).json({ error: 'Failed to re-evaluate: ' + err.message });
@@ -2818,28 +2822,56 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs, useMagicApiRepair } = req.body;
+    const { repairs: manualRepairs, useMagicApiRepair, autoSelect } = req.body;
 
-    if (!repairs || !Array.isArray(repairs) || repairs.length === 0) {
-      return res.status(400).json({ error: 'repairs array is required' });
-    }
+    let repairs;
 
-    // Limit total repair attempts: count all pages across all characters
-    const MAX_REPAIR_PAGES = 3;
-    let totalPageCount = 0;
-    for (const repair of repairs) {
-      totalPageCount += (repair.pages?.length || 0);
-    }
-    if (totalPageCount > MAX_REPAIR_PAGES) {
-      log.info(`👤 [REPAIR-WORKFLOW] Limiting character repairs: ${totalPageCount} pages requested, capping at ${MAX_REPAIR_PAGES}`);
-      // Trim pages from each repair, keeping lowest page numbers first (worst pages tend to be processed first)
-      let remaining = MAX_REPAIR_PAGES;
+    if (autoSelect) {
+      // Auto-select mode: derive repairs from entity report in DB
+      const storyResult = await getDbPool().query(
+        'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+      if (storyResult.rows.length === 0) {
+        return res.status(404).json({ error: 'Story not found' });
+      }
+      const story = storyResult.rows[0];
+      const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+      const entityReport = storyData.finalChecksReport?.entity;
+
+      if (!entityReport || !entityReport.characters) {
+        return res.json({ results: [], message: 'No entity report found, nothing to repair' });
+      }
+
+      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(entityReport);
+      if (autoRepairs.length === 0) {
+        return res.json({ results: [], message: 'No major/critical issues found' });
+      }
+      repairs = autoRepairs;
+      log.info(`👤 [REPAIR-WORKFLOW] Auto-selected ${repairs.length} character repairs (${dropped} dropped)`);
+    } else {
+      // Manual mode: use provided repairs array
+      repairs = manualRepairs;
+      if (!repairs || !Array.isArray(repairs) || repairs.length === 0) {
+        return res.status(400).json({ error: 'repairs array is required (or use autoSelect: true)' });
+      }
+
+      // Limit total repair attempts using shared constant
+      const maxRepairPages = REPAIR_DEFAULTS.maxCharRepairPages;
+      let totalPageCount = 0;
       for (const repair of repairs) {
-        if (remaining <= 0) {
-          repair.pages = [];
-        } else {
-          repair.pages = repair.pages.slice(0, remaining);
-          remaining -= repair.pages.length;
+        totalPageCount += (repair.pages?.length || 0);
+      }
+      if (totalPageCount > maxRepairPages) {
+        log.info(`👤 [REPAIR-WORKFLOW] Limiting character repairs: ${totalPageCount} pages requested, capping at ${maxRepairPages}`);
+        let remaining = maxRepairPages;
+        for (const repair of repairs) {
+          if (remaining <= 0) {
+            repair.pages = [];
+          } else {
+            repair.pages = repair.pages.slice(0, remaining);
+            remaining -= repair.pages.length;
+          }
         }
       }
     }

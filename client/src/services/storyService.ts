@@ -2033,6 +2033,7 @@ export const storyService = {
       fixableIssues: Array<{ description: string; severity: string; type: string; fix: string; source?: string }> | undefined;
       semanticResult?: unknown;
     }>;
+    badPages?: number[];
   }> {
     const response = await api.post<{
       pages: Record<number, {
@@ -2047,6 +2048,7 @@ export const storyService = {
         fixableIssues: Array<{ description: string; severity: string; type: string; fix: string; source?: string }> | undefined;
         semanticResult?: unknown;
       }>;
+      badPages?: number[];
     }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers });
     return response;
   },
@@ -2211,7 +2213,7 @@ export const storyService = {
   async repairCharacters(
     storyId: string,
     repairs: Array<{ character: string; pages: number[] }>,
-    options?: { useMagicApiRepair?: boolean }
+    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean }
   ): Promise<{
     results: Array<{
       character: string;
@@ -2246,7 +2248,7 @@ export const storyService = {
         error?: string;
       }>;
     }>(`/api/stories/${storyId}/repair-workflow/character-repair`, {
-      repairs,
+      ...(options?.autoSelect ? { autoSelect: true } : { repairs }),
       ...(options?.useMagicApiRepair !== undefined && { useMagicApiRepair: options.useMagicApiRepair })
     });
     return response;
