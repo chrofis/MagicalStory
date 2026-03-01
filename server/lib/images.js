@@ -13,7 +13,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS } = require('../config/models');
+const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
 // Grid-based repair (lazy-loaded to avoid circular dependencies)
 let gridBasedRepairModule = null;
@@ -156,7 +156,7 @@ const imageCache = new LRUCache(IMAGE_CACHE_MAX_SIZE, CACHE_TTL_MS, 'image');
 const compressedRefCache = new LRUCache(REF_CACHE_MAX_SIZE, CACHE_TTL_MS, 'ref');
 
 // Quality threshold from environment or default
-const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || REPAIR_DEFAULTS.scoreThreshold;
 
 // Maximum mask coverage (%) before skipping repair - larger masks degrade quality
 // Inpainting works best for small, targeted fixes. For large areas, regenerate the image instead.
@@ -3915,7 +3915,7 @@ function buildRegenFeedback(evaluation) {
  * @param {Object} context.dbPool - Database pool for progress updates
  * @param {Object} context.storyData - Full story data (needed for iteratePage mode)
  * @param {Object} [options]
- * @param {number} [options.regenThreshold=50] - Score below which to regenerate
+ * @param {number} [options.regenThreshold=REPAIR_DEFAULTS.scoreThreshold] - Score below which to regenerate
  * @param {number} [options.maxRegenAttempts=2] - Max regeneration attempts per page
  * @param {number} [options.evalConcurrency=10] - Concurrency for evaluations
  * @param {string} [options.qualityModelOverride] - Model override for quality evaluation
@@ -3935,8 +3935,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   } = context;
 
   const {
-    regenThreshold = 50,
-    maxRegenAttempts = 2,
+    regenThreshold = REPAIR_DEFAULTS.scoreThreshold,
+    maxRegenAttempts = REPAIR_DEFAULTS.maxPasses,
     evalConcurrency = 10,
     qualityModelOverride = null,
     useIteratePage = false
@@ -4083,7 +4083,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const lowScoringPages = rawImages.filter(img => {
     if (!img.imageData) return false;
     const ev = evalMap.get(img.pageNumber);
-    return ev?.evaluated && ev.qualityScore != null && ev.qualityScore < regenThreshold;
+    const issueCount = ev?.fixableIssues?.length ?? 0;
+    return ev?.evaluated && ev.qualityScore != null &&
+      (ev.qualityScore < regenThreshold || issueCount >= REPAIR_DEFAULTS.issueThreshold);
   });
 
   if (lowScoringPages.length > 0 && maxRegenAttempts >= 1) {
@@ -4191,7 +4193,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       if (!img.imageData) return false;
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
-      return bestSoFar && bestSoFar.score != null && bestSoFar.score < regenThreshold;
+      const issueCount = bestSoFar?.evaluation?.fixableIssues?.length ?? 0;
+      return bestSoFar && bestSoFar.score != null &&
+        (bestSoFar.score < regenThreshold || issueCount >= REPAIR_DEFAULTS.issueThreshold);
     });
 
     if (stillLowPages.length > 0) {
@@ -4353,9 +4357,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 
     log.info(`👤 [UNIFIED PIPELINE] ${fixTasks.length} character fix tasks across ${new Set(fixTasks.map(t => t.pageNumber)).size} pages`);
 
-    // Limit: max 30% of total pages including covers (rounded up)
-    const totalPagesWithCovers = rawImages.length + 3; // 3 covers: front, initial, back
-    const maxCharFixes = Math.ceil(totalPagesWithCovers * 0.3);
+    // Limit character fixes to a flat cap
+    const maxCharFixes = REPAIR_DEFAULTS.maxCharRepairPages;
     if (fixTasks.length > maxCharFixes) {
       // Sort by page quality score (ascending) — fix worst-scoring pages first
       fixTasks.sort((a, b) => {
@@ -4365,7 +4368,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       });
       const dropped = fixTasks.length - maxCharFixes;
       fixTasks.length = maxCharFixes;
-      log.info(`👤 [UNIFIED PIPELINE] Limited to ${maxCharFixes} fixes (${rawImages.length} pages × 30% = ${Math.ceil(rawImages.length * 0.3)}, cap 5). Dropped ${dropped} lower-priority fixes.`);
+      log.info(`👤 [UNIFIED PIPELINE] Limited to ${maxCharFixes} fixes (cap ${REPAIR_DEFAULTS.maxCharRepairPages}). Dropped ${dropped} lower-priority fixes.`);
     }
 
     // Group fix tasks by page for sequential application
@@ -4500,6 +4503,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const finalEval = best?.evaluation;
 
     // Build imageVersions array (all non-primary versions)
+    // The loop already includes all versions except the best (primary),
+    // so no need to separately add the original — it's already in the loop output.
     const imageVersions = [];
     for (const v of versions) {
       if (v === best && !charFix) continue; // Primary version, skip unless char fix replaced it
@@ -4508,18 +4513,12 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         qualityScore: v.score,
         source: v.source,
         modelId: v.modelId,
-        generatedAt: new Date().toISOString()
-      });
-    }
-
-    // If best is not original, add original to versions for comparison in UI
-    if (best !== versions[0] && versions[0]?.imageData) {
-      imageVersions.push({
-        imageData: versions[0].imageData,
-        qualityScore: versions[0].score,
-        source: versions[0].source,
-        modelId: versions[0].modelId,
-        generatedAt: new Date().toISOString()
+        generatedAt: new Date().toISOString(),
+        // Per-version evaluation data for dev mode version comparison
+        qualityReasoning: v.evaluation?.reasoning || null,
+        fixTargets: v.evaluation?.enrichedFixTargets || v.evaluation?.fixTargets || [],
+        description: img.sceneDescription || null,
+        prompt: img.prompt || null
       });
     }
 

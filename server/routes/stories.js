@@ -1567,23 +1567,46 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       }
 
       // Merge scene imageVersions metadata from blob (description, prompt, modelId, etc.)
+      // IMPORTANT: DB imageVersions includes v0 at index 0 (v0, v1, v2, ...),
+      // but blob imageVersions only has non-v0 versions (v1, v2, ...).
+      // v0's metadata lives on the main blob scene object, not in imageVersions.
       if (!activeOnly && storyData.sceneImages) {
         for (const [pageNum, scene] of sceneImagesMap) {
           const blobScene = storyData.sceneImages.find(s => s.pageNumber === pageNum);
-          if (blobScene?.imageVersions && scene.imageVersions) {
-            for (let i = 0; i < scene.imageVersions.length && i < blobScene.imageVersions.length; i++) {
-              const blobVersion = blobScene.imageVersions[i];
-              if (blobVersion) {
-                scene.imageVersions[i].description = blobVersion.description || null;
-                scene.imageVersions[i].prompt = blobVersion.prompt || null;
-                scene.imageVersions[i].userInput = blobVersion.userInput || null;
-                scene.imageVersions[i].modelId = blobVersion.modelId || null;
-                scene.imageVersions[i].type = blobVersion.type || null;
-                scene.imageVersions[i].qualityReasoning = blobVersion.qualityReasoning || null;
-                scene.imageVersions[i].fixTargets = blobVersion.fixTargets || [];
-                scene.imageVersions[i].totalAttempts = blobVersion.totalAttempts || null;
-                scene.imageVersions[i].referencePhotoNames = blobVersion.referencePhotoNames || [];
-                scene.imageVersions[i].createdAt = blobVersion.createdAt || scene.imageVersions[i].generatedAt || storyData.createdAt || null;
+          if (blobScene && scene.imageVersions) {
+            for (let i = 0; i < scene.imageVersions.length; i++) {
+              if (i === 0) {
+                // v0: metadata lives on the main blob scene object
+                scene.imageVersions[0].description = blobScene.sceneDescription || null;
+                scene.imageVersions[0].prompt = blobScene.prompt || null;
+                scene.imageVersions[0].modelId = blobScene.modelId || scene.imageVersions[0].modelId || null;
+                scene.imageVersions[0].qualityReasoning = blobScene.qualityReasoning || null;
+                scene.imageVersions[0].fixTargets = blobScene.fixTargets || [];
+                scene.imageVersions[0].type = null;
+                scene.imageVersions[0].userInput = null;
+                scene.imageVersions[0].totalAttempts = null;
+                scene.imageVersions[0].referencePhotoNames = blobScene.referencePhotoNames || [];
+                scene.imageVersions[0].createdAt = scene.imageVersions[0].generatedAt || storyData.createdAt || null;
+              } else {
+                // v1+: blob imageVersions[i-1] corresponds to DB imageVersions[i]
+                const blobVersion = blobScene.imageVersions?.[i - 1];
+                const retryEntry = blobScene.retryHistory?.[i];
+                if (blobVersion) {
+                  scene.imageVersions[i].description = blobVersion.description || null;
+                  scene.imageVersions[i].prompt = blobVersion.prompt || null;
+                  scene.imageVersions[i].userInput = blobVersion.userInput || null;
+                  scene.imageVersions[i].modelId = blobVersion.modelId || null;
+                  scene.imageVersions[i].type = blobVersion.type || null;
+                  scene.imageVersions[i].qualityReasoning = blobVersion.qualityReasoning || null;
+                  scene.imageVersions[i].fixTargets = blobVersion.fixTargets || [];
+                  scene.imageVersions[i].totalAttempts = blobVersion.totalAttempts || null;
+                  scene.imageVersions[i].referencePhotoNames = blobVersion.referencePhotoNames || [];
+                  scene.imageVersions[i].createdAt = blobVersion.createdAt || scene.imageVersions[i].generatedAt || storyData.createdAt || null;
+                }
+                // Fallback: retryHistory has per-attempt bboxDetection and score
+                if (retryEntry && !scene.imageVersions[i].fixTargets?.length) {
+                  scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection || null;
+                }
               }
             }
           }
