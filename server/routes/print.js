@@ -1522,19 +1522,17 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
 // Create Stripe checkout session for credits purchase
 router.post('/stripe/create-credits-checkout', authenticateToken, async (req, res) => {
   try {
-    const { credits: requestedCredits = CREDIT_CONFIG.LIMITS.MIN_PURCHASE } = req.body;
+    const { credits: requestedCredits } = req.body;
     const userId = req.user.id;
 
-    // Server-side price validation - NEVER trust client-provided amounts
-    // Use centralized pricing config
-    const { CENTS_PER_CREDIT } = CREDIT_CONFIG.PRICING;
-    const { MIN_PURCHASE, MAX_PURCHASE } = CREDIT_CONFIG.LIMITS;
-
-    // Validate and sanitize credits amount
-    const credits = Math.min(MAX_PURCHASE, Math.max(MIN_PURCHASE, Math.round(Number(requestedCredits) || MIN_PURCHASE)));
-
-    // Calculate amount server-side (never trust client)
-    const amount = credits * CENTS_PER_CREDIT;
+    // Server-side validation: only allow predefined packages
+    const pkg = CREDIT_CONFIG.PRICING.PACKAGES.find(p => p.credits === Number(requestedCredits));
+    if (!pkg) {
+      return res.status(400).json({
+        error: 'Invalid credit package',
+        validPackages: CREDIT_CONFIG.PRICING.PACKAGES.map(p => p.credits)
+      });
+    }
 
     // Get the appropriate Stripe client for this user
     const userStripe = getStripeForUser(req.user);
@@ -1547,19 +1545,19 @@ router.post('/stripe/create-credits-checkout', authenticateToken, async (req, re
 
     console.log(`💳 Creating credits checkout session for user ${userId}`);
     log.debug(`   Mode: ${isTestMode ? 'TEST (admin)' : 'LIVE (real payment)'}`);
-    log.debug(`   Credits: ${credits}, Amount: CHF ${(amount / 100).toFixed(2)} (server-calculated)`);
+    log.debug(`   Package: ${pkg.credits} credits, CHF ${pkg.amountCHF} (server-validated)`);
 
-    // Create checkout session
+    // Create checkout session with server-determined price
     const session = await userStripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
           currency: 'chf',
           product_data: {
-            name: `${credits} Story Credits`,
-            description: `${credits} credits for creating personalized stories on MagicalStory`,
+            name: `${pkg.credits} Story Credits`,
+            description: `${pkg.credits} credits for creating personalized stories on MagicalStory`,
           },
-          unit_amount: amount,
+          unit_amount: pkg.amountCents,
         },
         quantity: 1,
       }],
@@ -1569,7 +1567,7 @@ router.post('/stripe/create-credits-checkout', authenticateToken, async (req, re
       metadata: {
         type: 'credits',
         userId: userId.toString(),
-        credits: credits.toString(),
+        credits: pkg.credits.toString(),
       },
     });
 

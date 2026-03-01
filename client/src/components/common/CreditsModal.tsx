@@ -1,8 +1,15 @@
 import { useState } from 'react';
-import { CreditCard, Loader2 } from 'lucide-react';
+import { CreditCard, Loader2, Check } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/context/ToastContext';
 import { storyService } from '@/services';
+
+const CREDIT_PACKAGES = [
+  { credits: 300,  priceCHF: 5,  label: 'Starter' },
+  { credits: 700,  priceCHF: 10, label: 'Popular' },
+  { credits: 1500, priceCHF: 20, label: 'Best Value' },
+  { credits: 4000, priceCHF: 50, label: 'Pro' },
+] as const;
 
 interface CreditsModalProps {
   isOpen: boolean;
@@ -13,13 +20,16 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   const { language } = useLanguage();
   const { showError } = useToast();
   const [isBuyingCredits, setIsBuyingCredits] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(1); // Default to "Popular"
 
   if (!isOpen) return null;
+
+  const selectedPkg = CREDIT_PACKAGES[selectedIndex];
 
   const handleBuyCredits = async () => {
     setIsBuyingCredits(true);
     try {
-      const { url } = await storyService.createCreditsCheckout(100, 500);
+      const { url } = await storyService.createCreditsCheckout(selectedPkg.credits);
       if (url) {
         window.location.href = url;
       }
@@ -37,11 +47,6 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
   const texts = {
     title: language === 'de' ? 'Credits kaufen' : language === 'fr' ? 'Acheter des credits' : 'Buy Credits',
     credits: language === 'de' ? 'Credits' : language === 'fr' ? 'credits' : 'credits',
-    description: language === 'de'
-      ? '100 Credits reichen fuer etwa 3-4 Geschichten'
-      : language === 'fr'
-      ? '100 credits suffisent pour environ 3-4 histoires'
-      : '100 credits are enough for about 3-4 stories',
     securePayment: language === 'de'
       ? 'Sichere Zahlung mit Stripe'
       : language === 'fr'
@@ -57,22 +62,38 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
       onClick={() => !isBuyingCredits && onClose()}
     >
-      <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl w-full" onClick={(e) => e.stopPropagation()}>
         <h2 className="text-xl font-bold text-gray-900 mb-4">{texts.title}</h2>
 
-        {/* Credit Package */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-6 mb-6 border-2 border-indigo-200">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <CreditCard className="text-indigo-600" size={24} />
-              <span className="text-2xl font-bold text-gray-900">100</span>
-              <span className="text-gray-600">{texts.credits}</span>
-            </div>
-            <div className="text-right">
-              <span className="text-3xl font-bold text-indigo-600">CHF 5.-</span>
-            </div>
-          </div>
-          <p className="text-sm text-gray-500">{texts.description}</p>
+        {/* Credit Packages */}
+        <div className="space-y-2 mb-5">
+          {CREDIT_PACKAGES.map((pkg, idx) => (
+            <button
+              key={pkg.credits}
+              onClick={() => setSelectedIndex(idx)}
+              disabled={isBuyingCredits}
+              className={`w-full flex items-center justify-between rounded-xl px-4 py-3 border-2 transition-all ${
+                idx === selectedIndex
+                  ? 'border-indigo-500 bg-indigo-50'
+                  : 'border-gray-200 bg-white hover:border-gray-300'
+              } disabled:opacity-60`}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                  idx === selectedIndex ? 'border-indigo-500 bg-indigo-500' : 'border-gray-300'
+                }`}>
+                  {idx === selectedIndex && <Check size={12} className="text-white" />}
+                </div>
+                <div className="text-left">
+                  <span className="font-semibold text-gray-900">{pkg.credits}</span>
+                  <span className="text-gray-500 ml-1">{texts.credits}</span>
+                </div>
+              </div>
+              <span className={`text-lg font-bold ${idx === selectedIndex ? 'text-indigo-600' : 'text-gray-700'}`}>
+                CHF {pkg.priceCHF}.-
+              </span>
+            </button>
+          ))}
         </div>
 
         <p className="text-sm text-gray-500 mb-4 text-center">{texts.securePayment}</p>
@@ -96,7 +117,10 @@ export function CreditsModal({ isOpen, onClose }: CreditsModalProps) {
                 {texts.loading}
               </>
             ) : (
-              texts.buyNow
+              <>
+                <CreditCard size={18} />
+                {texts.buyNow} — CHF {selectedPkg.priceCHF}.-
+              </>
             )}
           </button>
         </div>

@@ -12,16 +12,19 @@ const CREDIT_CONFIG = {
     PER_PAGE: 10,             // Credits per story page (e.g., 20-page story = 200 credits)
   },
 
-  // Credit purchase pricing
+  // Credit purchase pricing — fixed packages only
   PRICING: {
-    CENTS_PER_CREDIT: 5,      // 5 cents per credit (CHF 0.05)
-    // So CHF 5 = 500 cents = 100 credits
+    PACKAGES: [
+      { credits: 300,  amountCHF: 5,  amountCents: 500 },
+      { credits: 700,  amountCHF: 10, amountCents: 1000 },
+      { credits: 1500, amountCHF: 20, amountCents: 2000 },
+      { credits: 4000, amountCHF: 50, amountCents: 5000 },
+    ],
   },
 
   // Credit limits
   LIMITS: {
-    MIN_PURCHASE: 100,        // Minimum credits to purchase
-    MAX_PURCHASE: 10000,      // Maximum credits to purchase
+    MAX_PURCHASE: 4000,       // Maximum credits to purchase (largest package)
     INITIAL_USER: 500,        // Credits for new users
     INITIAL_ADMIN: -1,        // Unlimited credits for admins (-1)
   },

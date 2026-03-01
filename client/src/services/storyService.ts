@@ -1850,11 +1850,10 @@ export const storyService = {
     return response;
   },
 
-  // Stripe checkout for credits purchase
-  async createCreditsCheckout(credits: number = 100, amount: number = 500): Promise<{ url: string }> {
+  // Stripe checkout for credits purchase (server determines price from package)
+  async createCreditsCheckout(credits: number): Promise<{ url: string }> {
     const response = await api.post<{ url: string }>('/api/stripe/create-credits-checkout', {
       credits,
-      amount,
     });
     return response;
   },

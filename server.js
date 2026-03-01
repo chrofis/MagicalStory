@@ -704,15 +704,19 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           log.debug('💰 [STRIPE WEBHOOK] Processing credits purchase');
           const userId = parseInt(fullSession.metadata?.userId);
 
-          // SERVER-SIDE VALIDATION: Calculate credits from amount paid, don't trust metadata
-          // Use centralized pricing config
+          // SERVER-SIDE VALIDATION: Look up package by amount paid
           const amountPaid = fullSession.amount_total || 0; // in cents
-          const creditsToAdd = Math.floor(amountPaid / CREDIT_CONFIG.PRICING.CENTS_PER_CREDIT);
-
-          // Sanity check - metadata credits should roughly match calculated credits (allow 10% variance)
+          const pkg = CREDIT_CONFIG.PRICING.PACKAGES.find(p => p.amountCents === amountPaid);
           const metadataCredits = parseInt(fullSession.metadata?.credits) || 0;
-          if (metadataCredits > 0 && Math.abs(metadataCredits - creditsToAdd) > creditsToAdd * 0.1) {
-            log.warn(`⚠️ [STRIPE WEBHOOK] Credit mismatch! Metadata: ${metadataCredits}, Calculated: ${creditsToAdd}. Using calculated value.`);
+
+          if (!pkg) {
+            log.warn(`⚠️ [STRIPE WEBHOOK] No matching package for amount ${amountPaid} cents. Using metadata credits: ${metadataCredits}`);
+          }
+          const creditsToAdd = pkg ? pkg.credits : metadataCredits;
+
+          if (!creditsToAdd || creditsToAdd <= 0) {
+            log.error(`❌ [STRIPE WEBHOOK] Cannot determine credits for amount ${amountPaid} cents, metadata: ${metadataCredits}`);
+            throw new Error('Cannot determine credits to add');
           }
 
           if (!userId || isNaN(userId)) {
