@@ -1591,6 +1591,10 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               target.fixTargets = source.fixTargets || [];
               target.totalAttempts = source.totalAttempts || null;
               target.referencePhotoNames = source.referencePhotoNames || [];
+              target.semanticScore = source.semanticScore ?? null;
+              target.entityPenalty = source.entityPenalty || 0;
+              target.evaluatedAt = source.evaluatedAt || null;
+              target.issuesSummary = source.issuesSummary || null;
               target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
             };
 

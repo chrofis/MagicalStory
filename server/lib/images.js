@@ -4071,7 +4071,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     const ev = evalMap.get(img.pageNumber);
     pageVersions.set(img.pageNumber, [{
       imageData: img.imageData,
-      score: ev?.qualityScore ?? null,
+      score: ev?.score ?? ev?.qualityScore ?? null,
       source: 'original',
       evaluation: ev || null,
       modelId: img.modelId
@@ -4180,7 +4180,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         if (versions && regenResult) {
           versions.push({
             imageData: regenResult.imageData,
-            score: ev.qualityScore ?? null,
+            score: ev.score ?? ev.qualityScore ?? null,
             source: 'regen-attempt-1',
             evaluation: ev,
             modelId: regenResult.modelId
@@ -4295,7 +4295,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           if (versions && regenResult) {
             versions.push({
               imageData: regenResult.imageData,
-              score: ev.qualityScore ?? null,
+              score: ev.score ?? ev.qualityScore ?? null,
               source: 'regen-attempt-2',
               evaluation: ev,
               modelId: regenResult.modelId
