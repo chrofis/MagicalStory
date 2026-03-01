@@ -78,7 +78,7 @@ Return ONLY valid JSON (no markdown, no explanation):
 1. **Use first appearance as canonical**: Cell A represents the first appearance; match other cells to it
 2. **Majority wins**: If 3 cells show blonde hair and 1 shows brown, the brown cell is wrong
 3. **pagesToFix**: List ONLY the page number(s) that need correction
-4. **Reference photo priority**: If a reference photo was provided, that is the ultimate truth
+4. **Reference photo priority**: If a reference photo (Cell R) was provided, use it to verify the character's **identity** (face structure, hair color/style, skin tone, eye color). However, the **art style of the story** determines the rendering style — do NOT flag style differences between a realistic reference photo and stylized illustrations. Only flag genuine identity mismatches (wrong hair color, wrong face shape, missing features), never recommend making illustrations more realistic or more detailed to match Cell R
 
 ## Severity Guide
 
