@@ -20,6 +20,7 @@ import {
   Image,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
+import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult } from '@/types/story';
 import type { Character } from '@/types/character';
@@ -368,9 +369,9 @@ export function RepairWorkflowPanel({
     setIsRunningFullWorkflow(true);
     try {
       await runFullWorkflow({
-        scoreThreshold: 60,
-        issueThreshold: 5,
-        maxPasses: 2,
+        scoreThreshold: REPAIR_DEFAULTS.scoreThreshold,
+        issueThreshold: REPAIR_DEFAULTS.issueThreshold,
+        maxPasses: REPAIR_DEFAULTS.maxPasses,
         onProgress: (step, detail) => {
           setFullWorkflowProgress({ step, detail });
         },
@@ -679,12 +680,12 @@ export function RepairWorkflowPanel({
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => autoIdentifyRedoPages(60, 5)}
+                    onClick={() => autoIdentifyRedoPages(REPAIR_DEFAULTS.scoreThreshold, REPAIR_DEFAULTS.issueThreshold)}
                     disabled={isRunning || workflowState.stepStatus['collect-feedback'] !== 'completed'}
                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                   >
                     <Zap className="w-4 h-4" />
-                    Auto-Identify (score &lt; 60 or 5+ issues)
+                    Auto-Identify (score &lt; {REPAIR_DEFAULTS.scoreThreshold} or {REPAIR_DEFAULTS.issueThreshold}+ issues)
                   </button>
                 </div>
 

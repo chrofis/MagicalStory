@@ -7,7 +7,8 @@ const STORY_BATCH_SIZE = parseInt(process.env.STORY_BATCH_SIZE) || 0;
 const IMAGE_GEN_MODE = process.env.IMAGE_GEN_MODE || 'parallel';
 
 // Image quality threshold - regenerate if score below this value (0-100 scale)
-const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || 50;
+const { REPAIR_DEFAULTS } = require('../config/models');
+const IMAGE_QUALITY_THRESHOLD = parseFloat(process.env.IMAGE_QUALITY_THRESHOLD) || REPAIR_DEFAULTS.scoreThreshold;
 
 // Text Model Configuration
 const TEXT_MODELS = {

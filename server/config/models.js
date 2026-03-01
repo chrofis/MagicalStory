@@ -174,6 +174,14 @@ const IMAGE_MODELS = {
   }
 };
 
+// Repair workflow thresholds — single source of truth for server-side pipeline
+const REPAIR_DEFAULTS = {
+  scoreThreshold: 60,       // Pages scoring below this need redo (0-100)
+  issueThreshold: 5,        // Pages with this many fixable issues need redo
+  maxPasses: 2,             // Global passes over all pages
+  maxCharRepairPages: 3,    // Max pages to character-repair per run
+};
+
 // Approximate pricing per 1M tokens (USD)
 // Updated Feb 2026 - check provider websites for latest pricing
 // Source: https://platform.claude.com/docs/en/about-claude/pricing
@@ -291,6 +299,7 @@ module.exports = {
   IMAGE_BACKENDS,
   MODEL_PRICING,
   INPAINT_BACKENDS,
+  REPAIR_DEFAULTS,
   // Cost calculation utilities
   calculateTextCost,
   calculateImageCost,

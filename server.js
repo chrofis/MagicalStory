@@ -143,6 +143,7 @@ const {
 } = require('./server/lib/textModels');
 const {
   MODEL_PRICING,
+  REPAIR_DEFAULTS,
   calculateTextCost,
   calculateImageCost,
   formatCostSummary
@@ -3348,8 +3349,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         jobId,
         dbPool
       }, {
-        regenThreshold: 50,
-        maxRegenAttempts: enableFullRepair ? 2 : 0,  // 0 = evaluate only, 2 = full repair
+        maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
         evalConcurrency: 10,
         qualityModelOverride: modelOverrides.qualityModel,
         useIteratePage: false  // Fresh generation by default during story creation
