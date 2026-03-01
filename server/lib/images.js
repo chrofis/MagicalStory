@@ -2986,8 +2986,8 @@ async function evaluateImageBatch(images, options = {}) {
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
       const qualityResult = await evaluateImageQuality(
         img.imageData,
-        img.prompt || '',
-        img.characterPhotos || [],
+        img.sceneDescription || img.prompt || '',
+        img.allCharacterPhotos || img.characterPhotos || [],
         'scene',
         qualityModelOverride,
         pageLabel,
@@ -3974,12 +3974,21 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   log.info(`🔍 [UNIFIED PIPELINE] Step 1: Evaluating ${imagesWithData.length} images + entity consistency...`);
   const step1Start = Date.now();
 
+  // Build ALL character photos for evaluation (matches re-evaluate endpoint behavior)
+  const allCharacterPhotos = characters
+    .filter(c => c.photoUrl || c.avatars?.styled)
+    .map(c => ({
+      name: c.name,
+      photoUrl: c.avatars?.styled || c.photoUrl
+    }));
+
   // Prepare eval inputs
   const evalInputs = imagesWithData.map(img => ({
     imageData: img.imageData,
     pageNumber: img.pageNumber,
     prompt: img.prompt,
     characterPhotos: img.characterPhotos,
+    allCharacterPhotos,
     sceneDescription: img.sceneDescription,
     sceneCharacters: img.sceneCharacters,
     sceneMetadata: img.sceneMetadata,

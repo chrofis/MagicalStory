@@ -2454,7 +2454,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
 router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { pageNumbers } = req.body;
+    const { pageNumbers, qualityModelOverride } = req.body;
 
     if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
@@ -2538,7 +2538,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           scene.description,       // originalPrompt
           characterPhotos,         // referenceImages
           'scene',                 // evaluationType
-          null,                    // qualityModelOverride
+          qualityModelOverride || null,
           `PAGE ${pageNumber}`,    // pageContext
           pageText,                // storyText for semantic fidelity
           sceneHint                // sceneHint for semantic evaluation
