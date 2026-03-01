@@ -432,7 +432,7 @@ async function downloadRunwareImage(imageUrl) {
 
   log.debug(`📥 [RUNWARE] Downloading image from ${imageUrl.slice(0, 50)}...`);
 
-  const response = await fetch(imageUrl);
+  const response = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
   if (!response.ok) {
     throw new Error(`Failed to download image: ${response.status}`);
   }

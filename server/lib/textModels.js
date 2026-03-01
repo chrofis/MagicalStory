@@ -32,6 +32,9 @@ async function withRetry(fn, options = {}) {
         error.code === 'UND_ERR_SOCKET' ||
         error.code === 'ECONNRESET' ||
         error.code === 'ETIMEDOUT' ||
+        error.name === 'AbortError' ||
+        error.name === 'TimeoutError' ||
+        error.message?.includes('aborted') ||
         error.message?.includes('terminated') ||
         error.message?.includes('reset') ||
         error.message?.includes('ECONNRESET') ||
@@ -485,6 +488,7 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
       return fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(120000),
         body: JSON.stringify({
           contents: [{
             parts: [{ text: prompt }]

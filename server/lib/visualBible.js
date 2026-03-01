@@ -823,6 +823,7 @@ async function analyzeVisualBibleElements(imageData, elementsToAnalyze) {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {

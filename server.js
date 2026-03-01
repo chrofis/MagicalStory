@@ -3406,13 +3406,23 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           [95, 'Finishing cover images...', jobId]
         );
       }
-      await coverAwaitPromise;
-
-      // Run bbox detection on covers for entity consistency checks
+      const COVER_TIMEOUT_MS = 180000; // 3 minutes
       try {
-        await detectBboxOnCovers(coverImages, inputData.characters);
-      } catch (bboxErr) {
-        log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
+        await Promise.race([
+          coverAwaitPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Cover generation timed out after 3 minutes')), COVER_TIMEOUT_MS))
+        ]);
+
+        // Run bbox detection on covers for entity consistency checks
+        try {
+          await detectBboxOnCovers(coverImages, inputData.characters);
+        } catch (bboxErr) {
+          log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
+        }
+      } catch (coverErr) {
+        log.error(`❌ [UNIFIED] Cover generation failed/timed out: ${coverErr.message}`);
+        genLog.error('covers_failed', coverErr.message);
+        // Continue without covers — story is still usable
       }
     }
 

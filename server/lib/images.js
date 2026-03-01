@@ -4871,6 +4871,7 @@ OUTPUT: A single image matching the reference style.`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(120000),
     body: JSON.stringify({
       ...(systemInstruction && { systemInstruction }),
       contents: [{ parts }],
@@ -5002,6 +5003,7 @@ Output a single corrected image.`;
   const response = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal: AbortSignal.timeout(120000),
     body: JSON.stringify({
       ...(systemInstruction && { systemInstruction }),
       contents: [{ parts }],
@@ -5522,6 +5524,7 @@ async function editImageWithPrompt(imageData, editInstruction) {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(120000),
       body: JSON.stringify({
         ...(systemInstruction && { systemInstruction }),
         contents: [{ parts }],
@@ -6366,6 +6369,7 @@ async function inspectImageForErrors(imageData) {
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(60000),
       body: JSON.stringify({
         contents: [{ parts }],
         generationConfig: {
@@ -8782,6 +8786,7 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: AbortSignal.timeout(120000),
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
