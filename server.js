@@ -3187,6 +3187,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     timing.pagesStart = Date.now();
     let allImages;
+    let pipelineEntityReport = null;
+    let pipelineCharFixDetails = null;
 
     {
       // =======================================================================
@@ -3353,6 +3355,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         useIteratePage: false  // Fresh generation by default during story creation
       });
 
+      // Hoist pipeline data for use outside this block (finalChecksReport)
+      pipelineEntityReport = pipelineResult[0]?.entityReport || null;
+      pipelineCharFixDetails = charFixDetails;
+
       // Map pipeline results to allImages format
       allImages = pipelineResult.map(img => ({
         pageNumber: img.pageNumber,
@@ -3509,13 +3515,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     );
 
     // Extract entity report from unified pipeline results (same on every page)
-    const entityReport = pipelineResult[0]?.entityReport || null;
-    let finalChecksReport = entityReport ? { entity: entityReport } : null;
+    let finalChecksReport = pipelineEntityReport ? { entity: pipelineEntityReport } : null;
 
     // Build entityRepairs from character fix data for StoryDisplay before/after visualization
-    if (finalChecksReport?.entity && charFixDetails && Object.keys(charFixDetails).length > 0) {
+    if (finalChecksReport?.entity && pipelineCharFixDetails && Object.keys(pipelineCharFixDetails).length > 0) {
       finalChecksReport.entityRepairs = {};
-      for (const [charName, charData] of Object.entries(charFixDetails)) {
+      for (const [charName, charData] of Object.entries(pipelineCharFixDetails)) {
         finalChecksReport.entityRepairs[charName] = {
           timestamp: new Date().toISOString(),
           pages: charData.pages,
