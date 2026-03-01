@@ -248,6 +248,14 @@ export function GenerationProgress({
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
 
+    // Pre-seed each character's message index to a different offset
+    // so they don't all start on the same template
+    const uniqueCharIds = [...new Set(shuffled.map(p => p.char.id))];
+    const spacing = Math.max(1, Math.floor(funnyMessageTemplates.length / uniqueCharIds.length));
+    for (let i = 0; i < uniqueCharIds.length; i++) {
+      messageIndicesRef.current[uniqueCharIds[i]] = i * spacing;
+    }
+
     const items: Array<
       { type: 'message'; key: string } |
       { type: 'character'; char: Character; avatarUrl: string }
