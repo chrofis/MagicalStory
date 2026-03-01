@@ -273,13 +273,13 @@ export function GenerationProgress({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [charactersKey]);
 
-  // Rotate every 8 seconds
+  // Rotate every 5 seconds
   useEffect(() => {
     if (rotationItems.length <= 1) return;
 
     const interval = setInterval(() => {
       setRotationIndex(prev => (prev + 1) % rotationItems.length);
-    }, 8000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, [rotationItems.length]);
