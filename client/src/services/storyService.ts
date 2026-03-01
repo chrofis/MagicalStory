@@ -2060,10 +2060,32 @@ export const storyService = {
 
   // Step 4: Re-evaluate pages
   async reEvaluatePages(storyId: string, pageNumbers: number[]): Promise<{
-    pages: Record<number, { qualityScore: number; fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }> | undefined }>;
+    pages: Record<number, {
+      score?: number;
+      qualityScore: number;
+      semanticScore?: number | null;
+      entityPenalty?: number;
+      rawScore?: number;
+      verdict?: string;
+      issuesSummary?: string;
+      reasoning?: string;
+      fixableIssues: Array<{ description: string; severity: string; type: string; fix: string; source?: string }> | undefined;
+      semanticResult?: unknown;
+    }>;
   }> {
     const response = await api.post<{
-      pages: Record<number, { qualityScore: number; fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }> | undefined }>;
+      pages: Record<number, {
+        score?: number;
+        qualityScore: number;
+        semanticScore?: number | null;
+        entityPenalty?: number;
+        rawScore?: number;
+        verdict?: string;
+        issuesSummary?: string;
+        reasoning?: string;
+        fixableIssues: Array<{ description: string; severity: string; type: string; fix: string; source?: string }> | undefined;
+        semanticResult?: unknown;
+      }>;
     }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers });
     return response;
   },
@@ -2074,9 +2096,12 @@ export const storyService = {
       timestamp: string;
       characters: Record<string, {
         gridImage?: string;
-        consistent: boolean;
-        score: number;
-        issues: Array<{
+        consistent?: boolean;
+        overallConsistent?: boolean;
+        score?: number;
+        overallScore?: number;
+        totalIssues?: number;
+        issues?: Array<{
           id: string;
           source: 'entity';
           pageNumber: number | null;
@@ -2088,6 +2113,23 @@ export const storyService = {
           affectedCharacter: string;
           cells?: string[];
           pagesToFix?: number[];
+        }>;
+        byClothing?: Record<string, {
+          consistent: boolean;
+          score: number;
+          issues: Array<{
+            id: string;
+            source: 'entity';
+            pageNumber: number | null;
+            type: string;
+            subType: string;
+            severity: string;
+            description: string;
+            fixInstruction: string;
+            affectedCharacter: string;
+            cells?: string[];
+            pagesToFix?: number[];
+          }>;
         }>;
         summary?: string;
         error?: string;
@@ -2125,9 +2167,12 @@ export const storyService = {
         timestamp: string;
         characters: Record<string, {
           gridImage?: string;
-          consistent: boolean;
-          score: number;
-          issues: Array<{
+          consistent?: boolean;
+          overallConsistent?: boolean;
+          score?: number;
+          overallScore?: number;
+          totalIssues?: number;
+          issues?: Array<{
             id: string;
             source: 'entity';
             pageNumber: number | null;
@@ -2139,6 +2184,23 @@ export const storyService = {
             affectedCharacter: string;
             cells?: string[];
             pagesToFix?: number[];
+          }>;
+          byClothing?: Record<string, {
+            consistent: boolean;
+            score: number;
+            issues: Array<{
+              id: string;
+              source: 'entity';
+              pageNumber: number | null;
+              type: string;
+              subType: string;
+              severity: string;
+              description: string;
+              fixInstruction: string;
+              affectedCharacter: string;
+              cells?: string[];
+              pagesToFix?: number[];
+            }>;
           }>;
           summary?: string;
           error?: string;

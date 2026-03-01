@@ -107,7 +107,11 @@ export interface UseRepairWorkflowReturn {
   redoProgress: { current: number; total: number; currentPage?: number };
 
   // Step 4: Re-evaluate
-  reEvaluatePages: (pageNumbers?: number[]) => Promise<void>;
+  reEvaluatePages: (pageNumbers?: number[]) => Promise<Record<number, {
+    score?: number;
+    qualityScore: number;
+    fixableIssues?: unknown[];
+  }> | undefined>;
 
   // Step 5: Consistency check
   runConsistencyCheck: () => Promise<void>;
@@ -564,8 +568,20 @@ export function useRepairWorkflow({
   }, [storyId, workflowState.redoPages.pageNumbers, imageModel, sceneImages, onImageUpdate, startStep, failStep]);
 
   // Step 4: Re-evaluate pages
-  const reEvaluatePages = useCallback(async (pageNumbers?: number[]) => {
-    if (!storyId) return;
+  type EvalPageResult = {
+    score?: number;
+    qualityScore: number;
+    semanticScore?: number | null;
+    entityPenalty?: number;
+    rawScore?: number;
+    verdict?: string;
+    issuesSummary?: string;
+    reasoning?: string;
+    fixableIssues: EvaluationData['fixableIssues'];
+  };
+
+  const reEvaluatePages = useCallback(async (pageNumbers?: number[]): Promise<Record<number, EvalPageResult> | undefined> => {
+    if (!storyId) return undefined;
 
     startStep('re-evaluate');
 
@@ -574,36 +590,16 @@ export function useRepairWorkflow({
 
     if (pagesToEvaluate.length === 0) {
       skipStep('re-evaluate');
-      return;
+      return undefined;
     }
 
     try {
       const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate);
 
-      const evalResults: Record<number, {
-        score?: number;
-        qualityScore: number;
-        semanticScore?: number | null;
-        entityPenalty?: number;
-        rawScore?: number;
-        verdict?: string;
-        issuesSummary?: string;
-        reasoning?: string;
-        fixableIssues: EvaluationData['fixableIssues'];
-      }> = {};
+      const evalResults: Record<number, EvalPageResult> = {};
 
       for (const [pageNum, pageResult] of Object.entries(result.pages || {})) {
-        const pr = pageResult as {
-          score?: number;
-          qualityScore: number;
-          semanticScore?: number | null;
-          entityPenalty?: number;
-          rawScore?: number;
-          verdict?: string;
-          issuesSummary?: string;
-          reasoning?: string;
-          fixableIssues: EvaluationData['fixableIssues'];
-        };
+        const pr = pageResult as EvalPageResult;
         evalResults[parseInt(pageNum)] = {
           score: pr.score,
           qualityScore: pr.qualityScore,
@@ -618,9 +614,11 @@ export function useRepairWorkflow({
       }
 
       completeStep('re-evaluate', { pages: evalResults });
+      return evalResults;
     } catch (error) {
       console.error('Re-evaluation failed:', error);
       failStep('re-evaluate', error instanceof Error ? error.message : 'Unknown error');
+      return undefined;
     }
   }, [storyId, workflowState.redoResults.pagesCompleted, startStep, completeStep, failStep, skipStep]);
 
@@ -924,30 +922,14 @@ export function useRepairWorkflow({
       }
     };
 
-    // Helper: evaluate all pages and return scores map
-    const evaluateAll = async (label: string): Promise<Record<number, { score: number; qualityScore: number; fixableIssues?: Array<{ type: string }> }>> => {
-      checkAborted();
-      onProgress?.('re-evaluate', label);
-      const allPageNumbers = sceneImages.map(s => s.pageNumber);
-      const evalResult = await storyService.reEvaluatePages(storyId, allPageNumbers);
-      const evalPages: Record<number, { score: number; qualityScore: number; fixableIssues?: Array<{ type: string }> }> = {};
-      for (const [pageNum, pageResult] of Object.entries(evalResult.pages || {})) {
-        const pr = pageResult as { score?: number; qualityScore: number; fixableIssues?: Array<{ type: string }> };
-        evalPages[parseInt(pageNum)] = {
-          score: pr.score ?? pr.qualityScore,
-          qualityScore: pr.qualityScore,
-          fixableIssues: pr.fixableIssues,
-        };
-      }
-      return evalPages;
-    };
+    const allPageNumbers = sceneImages.map(s => s.pageNumber);
 
     // Helper: identify bad pages from eval results
-    const findBadPages = (evalPages: Record<number, { score: number; fixableIssues?: Array<{ type: string }> }>): number[] => {
+    const findBadPages = (evalPages: Record<number, EvalPageResult>): number[] => {
       const bad: number[] = [];
       for (const [pageNumStr, result] of Object.entries(evalPages)) {
         const pageNum = parseInt(pageNumStr);
-        const score = result.score ?? 100;
+        const score = result.score ?? result.qualityScore ?? 100;
         const issueCount = result.fixableIssues?.length ?? 0;
         if (score < scoreThreshold || issueCount >= issueThreshold) {
           bad.push(pageNum);
@@ -957,7 +939,7 @@ export function useRepairWorkflow({
     };
 
     try {
-      // Step 1: Collect feedback
+      // Step 1: Collect feedback (populates UI state; pass logic uses fresh API data)
       checkAborted();
       onProgress?.('collect-feedback', 'Collecting existing issues...');
       await collectFeedback();
@@ -966,16 +948,16 @@ export function useRepairWorkflow({
 
       // === Global passes ===
       for (let pass = 1; pass <= maxPasses; pass++) {
+        // 1. Re-evaluate ALL pages (updates UI state via completeStep)
         checkAborted();
         onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
-
-        // 1. Re-evaluate ALL pages
-        let evalPages = await evaluateAll(`Pass ${pass}/${maxPasses}: Evaluating all pages...`);
+        let evalPages = await reEvaluatePages(allPageNumbers) ?? {};
 
         // 2. On pass 2+, run entity consistency first, then re-evaluate to apply entity penalties
         if (pass >= 2) {
           checkAborted();
           onProgress?.('consistency-check', `Pass ${pass}: Running entity consistency...`);
+          startStep('consistency-check');
           const consistencyResult = await storyService.runEntityConsistency(storyId);
           const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
           setWorkflowState(prev => ({
@@ -985,7 +967,8 @@ export function useRepairWorkflow({
           }));
 
           // Re-evaluate again — now entity penalties will apply
-          evalPages = await evaluateAll(`Pass ${pass}: Re-evaluating with entity penalties...`);
+          onProgress?.('re-evaluate', `Pass ${pass}: Re-evaluating with entity penalties...`);
+          evalPages = await reEvaluatePages(allPageNumbers) ?? {};
         }
 
         // 3. Identify bad pages
@@ -1045,11 +1028,12 @@ export function useRepairWorkflow({
       // Final re-evaluate ALL
       checkAborted();
       onProgress?.('re-evaluate', 'Final evaluation of all pages...');
-      await reEvaluatePages(sceneImages.map(s => s.pageNumber));
+      await reEvaluatePages(allPageNumbers);
 
       // Final entity consistency check
       checkAborted();
       onProgress?.('consistency-check', 'Final consistency check...');
+      startStep('consistency-check');
       const consistencyResult = await storyService.runEntityConsistency(storyId);
       const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
       setWorkflowState(prev => ({
@@ -1168,7 +1152,7 @@ export function useRepairWorkflow({
   }, [
     storyId, sceneImages, imageModel, onImageUpdate,
     collectFeedback, reEvaluatePages, startStep, setRedoProgress,
-    runConsistencyCheck, repairCharacter
+    repairCharacter
   ]);
 
   return {
