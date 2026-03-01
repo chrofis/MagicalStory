@@ -4535,7 +4535,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       perCharClothing: img.perCharClothing,
       modelId: best?.modelId || img.modelId,
       thinkingText: img.thinkingText || null,
-      qualityScore: finalEval?.qualityScore ?? null,
+      qualityScore: best?.score ?? finalEval?.qualityScore ?? null,
       qualityReasoning: finalEval?.reasoning ?? null,
       semanticScore: finalEval?.semanticScore ?? null,
       semanticResult: finalEval?.semanticResult ?? null,
