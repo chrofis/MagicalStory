@@ -175,6 +175,77 @@ POST /api/jobs/create-story → Background Job:
   → GET /api/jobs/:id/status (polling)
 ```
 
+### Repair Workflow (Post-Generation)
+
+After story generation, the user can run an automated repair workflow to improve image
+quality and character consistency. Triggered from `RepairWorkflowPanel` → `runFullWorkflow()`.
+
+**Scoring model** — one unified score drives all redo decisions:
+```
+finalScore = qualityScore - semanticPenalties - entityPenalties
+```
+- Quality eval (Gemini 2.5 Flash): produces qualityScore (0-100) and fixableIssues
+- Semantic eval: compares image to scene description, penalties baked into score
+- Entity penalties: from finalChecksReport.entity (critical -30, major -20, minor -10)
+- Image check penalties: same scale as entity
+- Quality eval issues are NOT double-penalized (already in qualityScore)
+
+**Important**: Entity data exists from generation (the pipeline runs entity consistency
+before the workflow starts). So entity penalties apply from Pass 1 onward.
+
+```
+Story completes → entity consistency already ran → finalChecksReport.entity saved
+User clicks "Run Full Workflow"
+
+1. COLLECT FEEDBACK
+   Reads existing evaluation data from DB (populates UI; pass logic uses fresh API data)
+
+═══ GLOBAL PASS LOOP (maxPasses = 2) ═══════════════════════════════════════════
+
+  PASS 1:
+  ├─ EVALUATE ALL pages (quality + semantic + entity penalties from generation)
+  ├─ IDENTIFY BAD PAGES (score < 60 OR issues >= 5)
+  ├─ If no bad pages → skip to final steps
+  └─ REDO all bad pages (once each, generates new image version)
+
+  PASS 2:
+  ├─ RUN ENTITY CONSISTENCY (fresh grid analysis against new images from Pass 1)
+  ├─ EVALUATE ALL pages (quality + semantic + fresh entity penalties)
+  ├─ IDENTIFY BAD PAGES (score < 60 OR issues >= 5)
+  ├─ If no bad pages → skip to final steps
+  └─ REDO all bad pages (once each)
+
+═══ FINAL STEPS ═════════════════════════════════════════════════════════════════
+
+  FINAL ENTITY CONSISTENCY (against latest images)
+  FINAL EVALUATE ALL pages (with fresh entity data)
+  CHARACTER REPAIR (up to 3 pages, critical severity first)
+  PICK BEST VERSIONS (for each redone page, activate highest-scoring version)
+```
+
+**Key design decisions:**
+- Entity data exists from generation — penalties apply from Pass 1.
+- On Pass 2+, entity consistency re-runs first (images changed), then one evaluation.
+- No per-page retries — each pass redoes each bad page once. Versions accumulate.
+- Character repair runs before pick-best so repair versions are also considered.
+- Pick-best runs last, comparing ALL versions (original + redos + repairs) per page.
+- Character repair budget: max 3 pages, critical > major priority.
+- Abortable at every step via AbortController.
+
+**Endpoints** (in `server/routes/regeneration.js`):
+- `POST /:id/repair-workflow/re-evaluate` — quality + semantic eval, entity penalties
+- `POST /:id/repair-workflow/consistency-check` — entity grid analysis
+- `POST /:id/repair-workflow/pick-best-versions` — activate best version per page
+- `POST /:id/repair-workflow/character-repair` — fix character appearance issues
+- Page redo uses existing `POST /:id/iterate/:pageNum` endpoint
+
+**Key files:**
+- `client/src/hooks/useRepairWorkflow.ts` — orchestrates the full workflow
+- `client/src/components/generation/RepairWorkflowPanel.tsx` — UI panel
+- `client/src/services/storyService.ts` — API client methods
+- `server/routes/regeneration.js` — backend endpoints
+- `server/lib/images.js` → `collectAllIssuesForPage()` — aggregates all issue sources
+
 ### Key Backend Files
 - `server.js` - Main Express app with all routes embedded
 - `server/config/models.js` - AI model configuration and defaults
@@ -184,10 +255,12 @@ POST /api/jobs/create-story → Background Job:
 - `server/lib/visualBible.js` - Character consistency tracking
 - `server/routes/avatars.js` - Avatar generation endpoints
 - `server/routes/stories.js` - Story CRUD and regeneration
+- `server/routes/regeneration.js` - Repair workflow + image regeneration endpoints
 - `prompts/` - All AI prompt templates (editable without code changes)
 
 ### Key Frontend Files
 - `client/src/pages/StoryWizard.tsx` - Main story creation wizard
+- `client/src/hooks/useRepairWorkflow.ts` - Repair workflow orchestration hook
 - `client/src/hooks/useDeveloperMode.ts` - Dev mode model overrides
 - `client/src/types/character.ts` - Character type definitions
 - `client/src/components/generation/` - Story generation UI components

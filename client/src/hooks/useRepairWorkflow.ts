@@ -877,12 +877,7 @@ export function useRepairWorkflow({
 
       // === Global passes ===
       for (let pass = 1; pass <= maxPasses; pass++) {
-        // 1. Re-evaluate ALL pages (updates UI state via completeStep)
-        checkAborted();
-        onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
-        let evalPages = await reEvaluatePages(allPageNumbers) ?? {};
-
-        // 2. On pass 2+, run entity consistency first, then re-evaluate to apply entity penalties
+        // On pass 2+, run entity consistency first (images changed in previous pass)
         if (pass >= 2) {
           checkAborted();
           onProgress?.('consistency-check', `Pass ${pass}: Running entity consistency...`);
@@ -894,11 +889,13 @@ export function useRepairWorkflow({
             consistencyResults: { report: consistencyReport },
             stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
           }));
-
-          // Re-evaluate again — now entity penalties will apply
-          onProgress?.('re-evaluate', `Pass ${pass}: Re-evaluating with entity penalties...`);
-          evalPages = await reEvaluatePages(allPageNumbers) ?? {};
         }
+
+        // Re-evaluate ALL pages (quality + semantic + entity penalties)
+        // Pass 1: entity data from generation. Pass 2+: freshly updated entity data.
+        checkAborted();
+        onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
+        const evalPages = await reEvaluatePages(allPageNumbers) ?? {};
 
         // 3. Identify bad pages
         checkAborted();
@@ -952,14 +949,9 @@ export function useRepairWorkflow({
         }));
       }
 
-      // === Final evaluation + consistency + pick best ===
+      // === Final steps: consistency → evaluate → character repair → pick best ===
 
-      // Final re-evaluate ALL
-      checkAborted();
-      onProgress?.('re-evaluate', 'Final evaluation of all pages...');
-      await reEvaluatePages(allPageNumbers);
-
-      // Final entity consistency check
+      // Final entity consistency check (against latest images)
       checkAborted();
       onProgress?.('consistency-check', 'Final consistency check...');
       startStep('consistency-check');
@@ -971,21 +963,12 @@ export function useRepairWorkflow({
         stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
       }));
 
-      // Pick best versions for all pages that were redone
-      const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
-      if (redonePagesArray.length > 0) {
-        checkAborted();
-        onProgress?.('redo-pages', 'Picking best versions...');
-        try {
-          const pickResult = await storyService.pickBestVersions(storyId, redonePagesArray);
-          const switched = Object.values(pickResult.results).filter(r => r.switched).length;
-          console.log(`[RepairWorkflow] Pick-best: ${switched}/${redonePagesArray.length} pages switched to better version`);
-        } catch (err) {
-          console.error('[RepairWorkflow] Pick-best failed:', err);
-        }
-      }
+      // Final re-evaluate ALL (with fresh entity data)
+      checkAborted();
+      onProgress?.('re-evaluate', 'Final evaluation of all pages...');
+      await reEvaluatePages(allPageNumbers);
 
-      // Character repair (existing logic, unchanged)
+      // Character repair (before pick-best so repair versions are also considered)
       checkAborted();
       if (consistencyReport?.characters) {
         const charsWithIssues = Object.entries(consistencyReport.characters)
@@ -1063,6 +1046,20 @@ export function useRepairWorkflow({
             onProgress?.('character-repair', `Repairing ${charName} on ${pages.length} pages...`);
             await repairCharacter(charName, pages);
           }
+        }
+      }
+
+      // Pick best versions last (considers all versions including character repairs)
+      const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
+      if (redonePagesArray.length > 0) {
+        checkAborted();
+        onProgress?.('redo-pages', 'Picking best versions...');
+        try {
+          const pickResult = await storyService.pickBestVersions(storyId, redonePagesArray);
+          const switched = Object.values(pickResult.results).filter(r => r.switched).length;
+          console.log(`[RepairWorkflow] Pick-best: ${switched}/${redonePagesArray.length} pages switched to better version`);
+        } catch (err) {
+          console.error('[RepairWorkflow] Pick-best failed:', err);
         }
       }
 
