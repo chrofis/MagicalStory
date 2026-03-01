@@ -1598,14 +1598,20 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
               const dbVersionIdx = scene.imageVersions[i].versionIndex;
 
               if (dbVersionIdx === 0) {
-                // v0: check if iterate created a preservation entry in blob imageVersions[0]
-                // Iterate preservation entries lack a 'source' field (repair entries have one)
+                // v0: find original metadata from one of three sources (in priority order):
+                // 1. Iterate preservation entry at imageVersions[0] (no 'source' field)
+                // 2. originalMetadata saved before Object.assign (repair-before-iterate case)
+                // 3. Main blob scene object (no iterate happened, main blob = v0)
                 const firstBlob = blobScene.imageVersions?.[0];
                 if (firstBlob && !firstBlob.source) {
-                  // Iterate case: v0's original metadata preserved in imageVersions[0]
+                  // Source 1: iterate preservation entry
                   mergeFields(scene.imageVersions[i], firstBlob);
+                } else if (blobScene.originalMetadata) {
+                  // Source 2: saved before iterate's Object.assign (repair ran first)
+                  mergeFields(scene.imageVersions[i], blobScene.originalMetadata);
+                  scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
                 } else {
-                  // Normal case: v0's metadata is on the main blob scene object
+                  // Source 3: main blob = v0 (no iterate happened)
                   mergeFields(scene.imageVersions[i], {
                     description: blobScene.sceneDescription,
                     prompt: blobScene.prompt,

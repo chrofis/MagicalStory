@@ -625,6 +625,23 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       } else {
         sceneImages[existingIndex].imageVersions = [newVersion];
       }
+      // Preserve v0's original metadata before Object.assign overwrites the main blob.
+      // This is needed when imageVersions already exists (e.g., repair ran before iterate),
+      // so the preservation entry at imageVersions[0] wasn't created above.
+      if (!sceneImages[existingIndex].originalMetadata) {
+        sceneImages[existingIndex].originalMetadata = {
+          description: sceneImages[existingIndex].description || null,
+          prompt: sceneImages[existingIndex].prompt || null,
+          modelId: sceneImages[existingIndex].modelId || null,
+          qualityScore: sceneImages[existingIndex].qualityScore ?? null,
+          qualityReasoning: sceneImages[existingIndex].qualityReasoning || null,
+          fixTargets: sceneImages[existingIndex].fixTargets || [],
+          referencePhotoNames: (sceneImages[existingIndex].referencePhotos || []).map(p => ({
+            name: p.name, photoType: p.photoType,
+            clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+          })),
+        };
+      }
       // Update main fields (but NOT imageData - that would cause duplicate image storage)
       // The new image is stored in imageVersions and activeVersion meta points to it
       const { imageData: _unused, ...metadataOnly } = newImageData;

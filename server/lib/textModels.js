@@ -155,8 +155,11 @@ async function callAnthropicAPI(prompt, maxTokens, modelId, options = {}) {
     log.debug(`📊 [ANTHROPIC] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
   }
 
-  // Prepend prefill to response (Claude continues after the prefill, not including it)
-  const responseText = options.prefill ? options.prefill + data.content[0].text : data.content[0].text;
+  // Prepend prefill to response only for models that support assistant prefill.
+  // With assistant prefill, Claude continues AFTER the prefill (not including it), so we must prepend.
+  // For Claude 4+ models, the prefill was moved into the prompt instruction, so Claude's response
+  // already includes it — prepending would create invalid/doubled content.
+  const responseText = (options.prefill && supportsAssistantPrefill) ? options.prefill + data.content[0].text : data.content[0].text;
 
   return {
     text: responseText,
@@ -305,8 +308,8 @@ async function callAnthropicAPIStreaming(prompt, maxTokens, modelId, onChunk, op
       log.warn(`⚠️ [ANTHROPIC STREAM] No token usage captured! Buffer remaining: ${buffer.length} chars`);
     }
 
-    // Prepend prefill to response (Claude continues after the prefill, not including it)
-    const responseText = options.prefill ? options.prefill + fullText : fullText;
+    // Prepend prefill only for models that support assistant prefill (see comment above)
+    const responseText = (options.prefill && supportsAssistantPrefill) ? options.prefill + fullText : fullText;
 
     return {
       text: responseText,
