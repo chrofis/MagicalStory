@@ -365,7 +365,7 @@ export function RepairWorkflowPanel({
       await runFullWorkflow({
         scoreThreshold: 6,
         issueThreshold: 5,
-        maxRetries: 4,
+        maxPasses: 2,
         onProgress: (step, detail) => {
           setFullWorkflowProgress({ step, detail });
         },
@@ -874,6 +874,11 @@ export function RepairWorkflowPanel({
                               {semanticScore !== null && semanticScore !== undefined && (
                                 <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
                                   Semantic: {semanticScore}%
+                                </span>
+                              )}
+                              {result.entityPenalty != null && result.entityPenalty > 0 && (
+                                <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                                  Entity: -{result.entityPenalty}
                                 </span>
                               )}
                               <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${

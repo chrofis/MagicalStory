@@ -126,7 +126,7 @@ export interface UseRepairWorkflowReturn {
   runFullWorkflow: (options?: {
     scoreThreshold?: number;
     issueThreshold?: number;
-    maxRetries?: number;
+    maxPasses?: number;
     onProgress?: (step: string, detail: string) => void;
   }) => Promise<void>;
 
@@ -451,15 +451,21 @@ export function useRepairWorkflow({
     for (const [pageNum, feedback] of Object.entries(workflowState.collectedFeedback.pages)) {
       const page = parseInt(pageNum);
       const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length;
-      const score = feedback.qualityScore ?? 100;
+
+      // Prefer re-evaluation scores when available (more current than collectedFeedback)
+      const reEval = workflowState.reEvaluationResults.pages?.[page];
+      const score = reEval?.score ?? reEval?.qualityScore ?? feedback.qualityScore ?? 100;
+      const issueCount = reEval
+        ? (reEval.fixableIssues?.length ?? 0)
+        : totalIssues;
 
       // Mark for redo if score is low or too many issues
       if (score < scoreThreshold) {
         pagesToRedo.push(page);
         reasons[page] = `Low quality score: ${score}`;
-      } else if (totalIssues >= issueThreshold) {
+      } else if (issueCount >= issueThreshold) {
         pagesToRedo.push(page);
-        reasons[page] = `Too many issues: ${totalIssues}`;
+        reasons[page] = `Too many issues: ${issueCount}`;
       } else if (feedback.needsFullRedo) {
         pagesToRedo.push(page);
         reasons[page] = 'Manually marked for redo';
@@ -477,7 +483,7 @@ export function useRepairWorkflow({
         'identify-redo-pages': 'completed',
       },
     }));
-  }, [workflowState.collectedFeedback.pages, startStep]);
+  }, [workflowState.collectedFeedback.pages, workflowState.reEvaluationResults.pages, startStep]);
 
   // Step 3: Redo marked pages using existing iterate function
   const redoMarkedPages = useCallback(async (options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => {
@@ -575,7 +581,10 @@ export function useRepairWorkflow({
       const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate);
 
       const evalResults: Record<number, {
+        score?: number;
         qualityScore: number;
+        semanticScore?: number | null;
+        entityPenalty?: number;
         rawScore?: number;
         verdict?: string;
         issuesSummary?: string;
@@ -585,7 +594,10 @@ export function useRepairWorkflow({
 
       for (const [pageNum, pageResult] of Object.entries(result.pages || {})) {
         const pr = pageResult as {
+          score?: number;
           qualityScore: number;
+          semanticScore?: number | null;
+          entityPenalty?: number;
           rawScore?: number;
           verdict?: string;
           issuesSummary?: string;
@@ -593,7 +605,10 @@ export function useRepairWorkflow({
           fixableIssues: EvaluationData['fixableIssues'];
         };
         evalResults[parseInt(pageNum)] = {
+          score: pr.score,
           qualityScore: pr.qualityScore,
+          semanticScore: pr.semanticScore,
+          entityPenalty: pr.entityPenalty,
           rawScore: pr.rawScore,
           verdict: pr.verdict,
           issuesSummary: pr.issuesSummary,
@@ -879,22 +894,22 @@ export function useRepairWorkflow({
     return Array.from(severePages).sort((a, b) => a - b);
   }, [workflowState.consistencyResults.report]);
 
-  // Full automated workflow - runs all steps in sequence
-  // Note: We use local tracking instead of relying on React state updates (stale closure issue)
+  // Full automated workflow - global passes instead of per-page retries
+  // Each pass: evaluate ALL → redo ALL bad → re-evaluate ALL
   const runFullWorkflow = useCallback(async (options: {
     scoreThreshold?: number;
     issueThreshold?: number;
-    maxRetries?: number;
+    maxPasses?: number;
     onProgress?: (step: string, detail: string) => void;
   } = {}) => {
     if (!storyId) return;
 
     // Default thresholds for repair decisions
-    const DEFAULT_SCORE_THRESHOLD = 6;      // Out of 10 - pages below this need redo
+    const DEFAULT_SCORE_THRESHOLD = 60;     // Out of 100 - pages below this need redo
     const DEFAULT_ISSUE_THRESHOLD = 5;      // Number of fixable issues triggering redo
-    const DEFAULT_MAX_RETRIES = 2;          // Max iterations per page
+    const DEFAULT_MAX_PASSES = 2;           // Global passes over all pages
 
-    const { scoreThreshold = DEFAULT_SCORE_THRESHOLD, issueThreshold = DEFAULT_ISSUE_THRESHOLD, maxRetries = DEFAULT_MAX_RETRIES, onProgress } = options;
+    const { scoreThreshold = DEFAULT_SCORE_THRESHOLD, issueThreshold = DEFAULT_ISSUE_THRESHOLD, maxPasses = DEFAULT_MAX_PASSES, onProgress } = options;
 
     // Create abort controller for this workflow run
     abortControllerRef.current = new AbortController();
@@ -909,135 +924,155 @@ export function useRepairWorkflow({
       }
     };
 
+    // Helper: evaluate all pages and return scores map
+    const evaluateAll = async (label: string): Promise<Record<number, { score: number; qualityScore: number; fixableIssues?: Array<{ type: string }> }>> => {
+      checkAborted();
+      onProgress?.('re-evaluate', label);
+      const allPageNumbers = sceneImages.map(s => s.pageNumber);
+      const evalResult = await storyService.reEvaluatePages(storyId, allPageNumbers);
+      const evalPages: Record<number, { score: number; qualityScore: number; fixableIssues?: Array<{ type: string }> }> = {};
+      for (const [pageNum, pageResult] of Object.entries(evalResult.pages || {})) {
+        const pr = pageResult as { score?: number; qualityScore: number; fixableIssues?: Array<{ type: string }> };
+        evalPages[parseInt(pageNum)] = {
+          score: pr.score ?? pr.qualityScore,
+          qualityScore: pr.qualityScore,
+          fixableIssues: pr.fixableIssues,
+        };
+      }
+      return evalPages;
+    };
+
+    // Helper: identify bad pages from eval results
+    const findBadPages = (evalPages: Record<number, { score: number; fixableIssues?: Array<{ type: string }> }>): number[] => {
+      const bad: number[] = [];
+      for (const [pageNumStr, result] of Object.entries(evalPages)) {
+        const pageNum = parseInt(pageNumStr);
+        const score = result.score ?? 100;
+        const issueCount = result.fixableIssues?.length ?? 0;
+        if (score < scoreThreshold || issueCount >= issueThreshold) {
+          bad.push(pageNum);
+        }
+      }
+      return bad.sort((a, b) => a - b);
+    };
+
     try {
       // Step 1: Collect feedback
       checkAborted();
       onProgress?.('collect-feedback', 'Collecting existing issues...');
       await collectFeedback();
 
-      // Step 4 first: Re-evaluate ALL pages to get current state
-      checkAborted();
-      onProgress?.('re-evaluate', 'Evaluating all pages...');
-      const evalResult = await storyService.reEvaluatePages(storyId, sceneImages.map(s => s.pageNumber));
+      const allRedonePagesAcrossPasses: Set<number> = new Set();
 
-      // Build local evaluation results map
-      const evalPages: Record<number, { qualityScore: number; rawScore?: number; fixableIssues?: Array<{ type: string }> }> = {};
-      for (const [pageNum, pageResult] of Object.entries(evalResult.pages || {})) {
-        const pr = pageResult as { qualityScore: number; rawScore?: number; fixableIssues?: Array<{ type: string }> };
-        evalPages[parseInt(pageNum)] = pr;
-      }
+      // === Global passes ===
+      for (let pass = 1; pass <= maxPasses; pass++) {
+        checkAborted();
+        onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
 
-      // Step 2: Auto-identify redo pages based on evaluation results (compute locally)
-      checkAborted();
-      onProgress?.('identify-redo-pages', 'Identifying pages needing redo...');
-      const pagesToRedo: number[] = [];
-      for (const [pageNumStr, result] of Object.entries(evalPages)) {
-        const pageNum = parseInt(pageNumStr);
-        const rawScore = result.rawScore ?? Math.round(result.qualityScore / 10);
-        // Validate rawScore is on 0-10 scale (not 0-100)
-        if (rawScore > 10) {
-          console.error(`[RepairWorkflow] Invalid rawScore scale for page ${pageNum}: ${rawScore} (expected 0-10)`);
+        // 1. Re-evaluate ALL pages
+        let evalPages = await evaluateAll(`Pass ${pass}/${maxPasses}: Evaluating all pages...`);
+
+        // 2. On pass 2+, run entity consistency first, then re-evaluate to apply entity penalties
+        if (pass >= 2) {
+          checkAborted();
+          onProgress?.('consistency-check', `Pass ${pass}: Running entity consistency...`);
+          const consistencyResult = await storyService.runEntityConsistency(storyId);
+          const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
+          setWorkflowState(prev => ({
+            ...prev,
+            consistencyResults: { report: consistencyReport },
+            stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
+          }));
+
+          // Re-evaluate again — now entity penalties will apply
+          evalPages = await evaluateAll(`Pass ${pass}: Re-evaluating with entity penalties...`);
         }
-        const issueCount = result.fixableIssues?.length ?? 0;
-        if (rawScore < scoreThreshold || issueCount >= issueThreshold) {
-          pagesToRedo.push(pageNum);
+
+        // 3. Identify bad pages
+        checkAborted();
+        onProgress?.('identify-redo-pages', `Pass ${pass}: Identifying pages needing redo...`);
+        const pagesToRedo = findBadPages(evalPages);
+
+        setWorkflowState(prev => ({
+          ...prev,
+          redoPages: { pageNumbers: pagesToRedo, reasons: {} },
+          stepStatus: { ...prev.stepStatus, 'identify-redo-pages': 'completed' },
+        }));
+
+        // 4. If no bad pages, we're done with passes
+        if (pagesToRedo.length === 0) {
+          console.log(`[RepairWorkflow] Pass ${pass}: No bad pages, stopping early`);
+          break;
         }
-      }
-      pagesToRedo.sort((a, b) => a - b);
 
-      // Update state for UI
-      setWorkflowState(prev => ({
-        ...prev,
-        redoPages: { pageNumbers: pagesToRedo, reasons: {} },
-        stepStatus: { ...prev.stepStatus, 'identify-redo-pages': 'completed' },
-      }));
-
-      // Step 3: Redo pages with retry logic (up to maxRetries, keep best)
-      checkAborted();
-      const pagesCompleted: number[] = [];
-      if (pagesToRedo.length > 0) {
-        onProgress?.('redo-pages', `Redoing ${pagesToRedo.length} pages...`);
+        // 5. Redo ALL bad pages (once each, no inner retry)
+        checkAborted();
+        onProgress?.('redo-pages', `Pass ${pass}: Redoing ${pagesToRedo.length} pages...`);
         startStep('redo-pages');
 
-        const bestResults: Record<number, { score: number; imageData: string; versionIndex: number }> = {};
-
         for (let i = 0; i < pagesToRedo.length; i++) {
-          // Check abort before each page
           checkAborted();
-
           const pageNumber = pagesToRedo[i];
-          let bestScore = 0;
-          let bestImageData = '';
-          let bestVersionIndex = 0;
+          onProgress?.('redo-pages', `Pass ${pass}: Page ${pageNumber} (${i + 1}/${pagesToRedo.length})`);
+          setRedoProgress({ current: i, total: pagesToRedo.length, currentPage: pageNumber });
 
-          for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            // Check abort before each attempt
-            checkAborted();
-
-            onProgress?.('redo-pages', `Page ${pageNumber}: attempt ${attempt}/${maxRetries}`);
-            setRedoProgress({ current: i, total: pagesToRedo.length, currentPage: pageNumber });
-
-            try {
-              const result = await storyService.iteratePage(storyId, pageNumber, imageModel);
-
-              if (result.success) {
-                const score = result.qualityScore ?? 0;
-                if (score > bestScore) {
-                  bestScore = score;
-                  bestImageData = result.imageData;
-                  const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-                  bestVersionIndex = (scene?.imageVersions?.length ?? 0) + attempt - 1;
-                }
-
-                // If score is good enough, stop retrying
-                if (score >= scoreThreshold * 10) {
-                  break;
-                }
-              }
-            } catch (err) {
-              console.error(`Failed to redo page ${pageNumber} attempt ${attempt}:`, err);
+          try {
+            const result = await storyService.iteratePage(storyId, pageNumber, imageModel);
+            if (result.success) {
+              allRedonePagesAcrossPasses.add(pageNumber);
+              const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+              const newVersionIndex = (scene?.imageVersions?.length ?? 0);
+              onImageUpdate?.(pageNumber, result.imageData, newVersionIndex);
             }
-          }
-
-          if (bestImageData) {
-            bestResults[pageNumber] = { score: bestScore, imageData: bestImageData, versionIndex: bestVersionIndex };
-            pagesCompleted.push(pageNumber);
-            onImageUpdate?.(pageNumber, bestImageData, bestVersionIndex);
+          } catch (err) {
+            console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo page ${pageNumber}:`, err);
           }
         }
 
         setWorkflowState(prev => ({
           ...prev,
           redoResults: {
-            pagesCompleted,
-            newVersions: Object.fromEntries(Object.entries(bestResults).map(([p, r]) => [p, r.versionIndex])),
-            pageDetails: {},  // Auto-repair doesn't capture per-page details
+            pagesCompleted: Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b),
+            newVersions: {},
+            pageDetails: {},
           },
           stepStatus: { ...prev.stepStatus, 'redo-pages': 'completed' },
         }));
       }
 
-      // Step 4 again: Re-evaluate redone pages
-      if (pagesCompleted.length > 0) {
-        checkAborted();
-        onProgress?.('re-evaluate', 'Re-evaluating redone pages...');
-        await reEvaluatePages(pagesCompleted);
-      }
+      // === Final evaluation + consistency + pick best ===
 
-      // Step 5: Consistency check
+      // Final re-evaluate ALL
       checkAborted();
-      onProgress?.('consistency-check', 'Running consistency check...');
+      onProgress?.('re-evaluate', 'Final evaluation of all pages...');
+      await reEvaluatePages(sceneImages.map(s => s.pageNumber));
+
+      // Final entity consistency check
+      checkAborted();
+      onProgress?.('consistency-check', 'Final consistency check...');
       const consistencyResult = await storyService.runEntityConsistency(storyId);
       const consistencyReport = consistencyResult.report as EntityConsistencyReport | undefined;
-
-      // Update state with consistency results
       setWorkflowState(prev => ({
         ...prev,
         consistencyResults: { report: consistencyReport },
         stepStatus: { ...prev.stepStatus, 'consistency-check': 'completed' },
       }));
 
-      // Step 6: Auto-repair characters with severe issues (use local consistency result)
+      // Pick best versions for all pages that were redone
+      const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
+      if (redonePagesArray.length > 0) {
+        checkAborted();
+        onProgress?.('redo-pages', 'Picking best versions...');
+        try {
+          const pickResult = await storyService.pickBestVersions(storyId, redonePagesArray);
+          const switched = Object.values(pickResult.results).filter(r => r.switched).length;
+          console.log(`[RepairWorkflow] Pick-best: ${switched}/${redonePagesArray.length} pages switched to better version`);
+        } catch (err) {
+          console.error('[RepairWorkflow] Pick-best failed:', err);
+        }
+      }
+
+      // Character repair (existing logic, unchanged)
       checkAborted();
       if (consistencyReport?.characters) {
         const charsWithIssues = Object.entries(consistencyReport.characters)
@@ -1117,8 +1152,6 @@ export function useRepairWorkflow({
           }
         }
       }
-
-      // Step 7: Artifact repair removed — unified pipeline handles quality via regen+pick-best
 
       onProgress?.('complete', 'Workflow complete!');
     } catch (error) {

@@ -971,9 +971,10 @@ export interface RepairWorkflowState {
   };
   reEvaluationResults: {
     pages: Record<number, {
-      score?: number;                // Combined final score (quality - semantic penalties)
+      score?: number;                // Combined final score (quality - semantic - entity penalties)
       qualityScore: number;          // Visual quality score only
       semanticScore?: number | null; // Semantic fidelity score only
+      entityPenalty?: number;        // Penalty from entity/image-check issues
       rawScore?: number;
       verdict?: string;
       issuesSummary?: string;

@@ -2783,6 +2783,20 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         // Collect ALL issues for this page (quality eval + entity + imageChecks + retries)
         const allIssues = collectAllIssuesForPage(scene, storyData, pageNumber);
 
+        // Compute entity/image-check penalties (quality eval issues already reflected in score)
+        let entityPenalty = 0;
+        for (const issue of allIssues) {
+          if (issue.source === 'entity check' || issue.source === 'image checks') {
+            if (issue.severity === 'critical') entityPenalty += 30;
+            else if (issue.severity === 'major') entityPenalty += 20;
+            else entityPenalty += 10;
+          }
+        }
+        const adjustedScore = Math.max(0, evaluation.score - entityPenalty);
+        if (entityPenalty > 0) {
+          log.info(`📊 [RE-EVALUATE] Page ${pageNumber}: entity penalty ${entityPenalty} (${evaluation.score} → ${adjustedScore})`);
+        }
+
         // Run bbox enrichment if there are any issues
         if (allIssues.length > 0) {
           const characterDescriptions = {};
@@ -2813,10 +2827,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           activeVersion.fixableIssues = allIssues;
         }
 
+        // Update scene with adjusted score
+        scene.qualityScore = adjustedScore;
+
         pages[pageNumber] = {
-          score: evaluation.score,                    // Combined final score
+          score: adjustedScore,                       // Combined final score (quality - semantic - entity penalties)
           qualityScore: evaluation.qualityScore ?? evaluation.score,  // Visual quality only
           semanticScore: evaluation.semanticScore ?? null,            // Semantic fidelity only
+          entityPenalty: entityPenalty || 0,           // Penalty from entity/image-check issues
           rawScore: evaluation.rawScore,
           verdict: evaluation.verdict,
           issuesSummary: evaluation.issuesSummary || '',
@@ -2932,6 +2950,72 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
   } catch (err) {
     log.error('Error in consistency check:', err);
     res.status(500).json({ error: 'Failed to run consistency check: ' + err.message });
+  }
+});
+
+// Step 5b: Pick best version per page (highest qualityScore from imageVersions)
+router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { pageNumbers } = req.body;
+
+    if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
+      return res.status(400).json({ error: 'pageNumbers array is required' });
+    }
+
+    log.info(`🏆 [REPAIR-WORKFLOW] Picking best versions for ${pageNumbers.length} pages`);
+
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    const results = {};
+    for (const pageNumber of pageNumbers) {
+      const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      if (!scene?.imageVersions || scene.imageVersions.length <= 1) {
+        results[pageNumber] = { switched: false, reason: 'single version' };
+        continue;
+      }
+
+      // Find version with highest qualityScore
+      let bestIndex = -1;
+      let bestScore = -1;
+      let activeIndex = -1;
+      for (let i = 0; i < scene.imageVersions.length; i++) {
+        const v = scene.imageVersions[i];
+        if (v.isActive) activeIndex = i;
+        const score = v.qualityScore ?? 0;
+        if (score > bestScore) {
+          bestScore = score;
+          bestIndex = i;
+        }
+      }
+
+      if (bestIndex >= 0 && bestIndex !== activeIndex) {
+        // Switch active version
+        scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
+        await setActiveVersion(id, pageNumber, bestIndex);
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (score ${bestScore}, was ${activeIndex})`);
+        results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex };
+      } else {
+        results[pageNumber] = { switched: false, toIndex: activeIndex, score: bestScore };
+      }
+    }
+
+    await saveStoryData(id, storyData);
+
+    log.info(`✅ [REPAIR-WORKFLOW] Pick-best complete: ${Object.values(results).filter(r => r.switched).length} pages switched`);
+    res.json({ results });
+  } catch (err) {
+    log.error('❌ [REPAIR-WORKFLOW] Failed to pick best versions:', err);
+    res.status(500).json({ error: 'Failed to pick best versions: ' + err.message });
   }
 });
 

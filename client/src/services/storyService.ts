@@ -2174,6 +2174,16 @@ export const storyService = {
     return response;
   },
 
+  // Step 5b: Pick best version per page (highest qualityScore)
+  async pickBestVersions(storyId: string, pageNumbers: number[]): Promise<{
+    results: Record<number, { switched: boolean; toIndex?: number; score?: number; fromIndex?: number; reason?: string }>;
+  }> {
+    const response = await api.post<{
+      results: Record<number, { switched: boolean; toIndex?: number; score?: number; fromIndex?: number; reason?: string }>;
+    }>(`/api/stories/${storyId}/repair-workflow/pick-best-versions`, { pageNumbers });
+    return response;
+  },
+
   // Step 6: Repair characters
   async repairCharacters(
     storyId: string,
