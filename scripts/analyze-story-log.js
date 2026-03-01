@@ -432,6 +432,11 @@ function extractImageStats(jobLines) {
       attempt3: 0,  // Needed 3rd attempt
       pages: {}     // Track by page: { 1: 1, 2: 3, ... } (page -> final attempt)
     },
+    // Unified pipeline image generation (gen-only mode, no quality retry)
+    genOnly: {
+      count: 0,       // Individual [IMAGE GEN-ONLY] successes
+      totalFromLog: 0  // From "[UNIFIED] Phase 5a complete: X/Y images"
+    },
     // Covers
     covers: {
       generated: false,
@@ -458,6 +463,23 @@ function extractImageStats(jobLines) {
     scenePreviews: {
       count: 0,
       totalCost: 0
+    },
+    // Unified repair pipeline
+    repairPipeline: {
+      ran: false,
+      imageCount: 0,
+      threshold: 0,
+      maxAttempts: 0,
+      mode: null,
+      avgScore: null,
+      entityIssues: null,
+      evalDuration: null,
+      passes: [],        // Array of { pass, pagesRegenerated, duration }
+      upgradedPages: 0,
+      charFixed: 0,
+      pageScores: [],    // Array of { page, quality, semantic, final, fixTargets }
+      lowPages: [],      // Pages below threshold
+      upgradedDetails: [] // Array of { page, from, to, source }
     }
   };
 
@@ -482,6 +504,90 @@ function extractImageStats(jobLines) {
     }
     if (msg.includes('[COVERS]') && msg.includes('Generated')) {
       stats.covers.generated = true;
+    }
+
+    // Unified pipeline gen-only image generation
+    if (msg.includes('[IMAGE GEN-ONLY] Image generated successfully')) {
+      stats.genOnly.count++;
+    }
+    // Phase 5a summary: "✅ [UNIFIED] Phase 5a complete: 8/8 images generated in 24.0s"
+    const phase5aMatch = msg.match(/Phase 5a complete:\s*(\d+)\/(\d+)\s*images generated/);
+    if (phase5aMatch) {
+      stats.genOnly.totalFromLog = parseInt(phase5aMatch[1]);
+    }
+
+    // ── Unified Repair Pipeline ──────────────────────────────────────────
+    // Start: "🔧 [UNIFIED PIPELINE] Starting: 8 images, threshold=60, maxAttempts=2, mode=generateImageOnly"
+    const pipelineStartMatch = msg.match(/\[UNIFIED PIPELINE\] Starting:\s*(\d+)\s*images,\s*threshold=(\d+),\s*maxAttempts=(\d+),\s*mode=(\S+)/);
+    if (pipelineStartMatch) {
+      stats.repairPipeline.ran = true;
+      stats.repairPipeline.imageCount = parseInt(pipelineStartMatch[1]);
+      stats.repairPipeline.threshold = parseInt(pipelineStartMatch[2]);
+      stats.repairPipeline.maxAttempts = parseInt(pipelineStartMatch[3]);
+      stats.repairPipeline.mode = pipelineStartMatch[4];
+    }
+
+    // Step 1 complete: "✅ [UNIFIED PIPELINE] Step 1 complete in 39.6s: avg score 93%, entity issues: 0"
+    const step1Match = msg.match(/\[UNIFIED PIPELINE\] Step 1 complete in ([\d.]+)s:\s*avg score (\d+)%,\s*entity issues:\s*(\d+)/);
+    if (step1Match) {
+      stats.repairPipeline.evalDuration = parseFloat(step1Match[1]);
+      stats.repairPipeline.avgScore = parseInt(step1Match[2]);
+      stats.repairPipeline.entityIssues = parseInt(step1Match[3]);
+    }
+
+    // Per-page scores: "✅ [BATCH EVAL] PAGE 1: Quality 100%, Semantic 100%, Final 100%, 0 fix targets"
+    const pageScoreMatch = msg.match(/\[BATCH EVAL\] PAGE (\d+):\s*Quality (\d+)%,\s*Semantic (\S+)%,\s*Final (\d+)%,\s*(\d+)\s*fix targets/);
+    if (pageScoreMatch) {
+      stats.repairPipeline.pageScores.push({
+        page: parseInt(pageScoreMatch[1]),
+        quality: parseInt(pageScoreMatch[2]),
+        semantic: pageScoreMatch[3] === 'N/A' ? null : parseInt(pageScoreMatch[3]),
+        final: parseInt(pageScoreMatch[4]),
+        fixTargets: parseInt(pageScoreMatch[5])
+      });
+    }
+
+    // Regeneration pass: "🔄 [UNIFIED PIPELINE] Step 2: Regenerating 1 low-scoring pages (pass 1)..."
+    const regenPassMatch = msg.match(/\[UNIFIED PIPELINE\] Step 2: Regenerating (\d+) low-scoring pages \(pass (\d+)\)/);
+    if (regenPassMatch) {
+      stats.repairPipeline.passes.push({
+        pass: parseInt(regenPassMatch[2]),
+        pagesRegenerated: parseInt(regenPassMatch[1]),
+        duration: null
+      });
+    }
+
+    // Pass complete: "✅ [UNIFIED PIPELINE] Pass 1: 1/1 regenerated in 9.3s"
+    const passCompleteMatch = msg.match(/\[UNIFIED PIPELINE\] Pass (\d+):\s*(\d+)\/(\d+)\s*regenerated in ([\d.]+)s/);
+    if (passCompleteMatch) {
+      const passNum = parseInt(passCompleteMatch[1]);
+      const pass = stats.repairPipeline.passes.find(p => p.pass === passNum);
+      if (pass) pass.duration = parseFloat(passCompleteMatch[4]);
+    }
+
+    // Page upgraded: "📊 [UNIFIED PIPELINE] Page 11: selected regen-attempt-1 (score 80) over original (score 45)"
+    const upgradeMatch = msg.match(/\[UNIFIED PIPELINE\] Page (\d+): selected (\S+) \(score (\d+)\) over (\S+) \(score (\d+)\)/);
+    if (upgradeMatch) {
+      stats.repairPipeline.upgradedDetails.push({
+        page: parseInt(upgradeMatch[1]),
+        to: upgradeMatch[2],
+        toScore: parseInt(upgradeMatch[3]),
+        from: upgradeMatch[4],
+        fromScore: parseInt(upgradeMatch[5])
+      });
+    }
+
+    // Final summary: "✅ [UNIFIED PIPELINE] Complete: 8 pages, 0 upgraded, 0 character-fixed"
+    const pipelineCompleteMatch = msg.match(/\[UNIFIED PIPELINE\] Complete:\s*(\d+)\s*pages,\s*(\d+)\s*upgraded,\s*(\d+)\s*character-fixed/);
+    if (pipelineCompleteMatch) {
+      stats.repairPipeline.upgradedPages = parseInt(pipelineCompleteMatch[2]);
+      stats.repairPipeline.charFixed = parseInt(pipelineCompleteMatch[3]);
+    }
+
+    // Step 4 upgraded count: "✅ [UNIFIED PIPELINE] Step 4: 1 pages upgraded from regeneration"
+    const step4Match = msg.match(/\[UNIFIED PIPELINE\] Step 4:\s*(\d+)\s*pages upgraded/);
+    if (step4Match) {
+      stats.repairPipeline.upgradedPages = parseInt(step4Match[1]);
     }
 
     // Track current page being processed (from attempt messages)

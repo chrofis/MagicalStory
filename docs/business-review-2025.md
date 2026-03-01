@@ -50,7 +50,7 @@ MagicalStory operates in the personalized children's book market, valued at **$5
 |------------|-------------|-------|
 | Magical Children's Book | $7.99 | 24 |
 | Childbook.ai | $2.50 | 24 |
-| **MagicalStory** | **~$10-25** (200-500 credits) | 10-50 |
+| **MagicalStory** | **~$5-10** (300-700 credits) | 10-50 |
 | StoryBee | $5-7/mo unlimited | Varies |
 
 ### Print Book Pricing
@@ -63,9 +63,9 @@ MagicalStory operates in the personalized children's book market, valued at **$5
 | **MagicalStory** | **Via Gelato** | **Via Gelato** | **6-50+** |
 
 ### Your Pricing Analysis
-- **Credits**: 500 starting free, 10 credits/page = **CHF 0.50/page** (at CHF 0.05/credit)
-- **20-page story**: 200 credits = **CHF 10** (~$11 USD)
-- **Competitive positioning**: Mid-range for digital, flexible for length
+- **Credits**: 500 starting free, 10 credits/page = **CHF 0.17/page** (at smallest package CHF 5/300 credits)
+- **30-page story**: 300 credits = **CHF 5** (~$5.50 USD) — the Starter package
+- **Competitive positioning**: Competitive with AI-native platforms, flexible for length
 
 ---
 
@@ -327,18 +327,18 @@ MagicalStory operates in the personalized children's book market, valued at **$5
 | Aspect | Current | Recommended |
 |--------|---------|-------------|
 | **Entry Point** | 500 free credits (~2 short stories) | Keep (good conversion tool) |
-| **Per-Page Cost** | CHF 0.50 | Consider CHF 0.30-0.40 for competitiveness |
+| **Per-Page Cost** | CHF 0.17 (Starter pkg) | Already competitive at current pricing |
 | **Subscription** | None | Add $15-25/mo plan |
 | **Life Skills Premium** | Same as adventures | +20-30% premium (justified by value) |
 | **Print Markup** | Gelato cost | Ensure 40-50% margin |
 
 ### Suggested Pricing Tiers
 
-1. **Free Tier**: 500 credits (unchanged)
-2. **Pay-As-You-Go**: CHF 0.04/credit (20% cheaper)
-3. **Family Plan**: CHF 19/mo - 500 credits/month + rollover
-4. **Unlimited**: CHF 49/mo - unlimited stories, priority generation
-5. **Therapist/School**: Custom B2B pricing
+1. **Free Tier**: 500 credits on signup (~1-2 stories)
+2. **Fixed Packages**: 300/CHF 5, 700/CHF 10, 1500/CHF 20, 4000/CHF 50
+3. **Family Plan** (future): CHF 19/mo - credits/month + rollover
+4. **Unlimited** (future): CHF 49/mo - unlimited stories, priority generation
+5. **Therapist/School** (future): Custom B2B pricing
 
 ---
 
