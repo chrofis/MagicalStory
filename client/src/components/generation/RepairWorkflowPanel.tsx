@@ -369,8 +369,6 @@ export function RepairWorkflowPanel({
     setIsRunningFullWorkflow(true);
     try {
       await runFullWorkflow({
-        scoreThreshold: REPAIR_DEFAULTS.scoreThreshold,
-        issueThreshold: REPAIR_DEFAULTS.issueThreshold,
         maxPasses: REPAIR_DEFAULTS.maxPasses,
         onProgress: (step, detail) => {
           setFullWorkflowProgress({ step, detail });

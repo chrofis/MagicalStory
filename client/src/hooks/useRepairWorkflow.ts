@@ -124,8 +124,6 @@ export interface UseRepairWorkflowReturn {
 
   // Full automated workflow
   runFullWorkflow: (options?: {
-    scoreThreshold?: number;
-    issueThreshold?: number;
     maxPasses?: number;
     onProgress?: (step: string, detail: string) => void;
   }) => Promise<void>;
@@ -849,8 +847,6 @@ export function useRepairWorkflow({
   // Full automated workflow - global passes instead of per-page retries
   // Each pass: evaluate ALL → redo ALL bad → re-evaluate ALL
   const runFullWorkflow = useCallback(async (options: {
-    scoreThreshold?: number;
-    issueThreshold?: number;
     maxPasses?: number;
     onProgress?: (step: string, detail: string) => void;
   } = {}) => {

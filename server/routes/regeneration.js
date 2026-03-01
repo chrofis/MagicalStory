@@ -66,7 +66,7 @@ const {
 } = require('../lib/visualBible');
 const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
-const { getActiveIndexAfterPush } = require('../lib/versionManager');
+const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 
 function getDbPool() { return getPool(); }
@@ -2623,6 +2623,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         if (activeVersion) {
           activeVersion.fixTargets = scene.fixTargets;
           activeVersion.fixableIssues = allIssues;
+          activeVersion.qualityScore = adjustedScore;
         }
 
         // Update scene with adjusted score
@@ -2752,7 +2753,7 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
   }
 });
 
-// Step 5b: Pick best version per page (highest qualityScore from imageVersions)
+// Step 6: Pick best version per page (highest qualityScore from imageVersions)
 router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
@@ -2783,15 +2784,15 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         continue;
       }
 
-      // Find version with highest qualityScore
+      // Find version with highest qualityScore (skip null/unevaluated versions)
       let bestIndex = -1;
       let bestScore = -1;
       let activeIndex = -1;
       for (let i = 0; i < scene.imageVersions.length; i++) {
         const v = scene.imageVersions[i];
         if (v.isActive) activeIndex = i;
-        const score = v.qualityScore ?? 0;
-        if (score > bestScore) {
+        const score = v.qualityScore;
+        if (score != null && score > bestScore) {
           bestScore = score;
           bestIndex = i;
         }
@@ -2800,8 +2801,9 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       if (bestIndex >= 0 && bestIndex !== activeIndex) {
         // Switch active version
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
-        await setActiveVersion(id, pageNumber, bestIndex);
-        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (score ${bestScore}, was ${activeIndex})`);
+        const dbIndex = arrayToDbIndex(bestIndex, 'scene');
+        await setActiveVersion(id, pageNumber, dbIndex);
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (db index ${dbIndex}, score ${bestScore}, was ${activeIndex})`);
         results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex };
       } else {
         results[pageNumber] = { switched: false, toIndex: activeIndex, score: bestScore };
@@ -2818,7 +2820,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
   }
 });
 
-// Step 6: Repair characters using repairSinglePage or MagicAPI
+// Step 7: Repair characters using repairSinglePage or MagicAPI
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
@@ -2843,7 +2845,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         return res.json({ results: [], message: 'No entity report found, nothing to repair' });
       }
 
-      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(entityReport);
+      const pageScores = {};
+      for (const scene of (storyData.sceneImages || [])) {
+        if (scene.pageNumber != null) pageScores[scene.pageNumber] = scene.qualityScore ?? 100;
+      }
+      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(entityReport, { pageScores });
       if (autoRepairs.length === 0) {
         return res.json({ results: [], message: 'No major/critical issues found' });
       }
@@ -3135,6 +3141,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
                   createdAt: new Date().toISOString(),
                   isActive: true,
                   type: 'entity-repair',
+                  qualityScore: null,  // Not evaluated; pick-best will skip
                   entityRepairedFor: characterName,
                   clothingCategory: repairResult.clothingCategory,
                   ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
