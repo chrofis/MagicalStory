@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Wrench,
   RotateCcw,
@@ -32,10 +32,6 @@ interface RepairWorkflowPanelProps {
   imageModel?: string;
   onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number) => void;
   onRefreshStory?: () => Promise<void>;
-  // Auto-trigger full workflow on mount (for post-generation repair)
-  autoRunFullWorkflow?: boolean;
-  // Callback when auto-run completes (to clear the trigger state in parent)
-  onAutoRunComplete?: () => void;
   // Developer mode settings
   developerMode?: boolean;
   useMagicApiRepair?: boolean;
@@ -311,9 +307,6 @@ function PageFeedbackCard({
   );
 }
 
-// localStorage key for tracking completed auto-runs (persists across remounts/refreshes)
-const AUTORUN_COMPLETED_KEY = 'repair-workflow-autorun-completed';
-
 export function RepairWorkflowPanel({
   storyId,
   sceneImages,
@@ -322,8 +315,6 @@ export function RepairWorkflowPanel({
   imageModel,
   onImageUpdate,
   onRefreshStory,
-  autoRunFullWorkflow = false,
-  onAutoRunComplete,
   developerMode = false,
   useMagicApiRepair = false,
   setUseMagicApiRepair,
@@ -366,56 +357,7 @@ export function RepairWorkflowPanel({
   const [fullWorkflowProgress, setFullWorkflowProgress] = useState<{ step: string; detail: string } | null>(null);
   const [isRunningFullWorkflow, setIsRunningFullWorkflow] = useState(false);
 
-  // Track if we've already auto-run for this story (ref for current session)
-  const autoRunTriggeredRef = useRef<string | null>(null);
 
-  // Check if auto-run has already completed for this story (persisted in localStorage)
-  const hasCompletedAutoRun = (checkStoryId: string): boolean => {
-    try {
-      const completedStories = JSON.parse(localStorage.getItem(AUTORUN_COMPLETED_KEY) || '[]');
-      return completedStories.includes(checkStoryId);
-    } catch {
-      return false;
-    }
-  };
-
-  // Mark auto-run as completed for this story (persist to localStorage)
-  const markAutoRunCompleted = (completedStoryId: string) => {
-    try {
-      const completedStories = JSON.parse(localStorage.getItem(AUTORUN_COMPLETED_KEY) || '[]');
-      if (!completedStories.includes(completedStoryId)) {
-        completedStories.push(completedStoryId);
-        // Keep only last 10 to prevent unbounded growth
-        const trimmed = completedStories.slice(-10);
-        localStorage.setItem(AUTORUN_COMPLETED_KEY, JSON.stringify(trimmed));
-      }
-    } catch (e) {
-      console.error('[RepairWorkflowPanel] Failed to save auto-run completion:', e);
-    }
-  };
-
-  // Auto-run full workflow when triggered by parent (e.g., after story generation)
-  useEffect(() => {
-    if (autoRunFullWorkflow && storyId && sceneImages.length > 0 && !isRunning && !isRunningFullWorkflow) {
-      // Check both ref (current session) and localStorage (persisted)
-      const alreadyRunThisSession = autoRunTriggeredRef.current === storyId;
-      const alreadyCompletedPreviously = hasCompletedAutoRun(storyId);
-
-      if (!alreadyRunThisSession && !alreadyCompletedPreviously) {
-        autoRunTriggeredRef.current = storyId;
-        console.log('[RepairWorkflowPanel] Auto-triggering full repair workflow for story:', storyId);
-        // Delay slightly to ensure component is fully mounted
-        setTimeout(async () => {
-          await handleRunFullWorkflow();
-          // After completion, mark as completed and notify parent
-          markAutoRunCompleted(storyId);
-          onAutoRunComplete?.();
-        }, 500);
-      } else {
-        console.log('[RepairWorkflowPanel] Skipping auto-run - already completed for story:', storyId, { alreadyRunThisSession, alreadyCompletedPreviously });
-      }
-    }
-  }, [autoRunFullWorkflow, storyId, sceneImages.length, isRunning, isRunningFullWorkflow]);
 
   const handleRunFullWorkflow = async () => {
     setIsRunningFullWorkflow(true);

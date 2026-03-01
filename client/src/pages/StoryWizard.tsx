@@ -321,8 +321,6 @@ export default function StoryWizard() {
   const [savedGenerationSettings, setSavedGenerationSettings] = useState<GenerationSettings | null>(null);
   // Flag to skip server reload when we just finished generating (data is already in state)
   const justFinishedGenerating = useRef(false);
-  // Track which story should auto-run the full repair workflow (set when generation completes with enableFullRepair)
-  const [autoRunRepairForStoryId, setAutoRunRepairForStoryId] = useState<string | null>(null);
   // Flag to track if dev metadata has been loaded (prevents duplicate fetches)
   const devMetadataLoadedRef = useRef(false);
   const storyTextReceivedRef = useRef(false);
@@ -3640,11 +3638,6 @@ export default function StoryWizard() {
           // result_data doesn't include imageData (stripped for performance),
           // so we need the two-phase loading to fetch images from story_images table
 
-          // If full repair after generation is enabled, mark this story for auto-repair
-          if (enableFullRepair) {
-            setAutoRunRepairForStoryId(status.result.storyId);
-          }
-
           // Stop tracking in global context
           stopTracking();
 
@@ -4033,8 +4026,6 @@ export default function StoryWizard() {
                       log.error('Failed to refresh story:', error);
                     }
                   } : undefined}
-                  autoRunFullWorkflow={autoRunRepairForStoryId === storyId}
-                  onAutoRunComplete={() => setAutoRunRepairForStoryId(null)}
                   developerMode={developerMode}
                   useMagicApiRepair={useMagicApiRepair}
                   setUseMagicApiRepair={setUseMagicApiRepair}
