@@ -1453,8 +1453,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             const activeIdx = activeVersions[pageNum.toString()] ?? 0;
 
             // Add ALL versions to imageVersions array (including version 0)
-            // imageVersions[i] → version_index = i (zero-indexed)
             scene.imageVersions.push({
+              versionIndex: row.version_index,
               imageData: normalizeImageData(row.image_data),
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
@@ -1567,43 +1567,64 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
       }
 
       // Merge scene imageVersions metadata from blob (description, prompt, modelId, etc.)
-      // IMPORTANT: DB imageVersions includes v0 at index 0 (v0, v1, v2, ...),
-      // but blob imageVersions only has non-v0 versions (v1, v2, ...).
-      // v0's metadata lives on the main blob scene object, not in imageVersions.
+      // Uses DB version_index + dbToArrayIndex to correctly map to blob imageVersions.
+      //
+      // Blob structure varies by source:
+      //  - Initial generation: main blob = v0, imageVersions = [] (empty)
+      //  - Repair pipeline: main blob = best version, imageVersions = [v1, v2, ...]
+      //  - After iterate: main blob = LATEST version (overwritten by Object.assign),
+      //    imageVersions[0] = v0 preservation (no source field), imageVersions[1+] = iterate versions
+      //
+      // DB version_index mapping: imageVersions[i] → DB version_index = i+1 (for scenes)
+      // So DB version_index 0 = main image, DB version_index N → blob imageVersions[N-1]
       if (!activeOnly && storyData.sceneImages) {
         for (const [pageNum, scene] of sceneImagesMap) {
           const blobScene = storyData.sceneImages.find(s => s.pageNumber === pageNum);
           if (blobScene && scene.imageVersions) {
+            const mergeFields = (target, source) => {
+              target.description = source.description || source.sceneDescription || null;
+              target.prompt = source.prompt || null;
+              target.userInput = source.userInput || null;
+              target.modelId = source.modelId || target.modelId || null;
+              target.type = source.type || null;
+              target.qualityReasoning = source.qualityReasoning || null;
+              target.fixTargets = source.fixTargets || [];
+              target.totalAttempts = source.totalAttempts || null;
+              target.referencePhotoNames = source.referencePhotoNames || [];
+              target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
+            };
+
             for (let i = 0; i < scene.imageVersions.length; i++) {
-              if (i === 0) {
-                // v0: metadata lives on the main blob scene object
-                scene.imageVersions[0].description = blobScene.sceneDescription || null;
-                scene.imageVersions[0].prompt = blobScene.prompt || null;
-                scene.imageVersions[0].modelId = blobScene.modelId || scene.imageVersions[0].modelId || null;
-                scene.imageVersions[0].qualityReasoning = blobScene.qualityReasoning || null;
-                scene.imageVersions[0].fixTargets = blobScene.fixTargets || [];
-                scene.imageVersions[0].type = null;
-                scene.imageVersions[0].userInput = null;
-                scene.imageVersions[0].totalAttempts = null;
-                scene.imageVersions[0].referencePhotoNames = blobScene.referencePhotoNames || [];
-                scene.imageVersions[0].createdAt = scene.imageVersions[0].generatedAt || storyData.createdAt || null;
-              } else {
-                // v1+: blob imageVersions[i-1] corresponds to DB imageVersions[i]
-                const blobVersion = blobScene.imageVersions?.[i - 1];
-                const retryEntry = blobScene.retryHistory?.[i];
-                if (blobVersion) {
-                  scene.imageVersions[i].description = blobVersion.description || null;
-                  scene.imageVersions[i].prompt = blobVersion.prompt || null;
-                  scene.imageVersions[i].userInput = blobVersion.userInput || null;
-                  scene.imageVersions[i].modelId = blobVersion.modelId || null;
-                  scene.imageVersions[i].type = blobVersion.type || null;
-                  scene.imageVersions[i].qualityReasoning = blobVersion.qualityReasoning || null;
-                  scene.imageVersions[i].fixTargets = blobVersion.fixTargets || [];
-                  scene.imageVersions[i].totalAttempts = blobVersion.totalAttempts || null;
-                  scene.imageVersions[i].referencePhotoNames = blobVersion.referencePhotoNames || [];
-                  scene.imageVersions[i].createdAt = blobVersion.createdAt || scene.imageVersions[i].generatedAt || storyData.createdAt || null;
+              const dbVersionIdx = scene.imageVersions[i].versionIndex;
+
+              if (dbVersionIdx === 0) {
+                // v0: check if iterate created a preservation entry in blob imageVersions[0]
+                // Iterate preservation entries lack a 'source' field (repair entries have one)
+                const firstBlob = blobScene.imageVersions?.[0];
+                if (firstBlob && !firstBlob.source) {
+                  // Iterate case: v0's original metadata preserved in imageVersions[0]
+                  mergeFields(scene.imageVersions[i], firstBlob);
+                } else {
+                  // Normal case: v0's metadata is on the main blob scene object
+                  mergeFields(scene.imageVersions[i], {
+                    description: blobScene.sceneDescription,
+                    prompt: blobScene.prompt,
+                    modelId: blobScene.modelId,
+                    qualityReasoning: blobScene.qualityReasoning,
+                    fixTargets: blobScene.fixTargets,
+                    referencePhotoNames: blobScene.referencePhotoNames,
+                  });
+                  scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
                 }
-                // Fallback: retryHistory has per-attempt bboxDetection and score
+              } else {
+                // v1+: use dbToArrayIndex to find the correct blob entry
+                const blobIdx = dbToArrayIndex(dbVersionIdx, 'scene');
+                const blobVersion = blobScene.imageVersions?.[blobIdx];
+                if (blobVersion) {
+                  mergeFields(scene.imageVersions[i], blobVersion);
+                }
+                // Fallback: retryHistory has per-attempt bboxDetection
+                const retryEntry = blobScene.retryHistory?.[dbVersionIdx];
                 if (retryEntry && !scene.imageVersions[i].fixTargets?.length) {
                   scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection || null;
                 }
