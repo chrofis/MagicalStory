@@ -2019,45 +2019,6 @@ export const storyService = {
   // Repair Workflow Methods
   // =============================================================================
 
-  // Step 1: Collect feedback from existing evaluation data
-  async collectRepairFeedback(storyId: string): Promise<{
-    pages: Record<number, {
-      pageNumber: number;
-      qualityScore?: number;
-      fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }>;
-      entityIssues: Array<{ character: string; issue: string; severity: string }>;
-      needsFullRedo: boolean;
-    }>;
-    totalIssues: number;
-  }> {
-    const response = await api.post<{
-      pages: Record<number, {
-        pageNumber: number;
-        qualityScore?: number;
-        fixableIssues: Array<{ description: string; severity: string; type: string; fix: string }>;
-        entityIssues: Array<{ character: string; issue: string; severity: string }>;
-        needsFullRedo: boolean;
-      }>;
-      totalIssues: number;
-    }>(`/api/stories/${storyId}/repair-workflow/collect-feedback`, {});
-    return response;
-  },
-
-  // Step 3: Redo pages (complete regeneration)
-  async redoPages(storyId: string, pageNumbers: number[], options?: { useOriginalAsReference?: boolean }): Promise<{
-    pagesCompleted: number[];
-    newVersions: Record<number, number>;
-  }> {
-    const response = await api.post<{
-      pagesCompleted: number[];
-      newVersions: Record<number, number>;
-    }>(`/api/stories/${storyId}/repair-workflow/redo-pages`, {
-      pageNumbers,
-      ...(options?.useOriginalAsReference && { useOriginalAsReference: true }),
-    });
-    return response;
-  },
-
   // Step 4: Re-evaluate pages
   async reEvaluatePages(storyId: string, pageNumbers: number[]): Promise<{
     pages: Record<number, {

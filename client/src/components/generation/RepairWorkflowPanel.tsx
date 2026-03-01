@@ -41,14 +41,14 @@ interface RepairWorkflowPanelProps {
 // Step configuration
 const STEP_CONFIG: Record<RepairWorkflowStep, { label: string; icon: React.ComponentType<{ className?: string }>; description: string }> = {
   'idle': { label: 'Ready', icon: Circle, description: '' },
-  'collect-feedback': { label: '1. Collect Feedback', icon: Search, description: 'Gather all issues from evaluation data' },
-  'identify-redo-pages': { label: '2. Identify Redo Pages', icon: AlertTriangle, description: 'Mark pages needing complete regeneration' },
-  'redo-pages': { label: '3. Redo Pages', icon: RefreshCw, description: 'Regenerate marked pages via iteration' },
-  're-evaluate': { label: '4. Re-evaluate', icon: CheckCircle, description: 'Run quality evaluation on new images' },
-  'consistency-check': { label: '5. Consistency Check', icon: Users, description: 'Run entity consistency on all pages' },
-  'character-repair': { label: '6. Character Repair', icon: Users, description: 'Fix character appearance issues' },
-  'artifact-repair': { label: '7. Artifact Repair', icon: Grid, description: 'Fix remaining artifacts via grid repair' },
-  'cover-repair': { label: '8. Cover Repair', icon: Image, description: 'Regenerate front, back, or dedication covers' },
+  'collect-feedback': { label: 'Collect Feedback', icon: Search, description: 'Gather all issues from evaluation data' },
+  'identify-redo-pages': { label: 'Identify Redo Pages', icon: AlertTriangle, description: 'Mark pages needing complete regeneration' },
+  'redo-pages': { label: 'Redo Pages', icon: RefreshCw, description: 'Regenerate marked pages via iteration' },
+  're-evaluate': { label: 'Re-evaluate', icon: CheckCircle, description: 'Run quality evaluation on new images' },
+  'consistency-check': { label: 'Consistency Check', icon: Users, description: 'Run entity consistency on all pages' },
+  'character-repair': { label: 'Character Repair', icon: Users, description: 'Fix character appearance issues' },
+  'artifact-repair': { label: 'Artifact Repair', icon: Grid, description: 'Fix remaining artifacts via grid repair' },
+  'cover-repair': { label: 'Cover Repair', icon: Image, description: 'Regenerate front, back, or dedication covers' },
 };
 
 // Status badge component

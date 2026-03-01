@@ -86,13 +86,6 @@ export interface UseRepairWorkflowReturn {
   // State
   workflowState: RepairWorkflowState;
   isRunning: boolean;
-  currentStepIndex: number;
-
-  // Step control
-  startStep: (step: RepairWorkflowStep) => void;
-  completeStep: (step: RepairWorkflowStep, result?: unknown) => void;
-  failStep: (step: RepairWorkflowStep, error?: string) => void;
-  skipStep: (step: RepairWorkflowStep) => void;
   resetWorkflow: () => void;
 
   // Step 1: Collect feedback
@@ -139,9 +132,7 @@ export interface UseRepairWorkflowReturn {
   isAborted: boolean;
 
   // Computed helpers
-  canProceedToStep: (step: RepairWorkflowStep) => boolean;
   getStepNumber: (step: RepairWorkflowStep) => number;
-  getPagesNeedingAttention: () => number[];
   getCharactersWithIssues: () => string[];
   getPagesWithSevereIssuesForCharacter: (characterName: string) => number[];
 }
@@ -165,11 +156,6 @@ export function useRepairWorkflow({
   const isRunning = useMemo(() => {
     return Object.values(workflowState.stepStatus).some(s => s === 'in-progress');
   }, [workflowState.stepStatus]);
-
-  // Computed: current step index
-  const currentStepIndex = useMemo(() => {
-    return STEP_ORDER.indexOf(workflowState.currentStep);
-  }, [workflowState.currentStep]);
 
   // Step control
   const startStep = useCallback((step: RepairWorkflowStep) => {
@@ -770,68 +756,11 @@ export function useRepairWorkflow({
     }
   }, [storyId, startStep, failStep]);
 
-  // Can proceed to a step?
-  const canProceedToStep = useCallback((step: RepairWorkflowStep): boolean => {
-    const stepIndex = STEP_ORDER.indexOf(step);
-
-    // Can always go to idle
-    if (step === 'idle') return true;
-
-    // Can't proceed if currently running
-    if (isRunning) return false;
-
-    // Check prerequisites based on step
-    switch (step) {
-      case 'collect-feedback':
-        return true; // Can always start here
-
-      case 'identify-redo-pages':
-        return workflowState.stepStatus['collect-feedback'] === 'completed';
-
-      case 'redo-pages':
-        return workflowState.redoPages.pageNumbers.length > 0;
-
-      case 're-evaluate':
-        return workflowState.stepStatus['redo-pages'] === 'completed' ||
-               workflowState.stepStatus['redo-pages'] === 'skipped';
-
-      case 'consistency-check':
-        // Can run after any earlier step
-        return stepIndex > STEP_ORDER.indexOf('collect-feedback');
-
-      case 'character-repair':
-        return workflowState.stepStatus['consistency-check'] === 'completed';
-
-      case 'artifact-repair':
-        // Can run if there are artifact issues identified
-        return workflowState.stepStatus['collect-feedback'] === 'completed';
-
-      case 'cover-repair':
-        // Can always run independently — no prerequisite steps
-        return true;
-
-      default:
-        return false;
-    }
-  }, [workflowState, isRunning]);
-
-  // Get step number (1-7)
+  // Get step number (1-8, 0 for idle)
   const getStepNumber = useCallback((step: RepairWorkflowStep): number => {
     const index = STEP_ORDER.indexOf(step);
     return index > 0 ? index : 0;
   }, []);
-
-  // Get pages needing attention (low score or many issues)
-  const getPagesNeedingAttention = useCallback((): number[] => {
-    return Object.entries(workflowState.collectedFeedback.pages)
-      .filter(([_, feedback]) => {
-        const score = feedback.qualityScore ?? 100;
-        const issues = feedback.fixableIssues.length + feedback.entityIssues.length;
-        return score < 70 || issues > 0 || feedback.needsFullRedo;
-      })
-      .map(([pageNum]) => parseInt(pageNum))
-      .sort((a, b) => a - b);
-  }, [workflowState.collectedFeedback.pages]);
 
   // Get characters with issues from consistency results
   // Supports new per-clothing structure (overallConsistent, totalIssues, byClothing)
@@ -1158,12 +1087,6 @@ export function useRepairWorkflow({
   return {
     workflowState,
     isRunning,
-    currentStepIndex,
-
-    startStep,
-    completeStep,
-    failStep,
-    skipStep,
     resetWorkflow,
 
     collectFeedback,
@@ -1189,9 +1112,7 @@ export function useRepairWorkflow({
     abortWorkflow,
     isAborted,
 
-    canProceedToStep,
     getStepNumber,
-    getPagesNeedingAttention,
     getCharactersWithIssues,
     getPagesWithSevereIssuesForCharacter,
   };
