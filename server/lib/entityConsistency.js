@@ -29,6 +29,21 @@ const MIN_APPEARANCES = 2;    // Minimum appearances to check consistency
 const MAX_GRID_CELLS = 12;    // Maximum cells per grid (4x3)
 
 /**
+ * Normalize a clothing category string to a canonical form.
+ * Strips bracket notation like [CLO001] and validates against known categories.
+ * Valid categories: standard, winter, summer, costumed:<type>
+ */
+function normalizeClothingCategory(category) {
+  if (!category) return 'standard';
+  // Strip any bracket notation (e.g., [CLO001], [CLO002])
+  let normalized = category.replace(/\s*\[[A-Z]+\d+\]\s*/g, '').trim();
+  if (!normalized) return 'standard';
+  // Normalize common aliases
+  if (normalized === 'normal') normalized = 'standard';
+  return normalized;
+}
+
+/**
  * Group appearances by clothing category
  *
  * @param {Array} appearances - Array of appearance objects with clothing field
@@ -38,7 +53,7 @@ function groupAppearancesByClothing(appearances) {
   const groups = new Map();
 
   for (const app of appearances) {
-    const clothing = app.clothing || 'standard';
+    const clothing = normalizeClothingCategory(app.clothing);
     if (!groups.has(clothing)) {
       groups.set(clothing, []);
     }
@@ -613,7 +628,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       }
 
       if (matchingFigure) {
-        const clothing = characterClothing[charName] || defaultClothing;
+        const clothing = normalizeClothingCategory(characterClothing[charName] || defaultClothing);
         // Determine confidence based on how we matched
         const confidence = (matchingFigure.name || '').toLowerCase() === charNameLower
           ? (matchingFigure.confidence === 'high' ? 0.95 : matchingFigure.confidence === 'medium' ? 0.8 : 0.65)
@@ -2433,6 +2448,7 @@ module.exports = {
   repairSinglePage,
 
   // Helper functions (exported for testing)
+  normalizeClothingCategory,
   groupAppearancesByClothing,
   collectEntityAppearances,
   collectObjectAppearances,

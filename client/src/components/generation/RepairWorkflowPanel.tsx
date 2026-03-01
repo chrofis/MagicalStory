@@ -112,13 +112,18 @@ function PageFeedbackCard({
               Semantic: {feedback.semanticScore}%
             </span>
           )}
-          {feedback.qualityScore !== undefined && feedback.semanticScore != null && (
+          {feedback.entityPenalty != null && feedback.entityPenalty > 0 && (
+            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+              Entity: -{feedback.entityPenalty}
+            </span>
+          )}
+          {feedback.score !== undefined && (
             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-              feedback.qualityScore >= 70 ? 'bg-green-100 text-green-700' :
-              feedback.qualityScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
+              feedback.score >= 70 ? 'bg-green-100 text-green-700' :
+              feedback.score >= 50 ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              Final: {feedback.qualityScore}%
+              Final: {feedback.score}%
             </span>
           )}
           {feedback.verdict && (

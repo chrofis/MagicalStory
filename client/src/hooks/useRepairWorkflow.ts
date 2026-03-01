@@ -394,6 +394,28 @@ export function useRepairWorkflow({
           }
         }
 
+        // Compute entity penalty (same model as backend re-evaluate)
+        let entityPenalty = 0;
+        for (const ei of feedback.entityIssues) {
+          if (ei.severity === 'critical') entityPenalty += 30;
+          else if (ei.severity === 'major') entityPenalty += 20;
+          else entityPenalty += 10;
+        }
+        for (const oi of feedback.objectIssues) {
+          if (oi.severity === 'critical') entityPenalty += 30;
+          else if (oi.severity === 'major') entityPenalty += 20;
+          else entityPenalty += 10;
+        }
+        for (const si of feedback.semanticIssues) {
+          if (si.severity === 'critical') entityPenalty += 30;
+          else if (si.severity === 'major') entityPenalty += 20;
+          else entityPenalty += 10;
+        }
+        feedback.entityPenalty = entityPenalty;
+        // scene.score already includes semantic penalties; apply entity penalty on top
+        const baseScore = scene.score ?? feedback.qualityScore ?? 100;
+        feedback.score = Math.max(0, baseScore - entityPenalty);
+
         totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
                        feedback.objectIssues.length + feedback.semanticIssues.length;
         pages[scene.pageNumber] = feedback;

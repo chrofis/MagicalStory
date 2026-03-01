@@ -432,13 +432,6 @@ function extractImageStats(jobLines) {
       attempt3: 0,  // Needed 3rd attempt
       pages: {}     // Track by page: { 1: 1, 2: 3, ... } (page -> final attempt)
     },
-    // Auto-repair
-    autoRepair: {
-      enabled: null,    // true/false/null if unknown
-      skipped: 0,       // Times skipped (disabled)
-      executed: 0,      // Times actually run
-      inpaintCalls: 0   // Number of inpaint API calls
-    },
     // Covers
     covers: {
       generated: false,
@@ -511,28 +504,6 @@ function extractImageStats(jobLines) {
       if (attempt === 1) stats.retries.attempt1++;
       else if (attempt === 2) stats.retries.attempt2++;
       else if (attempt === 3) stats.retries.attempt3++;
-    }
-
-    // Auto-repair skipped (disabled)
-    if (msg.includes('Auto-repair skipped (disabled)')) {
-      stats.autoRepair.skipped++;
-      stats.autoRepair.enabled = false;
-    }
-
-    // Auto-repair executed (would be something like "[AUTO-REPAIR] Executing..." or inpaint calls)
-    if (msg.includes('[AUTO-REPAIR]') && !msg.includes('skipped')) {
-      stats.autoRepair.executed++;
-      stats.autoRepair.enabled = true;
-    }
-
-    // Inpaint calls from cost summary
-    const inpaintMatch = msg.match(/inpaint:\s*(\d+)\s*calls/);
-    if (inpaintMatch) {
-      stats.autoRepair.inpaintCalls = parseInt(inpaintMatch[1]);
-      if (stats.autoRepair.inpaintCalls > 0) {
-        stats.autoRepair.enabled = true;
-        stats.autoRepair.executed = stats.autoRepair.inpaintCalls;
-      }
     }
 
     // Content blocked (PROHIBITED_CONTENT)
@@ -914,15 +885,6 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
   // Content blocked
   if (imageStats.contentBlocked > 0) {
     console.log(`   Content blocked retries: ${imageStats.contentBlocked}`);
-  }
-
-  // Auto-repair
-  if (imageStats.autoRepair.enabled === false) {
-    console.log(`   Auto-repair: DISABLED (${imageStats.autoRepair.skipped} opportunities skipped)`);
-  } else if (imageStats.autoRepair.enabled === true) {
-    console.log(`   Auto-repair: ENABLED (${imageStats.autoRepair.executed} repairs, ${imageStats.autoRepair.inpaintCalls} inpaints)`);
-  } else {
-    console.log(`   Auto-repair: Unknown status`);
   }
 
   // Consistency regeneration

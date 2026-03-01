@@ -892,6 +892,8 @@ export interface PageFeedback {
   pageNumber: number;
   qualityScore?: number;
   semanticScore?: number | null;
+  entityPenalty?: number;
+  score?: number;
   verdict?: string;
   issuesSummary?: string;
   semanticResult?: SemanticEvaluationResult | null;
