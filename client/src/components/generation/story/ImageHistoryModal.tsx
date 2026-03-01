@@ -96,7 +96,10 @@ export function ImageHistoryModal({
                           version.qualityScore >= 80 ? 'bg-green-600' :
                           version.qualityScore >= 60 ? 'bg-yellow-600' : 'bg-red-600'
                         }`}>
-                          {version.qualityScore}%
+                          {version.semanticScore != null || version.entityPenalty
+                            ? `Q:${Math.round(version.qualityScore + (version.entityPenalty || 0))} S:${version.semanticScore ?? '?'} E:${version.entityPenalty ? `-${version.entityPenalty}` : '0'} → ${version.qualityScore}%`
+                            : `${version.qualityScore}%`
+                          }
                         </span>
                       )}
                       {version.isActive && (
@@ -160,16 +163,36 @@ export function ImageHistoryModal({
                       <div className="text-xs text-gray-500">Model: {version.modelId}</div>
                     )}
                     {version.qualityScore != null && (
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs font-semibold text-gray-700">Quality:</span>
-                        <span className={`text-xs font-bold ${
-                          version.qualityScore >= 80 ? 'text-green-600' :
-                          version.qualityScore >= 60 ? 'text-yellow-600' : 'text-red-600'
-                        }`}>
-                          {version.qualityScore}%
-                        </span>
-                        {version.totalAttempts != null && version.totalAttempts > 1 && (
-                          <span className="text-xs text-gray-400">({version.totalAttempts} attempts)</span>
+                      <div className="mt-1 space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-gray-700">Final Score:</span>
+                          <span className={`text-xs font-bold ${
+                            version.qualityScore >= 80 ? 'text-green-600' :
+                            version.qualityScore >= 60 ? 'text-yellow-600' : 'text-red-600'
+                          }`}>
+                            {version.qualityScore}%
+                          </span>
+                          {version.totalAttempts != null && version.totalAttempts > 1 && (
+                            <span className="text-xs text-gray-400">({version.totalAttempts} attempts)</span>
+                          )}
+                        </div>
+                        {version.semanticScore != null && (
+                          <div className="text-xs text-purple-600">
+                            Semantic: {version.semanticScore}%
+                          </div>
+                        )}
+                        {version.entityPenalty != null && version.entityPenalty > 0 && (
+                          <div className="text-xs text-orange-600">
+                            Entity Penalty: -{version.entityPenalty}
+                          </div>
+                        )}
+                        {version.evaluatedAt && (
+                          <div className="text-xs text-gray-400">
+                            Evaluated: {new Date(version.evaluatedAt).toLocaleString()}
+                          </div>
+                        )}
+                        {version.issuesSummary && (
+                          <div className="text-xs text-gray-500 italic">{version.issuesSummary}</div>
                         )}
                       </div>
                     )}

@@ -622,6 +622,10 @@ export interface ImageVersion {
   isActive: boolean;
   type?: 'original' | 'regeneration' | 'iteration' | 'edit' | 'repair' | 'entity-repair';
   qualityScore?: number;
+  semanticScore?: number | null;
+  entityPenalty?: number;
+  evaluatedAt?: string;
+  issuesSummary?: string;
   qualityReasoning?: string;
   fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
   fixableIssues?: Array<{
