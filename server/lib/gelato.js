@@ -341,7 +341,9 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     }
 
     const printOrder = await printResponse.json();
-    console.log('✅ [BACKGROUND] Print order created:', printOrder.orderId);
+    // Gelato v4 API returns 'id', not 'orderId'
+    const gelatoOrderId = printOrder.id || printOrder.orderId;
+    console.log('✅ [BACKGROUND] Print order created:', gelatoOrderId);
 
     // Step 5: Update order with print order ID and status
     await dbPool.query(`
@@ -351,7 +353,7 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
           payment_status = 'completed',
           updated_at = CURRENT_TIMESTAMP
       WHERE stripe_session_id = $2
-    `, [printOrder.orderId, sessionId]);
+    `, [gelatoOrderId, sessionId]);
 
     log.debug('🎉 [BACKGROUND] Book order processing completed successfully!');
 

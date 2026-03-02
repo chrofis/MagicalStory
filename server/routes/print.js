@@ -254,7 +254,7 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
     }
 
     await logActivity(req.user.id, req.user.username, 'PRINT_ORDER_CREATED', {
-      orderId: printData.orderId || printData.id,
+      orderId: printData.id || printData.orderId,
       orderReference: orderPayload.orderReferenceId,
       orderType: orderType
     });
@@ -278,12 +278,12 @@ router.post('/print-provider/order', authenticateToken, async (req, res) => {
 
     res.json({
       success: true,
-      orderId: printData.orderId || printData.id,
+      orderId: printData.id || printData.orderId,
       orderReference: orderPayload.orderReferenceId,
       orderType: orderType,
       isDraft: orderType === 'draft',
       previewUrls: previewUrls,
-      dashboardUrl: `https://dashboard.gelato.com/checkout/${printData.orderId || printData.id}/product`,
+      dashboardUrl: `https://dashboard.gelato.com/checkout/${printData.id || printData.orderId}/product`,
       data: printData
     });
 
@@ -1349,7 +1349,9 @@ router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async
     }
 
     const printOrder = await printResponse.json();
-    console.log('✅ [ADMIN] Print order created:', printOrder.orderId);
+    // Gelato v4 API returns 'id', not 'orderId'
+    const gelatoOrderId = printOrder.id || printOrder.orderId;
+    console.log('✅ [ADMIN] Print order created:', gelatoOrderId);
 
     // Update order with print order ID
     await getDbPool().query(`
@@ -1359,12 +1361,12 @@ router.post('/admin/orders/:orderId/retry-print-order', authenticateToken, async
           payment_status = 'completed',
           updated_at = CURRENT_TIMESTAMP
       WHERE id = $2
-    `, [printOrder.orderId, orderId]);
+    `, [gelatoOrderId, orderId]);
 
     res.json({
       success: true,
       message: 'Print order created successfully',
-      printOrderId: printOrder.orderId
+      printOrderId: gelatoOrderId
     });
 
   } catch (err) {
