@@ -1796,6 +1796,27 @@ async function initializeDatabase() {
     // Drop obsolete discovered_landmarks table (now unified in landmark_index)
     await dbPool.query(`DROP TABLE IF EXISTS discovered_landmarks`).catch(() => {});
 
+    // Historical locations table (pre-fetched photos for historical stories)
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS historical_locations (
+        id SERIAL PRIMARY KEY,
+        event_id VARCHAR(100) NOT NULL,
+        location_name VARCHAR(255) NOT NULL,
+        location_query VARCHAR(255),
+        location_type VARCHAR(100),
+        aliases JSONB DEFAULT '[]',
+        photo_url TEXT NOT NULL DEFAULT '',
+        photo_data TEXT,
+        photo_attribution TEXT,
+        photo_description TEXT,
+        photo_score INT,
+        photo_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(event_id, location_name, photo_url)
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
+
     console.log('✓ Database tables initialized');
 
   } catch (err) {
