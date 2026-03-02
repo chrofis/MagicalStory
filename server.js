@@ -1938,7 +1938,7 @@ app.post('/api/landmarks/discover', async (req, res) => {
       if (indexedLandmarks.length > 0) {
         // Count total landmarks for this city
         const countResult = await dbPool.query(
-          'SELECT COUNT(*) as count FROM landmark_index WHERE LOWER(nearest_city) = LOWER($1)',
+          "SELECT COUNT(*) as count FROM landmark_index WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn')) = LOWER(translate($1, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn'))",
           [city]
         );
         const landmarkCount = parseInt(countResult.rows[0].count);

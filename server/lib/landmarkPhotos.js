@@ -2269,12 +2269,14 @@ async function getIndexedLandmarks(city, limit = 30) {
   }
 
   try {
+    // Normalize diacritics on both sides (e.g. "Zurich" matches "Zürich")
+    const normalizedCity = normalizeForCompare(city);
     const result = await pool.query(`
       SELECT * FROM landmark_index
-      WHERE LOWER(nearest_city) = LOWER($1)
+      WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
       ORDER BY score DESC
       LIMIT $2
-    `, [city, limit]);
+    `, [normalizedCity, limit]);
 
     log.info(`[LANDMARK-INDEX] Found ${result.rows.length} landmarks for city "${city}"`);
     return result.rows;

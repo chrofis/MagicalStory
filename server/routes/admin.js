@@ -344,7 +344,7 @@ router.get('/landmarks-photos', async (req, res) => {
               photo_url_4, photo_description_4,
               photo_url_5, photo_description_5,
               photo_url_6, photo_description_6
-       FROM landmark_index WHERE LOWER(nearest_city) = LOWER($1)
+       FROM landmark_index WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn')) = LOWER(translate($1, 'üùäàâöôéèêëîïçñ', 'uuaaaooeeeeiicn'))
        ORDER BY score DESC`,
       [city]
     );
