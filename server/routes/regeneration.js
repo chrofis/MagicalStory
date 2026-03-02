@@ -269,8 +269,39 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       ? JSON.parse(story.data)
       : story.data;
 
-    // Rehydrate images from story_images table (images may be stripped from data blob)
-    storyData = await rehydrateStoryImages(id, storyData);
+    // Only load images for the page being regenerated (not entire story).
+    // Full rehydrateStoryImages loads ALL pages (~50-100MB for 30 pages) which causes
+    // 503 crashes when multiple regenerations fire concurrently.
+    const pageImages = await dbQuery(
+      `SELECT version_index, image_data FROM story_images
+       WHERE story_id = $1 AND image_type = 'scene' AND page_number = $2
+       ORDER BY version_index`,
+      [id, pageNumber]
+    );
+    const sceneEntry = (storyData.sceneImages || []).find(s => s.pageNumber === pageNumber);
+    if (sceneEntry && pageImages.length > 0) {
+      // Load active version's image data into the main imageData field
+      const metaResult = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [id]);
+      const versionMeta = metaResult[0]?.image_version_meta || {};
+      const activeVersion = versionMeta[String(pageNumber)]?.activeVersion || 0;
+      const activeImg = pageImages.find(i => i.version_index === activeVersion) || pageImages.find(i => i.version_index === 0);
+      if (activeImg) sceneEntry.imageData = activeImg.image_data;
+
+      // Populate imageVersions with their image data from DB
+      if (sceneEntry.imageVersions) {
+        for (let vIdx = 0; vIdx < sceneEntry.imageVersions.length; vIdx++) {
+          const version = sceneEntry.imageVersions[vIdx];
+          if (!version.imageData) {
+            const dbVersionIndex = arrayToDbIndex(vIdx, 'scene');
+            const vImg = pageImages.find(i => i.version_index === dbVersionIndex);
+            if (vImg) {
+              version.imageData = vImg.image_data;
+              version._rehydrated = true;
+            }
+          }
+        }
+      }
+    }
 
     // Get scene description
     const sceneDescriptions = storyData.sceneDescriptions || [];
@@ -654,13 +685,29 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       sceneImages.sort((a, b) => a.pageNumber - b.pageNumber);
     }
 
-    // Update image prompts
-    storyData.imagePrompts = storyData.imagePrompts || {};
-    storyData.imagePrompts[pageNumber] = imagePrompt;
-
-    // Save updated story with metadata
+    // Save only the updated page atomically (instead of full saveStoryData which
+    // would require all images in memory and risks race conditions with concurrent regenerations)
     storyData.sceneImages = sceneImages;
-    await saveStoryData(id, storyData);
+    const updatedScene = sceneImages.find(s => s.pageNumber === pageNumber);
+    const saved = await saveScenePageData(id, pageNumber, updatedScene);
+    if (!saved) {
+      // Fallback to full save if page not found in sceneImages array
+      await saveStoryData(id, storyData);
+    }
+
+    // Update imagePrompts separately since we're not saving the full data blob
+    await dbQuery(
+      `UPDATE stories SET data = jsonb_set(
+         COALESCE(data, '{}'::jsonb),
+         '{imagePrompts}',
+         jsonb_set(
+           COALESCE(data->'imagePrompts', '{}'::jsonb),
+           $2::text[],
+           $3::jsonb
+         )
+       ) WHERE id = $1`,
+      [id, [String(pageNumber)], JSON.stringify(imagePrompt)]
+    );
 
     // Update image_version_meta with new active version (new version is always the last one)
     const scene = sceneImages.find(s => s.pageNumber === pageNumber);
@@ -687,8 +734,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
     }
 
-    // Get version info for response
-    const updatedScene = sceneImages.find(s => s.pageNumber === pageNumber);
+    // Get version info for response (reuse updatedScene from save above)
     const versionCount = updatedScene?.imageVersions?.length || 1;
     const imageVersions = updatedScene?.imageVersions?.map((v, idx) => ({
       description: v.description,
