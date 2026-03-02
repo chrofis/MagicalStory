@@ -1063,19 +1063,19 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
           SET gelato_status = $1,
               tracking_number = $2,
               tracking_url = $3,
-              shipped_at = CASE WHEN $1::text = 'shipped' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
-              delivered_at = CASE WHEN $1::text = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+              shipped_at = CASE WHEN $4 = 'shipped' AND shipped_at IS NULL THEN NOW() ELSE shipped_at END,
+              delivered_at = CASE WHEN $4 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
               updated_at = NOW()
-          WHERE gelato_order_id = $4
-        `, [newStatus, trackingNumber, trackingUrl, orderId]);
+          WHERE gelato_order_id = $5
+        `, [newStatus, trackingNumber, trackingUrl, newStatus, orderId]);
       } else {
         await dbPool.query(`
           UPDATE orders
           SET gelato_status = $1,
-              delivered_at = CASE WHEN $1::text = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+              delivered_at = CASE WHEN $2 = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
               updated_at = NOW()
-          WHERE gelato_order_id = $2
-        `, [newStatus, orderId]);
+          WHERE gelato_order_id = $3
+        `, [newStatus, newStatus, orderId]);
       }
 
       console.log('✅ [GELATO WEBHOOK] Order status updated to:', newStatus);
