@@ -11,6 +11,7 @@
 }
 
 html {
+  overflow-x: hidden; /* Prevent horizontal scroll on mobile (needed for iOS Safari) */
   overscroll-behavior: none; /* Prevent pull-to-refresh and rubber-band on mobile */
 }
 

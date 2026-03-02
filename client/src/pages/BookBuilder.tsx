@@ -313,7 +313,7 @@ export default function BookBuilder() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navigation currentStep={0} />
-        <div className="px-4 md:px-8 py-8 max-w-4xl mx-auto">
+        <div className="px-3 sm:px-4 md:px-8 py-8 max-w-4xl mx-auto">
           <div className="text-center py-12">
             <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-gray-800 mb-2">{t.noStories}</h2>
@@ -331,10 +331,10 @@ export default function BookBuilder() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       <Navigation currentStep={0} />
 
-      <div className="px-4 md:px-8 py-8 max-w-4xl mx-auto">
+      <div className="px-3 sm:px-4 md:px-8 py-8 max-w-4xl mx-auto">
         {/* Back button */}
         <button
           onClick={() => navigate('/stories')}
@@ -368,7 +368,7 @@ export default function BookBuilder() {
               {stories.map((story, index) => (
                 <div
                   key={story.id}
-                  className="bg-white rounded-xl shadow-md p-4 flex items-center gap-4"
+                  className="bg-white rounded-xl shadow-md p-3 sm:p-4 flex items-center gap-3 sm:gap-4"
                 >
                   {/* Thumbnail */}
                   {story.thumbnail ? (
@@ -456,20 +456,20 @@ export default function BookBuilder() {
               {/* Softcover */}
               <button
                 onClick={() => setCoverType('softcover')}
-                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   coverType === 'softcover'
                     ? 'border-indigo-600 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <Book size={32} className={coverType === 'softcover' ? 'text-indigo-600' : 'text-gray-400'} />
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Book size={32} className={`shrink-0 ${coverType === 'softcover' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.softcover}</div>
                     <div className="text-sm text-gray-500">{t.softcoverSize}</div>
                   </div>
                   {!isOverLimit && (
-                    <div className="text-xl font-bold text-gray-800">
+                    <div className="text-lg sm:text-xl font-bold text-gray-800 shrink-0">
                       CHF {getPriceForPages(totalPages, false, pricingTiers)}.-
                     </div>
                   )}
@@ -479,20 +479,20 @@ export default function BookBuilder() {
               {/* Hardcover */}
               <button
                 onClick={() => setCoverType('hardcover')}
-                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   coverType === 'hardcover'
                     ? 'border-indigo-600 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <BookOpen size={32} className={coverType === 'hardcover' ? 'text-indigo-600' : 'text-gray-400'} />
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <BookOpen size={32} className={`shrink-0 ${coverType === 'hardcover' ? 'text-indigo-600' : 'text-gray-400'}`} />
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.hardcover}</div>
                     <div className="text-sm text-gray-500">{t.hardcoverSize}</div>
                   </div>
                   {!isOverLimit && (
-                    <div className="text-xl font-bold text-indigo-700">
+                    <div className="text-lg sm:text-xl font-bold text-indigo-700 shrink-0">
                       CHF {getPriceForPages(totalPages, true, pricingTiers)}.-
                     </div>
                   )}
@@ -506,15 +506,15 @@ export default function BookBuilder() {
               {/* Square */}
               <button
                 onClick={() => setBookFormat('square')}
-                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   bookFormat === 'square'
                     ? 'border-indigo-600 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-8 h-8 border-2 rounded ${bookFormat === 'square' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className={`w-8 h-8 shrink-0 border-2 rounded ${bookFormat === 'square' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.squareFormat}</div>
                     <div className="text-sm text-gray-500">{t.squareSize}</div>
                   </div>
@@ -524,15 +524,15 @@ export default function BookBuilder() {
               {/* Portrait */}
               <button
                 onClick={() => setBookFormat('A4')}
-                className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+                className={`w-full p-3 sm:p-4 rounded-xl border-2 text-left transition-all ${
                   bookFormat === 'A4'
                     ? 'border-indigo-600 bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-300'
                 }`}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`w-6 h-8 border-2 rounded ${bookFormat === 'A4' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
-                  <div className="flex-1">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className={`w-6 h-8 shrink-0 border-2 rounded ${bookFormat === 'A4' ? 'border-indigo-600 bg-indigo-100' : 'border-gray-400'}`} />
+                  <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-800">{t.portraitFormat}</div>
                     <div className="text-sm text-gray-500">{t.portraitSize}</div>
                   </div>
@@ -542,7 +542,7 @@ export default function BookBuilder() {
 
             {/* Price summary */}
             {!isOverLimit && price && (
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6 mb-6">
+              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 sm:p-6 mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-gray-700">{t.price}</span>
                   <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
