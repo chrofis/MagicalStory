@@ -68,19 +68,55 @@ Print orders go through Gelato. Prices charged to users:
 | Page Range | Softcover (CHF) | Hardcover (CHF) |
 |------------|-----------------|-----------------|
 | 1-30       | 38              | 53              |
-| 31-40      | 42              | 57              |
-| 41-50      | 46              | 61              |
-| 51-60      | 50              | 65              |
-| 61-70      | 54              | 69              |
-| 71-80      | 58              | 73              |
-| 81-90      | 62              | 77              |
-| 91-100     | 66              | 81              |
-
-Gelato manufacturing + shipping costs vary by region. Target print margin: **40-50%**.
-
-Book purchases reward credits: **10 credits per page** (so a 30-page book purchase gives 300 credits back).
+| 31-40      | 45              | 60              |
+| 41-50      | 51              | 66              |
+| 51-60      | 57              | 72              |
+| 61-70      | 63              | 78              |
+| 71-80      | 69              | 84              |
+| 81-90      | 75              | 90              |
+| 91-100     | 81              | 96              |
 
 Config: Pricing tiers stored in `pricing_tiers` DB table, seeded on first run. Endpoint: `GET /api/pricing`.
+
+### Credit Reward on Book Purchase
+
+Book purchases reward credits: **10 credits/page x 2 (double promo) = 20 credits/page**.
+
+The promo multiplier is configurable via admin (`token_promo_multiplier` in `config` table, currently 2x).
+
+Credit value at best rate: CHF 50 / 4000 credits = **CHF 0.0125/credit**.
+
+| Pages | Credits Back (2x) | Credit Value (CHF) | Softcover Price | Net Effective Price |
+|-------|-------------------|-------------------|-----------------|---------------------|
+| 30    | 600               | 7.50              | 38              | 30.50               |
+| 40    | 800               | 10.00             | 45              | 35.00               |
+| 50    | 1000              | 12.50             | 51              | 38.50               |
+| 60    | 1200              | 15.00             | 57              | 42.00               |
+| 70    | 1400              | 17.50             | 63              | 45.50               |
+| 80    | 1600              | 20.00             | 69              | 49.00               |
+| 90    | 1800              | 22.50             | 75              | 52.50               |
+| 100   | 2000              | 25.00             | 81              | 56.00               |
+
+The credit reward effectively subsidizes the book price by ~CHF 7.50-25, encouraging repeat story generation.
+
+### Gelato Cost Breakdown (Switzerland, March 2026)
+
+Our prices include Gelato manufacturing, ~CHF 10 shipping (Swiss Post Economy), and 8% Swiss VAT.
+
+| Pages | Gelato Soft | Gelato Hard | + Ship + Tax | Our Soft | Our Hard | Soft Margin | Hard Margin |
+|-------|------------|------------|--------------|----------|----------|-------------|-------------|
+| 30    | 10.86      | 14.32      | 22.53 / 26.27 | 38     | 53       | 41%         | 50%         |
+| 40    | 12.47      | 16.16      | 24.27 / 28.25 | 45     | 60       | 46%         | 53%         |
+| 50    | 14.07      | 17.98      | 26.00 / 30.22 | 51     | 66       | 49%         | 54%         |
+| 60    | 15.68      | 19.81      | 27.74 / 32.20 | 57     | 72       | 51%         | 55%         |
+| 70    | 17.30      | 21.65      | 29.48 / 34.18 | 63     | 78       | 53%         | 56%         |
+| 80    | 18.91      | 23.47      | 31.22 / 36.15 | 69     | 84       | 55%         | 57%         |
+| 90    | 20.51      | 25.31      | 32.95 / 38.13 | 75     | 90       | 56%         | 58%         |
+| 100   | 22.12      | 27.14      | 34.69 / 40.11 | 81     | 96       | 57%         | 58%         |
+
+**Margin range: 41-58%** before credit reward. After accounting for the credit reward value, the effective margin on softcovers drops to ~21-38%.
+
+Source: Gelato Product Prices API (`/v3/products/{uid}/prices?country=CH&currency=CHF`), queried March 2026. Shipping ~CHF 8.50-10 (Swiss Post Economy, varies by weight).
 
 ## Key Files
 
