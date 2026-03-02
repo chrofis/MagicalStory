@@ -1100,6 +1100,14 @@ export function useRepairWorkflow({
           }));
         }
 
+        // Add character-repaired pages to allRedonePagesAcrossPasses so pick-best considers them
+        for (const charResult of (repairResult.results || [])) {
+          for (const repair of (charResult.pagesRepaired || [])) {
+            const pn = typeof repair === 'number' ? repair : repair.pageNumber;
+            if (pn != null) allRedonePagesAcrossPasses.add(pn);
+          }
+        }
+
         setWorkflowState(prev => ({
           ...prev,
           stepStatus: { ...prev.stepStatus, 'character-repair': 'completed' },

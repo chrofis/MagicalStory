@@ -19,7 +19,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, rehydrateStoryImages, saveStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
+const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Shared repair logic
@@ -739,8 +739,6 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       prompt: imagePrompt,
       sceneWasEdited,
       sceneWasExpanded: shouldExpand,  // Flag if expansion was done
-      // All image versions
-      imageVersions: sceneImages.find(s => s.pageNumber === pageNumber)?.imageVersions || [],
       // Reference images used (for dev mode display)
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
@@ -1174,13 +1172,18 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     storyData.imagePrompts = storyData.imagePrompts || {};
     storyData.imagePrompts[pageNumber] = imagePrompt;
 
-    // Save updated story
+    // Save updated scene atomically (prevents race condition when pages are redone in parallel)
     storyData.sceneImages = sceneImages;
     storyData.sceneDescriptions = sceneDescriptions;
-    await saveStoryData(id, storyData);
+    const updatedSceneData = sceneImages.find(s => s.pageNumber === pageNumber);
+    const savedAtomically = updatedSceneData && await saveScenePageData(id, pageNumber, updatedSceneData);
+    if (!savedAtomically) {
+      // Fallback: save full blob (scene not found in DB array — shouldn't happen normally)
+      await saveStoryData(id, storyData);
+    }
 
     // Update active version in metadata
-    const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+    const scene = updatedSceneData;
     const newActiveIndex = scene?.imageVersions?.length ? getActiveIndexAfterPush(scene.imageVersions, 'scene') : 0;
     await setActiveVersion(id, pageNumber, newActiveIndex);
 
@@ -1653,14 +1656,8 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
       storyData.coverImages.backCover = coverData;
     }
 
-    // Save new version to story_images table with incrementing version_index
-    await saveStoryImage(id, coverKey, null, coverResult.imageData, {
-      qualityScore: coverResult.score,
-      generatedAt: new Date().toISOString(),
-      versionIndex: newVersionIndex
-    });
-
     // Update active version in image_version_meta (same mechanism as scenes)
+    // Note: saveStoryData() below handles extracting imageVersions to story_images table
     await setActiveVersion(id, coverKey, newVersionIndex);
 
     // Save updated story with metadata (imageData will be stripped by saveStoryData)
@@ -2818,7 +2815,15 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         }
       }
 
-      if (bestIndex >= 0 && bestIndex !== activeIndex) {
+      // Don't switch away from an unevaluated entity-repair version — it was applied
+      // intentionally to fix character issues and hasn't been scored yet
+      const activeVersion = activeIndex >= 0 ? scene.imageVersions[activeIndex] : null;
+      const isUnevaluatedRepair = activeVersion?.type === 'entity-repair' && activeVersion?.qualityScore == null;
+
+      if (isUnevaluatedRepair) {
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: keeping unevaluated entity-repair version (index ${activeIndex})`);
+        results[pageNumber] = { switched: false, toIndex: activeIndex, score: null, reason: 'unevaluated-entity-repair' };
+      } else if (bestIndex >= 0 && bestIndex !== activeIndex) {
         // Switch active version
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
 
@@ -3188,7 +3193,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           storyData.sceneImages = sceneImages;
           await saveStoryData(id, storyData);
-          await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, { versionIndex: newDbVersionIndex });
+          // Note: saveStoryData already saves images from imageVersions to story_images table
           await setActiveVersion(id, update.pageNumber, newDbVersionIndex);
 
           charResult.pagesRepaired.push({
@@ -3253,7 +3258,7 @@ router.post('/:id/repair-workflow/artifact-repair', authenticateToken, imageRege
     let issuesFixed = 0;
 
     // Process each page with grid repair
-    const { gridBasedRepair } = await import('./server/lib/images.js');
+    const { gridBasedRepair } = require('../lib/gridBasedRepair');
 
     for (const pageNumber of pageNumbers) {
       const sceneIndex = storyData.sceneImages?.findIndex(s => s.pageNumber === pageNumber);

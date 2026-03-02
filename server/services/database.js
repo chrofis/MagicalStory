@@ -603,6 +603,101 @@ async function saveStoryData(storyId, storyData) {
 }
 
 /**
+ * Atomically update a single scene entry in `data->'sceneImages'` using jsonb_set.
+ * Avoids the full blob read-modify-write of saveStoryData, preventing race conditions
+ * when multiple pages are redone in parallel.
+ *
+ * Handles imageVersions extraction: saves new versions to story_images table
+ * and strips imageData from the blob, just like saveStoryData does.
+ *
+ * @param {string} storyId - Story ID
+ * @param {number} pageNumber - Page number to update
+ * @param {object} sceneData - The complete scene object (with imageData/imageVersions)
+ */
+async function saveScenePageData(storyId, pageNumber, sceneData) {
+  if (!isDatabaseMode()) {
+    throw new Error('Database mode required');
+  }
+
+  // Deep clone to avoid modifying caller's object
+  const dataForStorage = JSON.parse(JSON.stringify(sceneData));
+  let imagesSaved = 0;
+
+  // Extract and save imageVersions to story_images table (same logic as saveStoryData)
+  if (dataForStorage.imageVersions && Array.isArray(dataForStorage.imageVersions)) {
+    for (let i = 0; i < dataForStorage.imageVersions.length; i++) {
+      const version = dataForStorage.imageVersions[i];
+      if (version.imageData && !version._rehydrated) {
+        await saveStoryImage(storyId, 'scene', pageNumber, version.imageData, {
+          qualityScore: version.qualityScore || version.score,
+          generatedAt: version.generatedAt,
+          versionIndex: arrayToDbIndex(i, 'scene')
+        });
+        imagesSaved++;
+      }
+      delete version.imageData;
+      delete version._rehydrated;
+    }
+  }
+
+  // Strip top-level imageData (already in story_images at version_index 0)
+  delete dataForStorage.imageData;
+
+  // Strip retry history images
+  if (dataForStorage.retryHistory) {
+    for (const entry of dataForStorage.retryHistory) {
+      delete entry.imageData;
+      delete entry.bboxOverlayImage;
+      delete entry.originalImage;
+      delete entry.annotatedOriginal;
+      if (entry.grids) {
+        for (const grid of entry.grids) {
+          delete grid.imageData;
+          delete grid.repairedImageData;
+          delete grid.original;
+          delete grid.repaired;
+        }
+      }
+    }
+  }
+  delete dataForStorage.originalImage;
+
+  if (imagesSaved > 0) {
+    console.log(`💾 [SAVE-SCENE] Extracted ${imagesSaved} images to story_images for ${storyId} page ${pageNumber}`);
+  }
+
+  // Atomically update just this scene entry in the sceneImages array using jsonb_set.
+  // The subquery finds the array index of the matching pageNumber.
+  // Only updates if the page exists in the array (WHERE clause checks existence).
+  const result = await dbQuery(
+    `UPDATE stories
+     SET data = jsonb_set(
+       data,
+       ('{sceneImages,' || (
+         SELECT (ordinality - 1)::text
+         FROM jsonb_array_elements(data->'sceneImages') WITH ORDINALITY AS elem(val, ordinality)
+         WHERE (val->>'pageNumber')::int = $2
+         LIMIT 1
+       ) || '}')::text[],
+       $3::jsonb
+     )
+     WHERE id = $1
+       AND EXISTS (
+         SELECT 1
+         FROM jsonb_array_elements(data->'sceneImages') AS elem(val)
+         WHERE (val->>'pageNumber')::int = $2
+       )`,
+    [storyId, pageNumber, JSON.stringify(dataForStorage)]
+  );
+
+  if ((result.rowCount ?? 0) === 0) {
+    console.warn(`⚠️ [SAVE-SCENE] Page ${pageNumber} not found in sceneImages for story ${storyId}, falling back to full save`);
+    return false; // Signal caller to fall back to saveStoryData
+  }
+  return true;
+}
+
+/**
  * Update story data metadata only (without re-saving images).
  * Use this for lightweight updates like changing isActive flags.
  * Images are stripped from the data but NOT re-saved to story_images.
@@ -1058,7 +1153,13 @@ async function getActiveVersion(storyId, pageNumber) {
     const scene = dataRows[0].scene_images.find(s => s.pageNumber === pageNum);
     if (scene?.imageVersions) {
       const activeIdx = scene.imageVersions.findIndex(v => v.isActive);
-      return activeIdx >= 0 ? activeIdx : 0;
+      if (activeIdx >= 0) {
+        // Convert array index to DB version_index (what setActiveVersion stores)
+        const pageNum = parseInt(pageNumber);
+        const imageType = isNaN(pageNum) ? pageNumber : 'scene';
+        return arrayToDbIndex(activeIdx, imageType);
+      }
+      return 0;
     }
   }
 
@@ -1414,6 +1515,7 @@ module.exports = {
   logActivity,
   buildStoryMetadata,
   saveStoryData,
+  saveScenePageData,
   updateStoryDataOnly,
   upsertStory,
   // Image functions
