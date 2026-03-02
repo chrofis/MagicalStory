@@ -115,14 +115,17 @@ Count characters with visible faces. If more than 3, you MUST reduce. For EACH e
 | **C. Hidden behind object** | Scene has furniture, trees, doorways, or other characters | "Lukas half-hidden behind the bookshelf", "partly obscured behind Sophie" |
 | **D. Cropped by frame** | Character is beside the focal action | "Manuel's arm and shoulder visible at the left edge" |
 | **E. Head turned away** | Character stays with the group but looks sideways/down | "Lukas walks alongside, head turned to look at the river", "Emma glances down at her bag" |
-| **F. Back view** | Character is NARRATIVELY walking away, leaving, or looking into the distance ahead | "Sophie walks away down the path, seen from behind" |
+| **F. Carrying something large** | Character holds an object that covers their face | "Manuel carries a tall stack of books", "Emma hugs a big stuffed bear to her chest" |
+| **G. Bending down** | Character is crouching, picking something up, petting an animal | "Lukas kneels to tie his shoe", "Emma bends down to pick up a shell" |
+| **H. Face in object** | Character is reading, looking into a bag, studying a map | "Manuel reads the map, face hidden behind it", "Emma peers into her backpack" |
+| **I. Back view** | Character is NARRATIVELY walking away, leaving, or looking into the distance ahead | "Sophie walks away down the path, seen from behind" |
 
 ❌ NEVER turn a character around just to hide their face. If 4 people walk forward together, they ALL face forward — remove one instead.
 ❌ "4 children running toward the castle, one facing backward" — makes no sense
 ✅ "Sophie and Manuel run toward the castle. Emma watches from the garden fence behind them."
 ✅ "Three children crowd around the treasure chest. Behind them, the cave entrance frames the scene."
 
-**Decision process:** For each extra character, ask: "Does this character DO something on this page?" If no → option A (remove). If yes → pick B-F based on what fits the scene's physical layout.
+**Decision process:** For each extra character, ask: "Does this character DO something on this page?" If no → option A (remove). If yes → pick B-I based on what fits the scene's physical layout.
 
 **18. Composition & Simplicity**
 The scene hint is a STARTING IDEA - change it freely if composition doesn't work. One focal point only.
