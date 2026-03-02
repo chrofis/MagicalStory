@@ -527,8 +527,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Generate new image with labeled character photos (name + photoUrl)
     // Use quality retry to regenerate if score is below threshold
-    // User-initiated regenerations use Gemini 3 Pro for higher quality
-    const imageModelId = 'gemini-3-pro-image-preview';
+    // Use same model as initial generation for consistency
+    const imageModelId = MODEL_DEFAULTS.pageImage;
     const imageResult = await generateImageWithQualityRetry(
       imagePrompt, referencePhotos, null, 'scene', null, null, null,
       { imageModel: imageModelId },
@@ -1574,9 +1574,9 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     }
 
     // Generate new cover with quality retry (automatically retries on text errors)
-    // User-initiated regenerations use Gemini 3 Pro for higher quality
+    // Use same model as initial generation for consistency
     const coverLabel = normalizedCoverType === 'front' ? 'FRONT COVER' : normalizedCoverType === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-    const coverImageModelId = 'gemini-3-pro-image-preview';
+    const coverImageModelId = MODEL_DEFAULTS.coverImage;
     const coverResult = await generateImageWithQualityRetry(
       coverPrompt, coverCharacterPhotos, null, 'cover', null, null, null,
       { imageModel: coverImageModelId },
