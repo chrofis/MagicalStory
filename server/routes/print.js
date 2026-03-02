@@ -21,7 +21,7 @@ const { log } = require('../utils/logger');
 const { getPool, rehydrateStoryImages, logActivity } = require('../services/database');
 
 // Lib modules
-const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('../lib/pdf');
+const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf, parseStoryPages } = require('../lib/pdf');
 const { processBookOrder, getCoverDimensions } = require('../lib/gelato');
 const email = require('../../email');
 
