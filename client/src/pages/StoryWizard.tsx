@@ -25,7 +25,7 @@ import { FaceSelectionModal } from '@/components/character';
 
 // Types
 import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory } from '@/types/character';
-import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport } from '@/types/story';
+import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
@@ -3974,8 +3974,8 @@ export default function StoryWizard() {
                   characters={characters.filter(c => !excludedCharacters.includes(c.id))}
                   finalChecksReport={finalChecksReport}
                   imageModel={modelSelections.imageModel || undefined}
-                  onImageUpdate={(pageNumber, imageData, _versionIndex) => {
-                    // Update local state with new image version
+                  onImageUpdate={(pageNumber, imageData, versionIndex, metadata) => {
+                    // Update local state with new image version (include metadata for version details)
                     setSceneImages(prev => prev.map(img => {
                       if (img.pageNumber === pageNumber) {
                         // If no existing versions, create v0 for the original image first
@@ -3994,9 +3994,17 @@ export default function StoryWizard() {
                             ...existingVersions,
                             {
                               imageData,
+                              versionIndex,
                               createdAt: new Date().toISOString(),
                               isActive: true,
-                              type: 'repair' as const
+                              type: (metadata?.type === 'character-repair' ? 'entity-repair' : metadata?.type || 'repair') as ImageVersion['type'],
+                              description: metadata?.description,
+                              prompt: metadata?.prompt,
+                              qualityScore: metadata?.qualityScore,
+                              qualityReasoning: metadata?.qualityReasoning,
+                              modelId: metadata?.modelId,
+                              fixTargets: metadata?.fixTargets,
+                              totalAttempts: metadata?.totalAttempts,
                             }
                           ].map((v, i, arr) => ({ ...v, isActive: i === arr.length - 1 }))
                         };

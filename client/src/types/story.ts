@@ -614,6 +614,7 @@ export interface ReferencePhoto {
 // Individual image version (for user-initiated regenerations)
 export interface ImageVersion {
   imageData: string;
+  versionIndex?: number; // DB version_index for correct metadata mapping
   userInput?: string;    // User's input before expansion (for dev mode)
   description?: string;  // Expanded scene description (AI's output)
   prompt?: string;       // Full API prompt (for dev mode)
