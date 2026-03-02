@@ -655,20 +655,27 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         // sceneCharacters - just names, not full character data with avatars
         sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown'),
         // Per-version metadata for dev mode (no image data)
-        imageVersionsMeta: (img.imageVersions || []).map(v => ({
-          description: v.description || null,
-          prompt: v.prompt || null,
-          userInput: v.userInput || null,
-          modelId: v.modelId || null,
-          createdAt: v.createdAt || null,
-          isActive: v.isActive || false,
-          type: v.type || null,
-          qualityScore: v.qualityScore ?? null,
-          qualityReasoning: v.qualityReasoning || null,
-          fixTargets: v.fixTargets || [],
-          totalAttempts: v.totalAttempts || null,
-          referencePhotoNames: v.referencePhotoNames || [],
-        })),
+        // Include versionIndex so frontend can correctly map to its imageVersions array
+        // Blob imageVersions may start at v1 (normal) or v0 (iterate preservation entry)
+        imageVersionsMeta: (() => {
+          const versions = img.imageVersions || [];
+          const hasPreservation = versions.length > 0 && versions[0] && !versions[0].source;
+          return versions.map((v, idx) => ({
+            versionIndex: hasPreservation ? idx : idx + 1,
+            description: v.description || null,
+            prompt: v.prompt || null,
+            userInput: v.userInput || null,
+            modelId: v.modelId || null,
+            createdAt: v.createdAt || null,
+            isActive: v.isActive || false,
+            type: v.type || null,
+            qualityScore: v.qualityScore ?? null,
+            qualityReasoning: v.qualityReasoning || null,
+            fixTargets: v.fixTargets || [],
+            totalAttempts: v.totalAttempts || null,
+            referencePhotoNames: v.referencePhotoNames || [],
+          }));
+        })(),
       })) || [],
       // Cover images dev data - expose full retryHistory like page images (for bbox/repair display)
       coverImages: story.coverImages ? {

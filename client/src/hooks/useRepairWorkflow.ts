@@ -108,7 +108,16 @@ export interface UseRepairWorkflowProps {
     imageChecks?: FinalChecksImageCheck[];
   } | null;
   imageModel?: string;
-  onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number) => void;
+  onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number, metadata?: {
+    description?: string;
+    prompt?: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+    modelId?: string;
+    fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
+    totalAttempts?: number;
+    type?: string;
+  }) => void;
 }
 
 export interface UseRepairWorkflowReturn {
@@ -586,9 +595,17 @@ export function useRepairWorkflow({
               blackoutImage: result.blackoutImage ?? null,
             };
 
-            // Notify parent of image update
+            // Notify parent of image update (include metadata for version details)
             if (onImageUpdate) {
-              onImageUpdate(pageNumber, result.imageData, versionIndex);
+              onImageUpdate(pageNumber, result.imageData, versionIndex, {
+                description: result.sceneDescription,
+                prompt: result.imagePrompt,
+                qualityScore: result.qualityScore,
+                qualityReasoning: result.qualityReasoning,
+                modelId: result.modelId,
+                totalAttempts: result.totalAttempts,
+                type: 'repair',
+              });
             }
           }
         } catch (pageError) {
@@ -707,7 +724,9 @@ export function useRepairWorkflow({
       for (const repair of pagesRepaired) {
         if (repair.imageData && onImageUpdate) {
           try {
-            onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex);
+            onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex, {
+              type: 'character-repair',
+            });
           } catch (err) {
             console.error(`[RepairWorkflow] Failed to notify parent of image update for page ${repair.pageNumber}:`, err);
           }
@@ -979,7 +998,15 @@ export function useRepairWorkflow({
               allRedonePagesAcrossPasses.add(pageNumber);
               const scene = sceneImages.find(s => s.pageNumber === pageNumber);
               const newVersionIndex = (scene?.imageVersions?.length ?? 0);
-              onImageUpdate?.(pageNumber, result.imageData, newVersionIndex);
+              onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
+                description: result.sceneDescription,
+                prompt: result.imagePrompt,
+                qualityScore: result.qualityScore,
+                qualityReasoning: result.qualityReasoning,
+                modelId: result.modelId,
+                totalAttempts: result.totalAttempts,
+                type: 'repair',
+              });
             }
           } catch (err) {
             console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo page ${pageNumber}:`, err);
@@ -1036,7 +1063,9 @@ export function useRepairWorkflow({
           for (const repair of pagesRepaired) {
             if (repair.imageData && onImageUpdate) {
               try {
-                onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex);
+                onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex, {
+                  type: 'character-repair',
+                });
               } catch (err) {
                 console.error(`[RepairWorkflow] Failed to notify image update for page ${repair.pageNumber}:`, err);
               }

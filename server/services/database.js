@@ -926,7 +926,10 @@ async function getActiveStoryImages(storyId) {
   }
 
   // Single optimized query: join images with active version metadata
-  // Uses CTEs for both active versions and version counts to avoid correlated subqueries
+  // Uses CTEs for both active versions and version counts to avoid correlated subqueries.
+  // Falls back to version_index 0 if the active version doesn't exist in story_images
+  // (can happen when pick-best pointed to an original preservation entry at DB index 1
+  // that was never saved — the actual original lives at version_index 0).
   const results = await dbQuery(
     `WITH active_versions AS (
       SELECT
@@ -940,13 +943,38 @@ async function getActiveStoryImages(storyId) {
       FROM story_images
       WHERE story_id = $1
       GROUP BY story_id, image_type, page_number
+    ),
+    target_versions AS (
+      SELECT
+        si.story_id, si.image_type, si.page_number,
+        COALESCE(av.active_version, 0) as requested_version,
+        CASE
+          WHEN EXISTS (
+            SELECT 1 FROM story_images si2
+            WHERE si2.story_id = si.story_id
+              AND si2.image_type = si.image_type
+              AND si2.page_number IS NOT DISTINCT FROM si.page_number
+              AND si2.version_index = COALESCE(av.active_version, 0)
+          ) THEN COALESCE(av.active_version, 0)
+          ELSE 0
+        END as effective_version
+      FROM (
+        SELECT DISTINCT story_id, image_type, page_number
+        FROM story_images WHERE story_id = $1
+      ) si
+      LEFT JOIN active_versions av ON (
+        (si.image_type = 'scene' AND av.page_key = si.page_number::text) OR
+        (si.image_type != 'scene' AND av.page_key = si.image_type)
+      )
     )
     SELECT si.image_type, si.page_number, si.version_index, si.image_data, si.quality_score, si.generated_at,
            COALESCE(vc.version_count, 1) as version_count
     FROM story_images si
-    LEFT JOIN active_versions av ON (
-      (si.image_type = 'scene' AND av.page_key = si.page_number::text) OR
-      (si.image_type != 'scene' AND av.page_key = si.image_type)
+    JOIN target_versions tv ON (
+      tv.story_id = si.story_id
+      AND tv.image_type = si.image_type
+      AND tv.page_number IS NOT DISTINCT FROM si.page_number
+      AND si.version_index = tv.effective_version
     )
     LEFT JOIN version_counts vc ON (
       vc.story_id = si.story_id
@@ -954,7 +982,6 @@ async function getActiveStoryImages(storyId) {
       AND vc.page_number IS NOT DISTINCT FROM si.page_number
     )
     WHERE si.story_id = $1
-      AND si.version_index = COALESCE(av.active_version, 0)
     ORDER BY si.image_type, si.page_number`,
     [storyId]
   );

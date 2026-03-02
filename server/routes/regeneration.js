@@ -2821,9 +2821,16 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       if (bestIndex >= 0 && bestIndex !== activeIndex) {
         // Switch active version
         scene.imageVersions.forEach((v, i) => { v.isActive = (i === bestIndex); });
-        const dbIndex = arrayToDbIndex(bestIndex, 'scene');
+
+        // The original preservation entry at imageVersions[0] (type 'original') has no
+        // imageData saved at DB version_index 1 — the original image lives at version_index 0.
+        // So when picking the original as best, point activeVersion to 0, not arrayToDbIndex(0).
+        const bestVersion = scene.imageVersions[bestIndex];
+        const isOriginalPreservation = bestIndex === 0 && bestVersion.type === 'original';
+        const dbIndex = isOriginalPreservation ? 0 : arrayToDbIndex(bestIndex, 'scene');
+
         await setActiveVersion(id, pageNumber, dbIndex);
-        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (db index ${dbIndex}, score ${bestScore}, was ${activeIndex})`);
+        log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (db index ${dbIndex}${isOriginalPreservation ? ' [original]' : ''}, score ${bestScore}, was ${activeIndex})`);
         results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex };
       } else {
         results[pageNumber] = { switched: false, toIndex: activeIndex, score: bestScore };

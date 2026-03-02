@@ -396,8 +396,11 @@ export default function StoryWizard() {
             hasVisualBibleGrid: devData.hasVisualBibleGrid ?? img.hasVisualBibleGrid,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
             // Merge per-version metadata into imageVersions
-            imageVersions: img.imageVersions?.map((v, idx) => {
-              const meta = devData.imageVersionsMeta?.[idx];
+            // Match by versionIndex (DB version_index) instead of array position
+            // to avoid off-by-one: blob imageVersions may not include v0
+            imageVersions: img.imageVersions?.map((v) => {
+              const vIdx = v.versionIndex ?? 0;
+              const meta = devData.imageVersionsMeta?.find(m => m.versionIndex === vIdx);
               if (!meta) return v;
               return {
                 ...v,

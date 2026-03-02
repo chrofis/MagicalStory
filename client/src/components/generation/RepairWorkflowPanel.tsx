@@ -31,7 +31,16 @@ interface RepairWorkflowPanelProps {
   characters: Character[];
   finalChecksReport?: FinalChecksReport | null;
   imageModel?: string;
-  onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number) => void;
+  onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number, metadata?: {
+    description?: string;
+    prompt?: string;
+    qualityScore?: number;
+    qualityReasoning?: string;
+    modelId?: string;
+    fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
+    totalAttempts?: number;
+    type?: string;
+  }) => void;
   onRefreshStory?: () => Promise<void>;
   // Developer mode settings
   developerMode?: boolean;

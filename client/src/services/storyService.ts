@@ -396,6 +396,7 @@ export const storyService = {
       landmarkPhotos?: LandmarkPhoto[] | null;
       hasVisualBibleGrid?: boolean;
       imageVersionsMeta?: Array<{
+        versionIndex: number;
         description: string | null;
         prompt: string | null;
         userInput: string | null;
