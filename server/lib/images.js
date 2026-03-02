@@ -2958,7 +2958,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
  */
 async function evaluateImageBatch(images, options = {}) {
   const {
-    concurrency = 10,
+    concurrency = 100,
     qualityModelOverride = null
   } = options;
 
@@ -3938,7 +3938,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   const {
     regenThreshold = REPAIR_DEFAULTS.scoreThreshold,
     maxRegenAttempts = REPAIR_DEFAULTS.maxPasses,
-    evalConcurrency = 10,
+    evalConcurrency = 100,
     qualityModelOverride = null,
     useIteratePage = false
   } = options;
@@ -4098,7 +4098,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     log.info(`🔄 [UNIFIED PIPELINE] Step 2: Regenerating ${lowScoringPages.length} low-scoring pages (pass 1)...`);
     const regen1Start = Date.now();
 
-    const regenLimit = pLimit(5);
+    const regenLimit = pLimit(50);
     const regen1Results = await Promise.all(
       lowScoringPages.map(img => regenLimit(async () => {
         try {
@@ -4215,7 +4215,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.info(`🔄 [UNIFIED PIPELINE] Step 3: Regenerating ${stillLowPages.length} still-low pages (pass 2)...`);
       const regen2Start = Date.now();
 
-      const regenLimit2 = pLimit(5);
+      const regenLimit2 = pLimit(50);
       const regen2Results = await Promise.all(
         stillLowPages.map(img => regenLimit2(async () => {
           try {
@@ -4349,7 +4349,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       log.info(`👤 [UNIFIED PIPELINE] Dropped ${dropped} lower-priority fixes (cap ${REPAIR_DEFAULTS.maxCharRepairPages}).`);
     }
 
-    // Group fix tasks by page for sequential application
+    // Group fix tasks by page — fixes within a page chain (each uses previous output),
+    // but different pages are independent and can run in parallel
     const fixesByPage = new Map();
     for (const task of fixTasks) {
       if (!fixesByPage.has(task.pageNumber)) {
@@ -4358,16 +4359,18 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       fixesByPage.get(task.pageNumber).push(task);
     }
 
-    for (const [pageNumber, pageFixes] of fixesByPage) {
+    const charFixLimit = pLimit(50);
+    await Promise.all([...fixesByPage.entries()].map(([pageNumber, pageFixes]) => charFixLimit(async () => {
       const best = bestPerPage.get(pageNumber);
       if (!best?.imageData) {
         log.warn(`⚠️ [UNIFIED PIPELINE] Page ${pageNumber}: no image data for character fix, skipping`);
-        continue;
+        return;
       }
 
       let currentImageData = best.imageData;
       let anyFixApplied = false;
 
+      // Fixes within a page must stay sequential (each uses previous output)
       for (const fix of pageFixes) {
         // Find bbox for this character on this page
         // Priority 1: quality eval matches[].face_bbox from best version
@@ -4456,7 +4459,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         charFixResults.set(pageNumber, { imageData: currentImageData, source: 'character-fix' });
         log.info(`✅ [UNIFIED PIPELINE] Page ${pageNumber}: character fix applied`);
       }
-    }
+    })));
 
     log.info(`✅ [UNIFIED PIPELINE] Step 5: ${charFixResults.size} pages had character fixes applied`);
   } else {

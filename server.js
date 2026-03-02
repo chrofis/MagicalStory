@@ -3259,7 +3259,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Phase 5a continued: Generate ALL images (no evaluation)
       log.info(`📸 [UNIFIED] Phase 5a: Generating all ${expandedScenes.length} images...`);
       const genStartTime = Date.now();
-      const genLimit = pLimit(5);
+      const genLimit = pLimit(50);
 
       const rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {

@@ -850,7 +850,7 @@ async function retryFailedRepairs(failedRepairs, imageBuffer, options = {}) {
  * @param {Object} options - Processing options
  */
 async function processMultiplePages(pages, options = {}) {
-  const { parallel = false, ...repairOptions } = options;
+  const { parallel = true, ...repairOptions } = options;
 
   const results = [];
 

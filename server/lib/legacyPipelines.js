@@ -658,7 +658,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     const MAX_RETRIES = 2;
 
     // Rate limiter for parallel image generation during streaming
-    const streamLimit = pLimit(3);  // Limit concurrent image generation during streaming
+    const streamLimit = pLimit(50);  // Limit concurrent image generation during streaming
 
     // Track completed pages for partial results (text -> sceneText mapping)
     const pageTexts = {};
@@ -1607,7 +1607,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           if (visualBible) {
             log.debug(`📖 [STORYBOOK] Using visual bible for remaining images`);
           }
-          const limit = pLimit(5);
+          const limit = pLimit(50);
 
           const remainingPromises = missingScenes.map((scene) => {
             return limit(() => generateImageForScene(scene.pageNumber, scene.description, null, visualBible));
@@ -2893,8 +2893,8 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
     const imagePrompts = {};
     const storyTextPrompts = []; // Collect all story text batch prompts for dev mode
 
-    // Create rate limiter for parallel image generation: max 5 concurrent
-    const limit = pLimit(5);
+    // Create rate limiter for parallel image generation
+    const limit = pLimit(50);
     const MAX_RETRIES = 2;
 
     // Track active image generation promises

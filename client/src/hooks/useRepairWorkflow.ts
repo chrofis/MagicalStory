@@ -12,6 +12,35 @@ import type { Character } from '../types/character';
 import { storyService } from '../services/storyService';
 import { REPAIR_DEFAULTS } from '../config/repairDefaults';
 
+// Concurrency limit for parallel image operations (redo, character repair)
+const IMAGE_CONCURRENCY = 50;
+
+/** Simple concurrency limiter (like p-limit) */
+function pLimit(concurrency: number) {
+  const queue: Array<() => void> = [];
+  let active = 0;
+
+  function next() {
+    if (queue.length > 0 && active < concurrency) {
+      active++;
+      const run = queue.shift()!;
+      run();
+    }
+  }
+
+  return <T>(fn: () => Promise<T>): Promise<T> => {
+    return new Promise<T>((resolve, reject) => {
+      queue.push(() => {
+        fn().then(resolve, reject).finally(() => {
+          active--;
+          next();
+        });
+      });
+      next();
+    });
+  };
+}
+
 // Initial state factory
 function createInitialState(): RepairWorkflowState {
   return {
@@ -527,9 +556,11 @@ export function useRepairWorkflow({
     }> = {};
 
     try {
-      for (let i = 0; i < pageNumbers.length; i++) {
-        const pageNumber = pageNumbers[i];
-        setRedoProgress({ current: i, total: pageNumbers.length, currentPage: pageNumber });
+      let completed = 0;
+      const limit = pLimit(IMAGE_CONCURRENCY);
+
+      await Promise.all(pageNumbers.map((pageNumber) => limit(async () => {
+        setRedoProgress({ current: completed, total: pageNumbers.length, currentPage: pageNumber });
 
         try {
           // Use existing iteratePage function
@@ -564,7 +595,10 @@ export function useRepairWorkflow({
           console.error(`Failed to redo page ${pageNumber}:`, pageError);
           // Continue with other pages
         }
-      }
+
+        completed++;
+        setRedoProgress({ current: completed, total: pageNumbers.length, currentPage: undefined });
+      })));
 
       setWorkflowState(prev => ({
         ...prev,
@@ -926,16 +960,18 @@ export function useRepairWorkflow({
           break;
         }
 
-        // 5. Redo ALL bad pages (once each, no inner retry)
+        // 5. Redo ALL bad pages (batched with concurrency limit)
         checkAborted();
-        onProgress?.('redo-pages', `Pass ${pass}: Redoing ${pagesToRedo.length} pages...`);
+        onProgress?.('redo-pages', `Pass ${pass}: Redoing ${pagesToRedo.length} pages (${IMAGE_CONCURRENCY} at a time)...`);
         startStep('redo-pages');
 
-        for (let i = 0; i < pagesToRedo.length; i++) {
+        let redoCompleted = 0;
+        const redoLimit = pLimit(IMAGE_CONCURRENCY);
+
+        await Promise.all(pagesToRedo.map((pageNumber) => redoLimit(async () => {
           checkAborted();
-          const pageNumber = pagesToRedo[i];
-          onProgress?.('redo-pages', `Pass ${pass}: Page ${pageNumber} (${i + 1}/${pagesToRedo.length})`);
-          setRedoProgress({ current: i, total: pagesToRedo.length, currentPage: pageNumber });
+          onProgress?.('redo-pages', `Pass ${pass}: Page ${pageNumber} (${redoCompleted + 1}/${pagesToRedo.length})`);
+          setRedoProgress({ current: redoCompleted, total: pagesToRedo.length, currentPage: pageNumber });
 
           try {
             const result = await storyService.iteratePage(storyId, pageNumber, imageModel);
@@ -948,7 +984,9 @@ export function useRepairWorkflow({
           } catch (err) {
             console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo page ${pageNumber}:`, err);
           }
-        }
+
+          redoCompleted++;
+        })));
 
         setWorkflowState(prev => ({
           ...prev,

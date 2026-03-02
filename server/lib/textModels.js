@@ -30,14 +30,18 @@ async function withRetry(fn, options = {}) {
       // Check if error is retryable (network errors, timeouts, 5xx)
       const isRetryable =
         error.code === 'UND_ERR_SOCKET' ||
+        error.code === 'UND_ERR_HEADERS_TIMEOUT' ||
         error.code === 'ECONNRESET' ||
         error.code === 'ETIMEDOUT' ||
         error.name === 'AbortError' ||
         error.name === 'TimeoutError' ||
+        error.name === 'HeadersTimeoutError' ||
+        error.message?.includes('Headers Timeout') ||
         error.message?.includes('aborted') ||
         error.message?.includes('terminated') ||
         error.message?.includes('reset') ||
         error.message?.includes('ECONNRESET') ||
+        error.message?.includes('fetch failed') ||
         (error.status >= 500 && error.status < 600);
 
       if (!isRetryable || attempt === maxRetries) {

@@ -2518,8 +2518,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     };
 
     // Run evaluations in parallel with concurrency limit
-    // Each page makes 2 API calls (quality + semantic), so limit to 5 pages = 10 concurrent calls
-    const evalLimit = pLimit(5);
+    const evalLimit = pLimit(100);
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
 
     await Promise.all(pageNumbers.map(pageNumber => evalLimit(async () => {
@@ -2911,305 +2910,295 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     let totalGeminiRepairs = 0, totalMagicApiRepairs = 0;
     let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
 
+    // Load story data once upfront
+    const storyResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+    const story = storyResult.rows[0];
+    let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+    storyData = await rehydrateStoryImages(id, storyData);
+    const artStyle = storyData.artStyle || 'pixar';
+
+    // Flatten all (character, page) pairs into parallel repair tasks
+    const repairTasks = [];
     for (const repair of repairs) {
       const { character: characterName, pages } = repair;
+      let character = storyData.characters?.find(c => c.name === characterName);
+      if (!character) {
+        results.push({ character: characterName, pagesRepaired: [], error: `Character "${characterName}" not found` });
+        continue;
+      }
 
-      try {
-        // Get fresh story data for each character (in case previous repairs updated it)
-        const storyResult = await getDbPool().query(
-          'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
-          [id, req.user.id]
-        );
-
-        if (storyResult.rows.length === 0) {
-          results.push({ character: characterName, pagesRepaired: [], error: 'Story not found' });
-          continue;
-        }
-
-        const story = storyResult.rows[0];
-        let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
-
-        // Rehydrate images (required for entity appearance collection)
-        storyData = await rehydrateStoryImages(id, storyData);
-
-        // Find the character object
-        let character = storyData.characters?.find(c => c.name === characterName);
-        if (!character) {
-          results.push({ character: characterName, pagesRepaired: [], error: `Character "${characterName}" not found` });
-          continue;
-        }
-
-        // Check if character has usable avatar data - need styled standard or at least base standard
-        const artStyle = storyData.artStyle || 'pixar';
-        const hasStyledStandard = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
-        const hasBaseStandard = !!character.avatars?.standard;
-        if (!hasStyledStandard && !hasBaseStandard) {
-          log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing standard avatar, fetching from database...`);
-          try {
-            // Get the character set ID from story data
-            const characterSetId = storyData.characterSetId;
-            if (characterSetId) {
-              const charSetResult = await getDbPool().query(
-                'SELECT data FROM characters WHERE id = $1',
-                [characterSetId]
-              );
-              if (charSetResult.rows.length > 0) {
-                const charSetData = typeof charSetResult.rows[0].data === 'string'
-                  ? JSON.parse(charSetResult.rows[0].data)
-                  : charSetResult.rows[0].data;
-                const fullChar = charSetData.characters?.find(c => c.name === characterName);
-                if (fullChar) {
-                  // Merge avatar data from full character
-                  character = { ...character, ...fullChar, avatars: fullChar.avatars || character.avatars };
-                  log.info(`🔧 [REPAIR-WORKFLOW] Enriched ${characterName} with avatar data from character set`);
-                }
+      // Check if character has usable avatar data
+      const hasStyledStandard = !!character.avatars?.styledAvatars?.[artStyle]?.standard;
+      const hasBaseStandard = !!character.avatars?.standard;
+      if (!hasStyledStandard && !hasBaseStandard) {
+        log.info(`🔧 [REPAIR-WORKFLOW] Character ${characterName} missing standard avatar, fetching from database...`);
+        try {
+          const characterSetId = storyData.characterSetId;
+          if (characterSetId) {
+            const charSetResult = await getDbPool().query(
+              'SELECT data FROM characters WHERE id = $1',
+              [characterSetId]
+            );
+            if (charSetResult.rows.length > 0) {
+              const charSetData = typeof charSetResult.rows[0].data === 'string'
+                ? JSON.parse(charSetResult.rows[0].data)
+                : charSetResult.rows[0].data;
+              const fullChar = charSetData.characters?.find(c => c.name === characterName);
+              if (fullChar) {
+                character = { ...character, ...fullChar, avatars: fullChar.avatars || character.avatars };
+                log.info(`🔧 [REPAIR-WORKFLOW] Enriched ${characterName} with avatar data from character set`);
               }
             }
-          } catch (enrichErr) {
-            log.warn(`[REPAIR-WORKFLOW] Failed to enrich character data: ${enrichErr.message}`);
           }
+        } catch (enrichErr) {
+          log.warn(`[REPAIR-WORKFLOW] Failed to enrich character data: ${enrichErr.message}`);
         }
+      }
 
-        const pagesRepaired = [];
-        const pagesFailed = [];
+      const entityReport = storyData.finalChecksReport?.entity;
+      const charIssues = entityReport?.characters?.[characterName]?.issues || [];
+      if (charIssues.length > 0) {
+        log.info(`🔧 [REPAIR-WORKFLOW] Found ${charIssues.length} consistency issues for ${characterName}`);
+      }
 
-        // Get issues for this character from the consistency report
-        const entityReport = storyData.finalChecksReport?.entity;
-        const charIssues = entityReport?.characters?.[characterName]?.issues || [];
-        if (charIssues.length > 0) {
-          log.info(`🔧 [REPAIR-WORKFLOW] Found ${charIssues.length} consistency issues for ${characterName}`);
-        }
+      for (const pageNumber of pages) {
+        repairTasks.push({ characterName, character, pageNumber, charIssues });
+      }
+    }
 
-        for (const pageNumber of pages) {
-          try {
-            log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
+    // Phase 1: Run all expensive API calls in parallel
+    log.info(`🔧 [REPAIR-WORKFLOW] Running ${repairTasks.length} repair tasks in parallel...`);
+    const repairLimit = pLimit(50);
+    const apiResults = await Promise.all(repairTasks.map(task => repairLimit(async () => {
+      const { characterName, character, pageNumber, charIssues } = task;
+      try {
+        log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
 
-            let repairResult;
+        let repairResult;
 
-            if (useMagicApiRepair) {
-              // Use MagicAPI face swap + hair fix pipeline
-              const { repairFaceWithMagicApi, isMagicApiConfigured } = require('../lib/magicApi');
-              const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
+        if (useMagicApiRepair) {
+          const { repairFaceWithMagicApi, isMagicApiConfigured } = require('../lib/magicApi');
+          const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 
-              if (!isMagicApiConfigured()) {
-                log.warn(`[REPAIR-WORKFLOW] MagicAPI not configured, falling back to Gemini`);
+          if (!isMagicApiConfigured()) {
+            log.warn(`[REPAIR-WORKFLOW] MagicAPI not configured, falling back to Gemini`);
+            repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+          } else {
+            const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+            if (!sceneImage || !sceneImage.imageData) {
+              log.warn(`[REPAIR-WORKFLOW] No scene image for page ${pageNumber}`);
+              return { task, error: true, failReason: 'No scene image data for this page' };
+            }
+
+            const sceneDescriptions = storyData.sceneDescriptions || [];
+            const entityAppearances = await collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
+            const appearances = entityAppearances.get(characterName);
+            const appearance = appearances?.find(a => a.pageNumber === pageNumber);
+
+            if (!appearance?.faceBox && !appearance?.bodyBox) {
+              log.warn(`[REPAIR-WORKFLOW] No bounding box for ${characterName} on page ${pageNumber}`);
+              repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
+            } else {
+              const clothingCategory = appearance.clothing || 'standard';
+              const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+
+              if (!styledAvatar) {
+                log.warn(`[REPAIR-WORKFLOW] No avatar for ${characterName}, falling back to Gemini`);
                 repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
               } else {
-                // Get the scene image for this page
-                const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
-                if (!sceneImage || !sceneImage.imageData) {
-                  log.warn(`[REPAIR-WORKFLOW] No scene image for page ${pageNumber}`);
-                  pagesFailed.push({ pageNumber, reason: 'No scene image data for this page' });
-                  continue;
-                }
+                const sceneBuffer = Buffer.from(
+                  sceneImage.imageData.replace(/^data:image\/\w+;base64,/, ''),
+                  'base64'
+                );
+                const avatarBuffer = styledAvatar.startsWith('data:')
+                  ? Buffer.from(styledAvatar.replace(/^data:image\/\w+;base64,/, ''), 'base64')
+                  : Buffer.from(styledAvatar, 'base64');
 
-                // Get character appearance with bounding box
-                const sceneDescriptions = storyData.sceneDescriptions || [];
-                const entityAppearances = await collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
-                const appearances = entityAppearances.get(characterName);
-                const appearance = appearances?.find(a => a.pageNumber === pageNumber);
+                const bbox = appearance.faceBox || appearance.bodyBox;
+                const hairConfig = {
+                  color: character.physical?.hairColor,
+                  style: character.physical?.hairStyle || character.physical?.hairLength,
+                  property: 'textured'
+                };
 
-                if (!appearance?.faceBox && !appearance?.bodyBox) {
-                  log.warn(`[REPAIR-WORKFLOW] No bounding box for ${characterName} on page ${pageNumber}`);
-                  // Fall back to Gemini repair
-                  repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
-                } else {
-                  // Get avatar for this character
-                  const clothingCategory = appearance.clothing || 'standard';
-                  const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+                log.info(`[REPAIR-WORKFLOW] MagicAPI repair: bbox=${JSON.stringify(bbox)}, hair=${JSON.stringify(hairConfig)}`);
 
-                  if (!styledAvatar) {
-                    log.warn(`[REPAIR-WORKFLOW] No avatar for ${characterName}, falling back to Gemini`);
-                    repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
-                  } else {
-                    // Convert images to buffers
-                    const sceneBuffer = Buffer.from(
-                      sceneImage.imageData.replace(/^data:image\/\w+;base64,/, ''),
-                      'base64'
-                    );
-                    const avatarBuffer = styledAvatar.startsWith('data:')
-                      ? Buffer.from(styledAvatar.replace(/^data:image\/\w+;base64,/, ''), 'base64')
-                      : Buffer.from(styledAvatar, 'base64');
+                try {
+                  const magicResult = await repairFaceWithMagicApi(sceneBuffer, avatarBuffer, bbox, hairConfig);
+                  const avatarDataUri = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
 
-                    // Get bounding box (prefer face box, fall back to body box)
-                    const bbox = appearance.faceBox || appearance.bodyBox;
+                  if (magicResult.success && magicResult.repairedBuffer) {
+                    const repairedDataUri = `data:image/png;base64,${magicResult.repairedBuffer.toString('base64')}`;
 
-                    // Build hair config from character physical traits
-                    const hairConfig = {
-                      color: character.physical?.hairColor,
-                      style: character.physical?.hairStyle || character.physical?.hairLength,
-                      property: 'textured'
-                    };
-
-                    log.info(`[REPAIR-WORKFLOW] MagicAPI repair: bbox=${JSON.stringify(bbox)}, hair=${JSON.stringify(hairConfig)}`);
-
+                    let beforeDataUri = null;
                     try {
-                      // Call MagicAPI repair
-                      const magicResult = await repairFaceWithMagicApi(sceneBuffer, avatarBuffer, bbox, hairConfig);
-
-                      // Build comparison reference from avatar
-                      const avatarDataUri = `data:image/png;base64,${avatarBuffer.toString('base64')}`;
-
-                      if (magicResult.success && magicResult.repairedBuffer) {
-                        // Convert result to base64 data URI
-                        const repairedDataUri = `data:image/png;base64,${magicResult.repairedBuffer.toString('base64')}`;
-
-                        // Extract bbox crop as "before" image for comparison
-                        let beforeDataUri = null;
-                        try {
-                          const sharp = require('sharp');
-                          const imgMeta = await sharp(sceneBuffer).metadata();
-                          const cropX = Math.round(bbox.x * imgMeta.width);
-                          const cropY = Math.round(bbox.y * imgMeta.height);
-                          const cropW = Math.round(bbox.width * imgMeta.width);
-                          const cropH = Math.round(bbox.height * imgMeta.height);
-                          if (cropW > 0 && cropH > 0) {
-                            const cropBuf = await sharp(sceneBuffer)
-                              .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
-                              .jpeg({ quality: 80 })
-                              .toBuffer();
-                            beforeDataUri = `data:image/jpeg;base64,${cropBuf.toString('base64')}`;
-                          }
-                        } catch (cropErr) {
-                          log.debug(`[REPAIR-WORKFLOW] Could not extract bbox crop for comparison: ${cropErr.message}`);
-                        }
-
-                        repairResult = {
-                          success: true,
-                          updatedImages: [{
-                            pageNumber,
-                            imageData: repairedDataUri
-                          }],
-                          method: 'magicapi',
-                          clothingCategory,
-                          cropHistory: magicResult.cropHistory,
-                          comparison: {
-                            before: beforeDataUri,
-                            after: repairedDataUri,
-                            reference: avatarDataUri,
-                          },
-                        };
-                      } else {
-                        log.error(`[REPAIR-WORKFLOW] MagicAPI returned no result for ${characterName} on page ${pageNumber}`);
-                        pagesFailed.push({ pageNumber, reason: 'MagicAPI returned no result' });
-                        continue;
+                      const sharp = require('sharp');
+                      const imgMeta = await sharp(sceneBuffer).metadata();
+                      const cropX = Math.round(bbox.x * imgMeta.width);
+                      const cropY = Math.round(bbox.y * imgMeta.height);
+                      const cropW = Math.round(bbox.width * imgMeta.width);
+                      const cropH = Math.round(bbox.height * imgMeta.height);
+                      if (cropW > 0 && cropH > 0) {
+                        const cropBuf = await sharp(sceneBuffer)
+                          .extract({ left: cropX, top: cropY, width: cropW, height: cropH })
+                          .jpeg({ quality: 80 })
+                          .toBuffer();
+                        beforeDataUri = `data:image/jpeg;base64,${cropBuf.toString('base64')}`;
                       }
-                    } catch (magicErr) {
-                      log.error(`[REPAIR-WORKFLOW] MagicAPI repair failed for ${characterName} on page ${pageNumber}: ${magicErr.message}`);
-                      pagesFailed.push({ pageNumber, reason: `MagicAPI: ${magicErr.message}` });
-                      continue;
+                    } catch (cropErr) {
+                      log.debug(`[REPAIR-WORKFLOW] Could not extract bbox crop for comparison: ${cropErr.message}`);
                     }
+
+                    repairResult = {
+                      success: true,
+                      updatedImages: [{ pageNumber, imageData: repairedDataUri }],
+                      method: 'magicapi',
+                      clothingCategory,
+                      cropHistory: magicResult.cropHistory,
+                      comparison: { before: beforeDataUri, after: repairedDataUri, reference: avatarDataUri },
+                    };
+                  } else {
+                    log.error(`[REPAIR-WORKFLOW] MagicAPI returned no result for ${characterName} on page ${pageNumber}`);
+                    return { task, error: true, failReason: 'MagicAPI returned no result' };
                   }
+                } catch (magicErr) {
+                  log.error(`[REPAIR-WORKFLOW] MagicAPI repair failed for ${characterName} on page ${pageNumber}: ${magicErr.message}`);
+                  return { task, error: true, failReason: `MagicAPI: ${magicErr.message}` };
                 }
               }
-            } else {
-              // Use standard Gemini repair
-              repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
             }
-
-            // Track repair cost: count attempts and accumulate verification tokens
-            if (repairResult.method === 'magicapi') {
-              totalMagicApiRepairs++;
-            } else {
-              totalGeminiRepairs++;
-            }
-            if (repairResult.usage) {
-              totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
-              totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
-            }
-
-            if (!repairResult.success) {
-              const reason = repairResult.reason || repairResult.error || 'Unknown error';
-              log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${reason}`);
-              pagesFailed.push({
-                pageNumber,
-                reason,
-                rejected: repairResult.rejected || false,
-                comparison: repairResult.comparison || null
-              });
-              continue;
-            }
-
-            // Apply updated image to story
-            const sceneImages = storyData.sceneImages || [];
-            for (const update of repairResult.updatedImages || []) {
-              const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
-              if (sceneIndex >= 0) {
-                const existingImage = sceneImages[sceneIndex];
-
-                // Initialize imageVersions if not present
-                if (!existingImage.imageVersions) {
-                  existingImage.imageVersions = [{
-                    // Don't copy imageData — the original is already stored at DB version_index 0.
-                    description: existingImage.description,
-                    prompt: existingImage.prompt,
-                    modelId: existingImage.modelId,
-                    createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
-                    isActive: false,
-                    type: 'original'
-                  }];
-                } else {
-                  existingImage.imageVersions.forEach(v => v.isActive = false);
-                }
-
-                // Add new version
-                const isMagicApiMethod = repairResult.method === 'magicapi';
-                existingImage.imageVersions.push({
-                  imageData: update.imageData,
-                  description: existingImage.description,
-                  prompt: existingImage.prompt,
-                  modelId: isMagicApiMethod ? 'magicapi-faceswap-hair' : 'gemini-2.0-flash-preview-image-generation',
-                  createdAt: new Date().toISOString(),
-                  isActive: true,
-                  type: 'entity-repair',
-                  qualityScore: null,  // Not evaluated; pick-best will skip
-                  entityRepairedFor: characterName,
-                  clothingCategory: repairResult.clothingCategory,
-                  ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
-                });
-
-                // Delete rehydrated imageData to prevent saveStoryData from re-saving at version_index 0
-                delete existingImage.imageData;
-                existingImage.entityRepaired = true;
-                existingImage.entityRepairedAt = new Date().toISOString();
-                existingImage.entityRepairedFor = characterName;
-
-                const newDbVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
-
-                // Save the story data with updated sceneImages
-                storyData.sceneImages = sceneImages;
-                await saveStoryData(id, storyData);
-
-                // Save the repaired image to story_images table with correct version index
-                await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, { versionIndex: newDbVersionIndex });
-
-                // Set the new version as active
-                await setActiveVersion(id, update.pageNumber, newDbVersionIndex);
-
-                pagesRepaired.push({
-                  pageNumber: update.pageNumber,
-                  imageData: update.imageData,
-                  versionIndex: newDbVersionIndex,
-                  // Debug data for repair panel
-                  comparison: repairResult.comparison || null,
-                  verification: repairResult.verification || null,
-                  method: repairResult.method || 'gemini',
-                  cropHistory: repairResult.cropHistory || null,
-                });
-              }
-            }
-
-          } catch (pageErr) {
-            log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
-            pagesFailed.push({ pageNumber, reason: pageErr.message });
           }
+        } else {
+          repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
         }
 
-        results.push({ character: characterName, pagesRepaired, pagesFailed });
-      } catch (repairErr) {
-        log.error(`Error repairing character ${characterName}:`, repairErr);
-        results.push({ character: characterName, pagesRepaired: [], pagesFailed: [], error: repairErr.message });
+        return { task, repairResult };
+      } catch (pageErr) {
+        log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
+        return { task, error: true, failReason: pageErr.message };
       }
+    })));
+
+    // Phase 2: Apply results to DB sequentially (avoids race conditions on storyData blob)
+    // Re-read storyData fresh before applying
+    const freshResult = await getDbPool().query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    storyData = typeof freshResult.rows[0].data === 'string' ? JSON.parse(freshResult.rows[0].data) : freshResult.rows[0].data;
+    storyData = await rehydrateStoryImages(id, storyData);
+
+    // Group results by character for output
+    const resultsByChar = new Map();
+    for (const repair of repairs) {
+      if (!resultsByChar.has(repair.character)) {
+        resultsByChar.set(repair.character, { pagesRepaired: [], pagesFailed: [] });
+      }
+    }
+
+    for (const apiResult of apiResults) {
+      if (!apiResult) continue;
+      const { task, repairResult, error, failReason } = apiResult;
+      const { characterName, pageNumber } = task;
+      const charResult = resultsByChar.get(characterName);
+      if (!charResult) continue;
+
+      if (error) {
+        charResult.pagesFailed.push({ pageNumber, reason: failReason });
+        continue;
+      }
+
+      // Track repair cost
+      if (repairResult.method === 'magicapi') {
+        totalMagicApiRepairs++;
+      } else {
+        totalGeminiRepairs++;
+      }
+      if (repairResult.usage) {
+        totalVerifyTokensIn += repairResult.usage.promptTokenCount || 0;
+        totalVerifyTokensOut += repairResult.usage.candidatesTokenCount || 0;
+      }
+
+      if (!repairResult.success) {
+        const reason = repairResult.reason || repairResult.error || 'Unknown error';
+        log.warn(`[REPAIR-WORKFLOW] Repair failed for ${characterName} on page ${pageNumber}: ${reason}`);
+        charResult.pagesFailed.push({
+          pageNumber,
+          reason,
+          rejected: repairResult.rejected || false,
+          comparison: repairResult.comparison || null
+        });
+        continue;
+      }
+
+      // Apply updated image to story (sequential DB writes)
+      const sceneImages = storyData.sceneImages || [];
+      for (const update of repairResult.updatedImages || []) {
+        const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
+        if (sceneIndex >= 0) {
+          const existingImage = sceneImages[sceneIndex];
+
+          if (!existingImage.imageVersions) {
+            existingImage.imageVersions = [{
+              description: existingImage.description,
+              prompt: existingImage.prompt,
+              modelId: existingImage.modelId,
+              createdAt: existingImage.generatedAt || storyData.createdAt || new Date().toISOString(),
+              isActive: false,
+              type: 'original'
+            }];
+          } else {
+            existingImage.imageVersions.forEach(v => v.isActive = false);
+          }
+
+          const isMagicApiMethod = repairResult.method === 'magicapi';
+          existingImage.imageVersions.push({
+            imageData: update.imageData,
+            description: existingImage.description,
+            prompt: existingImage.prompt,
+            modelId: isMagicApiMethod ? 'magicapi-faceswap-hair' : 'gemini-2.0-flash-preview-image-generation',
+            createdAt: new Date().toISOString(),
+            isActive: true,
+            type: 'entity-repair',
+            qualityScore: null,
+            entityRepairedFor: characterName,
+            clothingCategory: repairResult.clothingCategory,
+            ...(isMagicApiMethod && repairResult.cropHistory && { cropHistory: repairResult.cropHistory })
+          });
+
+          delete existingImage.imageData;
+          existingImage.entityRepaired = true;
+          existingImage.entityRepairedAt = new Date().toISOString();
+          existingImage.entityRepairedFor = characterName;
+
+          const newDbVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
+
+          storyData.sceneImages = sceneImages;
+          await saveStoryData(id, storyData);
+          await saveStoryImage(id, 'scene', update.pageNumber, update.imageData, { versionIndex: newDbVersionIndex });
+          await setActiveVersion(id, update.pageNumber, newDbVersionIndex);
+
+          charResult.pagesRepaired.push({
+            pageNumber: update.pageNumber,
+            imageData: update.imageData,
+            versionIndex: newDbVersionIndex,
+            comparison: repairResult.comparison || null,
+            verification: repairResult.verification || null,
+            method: repairResult.method || 'gemini',
+            cropHistory: repairResult.cropHistory || null,
+          });
+        }
+      }
+    }
+
+    for (const [characterName, charResult] of resultsByChar) {
+      results.push({ character: characterName, ...charResult });
     }
 
     // Calculate and persist repair cost (only Gemini repairs have per-image cost)
