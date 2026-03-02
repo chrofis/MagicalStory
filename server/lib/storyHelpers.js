@@ -765,8 +765,75 @@ const HISTORICAL_LOCATIONS_FILE = path.join(__dirname, '../data/historical-locat
 let historicalLocationsCache = null;
 
 /**
- * Load historical locations databank (lazy loading with cache)
- * @returns {Object|null} The databank object or null if not available
+ * Preload historical locations from the database into the in-memory cache.
+ * Call once at server startup (after DB init). If the DB has no rows or the
+ * query fails, the cache stays null so the sync fallback can try the JSON file.
+ */
+async function preloadHistoricalLocations() {
+  try {
+    const { dbQuery, isDatabaseMode } = require('../services/database');
+    if (!isDatabaseMode()) {
+      log.info('[LOCATIONS] Not in database mode — skipping DB preload');
+      return;
+    }
+
+    const rows = await dbQuery(
+      'SELECT * FROM historical_locations ORDER BY event_id, location_name'
+    );
+
+    if (!rows || rows.length === 0) {
+      log.warn('[LOCATIONS] DB table historical_locations is empty — will fall back to JSON file');
+      return;
+    }
+
+    // Group rows into the same structure as the JSON file:
+    // { eventId: { locations: [{ name, query, type, aliases, photos: [...] }] } }
+    const databank = {};
+    for (const row of rows) {
+      if (!databank[row.event_id]) {
+        databank[row.event_id] = { locations: [] };
+      }
+
+      const event = databank[row.event_id];
+      // Find or create the location entry
+      let loc = event.locations.find(l => l.name === row.location_name);
+      if (!loc) {
+        loc = {
+          name: row.location_name,
+          query: row.location_query,
+          type: row.location_type,
+          aliases: row.aliases || [],
+          photos: [],
+        };
+        event.locations.push(loc);
+      }
+
+      // Add photo if there is one
+      if (row.photo_data || row.photo_url) {
+        loc.photos.push({
+          photoUrl: row.photo_url || '',
+          photoData: row.photo_data || '',
+          attribution: row.photo_attribution || '',
+          description: row.photo_description || '',
+          score: row.photo_score,
+          reason: row.photo_reason || '',
+        });
+      }
+    }
+
+    historicalLocationsCache = databank;
+    const eventIds = Object.keys(databank);
+    log.info(`[LOCATIONS] Loaded historical locations databank from DB with ${eventIds.length} events (${rows.length} rows)`);
+  } catch (err) {
+    log.warn(`[LOCATIONS] DB preload failed (${err.message}) — will fall back to JSON file`);
+  }
+}
+
+/**
+ * Load historical locations databank (lazy loading with cache).
+ * If preloadHistoricalLocations() already populated the cache from DB, returns that.
+ * Otherwise falls back to reading the local JSON file.
+ * @returns {Object} The databank object (empty {} if not available)
  */
 function loadHistoricalLocationsDatabank() {
   if (historicalLocationsCache !== null) {
@@ -774,7 +841,8 @@ function loadHistoricalLocationsDatabank() {
     return historicalLocationsCache;
   }
 
-  log.info(`[LOCATIONS] Loading historical locations from: ${HISTORICAL_LOCATIONS_FILE}`);
+  // Fallback: try loading from JSON file (local dev without DB data)
+  log.info(`[LOCATIONS] Loading historical locations from JSON fallback: ${HISTORICAL_LOCATIONS_FILE}`);
   try {
     if (fs.existsSync(HISTORICAL_LOCATIONS_FILE)) {
       historicalLocationsCache = JSON.parse(fs.readFileSync(HISTORICAL_LOCATIONS_FILE, 'utf-8'));
@@ -3593,6 +3661,7 @@ module.exports = {
   getSceneComplexityGuide,
 
   // Historical locations
+  preloadHistoricalLocations,
   getHistoricalLocations,
 
   // Landmark helpers

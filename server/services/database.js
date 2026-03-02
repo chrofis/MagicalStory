@@ -396,6 +396,27 @@ async function initializeDatabase() {
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_without_page
       ON story_images(story_id, image_type, version_index) WHERE page_number IS NULL`);
 
+    // Historical locations table (pre-fetched photos for historical stories)
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS historical_locations (
+        id SERIAL PRIMARY KEY,
+        event_id VARCHAR(100) NOT NULL,
+        location_name VARCHAR(255) NOT NULL,
+        location_query VARCHAR(255),
+        location_type VARCHAR(100),
+        aliases JSONB DEFAULT '[]',
+        photo_url TEXT NOT NULL DEFAULT '',
+        photo_data TEXT,
+        photo_attribution TEXT,
+        photo_description TEXT,
+        photo_score INT,
+        photo_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(event_id, location_name, photo_url)
+      )
+    `);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
+
     console.log('✓ Database tables initialized');
 
   } catch (err) {

@@ -222,6 +222,7 @@ const {
   extractSceneMetadata,
   stripSceneMetadata,
   getHistoricalLocations,
+  preloadHistoricalLocations,
   convertClothingToCurrentFormat,
   getPageText,
   updatePageText
@@ -4588,6 +4589,8 @@ async function initialize() {
   if (STORAGE_MODE === 'database' && dbPool) {
     try {
       await initializeDatabase();
+      // Preload historical locations from DB into memory cache
+      await preloadHistoricalLocations();
     } catch (err) {
       log.error('⚠️  Database initialization failed, falling back to file storage');
       await initializeDataFiles();
