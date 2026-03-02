@@ -347,7 +347,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'historicalEvent', data::jsonb->'historicalEvent',
             'location', data::jsonb->'location',
             'season', data::jsonb->'season',
-            'userLocation', data::jsonb->'userLocation'
+            'userLocation', data::jsonb->'userLocation',
+            'sceneDescriptions', data::jsonb->'sceneDescriptions'
           ) as base_data,
           COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as scene_count,
           (SELECT jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name'))
