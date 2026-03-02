@@ -45,25 +45,50 @@ async function getCoverDimensions(productUid, pageCount) {
     // Extract dimensions from response
     const spineSize = data.spineSize || data.spine;
     if (spineSize) {
-      const spineWidth = spineSize.width || spineSize;
-      console.log(`[GELATO] Spine width for ${pageCount} pages: ${spineWidth}mm`);
+      const apiSpineWidth = spineSize.width || spineSize;
+      const apiPageCount = data.pagesCount || pageCount;
 
-      // wraparoundInsideSize = full cover page size required by Gelato (hardcover)
-      // For softcover, use productInsideSize as fallback
-      const fullCoverSize = data.wraparoundInsideSize || data.productInsideSize;
+      // The API may return dimensions for a different page count than requested
+      // (e.g., always returns 32 for some products). Scale spine proportionally.
+      let actualSpineWidth = apiSpineWidth;
+      if (apiPageCount !== pageCount && apiPageCount > 0) {
+        const spinePerPage = apiSpineWidth / apiPageCount;
+        actualSpineWidth = Math.round(pageCount * spinePerPage * 100) / 100;
+        console.log(`[GELATO] Spine scaled: API=${apiSpineWidth}mm (${apiPageCount}pg) → ${actualSpineWidth}mm (${pageCount}pg) @ ${spinePerPage.toFixed(4)}mm/pg`);
+      } else {
+        console.log(`[GELATO] Spine width for ${pageCount} pages: ${actualSpineWidth}mm`);
+      }
+
+      // Full cover page size: try wraparoundInsideSize (hardcover), productInsideSize, then bleedSize (softcover)
+      const fullCoverSize = data.wraparoundInsideSize || data.productInsideSize || data.bleedSize;
+
+      let coverPageWidth = fullCoverSize?.width;
+      let coverPageHeight = fullCoverSize?.height;
+
+      // If we used bleedSize and spine was scaled, adjust the width to match
+      if (!data.wraparoundInsideSize && !data.productInsideSize && data.bleedSize && apiPageCount !== pageCount) {
+        // bleedSize.width is for apiPageCount; adjust for actual page count
+        coverPageWidth = data.bleedSize.width - apiSpineWidth + actualSpineWidth;
+        console.log(`[GELATO] Cover width adjusted: ${data.bleedSize.width}mm → ${coverPageWidth}mm (spine delta: ${(actualSpineWidth - apiSpineWidth).toFixed(2)}mm)`);
+      }
+
+      // Also adjust content areas for the wider spine
+      const spineDelta = actualSpineWidth - apiSpineWidth;
+      const contentFront = data.contentFrontSize ? { ...data.contentFrontSize, left: data.contentFrontSize.left + spineDelta } : null;
 
       const result = {
-        spineWidth: spineWidth,
+        spineWidth: actualSpineWidth,
         // Full cover page dimensions (what Gelato expects as page 1 size)
-        coverPageWidth: fullCoverSize?.width,
-        coverPageHeight: fullCoverSize?.height,
+        coverPageWidth: coverPageWidth,
+        coverPageHeight: coverPageHeight,
         // Content areas for image placement (where the actual cover images go)
-        contentBack: data.contentBackSize,   // { width, height, left, top }
-        contentFront: data.contentFrontSize, // { width, height, left, top }
-        spineArea: data.spineSize,           // { width, height, left, top }
+        contentBack: data.contentBackSize,   // { width, height, left, top } — unchanged, always starts from left
+        contentFront: contentFront,          // { width, height, left, top } — shifted right by spine delta
+        spineArea: { ...data.spineSize, width: actualSpineWidth },
         raw: data
       };
-      console.log(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm (source: ${data.wraparoundInsideSize ? 'wraparoundInsideSize' : data.productInsideSize ? 'productInsideSize' : 'none'})`);
+      const source = data.wraparoundInsideSize ? 'wraparoundInsideSize' : data.productInsideSize ? 'productInsideSize' : data.bleedSize ? 'bleedSize' : 'none';
+      console.log(`[GELATO] Cover page size: ${result.coverPageWidth}x${result.coverPageHeight}mm (source: ${source})`);
       return result;
     }
 
