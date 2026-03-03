@@ -1086,7 +1086,11 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
         try {
           // Check if confirmation email was already sent (idempotency)
           const emailCheck = await dbPool.query(
-            'SELECT confirmation_email_sent, delivery_estimate_min, delivery_estimate_max, amount, currency, shipping_address FROM orders WHERE id = $1',
+            `SELECT confirmation_email_sent, delivery_estimate_min, delivery_estimate_max,
+                    amount_total, currency,
+                    shipping_address_line1, shipping_address_line2, shipping_city,
+                    shipping_state, shipping_postal_code, shipping_country
+             FROM orders WHERE id = $1`,
             [order.id]
           );
           const orderData = emailCheck.rows[0];
@@ -1104,17 +1108,21 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
               }
             }
 
-            // Parse shipping address
-            const shippingAddress = typeof orderData.shipping_address === 'string'
-              ? JSON.parse(orderData.shipping_address)
-              : orderData.shipping_address;
+            const shippingAddress = {
+              line1: orderData.shipping_address_line1,
+              line2: orderData.shipping_address_line2,
+              city: orderData.shipping_city,
+              state: orderData.shipping_state,
+              postal_code: orderData.shipping_postal_code,
+              country: orderData.shipping_country
+            };
 
             await email.sendOrderConfirmationEmail(
               order.customer_email,
               order.customer_name,
               {
                 orderId: orderId.substring(0, 8).toUpperCase(),
-                amount: orderData.amount ? (orderData.amount / 100).toFixed(2) : '0.00',
+                amount: orderData.amount_total ? (orderData.amount_total / 100).toFixed(2) : '0.00',
                 currency: (orderData.currency || 'CHF').toUpperCase(),
                 shippingAddress: shippingAddress,
                 deliveryEstimateMin: orderData.delivery_estimate_min,
