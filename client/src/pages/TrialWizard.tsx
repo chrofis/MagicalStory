@@ -123,12 +123,12 @@ export default function TrialWizard() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-50">
       {/* Same navigation bar as the rest of the site */}
       <Navigation hideSteps />
 
       {/* Main content */}
-      <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1">
+      <div className="px-3 md:px-8 py-4 md:py-8">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
           {/* Progress indicator */}
           <div className="max-w-4xl mx-auto pt-4 pb-2">

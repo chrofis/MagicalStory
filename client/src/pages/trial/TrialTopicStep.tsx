@@ -155,7 +155,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
   if (!storyInput.storyCategory) {
     return (
-      <div className="max-w-2xl mx-auto pt-4">
+      <div className="max-w-4xl mx-auto pt-4">
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
         <p className="text-gray-500 text-center mb-8">{t.subtitle}</p>
 
@@ -195,7 +195,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     const catData = trialCategories.find((c) => c.id === 'adventure');
 
     return (
-      <div className="max-w-2xl mx-auto pt-4">
+      <div className="max-w-4xl mx-auto pt-4">
         {/* Selected category chip */}
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
@@ -251,7 +251,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     const popularThemes = getStoryTypesByGroup('popular');
 
     return (
-      <div className="max-w-2xl mx-auto pt-4">
+      <div className="max-w-4xl mx-auto pt-4">
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
             <span className="text-lg">{catData?.emoji}</span>
@@ -373,7 +373,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     const catData = trialCategories.find((c) => c.id === 'historical');
 
     return (
-      <div className="max-w-2xl mx-auto pt-4">
+      <div className="max-w-4xl mx-auto pt-4">
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
             <span className="text-lg">{catData?.emoji}</span>
@@ -435,7 +435,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
         : null;
 
   return (
-    <div className="max-w-lg mx-auto pt-4">
+    <div className="max-w-4xl mx-auto pt-4">
       <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">{t.title}</h2>
 
       {/* Summary cards */}

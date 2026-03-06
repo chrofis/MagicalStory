@@ -257,7 +257,7 @@ export default function TrialIdeasStep({
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-3xl mx-auto pt-4">
+    <div className="max-w-4xl mx-auto pt-4">
       <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
       <p className="text-gray-500 text-center mb-6">{t.subtitle}</p>
 
