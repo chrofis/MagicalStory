@@ -130,12 +130,23 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
           thumbnail: face.thumbnail
         }));
 
+        // Build cachedFaces in the flat format Python expects internally
+        // (x, y, width, height at top level, not nested under faceBox)
+        const cachedFaces = analyzerData.faces.map(face => ({
+          id: face.id,
+          confidence: face.confidence,
+          x: face.faceBox?.x ?? face.face_box?.x ?? face.x,
+          y: face.faceBox?.y ?? face.face_box?.y ?? face.y,
+          width: face.faceBox?.width ?? face.face_box?.width ?? face.width,
+          height: face.faceBox?.height ?? face.face_box?.height ?? face.height,
+        }));
+
         return res.json({
           success: true,
           multipleFacesDetected: true,
           faceCount: analyzerData.face_count,
           faces: faces,
-          cachedFaces: analyzerData.faces
+          cachedFaces
         });
       }
 
