@@ -13,7 +13,6 @@ const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 const { log } = require('../utils/logger');
-const { buildIdeasPromptContext } = require('./storyIdeas');
 
 // Server.js-local dependencies received via initTrialRoutes()
 let deps = {};
@@ -135,7 +134,8 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
           success: true,
           multipleFacesDetected: true,
           faceCount: analyzerData.face_count,
-          faces: faces
+          faces: faces,
+          cachedFaces: analyzerData.faces
         });
       }
 
@@ -202,49 +202,52 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
   res.flushHeaders();
 
   try {
-    const { storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText, language, characters, relationships, pages = 10 } = req.body;
+    const { storyCategory, storyTopic, storyTheme, language, characters } = req.body;
 
     log.debug(`[TRIAL] [STREAM] Generating story ideas (unauthenticated)`);
-    log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
+    log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme}, Language: ${language}`);
 
-    // Use shared prompt builder with simplified params (no location, no landmarks, standard reading level)
-    const ctx = await buildIdeasPromptContext({
-      storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
-      language, languageLevel: 'standard', characters, relationships, pages,
-      userLocationInstruction: '',
-      availableLandmarksSection: ''
-    });
-
-    // Use Haiku for trial ideas (cheap — $1/$5 per 1M tokens vs Sonnet's $3/$15)
     const { callTextModelStreaming } = require('../lib/textModels');
+    const { getLanguageInstruction } = require('../lib/languages');
     const modelToUse = 'claude-haiku';
 
-    log.debug(`  Using model: ${modelToUse} (default)`);
+    log.debug(`  Using model: ${modelToUse}`);
 
-    // Helper function to parse [FINAL] from streaming text
-    const parseFinal = (text) => {
-      const match = text.match(/\[FINAL\]\s*([\s\S]*?)$/i);
-      if (match) {
-        let result = match[1].trim();
-        // Strip Claude extended thinking artifacts that may leak into output
-        result = result.replace(/<budget:[^>]*>[\s\S]*?<\/budget:[^>]*>/gi, '').trim();
-        result = result.replace(/<[a-z_]+:[^>]*>[\s\S]*?<\/[a-z_]+:[^>]*>/gi, '').trim();
-        return result;
-      }
-      return null; // Return null if [FINAL] not yet reached
-    };
+    // Build a simple character description
+    const mainChar = characters?.[0];
+    const charDesc = mainChar
+      ? `${mainChar.name}${mainChar.age ? `, ${mainChar.age} years old` : ''}${mainChar.gender ? `, ${mainChar.gender}` : ''}${mainChar.traits?.length ? ` (${mainChar.traits.join(', ')})` : ''}`
+      : 'a child';
 
-    // Build prompts for both stories using shared context
-    const buildSinglePrompt = (storyNum, variantInstruction) => {
-      const requirements = storyNum === 1 ? ctx.storyRequirements1 : ctx.storyRequirements2;
-      return ctx.applyReplacements(ctx.singlePromptTemplate, {
-        '{STORY_VARIANT_INSTRUCTION}': variantInstruction,
-        '{STORY_REQUIREMENTS}': requirements
-      });
-    };
+    // Determine category context
+    let categoryContext = '';
+    if (storyCategory === 'life-challenge') {
+      categoryContext = `This is a life skills story about "${storyTopic}". The story should help children understand and cope with this topic.${storyTheme && storyTheme !== 'realistic' ? ` Set in a ${storyTheme} adventure context.` : ''}`;
+    } else if (storyCategory === 'historical') {
+      categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
+    } else {
+      categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
+    }
 
-    const prompt1 = buildSinglePrompt(1, 'Create an engaging story that uses the setting naturally.');
-    const prompt2 = buildSinglePrompt(2, 'Create a DIFFERENT story. Use a different location, different approach to the conflict, and different story structure.');
+    const langInstruction = getLanguageInstruction(language);
+
+    // Simple, lightweight prompt — no DRAFT/REVIEW/FINAL overhead
+    const buildTrialPrompt = (variant) => `You write children's stories. Generate a story idea for a 10-page children's book.
+
+Character: ${charDesc}
+${categoryContext}
+
+${variant}
+
+Output format (plain text, no markdown, no bold, no headers):
+Line 1: Story title
+Lines 2+: A 3-4 sentence summary describing the plot — what happens, where, and how it resolves.
+
+${langInstruction}
+Write EVERYTHING in the language above. Do not use English unless English was specified.`;
+
+    const prompt1 = buildTrialPrompt('Create an engaging story that uses the setting naturally.');
+    const prompt2 = buildTrialPrompt('Create a DIFFERENT story with a different location, different conflict, and different story structure.');
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);
@@ -259,11 +262,10 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 - progressively send raw content as it arrives
-    const streamStory1 = callTextModelStreaming(prompt1, 3000, (delta, fullText) => {
+    // Stream Story 1 (500 max tokens — just title + short summary)
+    const streamStory1 = callTextModelStreaming(prompt1, 500, (delta, fullText) => {
       fullResponse1 = fullText;
-      // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
-      if (fullText.length > 50 && fullText.length > lastStory1Length + 50) {
+      if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
         lastStory1Length = fullText.length;
         if (!story1Started) {
@@ -272,24 +274,20 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
         }
       }
     }, modelToUse).then(() => {
-      // Send final story 1 content (extract [FINAL] if present for clean output)
-      const extractedFinal = parseFinal(fullResponse1);
-      const finalContent = extractedFinal || fullResponse1.trim();
+      const finalContent = fullResponse1.trim();
       if (finalContent) {
         res.write(`data: ${JSON.stringify({ story1: finalContent, isFinal: true })}\n\n`);
-        log.debug(`  Story 1 final: ${extractedFinal ? 'extracted [FINAL] section' : 'using full response'} (${finalContent.length} chars)`);
+        log.debug(`  Story 1 final (${finalContent.length} chars)`);
       }
-      log.debug('  Story 1 complete');
     }).catch(err => {
       log.error('  Story 1 generation failed:', err.message);
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 - progressively send raw content as it arrives
-    const streamStory2 = callTextModelStreaming(prompt2, 3000, (delta, fullText) => {
+    // Stream Story 2 (500 max tokens)
+    const streamStory2 = callTextModelStreaming(prompt2, 500, (delta, fullText) => {
       fullResponse2 = fullText;
-      // Stream raw content progressively (every 50 chars) - don't wait for [FINAL]
-      if (fullText.length > 50 && fullText.length > lastStory2Length + 50) {
+      if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
         res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
         lastStory2Length = fullText.length;
         if (!story2Started) {
@@ -298,14 +296,11 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
         }
       }
     }, modelToUse).then(() => {
-      // Send final story 2 content (extract [FINAL] if present for clean output)
-      const extractedFinal = parseFinal(fullResponse2);
-      const finalContent = extractedFinal || fullResponse2.trim();
+      const finalContent = fullResponse2.trim();
       if (finalContent) {
         res.write(`data: ${JSON.stringify({ story2: finalContent, isFinal: true })}\n\n`);
-        log.debug(`  Story 2 final: ${extractedFinal ? 'extracted [FINAL] section' : 'using full response'} (${finalContent.length} chars)`);
+        log.debug(`  Story 2 final (${finalContent.length} chars)`);
       }
-      log.debug('  Story 2 complete');
     }).catch(err => {
       log.error('  Story 2 generation failed:', err.message);
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate second story idea' })}\n\n`);

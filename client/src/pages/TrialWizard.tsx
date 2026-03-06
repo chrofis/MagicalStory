@@ -16,6 +16,7 @@ export interface CharacterData {
   gender: string;
   traits: string[];
   customTraits: string;
+  consentGiven?: boolean;
   photos: {
     original?: string;
     face?: string;

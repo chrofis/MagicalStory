@@ -12,6 +12,7 @@
 
 html {
   overflow-x: hidden; /* Prevent horizontal scroll on mobile (needed for iOS Safari) */
+  overflow-y: auto; /* Explicitly allow vertical scrolling (CSS spec: overflow-x:hidden can change overflow-y to auto implicitly, but some browsers handle this inconsistently) */
   overscroll-behavior: none; /* Prevent pull-to-refresh and rubber-band on mobile */
 }
 

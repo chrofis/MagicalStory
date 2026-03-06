@@ -154,9 +154,10 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Consent state — once both are checked and a photo is uploaded, don't ask again
+  // consentGiven is stored in characterData (parent state) so it survives component remounts
   const [consent1Checked, setConsent1Checked] = useState(false);
   const [consent2Checked, setConsent2Checked] = useState(false);
-  const [hasConsented, setHasConsented] = useState(false);
+  const hasConsented = !!characterData.consentGiven;
   const canUpload = hasConsented || (consent1Checked && consent2Checked);
 
   // Photo analysis state
@@ -207,6 +208,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
           // Single face - update character photos
           onChange({
             ...characterData,
+            consentGiven: true,
             photos: {
               original: base64,
               face: result.faceThumbnail,
@@ -216,7 +218,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
             },
           });
           setDetectedFaces([]);
-          setHasConsented(true);
         }
       } else {
         setPhotoError(result.error || t.noFaceDetected);
