@@ -1,0 +1,36 @@
+# Single Page Entity Repair
+
+You are repairing a cropped character region for a children's picture book. The repaired output will be composited back onto the original page.
+
+## Input Images
+
+**IMAGE 1 - CHARACTER REFERENCE:**
+The correct appearance of "{ENTITY_NAME}" - this is how the character MUST look.
+
+**IMAGE 2 - CROP TO REPAIR:**
+A cropped region from page {PAGE_NUMBER} showing "{ENTITY_NAME}" who needs correction.
+{ISSUES_FOUND}
+## Your Task
+
+Redraw the character in IMAGE 2 so their face, hair, and features match IMAGE 1.
+
+**Copy EXACTLY from IMAGE 1 (reference):**
+- Face shape, eyes, nose, mouth - exact match
+- Hair: {HAIR_COLOR}, {HAIR_STYLE} - exact match to IMAGE 1
+- Skin tone - exact match to IMAGE 1
+- Physical traits: {PHYSICAL_TRAITS}
+- Clothing: {CLOTHING_DESCRIPTION}
+
+**Keep from IMAGE 2 (crop to repair):**
+- Pose and body position - must stay the same for compositing
+- Any visible background elements - preserve for seamless blending
+- Lighting direction and shadows - match the scene
+
+## Output
+
+Generate a corrected version of IMAGE 2:
+- Same dimensions and aspect ratio as IMAGE 2
+- Character's face/hair/features now match IMAGE 1
+- Pose and position unchanged (critical for compositing)
+- Clean edges, no artifacts, ready for seamless compositing
+- Same art style as IMAGE 2

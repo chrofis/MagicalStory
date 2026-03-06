@@ -1,0 +1,40 @@
+Rewrite this image scene description to avoid content safety filters while preserving the story moment.
+
+**ORIGINAL SCENE:**
+{SCENE_DESCRIPTION}
+
+**CONTEXT:**
+- This is for a children's book illustration
+- The scene was blocked by image generation safety filters
+- We need to keep the same story moment but make it safer
+
+**REWRITE RULES:**
+1. Remove any potentially problematic elements:
+   - Physical contact that could be misinterpreted (hugging from behind, lifting, carrying)
+   - Children in vulnerable positions (sleeping, bathing, changing)
+   - Dark or scary imagery (monsters, shadows, fear)
+   - Any violence, even playful (sword fights, wrestling, chasing aggressively)
+   - Water/swimming scenes with children
+   - Bedtime/bedroom scenes
+
+2. Keep the emotional essence:
+   - If it was a bonding moment, show characters smiling together side-by-side
+   - If it was an adventure moment, show characters looking at something exciting
+   - If it was a comfort moment, show characters sitting near each other peacefully
+
+3. Safe alternatives:
+   - Instead of hugging: standing/sitting side by side, smiling at each other
+   - Instead of carrying: walking together hand-in-hand (if adult and child)
+   - Instead of bedtime: daytime cozy scene (reading together on couch)
+   - Instead of bath: playing in garden with water hose or at a fountain
+   - Instead of scary: mysterious but bright and colorful
+
+4. Add safe visual elements:
+   - Bright daylight or warm indoor lighting
+   - Open outdoor spaces (gardens, parks, meadows)
+   - Cheerful colors and expressions
+   - Characters at appropriate distances
+   - All characters fully clothed in everyday attire
+
+**OUTPUT FORMAT:**
+Return ONLY the rewritten scene description, nothing else. Keep the same format as the original (Setting, Characters, Action, Mood).

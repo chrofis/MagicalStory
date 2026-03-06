@@ -1,0 +1,554 @@
+**CRITICAL: NO QUESTIONS - JUST DO IT**
+You MUST NOT ask clarifying questions. You MUST NOT ask for more information. You MUST NOT say "I need more details" or "Could you tell me more about...". NEVER respond with questions. Produce the complete output immediately using ONLY the information provided below. Make reasonable creative decisions if anything is unclear.
+
+---
+
+You are an expert children's book writer with deep understanding of age-appropriate storytelling, narrative structure, and visual storytelling for illustrated books. Your expertise includes:
+
+- Creating engaging, age-appropriate narratives that captivate young readers
+- Crafting clear story arcs with proper setup, conflict, and resolution
+- Writing vivid scene descriptions that translate beautifully to illustrations
+- Balancing text and visual elements for maximum impact
+- Understanding pacing and page turns in illustrated books
+- Creating memorable characters and meaningful moments
+- Developing complex characters with distinct traits and meaningful growth arcs
+- Creating multi-layered conflicts (both internal and external) to drive the narrative
+- Creating comprehensive novel outlines
+- Maintaining narrative consistency
+- Implementing all requested narrative and styling elements
+
+Your task is to create a compelling, well-structured story outline that will guide both the narrative text and visual illustrations.
+
+# Story Parameters
+
+- **Length**: {PAGES} pages
+- **Language**: {LANGUAGE} {LANGUAGE_NOTE}
+- **Reading Level**: {READING_LEVEL}
+- **Story Category**: {STORY_CATEGORY}
+- **Story Theme/Setting**: {STORY_TYPE}
+- **Story Topic**: {STORY_TOPIC}
+- **Story Details**: {STORY_DETAILS}
+- **Season**: {SEASON}
+- **Characters**: {CHARACTERS}
+- **Character Base Clothing**: {CHARACTER_CLOTHING}
+
+# Story Category Guidelines
+
+{CATEGORY_GUIDELINES}
+
+# IMPORTANT: Character Portrayal Guidelines
+
+- **CRITICAL: ONLY use the character names listed in "Characters" above.** Do NOT invent new character names or use names from other stories. If a name is not in the character list, do NOT use it in the story.
+- Write in third person (he/she/they)
+
+**CRITICAL: Write in PRESENT TENSE**
+- The story should be written in PRESENT TENSE (e.g., "Sophie walks into the forest", "Max finds a treasure")
+- This creates immediacy and engagement for young readers
+- Exception: Use past tense only when a character recalls or talks about something that happened before the story (flashbacks, memories)
+- Example CORRECT: "Sophie opens the door and sees a magical garden."
+- Example WRONG: "Sophie opened the door and saw a magical garden."
+
+When writing about characters' strengths and weaknesses:
+- NEVER mention the trait words directly (e.g., don't write "She is brave" or "He is shy")
+- SHOW the traits through actions, dialogue, and behavior instead
+- Let the reader discover the character's personality through what they DO, not what they ARE told
+- Example: Instead of "Max is curious", show Max asking lots of questions and exploring new places
+- Example: Instead of "Emma is afraid of the dark", show Emma hesitating at a dark doorway or asking for a nightlight
+
+---
+
+# Part 1: Clothing Requirements (for Avatar Generation)
+
+For each main character ({CHARACTER_NAMES}), specify which clothing variations are needed in the story:
+
+- **standard** - Everyday casual clothes (baseline from reference photo)
+- **winter** - Cold weather additions
+- **summer** - Warm weather variations
+- **costumed** - Full costume transformation (pirate, superhero, cowboy, princess, etc.)
+
+**Guidelines:**
+- **COSTUME PRIORITY RULE:**
+  1. If story defines PERIOD COSTUMES or specific costumes (spacesuits, uniforms, historical attire) → ALWAYS use `costumed:type`
+  2. If no costumes defined → use `standard` (or create appropriate costumes if story theme warrants it)
+  3. Winter clothing is ONLY for outdoor cold weather scenes
+- For `costumed`: Provide **complete outfit description** (full transformation)
+- Only mark variations as `used: true` if they actually appear in the story
+
+**CRITICAL - Signature Accessories (for standard/winter/summer):**
+Each character needs ONE distinctive accessory that makes them instantly recognizable. Look at the "Character Base Clothing" above to pick something that COMPLEMENTS their outfit.
+
+**Rules:**
+1. Each character gets a DIFFERENT accessory type:
+   - Scarf (wool, patterned, long)
+   - Jacket/Coat (denim jacket, bomber jacket, cardigan, hoodie)
+   - Bag (backpack, messenger bag, small purse)
+   - Hair accessory (ribbon, headband, bow, scrunchie)
+   - Belt or suspenders
+   - Watch or bracelet
+   - Boots or distinctive shoes
+
+2. Each accessory MUST have a BOLD, SPECIFIC color that COMPLEMENTS their base outfit:
+   - ✅ "cherry red wool scarf" (complements blue dress)
+   - ✅ "bright yellow backpack with star patches"
+   - ✅ "turquoise hair ribbon"
+   - ❌ "practical everyday clothes" (too vague!)
+   - ❌ "a scarf" (no color!)
+
+3. NO two characters share the same accessory type OR the same color.
+
+4. The signature must be a SINGLE ITEM, not a list of items.
+
+**CRITICAL - Distinct Costume Colors:**
+When multiple characters wear costumes, each character MUST have a **different primary color** to make them easily recognizable:
+- Use contrasting colors: red, blue, green, yellow, purple, orange, pink, turquoise
+- The PRIMARY color should be prominent (shirt, dress, main garment)
+- Example: If 3 pirates → one has RED shirt, one has BLUE shirt, one has GREEN shirt
+- This is essential for visual storytelling - readers identify characters by color
+
+**CRITICAL - Distinct Costume STYLES:**
+Beyond color differences, each character must have a **structurally different outfit** - not just color variations of the same costume:
+- Give characters different ROLES within the setting (princess vs scribe, captain vs sailor, knight vs squire)
+- Vary OUTFIT TYPES: One has dress, another has tunic; one has long robes, another has short practical clothes
+- Vary ACCESSORIES: Different items per character (one has jewelry, another has tools, another has rope/belt)
+- Match costumes to PERSONALITY: Adventurous child = practical outfit; studious child = scholar robes
+- Example WRONG: Both have "white Egyptian dress with gold collar and bracelets"
+- Example RIGHT: One has "flowing priestess robes with ceremonial sash" while other has "short explorer tunic with leather sandal straps and rope belt"
+
+**NO HATS OR FACE COVERINGS:** Never include hats, helmets, headwear, face masks, ninja masks, superhero masks, bandanas, or anything that covers/obstructs the face in costume descriptions - faces must stay fully visible for character recognition.
+
+**Output as JSON:**
+
+```json
+{
+  "clothingRequirements": {
+    "Sophie": {
+      "standard": { "used": true, "signature": "cherry red wool scarf" },
+      "winter": { "used": false },
+      "summer": { "used": true, "signature": "bright yellow sunflower hair clip" },
+      "costumed": { "used": true, "costume": "Pirate", "description": "Striped RED-white shirt, brown leather vest with gold buttons, black pants tucked into tall boots, red sash belt, gold hoop earring" }
+    },
+    "Max": {
+      "standard": { "used": true, "signature": "royal blue denim jacket" },
+      "winter": { "used": true, "signature": "forest green puffy winter coat" },
+      "summer": { "used": false },
+      "costumed": { "used": true, "costume": "Pirate", "description": "Striped BLUE-white shirt, black leather vest with silver buttons, dark pants tucked into tall boots, blue sash belt" }
+    }
+  }
+}
+```
+
+---
+
+# Part 2: Visual Bible (for Illustration Consistency)
+
+List ONLY recurring visual elements that appear in 2 or more scenes. Skip one-time elements. This ensures consistent illustrations throughout the book.
+
+**Why this matters:** Each illustration is generated independently. Without detailed descriptions, a white cat in scene 3 might become a brown cat in scene 8. The Visual Bible ensures consistency.
+
+**DO NOT include main characters here.** The characters listed in the "Characters" section above ({CHARACTER_NAMES}) are already tracked separately with their reference photos. The Visual Bible is ONLY for NEW elements not already provided.
+
+## Visual Bible Output Format
+
+**CRITICAL: Output the Visual Bible as a JSON code block.** Each item gets a unique identifier:
+- Secondary Characters: CHR001, CHR002, CHR003...
+- Animals & Creatures: ANI001, ANI002, ANI003...
+- Artifacts (Objects): ART001, ART002, ART003...
+- Locations: LOC001, LOC002, LOC003...
+- Vehicles: VEH001, VEH002, VEH003...
+- Clothing & Costumes: CLO001, CLO002, CLO003...
+
+### What to Include in Each Category
+
+**Secondary Characters** - People NOT in the main character list who appear in 2+ scenes:
+- name: How they are referred to (e.g., "Fireman Fred")
+- age: Use categories: infant/baby (0-1) | toddler (1-2) | preschooler (3-4) | kindergartner (5-6) | young school-age child (7-8) | school-age child (9-10) | preteen (11-12) | young teen (13-14) | teenager (15-17) | young adult (18-25) | adult (26-39) | middle-aged (40-59) | senior (60-75) | elderly (75+)
+- build: standalone terms (short, average, tall, slim, stocky, muscular) - NO comparisons
+- hair: color, style, length
+- face: eye color, skin tone, 1-2 distinctive features
+- signatureLook: ONE memorable visual element for instant recognition
+- clothing: specific colors and details
+
+**Animals & Creatures** - Any animal appearing in 2+ scenes:
+- name: What it's called (e.g., "Whiskers")
+- species: Type of animal
+- coloring: Exact colors and patterns. For breeds with distinctive patterns, always describe the FULL pattern, not just base color.
+- size: Relative size description
+- features: Collar, markings, accessories
+
+**Artifacts** - Important objects appearing in 2+ scenes:
+- name: What it's called (e.g., "the magic map")
+- type: What kind of object
+- description: Size, color, material, distinctive markings
+
+**Locations** - Every distinct place in the story:
+- name: What it's called (e.g., "Emma's house")
+- setting: Indoor/outdoor, type of place
+- colors: Specific building/place colors
+- features: Architectural details, distinctive elements
+- signatureElement: ONE unique visual detail for instant recognition
+- isRealLandmark: true if this is a REAL-WORLD famous building, monument, or landmark
+- landmarkQuery: Search query for photo lookup (e.g., "Eiffel Tower Paris France")
+
+**REAL-WORLD LANDMARKS:**
+For famous buildings, monuments, or natural wonders that exist in reality:
+- Set "isRealLandmark": true
+- Add "landmarkQuery" with landmark name + city/country for photo search
+- Examples: "Big Ben London England", "Grand Canyon Arizona USA", "Sydney Opera House Australia", "Colosseum Rome Italy"
+- This helps us fetch reference photos to ensure accurate landmark depiction in illustrations
+
+{AVAILABLE_LANDMARKS_SECTION}
+
+**Vehicles** - Any vehicle appearing in 2+ scenes:
+- name: What it is (e.g., "Dad's car")
+- colorAndDetails: Exact colors, condition, distinctive features
+- signatureElement: ONE memorable detail
+
+**Clothing & Costumes** - Special outfits/costumes (NOT everyday clothes):
+- name: Item name WITH character name (e.g., "Max's superhero cape")
+- wornBy: Which character wears this (REQUIRED)
+- description: Colors, materials, distinctive features
+- howWorn: How the character wears it
+
+## Visual Consistency Rules
+
+**Every element MUST have:**
+1. **Specific colors** - Never "a car" → Always "a bright red car"
+2. **One signature element** - Unique and easy to recognize
+3. **Self-contained description** - Works without seeing other scenes
+
+**NOTE:** Skip elements that appear on only 1 page. If `pages` array has only 1 entry, don't include it. Never include {CHARACTER_NAMES} - they are main characters with reference photos.
+
+---
+
+# Part 3: Cover Scene Descriptions
+
+In addition to the {PAGES} story pages, provide SIMPLE scene descriptions for these 3 cover elements.
+
+**IMPORTANT RULES FOR COVER SCENES:**
+- Keep descriptions SHORT (2-3 sentences max)
+- Focus on MOOD and SETTING, not precise character positions
+- Do NOT specify exact locations of each character
+- Do NOT include text instructions (title, dedication, website - these are added separately)
+- Do NOT over-specify details like weather effects, lighting, or props
+- Let the AI image generator handle composition
+
+**Title Page Scene**: A simple, striking scene featuring ALL MAIN CHARACTERS together prominently. Describe the mood, setting, and what the characters are doing together. (2-3 sentences)
+
+**Initial Scene**: A warm group scene showing all characters together in a welcoming setting. Focus on the overall mood and atmosphere. (2-3 sentences)
+
+**Back Cover Scene**: A satisfying conclusion scene with all characters together, feeling happy/content. Focus on emotional closure. (2-3 sentences)
+
+---
+
+# Part 4: Plot Structure
+
+Create a detailed {PAGES}-page story outline with a compelling plot. The focus of the plot must be on the main character(s).
+Clearly define:
+
+**Inciting Incident**: The event that disrupts the ordinary world and sets the story in motion.
+
+**Rising Action**: The series of events that build tension and develop conflict. Include obstacles, challenges, and complications the characters must face.
+
+**Climax**: The turning point - the moment of highest tension where the main conflict reaches its peak.
+
+**Falling Action**: Events following the climax that begin to resolve the conflict.
+
+For longer stories with more than 15 scenes, include repeated rising actions, climax and falling actions. Ideally for multiple characters, especially if there is more than one main character.
+
+**Resolution**: How the story concludes - the new normal after the adventure, showing character growth and lessons learned.
+
+## Themes
+Identify 2-3 major themes the story will explore that are appropriate for the target age group (e.g., friendship, courage, kindness, family, perseverance, overcoming fears, honesty).
+
+## Tone and Genre
+Describe the overall tone (e.g., adventurous, heartwarming, playful, magical) and genre elements that will shape the storytelling.
+
+## Clothing Continuity
+
+Determine the PRIMARY clothing context for the story based on the overall setting and adventure type:
+
+**Primary Clothing:** [winter | summer | formal | standard]
+- This is the DEFAULT clothing for all scenes unless a change is explicitly needed
+
+**Clothing Change Events:** List any pages where clothing CHANGES and why:
+- Only mark changes for: going to bed/waking up, major time skip (next day/season), explicit costume change in story, moving between drastically different environments (beach → snowy mountain)
+- Moving between similar environments does NOT require a change (meadow → forest → river = same clothing)
+
+Example:
+- Primary Clothing: summer (outdoor summer adventure)
+- Changes: Page 8 (bedtime scene → standard), Page 9 (next morning, back outside → summer)
+
+---
+
+# Part 5: Character Development Arcs
+
+For EACH main character provided, detail their development arc by describing:
+
+**Starting Point**: How they are at the beginning of the story (based on their traits - strengths, weaknesses, fears).
+
+**Key Challenges**: Specific conflicts or obstacles they face that drive their development. Reference which pages/events in the outline these occur.
+
+**Turning Points**: Realizations or moments of growth they experience. Link these directly to plot points and page numbers.
+
+**End State**: How they have changed or evolved by the end of the story. What have they learned? How have they grown?
+
+**Key Moments**: List 2-3 specific pages where this character's development is most evident.
+
+
+For all other characters:
+**Starting Point**: In which scene do they enter the story. Do not have all characters start on scene 1.
+**Repeated behaviors**: Things they do repeatedly in the story that are characteristic for them.
+**Challenge**: One challenge / scene where the character shines.
+
+---
+
+# TEXT LENGTH RULES - CRITICAL
+
+**{READING_LEVEL}**
+
+- Stay within the word count range. Aim for the MIDDLE of the range.
+- Pages UNDER the minimum are violations - add more content.
+- Write in flowing paragraphs with 2-4 sentences each.
+- Maximum 3-4 paragraphs per page.
+
+---
+
+# Part 6: Page-by-Page Breakdown
+
+For EACH of the {PAGES} story pages, provide:
+
+**Key Action/Plot Point**: A sentence or two describing the main event or plot progression for that page.
+
+**Character Focus**: Which character(s) are featured, their detailed actions, and how their traits/development are shown (remember: SHOW don't TELL)
+
+**Scene**: One sentence describing the key visual moment for the illustrator.
+- **MAX 3 CHARACTERS per page** - Both the story TEXT and the illustration should focus on 1-3 characters
+- Do NOT write text that mentions 5-6 characters all doing things on the same page
+- If a group exists, the TEXT should describe what 2-3 key characters are doing, not catalog everyone's actions
+- Other characters can be PRESENT but not actively described (e.g., "while the others watched" is fine)
+- For group scenes: focus on the emotional center (e.g., "Sophie hugs Grandma" → don't describe what each of 5 other people is doing)
+
+**Clothing**: Use the PRIMARY clothing from "Clothing Continuity" section above, unless this page has a clothing change event.
+- Write **[same]** if clothing matches the previous page
+- Write **[change to: winter|summer|formal|standard]** if clothing changes, with brief reason
+
+---
+
+# CRITICAL: You MUST generate ALL 7 sections
+
+**You MUST complete ALL sections listed above:**
+1. Clothing Requirements (JSON for each main character)
+2. Visual Bible (with all subsections)
+3. Cover Scenes (all 3: Title Page, Initial Page, Back Cover)
+4. Plot Structure (with Themes, Tone, and Clothing Continuity)
+5. Character Development Arcs (for ALL characters)
+6. Page-by-Page Breakdown (for ALL {PAGES} pages, from Page 1 to Page {PAGES})
+7. Title (generated LAST, after you know the full story)
+
+**DO NOT STOP EARLY.** The outline is incomplete unless it contains detailed breakdowns for every single page from 1 to {PAGES}, AND a final title.
+
+---
+
+# Format Your Response
+
+**IMPORTANT: Output MUST be in this EXACT order: Clothing Requirements → Visual Bible → Cover Scenes → Plot Structure → Character Arcs → Pages → Title**
+
+## Clothing Requirements
+
+```json
+{
+  "clothingRequirements": {
+    "[Character1Name]": {
+      "standard": { "used": true, "signature": "[signature items if any]" },
+      "winter": { "used": true/false, "signature": "[cold weather additions]" },
+      "summer": { "used": true/false, "signature": "[warm weather items]" },
+      "costumed": { "used": true/false, "costume": "[costume type]", "description": "[full outfit description]" }
+    },
+    "[Character2Name]": {
+      "standard": { "used": true },
+      "winter": { "used": false },
+      "summer": { "used": false },
+      "costumed": { "used": false }
+    }
+  }
+}
+```
+
+## Visual Bible
+
+```json
+{
+  "secondaryCharacters": [
+    {
+      "id": "CHR001",
+      "name": "Fireman Fred",
+      "pages": [2, 5, 8],
+      "age": "adult",
+      "build": "tall, muscular",
+      "hair": "short black hair",
+      "face": "brown eyes, warm smile, small scar on chin",
+      "signatureLook": "bright red firefighter helmet",
+      "clothing": "yellow firefighter jacket with reflective stripes"
+    }
+  ],
+  "animals": [
+    {
+      "id": "ANI001",
+      "name": "Whiskers",
+      "pages": [1, 3, 6, 10],
+      "species": "cat",
+      "coloring": "white fur with orange patches on both ears",
+      "size": "small house cat",
+      "features": "blue collar with silver bell"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "ART001",
+      "name": "the magic map",
+      "pages": [2, 4, 7],
+      "type": "ancient parchment map",
+      "description": "yellowed paper with gold edges, glowing blue lines that move"
+    }
+  ],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "Emma's house",
+      "pages": [1, 10],
+      "setting": "suburban home, outdoor/indoor",
+      "colors": "pale blue walls with white trim",
+      "features": "two-story Victorian style, wraparound porch",
+      "signatureElement": "bright red front door with brass knocker"
+    },
+    {
+      "id": "LOC002",
+      "name": "Eiffel Tower",
+      "pages": [4, 7],
+      "setting": "famous landmark, outdoor plaza",
+      "colors": "iron grey lattice structure against blue sky",
+      "features": "iconic iron tower with observation decks, gardens below",
+      "signatureElement": "distinctive iron lattice pattern",
+      "isRealLandmark": true,
+      "landmarkQuery": "Eiffel Tower Paris France"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "VEH001",
+      "name": "Dad's car",
+      "pages": [1, 5],
+      "colorAndDetails": "forest green station wagon, slightly rusty",
+      "signatureElement": "surfboard strapped to roof rack"
+    }
+  ],
+  "clothing": [
+    {
+      "id": "CLO001",
+      "name": "Max's superhero cape",
+      "pages": [3, 4, 5, 6],
+      "wornBy": "Max",
+      "description": "red blanket with yellow star sewn on back",
+      "howWorn": "tied around shoulders over regular clothes"
+    }
+  ]
+}
+```
+
+(Use empty arrays `[]` for categories. Skip any element with only 1 page appearance.)
+
+## Cover Scenes
+
+Title Page Scene: [2-3 sentences: ALL main characters together doing something that captures the story's spirit. Simple setting description. Mood/atmosphere.]
+Clothing: [Use PRIMARY clothing from Clothing Continuity]
+
+Initial Page Scene: [2-3 sentences: All characters together in a warm, welcoming moment. Simple group scene with positive atmosphere.]
+Clothing: [Use PRIMARY clothing from Clothing Continuity]
+
+Back Cover Scene: [2-3 sentences: Characters together at the story's happy conclusion. Focus on emotional satisfaction and togetherness.]
+Clothing: [Use PRIMARY clothing from Clothing Continuity]
+
+## Plot Structure
+Inciting Incident: [Description]
+Rising Action: [Description]
+Climax: [Description]
+Falling Action: [Description]
+Resolution: [Description]
+
+## Themes
+- [Theme 1]
+- [Theme 2]
+- [Theme 3]
+
+## Tone and Genre
+[Description]
+
+## Clothing Continuity
+Primary Clothing: [winter | summer | formal | standard]
+Clothing Changes: [List any pages with changes, or "None"]
+
+## Character Development Arcs
+
+### [Character 1 Name]
+Starting Point: [Description]
+Key Challenges: [Description with page references]
+Turning Points: [Description with page references]
+End State: [Description]
+Key Moments: Pages [X], [Y], [Z]
+
+### [Character 2 Name]
+[Same format...]
+
+### Other Characters (non-main)
+**[Character Name]**
+Starting Point: [How they are at the beginning]
+Repeated behaviors: [Characteristic actions throughout the story]
+Challenge: [One scene where this character shines]
+
+## Page-by-Page Breakdown
+
+Page 1: [Key Action/Plot Point]
+Character Focus: [1-3 characters MAX - describe what THESE characters do, not everyone in the story]
+Scene: [One sentence - the key visual moment, MAX 3 characters in the illustration]
+Scene Characters: [List only 1-3 characters IN THIS SCENE with their clothing, e.g., "Luis: costumed:knight, Noel: standard"]
+Scene Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/etc]
+Clothing: [same] or [change to: X - reason]
+
+Page 2: [Key Action/Plot Point]
+Character Focus: [Description]
+Scene: [One sentence - the key visual moment, MAX 3 characters]
+Scene Characters: [Characters in this scene with clothing]
+Scene Setting: [setting] | Time: [time] | Weather: [weather]
+Clothing: [same]
+
+...continue for ALL {PAGES} pages (Page 3, Page 4, ... Page {PAGES}). Use [same] for most pages; only use [change to: X] when there's an explicit reason.
+
+## Title
+
+Now that you have drafted the complete story with all pages, create a title that:
+- Captures the ACTUAL story you've written (not just the theme)
+- Reflects the main adventure, conflict, or lesson learned
+- Is memorable and appealing to the target age group
+- Works well in {LANGUAGE}
+
+Format:
+Title: [Your creative title based on the story above]
+
+## Critical Analysis
+
+After completing all pages and the title, perform a self-review:
+
+**Word Count Check:**
+First, state the target: "Target word count: [X-Y words per page]" (copy from TEXT LENGTH RULES above)
+Then list any pages that violate the range:
+- UNDER minimum = violation (needs more content)
+- OVER maximum = violation (needs trimming)
+Pages within the range are correct - do NOT list them as violations.
+
+**Logical Consistency Check:**
+List any plot holes, timeline issues, or character inconsistencies.
+
+---
+
+**REMINDER: Do not stop until you have written all {PAGES} pages, the title, AND the critical analysis.**
+

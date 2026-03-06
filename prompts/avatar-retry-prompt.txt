@@ -1,0 +1,2 @@
+Generate a PHOTOREALISTIC fashion photograph of this person wearing {OUTFIT_DESCRIPTION}. Full body shot, white background.
+CRITICAL: Output MUST be photorealistic like a professional photo - NOT cartoon, NOT animated, NOT Pixar style.

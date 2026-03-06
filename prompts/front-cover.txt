@@ -1,0 +1,22 @@
+Create a front cover illustration for a children's book.
+
+{CHARACTER_REFERENCE_LIST}
+
+**SCENE:**
+{TITLE_PAGE_SCENE}
+
+**ART STYLE (secondary):** {STYLE_DESCRIPTION}
+
+**COMPOSITION GUIDELINES:**
+- ALL MAIN CHARACTERS should be prominently featured and clearly recognizable
+- Characters should be arranged in a balanced composition (side by side, or grouped naturally)
+- Keep the composition simple and uncluttered
+- Leave clear space at the TOP for the title text
+
+**TEXT REQUIREMENT - CRITICAL:**
+The image MUST include this exact title text: "{STORY_TITLE}"
+- Make the title PROMINENT and highly visible at the top
+- Use an attractive, readable font style that fits the art style
+- The title is the ONLY text that should appear in the image
+
+{VISUAL_BIBLE}

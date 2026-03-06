@@ -1,0 +1,27 @@
+C:\Users\roger\MagicalStory\server.js:3283:      const mainCharacterIds = storyData.mainCharacters || [];
+C:\Users\roger\MagicalStory\server.js:3377:      const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+C:\Users\roger\MagicalStory\server.js:3378:      const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+C:\Users\roger\MagicalStory\server.js:3380:      log.debug(`📕 [COVER REGEN] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${coverCharacterPhotos.length} chars), clothing: ${coverClothing}`);
+C:\Users\roger\MagicalStory\server.js:6421:      const isMain = (inputData.mainCharacters || []).includes(char.id) ? ' (MAIN CHARACTER)' : '';
+C:\Users\roger\MagicalStory\server.js:6701:          const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+C:\Users\roger\MagicalStory\server.js:6703:          const charactersToUse = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+C:\Users\roger\MagicalStory\server.js:6705:          log.debug(`📕 [STREAM-COVER] Generating front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${referencePhotos.length} chars), clothing: ${clothing}${costumeType ? ':' + costumeType : ''}`);
+C:\Users\roger\MagicalStory\server.js:7131:      // This populates visualBible.mainCharacters for the dev panel display
+C:\Users\roger\MagicalStory\server.js:7471:          const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+C:\Users\roger\MagicalStory\server.js:7473:          const frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+C:\Users\roger\MagicalStory\server.js:7491:          log.debug(`📕 [STORYBOOK] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars), clothing: ${frontCoverClothing}`);
+C:\Users\roger\MagicalStory\server.js:7861:      mainCharacters: inputData.mainCharacters || [],
+C:\Users\roger\MagicalStory\server.js:7887:    log.debug(`📝 [STORY SAVE] mainCharacters: ${JSON.stringify(storyData.mainCharacters)}, characters count: ${storyData.characters?.length || 0}`);
+C:\Users\roger\MagicalStory\server.js:8118:  log.debug(`📝 [UNIFIED INPUT] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
+C:\Users\roger\MagicalStory\server.js:8712:    // This populates visualBible.mainCharacters for the dev panel display
+C:\Users\roger\MagicalStory\server.js:9877:      mainCharacters: inputData.mainCharacters || [],
+C:\Users\roger\MagicalStory\server.js:9904:    log.debug(`📝 [UNIFIED SAVE] mainCharacters: ${JSON.stringify(storyData.mainCharacters)}, characters count: ${storyData.characters?.length || 0}`);
+C:\Users\roger\MagicalStory\server.js:10185:    log.debug(`📝 [JOB PROCESS] mainCharacters: ${JSON.stringify(inputData.mainCharacters)}, characters count: ${inputData.characters?.length || 0}`);
+C:\Users\roger\MagicalStory\server.js:10493:      mainCharacters: visualBible.mainCharacters.length,
+C:\Users\roger\MagicalStory\server.js:10747:      const mainCharacters = allCharacters.filter(c => c.isMainCharacter === true);
+C:\Users\roger\MagicalStory\server.js:10748:      const frontCoverCharacters = mainCharacters.length > 0 ? mainCharacters : allCharacters;
+C:\Users\roger\MagicalStory\server.js:10749:      log.debug(`📕 [PIPELINE] Front cover: ${mainCharacters.length > 0 ? 'MAIN: ' + mainCharacters.map(c => c.name).join(', ') : 'ALL (no main chars defined)'} (${frontCoverCharacters.length} chars)`);
+C:\Users\roger\MagicalStory\server.js:11909:      mainCharacters: inputData.mainCharacters || [],
+C:\Users\roger\MagicalStory\server.js:12113:        log.debug('  Main Characters:', inputData?.mainCharacters);
+C:\Users\roger\MagicalStory\server.js:12260:              mainCharacters: inputData?.mainCharacters || [],
+grep: 2: No such file or directory

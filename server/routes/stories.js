@@ -1,0 +1,2748 @@
+/**
+ * Story Routes - /api/stories/*
+ *
+ * Story CRUD operations (list, get, save, delete, cover)
+ *
+ * NOTE: Regenerate/edit routes remain in server.js due to AI generation dependencies
+ */
+
+const express = require('express');
+const router = express.Router();
+
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages } = require('../services/database');
+const { authenticateToken } = require('../middleware/auth');
+const { log } = require('../utils/logger');
+const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
+const { dbToArrayIndex } = require('../lib/versionManager');
+
+/**
+ * Build metadata object from story data for fast list queries.
+ * This extracts only the fields needed for listing stories.
+ */
+function buildStoryMetadata(story) {
+  const sceneCount = story.sceneImages?.length || 0;
+  const hasThumbnail = !!(
+    story.coverImages?.frontCover?.imageData ||
+    story.coverImages?.frontCover ||
+    story.thumbnail
+  );
+
+  return {
+    id: story.id,
+    title: story.title,
+    createdAt: story.createdAt,
+    updatedAt: story.updatedAt,
+    pages: story.pages,
+    language: story.language,
+    languageLevel: story.languageLevel,
+    isPartial: story.isPartial || false,
+    generatedPages: story.generatedPages,
+    totalPages: story.totalPages,
+    sceneCount,
+    hasThumbnail,
+    characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
+  };
+}
+
+/**
+ * Normalize image data to ensure it has the correct data URI prefix.
+ * Some images were saved without the prefix, causing rendering failures.
+ */
+function normalizeImageData(imageData) {
+  if (!imageData) return imageData;
+
+  // Already has the prefix - return as-is
+  if (imageData.startsWith('data:image/')) {
+    return imageData;
+  }
+
+  // Raw base64 - add JPEG prefix (most common format)
+  // PNG would start with iVBORw0KGgo, JPEG with /9j/
+  if (imageData.startsWith('/9j/')) {
+    return `data:image/jpeg;base64,${imageData}`;
+  }
+  if (imageData.startsWith('iVBORw0KGgo')) {
+    return `data:image/png;base64,${imageData}`;
+  }
+
+  // Unknown format - assume JPEG
+  return `data:image/jpeg;base64,${imageData}`;
+}
+
+// ============================================
+// HISTORICAL EVENTS API
+// ============================================
+
+// GET /api/stories/historical-events - List all historical events
+router.get('/historical-events', async (req, res) => {
+  try {
+    const events = getAllEvents();
+    res.json({
+      events,
+      categories: EVENT_CATEGORIES
+    });
+  } catch (error) {
+    log.error('Error fetching historical events:', error);
+    res.status(500).json({ error: 'Failed to fetch historical events' });
+  }
+});
+
+// GET /api/stories/historical-events/:id - Get historical event context for story generation
+router.get('/historical-events/:id', async (req, res) => {
+  try {
+    const eventContext = getEventForStory(req.params.id);
+    if (!eventContext) {
+      return res.status(404).json({ error: 'Historical event not found' });
+    }
+    res.json(eventContext);
+  } catch (error) {
+    log.error('Error fetching historical event:', error);
+    res.status(500).json({ error: 'Failed to fetch historical event' });
+  }
+});
+
+// ============================================
+// STORY CRUD
+// ============================================
+
+// GET /api/stories - List user's stories (paginated, metadata only)
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 6, 1), 50);
+    const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+
+    log.debug(`📚 GET /api/stories - User: ${req.user.username}, limit: ${limit}, offset: ${offset}`);
+    console.log(`📚 [STORIES] Fetching stories for user: ${req.user.username} (id: ${req.user.id})`);
+    log.debug(`📚 [DEBUG] Stories query user ID: "${req.user.id}" (type: ${typeof req.user.id})`);
+    let userStories = [];
+    let totalCount = 0;
+
+    if (isDatabaseMode()) {
+      // Get total count
+      const countResult = await dbQuery('SELECT COUNT(*) as count FROM stories WHERE user_id = $1', [req.user.id]);
+      totalCount = parseInt(countResult[0]?.count || 0);
+
+      // Get paginated data using metadata column (fast - no image data loaded)
+      // Falls back to full data parsing if metadata is null (for stories created before migration)
+      // Also check story_images for frontCover (metadata.hasThumbnail can be stale)
+      const rows = await dbQuery(
+        `SELECT s.metadata, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
+         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover') as has_cover_image
+         FROM stories s WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
+        [req.user.id, limit, offset]
+      );
+
+      // Map rows to story metadata
+      userStories = rows.map(row => {
+        // Use metadata if available, otherwise parse from data (fallback for old stories)
+        let meta;
+        if (row.metadata) {
+          meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata;
+        } else if (row.data) {
+          // Fallback: parse full data (slow path for stories without metadata)
+          const story = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+          meta = buildStoryMetadata(story);
+        } else {
+          return null; // Skip invalid rows
+        }
+
+        // Calculate page count from scene count
+        const sceneCount = meta.sceneCount || 0;
+        const isPictureBook = meta.languageLevel === '1st-grade';
+        const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
+        const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
+
+        return {
+          id: meta.id,
+          title: meta.title,
+          createdAt: meta.createdAt,
+          updatedAt: meta.updatedAt,
+          pages: meta.pages,
+          language: meta.language,
+          languageLevel: meta.languageLevel,
+          characters: meta.characters || [],
+          pageCount,
+          hasThumbnail: meta.hasThumbnail || row.has_cover_image || false,
+          isPartial: meta.isPartial || false,
+          generatedPages: meta.generatedPages,
+          totalPages: meta.totalPages
+        };
+      }).filter(Boolean); // Remove null entries
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    console.log(`📚 Returning ${userStories.length} stories`);
+    await logActivity(req.user.id, req.user.username, 'STORIES_LOADED', { count: userStories.length });
+
+    res.json({
+      stories: userStories,
+      pagination: {
+        total: totalCount,
+        limit,
+        offset,
+        hasMore: offset + userStories.length < totalCount
+      }
+    });
+  } catch (err) {
+    console.error('❌ Error fetching stories:', err);
+    res.status(500).json({ error: 'Failed to fetch stories', details: err.message });
+  }
+});
+
+// GET /api/stories/debug/:id - Debug endpoint to check story existence (admin only)
+router.get('/debug/:id', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { id } = req.params;
+    const rows = await dbQuery(
+      'SELECT id, user_id, created_at, (metadata::jsonb->>\'title\') as title FROM stories WHERE id = $1',
+      [id]
+    );
+    if (rows.length === 0) {
+      return res.json({ found: false, id });
+    }
+    const story = rows[0];
+    // Also get the user email for this story
+    const userRows = await dbQuery('SELECT email FROM users WHERE id = $1', [story.user_id]);
+    res.json({
+      found: true,
+      id: story.id,
+      user_id: story.user_id,
+      user_email: userRows[0]?.email || 'unknown',
+      created_at: story.created_at,
+      title: story.title
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stories/:id/quick-metadata - Ultra-fast endpoint for initial render (< 100ms)
+// Returns minimal data needed to display title + cover immediately
+// Uses pre-computed metadata column (NOT the large data blob) for speed
+router.get('/:id/quick-metadata', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const startTime = Date.now();
+
+    // Use metadata column (small, fast) instead of data blob (50MB+, slow)
+    // Run both queries in parallel for speed
+    const [metaResult, coverCheck] = await Promise.all([
+      dbQuery(`
+        SELECT id, metadata
+        FROM stories WHERE id = $1 AND user_id = $2
+      `, [id, req.user.id]),
+      dbQuery(`SELECT 1 FROM story_images WHERE story_id = $1 AND image_type = 'frontCover' LIMIT 1`, [id])
+    ]);
+
+    if (metaResult.length === 0) {
+      // Check if impersonating admin
+      if (req.user.impersonating && req.user.originalAdminId) {
+        const adminResult = await dbQuery(`SELECT id, metadata FROM stories WHERE id = $1`, [id]);
+        if (adminResult.length === 0) {
+          return res.status(404).json({ error: 'Story not found' });
+        }
+        const meta = typeof adminResult[0].metadata === 'string'
+          ? JSON.parse(adminResult[0].metadata)
+          : adminResult[0].metadata;
+        const duration = Date.now() - startTime;
+        console.log(`⚡ GET /api/stories/${id}/quick-metadata - ${duration}ms (admin)`);
+        return res.json({
+          id: meta.id,
+          title: meta.title,
+          language: meta.language,
+          languageLevel: meta.languageLevel,
+          pageCount: meta.sceneCount || 0,
+          hasFrontCover: coverCheck.length > 0 || meta.hasThumbnail
+        });
+      }
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const meta = typeof metaResult[0].metadata === 'string'
+      ? JSON.parse(metaResult[0].metadata)
+      : metaResult[0].metadata;
+    const duration = Date.now() - startTime;
+    console.log(`⚡ GET /api/stories/${id}/quick-metadata - ${duration}ms`);
+
+    res.json({
+      id: meta.id,
+      title: meta.title,
+      language: meta.language,
+      languageLevel: meta.languageLevel,
+      pageCount: meta.sceneCount || 0,
+      hasFrontCover: coverCheck.length > 0 || meta.hasThumbnail
+    });
+  } catch (err) {
+    console.error('❌ Error fetching quick metadata:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stories/:id/metadata - Get story WITHOUT image data (for fast initial load)
+// Optimized: If story has separate images, skip the slow blob loading
+router.get('/:id/metadata', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`📖 GET /api/stories/${id}/metadata - User: ${req.user.username}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // First verify access (fast query)
+    let accessRows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (accessRows.length === 0) {
+        accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      accessRows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (accessRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Check if story has images in separate table (FAST path)
+    const hasSeparateImages = await hasStorySeparateImages(id);
+
+    let metadata;
+
+    if (hasSeparateImages) {
+      // FAST PATH: Load metadata without image data, get image info from story_images table
+      // IMPORTANT: Extract only specific JSONB fields - do NOT use (data::jsonb) - 'field'
+      // because that still loads the entire blob before removing fields!
+      // Characters are extracted separately with only id/name (not full 7MB+ photo data)
+      const metaQuery = `
+        SELECT
+          jsonb_build_object(
+            'id', data::jsonb->'id',
+            'title', data::jsonb->'title',
+            'createdAt', data::jsonb->'createdAt',
+            'updatedAt', data::jsonb->'updatedAt',
+            'language', data::jsonb->'language',
+            'languageLevel', data::jsonb->'languageLevel',
+            'outline', data::jsonb->'outline',
+            'outlinePrompt', data::jsonb->'outlinePrompt',
+            'outlineModelId', data::jsonb->'outlineModelId',
+            'outlineUsage', data::jsonb->'outlineUsage',
+            'storyTextPrompts', data::jsonb->'storyTextPrompts',
+            'storyText', data::jsonb->'storyText',
+            'storyCategory', data::jsonb->'storyCategory',
+            'storyTopic', data::jsonb->'storyTopic',
+            'storyTheme', data::jsonb->'storyTheme',
+            'mainCharacters', data::jsonb->'mainCharacters',
+            'generatedPages', data::jsonb->'generatedPages',
+            'totalPages', data::jsonb->'totalPages',
+            'pages', data::jsonb->'pages',
+            'clothingRequirements', data::jsonb->'clothingRequirements',
+            'artStyle', data::jsonb->'artStyle',
+            'imageGenerationMode', data::jsonb->'imageGenerationMode',
+            'isPartial', data::jsonb->'isPartial',
+            'historicalEvent', data::jsonb->'historicalEvent',
+            'location', data::jsonb->'location',
+            'season', data::jsonb->'season',
+            'userLocation', data::jsonb->'userLocation',
+            'sceneDescriptions', data::jsonb->'sceneDescriptions'
+          ) as base_data,
+          COALESCE(jsonb_array_length(data::jsonb->'sceneImages'), 0) as scene_count,
+          (SELECT jsonb_agg(jsonb_build_object('id', c->>'id', 'name', c->>'name'))
+           FROM jsonb_array_elements(data::jsonb->'characters') c) as characters_mini
+        FROM stories WHERE id = $1
+      `;
+      const metaRows = await dbQuery(metaQuery, [id]);
+      const baseData = typeof metaRows[0].base_data === 'string'
+        ? JSON.parse(metaRows[0].base_data)
+        : metaRows[0].base_data;
+      const sceneCount = parseInt(metaRows[0].scene_count) || 0;
+      // Add minimal characters array (just id/name for GenerationSettingsPanel)
+      const charactersMini = metaRows[0].characters_mini || [];
+      baseData.characters = Array.isArray(charactersMini)
+        ? charactersMini.map(c => ({ id: parseInt(c.id) || c.id, name: c.name }))
+        : [];
+
+      // Get image info from story_images table (fast - no large data)
+      const imageInfoRows = await dbQuery(
+        `SELECT image_type, page_number, version_index, quality_score, generated_at
+         FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index`,
+        [id]
+      );
+
+      // Get active version metadata to set isActive flags correctly
+      const activeVersions = await getAllActiveVersions(id);
+
+      // Get version metadata (description, prompt, modelId, type) from data blob
+      // Only needed for dev mode — skip this expensive jsonb_array_elements subquery for normal users
+      const isDevMode = req.query.devMode === 'true';
+      const versionMetaByPage = new Map();
+      if (isDevMode) {
+        const versionMetaQuery = await dbQuery(
+          `SELECT scene->>'pageNumber' as page_number, scene->'imageVersions' as image_versions
+           FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+           WHERE id = $1`,
+          [id]
+        );
+        for (const row of versionMetaQuery) {
+          if (row.page_number && row.image_versions) {
+            versionMetaByPage.set(parseInt(row.page_number), row.image_versions.map(v => ({
+              description: v.description,
+              prompt: v.prompt,
+              userInput: v.userInput,
+              modelId: v.modelId,
+              type: v.type,
+              createdAt: v.createdAt
+            })));
+          }
+        }
+      }
+
+      // Build sceneImages array from image info
+      const sceneImagesMap = new Map();
+      const coverImages = { frontCover: null, initialPage: null, backCover: null };
+
+      for (const row of imageInfoRows) {
+        if (row.image_type === 'scene') {
+          const activeVersion = activeVersions[row.page_number] ?? 0;
+          if (!sceneImagesMap.has(row.page_number)) {
+            sceneImagesMap.set(row.page_number, {
+              pageNumber: row.page_number,
+              hasImage: true,
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              imageVersions: [],
+              activeVersionIndex: activeVersion  // Track which version is active
+            });
+          }
+          // Add all versions (including version 0) to imageVersions array
+          // Merge with metadata from data blob (description, prompt, modelId, type)
+          // NOTE: DB version_index 0 = main image, version_index 1+ = blob imageVersions[0+]
+          // saveStoryData saves imageVersions[i] at version_index i+1, so offset by -1
+          const scene = sceneImagesMap.get(row.page_number);
+          const pageMeta = versionMetaByPage.get(row.page_number) || [];
+          const versionMeta = row.version_index > 0 ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {}) : {};
+          const versionDate = row.generated_at || versionMeta.createdAt;
+          scene.imageVersions.push({
+            versionIndex: row.version_index,
+            hasImage: true,
+            qualityScore: row.quality_score,
+            generatedAt: versionDate,
+            createdAt: versionDate,  // ImageHistoryModal reads createdAt
+            isActive: row.version_index === activeVersion,
+            // Dev mode metadata from data blob
+            description: versionMeta.description,
+            prompt: versionMeta.prompt,
+            userInput: versionMeta.userInput,
+            modelId: versionMeta.modelId,
+            type: versionMeta.type
+          });
+        } else {
+          // Cover image
+          coverImages[row.image_type] = {
+            hasImage: true,
+            qualityScore: row.quality_score,
+            generatedAt: row.generated_at
+          };
+        }
+      }
+
+      const sceneImages = Array.from(sceneImagesMap.values()).sort((a, b) => a.pageNumber - b.pageNumber);
+      const coverCount = (coverImages.frontCover ? 1 : 0) + (coverImages.initialPage ? 1 : 0) + (coverImages.backCover ? 1 : 0);
+
+      metadata = {
+        ...baseData,
+        sceneImages,
+        coverImages: coverCount > 0 ? coverImages : null,
+        totalImages: sceneImages.length + coverCount
+      };
+
+      console.log(`📖 [FAST] Returning story metadata: ${metadata.title} (${metadata.totalImages} images to load)`);
+      console.log(`📖 [FAST] storyCategory: "${metadata.storyCategory}", storyTopic: "${metadata.storyTopic}", storyTheme: "${metadata.storyTheme}"`);
+      console.log(`📖 [FAST] mainCharacters: ${JSON.stringify(metadata.mainCharacters)}`);
+    } else {
+      // SLOW PATH: Load full data blob (for non-migrated stories)
+      const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+      const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+      // Strip out image data and full characters (photo data is huge), but include minimal char info
+      const { characters: fullCharacters, ...storyWithoutCharacters } = story;
+      // Extract just id/name from characters for GenerationSettingsPanel
+      const charactersMini = (fullCharacters || []).map(c => ({ id: c.id, name: c.name }));
+      metadata = {
+        ...storyWithoutCharacters,
+        characters: charactersMini,
+        sceneImages: story.sceneImages?.map(img => ({
+          ...img,
+          imageData: undefined,
+          hasImage: !!img.imageData,
+          imageVersions: img.imageVersions?.map(v => ({
+            ...v,
+            imageData: undefined,
+            hasImage: !!v.imageData
+          }))
+        })),
+        coverImages: story.coverImages ? {
+          frontCover: story.coverImages.frontCover ? {
+            ...story.coverImages.frontCover,
+            imageData: undefined,
+            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
+            hasImage: !!story.coverImages.frontCover?.imageData
+          } : null,
+          initialPage: story.coverImages.initialPage ? {
+            ...story.coverImages.initialPage,
+            imageData: undefined,
+            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
+            hasImage: !!story.coverImages.initialPage?.imageData
+          } : null,
+          backCover: story.coverImages.backCover ? {
+            ...story.coverImages.backCover,
+            imageData: undefined,
+            imageVersions: undefined, // IMPORTANT: Don't include blob's imageVersions, use /images endpoint instead
+            hasImage: !!story.coverImages.backCover?.imageData
+          } : null
+        } : null,
+        totalImages: (story.sceneImages?.length || 0) + (story.coverImages ? 3 : 0)
+      };
+
+      console.log(`📖 [SLOW] Returning story metadata: ${story.title} (${metadata.totalImages} images to load)`);
+      console.log(`📖 [SLOW] storyCategory: "${metadata.storyCategory}", storyTopic: "${metadata.storyTopic}", storyTheme: "${metadata.storyTheme}"`);
+      console.log(`📖 [SLOW] mainCharacters: ${JSON.stringify(metadata.mainCharacters)}`);
+    }
+
+    res.json(metadata);
+  } catch (err) {
+    console.error('❌ Error fetching story metadata:', err);
+    res.status(500).json({ error: 'Failed to fetch story metadata', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/dev-metadata - Get developer-only metadata (prompts, quality reasoning, retry history)
+// This is loaded separately to keep the main metadata endpoint fast for normal users
+router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🔧 GET /api/stories/${id}/dev-metadata - User: ${req.user.username}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+    // Extract CRITICAL ANALYSIS from outline (if present)
+    let criticalAnalysis = null;
+    if (story.outline) {
+      const analysisMatch = story.outline.match(/---CRITICAL ANALYSIS---\s*\n([\s\S]*?)(?=\n---TITLE---|$)/);
+      if (analysisMatch) {
+        criticalAnalysis = analysisMatch[1].trim();
+      }
+    }
+
+    // Extract only dev-relevant fields (no image data, no characters)
+    // IMPORTANT: Explicitly list fields to include - never use spread operator on objects
+    // that may contain large image data (retryHistory, repairHistory, grids, etc.)
+    const devMetadata = {
+      // Story outline review data
+      criticalAnalysis,
+      originalStory: story.originalStory || null,
+      // Scene images dev data - ONLY include specific fields, no spreading
+      sceneImages: story.sceneImages?.map(img => ({
+        pageNumber: img.pageNumber,
+        prompt: img.prompt || null,
+        qualityReasoning: img.qualityReasoning || null,
+        // retryHistory: ONLY include metadata fields, NO image data or grids
+        retryHistory: (img.retryHistory || []).map(r => ({
+          type: r.type,
+          score: r.score,
+          attempt: r.attempt,
+          modelId: r.modelId,
+          reasoning: r.reasoning,
+          thinkingText: r.thinkingText || null,
+          textIssue: r.textIssue,
+          timestamp: r.timestamp,
+          evalSkipped: r.evalSkipped,
+          autoRepairEnabled: r.autoRepairEnabled,
+          fixableIssuesCount: r.fixableIssuesCount,
+          enrichedTargetsCount: r.enrichedTargetsCount,
+          dryRun: r.dryRun,
+          consistencyScore: r.consistencyScore,
+          consistencyIssues: r.consistencyIssues,
+          failReason: r.failReason,
+          gridFixedCount: r.gridFixedCount,
+          preRepairScore: r.preRepairScore,
+          gridFailedCount: r.gridFailedCount,
+          gridTotalIssues: r.gridTotalIssues,
+          fixTargetsCount: r.fixTargetsCount,
+          postRepairScore: r.postRepairScore,
+          // Include evaluation data for dev mode display (no image data in these)
+          preRepairEval: r.preRepairEval || null,
+          postRepairEval: r.postRepairEval || null,
+          // Flags for lazy loading images
+          // Note: imageData is stripped from data blob by saveStoryData and saved to story_retry_images table.
+          // For 'generation' entries, images always exist in the table even though r.imageData is null in the blob.
+          hasImageData: !!r.imageData || r.type === 'generation',
+          hasOriginalImage: !!r.originalImage,
+          hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
+          hasAnnotatedOriginal: !!r.annotatedOriginal,
+          hasGrids: !!(r.grids && r.grids.length > 0),
+          gridsCount: r.grids?.length || 0,
+          // Keep small metadata from evaluations
+          bboxDetection: r.bboxDetection || null,  // figures/objects JSON for dev display
+          unifiedReport: r.unifiedReport,
+          reEvalUsage: r.reEvalUsage,
+          repairUsage: r.repairUsage
+        })),
+        // repairHistory - flags only, images lazy loaded
+        repairHistory: (img.repairHistory || []).map(r => ({
+          timestamp: r.timestamp,
+          type: r.type,
+          score: r.score,
+          reasoning: r.reasoning,
+          thinkingText: r.thinkingText || null,
+          hasImageData: !!r.imageData || r.type === 'generation',
+          hasOriginalImage: !!r.originalImage
+        })),
+        wasRegenerated: img.wasRegenerated || false,
+        // Flag for lazy loading original image
+        hasOriginalImage: !!img.originalImage,
+        originalScore: img.originalScore || null,
+        originalReasoning: img.originalReasoning || null,
+        totalAttempts: img.totalAttempts || null,
+        faceEvaluation: img.faceEvaluation || null,
+        // Reference photos metadata - images lazy loaded via /dev-image endpoint
+        referencePhotos: (img.referencePhotos || []).map(p => ({
+          name: p.name,
+          photoType: p.photoType,
+          clothingCategory: p.clothingCategory,
+          clothingDescription: p.clothingDescription,
+          hasPhoto: !!(p.photoUrl || p.photoData)
+        })),
+        landmarkPhotos: (img.landmarkPhotos || []).map(p => ({
+          name: p.name,
+          attribution: p.attribution,
+          source: p.source,
+          hasPhoto: !!p.photoData
+        })),
+        hasVisualBibleGrid: !!img.visualBibleGrid,
+        // Consistency regeneration - flags only, images lazy loaded
+        consistencyRegen: img.consistencyRegen ? {
+          hasOriginalImage: !!img.consistencyRegen.originalImage,
+          hasFixedImage: !!img.consistencyRegen.fixedImage,
+          correctionNotes: img.consistencyRegen.correctionNotes,
+          issues: img.consistencyRegen.issues,
+          score: img.consistencyRegen.score,
+          timestamp: img.consistencyRegen.timestamp
+        } : null,
+        // sceneCharacters - just names, not full character data with avatars
+        sceneCharacterNames: (img.sceneCharacters || []).map(c => c.name || c.label || 'Unknown'),
+        // Per-version metadata for dev mode (no image data)
+        // Include versionIndex so frontend can correctly map to its imageVersions array
+        // Blob imageVersions may start at v1 (normal) or v0 (iterate preservation entry)
+        imageVersionsMeta: (() => {
+          const versions = img.imageVersions || [];
+          const hasPreservation = versions.length > 0 && versions[0] && !versions[0].source;
+          return versions.map((v, idx) => ({
+            versionIndex: hasPreservation ? idx : idx + 1,
+            description: v.description || null,
+            prompt: v.prompt || null,
+            userInput: v.userInput || null,
+            modelId: v.modelId || null,
+            createdAt: v.createdAt || null,
+            isActive: v.isActive || false,
+            type: v.type || null,
+            qualityScore: v.qualityScore ?? null,
+            qualityReasoning: v.qualityReasoning || null,
+            fixTargets: v.fixTargets || [],
+            totalAttempts: v.totalAttempts || null,
+            referencePhotoNames: v.referencePhotoNames || [],
+          }));
+        })(),
+      })) || [],
+      // Cover images dev data - expose full retryHistory like page images (for bbox/repair display)
+      coverImages: story.coverImages ? {
+        frontCover: story.coverImages.frontCover && typeof story.coverImages.frontCover === 'object' ? {
+          prompt: story.coverImages.frontCover.prompt || null,
+          qualityReasoning: story.coverImages.frontCover.qualityReasoning || null,
+          totalAttempts: story.coverImages.frontCover.totalAttempts || null,
+          referencePhotosCount: (story.coverImages.frontCover.referencePhotos || []).length,
+          landmarkPhotosCount: (story.coverImages.frontCover.landmarkPhotos || []).length,
+          // Full retry history with repair/bbox details (same as page images)
+          retryHistory: (story.coverImages.frontCover.retryHistory || []).map(r => ({
+            type: r.type,
+            score: r.score,
+            attempt: r.attempt,
+            modelId: r.modelId,
+            reasoning: r.reasoning,
+            timestamp: r.timestamp,
+            evalSkipped: r.evalSkipped,
+            gridFixedCount: r.gridFixedCount,
+            gridFailedCount: r.gridFailedCount,
+            gridTotalIssues: r.gridTotalIssues,
+            fixTargetsCount: r.fixTargetsCount,
+            preRepairScore: r.preRepairScore,
+            postRepairScore: r.postRepairScore,
+            preRepairEval: r.preRepairEval || null,
+            postRepairEval: r.postRepairEval || null,
+            bboxDetection: r.bboxDetection || null,
+            hasImageData: !!r.imageData || r.type === 'generation',
+            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
+            hasAnnotatedOriginal: !!r.annotatedOriginal,
+            hasGrids: !!(r.grids && r.grids.length > 0),
+            gridsCount: r.grids?.length || 0
+          }))
+        } : null,
+        initialPage: story.coverImages.initialPage && typeof story.coverImages.initialPage === 'object' ? {
+          prompt: story.coverImages.initialPage.prompt || null,
+          qualityReasoning: story.coverImages.initialPage.qualityReasoning || null,
+          totalAttempts: story.coverImages.initialPage.totalAttempts || null,
+          referencePhotosCount: (story.coverImages.initialPage.referencePhotos || []).length,
+          landmarkPhotosCount: (story.coverImages.initialPage.landmarkPhotos || []).length,
+          retryHistory: (story.coverImages.initialPage.retryHistory || []).map(r => ({
+            type: r.type,
+            score: r.score,
+            attempt: r.attempt,
+            modelId: r.modelId,
+            reasoning: r.reasoning,
+            timestamp: r.timestamp,
+            evalSkipped: r.evalSkipped,
+            gridFixedCount: r.gridFixedCount,
+            gridFailedCount: r.gridFailedCount,
+            gridTotalIssues: r.gridTotalIssues,
+            fixTargetsCount: r.fixTargetsCount,
+            preRepairScore: r.preRepairScore,
+            postRepairScore: r.postRepairScore,
+            preRepairEval: r.preRepairEval || null,
+            postRepairEval: r.postRepairEval || null,
+            bboxDetection: r.bboxDetection || null,
+            hasImageData: !!r.imageData || r.type === 'generation',
+            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
+            hasAnnotatedOriginal: !!r.annotatedOriginal,
+            hasGrids: !!(r.grids && r.grids.length > 0),
+            gridsCount: r.grids?.length || 0
+          }))
+        } : null,
+        backCover: story.coverImages.backCover && typeof story.coverImages.backCover === 'object' ? {
+          prompt: story.coverImages.backCover.prompt || null,
+          qualityReasoning: story.coverImages.backCover.qualityReasoning || null,
+          totalAttempts: story.coverImages.backCover.totalAttempts || null,
+          referencePhotosCount: (story.coverImages.backCover.referencePhotos || []).length,
+          landmarkPhotosCount: (story.coverImages.backCover.landmarkPhotos || []).length,
+          retryHistory: (story.coverImages.backCover.retryHistory || []).map(r => ({
+            type: r.type,
+            score: r.score,
+            attempt: r.attempt,
+            modelId: r.modelId,
+            reasoning: r.reasoning,
+            timestamp: r.timestamp,
+            evalSkipped: r.evalSkipped,
+            gridFixedCount: r.gridFixedCount,
+            gridFailedCount: r.gridFailedCount,
+            gridTotalIssues: r.gridTotalIssues,
+            fixTargetsCount: r.fixTargetsCount,
+            preRepairScore: r.preRepairScore,
+            postRepairScore: r.postRepairScore,
+            preRepairEval: r.preRepairEval || null,
+            postRepairEval: r.postRepairEval || null,
+            bboxDetection: r.bboxDetection || null,
+            hasImageData: !!r.imageData || r.type === 'generation',
+            hasBboxOverlay: r.hasBboxOverlay || !!r.bboxOverlayImage || !!r.bboxDetection,
+            hasAnnotatedOriginal: !!r.annotatedOriginal,
+            hasGrids: !!(r.grids && r.grids.length > 0),
+            gridsCount: r.grids?.length || 0
+          }))
+        } : null
+      } : null,
+      // Scene descriptions (outline extract, scene prompt, scene description text)
+      sceneDescriptions: story.sceneDescriptions || [],
+      // Visual Bible - explicitly list fields, no spreading
+      visualBible: story.visualBible ? {
+        artStyle: story.visualBible.artStyle,
+        createdAt: story.visualBible.createdAt,
+        updatedAt: story.visualBible.updatedAt,
+        locations: (story.visualBible.locations || []).map(loc => ({
+          id: loc.id,
+          name: loc.name,
+          description: loc.description,
+          extractedDescription: loc.extractedDescription,
+          attributes: loc.attributes,
+          source: loc.source,
+          isRealLandmark: loc.isRealLandmark,
+          appearsInPages: loc.appearsInPages,
+          hasReferenceImage: !!loc.referenceImageData
+        })),
+        objects: (story.visualBible.objects || []).map(obj => ({
+          id: obj.id,
+          name: obj.name,
+          description: obj.description,
+          extractedDescription: obj.extractedDescription,
+          attributes: obj.attributes,
+          source: obj.source,
+          appearsInPages: obj.appearsInPages,
+          hasReferenceImage: !!obj.referenceImageData
+        })),
+        animals: (story.visualBible.animals || []).map(animal => ({
+          id: animal.id,
+          name: animal.name,
+          description: animal.description,
+          extractedDescription: animal.extractedDescription,
+          attributes: animal.attributes,
+          source: animal.source,
+          appearsInPages: animal.appearsInPages,
+          hasReferenceImage: !!animal.referenceImageData
+        })),
+        artifacts: (story.visualBible.artifacts || []).map(artifact => ({
+          id: artifact.id,
+          name: artifact.name,
+          description: artifact.description,
+          extractedDescription: artifact.extractedDescription,
+          attributes: artifact.attributes,
+          source: artifact.source,
+          appearsInPages: artifact.appearsInPages,
+          hasReferenceImage: !!artifact.referenceImageData
+        })),
+        secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
+          id: char.id,
+          name: char.name,
+          description: char.description,
+          extractedDescription: char.extractedDescription,
+          attributes: char.attributes,
+          source: char.source,
+          appearsInPages: char.appearsInPages,
+          hasReferenceImage: !!char.referenceImageData
+        }))
+      } : null,
+      // Generation log (avatar lookups, stage transitions, etc.)
+      generationLog: story.generationLog || [],
+      // Styled avatar generation log - strip image data, keep metadata
+      styledAvatarGeneration: (story.styledAvatarGeneration || []).map(entry => ({
+        timestamp: entry.timestamp,
+        characterName: entry.characterName,
+        artStyle: entry.artStyle,
+        clothingCategory: entry.clothingCategory,
+        durationMs: entry.durationMs,
+        success: entry.success,
+        error: entry.error,
+        prompt: entry.prompt,
+        inputs: entry.inputs ? {
+          facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto.identifier, sizeKB: entry.inputs.facePhoto.sizeKB } : null,
+          originalAvatar: entry.inputs.originalAvatar ? { identifier: entry.inputs.originalAvatar.identifier, sizeKB: entry.inputs.originalAvatar.sizeKB } : null,
+          styleSample: entry.inputs.styleSample ? { identifier: entry.inputs.styleSample.identifier, sizeKB: entry.inputs.styleSample.sizeKB } : null
+        } : null,
+        output: entry.output ? { identifier: entry.output.identifier, sizeKB: entry.output.sizeKB } : null
+      })),
+      // Costumed avatar generation log - strip image data, keep metadata
+      costumedAvatarGeneration: (story.costumedAvatarGeneration || []).map(entry => ({
+        timestamp: entry.timestamp,
+        characterName: entry.characterName,
+        costumeType: entry.costumeType,
+        artStyle: entry.artStyle,
+        costumeDescription: entry.costumeDescription,
+        durationMs: entry.durationMs,
+        success: entry.success,
+        error: entry.error,
+        prompt: entry.prompt,
+        costumeEvaluation: entry.costumeEvaluation || null,
+        inputs: entry.inputs ? {
+          facePhoto: entry.inputs.facePhoto ? { identifier: entry.inputs.facePhoto?.identifier, sizeKB: entry.inputs.facePhoto?.sizeKB } : null,
+          standardAvatar: entry.inputs.standardAvatar ? { identifier: entry.inputs.standardAvatar?.identifier, sizeKB: entry.inputs.standardAvatar?.sizeKB } : null,
+          referenceAvatar: entry.inputs.referenceAvatar ? { identifier: entry.inputs.referenceAvatar?.identifier, sizeKB: entry.inputs.referenceAvatar?.sizeKB } : null
+        } : null,
+        output: entry.output ? { identifier: entry.output?.identifier, sizeKB: entry.output?.sizeKB } : null
+      })),
+      // Final consistency checks report (if final checks were enabled)
+      // Strip gridImage data for lazy loading - only include metadata
+      finalChecksReport: story.finalChecksReport ? {
+        ...story.finalChecksReport,
+        entity: story.finalChecksReport.entity ? {
+          ...story.finalChecksReport.entity,
+          // Strip gridImage from grids, keep manifest and metadata for lazy loading
+          grids: (story.finalChecksReport.entity.grids || []).map((grid, idx) => ({
+            entityName: grid.entityName,
+            entityType: grid.entityType,
+            cellCount: grid.cellCount,
+            manifest: grid.manifest,
+            // Indicate that image needs to be loaded separately
+            hasGridImage: !!grid.gridImage,
+            gridImageSizeKB: grid.gridImage ? Math.round(grid.gridImage.length * 0.75 / 1024) : 0,
+            gridIndex: idx
+          }))
+        } : undefined,
+        // Strip gridImages from entityRepairs too
+        entityRepairs: story.finalChecksReport.entityRepairs ? Object.fromEntries(
+          Object.entries(story.finalChecksReport.entityRepairs).map(([name, repair]) => [
+            name,
+            {
+              ...repair,
+              // Strip large image fields, keep metadata
+              gridBeforeRepair: undefined,
+              gridAfterRepair: undefined,
+              gridDiff: undefined,
+              hasGridBeforeRepair: !!repair.gridBeforeRepair,
+              hasGridAfterRepair: !!repair.gridAfterRepair,
+              hasGridDiff: !!repair.gridDiff,
+              // Strip cell comparison images
+              cellComparisons: (repair.cellComparisons || []).map(c => ({
+                letter: c.letter,
+                pageNumber: c.pageNumber,
+                clothingCategory: c.clothingCategory,
+                hasBefore: !!c.before,
+                hasAfter: !!c.after,
+                hasDiff: !!c.diff
+              })),
+              // Strip gridsByClothing images
+              gridsByClothing: (repair.gridsByClothing || []).map(g => ({
+                clothingCategory: g.clothingCategory,
+                cropCount: g.cropCount,
+                hasGridBefore: !!g.gridBefore,
+                hasGridAfter: !!g.gridAfter
+              }))
+            }
+          ])
+        ) : undefined
+      } : null
+    };
+
+    console.log(`🔧 Returning dev metadata: ${devMetadata.sceneImages.length} scene entries, generationLog: ${devMetadata.generationLog?.length || 0} entries, styledAvatars: ${devMetadata.styledAvatarGeneration?.length || 0}, costumedAvatars: ${devMetadata.costumedAvatarGeneration?.length || 0}`);
+    res.json(devMetadata);
+  } catch (err) {
+    console.error('❌ Error fetching dev metadata:', err);
+    res.status(500).json({ error: 'Failed to fetch dev metadata', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/evaluation-data - Get evaluation fields from scene images
+// Used by Repair Workflow to populate Collect Feedback without loading full story blob
+router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Extract evaluation fields from sceneImages using jsonb_array_elements
+    const evalRows = await dbQuery(`
+      SELECT
+        (s->>'pageNumber')::int as page_number,
+        s->'qualityScore' as quality_score,
+        s->>'verdict' as verdict,
+        s->>'issuesSummary' as issues_summary,
+        s->'semanticScore' as semantic_score,
+        s->'semanticResult' as semantic_result,
+        s->'fixableIssues' as fixable_issues,
+        s->'fixTargets' as fix_targets,
+        s->'consistencyRegen' as consistency_regen
+      FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') s
+      WHERE id = $1
+      ORDER BY (s->>'pageNumber')::int
+    `, [id]);
+
+    // Extract finalChecksReport separately
+    const reportRows = await dbQuery(
+      `SELECT data::jsonb->'finalChecksReport' as final_checks_report FROM stories WHERE id = $1`,
+      [id]
+    );
+
+    const sceneEvaluations = evalRows.map(row => ({
+      pageNumber: row.page_number,
+      qualityScore: row.quality_score,
+      verdict: row.verdict,
+      issuesSummary: row.issues_summary,
+      semanticScore: row.semantic_score,
+      semanticResult: row.semantic_result,
+      fixableIssues: row.fixable_issues,
+      fixTargets: row.fix_targets,
+      consistencyRegen: row.consistency_regen,
+    }));
+
+    const finalChecksReport = reportRows[0]?.final_checks_report || null;
+
+    res.json({ sceneEvaluations, finalChecksReport });
+  } catch (err) {
+    console.error('❌ Error fetching evaluation data:', err);
+    res.status(500).json({ error: 'Failed to fetch evaluation data', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/entity-grid-image - Lazy load entity consistency grid images
+// Query params:
+//   entityName: character name (required)
+//   OR gridIndex: index of grid in entity.grids array (required)
+router.get('/:id/entity-grid-image', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { entityName, gridIndex, clothingCategory } = req.query;
+
+    if (!entityName && gridIndex === undefined) {
+      return res.status(400).json({ error: 'entityName or gridIndex query parameter required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const grids = story.finalChecksReport?.entity?.grids || [];
+
+    let grid;
+    if (gridIndex !== undefined) {
+      const idx = parseInt(gridIndex, 10);
+      grid = grids[idx];
+    } else {
+      // Find by entityName, optionally filtered by clothingCategory
+      grid = grids.find(g => {
+        if (g.entityName !== entityName) return false;
+        if (clothingCategory && g.clothingCategory !== clothingCategory) return false;
+        return true;
+      });
+    }
+
+    if (!grid) {
+      return res.status(404).json({ error: 'Grid not found for specified entity' });
+    }
+
+    res.json({
+      entityName: grid.entityName,
+      clothingCategory: grid.clothingCategory,
+      gridImage: grid.gridImage,
+      manifest: grid.manifest
+    });
+  } catch (err) {
+    console.error('❌ Error fetching entity grid image:', err);
+    res.status(500).json({ error: 'Failed to fetch entity grid image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/dev-image - Lazy load images for dev mode
+// Query params:
+//   page: page number (required for scene images)
+//   cover: cover type ('front', 'initial', 'back') - alternative to page for cover images
+//   type: 'original' | 'retry' | 'repair' | 'reference' | 'landmark' | 'consistency'
+//   index: index in array (for retry/repair history)
+//   field: specific field like 'imageData', 'originalImage', 'bboxOverlay'
+router.get('/:id/dev-image', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { page, cover, type, index, field } = req.query;
+    const pageNum = parseInt(page, 10);
+
+    // Either page or cover must be provided
+    const isCoverRequest = cover && ['front', 'initial', 'back'].includes(cover);
+    if (!isCoverRequest && (!page || isNaN(pageNum))) {
+      return res.status(400).json({ error: 'page or cover query parameter required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+    // Handle cover image requests
+    if (isCoverRequest) {
+      const coverKey = cover === 'front' ? 'frontCover' : cover === 'initial' ? 'initialPage' : 'backCover';
+      const coverImage = story.coverImages?.[coverKey];
+
+      if (!coverImage) {
+        return res.status(404).json({ error: `Cover ${cover} not found` });
+      }
+
+      // For covers, we support bboxOverlay field
+      if (field === 'bboxOverlay') {
+        return res.json({ bboxOverlayImage: coverImage.bboxOverlayImage || null });
+      }
+      if (field === 'imageData') {
+        return res.json({ imageData: coverImage.imageData || null });
+      }
+      // Return all cover data
+      return res.json({
+        imageData: coverImage.imageData || null,
+        bboxOverlayImage: coverImage.bboxOverlayImage || null,
+        bboxDetection: coverImage.bboxDetection || null
+      });
+    }
+
+    const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
+
+    if (!sceneImage) {
+      return res.status(404).json({ error: `Page ${pageNum} not found` });
+    }
+
+    let result = {};
+
+    switch (type) {
+      case 'original':
+        result = { originalImage: sceneImage.originalImage || null };
+        break;
+
+      case 'retry': {
+        const idx = parseInt(index, 10);
+        const entry = sceneImage.retryHistory?.[idx];
+        if (!entry) {
+          return res.status(404).json({ error: `Retry history index ${idx} not found` });
+        }
+
+        // Check if images are in data blob or need to be loaded from story_retry_images table
+        const hasImagesInBlob = entry.imageData || entry.bboxOverlayImage || entry.originalImage || entry.annotatedOriginal || (entry.grids && entry.grids.some(g => g.imageData || g.repairedImageData));
+
+        // If images stripped from blob, load from separate table
+        let retryImages = null;
+        if (!hasImagesInBlob) {
+          const allRetryImages = await getRetryHistoryImages(id, pageNum);
+          retryImages = allRetryImages[idx];
+        }
+
+        // Merge data blob metadata with images from table
+        // Map grid property names: table uses imageData/repairedImageData, frontend expects original/repaired
+        const mergedEntry = {
+          ...entry,
+          imageData: entry.imageData || retryImages?.imageData || null,
+          bboxOverlayImage: entry.bboxOverlayImage || retryImages?.bboxOverlayImage || null,
+          originalImage: entry.originalImage || retryImages?.originalImage || null,
+          annotatedOriginal: entry.annotatedOriginal || retryImages?.annotatedOriginal || null,
+          grids: entry.grids?.map((g, gIdx) => ({
+            ...g,
+            // Keep both naming conventions for compatibility
+            original: g.original || g.imageData || retryImages?.grids?.[gIdx]?.imageData || null,
+            repaired: g.repaired || g.repairedImageData || retryImages?.grids?.[gIdx]?.repairedImageData || null,
+            imageData: g.imageData || g.original || retryImages?.grids?.[gIdx]?.imageData || null,
+            repairedImageData: g.repairedImageData || g.repaired || retryImages?.grids?.[gIdx]?.repairedImageData || null
+          })) || (retryImages?.grids || []).map(g => ({
+            original: g.imageData,
+            repaired: g.repairedImageData,
+            imageData: g.imageData,
+            repairedImageData: g.repairedImageData
+          }))
+        };
+
+        if (field === 'imageData') {
+          result = { imageData: mergedEntry.imageData };
+        } else if (field === 'originalImage') {
+          result = { originalImage: mergedEntry.originalImage };
+        } else if (field === 'bboxOverlay') {
+          result = { bboxOverlayImage: mergedEntry.bboxOverlayImage };
+        } else if (field === 'annotatedOriginal') {
+          result = { annotatedOriginal: mergedEntry.annotatedOriginal };
+        } else if (field === 'grids') {
+          // Return grid images for grid-based repair
+          result = { grids: mergedEntry.grids };
+        } else {
+          // Return all available images for this retry entry
+          result = {
+            imageData: mergedEntry.imageData,
+            originalImage: mergedEntry.originalImage,
+            bboxOverlayImage: mergedEntry.bboxOverlayImage,
+            annotatedOriginal: mergedEntry.annotatedOriginal,
+            grids: mergedEntry.grids
+          };
+        }
+        break;
+      }
+
+      case 'repair': {
+        const idx = parseInt(index, 10);
+        const entry = sceneImage.repairHistory?.[idx];
+        if (!entry) {
+          return res.status(404).json({ error: `Repair history index ${idx} not found` });
+        }
+        result = {
+          imageData: entry.imageData || null,
+          originalImage: entry.originalImage || null
+        };
+        break;
+      }
+
+      case 'reference':
+        // Return all reference photos with their image data (photoUrl or photoData)
+        result = {
+          referencePhotos: (sceneImage.referencePhotos || []).map(p => ({
+            name: p.name,
+            photoType: p.photoType,
+            clothingCategory: p.clothingCategory,
+            clothingDescription: p.clothingDescription,
+            photoUrl: p.photoUrl || p.photoData || null  // photoData contains base64 data URI
+          })),
+          visualBibleGrid: sceneImage.visualBibleGrid || null
+        };
+        break;
+
+      case 'landmark':
+        // Return all landmark photos with their image data
+        result = {
+          landmarkPhotos: (sceneImage.landmarkPhotos || []).map(p => ({
+            name: p.name,
+            attribution: p.attribution,
+            source: p.source,
+            photoData: p.photoData || null
+          }))
+        };
+        break;
+
+      case 'consistency':
+        if (!sceneImage.consistencyRegen) {
+          return res.status(404).json({ error: 'No consistency regen data' });
+        }
+        result = {
+          originalImage: sceneImage.consistencyRegen.originalImage || null,
+          fixedImage: sceneImage.consistencyRegen.fixedImage || null
+        };
+        break;
+
+      default:
+        return res.status(400).json({ error: `Unknown type: ${type}` });
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error fetching dev image:', err);
+    res.status(500).json({ error: 'Failed to fetch dev image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/avatar-generation-image - Lazy load images for avatar generation log
+// Query params:
+//   type: 'styled' | 'costumed'
+//   index: index in the array
+//   field: 'facePhoto' | 'originalAvatar' | 'styleSample' | 'standardAvatar' | 'output'
+router.get('/:id/avatar-generation-image', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type, index, field } = req.query;
+    const idx = parseInt(index, 10);
+
+    if (!type || !['styled', 'costumed'].includes(type)) {
+      return res.status(400).json({ error: "type must be 'styled' or 'costumed'" });
+    }
+
+    if (isNaN(idx)) {
+      return res.status(400).json({ error: 'index query parameter required' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user access
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+    const arrayName = type === 'styled' ? 'styledAvatarGeneration' : 'costumedAvatarGeneration';
+    const entries = story[arrayName] || [];
+
+    if (idx < 0 || idx >= entries.length) {
+      return res.status(404).json({ error: `${type} avatar generation index ${idx} not found` });
+    }
+
+    const entry = entries[idx];
+    let result = {};
+
+    // Return specific field or all fields
+    if (field) {
+      switch (field) {
+        case 'facePhoto':
+          result = { facePhoto: entry.inputs?.facePhoto?.imageData || null };
+          break;
+        case 'originalAvatar':
+          result = { originalAvatar: entry.inputs?.originalAvatar?.imageData || null };
+          break;
+        case 'styleSample':
+          result = { styleSample: entry.inputs?.styleSample?.imageData || null };
+          break;
+        case 'standardAvatar':
+          result = { standardAvatar: entry.inputs?.standardAvatar?.imageData || null };
+          break;
+        case 'output':
+          result = { output: entry.output?.imageData || null };
+          break;
+        default:
+          return res.status(400).json({ error: `Unknown field: ${field}` });
+      }
+    } else {
+      // Return all images for this entry
+      result = {
+        facePhoto: entry.inputs?.facePhoto?.imageData || null,
+        originalAvatar: entry.inputs?.originalAvatar?.imageData || null,
+        styleSample: entry.inputs?.styleSample?.imageData || null,
+        standardAvatar: entry.inputs?.standardAvatar?.imageData || null,
+        output: entry.output?.imageData || null
+      };
+    }
+
+    res.json(result);
+  } catch (err) {
+    console.error('❌ Error fetching avatar generation image:', err);
+    res.status(500).json({ error: 'Failed to fetch avatar generation image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/retry-images/:pageNumber - Get retry history images for a page (dev mode)
+// Lazy-loads retry attempt images, bbox overlays, and grid repair images
+router.get('/:id/retry-images/:pageNumber', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    if (isNaN(pageNum)) {
+      return res.status(400).json({ error: 'Invalid page number' });
+    }
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access to this story
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Get retry history images from separate table
+    const images = await getRetryHistoryImages(id, pageNum);
+
+    console.log(`📷 [RETRY-IMAGES] ${id}/page${pageNum} - ${images.length} retry entries loaded`);
+
+    res.json({ images });
+  } catch (err) {
+    console.error('❌ Error fetching retry history images:', err);
+    res.status(500).json({ error: 'Failed to fetch retry history images', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/images - Get images in one request (optimized batch load)
+// Use ?activeOnly=true for fast initial load (~3MB instead of ~53MB)
+// Without activeOnly, returns all versions for dev mode / version switching
+router.get('/:id/images', authenticateToken, async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { id } = req.params;
+    const activeOnly = req.query.activeOnly === 'true';
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access to this story (fast query, no data loading)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Get all active versions from image_version_meta (fast lookup)
+    const activeVersions = await getAllActiveVersions(id);
+
+    // Use fast query for activeOnly mode, full query otherwise
+    const separateImages = activeOnly
+      ? await getActiveStoryImages(id)
+      : await getAllStoryImages(id);
+
+    if (separateImages && separateImages.length > 0) {
+      // Load story data blob for cover metadata (regeneration history, etc.)
+      // Skip for activeOnly mode to save time
+      let storyData = {};
+      if (!activeOnly) {
+        const storyDataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+        storyData = storyDataRows.length > 0
+          ? (typeof storyDataRows[0].data === 'string' ? JSON.parse(storyDataRows[0].data) : storyDataRows[0].data)
+          : {};
+      }
+
+      // Group images by page/cover type
+      const sceneImagesMap = new Map();
+      const covers = {};
+
+      for (const row of separateImages) {
+        if (row.image_type === 'scene') {
+          const pageNum = row.page_number;
+
+          if (activeOnly) {
+            // Fast path: one image per page, no versions array
+            sceneImagesMap.set(pageNum, {
+              pageNumber: pageNum,
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              versionCount: row.version_count || 1,
+              activeVersion: row.version_index
+            });
+          } else {
+            // Full path: build imageVersions array with ALL versions
+            if (!sceneImagesMap.has(pageNum)) {
+              sceneImagesMap.set(pageNum, {
+                pageNumber: pageNum,
+                imageData: null,
+                qualityScore: null,
+                generatedAt: null,
+                imageVersions: []
+              });
+            }
+            const scene = sceneImagesMap.get(pageNum);
+            const activeIdx = activeVersions[pageNum.toString()] ?? 0;
+
+            // Add ALL versions to imageVersions array (including version 0)
+            scene.imageVersions.push({
+              versionIndex: row.version_index,
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              createdAt: row.generated_at, // Alias for frontend compatibility
+              isActive: row.version_index === activeIdx
+            });
+
+            // Set main imageData to the ACTIVE version (not always version 0)
+            // This ensures full load returns the same image as fast load
+            if (row.version_index === activeIdx) {
+              scene.imageData = normalizeImageData(row.image_data);
+              scene.qualityScore = row.quality_score;
+              scene.generatedAt = row.generated_at;
+            }
+          }
+        } else {
+          // Cover image (frontCover, initialPage, backCover)
+          const coverType = row.image_type;
+
+          if (activeOnly) {
+            // Fast path: one image per cover, no versions array
+            covers[coverType] = {
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              versionCount: row.version_count || 1,
+              activeVersion: row.version_index
+            };
+          } else {
+            // Full path: build imageVersions array
+            if (!covers[coverType]) {
+              covers[coverType] = {
+                imageData: null,
+                qualityScore: null,
+                generatedAt: null,
+                imageVersions: []
+              };
+            }
+
+            const coverData = covers[coverType];
+            const activeCoverVersion = activeVersions[coverType] ?? 0;
+
+            // Add to imageVersions array
+            coverData.imageVersions.push({
+              imageData: normalizeImageData(row.image_data),
+              qualityScore: row.quality_score,
+              generatedAt: row.generated_at,
+              createdAt: row.generated_at, // Alias for frontend compatibility
+              isActive: row.version_index === activeCoverVersion
+            });
+
+            // If this is the active version, set as main imageData
+            if (row.version_index === activeCoverVersion) {
+              coverData.imageData = normalizeImageData(row.image_data);
+              coverData.qualityScore = row.quality_score;
+              coverData.generatedAt = row.generated_at;
+            }
+          }
+        }
+      }
+
+      // Sort cover imageVersions by version_index (rows may not be in order)
+      // Skip for activeOnly mode (no imageVersions array)
+      if (!activeOnly) {
+        for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+          if (covers[coverType]?.imageVersions?.length > 0) {
+            // imageVersions were added in row order, but version_index determines actual order
+            // Since we don't have version_index in the version object, rely on insertion order
+            // (getAllStoryImages returns them ordered by version_index ASC)
+          }
+        }
+      }
+
+      // For full mode only: merge cover metadata and process imageVersions
+      if (!activeOnly) {
+        // Merge cover metadata from story data blob (regeneration history, prompts, etc.)
+        // IMPORTANT: Exclude image fields (previousImage, originalImage, bboxOverlayImage, retryHistory)
+        // to avoid bloating the response. These can be lazy-loaded if needed.
+        const coverMetadataFields = ['description', 'prompt', 'modelId', 'wasRegenerated',
+          'regenerationCount', 'previousScore', 'previousReasoning',
+          'originalScore', 'originalReasoning', 'referencePhotos',
+          'regeneratedAt', 'bboxDetection'];
+
+        for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+          if (covers[coverType] && storyData.coverImages?.[coverType]) {
+            const blobCover = storyData.coverImages[coverType];
+            for (const field of coverMetadataFields) {
+              if (blobCover[field] !== undefined) {
+                covers[coverType][field] = blobCover[field];
+              }
+            }
+            // Also merge imageVersions metadata (description, type, createdAt) from blob
+            // IMPORTANT: Only merge up to the number of versions in the DB, not from blob
+            if (blobCover.imageVersions && covers[coverType].imageVersions) {
+              for (let i = 0; i < covers[coverType].imageVersions.length && i < blobCover.imageVersions.length; i++) {
+                const blobVersion = blobCover.imageVersions[i];
+                if (blobVersion) {
+                  covers[coverType].imageVersions[i].description = blobVersion.description;
+                  covers[coverType].imageVersions[i].type = blobVersion.type;
+                  covers[coverType].imageVersions[i].createdAt = blobVersion.createdAt || covers[coverType].imageVersions[i].generatedAt || storyData.createdAt || null;
+                }
+              }
+            }
+          }
+          // Strip imageVersions if only one version (original, no regenerations)
+          if (covers[coverType]?.imageVersions?.length <= 1) {
+            delete covers[coverType].imageVersions;
+          }
+        }
+      }
+
+      // Merge scene imageVersions metadata from blob (description, prompt, modelId, etc.)
+      // Uses DB version_index + dbToArrayIndex to correctly map to blob imageVersions.
+      //
+      // Blob structure varies by source:
+      //  - Initial generation: main blob = v0, imageVersions = [] (empty)
+      //  - Repair pipeline: main blob = best version, imageVersions = [v1, v2, ...]
+      //  - After iterate: main blob = LATEST version (overwritten by Object.assign),
+      //    imageVersions[0] = v0 preservation (no source field), imageVersions[1+] = iterate versions
+      //
+      // DB version_index mapping: imageVersions[i] → DB version_index = i+1 (for scenes)
+      // So DB version_index 0 = main image, DB version_index N → blob imageVersions[N-1]
+      if (!activeOnly && storyData.sceneImages) {
+        for (const [pageNum, scene] of sceneImagesMap) {
+          const blobScene = storyData.sceneImages.find(s => s.pageNumber === pageNum);
+          if (blobScene && scene.imageVersions) {
+            const mergeFields = (target, source) => {
+              target.description = source.description || source.sceneDescription || null;
+              target.prompt = source.prompt || null;
+              target.userInput = source.userInput || null;
+              target.modelId = source.modelId || target.modelId || null;
+              target.type = source.type || null;
+              target.qualityReasoning = source.qualityReasoning || null;
+              target.fixTargets = source.fixTargets || [];
+              target.totalAttempts = source.totalAttempts || null;
+              target.referencePhotoNames = source.referencePhotoNames || [];
+              target.semanticScore = source.semanticScore ?? null;
+              target.entityPenalty = source.entityPenalty || 0;
+              target.evaluatedAt = source.evaluatedAt || null;
+              target.issuesSummary = source.issuesSummary || null;
+              target.createdAt = source.createdAt || target.generatedAt || storyData.createdAt || null;
+            };
+
+            for (let i = 0; i < scene.imageVersions.length; i++) {
+              const dbVersionIdx = scene.imageVersions[i].versionIndex;
+
+              if (dbVersionIdx === 0) {
+                // v0: find original metadata from one of three sources (in priority order):
+                // 1. Iterate preservation entry at imageVersions[0] (no 'source' field)
+                // 2. originalMetadata saved before Object.assign (repair-before-iterate case)
+                // 3. Main blob scene object (no iterate happened, main blob = v0)
+                const firstBlob = blobScene.imageVersions?.[0];
+                if (firstBlob && !firstBlob.source) {
+                  // Source 1: iterate preservation entry
+                  mergeFields(scene.imageVersions[i], firstBlob);
+                } else if (blobScene.originalMetadata) {
+                  // Source 2: saved before iterate's Object.assign (repair ran first)
+                  mergeFields(scene.imageVersions[i], blobScene.originalMetadata);
+                  scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
+                } else {
+                  // Source 3: main blob = v0 (no iterate happened)
+                  mergeFields(scene.imageVersions[i], {
+                    description: blobScene.sceneDescription,
+                    prompt: blobScene.prompt,
+                    modelId: blobScene.modelId,
+                    qualityReasoning: blobScene.qualityReasoning,
+                    fixTargets: blobScene.fixTargets,
+                    referencePhotoNames: blobScene.referencePhotoNames,
+                  });
+                  scene.imageVersions[i].createdAt = scene.imageVersions[i].generatedAt || storyData.createdAt || null;
+                }
+              } else {
+                // v1+: use dbToArrayIndex to find the correct blob entry
+                const blobIdx = dbToArrayIndex(dbVersionIdx, 'scene');
+                const blobVersion = blobScene.imageVersions?.[blobIdx];
+                if (blobVersion) {
+                  mergeFields(scene.imageVersions[i], blobVersion);
+                }
+                // Fallback: retryHistory has per-attempt bboxDetection
+                const retryEntry = blobScene.retryHistory?.[dbVersionIdx];
+                if (retryEntry && !scene.imageVersions[i].fixTargets?.length) {
+                  scene.imageVersions[i].bboxDetection = retryEntry.bboxDetection || null;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Convert map to sorted array
+      const images = Array.from(sceneImagesMap.values())
+        .sort((a, b) => a.pageNumber - b.pageNumber)
+        .map(img => {
+          if (activeOnly) {
+            // Fast path: already have active image, no imageVersions
+            return img;
+          }
+          // Full path: mark active versions
+          const activeIdx = activeVersions[img.pageNumber.toString()];
+          return {
+            ...img,
+            isActive: activeIdx === 0 || activeIdx === undefined,
+            imageVersions: img.imageVersions.length > 0 ? img.imageVersions : undefined
+          };
+        });
+
+      const totalSize = separateImages.reduce((sum, r) => sum + (r.image_data?.length || 0), 0);
+      const mode = activeOnly ? 'FAST' : 'BATCH';
+      console.log(`📷 [${mode}] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Math.round(totalSize/1024)}KB, ${Date.now() - startTime}ms`);
+
+      return res.json({ images, covers });
+    }
+
+    // SLOW path: Load from data blob (for non-migrated stories)
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+
+    const images = (story.sceneImages || []).map(img => {
+      const activeIdx = activeVersions[img.pageNumber?.toString()];
+      return {
+        pageNumber: img.pageNumber,
+        imageData: normalizeImageData(img.imageData),
+        qualityScore: img.qualityScore,
+        isActive: activeIdx === 0 || activeIdx === undefined,
+        imageVersions: img.imageVersions?.map((v, i) => ({
+          imageData: normalizeImageData(v.imageData),
+          qualityScore: v.qualityScore,
+          isActive: activeIdx === (i + 1)
+        }))
+      };
+    });
+
+    const covers = {};
+    if (story.coverImages) {
+      for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
+        const coverData = story.coverImages[coverType];
+        if (coverData) {
+          const imageData = coverData.imageData;
+          if (imageData) {
+            const activeCoverIdx = activeVersions[coverType] ?? 0;
+            covers[coverType] = {
+              imageData: normalizeImageData(imageData),
+              qualityScore: coverData.qualityScore || null
+            };
+            // Include imageVersions if available in blob (more than 1 version)
+            if (coverData.imageVersions && coverData.imageVersions.length > 1) {
+              covers[coverType].imageVersions = coverData.imageVersions.map((v, i) => ({
+                imageData: normalizeImageData(v.imageData),
+                qualityScore: v.qualityScore,
+                description: v.description,
+                type: v.type,
+                createdAt: v.createdAt,
+                isActive: i === activeCoverIdx
+              }));
+            }
+          }
+        }
+      }
+    }
+
+    console.log(`📷 [BATCH-FALLBACK] ${id} - ${images.length} pages, ${Object.keys(covers).length} covers, ${Date.now() - startTime}ms`);
+
+    return res.json({ images, covers });
+
+  } catch (err) {
+    console.error(`❌ Error fetching batch images for ${req.params.id}:`, err);
+    res.status(500).json({ error: 'Failed to fetch images', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/image/:pageNumber - Get individual page image
+// Optimized: First tries separate story_images table, falls back to data blob
+// Returns isActive flag from image_version_meta column for each version
+router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
+  const startTime = Date.now();
+  try {
+    const { id, pageNumber } = req.params;
+    const pageNum = parseInt(pageNumber, 10);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // First, verify user has access to this story (fast query, no data loading)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Get active version from image_version_meta (fast lookup)
+    const activeVersion = await getActiveVersion(id, pageNum);
+
+    // Try to get image with all versions in single query (FAST path)
+    const separateImage = await getStoryImageWithVersions(id, 'scene', pageNum);
+    if (separateImage) {
+      // Get version metadata (description, prompt, modelId, type) from data blob for dev mode
+      const versionMetaQuery = await dbQuery(
+        `SELECT scene->'imageVersions' as version_meta
+         FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+         WHERE stories.id = $1 AND (scene->>'pageNumber')::int = $2`,
+        [id, pageNum]
+      );
+      let versionMeta = [];
+      if (versionMetaQuery.length > 0 && versionMetaQuery[0].version_meta) {
+        versionMeta = versionMetaQuery[0].version_meta.map(v => ({
+          description: v.description,
+          prompt: v.prompt,
+          userInput: v.userInput,
+          modelId: v.modelId,
+          type: v.type,
+          createdAt: v.createdAt
+        }));
+      }
+
+      // Build imageVersions array with ALL versions (including version 0 = main image)
+      // Frontend expects imageVersions[0] = original, imageVersions[1] = regeneration 1, etc.
+      const allVersions = [
+        // Version 0 (main/original image)
+        {
+          imageData: normalizeImageData(separateImage.imageData),
+          qualityScore: separateImage.qualityScore,
+          generatedAt: separateImage.generatedAt || versionMeta[0]?.createdAt,
+          isActive: activeVersion === 0,
+          description: versionMeta[0]?.description,
+          prompt: versionMeta[0]?.prompt,
+          userInput: versionMeta[0]?.userInput,
+          modelId: versionMeta[0]?.modelId,
+          type: versionMeta[0]?.type
+        },
+        // Versions 1, 2, 3... (regenerations)
+        ...(separateImage.versions || []).map((v, i) => {
+          const meta = versionMeta[i + 1] || {};
+          return {
+            ...v,
+            imageData: v.imageData ? normalizeImageData(v.imageData) : undefined,
+            isActive: (i + 1) === activeVersion,
+            description: meta.description,
+            prompt: meta.prompt,
+            userInput: meta.userInput,
+            modelId: meta.modelId,
+            type: meta.type
+          };
+        })
+      ];
+
+      const imageSize = separateImage.imageData?.length || 0;
+      const versionsCount = allVersions.length;
+      console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, active=${activeVersion}, ${Date.now() - startTime}ms`);
+
+      // Return active version's imageData as the main imageData
+      const activeImageData = activeVersion === 0
+        ? normalizeImageData(separateImage.imageData)
+        : (allVersions[activeVersion]?.imageData || normalizeImageData(separateImage.imageData));
+
+      return res.json({
+        pageNumber: pageNum,
+        imageData: activeImageData,
+        qualityScore: separateImage.qualityScore,
+        generatedAt: separateImage.generatedAt,
+        imageVersions: allVersions
+      });
+    }
+
+    // Fallback: Load from data blob (SLOW path for non-migrated stories)
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+    const sceneImage = story.sceneImages?.find(img => img.pageNumber === pageNum);
+    if (!sceneImage || !sceneImage.imageData) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+
+    // Mark isActive based on image_version_meta (or fallback to legacy isActive in data)
+    const versionsWithActive = sceneImage.imageVersions?.map((v, i) => ({
+      ...v,
+      isActive: i === activeVersion
+    }));
+
+    const imageSize = sceneImage.imageData?.length || 0;
+    const versionsCount = sceneImage.imageVersions?.length || 0;
+    console.log(`📷 [IMAGE-FALLBACK] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, ${Date.now() - startTime}ms`);
+
+    res.json({
+      pageNumber: pageNum,
+      imageData: normalizeImageData(sceneImage.imageData),
+      isActive: activeVersion === 0,
+      imageVersions: versionsWithActive
+    });
+  } catch (err) {
+    console.error(`❌ Error fetching page image ${req.params.id}/page${req.params.pageNumber}:`, err);
+    res.status(500).json({ error: 'Failed to fetch image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/cover-image/:coverType - Get individual cover image
+// Optimized: First tries separate story_images table, falls back to data blob
+router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) => {
+  try {
+    const { id, coverType } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // First, verify user has access to this story (fast query, no data loading)
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Try to get cover from separate table first (FAST path)
+    const separateImage = await getStoryImage(id, coverType, null, 0);
+    if (separateImage) {
+      return res.json({
+        coverType,
+        imageData: normalizeImageData(separateImage.imageData),
+        qualityScore: separateImage.qualityScore,
+        generatedAt: separateImage.generatedAt
+      });
+    }
+
+    // Fallback: Load from data blob (SLOW path for non-migrated stories)
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+    const coverData = story.coverImages?.[coverType];
+    if (!coverData) {
+      return res.status(404).json({ error: 'Cover not found' });
+    }
+
+    const imageData = coverData.imageData;
+    if (!imageData) {
+      return res.status(404).json({ error: 'Cover image not found' });
+    }
+
+    res.json({
+      coverType,
+      imageData: normalizeImageData(imageData),
+      description: coverData.description,
+      storyTitle: coverData.storyTitle
+    });
+  } catch (err) {
+    console.error('❌ Error fetching cover image:', err);
+    res.status(500).json({ error: 'Failed to fetch cover', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/visual-bible-image/:elementId - Get Visual Bible reference image
+// Lazy-loads reference images for secondary characters, animals, artifacts, etc.
+router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, res) => {
+  try {
+    const { id, elementId } = req.params;
+    console.log(`🖼️ GET visual-bible-image - Story: ${id}, Element: ${elementId}, User: ${req.user?.username || 'unknown'}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access to this story
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Load story data to find the Visual Bible element
+    const dataRows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (dataRows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = typeof dataRows[0].data === 'string' ? JSON.parse(dataRows[0].data) : dataRows[0].data;
+    const visualBible = story.visualBible;
+
+    if (!visualBible) {
+      return res.status(404).json({ error: 'Visual Bible not found' });
+    }
+
+    // Search all element arrays for the requested ID
+    const allArrays = [
+      visualBible.secondaryCharacters,
+      visualBible.animals,
+      visualBible.artifacts,
+      visualBible.locations,
+      visualBible.vehicles,
+      visualBible.clothing
+    ];
+
+    let foundElement = null;
+    for (const arr of allArrays) {
+      if (!arr) continue;
+      const element = arr.find(e => e.id === elementId);
+      if (element) {
+        foundElement = element;
+        break;
+      }
+    }
+
+    if (!foundElement) {
+      return res.status(404).json({ error: 'Element not found' });
+    }
+
+    if (!foundElement.referenceImageData) {
+      return res.status(404).json({ error: 'No reference image for this element' });
+    }
+
+    res.json({
+      elementId,
+      name: foundElement.name,
+      imageData: normalizeImageData(foundElement.referenceImageData)
+    });
+
+  } catch (err) {
+    console.error('❌ Error fetching Visual Bible image:', err);
+    res.status(500).json({ error: 'Failed to fetch image', details: err.message });
+  }
+});
+
+// GET /api/stories/:id - Get single story with ALL data (images included)
+router.get('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`📖 GET /api/stories/${id} - User: ${req.user.username}, impersonating: ${req.user.impersonating || false}`);
+
+    let story = null;
+
+    if (isDatabaseMode()) {
+      let rows;
+      if (req.user.impersonating && req.user.originalAdminId) {
+        // Admin impersonating - try impersonated user first, then any story
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+        if (rows.length === 0) {
+          rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+          if (rows.length > 0) {
+            console.log(`📖 [IMPERSONATE] Admin viewing story owned by user_id: ${rows[0].user_id}`);
+          }
+        }
+      } else {
+        rows = await dbQuery('SELECT data FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      }
+
+      if (rows.length > 0) {
+        story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+        // Rehydrate images from story_images table (images may be stripped from data blob)
+        story = await rehydrateStoryImages(id, story);
+
+        // Sync isActive flags in imageVersions with stored active version metadata
+        if (story.sceneImages && story.sceneImages.length > 0) {
+          const activeVersions = await getAllActiveVersions(id);
+          for (const scene of story.sceneImages) {
+            if (scene.imageVersions && scene.imageVersions.length > 0) {
+              const activeVersion = activeVersions[scene.pageNumber] ?? 0;
+              scene.imageVersions.forEach((v, idx) => {
+                v.isActive = idx === activeVersion;
+              });
+              // Track active version index for frontend
+              scene.activeVersionIndex = activeVersion;
+            }
+          }
+        }
+      }
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    console.log(`📖 Returning full story: ${story.title} with ${story.sceneImages?.length || 0} images`);
+    res.json(story);
+  } catch (err) {
+    console.error('❌ Error fetching story:', err);
+    res.status(500).json({ error: 'Failed to fetch story', details: err.message });
+  }
+});
+
+// GET /api/stories/:id/cover - Get story cover image only (for lazy loading in story list)
+router.get('/:id/cover', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify user has access (fast query, no data loading)
+    const accessCheck = await dbQuery(
+      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+    if (accessCheck.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // FAST PATH: Try to get cover from separate images table first
+    const separateImage = await getStoryImage(id, 'frontCover', null, 0);
+    if (separateImage) {
+      return res.json({ coverImage: separateImage.imageData });
+    }
+
+    // SLOW PATH: Fall back to loading from data blob
+    const result = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
+    if (result.length > 0) {
+      const story = typeof result[0].data === 'string' ? JSON.parse(result[0].data) : result[0].data;
+      const coverImage = story.coverImages?.frontCover?.imageData || story.coverImages?.frontCover || story.thumbnail || null;
+      if (coverImage) {
+        return res.json({ coverImage });
+      }
+    }
+
+    return res.status(404).json({ error: 'Cover image not found' });
+  } catch (err) {
+    console.error('❌ Error fetching cover image:', err);
+    res.status(500).json({ error: 'Failed to fetch cover image' });
+  }
+});
+
+// POST /api/stories - Save or update a story
+router.post('/', authenticateToken, async (req, res) => {
+  try {
+    const { story } = req.body;
+
+    // Add timestamp and ID if not present
+    if (!story.id) {
+      story.id = Date.now().toString();
+    }
+    story.createdAt = story.createdAt || new Date().toISOString();
+    story.updatedAt = new Date().toISOString();
+
+    let isNewStory;
+
+    if (isDatabaseMode()) {
+      // Check if story exists
+      const existing = await dbQuery('SELECT id FROM stories WHERE id = $1 AND user_id = $2', [story.id, req.user.id]);
+      isNewStory = existing.length === 0;
+
+      // Save story (automatically extracts images to story_images table)
+      // Use upsertStory which handles both insert and update
+      const { upsertStory } = require('../services/database');
+      await upsertStory(story.id, req.user.id, story);
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    await logActivity(req.user.id, req.user.username, 'STORY_SAVED', {
+      storyId: story.id,
+      isNew: isNewStory
+    });
+
+    res.json({ message: 'Story saved successfully', id: story.id });
+  } catch (err) {
+    console.error('Error saving story:', err);
+    res.status(500).json({ error: 'Failed to save story' });
+  }
+});
+
+// DELETE /api/stories/:id - Delete a story
+router.delete('/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`🗑️  DELETE /api/stories/${id} - User: ${req.user.username}`);
+
+    if (isDatabaseMode()) {
+      const result = await dbQuery('DELETE FROM stories WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+
+      if (!result.rowCount || result.rowCount === 0) {
+        return res.status(404).json({ error: 'Story not found or you do not have permission to delete it' });
+      }
+
+      // Also delete associated story_job
+      try {
+        const pool = getPool();
+        await pool.query('DELETE FROM story_jobs WHERE id = $1 AND user_id = $2', [id, req.user.id]);
+      } catch (jobErr) {
+        log.warn(`Could not delete story_job ${id}:`, jobErr.message);
+      }
+
+      console.log(`✅ Successfully deleted story ${id}`);
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    await logActivity(req.user.id, req.user.username, 'STORY_DELETED', { storyId: id });
+    res.json({ message: 'Story deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting story:', err);
+    res.status(500).json({ error: 'Failed to delete story' });
+  }
+});
+
+// Helper function to update page text
+function updatePageText(storyText, pageNumber, newText) {
+  const pageRegex = new RegExp(`(Page ${pageNumber}[:\\s]*\\n?)([\\s\\S]*?)(?=Page \\d+|$)`, 'i');
+  const match = storyText.match(pageRegex);
+
+  if (match) {
+    return storyText.replace(pageRegex, `$1${newText}\n\n`);
+  }
+  return storyText;
+}
+
+// PATCH /api/stories/:id/page/:pageNum - Update page text or scene description
+router.patch('/:id/page/:pageNum', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNum } = req.params;
+    const { text, sceneDescription } = req.body;
+    const pageNumber = parseInt(pageNum);
+
+    if (!text && !sceneDescription) {
+      return res.status(400).json({ error: 'Provide text or sceneDescription to update' });
+    }
+
+    console.log(`📝 Editing page ${pageNumber} for story ${id}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+    const storyResult = await pool.query(
+      'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (storyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const story = storyResult.rows[0];
+    const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
+
+    // Update page text if provided
+    if (text !== undefined) {
+      storyData.storyText = updatePageText(storyData.storyText, pageNumber, text);
+    }
+
+    // Update scene description if provided
+    if (sceneDescription !== undefined) {
+      let sceneDescriptions = storyData.sceneDescriptions || [];
+      const existingIndex = sceneDescriptions.findIndex(s => s.pageNumber === pageNumber);
+
+      if (existingIndex >= 0) {
+        sceneDescriptions[existingIndex].description = sceneDescription;
+      } else {
+        sceneDescriptions.push({ pageNumber, description: sceneDescription });
+        sceneDescriptions.sort((a, b) => a.pageNumber - b.pageNumber);
+      }
+      storyData.sceneDescriptions = sceneDescriptions;
+    }
+
+    // Save updated story with metadata (extracts images to story_images table)
+    await saveStoryData(id, storyData);
+
+    console.log(`✅ Page ${pageNumber} updated for story ${id}`);
+
+    res.json({
+      success: true,
+      pageNumber,
+      updated: { text: text !== undefined, sceneDescription: sceneDescription !== undefined }
+    });
+
+  } catch (err) {
+    console.error('Error editing page:', err);
+    res.status(500).json({ error: 'Failed to edit page: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/visual-bible - Update Visual Bible
+router.put('/:id/visual-bible', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { visualBible } = req.body;
+
+    if (!visualBible) {
+      return res.status(400).json({ error: 'visualBible is required' });
+    }
+
+    console.log(`📖 PUT /api/stories/${id}/visual-bible - User: ${req.user.username}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+    const result = await pool.query(
+      'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = typeof result.rows[0].data === 'string' ? JSON.parse(result.rows[0].data) : result.rows[0].data;
+    storyData.visualBible = visualBible;
+    storyData.updatedAt = new Date().toISOString();
+
+    // Note: visualBible doesn't affect metadata, but update for consistency
+    await saveStoryData(id, storyData);
+
+    console.log(`✅ Visual Bible updated for story ${id}`);
+
+    res.json({
+      success: true,
+      message: 'Visual Bible updated successfully'
+    });
+
+  } catch (err) {
+    console.error('Error updating Visual Bible:', err);
+    res.status(500).json({ error: 'Failed to update Visual Bible: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/text - Bulk update story text (for edit mode)
+router.put('/:id/text', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { story: newStoryText } = req.body;
+
+    if (!newStoryText) {
+      return res.status(400).json({ error: 'story text is required' });
+    }
+
+    console.log(`📝 PUT /api/stories/${id}/text - Saving edited text (user: ${req.user.username}, impersonating: ${req.user.impersonating || false})`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // If admin is impersonating, allow access to the impersonated user's stories
+    // The impersonation token has req.user.id set to the impersonated user's ID
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      // Admin impersonating - try with impersonated user's ID first, then allow any story
+      rows = await dbQuery(
+        'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+      // If not found with user_id, admin can still access any story
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+        if (rows.length > 0) {
+          console.log(`📝 [IMPERSONATE] Admin accessing story owned by user_id: ${rows[0].user_id}`);
+        }
+      }
+    } else {
+      rows = await dbQuery(
+        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+    // Preserve original story text on first edit
+    if (!storyData.originalStory && storyData.story) {
+      storyData.originalStory = storyData.story;
+      console.log(`📝 Preserved original story text (${storyData.originalStory.length} chars)`);
+    }
+
+    // Update story text
+    storyData.story = newStoryText;
+    storyData.storyText = newStoryText; // Also update storyText for compatibility
+    storyData.updatedAt = new Date().toISOString();
+
+    await saveStoryData(id, storyData);
+
+    console.log(`✅ Story text updated for ${id}`);
+    await logActivity(req.user.id, req.user.username, 'STORY_TEXT_EDITED', { storyId: id });
+
+    res.json({
+      success: true,
+      message: 'Story text saved successfully',
+      hasOriginal: !!storyData.originalStory
+    });
+
+  } catch (err) {
+    console.error('Error saving story text:', err);
+    res.status(500).json({ error: 'Failed to save story text: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/title - Update story title
+router.put('/:id/title', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title } = req.body;
+
+    if (!title || typeof title !== 'string') {
+      return res.status(400).json({ error: 'title is required' });
+    }
+
+    console.log(`📝 PUT /api/stories/${id}/title - Saving title (user: ${req.user.username})`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Handle impersonation similar to text endpoint
+    let rows;
+    if (req.user.impersonating && req.user.originalAdminId) {
+      rows = await dbQuery(
+        'SELECT data, user_id FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+      if (rows.length === 0) {
+        rows = await dbQuery('SELECT data, user_id FROM stories WHERE id = $1', [id]);
+      }
+    } else {
+      rows = await dbQuery(
+        'SELECT data FROM stories WHERE id = $1 AND user_id = $2',
+        [id, req.user.id]
+      );
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const storyData = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
+
+    // Update title
+    storyData.title = title.trim();
+    storyData.updatedAt = new Date().toISOString();
+
+    // Title is in metadata, so we need to update it
+    await saveStoryData(id, storyData);
+
+    console.log(`✅ Story title updated for ${id}: "${title.trim()}"`);
+    await logActivity(req.user.id, req.user.username, 'STORY_TITLE_EDITED', { storyId: id, newTitle: title.trim() });
+
+    res.json({
+      success: true,
+      message: 'Story title saved successfully',
+      title: title.trim()
+    });
+
+  } catch (err) {
+    console.error('Error saving story title:', err);
+    res.status(500).json({ error: 'Failed to save story title: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/pages/:pageNumber/active-image - Select which image version is active
+// OPTIMIZED: Uses image_version_meta column for O(1) update instead of rewriting entire data blob
+router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req, res) => {
+  try {
+    const { id, pageNumber } = req.params;
+    const { versionIndex } = req.body;
+    const pageNum = parseInt(pageNumber);
+
+    if (typeof versionIndex !== 'number' || versionIndex < 0) {
+      return res.status(400).json({ error: 'Valid versionIndex is required' });
+    }
+
+    console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - Selecting version ${versionIndex}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+
+    // Verify story ownership (fast query, no data loading)
+    const ownerCheck = await pool.query(
+      `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Validate version exists in story_images table
+    const versionCheck = await pool.query(
+      `SELECT 1 FROM story_images
+       WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
+      [id, pageNum, versionIndex]
+    );
+
+    if (versionCheck.rows.length === 0) {
+      // Fallback: check data blob for legacy stories without story_images entries
+      const dataCheck = await pool.query(
+        `SELECT jsonb_array_length(
+           (SELECT scene->'imageVersions'
+            FROM jsonb_array_elements(data->'sceneImages') AS scene
+            WHERE (scene->>'pageNumber')::int = $2
+            LIMIT 1)
+         ) as version_count
+         FROM stories WHERE id = $1`,
+        [id, pageNum]
+      );
+
+      const versionCount = dataCheck.rows[0]?.version_count || 0;
+      if (versionIndex >= versionCount) {
+        return res.status(400).json({ error: 'Invalid version index' });
+      }
+    }
+
+    // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
+    await setActiveVersion(id, pageNum, versionIndex);
+
+    // Also update metadata timestamp
+    await pool.query(
+      `UPDATE stories
+       SET metadata = jsonb_set(COALESCE(metadata::jsonb, '{}'), '{updatedAt}', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(new Date().toISOString()), id]
+    );
+
+    console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum} (fast path)`);
+
+    res.json({
+      success: true,
+      activeVersion: versionIndex,
+      pageNumber: pageNum
+    });
+
+  } catch (err) {
+    console.error('Error setting active image:', err);
+    res.status(500).json({ error: 'Failed to set active image: ' + err.message });
+  }
+});
+
+// PUT /api/stories/:id/covers/:coverType/active-image - Select which cover version is active
+// OPTIMIZED: Uses image_version_meta column for O(1) update instead of rewriting entire data blob
+router.put('/:id/covers/:coverType/active-image', authenticateToken, async (req, res) => {
+  try {
+    const { id, coverType } = req.params;
+    const { versionIndex } = req.body;
+
+    // Validate cover type
+    if (!['frontCover', 'initialPage', 'backCover'].includes(coverType)) {
+      return res.status(400).json({ error: 'Invalid cover type. Must be: frontCover, initialPage, or backCover' });
+    }
+
+    if (typeof versionIndex !== 'number' || versionIndex < 0) {
+      return res.status(400).json({ error: 'Valid versionIndex is required' });
+    }
+
+    console.log(`🖼️ PUT /api/stories/${id}/covers/${coverType}/active-image - Selecting version ${versionIndex}`);
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const pool = getPool();
+
+    // Verify story ownership (fast query, no data loading)
+    const ownerCheck = await pool.query(
+      `SELECT 1 FROM stories WHERE id = $1 AND user_id = $2`,
+      [id, req.user.id]
+    );
+
+    if (ownerCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Validate version exists in story_images table
+    const versionCheck = await pool.query(
+      `SELECT 1 FROM story_images
+       WHERE story_id = $1 AND image_type = $2 AND version_index = $3`,
+      [id, coverType, versionIndex]
+    );
+
+    if (versionCheck.rows.length === 0) {
+      // Fallback: check data blob for legacy stories without story_images entries
+      const dataCheck = await pool.query(
+        `SELECT jsonb_array_length(data->'coverImages'->'${coverType}'->'imageVersions') as version_count
+         FROM stories WHERE id = $1`,
+        [id]
+      );
+
+      const versionCount = dataCheck.rows[0]?.version_count || 0;
+      if (versionIndex >= versionCount) {
+        return res.status(400).json({ error: 'Invalid version index' });
+      }
+    }
+
+    // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
+    await setActiveVersion(id, coverType, versionIndex);
+
+    // Also update metadata timestamp
+    await pool.query(
+      `UPDATE stories
+       SET metadata = jsonb_set(COALESCE(metadata::jsonb, '{}'), '{updatedAt}', $1::jsonb)
+       WHERE id = $2`,
+      [JSON.stringify(new Date().toISOString()), id]
+    );
+
+    console.log(`✅ Active cover image set to version ${versionIndex} for ${coverType} (fast path)`);
+
+    res.json({
+      success: true,
+      activeVersion: versionIndex,
+      coverType
+    });
+
+  } catch (err) {
+    console.error('Error setting active cover image:', err);
+    res.status(500).json({ error: 'Failed to set active cover image: ' + err.message });
+  }
+});
+
+// ============================================
+// STORY SHARING
+// ============================================
+
+const crypto = require('crypto');
+
+/**
+ * Generate a cryptographically secure share token
+ */
+function generateShareToken() {
+  return crypto.randomBytes(32).toString('hex'); // 64 char hex string
+}
+
+/**
+ * GET /api/stories/:id/share-status - Get sharing status for a story
+ */
+router.get('/:id/share-status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership
+    const rows = await dbQuery(
+      'SELECT share_token, is_shared FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    const { share_token, is_shared } = rows[0];
+
+    res.json({
+      isShared: is_shared || false,
+      shareToken: is_shared ? share_token : null,
+      shareUrl: is_shared && share_token ? `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/s/${share_token}` : null
+    });
+  } catch (err) {
+    console.error('Error getting share status:', err);
+    res.status(500).json({ error: 'Failed to get share status' });
+  }
+});
+
+/**
+ * POST /api/stories/:id/share - Enable sharing for a story
+ */
+router.post('/:id/share', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership and get current token
+    const rows = await dbQuery(
+      'SELECT share_token FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    let shareToken = rows[0].share_token;
+
+    // Generate new token if none exists
+    if (!shareToken) {
+      shareToken = generateShareToken();
+      await dbQuery(
+        'UPDATE stories SET share_token = $1, is_shared = true WHERE id = $2',
+        [shareToken, id]
+      );
+    } else {
+      // Just enable sharing
+      await dbQuery(
+        'UPDATE stories SET is_shared = true WHERE id = $1',
+        [id]
+      );
+    }
+
+    const shareUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/s/${shareToken}`;
+
+    console.log(`✅ Sharing enabled for story ${id}, token: ${shareToken.substring(0, 8)}...`);
+
+    res.json({
+      isShared: true,
+      shareToken,
+      shareUrl
+    });
+  } catch (err) {
+    console.error('Error enabling sharing:', err);
+    res.status(500).json({ error: 'Failed to enable sharing' });
+  }
+});
+
+/**
+ * DELETE /api/stories/:id/share - Disable sharing for a story
+ */
+router.delete('/:id/share', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    // Verify ownership
+    const rows = await dbQuery(
+      'SELECT id FROM stories WHERE id = $1 AND user_id = $2',
+      [id, req.user.id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found' });
+    }
+
+    // Disable sharing (keep token for potential re-enable)
+    await dbQuery(
+      'UPDATE stories SET is_shared = false WHERE id = $1',
+      [id]
+    );
+
+    console.log(`🚫 Sharing disabled for story ${id}`);
+
+    res.json({ isShared: false, shareToken: null, shareUrl: null });
+  } catch (err) {
+    console.error('Error disabling sharing:', err);
+    res.status(500).json({ error: 'Failed to disable sharing' });
+  }
+});
+
+module.exports = router;

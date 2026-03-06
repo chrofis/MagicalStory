@@ -1,0 +1,73 @@
+You are evaluating an AI-generated avatar against the original reference photo.
+
+IMAGE 1: Original reference photo of a real person
+IMAGE 2: AI-generated avatar based on that person
+
+TASK 1: FACE MATCH EVALUATION
+Compare facial features between IMAGE 1 and IMAGE 2. Score each feature 1-10 (10 = perfect match).
+IGNORE when scoring: lighting, skin tone, clothing, hairstyle, background, expression, minor AI artifacts.
+
+TASK 2: PHYSICAL TRAITS EXTRACTION (from IMAGE 2 - the generated avatar)
+Extract the person's physical characteristics as shown in the GENERATED AVATAR.
+This captures user corrections (e.g., changed hair color) that were applied during generation.
+
+TASK 3: CLOTHING EXTRACTION (from IMAGE 2 - the generated avatar)
+Describe the clothing visible on the AI-generated avatar.
+NEVER include any text, logos, slogans, or graphic prints - only describe the garment type, color, fit, and style.
+Example: "black crew-neck sweatshirt with white graphic" → just "black crew-neck sweatshirt"
+IMPORTANT - Choose ONE of these two options:
+  Option A: Dress/Jumpsuit → set "fullBody" with description, set "upperBody" and "lowerBody" to null
+  Option B: Separate top + bottom → set "upperBody" and "lowerBody", set "fullBody" to null
+Never fill both fullBody AND upperBody/lowerBody - they are mutually exclusive!
+
+TASK 4: DETAILED HAIR ANALYSIS (from IMAGE 2 - the generated avatar)
+Extract detailed hair characteristics for better consistency across scenes.
+This provides more precise hair descriptions than the simple hairStyle field.
+
+IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed.
+
+Return a JSON object with this EXACT structure:
+
+{
+  "faceMatch": {
+    "faceShape": {"score": 8, "reason": "Similar oval shape"},
+    "eyes": {"score": 9, "reason": "Same shape and spacing"},
+    "nose": {"score": 7, "reason": "Slightly different bridge"},
+    "mouth": {"score": 8, "reason": "Lip shape matches"},
+    "overallStructure": {"score": 8, "reason": "Proportions match"},
+    "finalScore": 8
+  },
+  "physicalTraits": {
+    "apparentAge": "<MUST be one of: infant | toddler | preschooler | kindergartner | young-school-age | school-age | preteen | young-teen | teenager | young-adult | adult | middle-aged | senior | elderly>",
+    "build": "<MUST be one of: slim | average | athletic | stocky>",
+    "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
+    "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
+    "eyeColor": "<MUST be one of: blue | green | brown | hazel | gray | amber>",
+    "eyeColorHex": "<iris color as HEX code, e.g. '#6B4423'>",
+    "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
+    "hairColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
+    "hairDensity": "<MUST be one of: full | thinning | balding | bald>",
+    "hairLength": "<MUST be one of: bald | balding | buzz cut | cropped | pixie | ear-length | chin-length | neck-length | shoulder-length | armpit-length | mid-back | waist-length>",
+    "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
+    "facialHair": "<MUST be one of: none | clean-shaven | stubble | mustache | goatee | short beard | full beard | long beard> (use 'none' for females/children)",
+    "face": "<brief description of face shape, distinguishing features>",
+    "other": "<glasses, scars, moles, freckles, piercings, or 'none'>"
+  },
+  "clothing": {
+    "upperBody": "<e.g. 'red t-shirt', 'blue sweater' - OR null if fullBody is set>",
+    "lowerBody": "<e.g. 'dark blue jeans', 'black skirt' - OR null if fullBody is set>",
+    "shoes": "<e.g. 'white sneakers', 'brown boots'>",
+    "fullBody": "<e.g. 'floral summer dress', 'black jumpsuit' - OR null if upperBody/lowerBody are set>"
+  },
+  "detailedHairAnalysis": {
+    "texture": "<MUST be one of: fine | medium | thick | coarse>",
+    "type": "<MUST be one of: straight | wavy | curly | coily>",
+    "lengthTop": "<MUST be one of: bald | buzz cut | short | ear-length | chin-length | neck-length | shoulder-length | mid-back | waist-length>",
+    "lengthSides": "<MUST be one of: shaved | fade | tapered | buzz cut | short | ear-length | same as top> - use 'tapered' when sides are visibly shorter than top but not buzzed, 'fade' for gradient-shaved sides",
+    "bangsEndAt": "<MUST be one of: above eyebrows | at eyebrows | below eyebrows | no bangs> - hair swept ACROSS the forehead is NOT bangs, only hair falling DOWN over the forehead counts",
+    "styling": "<MUST be one of: natural | side-swept | combed | slicked | brushed back | tousled | messy | textured | ponytail | braids | bun | pigtails | spiky | layered | loose>",
+    "parting": "<MUST be one of: none | center part | side part left | side part right>",
+    "baseColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
+    "highlightsHex": "<highlight color as HEX code if visible, e.g. '#C4A77D', or 'none'>"
+  }
+}

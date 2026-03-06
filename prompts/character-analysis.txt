@@ -1,0 +1,96 @@
+You are an expert Image Prompt Engineer specializing in character consistency.
+
+Analyze this image of a person.
+Extract PERMANENT visual attributes that will maintain consistency across different scenes.
+
+IMPORTANT: Only describe PERMANENT physical features, NOT temporary states:
+- Face: Describe bone structure, shape, skin tone - NOT expressions (no "smiling", "frowning", "laughing")
+- Hair: Describe color, length, and style separately - NOT temporary styling (no "windblown", "messy from wind", "wet")
+- Eyes: Describe color and shape - NOT expression (no "squinting", "wide-eyed")
+
+{LANGUAGE_INSTRUCTION}
+
+IMPORTANT: For fields marked "MUST be one of:", use the EXACT English values listed (these are system identifiers).
+Only use local language for free-text fields: "face" and "distinctive markings".
+
+Return a JSON object with this EXACT structure:
+
+{
+  "traits": {
+    "age": "<estimated age as a number (e.g. 8, 25, 45)>",
+    "apparentAge": "<age category based on visual appearance - MUST be one of: infant | toddler | preschooler | kindergartner | young-school-age | school-age | preteen | young-teen | teenager | young-adult | adult | middle-aged | senior | elderly>",
+    "gender": "<male, female, or other>",
+    "height": "<height in cm as a number (e.g. 120 for child, 170 for adult)>",
+    "build": "<slim, average, athletic, stocky>",
+    "skinTone": "<MUST be one of: porcelain | fair | light | medium | olive | tan | caramel | brown | dark brown | deep>",
+    "skinUndertone": "<MUST be one of: warm | cool | neutral>",
+    "skinToneHex": "<skin tone as HEX code, e.g. '#E8BEAC'>",
+    "face": "<PERMANENT facial structure: bone structure, face shape - NO expressions>",
+    "eyeColor": "<eye color (e.g. blue, brown, green, hazel, gray)>",
+    "hairColor": "<MUST be one of: black | dark brown | brown | light brown | chestnut | auburn | red | strawberry blonde | dark blonde | blonde | light blonde | platinum blonde | gray | silver | white | salt and pepper>",
+    "hairDensity": "<MUST be one of: full | thinning | balding | bald> - full=normal coverage, thinning=visible scalp through hair, balding=significant hair loss with bald patches, bald=no hair",
+    "hairLength": "<MUST be one of: bald | buzz cut | short | ear-length | chin-length | neck-length | shoulder-length | mid-back | waist-length> - uses body reference points for AI image generation",
+    "hairStyle": "<MUST be one of: straight | wavy | curly | coily | messy | spiky | layered | slicked back | loose | ponytail | braids | bun | pigtails | bob | afro | mohawk | mullet | undercut | bangs | side bangs>",
+    "distinctive markings": "<glasses, facial hair, scars, moles, freckles, jewelry, piercings, braces or 'none'>"
+  },
+  "detailedHairAnalysis": {
+    "texture": "<fine | medium | thick | coarse>",
+    "type": "<straight | wavy | curly | coily>",
+    "density": "<MUST be one of: full | thinning | balding | bald>",
+    "lengthTop": "<MUST be one of: bald | buzz cut | short | ear-length | chin-length | neck-length | shoulder-length | mid-back | waist-length> - same scale as main hairLength, refers to longest hair on top of head",
+    "lengthSides": "<MUST be one of: shaved | fade | tapered | buzz cut | short | ear-length | same as top> - use 'tapered' when sides are visibly shorter than top but not buzzed, 'fade' for gradient-shaved sides",
+    "bangsEndAt": "<MUST be one of: no bangs | above eyebrows | at eyebrows | below eyebrows | past nose> - hair swept ACROSS the forehead is NOT bangs, only hair falling DOWN over the forehead counts",
+    "styling": "<MUST be one of: natural | side-swept | combed | slicked | brushed back | tousled | messy | textured | ponytail | braids | bun | pigtails | spiky | layered | loose>",
+    "parting": "<MUST be one of: none | center part | side part left | side part right>",
+    "baseColorHex": "<primary hair color as HEX code, e.g. '#3B2314'>",
+    "highlightsHex": "<highlight color as HEX code if visible, or 'none'>",
+    "salonLevel": "<hair darkness level 1-10, where 1=black, 10=lightest blonde>"
+  },
+  "detailedFaceAnalysis": {
+    "faceShape": "<oval | heart | square | diamond | oblong | round | rectangle>",
+    "eyes": {
+      "shape": "<almond | hooded | round | monolid | downturned | upturned>",
+      "canthalTilt": "<upturned | neutral | downturned>",
+      "spacing": "<close-set | average | wide-set>",
+      "size": "<small | medium | large>",
+      "irisColorHex": "<exact iris color as HEX code, e.g. '#6B4423'>"
+    },
+    "nose": {
+      "bridge": "<straight | aquiline | concave | curved>",
+      "tip": "<bulbous | pointed | upturned | rounded>",
+      "nostrilWidth": "<narrow | medium | wide>"
+    },
+    "jawlineAndChin": {
+      "jawline": "<sharp | angular | soft | rounded | square>",
+      "chin": "<prominent | recessed | neutral | dimpled | pointed>"
+    },
+    "cheeksAndForehead": {
+      "cheekboneHeight": "<high | medium | low>",
+      "cheekFullness": "<hollow | flat | full | round>",
+      "foreheadHeight": "<short | medium | tall>",
+      "foreheadWidth": "<narrow | medium | wide>"
+    },
+    "lipsAndMouth": {
+      "upperLipFullness": "<thin | medium | full>",
+      "lowerLipFullness": "<thin | medium | full>",
+      "cupidsBow": "<defined | soft | flat>"
+    },
+    "distinguishingMarks": {
+      "freckles": "<none | light | moderate | heavy>",
+      "moles": "<description of visible moles and locations, or 'none'>",
+      "skinTexture": "<smooth | textured | weathered>",
+      "nasolabialFolds": "<none | subtle | moderate | pronounced>"
+    }
+  },
+  "confidence": {
+    "overallConfidence": "<high | medium | low - based on image quality, angle, and visibility>",
+    "lowConfidenceFields": ["<list any fields where analysis is uncertain due to image quality, angle, or occlusion>"],
+    "analysisNotes": "<any caveats about image quality, lighting, angle, or partial visibility that may affect accuracy>"
+  }
+}
+
+Age category guide:
+- infant (0-1 years), toddler (1-2), preschooler (3-4), kindergartner (5-6)
+- young-school-age (7-8), school-age (9-10), preteen (11-12), young-teen (13-14)
+- teenager (15-17), young-adult (18-25), adult (26-39), middle-aged (40-59)
+- senior (60-75), elderly (75+)

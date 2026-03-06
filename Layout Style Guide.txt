@@ -1,0 +1,84 @@
+Layout Style Guide
+
+This document outlines the visual language, components, and patterns used specifically in the **Wizard Layout** (`components/layouts/LayoutWizard.tsx`). The design prioritizes focus, clarity, and a linear progression to reduce cognitive load.
+
+## 1. Core Principles
+
+*   **Linearity:** Users focus on one task at a time.
+*   **Clarity:** Active states are clearly distinguished from inactive ones.
+*   **Containment:** The interface is bounded within a central card to anchor the user's attention.
+
+## 2. Color Palette
+
+The Wizard uses a specific slice of the global Tailwind palette, primarily relying on Indigo for actions and progress.
+
+| Role | Color | Tailwind Class | Hex (approx) |
+| :--- | :--- | :--- | :--- |
+| **Primary / Brand** | Indigo | `bg-indigo-600` | `#4f46e5` |
+| **Primary Light** | Indigo Tint | `bg-indigo-50` | `#eef2ff` |
+| **Background** | White | `bg-white` | `#ffffff` |
+| **Surface** | Light Gray | `bg-gray-50` / `bg-gray-100` | `#f9fafb` / `#f3f4f6` |
+| **Text (Headings)** | Dark Gray | `text-gray-800` | `#1f2937` |
+| **Text (Body)** | Gray | `text-gray-500` | `#6b7280` |
+| **Destructive** | Red | `text-red-500` | `#ef4444` |
+| **Success** | Green | `bg-green-50` / `text-green-800` | `#f0fdf4` / `#166534` |
+
+## 3. Typography
+
+*   **Font Family:** Inter (`font-sans`)
+*   **Step Headings:** `text-2xl font-bold text-gray-800`
+*   **Sub-labels/Meta:** `text-sm font-medium text-gray-400`
+*   **Body Text:** `text-gray-900` (Primary), `text-gray-500` (Secondary)
+
+## 4. UI Components
+
+### 4.1. The Main Container
+The wizard is housed in a floating card centered on the screen.
+*   **Classes:** `max-w-2xl mx-auto bg-white rounded-xl shadow-xl overflow-hidden`
+
+### 4.2. Progress Bar
+Located at the very top of the container.
+*   **Track:** `bg-gray-100 h-2 w-full`
+*   **Fill:** `bg-indigo-600 h-full transition-all duration-500 ease-out`
+
+### 4.3. Selection Cards (Topics)
+Used for large, mutually exclusive choices.
+*   **Base:** `p-6 rounded-lg border-2 text-left transition-all`
+*   **Inactive:** `border-gray-200 hover:border-indigo-300`
+*   **Active:** `border-indigo-600 bg-indigo-50`
+*   **Typography:** Emoji at `4xl`, Label at `font-semibold`.
+
+### 4.4. Style Tiles (Art Style)
+Visual blocks representing aesthetic choices.
+*   **Dimensions:** `h-32`
+*   **Base:** `rounded-lg flex items-center justify-center font-bold text-lg border-2 transition-all`
+*   **Active Ring:** `border-indigo-600 ring-2 ring-indigo-200`
+
+### 4.5. Input Groups (Characters)
+Complex list items with internal inputs.
+*   **Container:** `p-4 border rounded-lg bg-gray-50`
+*   **Input Fields:** `w-full p-2 border rounded`
+    *   *Note: Focus states use browser defaults or global focus ring.*
+*   **Delete Action:** `text-red-500 hover:bg-red-50 p-2 rounded`
+
+### 4.6. Navigation Buttons
+Located in the footer `border-t`.
+*   **Next (Primary):** `bg-indigo-600 text-white`
+*   **Back (Ghost):** `bg-transparent hover:bg-gray-100 text-gray-700`
+*   **Generate (Secondary):** `bg-teal-600 text-white` (Defined in `Button.tsx`)
+
+## 5. Layout & Spacing
+
+*   **Padding:** The main content area uses `p-8`.
+*   **Gaps:**
+    *   Grid gaps: `gap-4`
+    *   Vertical stacking: `space-y-4` or `space-y-6`
+*   **Animation:**
+    *   `animate-fade-in` used for adding new list items.
+    *   `transition-all` used on interactive cards.
+
+## 6. Iconography
+Icons are sourced from `lucide-react`.
+*   **Navigation:** `ArrowRight`, `ArrowLeft`
+*   **Actions:** `Trash2` (Delete), `Plus` (Add)
+*   **Size:** Generally `size={16}` for buttons, `size={20}` for standalone actions.

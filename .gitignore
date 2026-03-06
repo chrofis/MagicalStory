@@ -1,0 +1,112 @@
+# Node modules (if any)
+node_modules/
+**/node_modules/
+client/node_modules/
+
+# Python virtual environment
+venv311/
+__pycache__/
+*.pyc
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+test-simple.html
+
+# Temp files
+nul
+
+# Secrets and API keys
+API key.txt
+*API key.txt
+*.key
+.env
+
+# Claude Code (ignore all except skills)
+.claude/*
+!.claude/skills/
+
+# Server data (sensitive - don't commit to Git)
+/data/
+/data/uploads/
+/data/files.json
+server/data/
+
+# User content and uploads
+# Images/ - now included in git for Railway deployment
+# But keep originals and unused out (large files)
+images/originals/
+images/not used/
+images/*.mp4
+!images/Boy to pirat to book.mp4
+Magical-Story-images/
+Geschichten, Prompts, Inputs/
+MagicalStory/
+*.zip
+
+# Logs
+*.log
+npm-debug.log*
+logs/*.log
+
+# Firebase service account (secrets)
+*.firebase*.json
+*-firebase-adminsdk-*.json
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+.auth/
+
+# Migration scripts (one-time use)
+run-migration*.js
+test-output/
+tmpclaude-*
+*.bak
+
+# Test files with potential secrets
+test-gemini*.js
+
+# Inpainting test outputs
+test-*.png
+test-*.jpg
+test_*.png
+test-scene*.jpg
+
+# Temp photos (debug/testing)
+temp_photos/
+
+# Test fixtures (large test data)
+tests/fixtures/
+test image inputs/
+
+# Baden landmarks cache (local testing)
+baden-landmarks/
+
+# Output folder (story extractions, etc.)
+output/
+
+# Historical location images (local editing)
+historical-location-images/
+historical-location-images-uploaded/
+
+# Miscellaneous temp/debug files
+availableLandmarks
+userLocation
+C:*
+*.tflite
+_local
+
+# Claude Code task tracking (local working files)
+tasks/

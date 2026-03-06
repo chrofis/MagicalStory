@@ -1,0 +1,2 @@
+Edit this children's storybook illustration: {EDIT_INSTRUCTION}
+Maintain the same artistic style and character appearances.

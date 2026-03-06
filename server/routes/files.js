@@ -1,0 +1,187 @@
+/**
+ * File Routes - /api/files/*
+ *
+ * File upload, serving, and deletion
+ */
+
+const express = require('express');
+const router = express.Router();
+
+const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
+const { authenticateToken } = require('../middleware/auth');
+const { validateBody, schemas, FILE_UPLOAD_CONFIG } = require('../middleware/validation');
+
+// POST /api/files - Upload a file
+// Validates file type, MIME type, and size
+router.post('/', authenticateToken, validateBody(schemas.uploadFile), async (req, res) => {
+  try {
+    const { fileData, fileType, storyId, mimeType, filename } = req.body;
+
+    // Extract base64 data (remove data URL prefix if present)
+    const base64Data = fileData.replace(/^data:[^;]+;base64,/, '');
+
+    // Check base64 length before decoding (base64 is ~33% larger than binary)
+    const estimatedSize = Math.ceil(base64Data.length * 0.75);
+    if (estimatedSize > FILE_UPLOAD_CONFIG.MAX_FILE_SIZE) {
+      return res.status(413).json({
+        error: 'File too large',
+        maxSize: `${FILE_UPLOAD_CONFIG.MAX_FILE_SIZE / (1024 * 1024)}MB`
+      });
+    }
+
+    const buffer = Buffer.from(base64Data, 'base64');
+    const fileSize = buffer.length;
+
+    // Final size check after decoding
+    if (fileSize > FILE_UPLOAD_CONFIG.MAX_FILE_SIZE) {
+      return res.status(413).json({
+        error: 'File too large',
+        maxSize: `${FILE_UPLOAD_CONFIG.MAX_FILE_SIZE / (1024 * 1024)}MB`
+      });
+    }
+
+    const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    if (isDatabaseMode()) {
+      const insertQuery = 'INSERT INTO files (id, user_id, file_type, story_id, mime_type, file_data, file_size, filename) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)';
+
+      await dbQuery(insertQuery, [
+        fileId,
+        req.user.id,
+        fileType,
+        storyId || null,
+        mimeType,
+        buffer,
+        fileSize,
+        filename || null
+      ]);
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    await logActivity(req.user.id, req.user.username, 'FILE_UPLOADED', {
+      fileId,
+      fileType,
+      fileSize
+    });
+
+    res.json({
+      success: true,
+      fileId,
+      fileUrl: `${req.protocol}://${req.get('host')}/api/files/${fileId}`,
+      fileSize
+    });
+
+  } catch (err) {
+    console.error('Error uploading file:', err);
+    res.status(500).json({ error: 'Failed to upload file', details: err.message });
+  }
+});
+
+// Optional auth middleware - doesn't fail if no token
+const optionalAuth = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (token) {
+    const jwt = require('jsonwebtoken');
+    const JWT_SECRET = process.env.JWT_SECRET;
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+      if (!err) {
+        req.user = user;
+      }
+      next();
+    });
+  } else {
+    next();
+  }
+};
+
+// GET /api/files/:fileId - Serve a file
+// Files use unique random IDs, so public access is acceptable
+// Authentication is optional but enables ownership verification
+router.get('/:fileId', optionalAuth, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (isDatabaseMode()) {
+      // Files have unique random IDs - allow access without strict ownership check
+      // This enables <img src> tags to work without auth headers
+      const rows = await dbQuery('SELECT mime_type, file_data, filename FROM files WHERE id = $1', [fileId]);
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'File not found' });
+      }
+
+      const file = rows[0];
+
+      res.set('Content-Type', file.mime_type);
+
+      // Cache headers for immutable resources - files have unique random IDs and never change
+      // Cache for 1 year (31536000 seconds) with immutable flag
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+      if (file.filename) {
+        // Sanitize filename for Content-Disposition header
+        const safeFilename = file.filename.replace(/[^\x20-\x7E]/g, '_');
+        const encodedFilename = encodeURIComponent(file.filename).replace(/'/g, '%27');
+        res.set('Content-Disposition', `inline; filename="${safeFilename}"; filename*=UTF-8''${encodedFilename}`);
+      }
+
+      // Handle various file_data formats
+      let fileBuffer;
+      if (Buffer.isBuffer(file.file_data)) {
+        const str = file.file_data.toString('utf8');
+        if (str.startsWith('data:')) {
+          fileBuffer = Buffer.from(str.split(',')[1], 'base64');
+        } else if (/^[A-Za-z0-9+/=]+$/.test(str.substring(0, 100))) {
+          fileBuffer = Buffer.from(str, 'base64');
+        } else {
+          fileBuffer = file.file_data;
+        }
+      } else if (typeof file.file_data === 'string') {
+        if (file.file_data.startsWith('data:')) {
+          fileBuffer = Buffer.from(file.file_data.split(',')[1], 'base64');
+        } else {
+          fileBuffer = Buffer.from(file.file_data, 'base64');
+        }
+      } else {
+        fileBuffer = file.file_data;
+      }
+
+      res.send(fileBuffer);
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+  } catch (err) {
+    console.error('Error serving file:', err);
+    res.status(500).json({ error: 'Failed to serve file', details: err.message });
+  }
+});
+
+// DELETE /api/files/:fileId - Delete a file
+router.delete('/:fileId', authenticateToken, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+
+    if (isDatabaseMode()) {
+      const result = await dbQuery('DELETE FROM files WHERE id = $1 AND user_id = $2', [fileId, req.user.id]);
+
+      if (result.rowCount === 0) {
+        return res.status(404).json({ error: 'File not found or unauthorized' });
+      }
+    } else {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    await logActivity(req.user.id, req.user.username, 'FILE_DELETED', { fileId });
+    res.json({ success: true, message: 'File deleted successfully' });
+
+  } catch (err) {
+    console.error('Error deleting file:', err);
+    res.status(500).json({ error: 'Failed to delete file', details: err.message });
+  }
+});
+
+module.exports = router;

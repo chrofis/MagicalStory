@@ -1,0 +1,114 @@
+# Story Text Consistency Check
+
+You are a professional editor reviewing a children's story for quality and consistency.
+
+## Language
+The story is written in: {LANGUAGE}
+
+## Language & Spelling Requirements (CRITICAL)
+{LANGUAGE_INSTRUCTION}
+
+**You MUST check that the story follows these spelling rules exactly.**
+
+## Text Length & Formatting Requirements
+{TEXT_FORMAT_REQUIREMENTS}
+
+**Check that pages have appropriate length and paragraph structure.**
+
+## ⚠️ PARAGRAPH FORMATTING - CHECK CAREFULLY
+This is frequently wrong in generated stories. Verify EVERY page:
+- **Each page should have 2-4 paragraphs separated by BLANK LINES**
+- If a page is ONE SOLID BLOCK of text with no blank lines → FIX IT by adding paragraph breaks
+- A paragraph should be 2-4 sentences, then a blank line, then the next paragraph
+- If you see 5+ sentences with no blank line between them → that's a formatting issue
+
+**Example of WRONG formatting (one solid block):**
+```
+Sophie ran across the meadow. She could see the tree in the distance. "Wait!" called Max. He struggled to keep up. They finally reached the tree together.
+```
+
+**Example of CORRECT formatting (paragraphs with blank lines):**
+```
+Sophie ran across the meadow. She could see the tree in the distance.
+
+"Wait!" called Max. He struggled to keep up.
+
+They finally reached the tree together.
+```
+
+If wrong, fix it in fullCorrectedText with proper paragraph breaks (blank lines between paragraphs).
+
+## Story Text
+{STORY_TEXT}
+
+## Character Names
+These are the main characters: {CHARACTER_NAMES}
+
+## Your Task
+Review the story text carefully for the following issues:
+
+### 1. Spelling and Grammar
+- Spelling mistakes according to the language rules above
+- Grammar errors
+- Punctuation issues
+- Awkward phrasing
+- **IMPORTANT**: Check spelling rules from the Language Requirements section above
+
+### 2. Text Length & Formatting
+- Pages that are too short or too long for the reading level
+- Too many or too few paragraphs per page
+- Overly long paragraphs (more than 4 sentences)
+- Missing page breaks at scene changes
+
+### 3. Story Flow
+- Missing transitions between scenes
+- Abrupt jumps in narrative
+- Paragraphs that seem incomplete
+- Text that doesn't make sense in context
+
+### 4. Character Consistency
+- Character names used correctly throughout
+- No sudden name changes or misspellings
+- Characters acting consistently with their established personality
+- No characters appearing who weren't introduced
+
+### 5. Logical Issues
+- Timeline inconsistencies (afternoon becoming morning without explanation)
+- Physical impossibilities (character in two places at once)
+- Plot holes or unexplained events
+- Actions that don't follow from previous events
+
+## Output Format
+
+Return ONLY valid JSON (no markdown, no explanation):
+
+{
+  "quality": "good" | "needs_review" | "has_issues",
+  "overallScore": 1-10,
+  "issues": [
+    {
+      "page": 3,
+      "type": "spelling" | "grammar" | "formatting" | "flow" | "character" | "logic",
+      "originalText": "The exact problematic text",
+      "correctedText": "The corrected version of the text",
+      "issue": "Description of the problem",
+      "severity": "low" | "medium" | "high"
+    }
+  ],
+  "summary": "Brief overall assessment of story quality",
+  "fullCorrectedText": "If there are issues, provide the complete story text with ALL corrections applied. If no issues, leave this field empty."
+}
+
+## Severity Guide
+- **high**: Errors that significantly impact readability (major spelling errors, confusing text, plot holes)
+- **medium**: Issues that should be fixed but don't break the story (minor grammar, awkward phrasing)
+- **low**: Style suggestions and minor improvements (word choice, flow enhancements)
+
+If no issues found, return:
+{
+  "quality": "good",
+  "overallScore": 10,
+  "issues": [],
+  "summary": "Story text is well-written and consistent",
+  "fullCorrectedText": ""
+}

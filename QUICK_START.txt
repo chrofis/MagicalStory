@@ -1,0 +1,114 @@
+=====================================
+MAGICALSTORY - QUICK START GUIDE
+=====================================
+
+STEP 1: Install Node.js (One-time setup)
+-----------------------------------------
+1. Go to: https://nodejs.org/
+2. Download the LTS version (recommended)
+3. Run the installer
+4. Restart your computer (or at least close/reopen Command Prompt)
+5. Verify installation by opening Command Prompt and typing:
+   node --version
+   (Should show: v20.x.x or similar)
+
+STEP 2: Start the Server
+-----------------------------------------
+EASY WAY:
+   - Double-click "START_SERVER.bat"
+   - The server will install dependencies automatically on first run
+   - Wait for "Server Running" message
+
+MANUAL WAY:
+   1. Open Command Prompt
+   2. Run: cd C:\Users\roger\MagicalStory
+   3. Run: npm install (first time only)
+   4. Run: npm start
+
+STEP 3: Open the Application
+-----------------------------------------
+1. Open your web browser
+2. Go to: http://localhost:3000
+3. You should see the login/registration page
+
+STEP 4: Register First User (Admin)
+-----------------------------------------
+1. Click "Sign up"
+2. Enter a username and password
+3. The FIRST user becomes the admin automatically (you'll see a 👑 crown icon)
+
+STEP 5: Configure API Keys (Admin Only)
+-----------------------------------------
+After logging in as admin:
+
+1. Press F12 to open browser Developer Console
+2. Click on "Console" tab
+3. Paste this code (replace with your actual keys):
+
+fetch('http://localhost:3000/api/admin/config', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+  },
+  body: JSON.stringify({
+    anthropicApiKey: 'sk-ant-your-anthropic-key-here',
+    geminiApiKey: 'your-gemini-key-here'
+  })
+}).then(res => res.json()).then(data => console.log(data));
+
+4. Press Enter
+5. You should see: {message: "API keys updated successfully"}
+
+STEP 6: Use the Application!
+-----------------------------------------
+Now all users can:
+- Create stories without needing their own API keys
+- Generate characters and images
+- The admin's API keys are used for everyone
+
+TROUBLESHOOTING
+-----------------------------------------
+Problem: "npm: command not found" or "node: command not found"
+Solution: Install Node.js (see Step 1)
+
+Problem: "Port 3000 already in use"
+Solution:
+  1. Close any other applications using port 3000
+  2. Or edit .env file and change PORT=3000 to PORT=3001
+  3. Then update frontend to use port 3001
+
+Problem: "Connection refused" when registering
+Solution: Make sure the server is running (Step 2)
+
+Problem: Can't login
+Solution:
+  1. Clear browser data: Open Console (F12) and type: localStorage.clear()
+  2. Refresh the page
+  3. Try registering again
+
+STOPPING THE SERVER
+-----------------------------------------
+In the Command Prompt/Terminal window where server is running:
+  - Press Ctrl+C
+  - Type 'Y' when asked to terminate
+
+DATA STORAGE
+-----------------------------------------
+All data is stored in: C:\Users\roger\MagicalStory\data\
+- users.json - User accounts
+- logs.json - Activity logs
+- config.json - API keys
+
+To reset everything: Delete the "data" folder
+
+SUPPORT
+-----------------------------------------
+Check the logs:
+  - Server output in Command Prompt
+  - Browser console (F12)
+  - data/logs.json file
+
+For more details, see: SERVER_SETUP.md
+
+=====================================

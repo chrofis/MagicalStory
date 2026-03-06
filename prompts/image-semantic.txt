@@ -1,0 +1,97 @@
+Check if this illustration matches what was requested.
+
+**SCENE_HINT (what image should show):** "{SCENE_HINT}"
+**STORY_TEXT (narrative context):** "{STORY_TEXT}"
+
+---
+
+**STEP 1: DESCRIBE WHAT'S VISIBLE**
+
+List everything you see in the image:
+- Characters (who, appearance, position, what they're doing)
+- Objects (items being held, used, or prominent in scene)
+- Setting/background (location, landmarks)
+- Action (what's happening)
+
+---
+
+**STEP 2: COMPARE TO SCENE_HINT**
+
+Check if the image matches what was requested:
+- Are all mentioned characters present?
+- Are all mentioned objects present?
+- Is the setting/location correct?
+- Is the action correct? (who's doing what to whom)
+
+---
+
+**SCORING**
+
+Start at 10, subtract for issues:
+- Missing character: -3 (CRITICAL)
+- Missing key object: -2 (MAJOR)
+- Wrong/missing setting: -2 (MAJOR)
+- Action reversed or wrong: -2 (MAJOR)
+- Missing background element: -1 (MINOR)
+
+VERDICT: PASS (7+), FAIL (0-6)
+
+---
+
+**OUTPUT FORMAT**
+
+Return JSON only:
+
+```json
+{
+  "visible": {
+    "characters": ["Emma (blonde girl, left side, waving)", "Lucas (boy, right side, holding sword)"],
+    "objects": ["sword", "treasure chest"],
+    "setting": "forest clearing",
+    "action": "Emma waving at Lucas who holds a sword"
+  },
+  "expected": {
+    "characters": ["Emma", "Lucas"],
+    "objects": ["sword", "map"],
+    "setting": "forest",
+    "action": "Emma gives map to Lucas"
+  },
+  "issues": [
+    {
+      "type": "missing_object",
+      "item": "map",
+      "severity": "MAJOR",
+      "problem": "Map not visible - Emma should be giving it to Lucas"
+    },
+    {
+      "type": "wrong_action",
+      "severity": "MAJOR",
+      "problem": "Emma is waving, not giving map to Lucas"
+    }
+  ],
+  "score": 6,
+  "verdict": "FAIL",
+  "semantic_issues": [
+    {
+      "problem": "Map not visible in scene",
+      "severity": "MAJOR"
+    },
+    {
+      "problem": "Wrong action - waving instead of giving map",
+      "severity": "MAJOR"
+    }
+  ]
+}
+```
+
+If no issues:
+```json
+{
+  "visible": { ... },
+  "expected": { ... },
+  "issues": [],
+  "score": 10,
+  "verdict": "PASS",
+  "semantic_issues": []
+}
+```

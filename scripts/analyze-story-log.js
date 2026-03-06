@@ -1,0 +1,1235 @@
+#!/usr/bin/env node
+/**
+ * Story Run Log Analyzer
+ * Analyzes Railway log files from story generation runs.
+ *
+ * Usage:
+ *   node scripts/analyze-story-log.js                    # Analyze latest log in Downloads
+ *   node scripts/analyze-story-log.js path/to/log.log   # Analyze specific log file
+ */
+
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function getLatestLogFile() {
+  const downloadsDir = path.join(os.homedir(), 'Downloads');
+  try {
+    const files = fs.readdirSync(downloadsDir)
+      .filter(f => f.match(/^logs\.\d+\.log$/))
+      .map(f => ({
+        name: f,
+        path: path.join(downloadsDir, f),
+        time: fs.statSync(path.join(downloadsDir, f)).mtime
+      }))
+      .sort((a, b) => b.time - a.time);
+    return files[0] ? files[0].path : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function parseTimestamp(ts) {
+  // Railway format: 2025-12-27T20:45:52.227147756Z
+  return new Date(ts.replace(/\.\d{9}Z$/, 'Z'));
+}
+
+function formatDuration(ms) {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${minutes}m ${secs}s`;
+}
+
+function stripAnsiCodes(str) {
+  return str.replace(/\x1b\[[0-9;]*m/g, '');
+}
+
+// ============================================================================
+// LOG PARSING
+// ============================================================================
+
+function parseLogFile(logPath) {
+  const content = fs.readFileSync(logPath, 'utf8');
+  const lines = content.split('\n');
+
+  const parsed = [];
+  for (const line of lines) {
+    // Railway format: timestamp [level] message
+    const match = line.match(/^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\s+\[(inf|err|wrn)\]\s+(.*)$/);
+    if (match) {
+      parsed.push({
+        timestamp: match[1],
+        level: match[2],
+        message: stripAnsiCodes(match[3]),
+        raw: line
+      });
+    }
+  }
+  return parsed;
+}
+
+// ============================================================================
+// JOB EXTRACTION
+// ============================================================================
+
+function extractJobs(lines) {
+  const jobs = [];
+  const jobsById = new Map();
+
+  // First pass: find all job IDs and their start/end indices
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const msg = line.message;
+
+    // Find job IDs in various patterns
+    const jobIdMatch = msg.match(/(job_\S+)/);
+    if (jobIdMatch) {
+      const jobId = jobIdMatch[1];
+      if (!jobsById.has(jobId)) {
+        jobsById.set(jobId, {
+          id: jobId,
+          user: null,
+          startTime: null,
+          endTime: null,
+          startIndex: i,
+          endIndex: i,
+          status: 'unknown',
+          lines: [] // Will be populated in second pass
+        });
+      }
+      const job = jobsById.get(jobId);
+      job.endIndex = i;
+
+      // Update timestamps
+      const ts = parseTimestamp(line.timestamp);
+      if (!job.startTime || ts < job.startTime) {
+        job.startTime = ts;
+        job.startIndex = i;
+      }
+      if (!job.endTime || ts > job.endTime) {
+        job.endTime = ts;
+      }
+
+      // Job start patterns
+      const createMatch = msg.match(/Creating story job (job_\S+) for user (\S+)/);
+      if (createMatch) {
+        job.user = createMatch[2];
+        job.startTime = ts;
+        job.startIndex = i;
+      }
+
+      // Starting processing pattern
+      const startMatch = msg.match(/Starting processing for job (job_\S+)/);
+      if (startMatch) {
+        job.startTime = ts;
+        job.startIndex = i;
+      }
+
+      // Job completion patterns (handle [STORYBOOK], [UNIFIED], or plain)
+      // Use this as the DEFINITIVE end time (not later post-completion iterations)
+      const completedMatch = msg.match(/(?:\[(?:STORYBOOK|UNIFIED)\]\s+)?Job (job_\S+) completed successfully/);
+      if (completedMatch) {
+        job.status = 'completed';
+        job.endTime = ts;
+        job.completionTime = ts;  // Store separately for accurate timing
+        job.endIndex = i;
+      }
+
+      // Job failed patterns
+      const failedMatch = msg.match(/(?:\[(?:STORYBOOK|UNIFIED)\]\s+)?Job (job_\S+) failed/);
+      if (failedMatch) {
+        job.status = 'failed';
+        job.endTime = ts;
+        job.endIndex = i;
+      }
+
+      // Extract user from story GET request
+      const userMatch = msg.match(/GET \/api\/stories\/job_\S+ - User: (\S+)/);
+      if (userMatch && !job.user) {
+        job.user = userMatch[1];
+      }
+    }
+  }
+
+  // Second pass: collect ALL lines between start and end index for each job
+  for (const job of jobsById.values()) {
+    // Collect all lines in the job's time range
+    for (let i = job.startIndex; i <= job.endIndex; i++) {
+      job.lines.push(lines[i]);
+    }
+
+    // Only include jobs with meaningful data
+    const hasCostData = job.lines.some(l => l.message.includes('Token usage & cost summary'));
+    const hasCompletion = job.status === 'completed' || job.status === 'failed';
+
+    if (hasCostData || hasCompletion || job.lines.length > 50) {
+      if (job.status === 'unknown') job.status = 'incomplete';
+      jobs.push(job);
+    }
+  }
+
+  return jobs;
+}
+
+// ============================================================================
+// DATA EXTRACTION
+// ============================================================================
+
+function extractStoryInfo(jobLines) {
+  const info = {
+    title: null,
+    language: null,
+    languageLevel: null,
+    characters: null,
+    pages: null,
+    storyType: null
+  };
+
+  for (const line of jobLines) {
+    // Strip [DEBUG] prefix if present
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
+
+    // Title - multiple patterns
+    // Pattern 1: "Extracted title: "Title""
+    const titleMatch = msg.match(/Extracted title.*?:\s*"(.+?)"/);
+    if (titleMatch) info.title = titleMatch[1];
+
+    // Pattern 2: "[UPSERT] Saving story job_XXX for user YYY, title: "Title""
+    const upsertTitleMatch = msg.match(/\[UPSERT\].*title:\s*"(.+?)"/);
+    if (upsertTitleMatch && !info.title) info.title = upsertTitleMatch[1];
+
+    // Pattern 3: "Returning story metadata: Title (X images to load)"
+    const metadataTitleMatch = msg.match(/Returning story metadata:\s*(.+?)\s*\(\d+\s*images/);
+    if (metadataTitleMatch && !info.title) info.title = metadataTitleMatch[1];
+
+    // Category/Topic/Language/Pages from job input logs
+    // Pattern: "Category: adventure, Topic: ..., Theme: ..., Language: en, Pages: 15"
+    const categoryMatch = msg.match(/Category:\s*(\S+),.*Language:\s*(\S+),\s*Pages:\s*(\d+)/);
+    if (categoryMatch) {
+      info.storyType = categoryMatch[1];
+      info.language = categoryMatch[2];
+      info.pages = parseInt(categoryMatch[3]);
+    }
+
+    // Language from standalone log: "  Language: en"
+    const langMatch = msg.match(/^\s*Language:\s*(\S+)\s*$/);
+    if (langMatch && !info.language) info.language = langMatch[1];
+
+    // Language from image prompt template: "Using storybook template for language: de-ch"
+    const templateLangMatch = msg.match(/template for language:\s*(\S+)/);
+    if (templateLangMatch && !info.language) info.language = templateLangMatch[1];
+
+    // Language level: "  Language Level: A1" or "Scene count: 15 (A1)"
+    const levelMatch = msg.match(/Language Level:\s*(\S+)/);
+    if (levelMatch) info.languageLevel = levelMatch[1];
+
+    const sceneCountLevelMatch = msg.match(/Scene count:\s*\d+\s*\((\w+)\)/);
+    if (sceneCountLevelMatch && !info.languageLevel) info.languageLevel = sceneCountLevelMatch[1];
+
+    // Characters count from: "characters count: 2"
+    const charsMatch = msg.match(/characters count:\s*(\d+)/);
+    if (charsMatch) info.characters = parseInt(charsMatch[1]);
+
+    // Pages from: "Scenes to generate: 15"
+    const pagesMatch = msg.match(/Scenes to generate:\s*(\d+)/);
+    if (pagesMatch && !info.pages) info.pages = parseInt(pagesMatch[1]);
+
+    // Pages from UNIFIED input: "Input: 15 pages"
+    const unifiedPagesMatch = msg.match(/\[UNIFIED\].*Input:\s*(\d+)\s*pages/);
+    if (unifiedPagesMatch && !info.pages) info.pages = parseInt(unifiedPagesMatch[1]);
+
+    // Pages from streaming efficiency: "Streaming efficiency: 7/7 pages"
+    const streamingPagesMatch = msg.match(/Streaming efficiency:\s*\d+\/(\d+)\s*pages/);
+    if (streamingPagesMatch && !info.pages) info.pages = parseInt(streamingPagesMatch[1]);
+
+    // Pages from consistency check: "pages 1-10" or "pages 6-15"
+    const consistencyPagesMatch = msg.match(/pages\s+\d+-(\d+)\]/);
+    if (consistencyPagesMatch) {
+      const maxPage = parseInt(consistencyPagesMatch[1]);
+      if (!info.pages || maxPage > info.pages) info.pages = maxPage;
+    }
+
+    // Returning full story (backup for title)
+    const returnMatch = msg.match(/Returning full story:\s*(.+?)\s+with\s+(\d+)\s+images/);
+    if (returnMatch && !info.title) {
+      info.title = returnMatch[1];
+      info.pages = parseInt(returnMatch[2]);
+    }
+  }
+
+  return info;
+}
+
+function extractCostSummary(jobLines) {
+  const costs = {
+    byProvider: {},
+    byFunction: {},
+    totals: {
+      inputTokens: 0,
+      outputTokens: 0,
+      thinkingTokens: 0,
+      totalCost: 0
+    }
+  };
+
+  for (const line of jobLines) {
+    // Strip [DEBUG] prefix if present
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
+
+    // By function entries: "Outline: 4,107 in / 11,870 out (1 calls) $0.1904 [claude-sonnet-4-5-20250929]"
+    // Also handles: "Scene Expand: 105,551 in / 23,349 out (15 calls) $0.6669 [claude-sonnet-4-5-20250929]"
+    const functionMatch = msg.match(/^\s*([\w\s]+?):\s+([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\s+\((\d+)\s+calls?\)\s+\$([\d.]+)\s+\[(.+?)\]/);
+    if (functionMatch) {
+      const name = functionMatch[1].trim();
+      // Skip provider-like entries in BY FUNCTION section
+      if (!name.match(/^(Anthropic|Gemini)/i)) {
+        costs.byFunction[name] = {
+          inputTokens: parseInt(functionMatch[2].replace(/,/g, '')),
+          outputTokens: parseInt(functionMatch[3].replace(/,/g, '')),
+          calls: parseInt(functionMatch[4]),
+          cost: parseFloat(functionMatch[5]),
+          model: functionMatch[6]
+        };
+      }
+      continue;
+    }
+
+    // Avatar/image cost entries: "avatar_styled: gemini-2.5-flash-image (885 in / 1,300 out) (8 calls) $0.0393"
+    // Also handles legacy format without calls: "avatar_styled: gemini-2.5-flash-image (885 in / 1,300 out) $0.0393"
+    const avatarCostMatch = msg.match(/(?:\[GEN:finalize\]\s+)?(avatar_\w+|page_images|cover_images):\s+(\S+)\s+\(([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\)(?:\s+\((\d+)\s+calls?\))?\s+\$([\d.]+)/);
+    if (avatarCostMatch) {
+      const name = avatarCostMatch[1].replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      costs.byFunction[name] = {
+        inputTokens: parseInt(avatarCostMatch[3].replace(/,/g, '')),
+        outputTokens: parseInt(avatarCostMatch[4].replace(/,/g, '')),
+        calls: avatarCostMatch[5] ? parseInt(avatarCostMatch[5]) : 1,
+        cost: parseFloat(avatarCostMatch[6]),
+        model: avatarCostMatch[2]
+      };
+      continue;
+    }
+
+    // genLog.apiUsage format (new): "page_images: gemini-2.5-flash-image (26,000 in / 12,900 out) (5 calls) $0.4000"
+    // Also legacy format: "genLog.apiUsage('function_name', 'model', {in: X, out: Y}, cost: $X.XX)"
+    const genLogNewMatch = msg.match(/(\w+):\s+(\S+)\s+\(([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out\)\s+\((\d+)\s+calls?\)\s+\$([\d.]+)/);
+    if (genLogNewMatch) {
+      const rawName = genLogNewMatch[1];
+      let name = rawName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const nameMap = {
+        'Scene Expansion': 'Scene Expand',
+        'Unified Story': 'Unified Story',
+        'Cover Images': 'Cover Images',
+        'Page Images': 'Page Images',
+        'Avatar Styled': 'Avatar Styled',
+        'Avatar Costumed': 'Avatar Costumed',
+        'Consistency Check': 'Consistency Check',
+        'Text Check': 'Text Check',
+        'Cover Quality': 'Cover Quality',
+        'Page Quality': 'Page Quality'
+      };
+      name = nameMap[name] || name;
+      if (!costs.byFunction[name]) {
+        costs.byFunction[name] = {
+          inputTokens: parseInt(genLogNewMatch[3].replace(/,/g, '')),
+          outputTokens: parseInt(genLogNewMatch[4].replace(/,/g, '')),
+          calls: parseInt(genLogNewMatch[5]),
+          cost: parseFloat(genLogNewMatch[6]),
+          model: genLogNewMatch[2]
+        };
+      }
+      continue;
+    }
+    const genLogMatch = msg.match(/genLog\.apiUsage\('(\w+)',\s*'([^']+)',\s*\{in:\s*(\d+),\s*out:\s*(\d+)\},\s*cost:\s*\$([\d.]+)\)/);
+    if (genLogMatch) {
+      const rawName = genLogMatch[1];
+      let name = rawName.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const nameMap = {
+        'Scene Expansion': 'Scene Expand',
+        'Unified Story': 'Unified Story',
+        'Cover Images': 'Cover Images',
+        'Page Images': 'Page Images',
+        'Avatar Styled': 'Avatar Styled',
+        'Avatar Costumed': 'Avatar Costumed',
+        'Consistency Check': 'Consistency Check',
+        'Text Check': 'Text Check',
+        'Cover Quality': 'Cover Quality',
+        'Page Quality': 'Page Quality'
+      };
+      name = nameMap[name] || name;
+      if (!costs.byFunction[name]) {
+        costs.byFunction[name] = {
+          inputTokens: parseInt(genLogMatch[3]),
+          outputTokens: parseInt(genLogMatch[4]),
+          calls: 1,
+          cost: parseFloat(genLogMatch[5]),
+          model: genLogMatch[2]
+        };
+      }
+      continue;
+    }
+
+    // Provider entries without calls count: "Anthropic: 116,579 in / 40,362 out $0.9552"
+    // Also with thinking: "Gemini Quality: 77,694 in / 26,828 out + 53,243 think $0.0398"
+    const providerMatch = msg.match(/^\s*(Anthropic|Gemini\s*\w*):\s+([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out(?:\s+\+\s+([\d,]+)\s+think)?\s+\$([\d.]+)/);
+    if (providerMatch) {
+      const name = providerMatch[1].trim();
+      costs.byProvider[name] = {
+        inputTokens: parseInt(providerMatch[2].replace(/,/g, '')),
+        outputTokens: parseInt(providerMatch[3].replace(/,/g, '')),
+        thinkingTokens: providerMatch[4] ? parseInt(providerMatch[4].replace(/,/g, '')) : 0,
+        cost: parseFloat(providerMatch[5])
+      };
+      continue;
+    }
+
+    // Provider entries with calls count: "Anthropic: 98,782 in / 49,377 out (17 calls) $1.0370"
+    const providerWithCallsMatch = msg.match(/^\s*(Anthropic|Gemini\s*\w*):\s+([\d,]+)\s+in\s+\/\s+([\d,]+)\s+out(?:\s+\/\s+([\d,]+)\s+think)?\s+\((\d+)\s+calls?\)\s+\$([\d.]+)/);
+    if (providerWithCallsMatch) {
+      const name = providerWithCallsMatch[1].trim();
+      costs.byProvider[name] = {
+        inputTokens: parseInt(providerWithCallsMatch[2].replace(/,/g, '')),
+        outputTokens: parseInt(providerWithCallsMatch[3].replace(/,/g, '')),
+        thinkingTokens: providerWithCallsMatch[4] ? parseInt(providerWithCallsMatch[4].replace(/,/g, '')) : 0,
+        calls: parseInt(providerWithCallsMatch[5]),
+        cost: parseFloat(providerWithCallsMatch[6])
+      };
+      continue;
+    }
+
+    // Total tokens: "TOTAL: 220,183 input, 77,770 output, 695 thinking tokens"
+    const totalTokensMatch = msg.match(/TOTAL:\s+([\d,NaN]+)\s+input,\s+([\d,NaN]+)\s+output/);
+    if (totalTokensMatch) {
+      const input = totalTokensMatch[1].replace(/,/g, '');
+      const output = totalTokensMatch[2].replace(/,/g, '');
+      costs.totals.inputTokens = input === 'NaN' ? 0 : parseInt(input);
+      costs.totals.outputTokens = output === 'NaN' ? 0 : parseInt(output);
+      continue;
+    }
+
+    // Total cost: "💰 TOTAL COST: $1.7878"
+    const totalCostMatch = msg.match(/TOTAL COST:\s+\$([\d.]+)/);
+    if (totalCostMatch) {
+      costs.totals.totalCost = parseFloat(totalCostMatch[1]);
+    }
+  }
+
+  return costs;
+}
+
+function extractImageStats(jobLines) {
+  const stats = {
+    // Image retries (how many pages needed multiple attempts)
+    retries: {
+      attempt1: 0,  // Success on first try
+      attempt2: 0,  // Needed 2nd attempt
+      attempt3: 0,  // Needed 3rd attempt
+      pages: {}     // Track by page: { 1: 1, 2: 3, ... } (page -> final attempt)
+    },
+    // Unified pipeline image generation (gen-only mode, no quality retry)
+    genOnly: {
+      count: 0,       // Individual [IMAGE GEN-ONLY] successes
+      totalFromLog: 0  // From "[UNIFIED] Phase 5a complete: X/Y images"
+    },
+    // Covers
+    covers: {
+      generated: false,
+      skipped: false,
+      skipReason: null,
+      count: 0
+    },
+    // Content blocked retries
+    contentBlocked: 0,
+    // Consistency regeneration
+    consistencyRegen: {
+      pagesQueued: 0,
+      pagesReplaced: 0,
+      pagesSkipped: [],
+      replacedPages: []  // Array of {page, score}
+    },
+    // Scene iterations (post-generation fixes)
+    sceneIterations: {
+      pagesIterated: 0,
+      totalMismatchesFixed: 0,
+      iterations: []  // Array of {page, mismatchesFixed, score}
+    },
+    // Scene previews (cheap Runware previews for validation)
+    scenePreviews: {
+      count: 0,
+      totalCost: 0
+    },
+    // Unified repair pipeline
+    repairPipeline: {
+      ran: false,
+      imageCount: 0,
+      threshold: 0,
+      maxAttempts: 0,
+      mode: null,
+      avgScore: null,
+      entityIssues: null,
+      evalDuration: null,
+      passes: [],        // Array of { pass, pagesRegenerated, duration }
+      upgradedPages: 0,
+      charFixed: 0,
+      pageScores: [],    // Array of { page, quality, semantic, final, fixTargets }
+      lowPages: [],      // Pages below threshold
+      upgradedDetails: [] // Array of { page, from, to, source }
+    }
+  };
+
+  for (const line of jobLines) {
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
+
+    // Cover images
+    if (msg.includes('skipCovers=true') || msg.includes('skipCovers') || msg.includes('No cover images to generate')) {
+      stats.covers.skipped = true;
+      stats.covers.skipReason = 'disabled';
+    }
+    if (msg.match(/cover_images:\s*(\d+)\s*calls/)) {
+      const match = msg.match(/cover_images:\s*(\d+)\s*calls/);
+      stats.covers.count = parseInt(match[1]);
+      if (stats.covers.count > 0) {
+        stats.covers.generated = true;
+      } else {
+        // 0 cover calls means covers were skipped
+        stats.covers.skipped = true;
+        if (!stats.covers.skipReason) stats.covers.skipReason = 'disabled or not requested';
+      }
+    }
+    if (msg.includes('[COVERS]') && msg.includes('Generated')) {
+      stats.covers.generated = true;
+    }
+
+    // Unified pipeline gen-only image generation
+    if (msg.includes('[IMAGE GEN-ONLY] Image generated successfully')) {
+      stats.genOnly.count++;
+    }
+    // Phase 5a summary: "✅ [UNIFIED] Phase 5a complete: 8/8 images generated in 24.0s"
+    const phase5aMatch = msg.match(/Phase 5a complete:\s*(\d+)\/(\d+)\s*images generated/);
+    if (phase5aMatch) {
+      stats.genOnly.totalFromLog = parseInt(phase5aMatch[1]);
+    }
+
+    // ── Unified Repair Pipeline ──────────────────────────────────────────
+    // Start: "🔧 [UNIFIED PIPELINE] Starting: 8 images, threshold=60, maxAttempts=2, mode=generateImageOnly"
+    const pipelineStartMatch = msg.match(/\[UNIFIED PIPELINE\] Starting:\s*(\d+)\s*images,\s*threshold=(\d+),\s*maxAttempts=(\d+),\s*mode=(\S+)/);
+    if (pipelineStartMatch) {
+      stats.repairPipeline.ran = true;
+      stats.repairPipeline.imageCount = parseInt(pipelineStartMatch[1]);
+      stats.repairPipeline.threshold = parseInt(pipelineStartMatch[2]);
+      stats.repairPipeline.maxAttempts = parseInt(pipelineStartMatch[3]);
+      stats.repairPipeline.mode = pipelineStartMatch[4];
+    }
+
+    // Step 1 complete: "✅ [UNIFIED PIPELINE] Step 1 complete in 39.6s: avg score 93%, entity issues: 0"
+    const step1Match = msg.match(/\[UNIFIED PIPELINE\] Step 1 complete in ([\d.]+)s:\s*avg score (\d+)%,\s*entity issues:\s*(\d+)/);
+    if (step1Match) {
+      stats.repairPipeline.evalDuration = parseFloat(step1Match[1]);
+      stats.repairPipeline.avgScore = parseInt(step1Match[2]);
+      stats.repairPipeline.entityIssues = parseInt(step1Match[3]);
+    }
+
+    // Per-page scores: "✅ [BATCH EVAL] PAGE 1: Quality 100%, Semantic 100%, Final 100%, 0 fix targets"
+    const pageScoreMatch = msg.match(/\[BATCH EVAL\] PAGE (\d+):\s*Quality (\d+)%,\s*Semantic (\S+)%,\s*Final (\d+)%,\s*(\d+)\s*fix targets/);
+    if (pageScoreMatch) {
+      stats.repairPipeline.pageScores.push({
+        page: parseInt(pageScoreMatch[1]),
+        quality: parseInt(pageScoreMatch[2]),
+        semantic: pageScoreMatch[3] === 'N/A' ? null : parseInt(pageScoreMatch[3]),
+        final: parseInt(pageScoreMatch[4]),
+        fixTargets: parseInt(pageScoreMatch[5])
+      });
+    }
+
+    // Regeneration pass: "🔄 [UNIFIED PIPELINE] Step 2: Regenerating 1 low-scoring pages (pass 1)..."
+    const regenPassMatch = msg.match(/\[UNIFIED PIPELINE\] Step 2: Regenerating (\d+) low-scoring pages \(pass (\d+)\)/);
+    if (regenPassMatch) {
+      stats.repairPipeline.passes.push({
+        pass: parseInt(regenPassMatch[2]),
+        pagesRegenerated: parseInt(regenPassMatch[1]),
+        duration: null
+      });
+    }
+
+    // Pass complete: "✅ [UNIFIED PIPELINE] Pass 1: 1/1 regenerated in 9.3s"
+    const passCompleteMatch = msg.match(/\[UNIFIED PIPELINE\] Pass (\d+):\s*(\d+)\/(\d+)\s*regenerated in ([\d.]+)s/);
+    if (passCompleteMatch) {
+      const passNum = parseInt(passCompleteMatch[1]);
+      const pass = stats.repairPipeline.passes.find(p => p.pass === passNum);
+      if (pass) pass.duration = parseFloat(passCompleteMatch[4]);
+    }
+
+    // Page upgraded: "📊 [UNIFIED PIPELINE] Page 11: selected regen-attempt-1 (score 80) over original (score 45)"
+    const upgradeMatch = msg.match(/\[UNIFIED PIPELINE\] Page (\d+): selected (\S+) \(score (\d+)\) over (\S+) \(score (\d+)\)/);
+    if (upgradeMatch) {
+      stats.repairPipeline.upgradedDetails.push({
+        page: parseInt(upgradeMatch[1]),
+        to: upgradeMatch[2],
+        toScore: parseInt(upgradeMatch[3]),
+        from: upgradeMatch[4],
+        fromScore: parseInt(upgradeMatch[5])
+      });
+    }
+
+    // Final summary: "✅ [UNIFIED PIPELINE] Complete: 8 pages, 0 upgraded, 0 character-fixed"
+    const pipelineCompleteMatch = msg.match(/\[UNIFIED PIPELINE\] Complete:\s*(\d+)\s*pages,\s*(\d+)\s*upgraded,\s*(\d+)\s*character-fixed/);
+    if (pipelineCompleteMatch) {
+      stats.repairPipeline.upgradedPages = parseInt(pipelineCompleteMatch[2]);
+      stats.repairPipeline.charFixed = parseInt(pipelineCompleteMatch[3]);
+    }
+
+    // Step 4 upgraded count: "✅ [UNIFIED PIPELINE] Step 4: 1 pages upgraded from regeneration"
+    const step4Match = msg.match(/\[UNIFIED PIPELINE\] Step 4:\s*(\d+)\s*pages upgraded/);
+    if (step4Match) {
+      stats.repairPipeline.upgradedPages = parseInt(step4Match[1]);
+    }
+
+    // Track current page being processed (from attempt messages)
+    // Pattern: "🎨 [QUALITY RETRY] [PAGE 8] Attempt 2/3"
+    const attemptStartMatch = msg.match(/\[QUALITY RETRY\]\s+\[PAGE\s+(\d+)\]\s+Attempt\s+(\d+)\/(\d+)/);
+    if (attemptStartMatch) {
+      const page = parseInt(attemptStartMatch[1]);
+      const attempt = parseInt(attemptStartMatch[2]);
+      // Track highest attempt for each page
+      if (!stats.retries.pages[page] || attempt > stats.retries.pages[page]) {
+        stats.retries.pages[page] = attempt;
+      }
+    }
+
+    // Quality retry success - count totals
+    // Pattern: "✅ [QUALITY RETRY] Success on attempt X!"
+    const successMatch = msg.match(/\[QUALITY RETRY\].*Success on attempt (\d+)/);
+    if (successMatch) {
+      const attempt = parseInt(successMatch[1]);
+      if (attempt === 1) stats.retries.attempt1++;
+      else if (attempt === 2) stats.retries.attempt2++;
+      else if (attempt === 3) stats.retries.attempt3++;
+    }
+
+    // Content blocked (PROHIBITED_CONTENT)
+    if (msg.includes('PROHIBITED_CONTENT') || msg.includes('Content blocked')) {
+      stats.contentBlocked++;
+    }
+
+    // Consistency regeneration - pages queued
+    // Pattern: "🔄 [CONSISTENCY REGEN] Regenerating 13 page(s) with issues: 16, 18, 2, ..."
+    const consistencyQueueMatch = msg.match(/\[CONSISTENCY REGEN\] Regenerating (\d+) page\(s\)/);
+    if (consistencyQueueMatch) {
+      stats.consistencyRegen.pagesQueued = parseInt(consistencyQueueMatch[1]);
+    }
+
+    // Consistency regeneration - page replaced
+    // Pattern: "✅ [CONSISTENCY REGEN] [PAGE 2] Replaced image (score: 95%)"
+    const consistencyReplacedMatch = msg.match(/\[CONSISTENCY REGEN\] \[PAGE (\d+)\] Replaced image \(score: (\d+)%\)/);
+    if (consistencyReplacedMatch) {
+      const page = parseInt(consistencyReplacedMatch[1]);
+      const score = parseInt(consistencyReplacedMatch[2]);
+      stats.consistencyRegen.pagesReplaced++;
+      stats.consistencyRegen.replacedPages.push({ page, score });
+    }
+
+    // Consistency regeneration - page skipped
+    // Pattern: "⚠️ [CONSISTENCY REGEN] Page 16 not found, skipping"
+    const consistencySkippedMatch = msg.match(/\[CONSISTENCY REGEN\] Page (\d+) not found/);
+    if (consistencySkippedMatch) {
+      stats.consistencyRegen.pagesSkipped.push(parseInt(consistencySkippedMatch[1]));
+    }
+
+    // Scene iterations - completed
+    // Pattern: "✅ [ITERATE] Page 6: Iteration complete (0 mismatches addressed, score: 100)"
+    const iterationCompleteMatch = msg.match(/\[ITERATE\] Page (\d+): Iteration complete \((\d+) mismatches addressed, score: (\d+)\)/);
+    if (iterationCompleteMatch) {
+      const page = parseInt(iterationCompleteMatch[1]);
+      const mismatchesFixed = parseInt(iterationCompleteMatch[2]);
+      const score = parseInt(iterationCompleteMatch[3]);
+      stats.sceneIterations.pagesIterated++;
+      stats.sceneIterations.totalMismatchesFixed += mismatchesFixed;
+      stats.sceneIterations.iterations.push({ page, mismatchesFixed, score });
+    }
+
+    // Scene previews
+    // Pattern: "[SCENE-VALIDATOR] Preview generated in 5327ms, cost: $0.000600"
+    const previewMatch = msg.match(/\[SCENE-VALIDATOR\] Preview generated.*cost: \$([\d.]+)/);
+    if (previewMatch) {
+      stats.scenePreviews.count++;
+      stats.scenePreviews.totalCost += parseFloat(previewMatch[1]);
+    }
+  }
+
+  return stats;
+}
+
+function extractTiming(jobLines) {
+  const timing = {
+    phases: {},
+    stageStarts: {}  // Track [GEN:xxx] stage starts
+  };
+
+  // Stage name mapping for cleaner output
+  const stageNames = {
+    'outline': 'Story Generation',
+    'avatars': 'Avatar Styling',
+    'scenes': 'Scene Validation',
+    'covers': 'Cover Generation',
+    'images': 'Page Images',
+    'final_checks': 'Final Checks',
+    'finalize': 'Finalization'
+  };
+
+  for (const line of jobLines) {
+    const msg = line.message.replace(/^\[DEBUG\]\s*/, '');
+    const ts = parseTimestamp(line.timestamp);
+
+    // Track [GEN:xxx] stage transitions
+    // Pattern: "[GEN:outline]  Starting outline stage"
+    const stageMatch = msg.match(/\[GEN:(\w+)\]\s+Starting (\w+) stage/);
+    if (stageMatch) {
+      const stageKey = stageMatch[1];
+      const displayName = stageNames[stageKey] || stageKey;
+
+      // End the previous stage
+      const stageOrder = ['outline', 'avatars', 'scenes', 'covers', 'images', 'final_checks', 'finalize'];
+      const currentIdx = stageOrder.indexOf(stageKey);
+      if (currentIdx > 0) {
+        const prevStage = stageOrder[currentIdx - 1];
+        const prevName = stageNames[prevStage] || prevStage;
+        if (timing.phases[prevName] && !timing.phases[prevName].end) {
+          timing.phases[prevName].end = ts;
+        }
+      }
+
+      // Start the new stage
+      timing.phases[displayName] = { start: ts };
+    }
+
+    // Unified story streaming start (more precise than [GEN:outline])
+    if (msg.includes('[STREAM] Starting streaming request to Anthropic') &&
+        msg.includes('64000 max tokens')) {
+      // This is the unified story call (large token limit)
+      if (timing.phases['Story Generation']) {
+        timing.phases['Story Generation'].streamStart = ts;
+      }
+    }
+
+    // Story text parsing complete
+    if (msg.includes('[UNIFIED] Streaming story complete') ||
+        msg.includes('[STREAM-UNIFIED] Story generation complete')) {
+      if (timing.phases['Story Generation']) {
+        timing.phases['Story Generation'].end = ts;
+      }
+    }
+
+    // Page images - track last quality success
+    if (msg.includes('[QUALITY RETRY]') && msg.includes('Success')) {
+      if (timing.phases['Page Images']) {
+        timing.phases['Page Images'].end = ts;
+      }
+    }
+
+    // Consistency check
+    if (msg.includes('[CONSISTENCY]') && msg.includes('Checking batch')) {
+      if (!timing.phases['Consistency Check']) {
+        timing.phases['Consistency Check'] = { start: ts };
+      }
+    }
+    if (msg.includes('[CONSISTENCY]') && msg.includes('Found')) {
+      if (timing.phases['Consistency Check']) {
+        timing.phases['Consistency Check'].end = ts;
+      }
+    }
+
+    // Job completion
+    if (msg.includes('Job') && msg.includes('completed successfully')) {
+      // End any open phases
+      for (const phase of Object.values(timing.phases)) {
+        if (phase.start && !phase.end) {
+          phase.end = ts;
+        }
+      }
+    }
+  }
+
+  return timing;
+}
+
+function extractIssues(jobLines) {
+  const issues = {
+    warnings: [],
+    errors: [],
+    fallbacks: [],
+    lowQualityScores: [],
+    retries: [],
+    runtimeErrors: [],  // JavaScript runtime errors (TypeError, etc.)
+    nanIssues: [],       // NaN in calculations
+    qualityFindings: []  // CONSISTENCY, TEXT CHECK findings (informational, not errors)
+  };
+
+  const seenMessages = new Set(); // For deduplication
+
+  for (const line of jobLines) {
+    const msg = line.message;
+    const ts = line.timestamp.substring(11, 19); // HH:MM:SS
+
+    // Skip Flask development server warning
+    if (msg.includes('development server') || msg.includes('WSGI server')) continue;
+
+    // CONSISTENCY and TEXT CHECK findings are INFORMATIONAL (normal part of generation)
+    // They report findings but are not errors or warnings
+    if (msg.includes('[CONSISTENCY]') && msg.includes('Found')) {
+      const key = `consistency-${ts}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.qualityFindings.push({ time: ts, type: 'CONSISTENCY', message: msg.substring(0, 200) });
+      }
+      continue; // Don't also add to warnings/errors
+    }
+    if (msg.includes('[TEXT CHECK]') && msg.includes('Found')) {
+      const key = `textcheck-${ts}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.qualityFindings.push({ time: ts, type: 'TEXT CHECK', message: msg.substring(0, 200) });
+      }
+      continue; // Don't also add to warnings/errors
+    }
+
+    // Warnings - look for actual warning indicators (but not CONSISTENCY/TEXT CHECK)
+    if ((msg.includes('WARNING') || msg.includes('\u26a0\ufe0f') || msg.includes('[WARN]') || line.level === 'wrn') &&
+        !msg.includes('development server') && !msg.includes('WSGI') &&
+        !msg.includes('[CONSISTENCY]') && !msg.includes('[TEXT CHECK]')) {
+      const key = `warn-${msg.substring(0, 50)}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.warnings.push({ time: ts, message: msg.substring(0, 150) });
+      }
+    }
+
+    // Errors - look for actual error indicators
+    // But DON'T classify as error if it's a WARN-level log (avoid duplicates in warnings + errors)
+    const isWarnLevel = msg.includes('[WARN]') || line.level === 'wrn';
+    // Skip JSON-like lines (debug output from quality eval, etc.)
+    const trimmedMsg = msg.trim();
+    const isJsonLine = trimmedMsg.startsWith('{') || trimmedMsg.startsWith('}') ||
+                       trimmedMsg.startsWith('[') || trimmedMsg.startsWith(']') ||
+                       trimmedMsg.startsWith('"') || trimmedMsg.startsWith('```');
+    const isError = !isWarnLevel && !isJsonLine && (
+                    msg.includes('Error') || msg.includes('\u274c') || msg.includes('[ERROR]') ||
+                    (msg.includes('failed') && !msg.includes('story-failed')) ||
+                    (msg.includes('Failed') && !msg.includes('story-failed')) ||
+                    line.level === 'err');
+    if (isError) {
+      // Skip checkpoint errors, email templates, CONSISTENCY/TEXT CHECK, and normal log messages
+      if (!msg.includes('checkpoint') && !msg.includes('story-failed') &&
+          !msg.includes('email template') && !msg.includes('[CONSISTENCY]') &&
+          !msg.includes('[TEXT CHECK]')) {
+        const key = `err-${msg.substring(0, 50)}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          issues.errors.push({ time: ts, message: msg.substring(0, 150) });
+        }
+      }
+    }
+
+    // Fallbacks
+    if (msg.toLowerCase().includes('fallback')) {
+      const key = `fallback-${msg.substring(0, 50)}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.fallbacks.push({ time: ts, message: msg.substring(0, 150) });
+      }
+    }
+
+    // Low quality scores (< 80) - look for quality evaluation score patterns
+    // Only match final scores from [QUALITY RETRY] success messages or quality evaluations
+    // Pattern: "Attempt X score: 60%" or "Success on attempt X! Score 70%"
+    const scoreMatch = msg.match(/(?:Attempt \d+ )?[Ss]core[:\s]+(\d+)%/i);
+    if (scoreMatch && (msg.includes('[QUALITY') || msg.includes('Success on attempt'))) {
+      const score = parseInt(scoreMatch[1]);
+      if (score < 80) {
+        // Extract page number if present
+        const pageMatch = msg.match(/\[PAGE\s+(\d+)\]/);
+        const page = pageMatch ? parseInt(pageMatch[1]) : null;
+        // Deduplicate by timestamp and score (same event may be logged with/without page)
+        const key = `quality-${ts}-${score}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          issues.lowQualityScores.push({ time: ts, score, page, message: msg.substring(0, 120) });
+        }
+      }
+    }
+
+    // Runtime errors (JavaScript errors like TypeError, .match is not a function, etc.)
+    const runtimeErrorPatterns = [
+      /is not a function/i,
+      /is not defined/i,
+      /cannot read propert/i,
+      /cannot set propert/i,
+      /TypeError/i,
+      /ReferenceError/i,
+      /SyntaxError/i,
+      /undefined is not/i,
+      /null is not/i
+    ];
+    for (const pattern of runtimeErrorPatterns) {
+      if (pattern.test(msg)) {
+        const key = `runtime-${msg.substring(0, 50)}`;
+        if (!seenMessages.has(key)) {
+          seenMessages.add(key);
+          issues.runtimeErrors.push({ time: ts, message: msg.substring(0, 200) });
+        }
+        break;
+      }
+    }
+
+    // NaN issues in calculations
+    if (msg.includes('NaN') && (msg.includes('TOTAL') || msg.includes('token') || msg.includes('cost'))) {
+      const key = `nan-${msg.substring(0, 50)}`;
+      if (!seenMessages.has(key)) {
+        seenMessages.add(key);
+        issues.nanIssues.push({ time: ts, message: msg.substring(0, 150) });
+      }
+    }
+  }
+
+  return issues;
+}
+
+// ============================================================================
+// OUTPUT
+// ============================================================================
+
+function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
+  const duration = job.endTime ? job.endTime - job.startTime : null;
+
+  console.log('\n' + '='.repeat(70));
+  // Show story title prominently at the top
+  if (storyInfo.title) {
+    console.log(`📚 ${storyInfo.title}`);
+    console.log('-'.repeat(70));
+  }
+  console.log(`Job: ${job.id}`);
+  if (job.user) {
+    console.log(`User: ${job.user}`);
+  }
+  console.log('='.repeat(70));
+
+  // Story Info
+  console.log('\n\ud83d\udcd6 STORY INFO');
+  if (!storyInfo.title) console.log(`   Title: (not found)`);
+  console.log(`   Language: ${storyInfo.language || '?'} (${storyInfo.languageLevel || '?'})`);
+  console.log(`   Characters: ${storyInfo.characters || '?'}`);
+  console.log(`   Pages: ${storyInfo.pages || '?'}`);
+  if (storyInfo.storyType) console.log(`   Type: ${storyInfo.storyType}`);
+
+  // Timing
+  console.log('\n\u23f1\ufe0f  TIMING');
+  console.log(`   Started: ${job.startTime.toISOString().substring(11, 19)}`);
+  if (job.completionTime) {
+    // Use actual completion time for accurate duration
+    const completionDuration = job.completionTime - job.startTime;
+    console.log(`   Completed: ${job.completionTime.toISOString().substring(11, 19)}`);
+    console.log(`   Generation Duration: ${formatDuration(completionDuration)}`);
+    // Note if there were post-completion activities
+    if (job.endTime && job.endTime > job.completionTime) {
+      const postDuration = job.endTime - job.completionTime;
+      console.log(`   Post-completion activity: +${formatDuration(postDuration)}`);
+    }
+  } else if (job.endTime) {
+    console.log(`   Ended: ${job.endTime.toISOString().substring(11, 19)}`);
+    console.log(`   Total Duration: ${formatDuration(duration)}`);
+  }
+
+  // Per-phase timing
+  if (timing && Object.keys(timing.phases).length > 0) {
+    console.log('\n   By Phase (some overlap - parallel execution):');
+    for (const [phase, data] of Object.entries(timing.phases)) {
+      if (data.start && data.end) {
+        const phaseDuration = data.end - data.start;
+        console.log(`   - ${phase}: ${formatDuration(phaseDuration)}`);
+      }
+    }
+  }
+
+  // Image Generation Stats
+  console.log('\n\ud83c\udfa8 IMAGE GENERATION');
+
+  // Covers
+  if (imageStats.covers.skipped) {
+    console.log(`   Covers: SKIPPED (${imageStats.covers.skipReason || 'disabled'})`);
+  } else if (imageStats.covers.generated) {
+    console.log(`   Covers: Generated (${imageStats.covers.count} images)`);
+  } else {
+    console.log(`   Covers: ${imageStats.covers.count > 0 ? 'Generated' : 'Not generated'}`);
+  }
+
+  // Image count: prefer gen-only (unified pipeline) over quality-retry (legacy)
+  const qualityRetryTotal = imageStats.retries.attempt1 + imageStats.retries.attempt2 + imageStats.retries.attempt3;
+  const genOnlyTotal = imageStats.genOnly.totalFromLog || imageStats.genOnly.count;
+  const totalImages = genOnlyTotal || qualityRetryTotal;
+
+  if (genOnlyTotal > 0) {
+    // Unified pipeline mode (gen-only, no per-image quality retry)
+    console.log(`   Page Images: ${genOnlyTotal} generated`);
+  } else if (qualityRetryTotal > 0) {
+    // Legacy quality-retry mode
+    const retriedImages = imageStats.retries.attempt2 + imageStats.retries.attempt3;
+    console.log(`   Page Images: ${qualityRetryTotal} total`);
+    console.log(`   - First attempt success: ${imageStats.retries.attempt1}`);
+    if (imageStats.retries.attempt2 > 0) {
+      console.log(`   - Needed 2nd attempt: ${imageStats.retries.attempt2}`);
+    }
+    if (imageStats.retries.attempt3 > 0) {
+      console.log(`   - Needed 3rd attempt: ${imageStats.retries.attempt3}`);
+    }
+    if (retriedImages > 0) {
+      const retriedPages = Object.entries(imageStats.retries.pages)
+        .filter(([_, attempts]) => attempts > 1)
+        .map(([page, attempts]) => `p${page}(${attempts} attempts)`)
+        .join(', ');
+      if (retriedPages) {
+        console.log(`   - Retried pages: ${retriedPages}`);
+      }
+    }
+  } else {
+    console.log(`   Page Images: (count not detected)`);
+  }
+
+  // Content blocked
+  if (imageStats.contentBlocked > 0) {
+    console.log(`   Content blocked retries: ${imageStats.contentBlocked}`);
+  }
+
+  // Consistency regeneration
+  if (imageStats.consistencyRegen.pagesQueued > 0) {
+    console.log(`\n🔄 CONSISTENCY REGENERATION`);
+    console.log(`   Pages queued: ${imageStats.consistencyRegen.pagesQueued}`);
+    console.log(`   Pages replaced: ${imageStats.consistencyRegen.pagesReplaced}`);
+    if (imageStats.consistencyRegen.pagesSkipped.length > 0) {
+      console.log(`   Pages skipped: ${imageStats.consistencyRegen.pagesSkipped.join(', ')} (not found)`);
+    }
+    if (imageStats.consistencyRegen.replacedPages.length > 0) {
+      const avgScore = imageStats.consistencyRegen.replacedPages.reduce((sum, p) => sum + p.score, 0) / imageStats.consistencyRegen.replacedPages.length;
+      console.log(`   Average score: ${avgScore.toFixed(0)}%`);
+      // Show pages with lower scores
+      const lowScorePages = imageStats.consistencyRegen.replacedPages.filter(p => p.score < 90);
+      if (lowScorePages.length > 0) {
+        console.log(`   Lower scores: ${lowScorePages.map(p => `p${p.page}(${p.score}%)`).join(', ')}`);
+      }
+    }
+  }
+
+  // Scene iterations
+  if (imageStats.sceneIterations.pagesIterated > 0) {
+    console.log(`\n🔁 SCENE ITERATIONS`);
+    console.log(`   Pages iterated: ${imageStats.sceneIterations.pagesIterated}`);
+    console.log(`   Total mismatches fixed: ${imageStats.sceneIterations.totalMismatchesFixed}`);
+    if (imageStats.sceneIterations.iterations.length > 0) {
+      const details = imageStats.sceneIterations.iterations.map(i =>
+        `p${i.page}(${i.mismatchesFixed} fixes, ${i.score}%)`
+      ).join(', ');
+      console.log(`   Details: ${details}`);
+    }
+  }
+
+  // Scene previews
+  if (imageStats.scenePreviews.count > 0) {
+    console.log(`\n🔍 SCENE PREVIEWS`);
+    console.log(`   Count: ${imageStats.scenePreviews.count}`);
+    console.log(`   Total cost: $${imageStats.scenePreviews.totalCost.toFixed(4)}`);
+  }
+
+  // Repair Pipeline
+  if (imageStats.repairPipeline.ran) {
+    const rp = imageStats.repairPipeline;
+    const hadRepairs = rp.passes.length > 0;
+    console.log(`\n🔧 AUTO-REPAIR PIPELINE`);
+    console.log(`   Images: ${rp.imageCount}, Threshold: ${rp.threshold}%, Max passes: ${rp.maxAttempts}`);
+    if (rp.evalDuration) {
+      console.log(`   Evaluation: ${rp.evalDuration}s, Avg score: ${rp.avgScore}%, Entity issues: ${rp.entityIssues}`);
+    }
+
+    if (hadRepairs) {
+      for (const pass of rp.passes) {
+        const dur = pass.duration ? ` in ${pass.duration}s` : '';
+        console.log(`   Pass ${pass.pass}: Regenerated ${pass.pagesRegenerated} pages${dur}`);
+      }
+      if (rp.upgradedDetails.length > 0) {
+        console.log(`   Upgrades:`);
+        for (const u of rp.upgradedDetails) {
+          console.log(`   - Page ${u.page}: ${u.from} (${u.fromScore}%) → ${u.to} (${u.toScore}%)`);
+        }
+      }
+      console.log(`   Result: ${rp.upgradedPages} upgraded, ${rp.charFixed} character-fixed`);
+    } else {
+      console.log(`   Result: All pages above threshold, no repairs needed`);
+    }
+
+    // Show per-page scores (only last evaluation round, sorted by page)
+    if (rp.pageScores.length > 0) {
+      // Deduplicate: keep last score per page (re-evaluation overwrites)
+      const lastScores = new Map();
+      for (const s of rp.pageScores) lastScores.set(s.page, s);
+      const sorted = [...lastScores.values()].sort((a, b) => a.page - b.page);
+      const low = sorted.filter(s => s.final < rp.threshold);
+      if (low.length > 0) {
+        console.log(`   Below threshold: ${low.map(s => `p${s.page}(${s.final}%)`).join(', ')}`);
+      }
+      // Compact score line
+      const scoreStr = sorted.map(s => `${s.final}`).join(' ');
+      console.log(`   Final scores: [${scoreStr}]`);
+    }
+  }
+
+  // Costs
+  console.log('\n\ud83d\udcb0 COST BREAKDOWN');
+  if (Object.keys(costs.byProvider).length > 0) {
+    for (const [provider, data] of Object.entries(costs.byProvider)) {
+      const tokens = `${data.inputTokens.toLocaleString()} in / ${data.outputTokens.toLocaleString()} out`;
+      console.log(`   ${provider.padEnd(20)} $${data.cost.toFixed(2).padStart(5)}  (${tokens})`);
+    }
+    // Add scene preview cost if significant
+    if (imageStats.scenePreviews.totalCost > 0.001) {
+      console.log(`   ${'Scene Previews'.padEnd(20)} $${imageStats.scenePreviews.totalCost.toFixed(2).padStart(5)}  (${imageStats.scenePreviews.count} previews @ $0.0006)`);
+    }
+    console.log('   ' + '\u2500'.repeat(45));
+    const totalWithPreviews = costs.totals.totalCost + imageStats.scenePreviews.totalCost;
+    console.log(`   ${'TOTAL'.padEnd(20)} $${totalWithPreviews.toFixed(2).padStart(5)}`);
+  } else {
+    console.log('   (no cost data found)');
+  }
+
+  // By Function breakdown with token details
+  if (Object.keys(costs.byFunction).length > 0) {
+    console.log('\n   By Function:');
+    for (const [func, data] of Object.entries(costs.byFunction)) {
+      const inK = (data.inputTokens / 1000).toFixed(1);
+      const outK = (data.outputTokens / 1000).toFixed(1);
+      console.log(`   - ${func}: $${data.cost.toFixed(4)} (${data.calls} calls) [${data.model}]`);
+      console.log(`     └─ ${inK}k in / ${outK}k out`);
+    }
+
+    // Token totals
+    const totalIn = Object.values(costs.byFunction).reduce((sum, d) => sum + d.inputTokens, 0);
+    const totalOut = Object.values(costs.byFunction).reduce((sum, d) => sum + d.outputTokens, 0);
+    console.log(`\n   Token Totals: ${(totalIn/1000).toFixed(1)}k input, ${(totalOut/1000).toFixed(1)}k output`);
+  }
+
+  // Issues (real problems)
+  const totalIssues = issues.warnings.length + issues.errors.length +
+                      issues.fallbacks.length + issues.lowQualityScores.length +
+                      issues.runtimeErrors.length + issues.nanIssues.length;
+
+  console.log(`\n⚠️  ISSUES (${totalIssues} found)`);
+
+  if (totalIssues === 0) {
+    console.log('   ✅ No issues detected');
+  } else {
+    if (issues.errors.length > 0) {
+      console.log(`\n   ❌ Errors (${issues.errors.length}):`);
+      issues.errors.slice(0, 10).forEach(e => console.log(`      [${e.time}] ${e.message}`));
+      if (issues.errors.length > 10) console.log(`      ... and ${issues.errors.length - 10} more`);
+    }
+
+    if (issues.warnings.length > 0) {
+      console.log(`\n   ⚠️  Warnings (${issues.warnings.length}):`);
+      issues.warnings.slice(0, 5).forEach(w => console.log(`      [${w.time}] ${w.message}`));
+      if (issues.warnings.length > 5) console.log(`      ... and ${issues.warnings.length - 5} more`);
+    }
+
+    if (issues.fallbacks.length > 0) {
+      console.log(`\n   🔄 Fallbacks (${issues.fallbacks.length}):`);
+      issues.fallbacks.slice(0, 5).forEach(f => console.log(`      [${f.time}] ${f.message}`));
+      if (issues.fallbacks.length > 5) console.log(`      ... and ${issues.fallbacks.length - 5} more`);
+    }
+
+    if (issues.lowQualityScores.length > 0) {
+      console.log(`\n   📊 Low Quality Scores (${issues.lowQualityScores.length}):`);
+      issues.lowQualityScores.forEach(q => {
+        const pageStr = q.page ? ` Page ${q.page}:` : '';
+        console.log(`      [${q.time}]${pageStr} Score: ${q.score}%`);
+      });
+    }
+
+    if (issues.runtimeErrors.length > 0) {
+      console.log(`\n   💥 Runtime Errors (${issues.runtimeErrors.length}):`);
+      issues.runtimeErrors.forEach(e => console.log(`      [${e.time}] ${e.message}`));
+    }
+
+    if (issues.nanIssues.length > 0) {
+      console.log(`\n   🔢 NaN Issues (${issues.nanIssues.length}):`);
+      issues.nanIssues.forEach(n => console.log(`      [${n.time}] ${n.message}`));
+    }
+  }
+
+  // Quality Findings (informational - normal part of story generation)
+  if (issues.qualityFindings.length > 0) {
+    console.log(`\n📋 QUALITY FINDINGS (${issues.qualityFindings.length} - informational)`);
+    issues.qualityFindings.forEach(f => {
+      console.log(`   [${f.time}] [${f.type}] ${f.message.substring(f.message.indexOf('Found'))}`);
+    });
+  }
+
+  // Status
+  const statusEmoji = job.status === 'completed' ? '\u2705' :
+                      job.status === 'failed' ? '\u274c' : '\u23f3';
+  console.log(`\n${statusEmoji} STATUS: ${job.status.toUpperCase()}`);
+  console.log('='.repeat(70) + '\n');
+}
+
+// ============================================================================
+// MAIN
+// ============================================================================
+
+function analyzeLog(logPath) {
+  const stats = fs.statSync(logPath);
+  const fileDate = stats.mtime;
+  const formattedDate = fileDate.toLocaleDateString('en-US', {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  });
+
+  console.log(`\nAnalyzing: ${path.basename(logPath)}`);
+  console.log(`File date: ${formattedDate}`);
+  console.log(`File size: ${(stats.size / 1024).toFixed(1)} KB`);
+
+  const lines = parseLogFile(logPath);
+  console.log(`Total log lines: ${lines.length}`);
+
+  const jobs = extractJobs(lines);
+  console.log(`Story jobs found: ${jobs.length}`);
+
+  if (jobs.length === 0) {
+    console.log('\nNo story generation jobs found in this log file.');
+    return;
+  }
+
+  // Analyze each job (most recent first)
+  for (const job of jobs.reverse()) {
+    const storyInfo = extractStoryInfo(job.lines);
+    const costs = extractCostSummary(job.lines);
+    const issues = extractIssues(job.lines);
+    const imageStats = extractImageStats(job.lines);
+    const timing = extractTiming(job.lines);
+    printAnalysis(job, storyInfo, costs, issues, imageStats, timing);
+  }
+}
+
+// CLI Entry Point
+const logFile = process.argv[2] || getLatestLogFile();
+
+if (!logFile) {
+  console.error('No log file found. Specify a path or ensure logs.*.log exists in Downloads.');
+  process.exit(1);
+}
+
+if (!fs.existsSync(logFile)) {
+  console.error(`Log file not found: ${logFile}`);
+  process.exit(1);
+}
+
+analyzeLog(logFile);

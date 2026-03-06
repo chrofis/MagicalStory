@@ -1,0 +1,16 @@
+node_modules
+client/node_modules
+client/dist
+dist
+.git
+*.log
+*.md
+.env*
+.claude
+test-*.js
+*.test.js
+*.spec.js
+coverage
+.nyc_output
+.vscode
+.idea

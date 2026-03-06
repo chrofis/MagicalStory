@@ -1,0 +1,108 @@
+# Image Consistency Check
+
+You are reviewing multiple images from a children's picture book for visual consistency.
+
+## Your Task
+Analyze the provided images and identify any inconsistencies that would break immersion for readers.
+
+## Check Type: {CHECK_TYPE}
+
+## Character Descriptions
+{CHARACTER_DESCRIPTIONS}
+
+## Scene Context (JSON format)
+{IMAGE_INFO}
+
+Each entry contains:
+- "image": Image number (1-indexed, matches "Image N" labels below)
+- "page": Story page number
+- "characters": Array of character names appearing in this scene
+- "clothing": Object mapping character names to clothing category (or "_default" if same for all)
+- "scene": Brief description of what happens in the scene
+
+**CRITICAL: Use the CHARACTER DESCRIPTIONS above to identify which figure is which character in each image. Use this JSON data to understand which characters appear in each image and what clothing they should wear.**
+
+- Different characters appearing in different images is EXPECTED - do NOT flag this as inconsistent
+- Clothing changes between scenes are INTENTIONAL if the clothing category differs (e.g., "standard" vs "winter" vs "costumed:pirate")
+- Only flag as inconsistent if:
+  1. The SAME character looks different in scenes with the SAME clothing requirement
+  2. A character's core features (face, hair color, skin tone) change unexpectedly
+  3. Art style or quality varies significantly between images
+
+### For CHARACTER checks:
+Focus on whether {CHARACTER_NAME} looks like the same person across images WHERE THEY APPEAR:
+- Face shape and features (eyes, nose, mouth proportions)
+- Hair color, style, and length
+- Skin tone
+- Body build and proportions
+- Age appearance
+- Clothing should match the listed category for each scene
+
+### For SEQUENCE checks:
+Focus on continuity between consecutive scenes:
+- Character positions should be logically consistent
+- Objects and props should remain consistent within the same scene
+- Actions should flow naturally from one scene to the next
+
+### For FULL checks:
+Review all images for overall visual coherence:
+- Art style should be consistent throughout
+- Color palette should feel unified
+- Characters should be recognizable when they appear in multiple scenes
+
+## Output Format
+
+Return ONLY valid JSON (no markdown, no explanation):
+
+{
+  "consistent": true/false,
+  "overallScore": 1-10,
+  "issues": [
+    {
+      "images": [2, 4],
+      "pagesToFix": [4],
+      "type": "character_appearance" | "position_swap" | "clothing_mismatch" | "prop_inconsistency" | "style_drift",
+      "characterInvolved": "Character name if applicable",
+      "description": "Clear description of what's inconsistent",
+      "details": {
+        "image2": "What it looks like in image 2",
+        "image4": "What it looks like in image 4"
+      },
+      "canonicalVersion": "Description of what the correct/target appearance should be (e.g., 'red hair as shown in image 2')",
+      "recommendation": "Single specific action to fix (e.g., 'Regenerate page 4: change hair to red to match page 2')",
+      "severity": "low" | "medium" | "high"
+    }
+  ],
+  "summary": "Brief overall assessment"
+}
+
+## Recommendation Rules (CRITICAL)
+
+When writing `recommendation` and `pagesToFix`:
+
+1. **NEVER give "either/or" options** - pick ONE specific direction
+2. **Minimize regeneration** - fix the FEWEST pages possible
+3. **Majority wins** - if 2 images show red hair and 1 shows brown, fix the brown one
+4. **First appearance wins** - if tied, match the earlier image (readers saw that first)
+5. **`pagesToFix`** - list ONLY the page numbers that need regeneration (not all involved pages)
+6. **`canonicalVersion`** - describe what the correct version looks like (used as reference)
+
+Example:
+- Images 1, 2, 3 all show Lukas
+- Images 1 & 2: no scarf
+- Image 3: blue scarf
+- WRONG: "Either add scarf to 1 & 2, or remove from 3"
+- CORRECT: `"pagesToFix": [3]`, `"canonicalVersion": "no scarf, as shown in images 1 and 2"`, `"recommendation": "Regenerate page 3: remove the scarf from Lukas to match images 1 and 2"`
+
+## Severity Guide
+- **high**: Obvious inconsistency that readers will immediately notice (wrong hair color, character looks completely different)
+- **medium**: Noticeable on closer inspection (clothing color slightly off, character proportions vary)
+- **low**: Minor variation that most readers won't notice (slight style differences, minor prop changes)
+
+If no issues found, return:
+{
+  "consistent": true,
+  "overallScore": 10,
+  "issues": [],
+  "summary": "All images are visually consistent"
+}

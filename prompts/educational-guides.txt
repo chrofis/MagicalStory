@@ -1,0 +1,406 @@
+# Educational Story Teaching Guides
+#
+# This file contains specific teaching content for each educational topic.
+# The story generation will use these guides to ensure accurate, comprehensive coverage.
+#
+# Format: [topic-id] followed by the teaching guide content.
+# Edit freely - changes take effect on next story generation.
+
+# =============================================================================
+# LETTERS & READING
+# =============================================================================
+
+[alphabet]
+Teach the 26 letters of the English alphabet (A-Z).
+Key learning points:
+- Introduce letters in memorable groups or through a journey
+- Show both uppercase (A, B, C) and lowercase (a, b, c) forms
+- Associate each letter with a word and object (A is for Apple, B is for Ball)
+- Include the alphabet song rhythm if natural to the story
+- Emphasize that letters combine to make words
+- Practice: Have characters find or collect letters during the adventure
+
+[vowels]
+Teach the 5 vowels: A, E, I, O, U (and sometimes Y).
+Key learning points:
+- Vowels are special letters that appear in every word
+- Each vowel makes different sounds (short and long)
+- Short sounds: a (cat), e (bed), i (sit), o (hot), u (cup)
+- Long sounds: a (cake), e (tree), i (bike), o (home), u (cute)
+- Memory trick: "A, E, I, O, U - and sometimes Y too!"
+- Practice: Find vowels in character names during the story
+
+[rhyming]
+Teach rhyming words and sound patterns.
+Key learning points:
+- Rhyming words end with the same sound (cat/hat, moon/spoon)
+- Rhymes help us remember things and make language fun
+- Common rhyme families: -at, -an, -op, -ig, -ug, -ake, -ine
+- Practice identifying "Which word rhymes with...?"
+- Create simple rhyming pairs throughout the story
+- Show how changing the first letter makes new rhyming words
+
+# =============================================================================
+# NUMBERS & MATH
+# =============================================================================
+
+[numbers-1-10]
+Teach numbers 1 through 10.
+Key learning points:
+- Number names: one, two, three, four, five, six, seven, eight, nine, ten
+- Number symbols: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+- Counting objects in the story (3 apples, 5 birds, 7 stars)
+- Number order: what comes before and after each number
+- Show quantities visually through story elements
+- Practice: Count items during each scene
+
+[numbers-1-20]
+Teach numbers 1 through 20.
+Key learning points:
+- Numbers 11-20 follow the pattern of "ten plus" (eleven, twelve... twenty)
+- Teen numbers (13-19) end in "-teen"
+- Counting by ones all the way to twenty
+- Skip counting by 2s (2, 4, 6, 8, 10, 12, 14, 16, 18, 20)
+- Relate to age ("I am 5 years old, soon I'll be 6!")
+- Practice: Count larger groups during the adventure
+
+[counting]
+Teach fundamental counting skills.
+Key learning points:
+- One-to-one correspondence: one number for each object
+- Count slowly and point to each item
+- The last number tells "how many"
+- Count anything: steps, jumps, toys, animals
+- Count forwards and backwards
+- Use fingers to show numbers
+- Practice: Count together with characters in each scene
+
+[shapes]
+Teach basic geometric shapes.
+Key learning points:
+- Circle: round like a ball, wheel, sun, cookie
+- Square: 4 equal sides, like a window or box
+- Triangle: 3 sides, 3 corners, like a mountain or slice of pizza
+- Rectangle: like a door, book, or phone
+- Oval: stretched circle, like an egg
+- Star: pointed shape, like stars in the sky
+- Heart: love shape
+- Find shapes in everyday objects throughout the story
+
+[addition]
+Teach simple addition (sums up to 10).
+Key learning points:
+- Adding means putting together to find "how many in all"
+- Use the word "plus" and the + symbol
+- Start with adding 1 more, then 2 more
+- Use story objects: "2 apples plus 3 apples equals 5 apples"
+- Show on fingers or with visual groups
+- Key facts: 1+1=2, 2+2=4, 5+5=10
+- Practice: Combine items in each scene and count the total
+
+# =============================================================================
+# COLORS
+# =============================================================================
+
+[colors-basic]
+Teach the basic colors.
+Key learning points:
+- Primary colors: Red, Blue, Yellow (can't be mixed from other colors)
+- Secondary colors: Orange, Green, Purple (made by mixing)
+- Other basics: Black, White, Brown, Pink
+- Find colors in nature: blue sky, green grass, yellow sun
+- Associate with objects: red apple, orange carrot, yellow banana
+- Color emotions: warm colors (red, orange) vs cool colors (blue, green)
+- Practice: Name colors of objects in each scene
+
+[colors-mixing]
+Teach how colors mix to create new colors.
+Key learning points:
+- Red + Yellow = Orange
+- Blue + Yellow = Green
+- Red + Blue = Purple
+- Red + White = Pink
+- Any color + Black = Darker shade
+- Any color + White = Lighter shade
+- Primary colors are the "parent" colors
+- Practice: Mix colors during an art or magic scene in the story
+
+# =============================================================================
+# NATURE & SCIENCE
+# =============================================================================
+
+[planets]
+Teach about planets and our solar system.
+Key learning points:
+- Our Sun is a star at the center of our solar system
+- 8 planets orbit the Sun (Pluto is a dwarf planet)
+- Order: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, Neptune
+- Memory: "My Very Eager Mother Just Served Us Nachos"
+- Earth is our home - the only planet with life we know
+- Jupiter is the biggest, Mercury is the smallest
+- Saturn has beautiful rings made of ice and rock
+- Practice: Visit or learn about 2-3 planets during the adventure
+
+[seasons]
+Teach the four seasons and their characteristics.
+Key learning points:
+- Spring: flowers bloom, baby animals, rain, warmer weather
+- Summer: hot, sunny, swimming, long days, vacation
+- Autumn/Fall: leaves change color and fall, harvest, cooler
+- Winter: cold, snow, short days, holidays, animals hibernate
+- Seasons change because Earth tilts as it orbits the Sun
+- Different activities for each season
+- Practice: Experience or discuss at least 2-3 seasons in the story
+
+[weather]
+Teach about different types of weather.
+Key learning points:
+- Sunny: bright, warm, blue sky, wear sunscreen
+- Rainy: clouds, water falls from sky, puddles, need umbrella
+- Cloudy: gray sky, might rain soon
+- Windy: air moves fast, trees sway, hold onto hats
+- Snowy: frozen rain, white, cold, make snowmen
+- Stormy: thunder (loud sound), lightning (bright flash), stay inside
+- Weather changes daily and by season
+- Practice: Experience different weather during the adventure
+
+[water-cycle]
+Teach the water cycle.
+Key learning points:
+- Water moves in a circle that never stops
+- Evaporation: Sun heats water, it rises as invisible vapor
+- Condensation: Vapor cools in sky, forms clouds
+- Precipitation: Water falls as rain, snow, or hail
+- Collection: Water gathers in oceans, lakes, rivers, ground
+- The same water has been recycled for millions of years!
+- Practice: Follow a water droplet through its journey
+
+[plants-grow]
+Teach how plants grow.
+Key learning points:
+- Seeds are baby plants waiting to grow
+- Plants need: water, sunlight, soil, and air
+- Growth stages: seed, sprout, seedling, mature plant
+- Roots grow down into soil for water and nutrients
+- Stems grow up toward sunlight
+- Leaves make food from sunlight (photosynthesis - plants eat sunshine!)
+- Some plants make flowers, then fruits with new seeds
+- Practice: Plant or grow something during the story
+
+[day-night]
+Teach about day and night.
+Key learning points:
+- Earth spins like a top (rotates) - one spin = one day
+- Daytime: our side of Earth faces the Sun
+- Nighttime: our side of Earth faces away from the Sun
+- Sunrise: Sun appears to rise in the East (morning)
+- Sunset: Sun appears to set in the West (evening)
+- Moon and stars visible at night
+- 24 hours in a full day-night cycle
+- Practice: Experience both day and night in the adventure
+
+# =============================================================================
+# ANIMALS
+# =============================================================================
+
+[farm-animals]
+Teach about farm animals and their characteristics.
+Key learning points:
+- Cow: says "moo," gives us milk, has black and white spots
+- Pig: says "oink," lives in a sty, loves mud to stay cool
+- Chicken: says "cluck," lays eggs, baby is a chick
+- Horse: says "neigh," can be ridden, very fast
+- Sheep: says "baa," gives us wool for clothes
+- Goat: says "maa," climbs well, eats grass
+- Duck: says "quack," swims in ponds, has webbed feet
+- Farm animals help people with food and materials
+- Practice: Meet and learn about 4-5 farm animals in the story
+
+[wild-animals]
+Teach about wild animals and where they live.
+Key learning points:
+- Lion: "king of the jungle" (actually lives in savannas), has a mane
+- Elephant: largest land animal, has a trunk, great memory
+- Giraffe: tallest animal, long neck to reach tree leaves
+- Zebra: black and white stripes, each pattern is unique
+- Monkey: swings in trees, very clever, eats fruit
+- Bear: strong, hibernates in winter, loves honey
+- Wolf: lives in packs, howls at night
+- Wild animals live in nature, not with people
+- Practice: Meet 4-5 wild animals and learn one fact about each
+
+[ocean-animals]
+Teach about ocean animals and sea life.
+Key learning points:
+- Whale: biggest animal ever, breathes air, sings songs
+- Dolphin: very smart, breathes air, playful and friendly
+- Shark: has many teeth, excellent swimmer
+- Octopus: 8 arms, can change color, very intelligent
+- Fish: breathe through gills, have scales, swim with fins
+- Sea turtle: lives very long, has a shell, swims far
+- Jellyfish: no brain or bones, floats in water
+- Oceans cover most of Earth
+- Practice: Explore underwater and meet 4-5 sea creatures
+
+[insects]
+Teach about insects and bugs.
+Key learning points:
+- All insects have: 6 legs, 3 body parts, often wings
+- Butterfly: starts as caterpillar, beautiful wings
+- Bee: makes honey, pollinates flowers, lives in hives
+- Ant: very strong, works in teams, lives in colonies
+- Ladybug: red with spots, helps gardens, brings good luck
+- Spider: 8 legs (not an insect!), makes webs
+- Firefly/Lightning bug: glows at night
+- Insects are important for nature and plants
+- Practice: Meet 4-5 insects and learn why they're helpful
+
+[dinosaurs]
+Teach about dinosaurs.
+Key learning points:
+- Dinosaurs lived millions of years ago, now extinct
+- T-Rex: huge meat-eater, tiny arms, big teeth
+- Triceratops: three horns, plant-eater, big frill
+- Brachiosaurus: very tall neck, gentle plant-eater
+- Stegosaurus: plates on back, spiky tail
+- Velociraptor: small, fast, clever hunter
+- Pterodactyl: flying reptile (not actually a dinosaur)
+- Scientists learn about them from fossils (bones in rocks)
+- Practice: Meet 4-5 dinosaurs and learn what they ate
+
+# =============================================================================
+# BODY & HEALTH
+# =============================================================================
+
+[body-parts]
+Teach the main parts of the human body.
+Key learning points:
+- Head: contains brain (for thinking), eyes, ears, nose, mouth
+- Arms and hands: for reaching, holding, waving
+- Legs and feet: for walking, running, jumping
+- Torso: contains heart (pumps blood) and lungs (for breathing)
+- Stomach: where food goes to give us energy
+- Bones: skeleton inside that holds us up
+- Skin: covers and protects our whole body
+- Practice: Point to and use different body parts in the story
+
+[five-senses]
+Teach the five senses and how they work.
+Key learning points:
+- Sight (eyes): see colors, shapes, people, read books
+- Hearing (ears): hear sounds, music, voices
+- Smell (nose): smell flowers, food, danger (smoke)
+- Taste (tongue): taste sweet, sour, salty, bitter
+- Touch (skin): feel soft, rough, hot, cold
+- Our senses help us understand and enjoy the world
+- Some senses warn us of danger
+- Practice: Use each sense during different story scenes
+
+[healthy-eating]
+Teach about nutritious food and healthy eating habits.
+Key learning points:
+- Fruits and vegetables: vitamins to stay healthy, eat many colors
+- Proteins (meat, beans, eggs): help muscles grow strong
+- Dairy (milk, cheese): calcium for strong bones
+- Grains (bread, rice, pasta): energy to play and learn
+- Water: most important drink, keeps body working
+- Treats are okay sometimes, but not every day
+- Eat a rainbow of foods for best health
+- Practice: Choose or prepare healthy foods during the story
+
+# =============================================================================
+# TIME & CALENDAR
+# =============================================================================
+
+[days-week]
+Teach the seven days of the week.
+Key learning points:
+- 7 days in a week, in order:
+- Monday, Tuesday, Wednesday, Thursday, Friday (weekdays - school/work)
+- Saturday, Sunday (weekend - rest and play)
+- Yesterday, today, tomorrow concepts
+- Each day repeats every week
+- Special days: Monday = start of week, Friday = almost weekend
+- Practice: Go through several days during the story adventure
+
+[months-year]
+Teach the twelve months of the year.
+Key learning points:
+- 12 months make one year, in order:
+- January (New Year, cold), February (Valentine's Day, short month)
+- March (spring begins), April (rain, Easter), May (flowers, Mother's Day)
+- June (summer starts), July (hot, fireworks), August (vacation)
+- September (back to school), October (Halloween, fall)
+- November (Thanksgiving), December (holidays, winter)
+- Birthdays come once a year in your special month
+- Practice: Travel through or mention several months in the story
+
+[telling-time]
+Teach how to read a clock and tell time.
+Key learning points:
+- Clock has 12 numbers in a circle
+- Short hand = hour hand (what hour it is)
+- Long hand = minute hand (how many minutes)
+- When long hand points to 12, it's exactly that hour (3:00)
+- Half past = long hand on 6 (3:30)
+- O'clock times: 1 o'clock, 2 o'clock, etc.
+- Morning (AM) and afternoon/evening (PM)
+- Practice: Check the time at different points in the story
+
+# =============================================================================
+# WORLD & GEOGRAPHY
+# =============================================================================
+
+[continents]
+Teach the seven continents.
+Key learning points:
+- Continents are the 7 large land masses on Earth
+- Africa: hot, lions, elephants, pyramids
+- Antarctica: cold, penguins, ice, no one lives there permanently
+- Asia: biggest, pandas, Great Wall of China
+- Australia: kangaroos, koalas, island continent
+- Europe: castles, many countries close together
+- North America: USA, Canada, Mexico
+- South America: rainforests, Amazon river
+- Practice: Visit or learn about 3-4 continents during the adventure
+
+[countries-flags]
+Teach about countries and their flags.
+Key learning points:
+- Countries are parts of continents with their own governments
+- Each country has a unique flag with special colors and symbols
+- USA: red, white, blue with stars and stripes
+- UK: Union Jack, red white and blue cross design
+- France: blue, white, red stripes (vertical)
+- Japan: white with red circle (sun)
+- Brazil: green with yellow diamond and blue globe
+- Flags represent what's important to each country
+- Practice: Learn about 4-5 countries and their flags
+
+# =============================================================================
+# MUSIC & ART
+# =============================================================================
+
+[instruments]
+Teach about musical instruments.
+Key learning points:
+- Instruments make music in different ways:
+- Strings (guitar, violin): pluck or bow the strings
+- Percussion (drums, xylophone): hit or shake them
+- Wind (flute, trumpet): blow air through them
+- Piano/Keyboard: press keys that hit strings inside
+- Each instrument has a unique sound
+- Instruments can play alone or together in a band/orchestra
+- Practice: See, hear, or try 4-5 instruments in the story
+
+[famous-artists]
+Teach about famous artists and art styles.
+Key learning points:
+- Artists express feelings and ideas through pictures
+- Leonardo da Vinci: Mona Lisa, inventor too
+- Vincent van Gogh: Starry Night, swirly brushstrokes
+- Pablo Picasso: cubism, faces from different angles
+- Claude Monet: water lilies, soft dreamy paintings
+- Frida Kahlo: colorful self-portraits, Mexican artist
+- Everyone can be an artist - it's about expressing yourself
+- Practice: Create art or learn about 2-3 artists in the story

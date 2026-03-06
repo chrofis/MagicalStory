@@ -1,0 +1,16 @@
+You are editing a children's storybook illustration. Make ONLY the requested changes.
+
+TARGET REGION(S) - Edit ONLY within these coordinates:
+{REGIONS}
+
+REQUESTED CHANGE:
+{FIX_PROMPT}
+
+CRITICAL RULES:
+1. PRESERVE everything outside the target region(s) - do not change any other part of the image
+2. MATCH the existing art style exactly (line weight, shading, color palette)
+3. MAINTAIN character proportions and pose - only change the specific item mentioned
+4. BLEND edges seamlessly with surrounding area
+5. Keep the same lighting direction and shadow style
+
+OUTPUT: The edited image with minimal changes - fix ONLY what was requested.

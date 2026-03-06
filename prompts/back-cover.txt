@@ -1,0 +1,22 @@
+Create a back cover illustration for a children's book.
+
+{CHARACTER_REFERENCE_LIST}
+
+**SCENE:**
+{BACK_COVER_SCENE}
+
+**ART STYLE (secondary):** {STYLE_DESCRIPTION}
+
+**COMPOSITION GUIDELINES:**
+- This is a GROUP scene - include all characters together
+- Give EQUAL visual prominence to all characters - like a family/group photo
+- Arrange characters as a balanced group where each person is clearly visible
+- This should feel like a satisfying, warm conclusion to the story
+
+**TEXT REQUIREMENT - CRITICAL:**
+The image MUST include this exact text: "magicalstory.ch"
+- Position it in the bottom left corner
+- Use elegant, readable letters
+- Do NOT add any other text - ONLY "magicalstory.ch"
+
+{VISUAL_BIBLE}

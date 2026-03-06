@@ -1,0 +1,21 @@
+Create an introduction page illustration for a children's book.
+
+{CHARACTER_REFERENCE_LIST}
+
+**SCENE:**
+{INITIAL_PAGE_SCENE}
+
+**ART STYLE (secondary):** {STYLE_DESCRIPTION}
+
+**COMPOSITION GUIDELINES:**
+- This is a GROUP scene introducing all the story's characters
+- The MAIN CHARACTER should be positioned in the CENTER
+- Other characters should be arranged AROUND the main character
+- Everyone should be clearly visible and recognizable
+- Create a warm, inviting atmosphere that draws readers in
+
+**IMPORTANT:**
+- This image should contain NO TEXT at all
+- Create a purely visual, atmospheric illustration that sets the mood for the story
+
+{VISUAL_BIBLE}
