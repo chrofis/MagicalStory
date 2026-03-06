@@ -545,12 +545,25 @@ router.get('/verify-email/:token', async (req, res) => {
     }
 
     const pool = getPool();
+    log.debug(`[AUTH] verify-email: token=${token.substring(0, 8)}...`);
+
     const result = await pool.query(
       'SELECT id, email, is_trial, trial_data FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
       [token]
     );
 
     if (result.rows.length === 0) {
+      // Debug: check if token exists but is expired
+      const expiredCheck = await pool.query(
+        'SELECT id, email, email_verification_expires FROM users WHERE email_verification_token = $1',
+        [token]
+      );
+      if (expiredCheck.rows.length > 0) {
+        const user = expiredCheck.rows[0];
+        log.warn(`[AUTH] verify-email: token found but expired for ${user.email} (expired: ${user.email_verification_expires})`);
+      } else {
+        log.warn(`[AUTH] verify-email: token not found in database`);
+      }
       return res.status(400).json({ error: 'Invalid or expired verification token' });
     }
 
