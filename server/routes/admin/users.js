@@ -522,8 +522,8 @@ router.get('/:userId/details', authenticateToken, requireAdmin, async (req, res)
 // GET /api/admin/users/:userId/stories - Get user's stories
 router.get('/:userId/stories', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const targetUserId = parseInt(req.params.userId);
-    if (isNaN(targetUserId)) {
+    const targetUserId = req.params.userId;
+    if (!targetUserId) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
@@ -597,10 +597,10 @@ router.get('/:userId/stories', authenticateToken, requireAdmin, async (req, res)
 // GET /api/admin/users/:userId/stories/:storyId - Get specific story
 router.get('/:userId/stories/:storyId', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const targetUserId = parseInt(req.params.userId);
+    const targetUserId = req.params.userId;
     const storyId = req.params.storyId;
 
-    if (isNaN(targetUserId)) {
+    if (!targetUserId) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
@@ -629,13 +629,13 @@ router.get('/:userId/stories/:storyId', authenticateToken, requireAdmin, async (
 // DELETE /api/admin/users/:userId - Delete user and all data
 router.delete('/:userId', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const userIdToDelete = parseInt(req.params.userId);
+    const userIdToDelete = req.params.userId;
 
-    if (isNaN(userIdToDelete)) {
+    if (!userIdToDelete) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
 
-    if (userIdToDelete === req.user.id) {
+    if (String(userIdToDelete) === String(req.user.id)) {
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
