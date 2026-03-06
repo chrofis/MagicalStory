@@ -517,6 +517,24 @@ router.post('/', authenticateToken, async (req, res) => {
         console.log(`[Characters] POST - Preserved data for ${preservedCount} characters`);
       }
 
+      // Preserve DB-only characters that the frontend doesn't know about yet
+      // This prevents a race condition where photo analysis creates a character
+      // but the frontend's next save overwrites the DB before including it
+      const frontendIds = new Set(charactersWithoutAvatars.map(c => String(c.id)));
+      const dbOnlyCharacters = dbCharacters.filter(dbChar => {
+        const dbId = String(dbChar.id);
+        // Not in frontend array by ID
+        if (frontendIds.has(dbId)) return false;
+        // Not matched by name either (the merge above uses name fallback)
+        const matchedByName = charactersWithoutAvatars.some(fc => fc.name === dbChar.name);
+        if (matchedByName) return false;
+        return true;
+      });
+      if (dbOnlyCharacters.length > 0) {
+        console.log(`[Characters] POST - Preserving ${dbOnlyCharacters.length} DB-only characters not in frontend array: ${dbOnlyCharacters.map(c => `${c.name || '(unnamed)'}(${c.id})`).join(', ')}`);
+        mergedCharacters.push(...dbOnlyCharacters);
+      }
+
       // Store character data as an object with all related information
       const characterData = {
         characters: mergedCharacters,
