@@ -321,9 +321,6 @@ export default function TrialIdeasStep({
                       {t.selected}
                     </span>
                   )}
-                  {!isSelected && isEditable && (
-                    <span className="text-xs text-gray-400">{t.selectIdea}</span>
-                  )}
                 </div>
 
                 {/* Content */}
@@ -358,6 +355,20 @@ export default function TrialIdeasStep({
                   <div className="flex items-center gap-2 py-8 justify-center flex-1">
                     <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
                   </div>
+                )}
+
+                {/* Select button */}
+                {isEditable && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSelectIdea(index); }}
+                    className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold transition-all ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-indigo-100 hover:text-indigo-700'
+                    }`}
+                  >
+                    {isSelected ? t.selected : t.selectIdea}
+                  </button>
                 )}
               </div>
             );

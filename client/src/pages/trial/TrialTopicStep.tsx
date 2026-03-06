@@ -5,10 +5,10 @@ import {
   storyCategories,
   storyTypes,
   lifeChallenges,
-  educationalTopics,
+  historicalEvents,
   getStoryTypesByGroup,
   getLifeChallengesByGroup,
-  getEducationalTopicsByGroup,
+  getHistoricalEventsByGroup,
 } from '@/constants/storyTypes';
 import type { Language } from '@/types/story';
 
@@ -21,11 +21,11 @@ interface Props {
   onNext: () => void;
 }
 
-type TrialCategory = 'adventure' | 'life-challenge' | 'educational';
+type TrialCategory = 'adventure' | 'life-challenge' | 'historical';
 
 // Only show these 3 categories for trial
 const trialCategories = storyCategories.filter(
-  (c) => c.id === 'adventure' || c.id === 'life-challenge' || c.id === 'educational'
+  (c) => c.id === 'adventure' || c.id === 'life-challenge' || c.id === 'historical'
 );
 
 // ─── Localized strings ──────────────────────────────────────────────────────
@@ -36,6 +36,8 @@ const strings: Record<string, {
   pickCategory: string;
   pickTheme: string;
   pickTopic: string;
+  pickStyle: string;
+  styleRealistic: string;
   orCustom: string;
   customPlaceholder: string;
   back: string;
@@ -48,6 +50,8 @@ const strings: Record<string, {
     pickCategory: 'Pick a story type',
     pickTheme: 'Pick a theme',
     pickTopic: 'Pick a topic',
+    pickStyle: 'Pick a story style (optional)',
+    styleRealistic: 'Realistic',
     orCustom: 'Or describe your own topic:',
     customPlaceholder: 'e.g. Learning to share toys with a sibling',
     back: 'Back',
@@ -60,6 +64,8 @@ const strings: Record<string, {
     pickCategory: 'Wahle eine Geschichtsart',
     pickTheme: 'Wahle ein Thema',
     pickTopic: 'Wahle ein Thema',
+    pickStyle: 'Wahle einen Stil (optional)',
+    styleRealistic: 'Realistisch',
     orCustom: 'Oder beschreibe dein eigenes Thema:',
     customPlaceholder: 'z.B. Spielzeug mit Geschwistern teilen lernen',
     back: 'Zuruck',
@@ -72,6 +78,8 @@ const strings: Record<string, {
     pickCategory: 'Choisis un type d\'histoire',
     pickTheme: 'Choisis un theme',
     pickTopic: 'Choisis un sujet',
+    pickStyle: 'Choisis un style (optionnel)',
+    styleRealistic: 'Realiste',
     orCustom: 'Ou decrivez votre propre sujet:',
     customPlaceholder: 'ex. Apprendre a partager ses jouets avec un frere ou une soeur',
     back: 'Retour',
@@ -96,7 +104,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
       ...storyInput,
       storyCategory: categoryId,
       storyTopic: '',
-      storyTheme: categoryId === 'adventure' ? '' : 'realistic',
+      storyTheme: categoryId === 'adventure' || categoryId === 'historical' ? '' : 'realistic',
     });
   };
 
@@ -138,7 +146,8 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
   const isComplete = (() => {
     if (!storyInput.storyCategory) return false;
     if (storyInput.storyCategory === 'adventure') return !!storyInput.storyTheme;
-    if (storyInput.storyCategory === 'life-challenge') return !!storyInput.storyTopic || !!customTopic.trim();
+    if (storyInput.storyCategory === 'historical') return !!storyInput.storyTopic;
+    if (storyInput.storyCategory === 'life-challenge') return (!!storyInput.storyTopic || !!customTopic.trim());
     return !!storyInput.storyTopic;
   })();
 
@@ -234,10 +243,12 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     );
   }
 
-  // ─── Render: Life Challenge topic selection ────────────────────────────────
+  // ─── Render: Life Challenge topic + style selection ─────────────────────────
 
-  if (storyInput.storyCategory === 'life-challenge' && !storyInput.storyTopic) {
+  if (storyInput.storyCategory === 'life-challenge') {
     const catData = trialCategories.find((c) => c.id === 'life-challenge');
+    const hasTopicSelected = !!storyInput.storyTopic || !!customTopic.trim();
+    const popularThemes = getStoryTypesByGroup('popular');
 
     return (
       <div className="max-w-2xl mx-auto pt-4">
@@ -281,14 +292,13 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
         </div>
 
         {/* Custom topic input */}
-        <div className="mb-8">
+        <div className="mb-6">
           <label className="block text-sm font-medium text-gray-600 mb-2">{t.orCustom}</label>
           <input
             type="text"
             value={customTopic}
             onChange={(e) => {
               setCustomTopic(e.target.value);
-              // Clear predefined selection when typing custom
               if (e.target.value.trim()) {
                 onChange({ ...storyInput, storyTopic: '' });
               }
@@ -299,8 +309,44 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           />
         </div>
 
-        {/* Next button when custom topic is entered */}
-        {customTopic.trim() && (
+        {/* Adventure style selector — shown when a topic is selected */}
+        {hasTopicSelected && (
+          <div className="mb-6">
+            <h3 className="text-base font-bold text-gray-900 mb-3">{t.pickStyle}</h3>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              <button
+                onClick={() => handleThemeSelect('realistic')}
+                className={`p-2.5 rounded-lg border transition-all text-center ${
+                  storyInput.storyTheme === 'realistic'
+                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
+                    : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+                }`}
+              >
+                <div className="text-2xl mb-1">📖</div>
+                <div className="font-medium text-xs text-gray-700">{t.styleRealistic}</div>
+              </button>
+              {popularThemes.map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => handleThemeSelect(theme.id)}
+                  className={`p-2.5 rounded-lg border transition-all text-center ${
+                    storyInput.storyTheme === theme.id
+                      ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
+                      : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{theme.emoji}</div>
+                  <div className="font-medium text-xs text-gray-700">
+                    {theme.name[lang] || theme.name.en}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Next button */}
+        {hasTopicSelected && (
           <button
             onClick={handleNext}
             className="w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 mb-4"
@@ -321,10 +367,10 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     );
   }
 
-  // ─── Render: Educational topic selection ───────────────────────────────────
+  // ─── Render: Historical event selection ──────────────────────────────────
 
-  if (storyInput.storyCategory === 'educational' && !storyInput.storyTopic) {
-    const catData = trialCategories.find((c) => c.id === 'educational');
+  if (storyInput.storyCategory === 'historical' && !storyInput.storyTopic) {
+    const catData = trialCategories.find((c) => c.id === 'historical');
 
     return (
       <div className="max-w-2xl mx-auto pt-4">
@@ -349,15 +395,15 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
         </h2>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
-          {getEducationalTopicsByGroup('popular').map((topic) => (
+          {getHistoricalEventsByGroup('popular').map((event) => (
             <button
-              key={topic.id}
-              onClick={() => handleTopicSelect(topic.id)}
+              key={event.id}
+              onClick={() => handleTopicSelect(event.id)}
               className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left flex items-center gap-2"
             >
-              <span className="text-xl">{topic.emoji}</span>
+              <span className="text-xl">{event.emoji}</span>
               <span className="text-sm font-medium text-gray-700">
-                {topic.name[lang] || topic.name.en}
+                {event.name[lang] || event.name.en}
               </span>
             </button>
           ))}
@@ -384,8 +430,8 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
   const selectedTopic =
     storyInput.storyCategory === 'life-challenge'
       ? lifeChallenges.find((c) => c.id === storyInput.storyTopic)
-      : storyInput.storyCategory === 'educational'
-        ? educationalTopics.find((t) => t.id === storyInput.storyTopic)
+      : storyInput.storyCategory === 'historical'
+        ? historicalEvents.find((e) => e.id === storyInput.storyTopic)
         : null;
 
   return (

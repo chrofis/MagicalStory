@@ -136,7 +136,7 @@ const strings: Record<string, {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface DetectedFace {
-  faceId: string;
+  id: string;
   thumbnail: string;
 }
 
@@ -153,10 +153,11 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
   const t = strings[language] || strings.en;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Consent state
+  // Consent state — once both are checked and a photo is uploaded, don't ask again
   const [consent1Checked, setConsent1Checked] = useState(false);
   const [consent2Checked, setConsent2Checked] = useState(false);
-  const canUpload = consent1Checked && consent2Checked;
+  const [hasConsented, setHasConsented] = useState(false);
+  const canUpload = hasConsented || (consent1Checked && consent2Checked);
 
   // Photo analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -215,6 +216,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
             },
           });
           setDetectedFaces([]);
+          setHasConsented(true);
         }
       } else {
         setPhotoError(result.error || t.noFaceDetected);
@@ -312,8 +314,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
             <div className="flex flex-wrap gap-3 justify-center">
               {detectedFaces.map((face) => (
                 <button
-                  key={face.faceId}
-                  onClick={() => handleFaceSelect(face.faceId)}
+                  key={face.id}
+                  onClick={() => handleFaceSelect(face.id)}
                   className="relative group"
                   disabled={isAnalyzing}
                 >
@@ -333,8 +335,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
           </div>
         )}
 
-        {/* Consent checkboxes - shown before upload */}
-        {!hasPhoto && (
+        {/* Consent checkboxes - shown before first upload only */}
+        {!hasPhoto && !hasConsented && (
           <div className="bg-white rounded-lg p-4 mb-4 space-y-3 border border-gray-200">
             {/* Consent 1: Rights to use photo */}
             <div
@@ -442,7 +444,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
         )}
 
         {/* Consent hint */}
-        {!hasPhoto && !canUpload && (
+        {!hasPhoto && !hasConsented && !canUpload && (
           <p className="mt-2 text-sm text-amber-600 text-center">{t.pleaseAccept}</p>
         )}
       </div>
