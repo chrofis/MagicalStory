@@ -248,6 +248,7 @@ const regenerationRoutes = require('./server/routes/regeneration');
 const printRoutes = require('./server/routes/print');
 const { jobRoutes, initJobRoutes } = require('./server/routes/jobs');
 const storyIdeasRoutes = require('./server/routes/storyIdeas');
+const trialRoutes = require('./server/routes/trial');
 const { apiRouter: sharingApiRoutes, htmlRouter: sharingHtmlRoutes, initSharingRoutes } = require('./server/routes/sharing');
 
 /**
@@ -1272,6 +1273,16 @@ initJobRoutes({ processStoryJob, getCheckpoint, getAllCheckpoints });
 // Initialize admin routes with server.js-local dependencies
 initAdminRoutes({ processStoryJob, userLandmarkCache });
 
+// Initialize trial routes with server.js-local dependencies
+if (trialRoutes.initTrialRoutes) {
+  trialRoutes.initTrialRoutes({ processStoryJob });
+}
+
+// Initialize auth routes with server.js-local dependencies (for trial job processing on email verify)
+if (authRoutes.initAuthRoutes) {
+  authRoutes.initAuthRoutes({ processStoryJob });
+}
+
 if (hasDistFolder) {
   // Serve the built React app from dist/
   app.use(express.static(distPath));
@@ -1304,6 +1315,7 @@ app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
 app.use('/api/jobs', jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', storyIdeasRoutes);  // Story idea generation
+app.use('/api/trial', trialRoutes);  // Anonymous trial story flow
 app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
 app.use('/', sharingHtmlRoutes);  // /s/:shareToken, /shared/:shareToken (HTML)
 
@@ -3876,14 +3888,57 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Send story completion email to customer
     try {
       const userResult = await dbPool.query(
-        'SELECT email, username, shipping_first_name, preferred_language FROM users WHERE id = $1',
+        'SELECT email, username, shipping_first_name, preferred_language, is_trial, claim_token FROM users WHERE id = $1',
         [userId]
       );
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
         const user = userResult.rows[0];
         const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
         const emailLanguage = user.preferred_language || inputData.language || 'English';
-        await email.sendStoryCompleteEmail(user.email, firstName, title, storyId, emailLanguage);
+
+        const emailOptions = {};
+
+        // For trial users: generate PDF and claim URL to include in email
+        if (user.is_trial) {
+          try {
+            // Generate a claim token if user doesn't have one
+            let claimToken = user.claim_token;
+            if (!claimToken) {
+              claimToken = crypto.randomBytes(32).toString('hex');
+              const claimExpires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+              await dbPool.query(
+                'UPDATE users SET claim_token = $1, claim_token_expires = $2 WHERE id = $3',
+                [claimToken, claimExpires, userId]
+              );
+            }
+            emailOptions.claimUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/claim/${claimToken}`;
+
+            // Generate a view PDF to attach to the email
+            // Fetch the full story data with images (rehydrate from story_images table)
+            const pdfStoryResult = await dbPool.query('SELECT data FROM stories WHERE id = $1', [storyId]);
+            if (pdfStoryResult.rows.length > 0) {
+              let pdfStoryData = typeof pdfStoryResult.rows[0].data === 'string'
+                ? JSON.parse(pdfStoryResult.rows[0].data)
+                : pdfStoryResult.rows[0].data;
+              pdfStoryData = await rehydrateStoryImages(storyId, pdfStoryData);
+
+              const pdfBuffer = await generateViewPdf(pdfStoryData, 'square');
+              const pdfSizeMB = pdfBuffer.length / 1024 / 1024;
+              log.info(`[UNIFIED] Generated trial PDF for email (${pdfSizeMB.toFixed(2)} MB)`);
+              if (pdfSizeMB > 35) {
+                log.warn(`[UNIFIED] Trial PDF too large for email (${pdfSizeMB.toFixed(2)} MB > 35MB) - sending without attachment`);
+              } else {
+                emailOptions.pdfBuffer = pdfBuffer;
+                emailOptions.pdfFilename = `${title || 'story'}.pdf`;
+              }
+            }
+          } catch (pdfErr) {
+            log.error('[UNIFIED] Failed to generate trial PDF for email (sending without attachment):', pdfErr.message);
+            // Continue sending email without PDF - better to send without attachment than not at all
+          }
+        }
+
+        await email.sendStoryCompleteEmail(user.email, firstName, title, storyId, emailLanguage, emailOptions);
       }
     } catch (emailErr) {
       log.error('❌ [UNIFIED] Failed to send story complete email:', emailErr);

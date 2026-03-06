@@ -67,7 +67,7 @@ const EMAIL_TEMPLATES = {};
 
 function loadEmailTemplates() {
   const emailsDir = path.join(__dirname, 'emails');
-  const templateFiles = ['story-complete.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'order-failed.html', 'email-verification.html', 'password-reset.html'];
+  const templateFiles = ['story-complete.html', 'trial-story-complete.html', 'story-failed.html', 'order-confirmation.html', 'order-shipped.html', 'order-failed.html', 'email-verification.html', 'password-reset.html'];
 
   for (const file of templateFiles) {
     const filePath = path.join(emailsDir, file);
@@ -177,16 +177,17 @@ function isEmailConfigured() {
  * @param {string} storyId - ID of the story for direct link
  * @param {string} language - Language for email content (English, German, French)
  */
-async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId, language = 'English') {
+async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId, language = 'English', options = {}) {
   if (!resend) {
     console.log('📧 Email not configured - skipping story complete notification');
     return null;
   }
 
-  // Get template for the specified language
-  const template = getTemplateSection('story-complete', language);
+  // Use trial-specific template when a claim URL is provided (trial user flow)
+  const templateName = options.claimUrl ? 'trial-story-complete' : 'story-complete';
+  const template = getTemplateSection(templateName, language);
   if (!template) {
-    console.error('❌ Failed to get story-complete template');
+    console.error(`❌ Failed to get ${templateName} template`);
     return null;
   }
 
@@ -199,25 +200,37 @@ async function sendStoryCompleteEmail(userEmail, firstName, storyTitle, storyId,
   const values = {
     greeting: firstName || 'there',
     title: storyTitle,
-    storyUrl: storyUrl
+    storyUrl: storyUrl,
+    claimUrl: options.claimUrl || ''
   };
 
   try {
-    const { data, error } = await resend.emails.send({
+    const emailPayload = {
       from: EMAIL_FROM,
       replyTo: EMAIL_REPLY_TO,
       to: userEmail,
       subject: fillTemplate(template.subject, values),
       text: fillTemplate(template.text, values),
       html: fillTemplate(template.html, values),
-    });
+    };
+
+    // Attach PDF if provided (for trial story completion emails)
+    if (options.pdfBuffer) {
+      emailPayload.attachments = [{
+        filename: options.pdfFilename || `${storyTitle || 'story'}.pdf`,
+        content: options.pdfBuffer, // Resend accepts Buffer directly
+      }];
+      console.log(`📧 Attaching PDF to story complete email (${(options.pdfBuffer.length / 1024).toFixed(1)}KB)`);
+    }
+
+    const { data, error } = await resend.emails.send(emailPayload);
 
     if (error) {
       console.error('❌ Failed to send story complete email:', error);
       return null;
     }
 
-    console.log(`📧 Story complete email sent to ${userEmail} (${language}), id: ${data.id}`);
+    console.log(`📧 Story complete email sent to ${userEmail} (${language}), id: ${data.id}${options.pdfBuffer ? ' [with PDF]' : ''}`);
     return data;
   } catch (err) {
     console.error('❌ Email send error:', err);

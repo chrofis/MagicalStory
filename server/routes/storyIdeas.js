@@ -22,6 +22,176 @@ const { discoverLandmarksForLocation, getIndexedLandmarks } = require('../lib/la
 // Landmark discovery cache (module-level, same as was in server.js)
 const userLandmarkCache = new Map();
 
+/**
+ * Build the shared prompt context for story idea generation.
+ * Used by both the authenticated endpoints and the trial endpoint.
+ *
+ * @param {Object} params
+ * @param {string} params.storyCategory
+ * @param {string} params.storyTopic
+ * @param {string} params.storyTheme
+ * @param {string} params.storyTypeName
+ * @param {string} params.customThemeText
+ * @param {string} params.language
+ * @param {string} params.languageLevel - defaults to 'standard'
+ * @param {Array}  params.characters
+ * @param {Array}  params.relationships
+ * @param {number} params.pages - defaults to 10
+ * @param {string} [params.userLocationInstruction] - pre-built location instruction (empty for trial)
+ * @param {string} [params.availableLandmarksSection] - pre-built landmarks section (empty for trial)
+ * @returns {Promise<Object>} { promptReplacements, storyRequirements1, storyRequirements2, singlePromptTemplate }
+ */
+async function buildIdeasPromptContext({
+  storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
+  language, languageLevel = 'standard', characters, relationships,
+  pages = 10, userLocationInstruction = '', availableLandmarksSection = ''
+}) {
+  const { getLanguageInstruction } = require('../lib/languages');
+
+  // Calculate scene count based on reading level
+  const sceneCount = languageLevel === '1st-grade' ? pages : Math.floor(pages / 2);
+
+  // Build character descriptions
+  const characterDescriptions = characters.map(c => {
+    const role = c.isMain ? 'main character' : 'side character';
+    const traits = [];
+    if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
+    if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
+    if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
+    const specialDetails = c.traits?.specialDetails || c.specialDetails || c.special_details;
+    if (specialDetails) traits.push(`special: ${specialDetails}`);
+    const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
+    return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
+  }).join('\n');
+
+  // Build relationship descriptions
+  const relationshipDescriptions = (relationships || []).map(r =>
+    `- ${r.character1} ${r.relationship} ${r.character2}`
+  ).join('\n');
+
+  // Determine reading level description
+  const readingLevelDescriptions = {
+    '1st-grade': 'Early reader (simple sentences, 6-7 year olds)',
+    'advanced': 'Advanced (older children 10+)',
+    'standard': 'Standard (7-9 year olds)'
+  };
+
+  // Build category-specific instructions
+  let categoryInstructions = '';
+  const effectiveCategory = storyCategory || 'adventure';
+  const effectiveTheme = storyTheme || storyTypeName || 'adventure';
+
+  if (effectiveCategory === 'life-challenge') {
+    categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
+The story should help children understand and cope with this topic.
+Show the characters facing this challenge and learning to handle it.
+${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
+  } else if (effectiveCategory === 'educational') {
+    categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".
+Weave learning about ${storyTopic} naturally into the plot.
+Make the educational content fun and part of the adventure.
+${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
+  } else if (effectiveCategory === 'historical') {
+    const { getEventById } = require('../lib/historicalEvents');
+    const { getTeachingGuide: getHistoricalGuide } = require('../lib/storyHelpers');
+    const historicalEvent = getEventById(storyTopic);
+    const historicalGuide = getHistoricalGuide('historical', storyTopic);
+
+    if (historicalEvent && historicalGuide) {
+      categoryInstructions = `IMPORTANT: This is a HISTORICAL story about "${historicalEvent.name}" (${historicalEvent.year}).
+
+**HISTORICAL ACCURACY REQUIRED**
+Use ONLY the verified information provided. Do NOT invent historical facts.
+
+${historicalGuide}`;
+    } else {
+      categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
+    }
+  } else if (effectiveCategory === 'custom') {
+    categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:
+"${customThemeText || ''}"
+Follow the user's vision closely while keeping the story age-appropriate and engaging.`;
+  } else {
+    categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
+  }
+
+  // Get teaching guide for the topic if available
+  const { getTeachingGuide, getSceneComplexityGuide, getAdventureGuide } = require('../lib/storyHelpers');
+  const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
+  const topicGuideText = teachingGuide
+    ? `**TOPIC GUIDE for "${storyTopic}":**
+${teachingGuide}`
+    : '';
+
+  // Get scene complexity guide based on page count
+  const sceneComplexityGuide = getSceneComplexityGuide(sceneCount);
+
+  // Always get adventure guide for setting/costume context
+  const adventureGuideContent = getAdventureGuide(effectiveTheme);
+  const adventureSettingGuide = adventureGuideContent
+    ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
+${adventureGuideContent}`
+    : '';
+
+  // Calculate story length category for output length limits
+  const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
+                              pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
+                                            'LONG (21+ pages) - 8 sentences max per idea';
+
+  // Load prompt templates
+  const promptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-ideas.txt'), 'utf-8');
+  const singlePromptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-idea-single.txt'), 'utf-8');
+
+  // Load category-specific story requirements (separate files for story 1 and story 2)
+  const requirementsBase = effectiveCategory === 'historical'
+    ? 'story-idea-requirements-historical'
+    : 'story-idea-requirements-adventure';
+  const storyRequirements1 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-1.txt`), 'utf-8');
+  const storyRequirements2 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-2.txt`), 'utf-8');
+
+  // Build the replacement map (shared across all prompt templates)
+  const storyCategoryLabel = effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure';
+  const storyTypeNameLabel = effectiveCategory === 'custom' ? 'custom' : effectiveTheme;
+  const storyTopicLabel = storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None');
+  const languageInstruction = getLanguageInstruction(language);
+
+  // Helper to apply replacements to any template
+  const applyReplacements = (template, extraReplacements = {}) => {
+    let result = template
+      .replace('{STORY_CATEGORY}', storyCategoryLabel)
+      .replace('{STORY_TYPE_NAME}', storyTypeNameLabel)
+      .replace('{STORY_TOPIC}', storyTopicLabel)
+      .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
+      .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
+      .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
+      .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
+      .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
+      .replace('{TOPIC_GUIDE}', topicGuideText)
+      .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
+      .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
+      .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
+      .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
+      .replace('{LANGUAGE_INSTRUCTION}', languageInstruction);
+    for (const [key, value] of Object.entries(extraReplacements)) {
+      result = result.replace(key, value);
+    }
+    return result;
+  };
+
+  return {
+    effectiveCategory,
+    effectiveTheme,
+    characterDescriptions,
+    relationshipDescriptions,
+    sceneCount,
+    promptTemplate,
+    singlePromptTemplate,
+    storyRequirements1,
+    storyRequirements2,
+    applyReplacements
+  };
+}
+
 // Generate story ideas endpoint - FREE, no credits
 router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
   try {
@@ -107,123 +277,29 @@ router.post('/generate-story-ideas', authenticateToken, async (req, res) => {
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
-    // Calculate scene count based on reading level
-    const sceneCount = languageLevel === '1st-grade' ? pages : Math.floor(pages / 2);
-    log.debug(`  Scene count: ${sceneCount} (${languageLevel})`);
-
-    // Build character descriptions
-    const characterDescriptions = characters.map(c => {
-      const role = c.isMain ? 'main character' : 'side character';
-      const traits = [];
-      if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
-      if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
-      if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
-      const specialDetails = c.traits?.specialDetails || c.specialDetails || c.special_details;
-      if (specialDetails) traits.push(`special: ${specialDetails}`);
-      const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
-      return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
-    }).join('\n');
-
-    // Build relationship descriptions
-    // Format: "Lukas is younger sibling of Manuel" (more readable than "Lukas and Manuel: younger sibling")
-    const relationshipDescriptions = relationships.map(r =>
-      `- ${r.character1} ${r.relationship} ${r.character2}`
-    ).join('\n');
-
-    // Get language instruction from centralized config
-    const { getLanguageInstruction } = require('../lib/languages');
-
-    // Determine reading level description
-    const readingLevelDescriptions = {
-      '1st-grade': 'Early reader (simple sentences, 6-7 year olds)',
-      'advanced': 'Advanced (older children 10+)',
-      'standard': 'Standard (7-9 year olds)'
-    };
-
-    // Build category-specific instructions
-    let categoryInstructions = '';
-    const effectiveCategory = storyCategory || 'adventure';
-    const effectiveTheme = storyTheme || storyTypeName || 'adventure';
-
-    if (effectiveCategory === 'life-challenge') {
-      categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
-The story should help children understand and cope with this topic.
-Show the characters facing this challenge and learning to handle it.
-${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
-    } else if (effectiveCategory === 'educational') {
-      categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".
-Weave learning about ${storyTopic} naturally into the plot.
-Make the educational content fun and part of the adventure.
-${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
-    } else if (effectiveCategory === 'historical') {
-      // Get historical event data and guide
-      const { getEventById } = require('../lib/historicalEvents');
-      const { getTeachingGuide: getHistoricalGuide } = require('../lib/storyHelpers');
-      const historicalEvent = getEventById(storyTopic);
-      const historicalGuide = getHistoricalGuide('historical', storyTopic);
-
-      if (historicalEvent && historicalGuide) {
-        categoryInstructions = `IMPORTANT: This is a HISTORICAL story about "${historicalEvent.name}" (${historicalEvent.year}).
-
-**HISTORICAL ACCURACY REQUIRED**
-Use ONLY the verified information provided. Do NOT invent historical facts.
-
-${historicalGuide}`;
-      } else {
-        categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
-      }
-    } else if (effectiveCategory === 'custom') {
-      categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:
-"${customThemeText || ''}"
-Follow the user's vision closely while keeping the story age-appropriate and engaging.`;
-    } else {
-      categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
-    }
-
-    // Get teaching guide for the topic if available
-    const { getTeachingGuide, getSceneComplexityGuide, getAdventureGuide } = require('../lib/storyHelpers');
-    const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
-    const topicGuideText = teachingGuide
-      ? `**TOPIC GUIDE for "${storyTopic}":**
-${teachingGuide}`
-      : '';
-
-    // Get scene complexity guide based on page count
-    const sceneComplexityGuide = getSceneComplexityGuide(sceneCount);
-
-    // Always get adventure guide for setting/costume context
-    const adventureGuideContent = getAdventureGuide(effectiveTheme);
-    const adventureSettingGuide = adventureGuideContent
-      ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
-${adventureGuideContent}`
-      : '';
-
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
-    // Season labels for prompt
+    const effectiveCategory_loc = storyCategory || 'adventure';
     const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
     const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
-    if (userLocation?.city && effectiveCategory !== 'historical') {
+    if (userLocation?.city && effectiveCategory_loc !== 'historical') {
       const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
       const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel && effectiveCategory !== 'historical') {
-      // Skip season for historical stories - they have their own time period from the event
+    } else if (seasonLabel && effectiveCategory_loc !== 'historical') {
       userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
     }
 
-    // Build available landmarks section for the prompt (include photo descriptions if available)
-    // Skip for historical stories - they use historically accurate locations, not local landmarks
+    // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
-    if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory !== 'historical') {
+    if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
       const landmarkEntries = availableLandmarks
-        .slice(0, 10) // Limit to top 10 landmarks
+        .slice(0, 10)
         .map(l => {
           let entry = `- ${l.name}`;
           if (l.type) entry += ` (${l.type})`;
-          // Prefer Wikipedia extract (what landmark IS) over photo description (what photo shows)
           const description = l.wikipediaExtract || l.photoDescription;
           if (description) entry += `: ${description}`;
           return entry;
@@ -237,39 +313,16 @@ ${landmarkEntries}`;
       log.info(`[LANDMARK] ⚠️ No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
 
-    // Calculate story length category for output length limits
-    const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
-                                pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
-                                              'LONG (21+ pages) - 8 sentences max per idea';
+    // Use shared prompt builder
+    const ctx = await buildIdeasPromptContext({
+      storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
+      language, languageLevel, characters, relationships, pages,
+      userLocationInstruction, availableLandmarksSection
+    });
 
-    // Load prompt from file and replace placeholders
-    const promptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-ideas.txt'), 'utf-8');
-
-    // Load category-specific story requirements (separate files for story 1 and story 2)
-    const requirementsBase = effectiveCategory === 'historical'
-      ? 'story-idea-requirements-historical'
-      : 'story-idea-requirements-adventure';
-    const storyRequirements1 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-1.txt`), 'utf-8');
-    const storyRequirements2 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-2.txt`), 'utf-8');
-    // Combined for backwards compatibility with non-streaming endpoint
-    const storyRequirements = storyRequirements1 + '\n\n' + storyRequirements2;
-
-    const prompt = promptTemplate
-      .replace('{STORY_CATEGORY}', effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
-      .replace('{STORY_TYPE_NAME}', effectiveCategory === 'custom' ? 'custom' : effectiveTheme)
-      .replace('{STORY_TOPIC}', storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None'))
-      .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
-      .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
-      .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
-      .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
-      .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
-      .replace('{TOPIC_GUIDE}', topicGuideText)
-      .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
-      .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
-      .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
-      .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
-      .replace('{STORY_REQUIREMENTS}', storyRequirements)
-      .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
+    const prompt = ctx.applyReplacements(ctx.promptTemplate, {
+      '{STORY_REQUIREMENTS}': ctx.storyRequirements1 + '\n\n' + ctx.storyRequirements2
+    });
 
     // Call the text model (using the imported function)
     const { callTextModel, getModelDefaults } = require('../lib/textModels');
@@ -422,124 +475,29 @@ router.post('/generate-story-ideas-stream', authenticateToken, async (req, res) 
     }
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme || storyTypeName}, Language: ${language}, Pages: ${pages}`);
 
-    // Calculate scene count based on reading level
-    const sceneCount = languageLevel === '1st-grade' ? pages : Math.floor(pages / 2);
-    log.debug(`  Scene count: ${sceneCount} (${languageLevel})`);
-
-    // Build character descriptions
-    const characterDescriptions = characters.map(c => {
-      const role = c.isMain ? 'main character' : 'side character';
-      const traits = [];
-      if (c.traits?.strengths?.length) traits.push(`strengths: ${c.traits.strengths.join(', ')}`);
-      if (c.traits?.flaws?.length) traits.push(`flaws: ${c.traits.flaws.join(', ')}`);
-      if (c.traits?.challenges?.length) traits.push(`challenges: ${c.traits.challenges.join(', ')}`);
-      const specialDetails = c.traits?.specialDetails || c.specialDetails || c.special_details;
-      if (specialDetails) traits.push(`special: ${specialDetails}`);
-      const traitsStr = traits.length ? ` (${traits.join('; ')})` : '';
-      return `- ${c.name}: ${c.age} years old, ${c.gender}, ${role}${traitsStr}`;
-    }).join('\n');
-
-    // Build relationship descriptions
-    // Format: "Lukas is younger sibling of Manuel" (more readable than "Lukas and Manuel: younger sibling")
-    const relationshipDescriptions = relationships.map(r =>
-      `- ${r.character1} ${r.relationship} ${r.character2}`
-    ).join('\n');
-
-    // Get language instruction from centralized config
-    const { getLanguageInstruction } = require('../lib/languages');
-
-    // Determine reading level description
-    const readingLevelDescriptions = {
-      '1st-grade': 'Early reader (simple sentences, 6-7 year olds)',
-      'advanced': 'Advanced (older children 10+)',
-      'standard': 'Standard (7-9 year olds)'
-    };
-
-    // Get scene complexity guide based on page count
-    const { getSceneComplexityGuide, getAdventureGuide } = require('../lib/storyHelpers');
-    const sceneComplexityGuide = getSceneComplexityGuide(sceneCount);
-
-    // Build category-specific instructions
-    let categoryInstructions = '';
-    const effectiveCategory = storyCategory || 'adventure';
-    const effectiveTheme = storyTheme || storyTypeName || 'adventure';
-
-    if (effectiveCategory === 'life-challenge') {
-      categoryInstructions = `IMPORTANT: This is a LIFE SKILLS story about "${storyTopic}".
-The story should help children understand and cope with this topic.
-Show the characters facing this challenge and learning to handle it.
-${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Keep the setting realistic and relatable.'}`;
-    } else if (effectiveCategory === 'educational') {
-      categoryInstructions = `IMPORTANT: This is an EDUCATIONAL story teaching about "${storyTopic}".
-Weave learning about ${storyTopic} naturally into the plot.
-Make the educational content fun and part of the adventure.
-${effectiveTheme && effectiveTheme !== 'realistic' ? `Set the story in a ${effectiveTheme} adventure context.` : 'Use everyday situations to explore the topic.'}`;
-    } else if (effectiveCategory === 'historical') {
-      // Get historical event data and guide
-      const { getEventById } = require('../lib/historicalEvents');
-      const { getTeachingGuide: getHistoricalGuide } = require('../lib/storyHelpers');
-      const historicalEvent = getEventById(storyTopic);
-      const historicalGuide = getHistoricalGuide('historical', storyTopic);
-
-      if (historicalEvent && historicalGuide) {
-        categoryInstructions = `IMPORTANT: This is a HISTORICAL story about "${historicalEvent.name}" (${historicalEvent.year}).
-
-**HISTORICAL ACCURACY REQUIRED**
-Use ONLY the verified information provided. Do NOT invent historical facts.
-
-${historicalGuide}`;
-      } else {
-        categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
-      }
-    } else if (effectiveCategory === 'custom') {
-      categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:
-"${customThemeText || ''}"
-Follow the user's vision closely while keeping the story age-appropriate and engaging.`;
-    } else {
-      categoryInstructions = `This is a ${effectiveTheme} adventure story. Make it exciting and appropriate for children.`;
-    }
-
-    // Get teaching guide for the topic if available
-    const { getTeachingGuide } = require('../lib/storyHelpers');
-    const teachingGuide = getTeachingGuide(effectiveCategory, storyTopic);
-    const topicGuideText = teachingGuide
-      ? `**TOPIC GUIDE for "${storyTopic}":**
-${teachingGuide}`
-      : '';
-
-    // Always get adventure guide for setting/costume context
-    const adventureGuideContent = getAdventureGuide(effectiveTheme);
-    const adventureSettingGuide = adventureGuideContent
-      ? `**ADVENTURE SETTING GUIDE for "${effectiveTheme}":**
-${adventureGuideContent}`
-      : '';
-
     // Build user location instruction for personalized settings (skip for historical - events have fixed locations)
-    // Season labels for prompt
+    const effectiveCategory_loc = storyCategory || 'adventure';
     const seasonLabels = { spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' };
     const seasonLabel = season ? seasonLabels[season] || season : null;
 
     let userLocationInstruction = '';
-    if (userLocation?.city && effectiveCategory !== 'historical') {
+    if (userLocation?.city && effectiveCategory_loc !== 'historical') {
       const locationParts = [userLocation.city, userLocation.region, userLocation.country].filter(Boolean);
       const locationStr = locationParts.join(', ');
       const seasonPart = seasonLabel ? ` The story takes place in ${seasonLabel} - include seasonal details like weather, activities, and atmosphere typical for this season.` : '';
       userLocationInstruction = `**LOCATION PREFERENCE**: Set the story in or near ${locationStr}. Use real local landmarks, street names, parks, or recognizable places from this area to make the story feel personal and familiar to the reader. The main characters live in this area.${seasonPart}`;
-    } else if (seasonLabel && effectiveCategory !== 'historical') {
-      // Skip season for historical stories - they have their own time period from the event
+    } else if (seasonLabel && effectiveCategory_loc !== 'historical') {
       userLocationInstruction = `**SEASON**: The story takes place in ${seasonLabel}. Include seasonal details like weather, activities, and atmosphere typical for this season.`;
     }
 
-    // Build available landmarks section for the prompt (include photo descriptions if available)
-    // Skip for historical stories - they use historically accurate locations, not local landmarks
+    // Build available landmarks section for the prompt
     let availableLandmarksSection = '';
-    if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory !== 'historical') {
+    if (availableLandmarks && availableLandmarks.length > 0 && effectiveCategory_loc !== 'historical') {
       const landmarkEntries = availableLandmarks
-        .slice(0, 10) // Limit to top 10 landmarks
+        .slice(0, 10)
         .map(l => {
           let entry = `- ${l.name}`;
           if (l.type) entry += ` (${l.type})`;
-          // Prefer Wikipedia extract (what landmark IS) over photo description (what photo shows)
           const description = l.wikipediaExtract || l.photoDescription;
           if (description) entry += `: ${description}`;
           return entry;
@@ -553,39 +511,12 @@ ${landmarkEntries}`;
       log.info(`[LANDMARK] ⚠️ [STREAM] No landmarks for ideas prompt (userLocation: ${userLocation?.city || 'none'})`);
     }
 
-    // Calculate story length category for output length limits
-    const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
-                                pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
-                                              'LONG (21+ pages) - 8 sentences max per idea';
-
-    // Load prompt from file and replace placeholders
-    const promptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-ideas.txt'), 'utf-8');
-
-    // Load category-specific story requirements (separate files for story 1 and story 2)
-    const requirementsBase = effectiveCategory === 'historical'
-      ? 'story-idea-requirements-historical'
-      : 'story-idea-requirements-adventure';
-    const storyRequirements1 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-1.txt`), 'utf-8');
-    const storyRequirements2 = await fs.readFile(path.join(__dirname, '../../prompts', `${requirementsBase}-2.txt`), 'utf-8');
-    // Combined for backwards compatibility with non-streaming endpoint
-    const storyRequirements = storyRequirements1 + '\n\n' + storyRequirements2;
-
-    const prompt = promptTemplate
-      .replace('{STORY_CATEGORY}', effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
-      .replace('{STORY_TYPE_NAME}', effectiveCategory === 'custom' ? 'custom' : effectiveTheme)
-      .replace('{STORY_TOPIC}', storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None'))
-      .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
-      .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
-      .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
-      .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
-      .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
-      .replace('{TOPIC_GUIDE}', topicGuideText)
-      .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
-      .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
-      .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
-      .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
-      .replace('{STORY_REQUIREMENTS}', storyRequirements)
-      .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
+    // Use shared prompt builder
+    const ctx = await buildIdeasPromptContext({
+      storyCategory, storyTopic, storyTheme, storyTypeName, customThemeText,
+      language, languageLevel, characters, relationships, pages,
+      userLocationInstruction, availableLandmarksSection
+    });
 
     // Get model to use
     const { callTextModelStreaming, getModelDefaults } = require('../lib/textModels');
@@ -593,9 +524,6 @@ ${landmarkEntries}`;
     const modelToUse = (req.user.role === 'admin' && ideaModel) ? ideaModel : modelDefaults.idea;
 
     log.debug(`  Using model: ${modelToUse}${ideaModel && req.user.role === 'admin' ? ' (admin override)' : ' (default)'}`);
-
-    // Load single-story prompt template
-    const singlePromptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-idea-single.txt'), 'utf-8');
 
     // Helper function to parse [FINAL] from streaming text
     const parseFinal = (text) => {
@@ -610,26 +538,13 @@ ${landmarkEntries}`;
       return null; // Return null if [FINAL] not yet reached
     };
 
-    // Build prompt for a single story (storyNum: 1 or 2)
+    // Build prompts for both stories using shared context
     const buildSinglePrompt = (storyNum, variantInstruction) => {
-      const requirements = storyNum === 1 ? storyRequirements1 : storyRequirements2;
-      return singlePromptTemplate
-        .replace('{STORY_CATEGORY}', effectiveCategory === 'custom' ? 'Custom' : effectiveCategory === 'life-challenge' ? 'Life Skills' : effectiveCategory === 'educational' ? 'Educational' : effectiveCategory === 'historical' ? 'Historical' : 'Adventure')
-        .replace('{STORY_TYPE_NAME}', effectiveCategory === 'custom' ? 'custom' : effectiveTheme)
-        .replace('{STORY_TOPIC}', storyTopic || (effectiveCategory === 'custom' ? (customThemeText || 'None') : 'None'))
-        .replace('{CHARACTER_DESCRIPTIONS}', characterDescriptions)
-        .replace('{RELATIONSHIP_DESCRIPTIONS}', relationshipDescriptions || 'No specific relationships defined.')
-        .replace('{READING_LEVEL_DESCRIPTION}', readingLevelDescriptions[languageLevel] || readingLevelDescriptions['standard'])
-        .replace('{SCENE_COMPLEXITY_GUIDE}', sceneComplexityGuide)
-        .replace('{CATEGORY_INSTRUCTIONS}', categoryInstructions)
-        .replace('{TOPIC_GUIDE}', topicGuideText)
-        .replace('{ADVENTURE_SETTING_GUIDE}', adventureSettingGuide)
-        .replace('{USER_LOCATION_INSTRUCTION}', userLocationInstruction)
-        .replace('{AVAILABLE_LANDMARKS}', availableLandmarksSection)
-        .replace('{STORY_LENGTH_CATEGORY}', storyLengthCategory)
-        .replace('{STORY_VARIANT_INSTRUCTION}', variantInstruction)
-        .replace('{STORY_REQUIREMENTS}', requirements)
-        .replace('{LANGUAGE_INSTRUCTION}', getLanguageInstruction(language));
+      const requirements = storyNum === 1 ? ctx.storyRequirements1 : ctx.storyRequirements2;
+      return ctx.applyReplacements(ctx.singlePromptTemplate, {
+        '{STORY_VARIANT_INSTRUCTION}': variantInstruction,
+        '{STORY_REQUIREMENTS}': requirements
+      });
     };
 
     // Build prompts for both stories (each with its own requirements)
@@ -723,3 +638,4 @@ ${landmarkEntries}`;
 });
 
 module.exports = router;
+module.exports.buildIdeasPromptContext = buildIdeasPromptContext;

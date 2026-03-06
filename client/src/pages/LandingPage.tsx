@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { useAuth } from '@/context/AuthContext';
 import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer } from '@/components/common';
@@ -137,7 +136,6 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const { isAuthenticated } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const st = sectionTranslations[language] || sectionTranslations.en;
 
@@ -192,11 +190,7 @@ export default function LandingPage() {
   }, [searchParams]);
 
   const handleStartJourney = () => {
-    if (isAuthenticated) {
-      navigate('/create');
-    } else {
-      setShowAuthModal(true);
-    }
+    navigate('/try');
   };
 
   const handleAuthSuccess = async () => {
@@ -308,6 +302,14 @@ export default function LandingPage() {
                 {t.startJourney}
                 <ArrowRight size={28} />
               </button>
+              <div className="mt-4">
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  className="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline"
+                >
+                  {t.alreadyHaveAccount || 'Already have an account? Log in'}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -579,6 +581,14 @@ export default function LandingPage() {
             {t.startJourney}
             <ArrowRight size={28} />
           </button>
+          <div className="mt-4">
+            <button
+              onClick={() => setShowAuthModal(true)}
+              className="text-indigo-200 hover:text-white text-sm font-medium underline"
+            >
+              {t.alreadyHaveAccount || 'Already have an account? Log in'}
+            </button>
+          </div>
         </div>
       </section>
 

@@ -32,6 +32,16 @@ try {
   console.warn('Email service not available');
 }
 
+// Trial helpers (loaded on demand to avoid circular deps)
+const { saveTrialCharacter, createTrialStoryJob } = require('./trial');
+
+// Server.js-local dependencies received via initAuthRoutes()
+let authDeps = {};
+
+function initAuthRoutes(serverDeps) {
+  authDeps = serverDeps;
+}
+
 // POST /api/auth/register
 router.post('/register', registerLimiter, validateBody(schemas.register), async (req, res) => {
   try {
@@ -536,7 +546,7 @@ router.get('/verify-email/:token', async (req, res) => {
 
     const pool = getPool();
     const result = await pool.query(
-      'SELECT id, email FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
+      'SELECT id, email, is_trial, trial_data FROM users WHERE email_verification_token = $1 AND email_verification_expires > NOW()',
       [token]
     );
 
@@ -550,6 +560,41 @@ router.get('/verify-email/:token', async (req, res) => {
       'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
       [user.id]
     );
+
+    // Handle trial user: save character, create story job, start processing
+    if (user.is_trial && user.trial_data) {
+      try {
+        const trialData = typeof user.trial_data === 'string'
+          ? JSON.parse(user.trial_data)
+          : user.trial_data;
+
+        // Save character to characters table
+        const characterId = await saveTrialCharacter(pool, user.id, trialData.characterData);
+
+        // Create story job (reserves credits)
+        const jobId = await createTrialStoryJob(pool, user.id, characterId, trialData.characterData, trialData.storyInput);
+
+        // Clear trial_data now that it's been processed
+        await pool.query('UPDATE users SET trial_data = NULL WHERE id = $1', [user.id]);
+
+        // Start processing the job asynchronously
+        if (authDeps.processStoryJob) {
+          authDeps.processStoryJob(jobId).catch(err => {
+            log.error(`[AUTH] Trial job ${jobId} failed:`, err);
+          });
+        } else {
+          log.warn(`[AUTH] processStoryJob not available - trial job ${jobId} created but not started`);
+        }
+
+        log.info(`[AUTH] Trial user ${user.email} verified - job ${jobId} started`);
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/trial-started`);
+      } catch (trialErr) {
+        log.error(`[AUTH] Failed to start trial job for user ${user.id}:`, trialErr);
+        // Email is verified but trial job failed - redirect to email-verified
+        // so the user at least knows their account is set up
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
+      }
+    }
 
     res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
   } catch (err) {
@@ -786,3 +831,4 @@ router.post('/logout', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+module.exports.initAuthRoutes = initAuthRoutes;

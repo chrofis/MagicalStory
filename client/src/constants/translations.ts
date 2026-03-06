@@ -6,6 +6,7 @@ export interface TranslationStrings {
   heroDescription: string;
   bookText: string;
   startJourney: string;
+  alreadyHaveAccount: string;
   selectLanguage: string;
   login: string;
   register: string;
@@ -184,7 +185,8 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     heroSubtitle: '',
     heroDescription: 'Turn your wildest ideas into a breathtaking personalized tale.',
     bookText: 'Get a beautifully printed book and make someone feel like the legend they truly are.',
-    startJourney: 'Start Your Adventure',
+    startJourney: 'Try a Free Story',
+    alreadyHaveAccount: 'Already have an account? Log in',
     selectLanguage: 'Choose your language',
     login: 'Login',
     register: 'Register',
@@ -361,7 +363,8 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     heroSubtitle: '',
     heroDescription: 'Verwandle deine wildesten Ideen in eine atemberaubende personalisierte Geschichte.',
     bookText: 'Erhalte ein wunderschön gedrucktes Buch und gib jemandem das Gefühl, die Legende zu sein, die er wirklich ist.',
-    startJourney: 'Starte dein Abenteuer',
+    startJourney: 'Kostenlose Geschichte testen',
+    alreadyHaveAccount: 'Bereits ein Konto? Anmelden',
     selectLanguage: 'Wähle deine Sprache',
     login: 'Anmelden',
     register: 'Registrieren',
@@ -538,7 +541,8 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
     heroSubtitle: '',
     heroDescription: 'Transformez vos idées les plus folles en un conte personnalisé époustouflant.',
     bookText: "Obtenez un livre magnifiquement imprimé et donnez à quelqu'un le sentiment d'être la légende qu'il est vraiment.",
-    startJourney: 'Commencez votre aventure',
+    startJourney: 'Essayer une histoire gratuite',
+    alreadyHaveAccount: 'Vous avez deja un compte ? Se connecter',
     selectLanguage: 'Choisissez votre langue',
     login: 'Connexion',
     register: "S'inscrire",
