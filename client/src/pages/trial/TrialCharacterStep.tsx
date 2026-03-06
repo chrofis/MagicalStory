@@ -1,6 +1,9 @@
 import { useState, useRef, useCallback } from 'react';
-import { Camera, Loader2, X, ArrowRight } from 'lucide-react';
+import { Camera, Loader2, X, ArrowRight, CheckSquare, Square } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { CharacterData } from '../TrialWizard';
+import { defaultStrengths } from '@/constants/traits';
+import type { Language } from '@/types/story';
 
 // ─── Localized strings ──────────────────────────────────────────────────────
 
@@ -15,14 +18,21 @@ const strings: Record<string, {
   nameLabel: string;
   namePlaceholder: string;
   ageLabel: string;
+  agePlaceholder: string;
   genderLabel: string;
   boy: string;
   girl: string;
-  other: string;
   traitsLabel: string;
-  traits: string[];
+  customTraitsLabel: string;
+  customTraitsPlaceholder: string;
   next: string;
-  termsNote: string;
+  consent1: string;
+  consent2: string;
+  termsLink: string;
+  and: string;
+  privacyLink: string;
+  consentPeriod: string;
+  pleaseAccept: string;
   selectFace: string;
   noFaceDetected: string;
   multipleFaces: string;
@@ -39,14 +49,21 @@ const strings: Record<string, {
     nameLabel: 'Name',
     namePlaceholder: "Child's name",
     ageLabel: 'Age',
+    agePlaceholder: 'e.g. 5',
     genderLabel: 'Gender',
     boy: 'Boy',
     girl: 'Girl',
-    other: 'Other',
     traitsLabel: 'Personality Traits',
-    traits: ['Brave', 'Curious', 'Kind', 'Funny', 'Creative', 'Adventurous'],
+    customTraitsLabel: 'Additional characteristics',
+    customTraitsPlaceholder: 'e.g. Loves dinosaurs, afraid of the dark, has a little sister...',
     next: 'Next',
-    termsNote: 'By uploading, you agree to our Terms',
+    consent1: 'I confirm I have the right to use the uploaded photos and, for photos of minors, I am the parent/guardian or have obtained their consent.',
+    consent2: 'I agree to the',
+    termsLink: 'Terms of Service',
+    and: 'and',
+    privacyLink: 'Privacy Policy',
+    consentPeriod: ', including the processing of these photos by AI to create illustrated avatars.',
+    pleaseAccept: 'Please accept the terms above to upload a photo',
     selectFace: 'Select the correct face',
     noFaceDetected: 'No face detected. Please try a different photo.',
     multipleFaces: 'Multiple faces detected. Please select the correct one.',
@@ -63,14 +80,21 @@ const strings: Record<string, {
     nameLabel: 'Name',
     namePlaceholder: 'Name des Kindes',
     ageLabel: 'Alter',
+    agePlaceholder: 'z.B. 5',
     genderLabel: 'Geschlecht',
     boy: 'Junge',
     girl: 'Madchen',
-    other: 'Andere',
     traitsLabel: 'Charaktereigenschaften',
-    traits: ['Mutig', 'Neugierig', 'Freundlich', 'Lustig', 'Kreativ', 'Abenteuerlustig'],
+    customTraitsLabel: 'Weitere Eigenschaften',
+    customTraitsPlaceholder: 'z.B. Liebt Dinosaurier, hat Angst vor der Dunkelheit, hat eine kleine Schwester...',
     next: 'Weiter',
-    termsNote: 'Mit dem Hochladen stimmst du unseren Nutzungsbedingungen zu',
+    consent1: 'Ich bestätige, dass ich das Recht habe, die hochgeladenen Fotos zu verwenden, und bei Fotos von Minderjährigen bin ich der Elternteil/Vormund oder habe deren Zustimmung eingeholt.',
+    consent2: 'Ich stimme den',
+    termsLink: 'Nutzungsbedingungen',
+    and: 'und der',
+    privacyLink: 'Datenschutzrichtlinie',
+    consentPeriod: ' zu, einschliesslich der Verarbeitung dieser Fotos durch KI zur Erstellung illustrierter Avatare.',
+    pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
     selectFace: 'Wahle das richtige Gesicht',
     noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
     multipleFaces: 'Mehrere Gesichter erkannt. Bitte wahle das richtige aus.',
@@ -87,14 +111,21 @@ const strings: Record<string, {
     nameLabel: 'Prenom',
     namePlaceholder: "Prenom de l'enfant",
     ageLabel: 'Age',
+    agePlaceholder: 'ex. 5',
     genderLabel: 'Genre',
     boy: 'Garcon',
     girl: 'Fille',
-    other: 'Autre',
     traitsLabel: 'Traits de personnalite',
-    traits: ['Courageux', 'Curieux', 'Gentil', 'Drole', 'Creatif', 'Aventurier'],
+    customTraitsLabel: 'Caracteristiques supplementaires',
+    customTraitsPlaceholder: 'ex. Aime les dinosaures, a peur du noir, a une petite soeur...',
     next: 'Suivant',
-    termsNote: 'En telechargeant, vous acceptez nos Conditions',
+    consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos téléchargées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
+    consent2: 'J\'accepte les',
+    termsLink: 'Conditions d\'Utilisation',
+    and: 'et la',
+    privacyLink: 'Politique de Confidentialité',
+    consentPeriod: ', y compris le traitement de ces photos par l\'IA pour créer des avatars illustrés.',
+    pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
     selectFace: 'Selectionnez le bon visage',
     noFaceDetected: 'Aucun visage detecte. Veuillez essayer une autre photo.',
     multipleFaces: 'Plusieurs visages detectes. Veuillez selectionner le bon.',
@@ -121,6 +152,11 @@ interface TrialCharacterStepProps {
 export default function TrialCharacterStep({ characterData, onChange, onNext, language }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Consent state
+  const [consent1Checked, setConsent1Checked] = useState(false);
+  const [consent2Checked, setConsent2Checked] = useState(false);
+  const canUpload = consent1Checked && consent2Checked;
 
   // Photo analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -297,17 +333,62 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
           </div>
         )}
 
+        {/* Consent checkboxes - shown before upload */}
+        {!hasPhoto && (
+          <div className="bg-white rounded-lg p-4 mb-4 space-y-3 border border-gray-200">
+            {/* Consent 1: Rights to use photo */}
+            <div
+              onClick={() => setConsent1Checked(!consent1Checked)}
+              className="flex items-start gap-3 cursor-pointer group"
+            >
+              <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
+                {consent1Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+              </span>
+              <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                {t.consent1}
+              </span>
+            </div>
+
+            {/* Consent 2: Terms and Privacy */}
+            <div
+              onClick={(e) => {
+                if ((e.target as HTMLElement).tagName !== 'A') {
+                  setConsent2Checked(!consent2Checked);
+                }
+              }}
+              className="flex items-start gap-3 cursor-pointer group"
+            >
+              <span className="flex-shrink-0 mt-0.5 text-indigo-600 hover:text-indigo-800">
+                {consent2Checked ? <CheckSquare size={20} /> : <Square size={20} />}
+              </span>
+              <span className="text-sm text-gray-700 group-hover:text-gray-900">
+                {t.consent2}{' '}
+                <Link to="/terms" className="text-indigo-600 hover:underline">
+                  {t.termsLink}
+                </Link>{' '}
+                {t.and}{' '}
+                <Link to="/privacy" className="text-indigo-600 hover:underline">
+                  {t.privacyLink}
+                </Link>
+                {t.consentPeriod}
+              </span>
+            </div>
+          </div>
+        )}
+
         {!hasPhoto ? (
           /* Drop zone / upload button */
           <div
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
-              isDragging
-                ? 'border-indigo-500 bg-indigo-50'
-                : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/50'
+            onDragOver={canUpload ? handleDragOver : undefined}
+            onDragLeave={canUpload ? handleDragLeave : undefined}
+            onDrop={canUpload ? handleDrop : undefined}
+            onClick={() => canUpload && fileInputRef.current?.click()}
+            className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+              !canUpload
+                ? 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                : isDragging
+                  ? 'border-indigo-500 bg-indigo-50 cursor-pointer'
+                  : 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50/50 cursor-pointer'
             }`}
           >
             {isAnalyzing ? (
@@ -360,9 +441,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
           <p className="mt-2 text-sm text-red-600">{photoError}</p>
         )}
 
-        {/* Terms note */}
-        {!hasPhoto && (
-          <p className="mt-2 text-xs text-gray-400 text-center">{t.termsNote}</p>
+        {/* Consent hint */}
+        {!hasPhoto && !canUpload && (
+          <p className="mt-2 text-sm text-amber-600 text-center">{t.pleaseAccept}</p>
         )}
       </div>
 
@@ -382,21 +463,15 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
       {/* Age */}
       <div className="mb-5">
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.ageLabel}</label>
-        <div className="flex flex-wrap gap-2">
-          {Array.from({ length: 11 }, (_, i) => i + 2).map((age) => (
-            <button
-              key={age}
-              onClick={() => updateField('age', String(age))}
-              className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
-                characterData.age === String(age)
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
-              }`}
-            >
-              {age}
-            </button>
-          ))}
-        </div>
+        <input
+          type="number"
+          min={1}
+          max={18}
+          value={characterData.age}
+          onChange={(e) => updateField('age', e.target.value)}
+          placeholder={t.agePlaceholder}
+          className="w-24 px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400"
+        />
       </div>
 
       {/* Gender */}
@@ -406,7 +481,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
           {[
             { value: 'male', label: t.boy },
             { value: 'female', label: t.girl },
-            { value: 'other', label: t.other },
           ].map(({ value, label }) => (
             <button
               key={value}
@@ -424,14 +498,14 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
       </div>
 
       {/* Traits */}
-      <div className="mb-8">
+      <div className="mb-5">
         <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.traitsLabel}</label>
         <div className="flex flex-wrap gap-2">
-          {t.traits.map((trait) => (
+          {(defaultStrengths[language as Language] || defaultStrengths.en).map((trait) => (
             <button
               key={trait}
               onClick={() => toggleTrait(trait)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all ${
                 characterData.traits.includes(trait)
                   ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
@@ -441,6 +515,19 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Custom traits text */}
+      <div className="mb-8">
+        <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.customTraitsLabel}</label>
+        <textarea
+          value={characterData.customTraits}
+          onChange={(e) => updateField('customTraits', e.target.value)}
+          placeholder={t.customTraitsPlaceholder}
+          maxLength={500}
+          rows={2}
+          className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400 resize-none"
+        />
       </div>
 
       {/* Next button */}

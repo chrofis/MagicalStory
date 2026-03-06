@@ -1,14 +1,11 @@
-import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import type { StoryInput } from '../TrialWizard';
 import {
   storyCategories,
   storyTypes,
   lifeChallenges,
-  lifeChallengeGroups,
   educationalTopics,
-  educationalGroups,
-  adventureThemeGroups,
   getStoryTypesByGroup,
   getLifeChallengesByGroup,
   getEducationalTopicsByGroup,
@@ -39,6 +36,8 @@ const strings: Record<string, {
   pickCategory: string;
   pickTheme: string;
   pickTopic: string;
+  orCustom: string;
+  customPlaceholder: string;
   back: string;
   next: string;
   change: string;
@@ -49,6 +48,8 @@ const strings: Record<string, {
     pickCategory: 'Pick a story type',
     pickTheme: 'Pick a theme',
     pickTopic: 'Pick a topic',
+    orCustom: 'Or describe your own topic:',
+    customPlaceholder: 'e.g. Learning to share toys with a sibling',
     back: 'Back',
     next: 'Next',
     change: 'Change',
@@ -59,6 +60,8 @@ const strings: Record<string, {
     pickCategory: 'Wahle eine Geschichtsart',
     pickTheme: 'Wahle ein Thema',
     pickTopic: 'Wahle ein Thema',
+    orCustom: 'Oder beschreibe dein eigenes Thema:',
+    customPlaceholder: 'z.B. Spielzeug mit Geschwistern teilen lernen',
     back: 'Zuruck',
     next: 'Weiter',
     change: 'Andern',
@@ -69,6 +72,8 @@ const strings: Record<string, {
     pickCategory: 'Choisis un type d\'histoire',
     pickTheme: 'Choisis un theme',
     pickTopic: 'Choisis un sujet',
+    orCustom: 'Ou decrivez votre propre sujet:',
+    customPlaceholder: 'ex. Apprendre a partager ses jouets avec un frere ou une soeur',
     back: 'Retour',
     next: 'Suivant',
     change: 'Changer',
@@ -81,19 +86,8 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
   const lang = (storyInput.language === 'de' ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
-  // Track which groups are expanded
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['popular']);
-
-  // Reset expanded groups when category changes
-  useEffect(() => {
-    setExpandedGroups(['popular']);
-  }, [storyInput.storyCategory]);
-
-  const toggleGroup = (groupId: string) => {
-    setExpandedGroups((prev) =>
-      prev.includes(groupId) ? prev.filter((g) => g !== groupId) : [...prev, groupId]
-    );
-  };
+  // Custom topic input for life challenges
+  const [customTopic, setCustomTopic] = useState('');
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -126,7 +120,17 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
       storyCategory: '',
       storyTopic: '',
       storyTheme: '',
+      storyDetails: '',
     });
+    setCustomTopic('');
+  };
+
+  const handleNext = () => {
+    // If custom topic entered for life challenges, save it to storyDetails
+    if (storyInput.storyCategory === 'life-challenge' && customTopic.trim() && !storyInput.storyTopic) {
+      onChange({ ...storyInput, storyTopic: 'custom', storyDetails: customTopic.trim() });
+    }
+    onNext();
   };
 
   // ─── Determine if selection is complete ────────────────────────────────────
@@ -134,6 +138,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
   const isComplete = (() => {
     if (!storyInput.storyCategory) return false;
     if (storyInput.storyCategory === 'adventure') return !!storyInput.storyTheme;
+    if (storyInput.storyCategory === 'life-challenge') return !!storyInput.storyTopic || !!customTopic.trim();
     return !!storyInput.storyTopic;
   })();
 
@@ -203,43 +208,19 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {t.pickTheme}
         </h2>
 
-        <div className="space-y-3 mb-8">
-          {adventureThemeGroups.filter((g) => g.id !== 'custom').map((group) => {
-            const themes = getStoryTypesByGroup(group.id);
-            const isExpanded = expandedGroups.includes(group.id);
-
-            return (
-              <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <span className="font-semibold text-gray-700 flex items-center gap-2 text-sm">
-                    {group.id === 'popular' && <span>*</span>}
-                    {group.name[lang] || group.name.en}
-                  </span>
-                  {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-
-                {isExpanded && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3">
-                    {themes.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => handleThemeSelect(type.id)}
-                        className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
-                      >
-                        <div className="text-2xl mb-1">{type.emoji}</div>
-                        <div className="font-medium text-xs text-gray-700">
-                          {type.name[lang] || type.name.en}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-8">
+          {getStoryTypesByGroup('popular').map((type) => (
+            <button
+              key={type.id}
+              onClick={() => handleThemeSelect(type.id)}
+              className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
+            >
+              <div className="text-2xl mb-1">{type.emoji}</div>
+              <div className="font-medium text-xs text-gray-700">
+                {type.name[lang] || type.name.en}
               </div>
-            );
-          })}
+            </button>
+          ))}
         </div>
 
         <button
@@ -280,44 +261,54 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {t.pickTopic}
         </h2>
 
-        <div className="space-y-3 mb-8">
-          {lifeChallengeGroups.map((group) => {
-            const challenges = getLifeChallengesByGroup(group.id);
-            const isExpanded = expandedGroups.includes(group.id);
-
-            return (
-              <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <span className="font-semibold text-gray-700 flex items-center gap-2 text-sm">
-                    {group.id === 'popular' && <span>*</span>}
-                    {group.name[lang] || group.name.en}
-                  </span>
-                  {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-
-                {isExpanded && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
-                    {challenges.map((challenge) => (
-                      <button
-                        key={challenge.id}
-                        onClick={() => handleTopicSelect(challenge.id)}
-                        className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left flex items-center gap-2"
-                      >
-                        <span className="text-xl">{challenge.emoji}</span>
-                        <span className="text-sm font-medium text-gray-700">
-                          {challenge.name[lang] || challenge.name.en}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+          {getLifeChallengesByGroup('popular').map((challenge) => (
+            <button
+              key={challenge.id}
+              onClick={() => { handleTopicSelect(challenge.id); setCustomTopic(''); }}
+              className={`p-2.5 rounded-lg border transition-all text-left flex items-center gap-2 ${
+                storyInput.storyTopic === challenge.id
+                  ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
+                  : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+              }`}
+            >
+              <span className="text-xl">{challenge.emoji}</span>
+              <span className="text-sm font-medium text-gray-700">
+                {challenge.name[lang] || challenge.name.en}
+              </span>
+            </button>
+          ))}
         </div>
+
+        {/* Custom topic input */}
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-600 mb-2">{t.orCustom}</label>
+          <input
+            type="text"
+            value={customTopic}
+            onChange={(e) => {
+              setCustomTopic(e.target.value);
+              // Clear predefined selection when typing custom
+              if (e.target.value.trim()) {
+                onChange({ ...storyInput, storyTopic: '' });
+              }
+            }}
+            placeholder={t.customPlaceholder}
+            maxLength={200}
+            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400"
+          />
+        </div>
+
+        {/* Next button when custom topic is entered */}
+        {customTopic.trim() && (
+          <button
+            onClick={handleNext}
+            className="w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 mb-4"
+          >
+            {t.next}
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
 
         <button
           onClick={onBack}
@@ -357,43 +348,19 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {t.pickTopic}
         </h2>
 
-        <div className="space-y-3 mb-8">
-          {educationalGroups.map((group) => {
-            const topics = getEducationalTopicsByGroup(group.id);
-            const isExpanded = expandedGroups.includes(group.id);
-
-            return (
-              <div key={group.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <span className="font-semibold text-gray-700 flex items-center gap-2 text-sm">
-                    {group.id === 'popular' && <span>*</span>}
-                    {group.name[lang] || group.name.en}
-                  </span>
-                  {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-
-                {isExpanded && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3">
-                    {topics.map((topic) => (
-                      <button
-                        key={topic.id}
-                        onClick={() => handleTopicSelect(topic.id)}
-                        className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left flex items-center gap-2"
-                      >
-                        <span className="text-xl">{topic.emoji}</span>
-                        <span className="text-sm font-medium text-gray-700">
-                          {topic.name[lang] || topic.name.en}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-8">
+          {getEducationalTopicsByGroup('popular').map((topic) => (
+            <button
+              key={topic.id}
+              onClick={() => handleTopicSelect(topic.id)}
+              className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left flex items-center gap-2"
+            >
+              <span className="text-xl">{topic.emoji}</span>
+              <span className="text-sm font-medium text-gray-700">
+                {topic.name[lang] || topic.name.en}
+              </span>
+            </button>
+          ))}
         </div>
 
         <button
@@ -475,7 +442,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
       {/* Next button */}
       <button
-        onClick={onNext}
+        onClick={handleNext}
         disabled={!isComplete}
         className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
           isComplete

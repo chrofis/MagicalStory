@@ -293,23 +293,23 @@ export default function TrialIdeasStep({
           {displayIdeas.map((idea, index) => {
             const isSelected = selectedIdeaIndex === index;
             const hasText = !!idea.text;
+            const isEditable = idea.isFinal || hasFinalIdeas;
 
             return (
-              <button
+              <div
                 key={index}
                 onClick={() => {
-                  if (idea.isFinal || hasFinalIdeas) {
+                  if (isEditable) {
                     onSelectIdea(index);
                   }
                 }}
-                disabled={!idea.isFinal && !hasFinalIdeas}
-                className={`relative text-left p-5 rounded-xl border-2 transition-all ${
+                className={`relative text-left p-5 rounded-xl border-2 transition-all min-h-[280px] flex flex-col ${
                   isSelected
                     ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 shadow-lg'
                     : hasText
                       ? 'border-gray-200 hover:border-indigo-300 hover:shadow-md bg-white'
                       : 'border-gray-200 bg-gray-50'
-                } ${idea.isFinal || hasFinalIdeas ? 'cursor-pointer' : 'cursor-default'}`}
+                } ${isEditable ? 'cursor-pointer' : 'cursor-default'}`}
               >
                 {/* Card header */}
                 <div className="flex items-center justify-between mb-3">
@@ -321,25 +321,45 @@ export default function TrialIdeasStep({
                       {t.selected}
                     </span>
                   )}
-                  {!isSelected && (idea.isFinal || hasFinalIdeas) && (
+                  {!isSelected && isEditable && (
                     <span className="text-xs text-gray-400">{t.selectIdea}</span>
                   )}
                 </div>
 
                 {/* Content */}
                 {hasText ? (
-                  <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                    {idea.text}
-                    {idea.isStreaming && (
-                      <span className="inline-block w-1.5 h-4 bg-indigo-500 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
-                    )}
-                  </div>
+                  isEditable ? (
+                    <textarea
+                      value={hasFinalIdeas ? generatedIdeas[index].title + (generatedIdeas[index].summary ? '\n' + generatedIdeas[index].summary : '') : idea.text}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        const text = e.target.value;
+                        const lines = text.split('\n').filter(l => l.trim());
+                        let title = lines[0] || '';
+                        title = title.replace(/^[#*\s]+/, '').replace(/[*]+$/, '').trim();
+                        const summary = lines.slice(1).join('\n').trim();
+                        const updated = [...generatedIdeas];
+                        updated[index] = { ...updated[index], title, summary };
+                        onIdeasGenerated(updated);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 w-full text-sm text-gray-700 leading-relaxed bg-transparent border-0 outline-none resize-none p-0"
+                      placeholder={t.idea}
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-line flex-1">
+                      {idea.text}
+                      {idea.isStreaming && (
+                        <span className="inline-block w-1.5 h-4 bg-indigo-500 animate-pulse ml-0.5 align-text-bottom rounded-sm" />
+                      )}
+                    </div>
+                  )
                 ) : (
-                  <div className="flex items-center gap-2 py-8 justify-center">
+                  <div className="flex items-center gap-2 py-8 justify-center flex-1">
                     <Loader2 className="w-5 h-5 text-gray-300 animate-spin" />
                   </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>

@@ -215,10 +215,9 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       availableLandmarksSection: ''
     });
 
-    // Use default model (no admin override for trial)
-    const { callTextModelStreaming, getModelDefaults } = require('../lib/textModels');
-    const modelDefaults = getModelDefaults();
-    const modelToUse = modelDefaults.idea;
+    // Use Haiku for trial ideas (cheap — $1/$5 per 1M tokens vs Sonnet's $3/$15)
+    const { callTextModelStreaming } = require('../lib/textModels');
+    const modelToUse = 'claude-haiku';
 
     log.debug(`  Using model: ${modelToUse} (default)`);
 
