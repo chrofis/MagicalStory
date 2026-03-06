@@ -24,7 +24,7 @@ function initTrialRoutes(serverDeps) {
 // Rate limiters for unauthenticated trial endpoints
 const trialPhotoLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 20,
   message: { error: 'Too many photo uploads. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -32,7 +32,7 @@ const trialPhotoLimiter = rateLimit({
 
 const trialIdeasLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5,
+  max: 10,
   message: { error: 'Too many idea generations. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
