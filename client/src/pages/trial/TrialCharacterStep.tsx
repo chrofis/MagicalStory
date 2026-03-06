@@ -73,17 +73,17 @@ const strings: Record<string, {
     title: 'Erstelle deine Figur',
     photoTitle: 'Foto hochladen',
     photoHint: 'Lade ein klares Foto hoch, um eine personalisierte Figur zu erstellen',
-    photoGuidelines: 'Tipp: Klares Gesicht, Oberkorper sichtbar funktioniert am besten',
+    photoGuidelines: 'Tipp: Klares Gesicht, Oberkörper sichtbar funktioniert am besten',
     dropOrClick: 'Foto hierhin ziehen oder klicken zum Hochladen',
     analyzing: 'Foto wird analysiert...',
-    changPhoto: 'Foto andern',
+    changPhoto: 'Foto ändern',
     nameLabel: 'Name',
     namePlaceholder: 'Name des Kindes',
     ageLabel: 'Alter',
     agePlaceholder: 'z.B. 5',
     genderLabel: 'Geschlecht',
     boy: 'Junge',
-    girl: 'Madchen',
+    girl: 'Mädchen',
     traitsLabel: 'Charaktereigenschaften',
     customTraitsLabel: 'Weitere Eigenschaften',
     customTraitsPlaceholder: 'z.B. Liebt Dinosaurier, hat Angst vor der Dunkelheit, hat eine kleine Schwester...',
@@ -95,9 +95,9 @@ const strings: Record<string, {
     privacyLink: 'Datenschutzrichtlinie',
     consentPeriod: ' zu, einschliesslich der Verarbeitung dieser Fotos durch KI zur Erstellung illustrierter Avatare.',
     pleaseAccept: 'Bitte akzeptieren Sie die obigen Bedingungen, um ein Foto hochzuladen',
-    selectFace: 'Wahle das richtige Gesicht',
+    selectFace: 'Wähle das richtige Gesicht',
     noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
-    multipleFaces: 'Mehrere Gesichter erkannt. Bitte wahle das richtige aus.',
+    multipleFaces: 'Mehrere Gesichter erkannt. Bitte wähle das richtige aus.',
     photoError: 'Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
   },
   fr: {
@@ -168,7 +168,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
   const [isDragging, setIsDragging] = useState(false);
 
   const hasPhoto = !!characterData.photos.face;
-  const canProceed = characterData.name.trim() && characterData.age && characterData.gender && hasPhoto;
+  const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
 
   // ─── Photo upload ────────────────────────────────────────────────────────────
 
