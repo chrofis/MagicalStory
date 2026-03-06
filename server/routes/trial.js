@@ -418,7 +418,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     pages,
     language: storyInput.language || 'English',
     languageLevel: 'standard',
-    artStyle: 'pixar',
+    artStyle: 'anime',
     storyCategory: storyInput.storyCategory || '',
     storyTopic: storyInput.storyTopic || '',
     storyTheme: storyInput.storyTheme || '',
