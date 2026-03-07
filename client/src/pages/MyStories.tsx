@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Book, Trash2, Eye, AlertTriangle, BookOpen, Tag, Loader2 } from 'lucide-react';
+import { Book, Trash2, Eye, Pencil, AlertTriangle, BookOpen, Tag, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -35,6 +35,7 @@ interface StoryListItem {
   isPartial?: boolean;
   generatedPages?: number;
   totalPages?: number;
+  shareToken?: string;
 }
 
 // Generating story card - shown at top of list when a story is being generated
@@ -96,6 +97,7 @@ const StoryCard = memo(function StoryCard({
   story,
   language,
   onView,
+  onEdit,
   onDelete,
   formatDate,
   isSelected,
@@ -106,6 +108,7 @@ const StoryCard = memo(function StoryCard({
   story: StoryListItem;
   language: string;
   onView: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   formatDate: (date: string | undefined) => string;
   isSelected: boolean;
@@ -222,7 +225,14 @@ const StoryCard = memo(function StoryCard({
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
             <Eye size={18} />
-            {language === 'de' ? 'Ansehen' : language === 'fr' ? 'Voir' : 'View'}
+            {language === 'de' ? 'Lesen' : language === 'fr' ? 'Lire' : 'Read'}
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onEdit(); }}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+            title={language === 'de' ? 'Bearbeiten' : language === 'fr' ? 'Modifier' : 'Edit'}
+          >
+            <Pencil size={16} />
           </button>
 
           {/* Add/Remove button for book selection - same style as View button */}
@@ -759,7 +769,8 @@ export default function MyStories() {
                   key={story.id}
                   story={story}
                   language={language}
-                  onView={() => navigate(`/create?storyId=${story.id}`)}
+                  onView={() => story.shareToken ? navigate(`/shared/${story.shareToken}`) : navigate(`/create?storyId=${story.id}`)}
+                  onEdit={() => navigate(`/create?storyId=${story.id}`)}
                   onDelete={() => deleteStory(story.id)}
                   formatDate={formatDate}
                   isSelected={selectedIds.has(story.id)}

@@ -803,9 +803,16 @@ async function upsertStory(storyId, userId, storyData) {
   const metadata = buildStoryMetadata(storyData);
   console.log(`💾 [UPSERT] Creating/updating story ${storyId} for user ${userId}, title: "${metadata.title}"`);
 
+  const crypto = require('crypto');
+  const shareToken = crypto.randomBytes(32).toString('hex');
+
   await dbQuery(
-    'INSERT INTO stories (id, user_id, data, metadata) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO UPDATE SET user_id = EXCLUDED.user_id',
-    [storyId, userId, JSON.stringify({}), JSON.stringify(metadata)]
+    `INSERT INTO stories (id, user_id, data, metadata, share_token)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (id) DO UPDATE SET
+       user_id = EXCLUDED.user_id,
+       share_token = COALESCE(stories.share_token, EXCLUDED.share_token)`,
+    [storyId, userId, JSON.stringify({}), JSON.stringify(metadata), shareToken]
   );
 
   // Extract and save scene images to story_images table

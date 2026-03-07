@@ -126,11 +126,26 @@ router.get('/', authenticateToken, async (req, res) => {
       // Falls back to full data parsing if metadata is null (for stories created before migration)
       // Also check story_images for frontCover (metadata.hasThumbnail can be stale)
       const rows = await dbQuery(
-        `SELECT s.metadata, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
+        `SELECT s.metadata, s.share_token, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
          EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover') as has_cover_image
          FROM stories s WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
+
+      // Backfill share_tokens for old stories that don't have one
+      const missingTokenRows = rows.filter(r => !r.share_token);
+      if (missingTokenRows.length > 0) {
+        const crypto = require('crypto');
+        for (const row of missingTokenRows) {
+          const meta = row.metadata ? (typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata) : null;
+          const storyId = meta?.id;
+          if (storyId) {
+            const token = crypto.randomBytes(32).toString('hex');
+            await dbQuery('UPDATE stories SET share_token = $1 WHERE id = $2 AND share_token IS NULL', [token, storyId]);
+            row.share_token = token;
+          }
+        }
+      }
 
       // Map rows to story metadata
       userStories = rows.map(row => {
@@ -166,7 +181,8 @@ router.get('/', authenticateToken, async (req, res) => {
           hasThumbnail: meta.hasThumbnail || row.has_cover_image || false,
           isPartial: meta.isPartial || false,
           generatedPages: meta.generatedPages,
-          totalPages: meta.totalPages
+          totalPages: meta.totalPages,
+          shareToken: row.share_token || null,
         };
       }).filter(Boolean); // Remove null entries
     } else {

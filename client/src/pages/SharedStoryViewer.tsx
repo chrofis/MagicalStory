@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil, Globe, Lock, Share2 } from 'lucide-react';
 
 // Swipe detection hook
 function useSwipe(onSwipeLeft: () => void, onSwipeRight: () => void) {
@@ -48,6 +48,7 @@ interface SharedStoryData {
     backCover?: boolean;
   };
   isOwner?: boolean;
+  isShared?: boolean;
 }
 
 type PageEntry =
@@ -62,6 +63,8 @@ export default function SharedStoryViewer() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0); // 0 = cover, 1+ = pages
+  const [sharingEnabled, setSharingEnabled] = useState(false);
+  const [sharingLoading, setSharingLoading] = useState(false);
 
   useEffect(() => {
     async function fetchStory() {
@@ -88,6 +91,7 @@ export default function SharedStoryViewer() {
 
         const data = await response.json();
         setStory(data);
+        setSharingEnabled(data.isShared || false);
       } catch (err) {
         setError('Failed to load story. Please check your connection.');
       } finally {
@@ -97,6 +101,68 @@ export default function SharedStoryViewer() {
 
     fetchStory();
   }, [shareToken]);
+
+  // Toggle sharing on/off (owner only)
+  const toggleSharing = async () => {
+    if (!story?.isOwner) return;
+    setSharingLoading(true);
+    try {
+      const authToken = localStorage.getItem('auth_token');
+      const method = sharingEnabled ? 'DELETE' : 'POST';
+      const response = await fetch(`/api/stories/${story.id}/share`, {
+        method,
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSharingEnabled(data.isShared);
+      }
+    } catch {
+      // Ignore errors
+    } finally {
+      setSharingLoading(false);
+    }
+  };
+
+  // Native share (mobile) or copy link
+  const handleShare = async () => {
+    if (!shareToken) return;
+    const shareUrl = `${window.location.origin}/s/${shareToken}`;
+
+    // If not shared yet, enable first
+    if (!sharingEnabled && story?.isOwner) {
+      setSharingLoading(true);
+      try {
+        const authToken = localStorage.getItem('auth_token');
+        const response = await fetch(`/api/stories/${story.id}/share`, {
+          method: 'POST',
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setSharingEnabled(data.isShared);
+        }
+      } catch {
+        // Continue anyway
+      } finally {
+        setSharingLoading(false);
+      }
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: story?.title || 'Story', url: shareUrl });
+      } catch {
+        // User cancelled
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+      } catch {
+        // Fallback
+      }
+    }
+  };
 
   // Build dynamic page list based on which covers exist
   const pageList: PageEntry[] = story ? (() => {
@@ -185,13 +251,46 @@ export default function SharedStoryViewer() {
             <span className="font-bold text-indigo-900 hidden sm:inline">MagicalStory</span>
           </div>
           {story?.isOwner ? (
-            <Link
-              to="/stories"
-              className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
-            >
-              <Pencil className="w-4 h-4" />
-              Edit Story
-            </Link>
+            <div className="flex items-center gap-2">
+              {/* Share toggle */}
+              <button
+                onClick={toggleSharing}
+                disabled={sharingLoading}
+                className={`inline-flex items-center gap-1 px-3 py-2 rounded-full text-sm font-medium transition-all ${
+                  sharingEnabled
+                    ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+                title={sharingEnabled ? 'Public — anyone with the link can view' : 'Private — only you can view'}
+              >
+                {sharingLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : sharingEnabled ? (
+                  <Globe className="w-4 h-4" />
+                ) : (
+                  <Lock className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">{sharingEnabled ? 'Public' : 'Private'}</span>
+              </button>
+
+              {/* Share button */}
+              <button
+                onClick={handleShare}
+                className="inline-flex items-center gap-1 px-3 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium hover:bg-blue-200 transition-all"
+              >
+                <Share2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Share</span>
+              </button>
+
+              {/* Edit button */}
+              <Link
+                to={`/create?storyId=${story.id}`}
+                className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
+              >
+                <Pencil className="w-4 h-4" />
+                <span className="hidden sm:inline">Edit</span>
+              </Link>
+            </div>
           ) : (
             <Link
               to="/"

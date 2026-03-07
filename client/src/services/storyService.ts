@@ -55,6 +55,7 @@ interface StoryListItemServer {
   isPartial?: boolean;
   generatedPages?: number;
   totalPages?: number;
+  shareToken?: string;
 }
 
 interface PaginatedStoriesResponse {
@@ -80,6 +81,7 @@ export interface StoryListItem {
   isPartial?: boolean;
   generatedPages?: number;
   totalPages?: number;
+  shareToken?: string;
 }
 
 interface StoryDetailsServer {
@@ -175,6 +177,7 @@ export const storyService = {
       isPartial: s.isPartial,
       generatedPages: s.generatedPages,
       totalPages: s.totalPages,
+      shareToken: s.shareToken,
     }));
 
     return {
