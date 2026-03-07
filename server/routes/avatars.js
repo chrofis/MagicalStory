@@ -4081,3 +4081,4 @@ module.exports.getCostumedAvatarGenerationLog = getCostumedAvatarGenerationLog;
 module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationLog;
 module.exports.evaluateAvatarFaceMatch = evaluateAvatarFaceMatch;
 module.exports.avatarJobs = avatarJobs; // Export for testing
+module.exports.processAvatarJobInBackground = processAvatarJobInBackground;

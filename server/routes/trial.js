@@ -756,6 +756,90 @@ router.post('/register-google', trialRegisterLimiter, async (req, res) => {
 
 // ─── Task E: Account Claim Endpoints ─────────────────────────────────────────
 
+/**
+ * Trigger background avatar generation for a user's characters that have photos but no avatars.
+ * Called after account claim to give trial-turned-real users proper avatars/thumbnails.
+ */
+async function triggerAvatarGenerationForUser(userId) {
+  try {
+    const { dbQuery } = require('../services/database');
+    const { getFacePhoto } = require('../lib/characterPhotos');
+    const { avatarJobs, processAvatarJobInBackground } = require('./avatars');
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      log.warn('[TRIAL] No GEMINI_API_KEY - skipping avatar generation on claim');
+      return;
+    }
+
+    // Load user's character data
+    const rows = await dbQuery(
+      'SELECT id, data FROM characters WHERE user_id = $1',
+      [userId]
+    );
+    if (!rows || rows.length === 0) {
+      log.debug('[TRIAL] No characters found for claimed user - skipping avatar generation');
+      return;
+    }
+
+    const charData = rows[0].data || {};
+    const characters = charData.characters || [];
+
+    for (const char of characters) {
+      // Skip characters that already have avatars
+      const avatars = char.avatars;
+      if (avatars?.standard || avatars?.winter || avatars?.summer || avatars?.hasFullAvatars) {
+        log.debug(`[TRIAL] Character ${char.name} already has avatars - skipping`);
+        continue;
+      }
+
+      // Get face photo for avatar generation
+      const facePhoto = getFacePhoto(char);
+      if (!facePhoto) {
+        log.debug(`[TRIAL] Character ${char.name} has no photo - skipping avatar generation`);
+        continue;
+      }
+
+      // Create a background avatar job
+      const jobId = `avatar_claim_${crypto.randomBytes(8).toString('hex')}`;
+      avatarJobs.set(jobId, {
+        userId,
+        characterId: char.id,
+        characterName: char.name,
+        status: 'pending',
+        progress: 0,
+        message: 'Starting avatar generation (account claim)...',
+        createdAt: Date.now(),
+        result: null,
+        error: null,
+      });
+
+      const bodyParams = {
+        characterId: char.id,
+        facePhoto,
+        name: char.name,
+        age: char.age || '',
+        gender: char.gender || '',
+      };
+
+      const user = { id: userId };
+
+      log.info(`[TRIAL] Triggering background avatar generation for ${char.name} (job: ${jobId})`);
+      processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKey).catch(err => {
+        log.error(`[TRIAL] Avatar generation failed for ${char.name}: ${err.message}`);
+        const job = avatarJobs.get(jobId);
+        if (job) {
+          job.status = 'failed';
+          job.error = err.message;
+        }
+      });
+    }
+  } catch (err) {
+    // Non-fatal - account claim should succeed even if avatar generation fails
+    log.error('[TRIAL] Error triggering avatar generation on claim:', err.message);
+  }
+}
+
 const trialClaimLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
@@ -871,6 +955,9 @@ router.post('/claim/:token', trialClaimLimiter, async (req, res) => {
 
     log.info(`[TRIAL] Account claimed via password: ${user.email}`);
 
+    // Trigger background avatar generation for trial characters (non-blocking)
+    triggerAvatarGenerationForUser(user.id);
+
     res.json({
       success: true,
       token: jwtToken,
@@ -978,6 +1065,9 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
     });
 
     log.info(`[TRIAL] Account claimed via Google: ${user.email}`);
+
+    // Trigger background avatar generation for trial characters (non-blocking)
+    triggerAvatarGenerationForUser(user.id);
 
     res.json({
       success: true,
