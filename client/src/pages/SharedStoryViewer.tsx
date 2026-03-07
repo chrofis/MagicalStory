@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 
 // Swipe detection hook
 function useSwipe(onSwipeLeft: () => void, onSwipeRight: () => void) {
@@ -47,6 +47,7 @@ interface SharedStoryData {
     initialPage?: boolean;
     backCover?: boolean;
   };
+  isOwner?: boolean;
 }
 
 type PageEntry =
@@ -71,7 +72,10 @@ export default function SharedStoryViewer() {
       }
 
       try {
-        const response = await fetch(`/api/shared/${shareToken}`);
+        const authToken = localStorage.getItem('auth_token');
+        const headers: Record<string, string> = {};
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        const response = await fetch(`/api/shared/${shareToken}`, { headers });
         if (!response.ok) {
           if (response.status === 404) {
             setError('This story is no longer available or the link is invalid.');
@@ -180,13 +184,23 @@ export default function SharedStoryViewer() {
             <BookOpen className="w-6 h-6 text-indigo-600" />
             <span className="font-bold text-indigo-900 hidden sm:inline">MagicalStory</span>
           </div>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
-          >
-            <Sparkles className="w-4 h-4" />
-            Create Your Own Story
-          </Link>
+          {story?.isOwner ? (
+            <Link
+              to="/stories"
+              className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit Story
+            </Link>
+          ) : (
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1 bg-gradient-to-r from-indigo-500 to-blue-500 text-white px-4 py-2 rounded-full text-sm font-semibold hover:from-indigo-600 hover:to-blue-600 transition-all"
+            >
+              <Sparkles className="w-4 h-4" />
+              Create Your Own Story
+            </Link>
+          )}
         </div>
       </header>
 

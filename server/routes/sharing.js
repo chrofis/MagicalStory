@@ -16,8 +16,11 @@ const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
+const jwt = require('jsonwebtoken');
+
 const { dbQuery, getStoryImage } = require('../services/database');
 const { log } = require('../utils/logger');
+const { JWT_SECRET } = require('../middleware/auth');
 
 // Base URL for OG tags and share links (consistent with stories.js)
 const SITE_URL = process.env.FRONTEND_URL || 'https://www.magicalstory.ch';
@@ -54,7 +57,7 @@ async function getSharedStory(shareToken) {
     return null;
   }
   const rows = await dbQuery(
-    'SELECT id, data FROM stories WHERE share_token = $1 AND is_shared = true',
+    'SELECT id, user_id, data FROM stories WHERE share_token = $1 AND is_shared = true',
     [shareToken]
   );
   if (rows.length === 0) {
@@ -62,7 +65,7 @@ async function getSharedStory(shareToken) {
   }
   // Parse data if it's a JSON string
   const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-  return { id: rows[0].id, data };
+  return { id: rows[0].id, userId: rows[0].user_id, data };
 }
 
 /**
@@ -110,7 +113,7 @@ function getPageText(storyText, pageNumber) {
 // NOTE: Share auth endpoints (share-status, enable/disable sharing) are in stories.js
 // They are mounted at /api/stories before this router, so they handle those requests.
 
-// GET /api/shared/:shareToken - Get shared story data (public, no auth)
+// GET /api/shared/:shareToken - Get shared story data (public, optional auth for ownership)
 apiRouter.get('/shared/:shareToken', async (req, res) => {
   try {
     const { shareToken } = req.params;
@@ -118,6 +121,19 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
 
     if (!story) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
+    }
+
+    // Optional auth: check if viewer is the story owner
+    let isOwner = false;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        isOwner = decoded.id === story.userId;
+      } catch {
+        // Invalid token — not the owner, that's fine
+      }
     }
 
     // Return only safe public data (no user info, no prompts)
@@ -155,6 +171,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       dedication: data.dedication,
       hasImages: true,
       covers,
+      isOwner,
     });
   } catch (err) {
     log.error('Error fetching shared story:', err);
