@@ -408,10 +408,6 @@ export default function SharedStoryViewer() {
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain"
                     loading="eager"
-                    onError={(e) => {
-                      e.currentTarget.src = '';
-                      e.currentTarget.alt = 'Image not available';
-                    }}
                   />
                 </div>
                 {/* Text - 50% width, scrollable */}
