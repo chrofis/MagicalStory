@@ -161,7 +161,7 @@ export default function ClaimAccount() {
       }
 
       setPageState('success');
-      setTimeout(() => navigate('/stories'), 1500);
+      setTimeout(() => { window.location.href = '/stories'; }, 1500);
     } catch {
       setError(t.error);
     } finally {
@@ -211,7 +211,7 @@ export default function ClaimAccount() {
       }
 
       setPageState('success');
-      setTimeout(() => navigate('/stories'), 1500);
+      setTimeout(() => { window.location.href = '/stories'; }, 1500);
     } catch (err) {
       if (err instanceof Error && err.message === 'Redirecting to Google...') {
         return;
