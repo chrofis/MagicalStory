@@ -150,7 +150,8 @@ router.get('/', authenticateToken, async (req, res) => {
         const sceneCount = meta.sceneCount || 0;
         const isPictureBook = meta.languageLevel === '1st-grade';
         const storyPages = isPictureBook ? sceneCount : sceneCount * 2;
-        const pageCount = sceneCount > 0 ? storyPages + 3 : 0;
+        const hasCovers = meta.hasThumbnail || row.has_cover_image;
+        const pageCount = sceneCount > 0 ? storyPages + (hasCovers ? 3 : 0) : 0;
 
         return {
           id: meta.id,
