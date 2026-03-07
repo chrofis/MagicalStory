@@ -26,6 +26,7 @@ interface StreamingIdea {
 const strings: Record<string, {
   title: string;
   subtitle: string;
+  editHint: string;
   generating: string;
   idea: string;
   selectIdea: string;
@@ -39,6 +40,7 @@ const strings: Record<string, {
   en: {
     title: 'Your Story Ideas',
     subtitle: 'We created two unique story ideas just for you. Pick your favorite!',
+    editHint: 'You can click into the text to edit the story idea before creating.',
     generating: 'Creating magical story ideas...',
     idea: 'Story Idea',
     selectIdea: 'Click to select',
@@ -52,6 +54,7 @@ const strings: Record<string, {
   de: {
     title: 'Deine Geschichtenideen',
     subtitle: 'Wir haben zwei einzigartige Ideen nur für dich erstellt. Wähle deinen Favoriten!',
+    editHint: 'Du kannst in den Text klicken, um die Idee vor dem Erstellen zu bearbeiten.',
     generating: 'Magische Geschichtenideen werden erstellt...',
     idea: 'Geschichtenidee',
     selectIdea: 'Klicke zum Auswählen',
@@ -65,6 +68,7 @@ const strings: Record<string, {
   fr: {
     title: 'Vos idées d\'histoire',
     subtitle: 'Nous avons créé deux idées uniques rien que pour vous. Choisissez votre préférée !',
+    editHint: 'Vous pouvez cliquer sur le texte pour modifier l\'idée avant de créer.',
     generating: 'Création d\'idées magiques...',
     idea: 'Idée d\'histoire',
     selectIdea: 'Cliquez pour sélectionner',
@@ -257,9 +261,10 @@ export default function TrialIdeasStep({
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-4xl mx-auto pt-4">
+    <div className="max-w-5xl mx-auto pt-4">
       <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
-      <p className="text-gray-500 text-center mb-6">{t.subtitle}</p>
+      <p className="text-gray-500 text-center mb-1">{t.subtitle}</p>
+      <p className="text-xs text-gray-400 text-center mb-6">{t.editHint}</p>
 
       {/* Error state */}
       {error && (
