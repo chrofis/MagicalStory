@@ -233,13 +233,41 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
     }
   }, [onChange, t]);
 
+  // Resize image to reduce upload size (max 1500px on longest side, JPEG 85%)
+  const resizeImage = (dataUrl: string, maxSize = 1500): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > maxSize || height > maxSize) {
+          if (width > height) {
+            height = Math.round((height * maxSize) / width);
+            width = maxSize;
+          } else {
+            width = Math.round((width * maxSize) / height);
+            height = maxSize;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  };
+
   const handleFileSelect = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
 
     const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      analyzePhoto(base64);
+    reader.onloadend = async () => {
+      const raw = reader.result as string;
+      const resized = await resizeImage(raw);
+      analyzePhoto(resized);
     };
     reader.readAsDataURL(file);
   }, [analyzePhoto]);
