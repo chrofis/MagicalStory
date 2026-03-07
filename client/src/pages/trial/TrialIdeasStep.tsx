@@ -284,10 +284,7 @@ export default function TrialIdeasStep({
       {/* Loading indicator (before any text arrives) */}
       {isGenerating && !displayIdeas[0].text && !displayIdeas[1].text && !error && (
         <div className="flex flex-col items-center justify-center py-16 gap-4">
-          <div className="relative">
-            <Sparkles className="w-10 h-10 text-indigo-400 animate-pulse" />
-            <Loader2 className="w-6 h-6 text-indigo-600 animate-spin absolute -bottom-1 -right-1" />
-          </div>
+          <Loader2 className="w-10 h-10 text-indigo-500 animate-spin" />
           <p className="text-indigo-600 font-medium">{t.generating}</p>
         </div>
       )}
