@@ -63,17 +63,17 @@ const strings: Record<string, {
     errorRetry: 'Erneut versuchen',
   },
   fr: {
-    title: 'Vos idees d\'histoire',
-    subtitle: 'Nous avons cree deux idees uniques rien que pour vous. Choisissez votre preferee!',
-    generating: 'Creation d\'idees magiques...',
-    idea: 'Idee d\'histoire',
-    selectIdea: 'Cliquez pour selectionner',
-    selected: 'Selectionnee',
-    createStory: 'Creer mon histoire',
-    regenerate: 'Generer de nouvelles idees',
+    title: 'Vos idées d\'histoire',
+    subtitle: 'Nous avons créé deux idées uniques rien que pour vous. Choisissez votre préférée !',
+    generating: 'Création d\'idées magiques...',
+    idea: 'Idée d\'histoire',
+    selectIdea: 'Cliquez pour sélectionner',
+    selected: 'Sélectionnée',
+    createStory: 'Créer mon histoire',
+    regenerate: 'Générer de nouvelles idées',
     back: 'Retour',
-    errorTitle: 'Quelque chose s\'est mal passe',
-    errorRetry: 'Reessayer',
+    errorTitle: 'Quelque chose s\'est mal passé',
+    errorRetry: 'Réessayer',
   },
 };
 
@@ -89,7 +89,7 @@ export default function TrialIdeasStep({
   onBack,
   onCreate,
 }: Props) {
-  const lang = storyInput.language === 'de' ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en';
+  const lang = storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en';
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
   const [streamingIdeas, setStreamingIdeas] = useState<StreamingIdea[]>([
@@ -303,7 +303,7 @@ export default function TrialIdeasStep({
                     onSelectIdea(index);
                   }
                 }}
-                className={`relative text-left p-5 rounded-xl border-2 transition-all min-h-[280px] flex flex-col ${
+                className={`relative text-left p-5 rounded-xl border-2 transition-all min-h-[360px] flex flex-col ${
                   isSelected
                     ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 shadow-lg'
                     : hasText

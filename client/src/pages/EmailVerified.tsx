@@ -17,28 +17,52 @@ const translations = {
     createStory: 'Create Your Story',
     login: 'Log In',
     goHome: 'Go to Homepage',
+    upsellTitle: 'More features with a full account',
+    upsellFeatures: [
+      'Choose from multiple art styles',
+      'Longer stories with up to 24 pages',
+      'Multiple characters in one story',
+      'Higher image quality with auto-repair',
+      'Order as a printed book',
+    ],
   },
   de: {
     title: 'E-Mail bestätigt!',
-    checkingOtherWindow: 'Bitte kehren Sie zu Ihrem ursprünglichen Browserfenster zurück, wo Ihre Geschichte nun generiert werden sollte...',
-    generatingInOtherWindow: 'Ihre Geschichte wird im anderen Browserfenster generiert!',
-    otherWindowHint: 'Sie können diesen Tab schließen und zu Ihrem ursprünglichen Fenster zurückkehren.',
-    manualHint: 'Ihr ursprüngliches Fenster wurde möglicherweise geschlossen. Klicken Sie unten, um Ihre Geschichte zu erstellen.',
-    notLoggedInHint: 'Bitte melden Sie sich an, um Ihre Geschichte zu erstellen.',
+    checkingOtherWindow: 'Bitte kehre zu deinem ursprünglichen Browserfenster zurück, wo deine Geschichte nun generiert werden sollte...',
+    generatingInOtherWindow: 'Deine Geschichte wird im anderen Browserfenster generiert!',
+    otherWindowHint: 'Du kannst diesen Tab schliessen und zu deinem ursprünglichen Fenster zurückkehren.',
+    manualHint: 'Dein ursprüngliches Fenster wurde möglicherweise geschlossen. Klicke unten, um deine Geschichte zu erstellen.',
+    notLoggedInHint: 'Bitte melde dich an, um deine Geschichte zu erstellen.',
     createStory: 'Geschichte erstellen',
     login: 'Anmelden',
     goHome: 'Zur Startseite',
+    upsellTitle: 'Mehr Möglichkeiten mit einem vollständigen Konto',
+    upsellFeatures: [
+      'Verschiedene Kunststile zur Auswahl',
+      'Längere Geschichten mit bis zu 24 Seiten',
+      'Mehrere Figuren in einer Geschichte',
+      'Höhere Bildqualität mit automatischer Reparatur',
+      'Als gedrucktes Buch bestellen',
+    ],
   },
   fr: {
-    title: 'E-mail verifie!',
-    checkingOtherWindow: 'Veuillez retourner a votre fenetre de navigateur d\'origine ou votre histoire devrait maintenant etre generee...',
-    generatingInOtherWindow: 'Votre histoire est en cours de generation dans votre autre fenetre!',
-    otherWindowHint: 'Vous pouvez fermer cet onglet et retourner a votre fenetre d\'origine.',
-    manualHint: 'Votre fenetre d\'origine a peut-etre ete fermee. Cliquez ci-dessous pour creer votre histoire.',
-    notLoggedInHint: 'Veuillez vous connecter pour creer votre histoire.',
-    createStory: 'Creer votre histoire',
+    title: 'E-mail vérifié !',
+    checkingOtherWindow: 'Veuillez retourner à votre fenêtre de navigateur d\'origine où votre histoire devrait maintenant être générée...',
+    generatingInOtherWindow: 'Votre histoire est en cours de génération dans votre autre fenêtre !',
+    otherWindowHint: 'Vous pouvez fermer cet onglet et retourner à votre fenêtre d\'origine.',
+    manualHint: 'Votre fenêtre d\'origine a peut-être été fermée. Cliquez ci-dessous pour créer votre histoire.',
+    notLoggedInHint: 'Veuillez vous connecter pour créer votre histoire.',
+    createStory: 'Créer votre histoire',
     login: 'Se connecter',
-    goHome: 'Aller a l\'accueil',
+    goHome: 'Aller à l\'accueil',
+    upsellTitle: 'Plus de fonctionnalités avec un compte complet',
+    upsellFeatures: [
+      'Plusieurs styles artistiques au choix',
+      'Des histoires plus longues jusqu\'à 24 pages',
+      'Plusieurs personnages dans une même histoire',
+      'Qualité d\'image supérieure avec réparation automatique',
+      'Commander en livre imprimé',
+    ],
   },
 };
 
@@ -213,6 +237,18 @@ export default function EmailVerified() {
               </Button>
             </div>
           )}
+
+          {/* Upsell banner */}
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 mt-6 border border-indigo-100 text-left">
+            <p className="text-sm font-semibold text-indigo-700 mb-3">{t.upsellTitle}</p>
+            <ul className="text-sm text-gray-600 space-y-1.5">
+              {t.upsellFeatures.map((f, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <span className="text-indigo-500 font-bold">+</span> {f}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
     </div>

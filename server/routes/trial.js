@@ -242,23 +242,14 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     const langInstruction = getLanguageInstruction(language);
 
-    // Simple, lightweight prompt — no DRAFT/REVIEW/FINAL overhead
-    const buildTrialPrompt = (variant) => `You write children's stories. Generate a story idea for a 10-page children's book.
+    // Minimal prompt — just title + short summary
+    const buildTrialPrompt = (variant) => `Generate a children's story idea. Character: ${charDesc}. ${categoryContext} ${variant}
 
-Character: ${charDesc}
-${categoryContext}
+Plain text only, no markdown. Line 1: title. Lines 2-3: 2-sentence plot summary.
+${langInstruction} Write EVERYTHING in that language.`;
 
-${variant}
-
-Output format (plain text, no markdown, no bold, no headers):
-Line 1: Story title
-Lines 2+: A 3-4 sentence summary describing the plot — what happens, where, and how it resolves.
-
-${langInstruction}
-Write EVERYTHING in the language above. Do not use English unless English was specified.`;
-
-    const prompt1 = buildTrialPrompt('Create an engaging story that uses the setting naturally.');
-    const prompt2 = buildTrialPrompt('Create a DIFFERENT story with a different location, different conflict, and different story structure.');
+    const prompt1 = buildTrialPrompt('Make it engaging and fun.');
+    const prompt2 = buildTrialPrompt('Create a DIFFERENT story — different setting, different conflict.');
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);
@@ -273,8 +264,8 @@ Write EVERYTHING in the language above. Do not use English unless English was sp
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (500 max tokens — just title + short summary)
-    const streamStory1 = callTextModelStreaming(prompt1, 500, (delta, fullText) => {
+    // Stream Story 1 (200 max tokens — title + 2-sentence summary)
+    const streamStory1 = callTextModelStreaming(prompt1, 200, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
@@ -295,8 +286,8 @@ Write EVERYTHING in the language above. Do not use English unless English was sp
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 (500 max tokens)
-    const streamStory2 = callTextModelStreaming(prompt2, 500, (delta, fullText) => {
+    // Stream Story 2 (200 max tokens)
+    const streamStory2 = callTextModelStreaming(prompt2, 200, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
         res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);

@@ -38,6 +38,15 @@ const translations = {
     trialUsed: 'This email has already been used for a free trial.',
     error: 'Something went wrong. Please try again.',
     close: 'Close',
+    upsellTitle: 'Want even more?',
+    upsellDesc: 'With a full account you unlock:',
+    upsellFeatures: [
+      'Choose from multiple art styles',
+      'Longer stories with up to 24 pages',
+      'Multiple characters in one story',
+      'Higher image quality with auto-repair',
+      'Order as a printed book',
+    ],
   },
   de: {
     title: 'Erstelle deine kostenlose Geschichte',
@@ -61,6 +70,15 @@ const translations = {
     trialUsed: 'Diese E-Mail wurde bereits für eine kostenlose Testversion verwendet.',
     error: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
     close: 'Schliessen',
+    upsellTitle: 'Du willst noch mehr?',
+    upsellDesc: 'Mit einem vollständigen Konto erhältst du:',
+    upsellFeatures: [
+      'Verschiedene Kunststile zur Auswahl',
+      'Längere Geschichten mit bis zu 24 Seiten',
+      'Mehrere Figuren in einer Geschichte',
+      'Höhere Bildqualität mit automatischer Reparatur',
+      'Als gedrucktes Buch bestellen',
+    ],
   },
   fr: {
     title: 'Créez votre histoire gratuite',
@@ -82,14 +100,23 @@ const translations = {
     accountExists: 'Un compte avec cet e-mail existe déjà.',
     accountExistsLogin: 'Veuillez vous connecter.',
     trialUsed: 'Cet e-mail a déjà été utilisé pour un essai gratuit.',
-    error: 'Quelque chose s\'est mal passe. Veuillez reessayer.',
+    error: 'Quelque chose s\'est mal passé. Veuillez réessayer.',
     close: 'Fermer',
+    upsellTitle: 'Vous en voulez plus ?',
+    upsellDesc: 'Avec un compte complet, vous débloquez :',
+    upsellFeatures: [
+      'Plusieurs styles artistiques au choix',
+      'Des histoires plus longues jusqu\'à 24 pages',
+      'Plusieurs personnages dans une même histoire',
+      'Qualité d\'image supérieure avec réparation automatique',
+      'Commander en livre imprimé',
+    ],
   },
 };
 
 export default function TrialAuthModal({ characterData, storyInput, onClose }: Props) {
   const navigate = useNavigate();
-  const lang = (storyInput.language === 'German' ? 'de' : storyInput.language === 'French' ? 'fr' : 'en') as keyof typeof translations;
+  const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as keyof typeof translations;
   const t = translations[lang] || translations.en;
 
   const [state, setState] = useState<ModalState>('input');
@@ -207,24 +234,50 @@ export default function TrialAuthModal({ characterData, storyInput, onClose }: P
 
         {/* ── Verifying state ──────────────────────────────────────────────── */}
         {state === 'verifying' && (
-          <div className="text-center py-4">
-            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Mail className="w-8 h-8 text-indigo-600" />
+          <div className="py-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Mail className="w-8 h-8 text-indigo-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.verifyingTitle}</h2>
+              <p className="text-gray-600 mb-4">{t.verifyingDesc}</p>
+              <p className="text-sm text-gray-400 mb-5">{t.verifyingNote}</p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.verifyingTitle}</h2>
-            <p className="text-gray-600 mb-4">{t.verifyingDesc}</p>
-            <p className="text-sm text-gray-400">{t.verifyingNote}</p>
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+              <p className="text-sm font-semibold text-indigo-700 mb-2">{t.upsellTitle}</p>
+              <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
+              <ul className="text-xs text-gray-600 space-y-1">
+                {t.upsellFeatures.map((f, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-indigo-500 mt-0.5">+</span> {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 
         {/* ── Generating state ─────────────────────────────────────────────── */}
         {state === 'generating' && (
-          <div className="text-center py-4">
-            <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Sparkles className="w-8 h-8 text-purple-600 animate-pulse" />
+          <div className="py-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-8 h-8 text-purple-600 animate-pulse" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.generatingTitle}</h2>
+              <p className="text-gray-600 mb-5">{t.generatingDesc}</p>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.generatingTitle}</h2>
-            <p className="text-gray-600">{t.generatingDesc}</p>
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+              <p className="text-sm font-semibold text-indigo-700 mb-2">{t.upsellTitle}</p>
+              <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
+              <ul className="text-xs text-gray-600 space-y-1">
+                {t.upsellFeatures.map((f, i) => (
+                  <li key={i} className="flex items-start gap-1.5">
+                    <span className="text-indigo-500 mt-0.5">+</span> {f}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         )}
 
