@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Share2, Copy, Check, Loader2, Link2, Link2Off, MessageCircle } from 'lucide-react';
+import { Share2, Copy, Check, Loader2, Link2, Link2Off } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 interface ShareButtonProps {
@@ -37,7 +37,6 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     sharingDisabled: language === 'de' ? 'Teilen inaktiv' : language === 'fr' ? 'Partage inactif' : 'Sharing disabled',
     anyoneWithLink: language === 'de' ? 'Jeder mit dem Link kann die Geschichte lesen' : language === 'fr' ? 'Toute personne avec le lien peut lire l\'histoire' : 'Anyone with the link can read the story',
     errorLoading: language === 'de' ? 'Fehler beim Laden' : language === 'fr' ? 'Erreur de chargement' : 'Error loading',
-    shareWhatsApp: language === 'de' ? 'Via WhatsApp teilen' : language === 'fr' ? 'Partager via WhatsApp' : 'Share via WhatsApp',
   };
 
   // Fetch share status when dropdown opens
@@ -115,18 +114,15 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     }
   };
 
-  const shareOnWhatsApp = () => {
-    if (shareStatus?.shareUrl) {
-      window.open(`https://wa.me/?text=${encodeURIComponent(shareStatus.shareUrl)}`, '_blank');
-    }
-  };
+  const isMobileDevice = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-  // Mobile: use native share API if available
-  const pendingMobileShare = useRef(false);
+  const pendingNativeShare = useRef(false);
 
+  // Fire native share sheet once shareStatus arrives after enabling
   useEffect(() => {
-    if (pendingMobileShare.current && shareStatus?.isShared && shareStatus.shareUrl) {
-      pendingMobileShare.current = false;
+    if (pendingNativeShare.current && shareStatus?.isShared && shareStatus.shareUrl) {
+      pendingNativeShare.current = false;
+      setLoading(false);
       navigator.share({
         title: t.shareStory,
         url: shareStatus.shareUrl,
@@ -134,18 +130,101 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     }
   }, [shareStatus]);
 
+  const enableSharing = async (): Promise<ShareStatus | null> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/share`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Failed to enable sharing');
+      const data = await response.json();
+      const status: ShareStatus = {
+        isShared: data.isShared,
+        shareToken: data.shareToken,
+        shareUrl: data.shareUrl,
+      };
+      setShareStatus(status);
+      onShareStatusChange?.(data.isShared);
+      return status;
+    } catch {
+      setError('Failed to update sharing');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchShareStatusAsync = async (): Promise<ShareStatus | null> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`/api/stories/${storyId}/share-status`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Failed to fetch status');
+      const data = await response.json();
+      setShareStatus(data);
+      return data;
+    } catch {
+      setError(t.errorLoading);
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleButtonClick = async () => {
+    // Mobile: use native share sheet
+    if (isMobileDevice() && navigator.share) {
+      setLoading(true);
+
+      let status = shareStatus;
+      if (!status) {
+        status = await fetchShareStatusAsync();
+      }
+
+      if (status && !status.isShared) {
+        status = await enableSharing();
+      }
+
+      if (status?.shareUrl) {
+        setLoading(false);
+        try {
+          await navigator.share({ title: t.shareStory, url: status.shareUrl });
+        } catch {
+          // User cancelled
+        }
+      } else {
+        pendingNativeShare.current = true;
+      }
+      return;
+    }
+
+    // Desktop: open dropdown
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div className="relative">
       {/* Main share button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleButtonClick}
+        disabled={loading}
         className={isFullVariant
-          ? "bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full hover:bg-indigo-600"
-          : "flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md hover:shadow-lg"
+          ? "bg-indigo-500 text-white px-3 py-2 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 w-full hover:bg-indigo-600 disabled:opacity-50"
+          : "flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-lg hover:from-blue-600 hover:to-indigo-600 transition-all shadow-md hover:shadow-lg disabled:opacity-50"
         }
         title={t.share}
       >
-        <Share2 className={isFullVariant ? "w-4 h-4" : "w-4 h-4"} />
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Share2 className="w-4 h-4" />
+        )}
         <span className={isFullVariant ? "" : "hidden sm:inline"}>{t.share}</span>
         {shareStatus?.isShared && (
           <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -230,15 +309,6 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
                             {t.copyLink}
                           </>
                         )}
-                      </button>
-
-                      {/* WhatsApp share */}
-                      <button
-                        onClick={shareOnWhatsApp}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                        {t.shareWhatsApp}
                       </button>
                     </>
                   )}
