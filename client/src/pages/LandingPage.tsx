@@ -264,7 +264,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div ref={containerRef} className="h-screen overflow-y-auto snap-y snap-proximity bg-gray-50">
+    <div ref={containerRef} className="bg-gray-50">
       {/* Scroll Indicator */}
       <ScrollIndicator
         activeIndex={activeSection}
@@ -278,7 +278,7 @@ export default function LandingPage() {
       </div>
 
       {/* Hero Section - Full viewport height */}
-      <section ref={(el) => { sectionRefs.current[0] = el; }} className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative snap-start">
+      <section ref={(el) => { sectionRefs.current[0] = el; }} className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10 flex-1 items-center">
           {/* Left Side - Text and Button */}
           <div className="w-full lg:w-[35%] flex flex-col justify-center">
@@ -385,11 +385,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 1: Create Your Characters */}
-      <section ref={(el) => { sectionRefs.current[1] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[1] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-1 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
+            <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Camera className="w-6 h-6 text-indigo-600" />
@@ -418,7 +418,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image - Second on mobile, peeks from below */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-2 lg:min-h-0 flex items-center pb-8 lg:py-0">
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
               <img
                 src={`/images/landing-characters-${language}.jpg`}
                 alt={st.createCharacters}
@@ -430,11 +430,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section ref={(el) => { sectionRefs.current[2] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[2] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
+            <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-amber-100 p-3 rounded-full">
                   <BookOpen className="w-6 h-6 text-amber-600" />
@@ -463,7 +463,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image - Second on mobile, peeks from below */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1 lg:min-h-0 flex items-center pb-8 lg:py-0">
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
               <img
                 src="/images/landing-story.jpg"
                 alt={st.tellStory}
@@ -475,11 +475,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 3: Choose Your Style */}
-      <section ref={(el) => { sectionRefs.current[3] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-white snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[3] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-1 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
+            <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-pink-100 p-3 rounded-full">
                   <Palette className="w-6 h-6 text-pink-600" />
@@ -508,7 +508,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image - Second on mobile, peeks from below */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-2 lg:min-h-0 flex items-center pb-8 lg:py-0">
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
               <img
                 src="/images/landing-styles.jpg"
                 alt={st.chooseStyle}
@@ -520,11 +520,11 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section ref={(el) => { sectionRefs.current[4] = el; }} className="min-h-screen pt-20 lg:py-24 px-4 lg:px-8 bg-gray-50 snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[4] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-2 min-h-[70vh] lg:min-h-0 flex flex-col justify-center pt-8 pb-4 lg:py-0">
+            <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-emerald-100 p-3 rounded-full">
                   <Printer className="w-6 h-6 text-emerald-600" />
@@ -553,7 +553,7 @@ export default function LandingPage() {
               </ul>
             </div>
             {/* Image - Second on mobile, peeks from below */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-1 lg:min-h-0 flex items-center pb-8 lg:py-0">
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
               <img
                 src="/images/landing-print.jpg"
                 alt={st.printShare}
@@ -565,7 +565,7 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA Section */}
-      <section ref={(el) => { sectionRefs.current[5] = el; }} className="min-h-screen py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600 snap-start flex flex-col justify-center">
+      <section ref={(el) => { sectionRefs.current[5] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl lg:text-5xl font-title text-white mb-6">
             {st.readyToCreate}
@@ -593,7 +593,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <div className="snap-start">
+      <div>
         <Footer />
       </div>
 
