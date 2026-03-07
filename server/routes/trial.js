@@ -400,10 +400,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
  * @returns {string} jobId
  */
 async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput) {
-  const { CREDIT_CONFIG } = require('../config/credits');
-
   const pages = 10;
-  const creditsNeeded = pages * CREDIT_CONFIG.COSTS.PER_PAGE; // 100 credits for 10 pages
 
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -440,33 +437,14 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     trialMode: true, // Use lightweight story prompt
   };
 
-  // Reserve credits from the trial user
-  const updateResult = await pool.query(
-    'UPDATE users SET credits = credits - $1 WHERE id = $2 AND credits >= $1 RETURNING credits',
-    [creditsNeeded, userId]
-  );
-
-  if (updateResult.rows.length === 0) {
-    throw new Error('Insufficient credits for trial story');
-  }
-
-  const newBalance = updateResult.rows[0].credits;
-
-  // Create credit transaction
-  await pool.query(
-    `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [userId, -creditsNeeded, newBalance, 'story_reserve', jobId, `Reserved ${creditsNeeded} credits for trial ${pages}-page story`]
-  );
-
-  // Create the job
+  // Trial stories are free — no credit deduction
   await pool.query(
     `INSERT INTO story_jobs (id, user_id, status, input_data, progress, progress_message, credits_reserved)
      VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', creditsNeeded]
+    [jobId, userId, 'pending', JSON.stringify(inputData), 0, 'Job created, waiting to start...', 0]
   );
 
-  log.debug(`[TRIAL] Created story job ${jobId} for user ${userId} (${creditsNeeded} credits reserved)`);
+  log.debug(`[TRIAL] Created story job ${jobId} for user ${userId} (free trial, no credits reserved)`);
   return jobId;
 }
 
@@ -559,13 +537,9 @@ router.post('/register-email', trialRegisterLimiter, async (req, res) => {
 
     // ── New trial user ──────────────────────────────────────────────────────
 
-    const { CREDIT_CONFIG } = require('../config/credits');
     const userId = crypto.randomUUID();
     const username = normalizedEmail; // username = email, matching auth.js pattern
     const displayName = characterData.name || normalizedEmail.split('@')[0];
-
-    // Credits: enough for a 10-page story
-    const initialCredits = 10 * CREDIT_CONFIG.COSTS.PER_PAGE; // 100 credits
 
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
@@ -575,6 +549,7 @@ router.post('/register-email', trialRegisterLimiter, async (req, res) => {
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
+    // Trial users start with 0 credits — trial story is free, full credits given on claim
     await pool.query(
       `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified, is_trial, trial_data, email_verification_token, email_verification_expires)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
@@ -586,19 +561,13 @@ router.post('/register-email', trialRegisterLimiter, async (req, res) => {
         'user',
         1,  // trial users get 1 story
         0,
-        initialCredits,
+        0,  // no credits needed — trial story is free
         false,
         true, // is_trial
         JSON.stringify({ characterData, storyInput }),
         verificationToken,
         verificationExpires,
       ]
-    );
-
-    // Create initial credit transaction
-    await pool.query(
-      'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
-      [userId, initialCredits, initialCredits, 'initial', 'Trial story credits']
     );
 
     // Send verification email
@@ -723,16 +692,15 @@ router.post('/register-google', trialRegisterLimiter, async (req, res) => {
 
     // ── New trial user via Google ───────────────────────────────────────────
 
-    const { CREDIT_CONFIG } = require('../config/credits');
     const userId = crypto.randomUUID();
     const username = normalizedEmail;
-    const initialCredits = 10 * CREDIT_CONFIG.COSTS.PER_PAGE; // 100 credits
 
     // Google users don't need a real password
     const bcrypt = require('bcryptjs');
     const randomPassword = crypto.randomBytes(32).toString('hex');
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
+    // Trial users start with 0 credits — trial story is free, full credits given on claim
     const result = await pool.query(
       `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified, is_trial, trial_data)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -745,19 +713,13 @@ router.post('/register-google', trialRegisterLimiter, async (req, res) => {
         'user',
         1,
         0,
-        initialCredits,
+        0,  // no credits needed — trial story is free
         true,  // Google-verified
         true,  // is_trial
         JSON.stringify({ characterData, storyInput }),
       ]
     );
     const newUser = result.rows[0];
-
-    // Create initial credit transaction
-    await pool.query(
-      'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
-      [userId, initialCredits, initialCredits, 'initial', 'Trial story credits']
-    );
 
     // Save character to characters table
     const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
@@ -876,15 +838,24 @@ router.post('/claim/:token', trialClaimLimiter, async (req, res) => {
     // Hash the new password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Convert trial account to full account
+    // Convert trial account to full account with standard credits (500)
+    const { CREDIT_CONFIG } = require('../config/credits');
+    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 500
     await pool.query(
       `UPDATE users SET
          password = $1,
          is_trial = FALSE,
+         credits = $2,
          claim_token = NULL,
          claim_token_expires = NULL
-       WHERE id = $2`,
-      [hashedPassword, user.id]
+       WHERE id = $3`,
+      [hashedPassword, fullCredits, user.id]
+    );
+
+    // Create credit transaction for the upgrade
+    await pool.query(
+      'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+      [user.id, fullCredits, fullCredits, 'initial', 'Welcome credits for claimed account']
     );
 
     // Generate JWT so user is immediately logged in
@@ -906,7 +877,7 @@ router.post('/claim/:token', trialClaimLimiter, async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        credits: user.credits != null ? user.credits : 0,
+        credits: fullCredits,
         storyQuota: user.story_quota !== undefined ? user.story_quota : 1,
         storiesGenerated: user.stories_generated || 0,
         emailVerified: true,
@@ -975,15 +946,24 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
       });
     }
 
-    // Link Google account and convert trial to full account
+    // Link Google account and convert trial to full account with standard credits (500)
+    const { CREDIT_CONFIG } = require('../config/credits');
+    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 500
     await pool.query(
       `UPDATE users SET
          firebase_uid = $1,
          is_trial = FALSE,
+         credits = $2,
          claim_token = NULL,
          claim_token_expires = NULL
-       WHERE id = $2`,
-      [firebaseUid, user.id]
+       WHERE id = $3`,
+      [firebaseUid, fullCredits, user.id]
+    );
+
+    // Create credit transaction for the upgrade
+    await pool.query(
+      'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+      [user.id, fullCredits, fullCredits, 'initial', 'Welcome credits for claimed account']
     );
 
     // Generate JWT
@@ -1005,7 +985,7 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
         username: user.username,
         email: user.email,
         role: user.role,
-        credits: user.credits != null ? user.credits : 0,
+        credits: fullCredits,
         storyQuota: user.story_quota !== undefined ? user.story_quota : 1,
         storiesGenerated: user.stories_generated || 0,
         emailVerified: true,
