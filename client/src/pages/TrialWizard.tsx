@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation } from '@/components/common';
 import TrialCharacterStep from './trial/TrialCharacterStep';
@@ -80,6 +80,11 @@ export default function TrialWizard() {
     storyDetails: '',
     language: storyLanguage,
   });
+
+  // Sync language when UI language changes
+  useEffect(() => {
+    setStoryInput(prev => ({ ...prev, language: storyLanguage }));
+  }, [storyLanguage]);
 
   // Ideas state
   const [generatedIdeas, setGeneratedIdeas] = useState<GeneratedIdea[]>([]);
