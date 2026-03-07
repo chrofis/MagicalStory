@@ -50,11 +50,12 @@ function initSharingRoutes(config) {
 // ============================================
 
 /**
- * Optional auth middleware — sets req.user if valid JWT present, otherwise continues
+ * Optional auth middleware — sets req.user if valid JWT present, otherwise continues.
+ * Checks Authorization header first, then ?token= query param (for <img> tags that can't send headers).
  */
 function optionalAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
   if (token) {
     try {
       req.user = jwt.verify(token, JWT_SECRET);

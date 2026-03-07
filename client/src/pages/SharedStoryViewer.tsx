@@ -66,6 +66,10 @@ export default function SharedStoryViewer() {
   const [sharingEnabled, setSharingEnabled] = useState(false);
   const [sharingLoading, setSharingLoading] = useState(false);
 
+  // Auth token suffix for image URLs (img tags can't send Authorization headers)
+  const authToken = localStorage.getItem('auth_token');
+  const tokenParam = authToken ? `?token=${encodeURIComponent(authToken)}` : '';
+
   useEffect(() => {
     async function fetchStory() {
       if (!shareToken) {
@@ -191,9 +195,9 @@ export default function SharedStoryViewer() {
       const entry = pageList[idx];
       const img = new Image();
       if (entry.type === 'story') {
-        img.src = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}`;
+        img.src = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}${tokenParam}`;
       } else {
-        img.src = `/api/shared/${shareToken}/cover-image/${entry.type}`;
+        img.src = `/api/shared/${shareToken}/cover-image/${entry.type}${tokenParam}`;
       }
     }
   }, [currentPage, story, shareToken, totalPages]);
@@ -324,7 +328,7 @@ export default function SharedStoryViewer() {
           {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
             <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
               <img
-                src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}`}
+                src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`}
                 alt={currentEntry.type === 'frontCover' ? story.title : currentEntry.type === 'initialPage' ? 'Dedication' : 'Back Cover'}
                 className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
                 loading="eager"
@@ -344,7 +348,7 @@ export default function SharedStoryViewer() {
                 {/* Image - 50% width */}
                 <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
                   <img
-                    src={`/api/shared/${shareToken}/image/${page.pageNumber}`}
+                    src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain"
                     loading="eager"
