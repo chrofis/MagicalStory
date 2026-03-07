@@ -303,7 +303,7 @@ export default function TrialIdeasStep({
                     onSelectIdea(index);
                   }
                 }}
-                className={`relative text-left p-5 rounded-xl border-2 transition-all min-h-[360px] flex flex-col ${
+                className={`relative text-left p-5 rounded-xl border-2 transition-all min-h-[40vh] flex flex-col ${
                   isSelected
                     ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200 shadow-lg'
                     : hasText

@@ -276,7 +276,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {getLifeChallengesByGroup('popular').map((challenge) => (
             <button
               key={challenge.id}
-              onClick={() => { handleTopicSelect(challenge.id); setCustomTopic(''); onNext(); }}
+              onClick={() => { handleTopicSelect(challenge.id); setCustomTopic(''); }}
               className={`p-2.5 rounded-lg border transition-all text-left flex items-center gap-2 ${
                 storyInput.storyTopic === challenge.id
                   ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'

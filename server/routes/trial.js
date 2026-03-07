@@ -264,8 +264,8 @@ ${langInstruction} Write EVERYTHING in that language.`;
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (200 max tokens — title + 2-sentence summary)
-    const streamStory1 = callTextModelStreaming(prompt1, 200, (delta, fullText) => {
+    // Stream Story 1 (350 max tokens — title + short summary)
+    const streamStory1 = callTextModelStreaming(prompt1, 350, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
@@ -286,8 +286,8 @@ ${langInstruction} Write EVERYTHING in that language.`;
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 (200 max tokens)
-    const streamStory2 = callTextModelStreaming(prompt2, 200, (delta, fullText) => {
+    // Stream Story 2 (350 max tokens)
+    const streamStory2 = callTextModelStreaming(prompt2, 350, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
         res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
