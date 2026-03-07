@@ -375,6 +375,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
   // Lightweight metadata for list queries (strip heavy base64 photos)
   const metadata = {
     characters: [{
+      id: charId,
       name: character.name,
       age: character.age,
       gender: character.gender,
@@ -817,13 +818,18 @@ async function triggerAvatarGenerationForUser(userId) {
 
       // Mark avatar status as 'generating' in DB so frontend knows not to trigger a duplicate
       // and can show appropriate UI (spinner with "generating" message)
+      // Also ensure character id is in metadata (trial saveCharacter didn't include it)
       const generatingStatus = JSON.stringify({ status: 'generating' });
+      const charIdJson = JSON.stringify(char.id);
       await dbQuery(
         `UPDATE characters SET
            data = jsonb_set(data, '{characters,${i},avatars}', $1::jsonb, true),
-           metadata = jsonb_set(metadata, '{characters,${i},avatars}', $1::jsonb, true)
+           metadata = jsonb_set(
+             jsonb_set(metadata, '{characters,${i},avatars}', $1::jsonb, true),
+             '{characters,${i},id}', $3::jsonb, true
+           )
          WHERE id = $2`,
-        [generatingStatus, rowId]
+        [generatingStatus, rowId, charIdJson]
       );
       log.debug(`[TRIAL] Marked ${char.name} avatars as 'generating' in DB`);
 
