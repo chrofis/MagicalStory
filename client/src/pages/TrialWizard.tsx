@@ -47,7 +47,7 @@ const STEPS: TrialStep[] = ['character', 'topic', 'ideas'];
 const stepLabels: Record<string, Record<TrialStep, string>> = {
   en: { character: 'Character', topic: 'Topic', ideas: 'Ideas' },
   de: { character: 'Figur', topic: 'Thema', ideas: 'Ideen' },
-  fr: { character: 'Personnage', topic: 'Sujet', ideas: 'Idees' },
+  fr: { character: 'Personnage', topic: 'Sujet', ideas: 'Idées' },
 };
 
 

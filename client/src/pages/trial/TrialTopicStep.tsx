@@ -74,14 +74,14 @@ const strings: Record<string, {
   },
   fr: {
     title: 'Choisis ton histoire',
-    subtitle: 'Quel type d\'aventure allons-nous creer?',
+    subtitle: 'Quel type d\'aventure allons-nous créer?',
     pickCategory: 'Choisis un type d\'histoire',
-    pickTheme: 'Choisis un theme',
+    pickTheme: 'Choisis un thème',
     pickTopic: 'Choisis un sujet',
     pickStyle: 'Choisis un style (optionnel)',
-    styleRealistic: 'Realiste',
-    orCustom: 'Ou decrivez votre propre sujet:',
-    customPlaceholder: 'ex. Apprendre a partager ses jouets avec un frere ou une soeur',
+    styleRealistic: 'Réaliste',
+    orCustom: 'Ou décrivez votre propre sujet:',
+    customPlaceholder: 'ex. Apprendre à partager ses jouets avec un frère ou une sœur',
     back: 'Retour',
     next: 'Suivant',
     change: 'Changer',
@@ -91,7 +91,7 @@ const strings: Record<string, {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }: Props) {
-  const lang = (storyInput.language === 'de' ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
+  const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
   // Custom topic input for life challenges
@@ -221,7 +221,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {getStoryTypesByGroup('popular').map((type) => (
             <button
               key={type.id}
-              onClick={() => handleThemeSelect(type.id)}
+              onClick={() => { handleThemeSelect(type.id); onNext(); }}
               className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
             >
               <div className="text-2xl mb-1">{type.emoji}</div>
@@ -276,7 +276,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {getLifeChallengesByGroup('popular').map((challenge) => (
             <button
               key={challenge.id}
-              onClick={() => { handleTopicSelect(challenge.id); setCustomTopic(''); }}
+              onClick={() => { handleTopicSelect(challenge.id); setCustomTopic(''); onNext(); }}
               className={`p-2.5 rounded-lg border transition-all text-left flex items-center gap-2 ${
                 storyInput.storyTopic === challenge.id
                   ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
@@ -398,7 +398,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {getHistoricalEventsByGroup('popular').map((event) => (
             <button
               key={event.id}
-              onClick={() => handleTopicSelect(event.id)}
+              onClick={() => { handleTopicSelect(event.id); onNext(); }}
               className="p-2.5 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left flex items-center gap-2"
             >
               <span className="text-xl">{event.emoji}</span>
