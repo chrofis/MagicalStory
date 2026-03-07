@@ -133,6 +133,19 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       }
     }
 
+    // Check which covers exist
+    const coverTypes = ['frontCover', 'initialPage', 'backCover'];
+    const covers = {};
+    for (const coverType of coverTypes) {
+      const img = await getStoryImage(story.id, coverType, null, 0);
+      if (img?.imageData) {
+        covers[coverType] = true;
+      } else {
+        // Fallback: check legacy coverImages in story data
+        covers[coverType] = !!data.coverImages?.[coverType]?.imageData;
+      }
+    }
+
     res.json({
       id: story.id,
       title: data.title,
@@ -140,8 +153,8 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       pageCount: pageCount,
       pages,
       dedication: data.dedication,
-      // Image URLs (client will fetch separately)
-      hasImages: true
+      hasImages: true,
+      covers,
     });
   } catch (err) {
     log.error('Error fetching shared story:', err);

@@ -42,7 +42,18 @@ interface SharedStoryData {
   pages: SharedStoryPage[];
   dedication?: string;
   hasImages: boolean;
+  covers?: {
+    frontCover?: boolean;
+    initialPage?: boolean;
+    backCover?: boolean;
+  };
 }
+
+type PageEntry =
+  | { type: 'frontCover' }
+  | { type: 'initialPage' }
+  | { type: 'story'; storyPageIdx: number }
+  | { type: 'backCover' };
 
 export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
@@ -83,49 +94,36 @@ export default function SharedStoryViewer() {
     fetchStory();
   }, [shareToken]);
 
-  // Page layout:
-  // 0 = Front Cover
-  // 1 = Initial Page (dedication)
-  // 2 to (pageCount+1) = Story pages
-  // pageCount+2 = Back Cover
-  const totalPages = story ? story.pages.length + 3 : 0; // frontCover + initialPage + story pages + backCover
-
-  // Get story page index from current page (returns -1 if not a story page)
-  const getStoryPageIndex = (page: number) => {
-    if (page >= 2 && page < story!.pages.length + 2) {
-      return page - 2;
+  // Build dynamic page list based on which covers exist
+  const pageList: PageEntry[] = story ? (() => {
+    const list: PageEntry[] = [];
+    const c = story.covers ?? { frontCover: true, initialPage: true, backCover: true };
+    if (c.frontCover) list.push({ type: 'frontCover' });
+    if (c.initialPage) list.push({ type: 'initialPage' });
+    for (let i = 0; i < story.pages.length; i++) {
+      list.push({ type: 'story', storyPageIdx: i });
     }
-    return -1;
-  };
+    if (c.backCover) list.push({ type: 'backCover' });
+    return list;
+  })() : [];
+
+  const totalPages = pageList.length;
+  const currentEntry = pageList[currentPage] || null;
 
   // Preload adjacent page images for faster navigation
   useEffect(() => {
-    if (!story || !shareToken) return;
+    if (!story || !shareToken || totalPages === 0) return;
 
-    // Preload cover images when near them
-    if (currentPage <= 2) {
-      ['frontCover', 'initialPage'].forEach(type => {
-        const img = new Image();
-        img.src = `/api/shared/${shareToken}/cover-image/${type}`;
-      });
-    }
-    if (currentPage >= totalPages - 3) {
+    // Preload next and previous pages
+    for (const offset of [-1, 1]) {
+      const idx = currentPage + offset;
+      if (idx < 0 || idx >= totalPages) continue;
+      const entry = pageList[idx];
       const img = new Image();
-      img.src = `/api/shared/${shareToken}/cover-image/backCover`;
-    }
-
-    // Preload adjacent story page images
-    const storyPageIdx = getStoryPageIndex(currentPage);
-    if (storyPageIdx >= 0) {
-      // Preload next story page
-      if (storyPageIdx + 1 < story.pages.length) {
-        const img = new Image();
-        img.src = `/api/shared/${shareToken}/image/${story.pages[storyPageIdx + 1].pageNumber}`;
-      }
-      // Preload previous story page
-      if (storyPageIdx > 0) {
-        const img = new Image();
-        img.src = `/api/shared/${shareToken}/image/${story.pages[storyPageIdx - 1].pageNumber}`;
+      if (entry.type === 'story') {
+        img.src = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}`;
+      } else {
+        img.src = `/api/shared/${shareToken}/cover-image/${entry.type}`;
       }
     }
   }, [currentPage, story, shareToken, totalPages]);
@@ -209,12 +207,12 @@ export default function SharedStoryViewer() {
 
         {/* Book container */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
-          {/* Front Cover (page 0) */}
-          {currentPage === 0 && (
+          {/* Cover pages (frontCover, initialPage, backCover) */}
+          {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
             <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
               <img
-                src={`/api/shared/${shareToken}/cover-image/frontCover`}
-                alt={story.title}
+                src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}`}
+                alt={currentEntry.type === 'frontCover' ? story.title : currentEntry.type === 'initialPage' ? 'Dedication' : 'Back Cover'}
                 className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
                 loading="eager"
                 onError={(e) => {
@@ -224,33 +222,17 @@ export default function SharedStoryViewer() {
             </div>
           )}
 
-          {/* Initial/Dedication Page (page 1) */}
-          {currentPage === 1 && (
-            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
-              <img
-                src={`/api/shared/${shareToken}/cover-image/initialPage`}
-                alt="Dedication"
-                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
-                loading="eager"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-
-          {/* Story Pages (pages 2 to pageCount+1) */}
-          {(() => {
-            const storyPageIdx = getStoryPageIndex(currentPage);
-            if (storyPageIdx < 0 || !story.pages[storyPageIdx]) return null;
-            const page = story.pages[storyPageIdx];
+          {/* Story Pages */}
+          {currentEntry && currentEntry.type === 'story' && (() => {
+            const page = story.pages[currentEntry.storyPageIdx];
+            if (!page) return null;
             return (
               <div className="md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
                 {/* Image - 50% width */}
                 <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}`}
-                    alt={`Page ${storyPageIdx + 1}`}
+                    alt={`Page ${currentEntry.storyPageIdx + 1}`}
                     className="w-full h-full object-contain"
                     loading="eager"
                     onError={(e) => {
@@ -267,27 +249,12 @@ export default function SharedStoryViewer() {
                     </p>
                   </div>
                   <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
-                    Page {storyPageIdx + 1} of {story.pages.length}
+                    Page {currentEntry.storyPageIdx + 1} of {story.pages.length}
                   </div>
                 </div>
               </div>
             );
           })()}
-
-          {/* Back Cover (last page) */}
-          {currentPage === totalPages - 1 && (
-            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
-              <img
-                src={`/api/shared/${shareToken}/cover-image/backCover`}
-                alt="Back Cover"
-                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
-                loading="eager"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-          )}
 
 
           {/* Page dots - inside book container */}
