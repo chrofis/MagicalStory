@@ -37,7 +37,6 @@ const strings: Record<string, {
   pickTheme: string;
   pickTopic: string;
   pickStyle: string;
-  styleRealistic: string;
   orCustom: string;
   customPlaceholder: string;
   back: string;
@@ -50,8 +49,7 @@ const strings: Record<string, {
     pickCategory: 'Pick a story type',
     pickTheme: 'Pick a theme',
     pickTopic: 'Pick a topic',
-    pickStyle: 'Pick a story style (optional)',
-    styleRealistic: 'Realistic',
+    pickStyle: 'Pick a story style',
     orCustom: 'Or describe your own topic:',
     customPlaceholder: 'e.g. Learning to share toys with a sibling',
     back: 'Back',
@@ -64,8 +62,7 @@ const strings: Record<string, {
     pickCategory: 'Wähle eine Geschichtsart',
     pickTheme: 'Wähle ein Thema',
     pickTopic: 'Wähle ein Thema',
-    pickStyle: 'Wähle einen Stil (optional)',
-    styleRealistic: 'Realistisch',
+    pickStyle: 'Wähle einen Stil',
     orCustom: 'Oder beschreibe dein eigenes Thema:',
     customPlaceholder: 'z.B. Spielzeug mit Geschwistern teilen lernen',
     back: 'Zurück',
@@ -78,8 +75,7 @@ const strings: Record<string, {
     pickCategory: 'Choisis un type d\'histoire',
     pickTheme: 'Choisis un thème',
     pickTopic: 'Choisis un sujet',
-    pickStyle: 'Choisis un style (optionnel)',
-    styleRealistic: 'Réaliste',
+    pickStyle: 'Choisis un style',
     orCustom: 'Ou décrivez votre propre sujet:',
     customPlaceholder: 'ex. Apprendre à partager ses jouets avec un frère ou une sœur',
     back: 'Retour',
@@ -104,7 +100,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
       ...storyInput,
       storyCategory: categoryId,
       storyTopic: '',
-      storyTheme: categoryId === 'adventure' || categoryId === 'historical' ? '' : 'realistic',
+      storyTheme: '',
     });
   };
 
@@ -147,7 +143,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     if (!storyInput.storyCategory) return false;
     if (storyInput.storyCategory === 'adventure') return !!storyInput.storyTheme;
     if (storyInput.storyCategory === 'historical') return !!storyInput.storyTopic;
-    if (storyInput.storyCategory === 'life-challenge') return (!!storyInput.storyTopic || !!customTopic.trim());
+    if (storyInput.storyCategory === 'life-challenge') return (!!storyInput.storyTopic || !!customTopic.trim()) && !!storyInput.storyTheme;
     return !!storyInput.storyTopic;
   })();
 
@@ -314,17 +310,6 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           <div className="mb-6">
             <h3 className="text-base font-bold text-gray-900 mb-3">{t.pickStyle}</h3>
             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-              <button
-                onClick={() => handleThemeSelect('realistic')}
-                className={`p-2.5 rounded-lg border transition-all text-center ${
-                  storyInput.storyTheme === 'realistic'
-                    ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
-                    : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
-                }`}
-              >
-                <div className="text-2xl mb-1">📖</div>
-                <div className="font-medium text-xs text-gray-700">{t.styleRealistic}</div>
-              </button>
               {popularThemes.map((theme) => (
                 <button
                   key={theme.id}
