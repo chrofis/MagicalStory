@@ -202,8 +202,12 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
+    // Try active version first, fall back to version 0 if not found
     const activeVersion = await getActiveVersion(storyId, pageNum);
-    const separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
+    let separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
+    if (!separateImage?.imageData && activeVersion !== 0) {
+      separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
+    }
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(base64, 'base64');
