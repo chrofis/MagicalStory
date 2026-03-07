@@ -145,7 +145,7 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'sharing', name: { en: 'Learning to Share', de: 'Teilen lernen', fr: 'Apprendre à partager' }, emoji: '🤝', ageGroup: 'preschool' },
   { id: 'waiting-turn', name: { en: 'Waiting Your Turn', de: 'Warten können', fr: 'Attendre son tour' }, emoji: '⏳', ageGroup: 'preschool' },
   { id: 'first-kindergarten', name: { en: 'First Day of Kindergarten', de: 'Erster Kindergartentag', fr: 'Premier jour de maternelle' }, emoji: '🎒', ageGroup: 'preschool' },
-  { id: 'making-friends', name: { en: 'Making Friends', de: 'Freunde finden', fr: 'Se faire des amis' }, emoji: '👫', ageGroup: 'preschool' },
+  { id: 'making-friends', name: { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis' }, emoji: '👫', ageGroup: 'preschool' },
   { id: 'being-brave', name: { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux' }, emoji: '💪', ageGroup: 'preschool' },
   { id: 'new-sibling', name: { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille' }, emoji: '👶', ageGroup: 'preschool' },
 
@@ -154,10 +154,10 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'homework', name: { en: 'Doing Homework', de: 'Hausaufgaben machen', fr: 'Faire ses devoirs' }, emoji: '📝', ageGroup: 'early-school' },
   { id: 'reading-alone', name: { en: 'Learning to Read', de: 'Lesen lernen', fr: 'Apprendre à lire' }, emoji: '📖', ageGroup: 'early-school' },
   { id: 'losing-game', name: { en: 'Losing a Game', de: 'Verlieren können', fr: 'Savoir perdre' }, emoji: '🎯', ageGroup: 'early-school' },
-  { id: 'being-different', name: { en: 'Being Different is OK', de: 'Anders sein ist OK', fr: 'Être différent c\'est bien' }, emoji: '🌈', ageGroup: 'early-school' },
-  { id: 'dealing-bully', name: { en: 'Dealing with Bullies', de: 'Mit Hänseleien umgehen', fr: 'Faire face aux moqueries' }, emoji: '🛡️', ageGroup: 'early-school' },
+  { id: 'being-different', name: { en: 'Being Yourself', de: 'Du selbst sein', fr: 'Être soi-même' }, emoji: '🌈', ageGroup: 'early-school' },
+  { id: 'dealing-bully', name: { en: 'Standing Up for Yourself', de: 'Für sich einstehen', fr: 'S\'affirmer face aux autres' }, emoji: '🛡️', ageGroup: 'early-school' },
   { id: 'telling-truth', name: { en: 'Telling the Truth', de: 'Die Wahrheit sagen', fr: 'Dire la vérité' }, emoji: '✅', ageGroup: 'early-school' },
-  { id: 'trying-new-things', name: { en: 'Trying New Things', de: 'Neues ausprobieren', fr: 'Essayer de nouvelles choses' }, emoji: '🌟', ageGroup: 'early-school' },
+  { id: 'trying-new-things', name: { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & Apprendre' }, emoji: '🌟', ageGroup: 'early-school' },
   { id: 'tattling-vs-telling', name: { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: 'Rapporter vs Demander de l\'aide' }, emoji: '🗣️', ageGroup: 'preschool' },
   { id: 'understanding-rules', name: { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non' }, emoji: '🚦', ageGroup: 'preschool' },
 
