@@ -50,34 +50,54 @@ function initSharingRoutes(config) {
 // ============================================
 
 /**
- * Get shared story by token (validates is_shared = true)
+ * Optional auth middleware — sets req.user if valid JWT present, otherwise continues
  */
-async function getSharedStory(shareToken) {
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (token) {
+    try {
+      req.user = jwt.verify(token, JWT_SECRET);
+    } catch {
+      // Invalid token — continue as anonymous
+    }
+  }
+  next();
+}
+
+// Apply optional auth to all shared API routes
+apiRouter.use('/shared', optionalAuth);
+
+/**
+ * Get shared story by token.
+ * Access allowed if: is_shared=true (public) OR userId matches owner (private owner view)
+ */
+async function getSharedStory(shareToken, userId = null) {
   if (!shareToken || shareToken.length !== 64) {
     return null;
   }
   const rows = await dbQuery(
-    'SELECT id, user_id, data FROM stories WHERE share_token = $1 AND is_shared = true',
-    [shareToken]
+    'SELECT id, user_id, is_shared, data FROM stories WHERE share_token = $1 AND (is_shared = true OR user_id = $2)',
+    [shareToken, userId]
   );
   if (rows.length === 0) {
     return null;
   }
-  // Parse data if it's a JSON string
   const data = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
-  return { id: rows[0].id, userId: rows[0].user_id, data };
+  return { id: rows[0].id, userId: rows[0].user_id, isShared: rows[0].is_shared, data };
 }
 
 /**
  * Get shared story ID only (fast path for image endpoints)
+ * Access allowed if: is_shared=true (public) OR userId matches owner
  */
-async function getSharedStoryId(shareToken) {
+async function getSharedStoryId(shareToken, userId = null) {
   if (!shareToken || shareToken.length !== 64) {
     return null;
   }
   const rows = await dbQuery(
-    'SELECT id FROM stories WHERE share_token = $1 AND is_shared = true',
-    [shareToken]
+    'SELECT id FROM stories WHERE share_token = $1 AND (is_shared = true OR user_id = $2)',
+    [shareToken, userId]
   );
   return rows.length > 0 ? rows[0].id : null;
 }
@@ -113,28 +133,17 @@ function getPageText(storyText, pageNumber) {
 // NOTE: Share auth endpoints (share-status, enable/disable sharing) are in stories.js
 // They are mounted at /api/stories before this router, so they handle those requests.
 
-// GET /api/shared/:shareToken - Get shared story data (public, optional auth for ownership)
+// GET /api/shared/:shareToken - Get shared story data (public or owner)
 apiRouter.get('/shared/:shareToken', async (req, res) => {
   try {
     const { shareToken } = req.params;
-    const story = await getSharedStory(shareToken);
+    const story = await getSharedStory(shareToken, req.user?.id);
 
     if (!story) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    // Optional auth: check if viewer is the story owner
-    let isOwner = false;
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, JWT_SECRET);
-        isOwner = decoded.id === story.userId;
-      } catch {
-        // Invalid token — not the owner, that's fine
-      }
-    }
+    const isOwner = !!req.user && req.user.id === story.userId;
 
     // Return only safe public data (no user info, no prompts)
     const data = story.data;
@@ -172,6 +181,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       hasImages: true,
       covers,
       isOwner,
+      isShared: story.isShared,
     });
   } catch (err) {
     log.error('Error fetching shared story:', err);
@@ -186,7 +196,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     const pageNum = parseInt(pageNumber, 10);
 
     // Fast path: get only story ID, then fetch image from separate table
-    const storyId = await getSharedStoryId(shareToken);
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
@@ -201,7 +211,7 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
     }
 
     // Fallback: fetch full story data for legacy sceneImages array
-    const story = await getSharedStory(shareToken);
+    const story = await getSharedStory(shareToken, req.user?.id);
     if (!story) {
       return res.status(404).json({ error: 'Image not found' });
     }
@@ -228,7 +238,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     const { shareToken, coverType } = req.params;
 
     // Fast path: get only story ID, then fetch cover from separate table
-    const storyId = await getSharedStoryId(shareToken);
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
@@ -243,7 +253,7 @@ apiRouter.get('/shared/:shareToken/cover-image/:coverType', async (req, res) => 
     }
 
     // Fallback: fetch full story data for legacy coverImages
-    const story = await getSharedStory(shareToken);
+    const story = await getSharedStory(shareToken, req.user?.id);
     if (!story) {
       return res.status(404).json({ error: 'Cover not found' });
     }
@@ -275,7 +285,7 @@ async function ogImageHandler(req, res) {
     const { shareToken } = req.params;
 
     // Fast path: get only story ID, then fetch cover from separate table
-    const storyId = await getSharedStoryId(shareToken);
+    const storyId = await getSharedStoryId(shareToken, req.user?.id);
     if (!storyId) {
       log.warn(`[OG-IMAGE] Story not found for shareToken: ${shareToken.substring(0, 8)}...`);
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
@@ -293,7 +303,7 @@ async function ogImageHandler(req, res) {
 
     // Fallback: fetch full story data for legacy coverImages
     if (!coverImage) {
-      const story = await getSharedStory(shareToken);
+      const story = await getSharedStory(shareToken, req.user?.id);
       if (story?.data.coverImages?.frontCover) {
         const fc = story.data.coverImages.frontCover;
         log.debug(`[OG-IMAGE] Legacy frontCover type: ${typeof fc}, keys: ${typeof fc === 'object' ? Object.keys(fc).join(',') : 'N/A'}`);
@@ -358,7 +368,7 @@ htmlRouter.get('/s/:shareToken', async (req, res) => {
   const { shareToken } = req.params;
 
   try {
-    const story = await getSharedStory(shareToken);
+    const story = await getSharedStory(shareToken, req.user?.id);
 
     if (story) {
       // Strip markdown bold/heading markers, then HTML-escape for safe meta tags
@@ -417,7 +427,7 @@ htmlRouter.get('/shared/:shareToken', async (req, res) => {
   log.debug(`[SHARED] Request for /shared/${shareToken.substring(0, 8)}...`);
 
   try {
-    const story = await getSharedStory(shareToken);
+    const story = await getSharedStory(shareToken, req.user?.id);
     log.debug(`[SHARED] Story found: ${!!story}, hasDistFolder: ${hasDistFolder}`);
 
     if (story && hasDistFolder) {
