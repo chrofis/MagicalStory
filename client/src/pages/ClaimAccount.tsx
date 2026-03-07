@@ -225,7 +225,7 @@ export default function ClaimAccount() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-indigo-50">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-indigo-50">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center">
@@ -240,7 +240,7 @@ export default function ClaimAccount() {
       </header>
 
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-4 mt-20">
+      <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8">
 
           {/* Loading */}
