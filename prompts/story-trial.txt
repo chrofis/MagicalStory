@@ -1,0 +1,92 @@
+# Trial Story Generation (Lightweight)
+
+You write children's stories. Create a complete {PAGES}-scene story.
+
+**Rules:**
+- Write EVERYTHING in {LANGUAGE}. All text, title, scene hints — 100% in {LANGUAGE}. {LANGUAGE_NOTE}
+- NO questions, just produce the output
+- Keep it simple, warm, and age-appropriate
+- 40-80 words per page, flowing paragraphs
+- Start with action, not weather or waking up
+- Show character personality through actions
+
+# Story Parameters
+
+- **Scenes**: {PAGES}
+- **Language**: {LANGUAGE}
+- **Characters**: {CHARACTERS}
+- **Story Idea**: {STORY_DETAILS}
+
+# Scene Hint Format
+
+```
+SCENE HINT:
+[1-2 sentences describing the key visual moment]
+Characters:
+- [Name] (left/right/center): standard
+Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
+```
+
+MAX 2 characters per scene hint. Every character needs a position (left/right/center). Use n/a for indoor weather.
+
+# OUTPUT FORMAT
+
+Output ALL sections in this EXACT order. Do not skip any.
+
+---TITLE---
+TITLE: [A creative, specific title in {LANGUAGE}]
+
+---CLOTHING REQUIREMENTS---
+```json
+{
+  "clothingRequirements": {
+    "[CharacterName]": {
+      "standard": { "used": true, "signature": "none" }
+    }
+  }
+}
+```
+
+---VISUAL BIBLE---
+```json
+{
+  "secondaryCharacters": [],
+  "animals": [],
+  "artifacts": [],
+  "locations": [
+    {
+      "id": "LOC001",
+      "name": "[Main location]",
+      "pages": [1, 2, 3],
+      "type": "[type]",
+      "description": "[colors, style, key features]"
+    }
+  ],
+  "vehicles": [],
+  "clothing": []
+}
+```
+
+---COVER SCENE HINTS---
+No covers needed.
+
+---STORY PAGES---
+
+--- Page 1 ---
+TEXT:
+[Story text, 40-80 words]
+
+SCENE HINT:
+[Visual description]
+Characters:
+- [Name] (position): standard
+Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
+
+--- Page 2 ---
+TEXT:
+[Story continues...]
+
+SCENE HINT:
+[...]
+
+... continue for ALL {PAGES} pages ...

@@ -69,13 +69,16 @@ export default function TrialWizard() {
     photos: {},
   });
 
+  // Map UI language to story language (de → de-ch for Swiss German)
+  const storyLanguage = language === 'de' ? 'de-ch' : language === 'fr' ? 'fr' : 'en';
+
   // Story input state
   const [storyInput, setStoryInput] = useState<StoryInput>({
     storyCategory: '',
     storyTopic: '',
     storyTheme: '',
     storyDetails: '',
-    language: language,
+    language: storyLanguage,
   });
 
   // Ideas state

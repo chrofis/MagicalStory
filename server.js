@@ -215,6 +215,7 @@ const {
   buildSceneDescriptionPrompt,
   buildImagePrompt,
   buildUnifiedStoryPrompt,
+  buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
   getLandmarkPhotosForPage,
@@ -2259,8 +2260,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       [5, 'Starting story generation...', jobId]
     );
 
-    const unifiedPrompt = buildUnifiedStoryPrompt(inputData, sceneCount);
-    log.debug(`📖 [UNIFIED] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages`);
+    const unifiedPrompt = inputData.trialMode
+      ? buildTrialStoryPrompt(inputData, sceneCount)
+      : buildUnifiedStoryPrompt(inputData, sceneCount);
+    log.debug(`📖 [UNIFIED] Prompt length: ${unifiedPrompt.length} chars, requesting ${sceneCount} pages${inputData.trialMode ? ' (trial mode)' : ''}`);
 
     // Art style for avatar generation
     const artStyle = inputData.artStyle || 'pixar';

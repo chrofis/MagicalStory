@@ -3310,6 +3310,41 @@ Story Details: ${inputData.storyDetails || 'None'}
 Output: Title, clothing requirements, character arcs, plot structure, visual bible, cover scenes, and all ${pageCount} pages with text and scene hints.`;
 }
 
+/**
+ * Build a lightweight story prompt for trial stories.
+ * Much simpler than the full unified prompt — no critical analysis, no character arcs,
+ * no plot structure planning. Just generates the story directly.
+ */
+function buildTrialStoryPrompt(inputData, sceneCount = null) {
+  const pageCount = sceneCount || inputData.pages || 5;
+  const language = inputData.language || 'en';
+
+  const characterDesc = (inputData.characters || []).map(char => {
+    const parts = [char.name];
+    if (char.age) parts.push(`age ${char.age}`);
+    if (char.gender) parts.push(char.gender);
+    if (char.traits?.length) parts.push(`traits: ${char.traits.join(', ')}`);
+    return parts.join(', ');
+  }).join('\n');
+
+  if (PROMPT_TEMPLATES.storyTrial) {
+    return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
+      LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
+      PAGES: pageCount,
+      LANGUAGE: getLanguageNameEnglish(language),
+      LANGUAGE_NOTE: getLanguageNote(language),
+      CHARACTERS: characterDesc || 'A child',
+      STORY_DETAILS: inputData.storyDetails || inputData.storyTheme || 'A fun adventure',
+    });
+  }
+
+  // Fallback
+  return `Create a ${pageCount}-page children's story in ${getLanguageNameEnglish(language)}.
+Character: ${characterDesc}
+Story: ${inputData.storyDetails || 'A fun adventure'}
+Output: Title, then each page with story text and a scene hint for illustration.`;
+}
+
 // ============================================================================
 // LANDMARK PHOTO HELPERS
 // ============================================================================
@@ -3652,6 +3687,7 @@ module.exports = {
   buildSceneIterationPrompt: buildSceneDescriptionPrompt,  // Alias: iteration = full description prompt
   buildImagePrompt,
   buildUnifiedStoryPrompt,
+  buildTrialStoryPrompt,
   buildPreviousScenesContext,
   buildAvailableAvatarsForPrompt,
 

@@ -61,6 +61,7 @@ async function loadPromptTemplates() {
     // PROMPT_TEMPLATES.sceneExpansionFr = await fs.readFile(path.join(promptsDir, 'scene-expansion-fr.txt'), 'utf-8');
     // Unified story generation (single prompt for complete story)
     PROMPT_TEMPLATES.storyUnified = await fs.readFile(path.join(promptsDir, 'story-unified.txt'), 'utf-8');
+    PROMPT_TEMPLATES.storyTrial = await fs.readFile(path.join(promptsDir, 'story-trial.txt'), 'utf-8');
     // Final consistency check prompts
     PROMPT_TEMPLATES.finalConsistencyCheck = await fs.readFile(path.join(promptsDir, 'final-consistency-check.txt'), 'utf-8');
     PROMPT_TEMPLATES.textConsistencyCheck = await fs.readFile(path.join(promptsDir, 'text-consistency-check.txt'), 'utf-8');
