@@ -18,7 +18,7 @@ const sharp = require('sharp');
 
 const jwt = require('jsonwebtoken');
 
-const { dbQuery, getStoryImage } = require('../services/database');
+const { dbQuery, getStoryImage, getActiveVersion } = require('../services/database');
 const { log } = require('../utils/logger');
 const { JWT_SECRET } = require('../middleware/auth');
 
@@ -202,7 +202,8 @@ apiRouter.get('/shared/:shareToken/image/:pageNumber', async (req, res) => {
       return res.status(404).json({ error: 'Story not found or sharing disabled' });
     }
 
-    const separateImage = await getStoryImage(storyId, 'scene', pageNum, 0);
+    const activeVersion = await getActiveVersion(storyId, pageNum);
+    const separateImage = await getStoryImage(storyId, 'scene', pageNum, activeVersion);
     if (separateImage?.imageData) {
       const base64 = separateImage.imageData.replace(/^data:image\/\w+;base64,/, '');
       const imageBuffer = Buffer.from(base64, 'base64');
