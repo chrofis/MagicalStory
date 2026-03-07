@@ -10,7 +10,7 @@ This is a SHORT story — {PAGES} scenes is all you have. Keep it focused:
 - Write EVERYTHING in {LANGUAGE}. All text, title, scene hints — 100% in {LANGUAGE}. {LANGUAGE_NOTE}
 - NO questions, just produce the output
 - Keep it simple, warm, and age-appropriate
-- 40-80 words per page, flowing paragraphs
+- 150-200 words per page, flowing paragraphs
 - Start with action, not weather or waking up
 - Show character personality through actions
 
@@ -82,7 +82,7 @@ No covers needed.
 
 --- Page 1 ---
 TEXT:
-[Story text, 40-80 words]
+[Story text, 150-200 words]
 
 SCENE HINT:
 [Visual description]

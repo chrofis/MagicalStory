@@ -245,7 +245,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Minimal prompt — just title + short summary
     const buildTrialPrompt = (variant) => `Generate a children's story idea for a SHORT 5-scene story. Character: ${charDesc}. ${categoryContext} ${variant}
 
-This is a short story (5 scenes, 40-80 words each) — keep the plot simple: one clear conflict, one resolution. No subplots.
+This is a short story (5 scenes, 150-200 words each) — keep the plot simple: one clear conflict, one resolution. No subplots.
 
 Plain text only, no markdown. Line 1: title. Lines 2-3: 2-sentence plot summary.
 ${langInstruction} Write EVERYTHING in that language.`;
