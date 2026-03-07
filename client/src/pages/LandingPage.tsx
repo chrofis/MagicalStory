@@ -264,7 +264,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div ref={containerRef} className="h-screen overflow-y-auto snap-y snap-mandatory bg-gray-50">
+    <div ref={containerRef} className="h-screen overflow-y-auto snap-y snap-proximity bg-gray-50">
       {/* Scroll Indicator */}
       <ScrollIndicator
         activeIndex={activeSection}
