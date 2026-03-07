@@ -275,9 +275,9 @@ export const educationalGroups: EducationalGroup[] = [
 // =============================================================================
 // Popular historical event IDs (shown in expanded "Popular" section)
 export const popularHistoricalEventIds = [
-  'moon-landing', 'wright-brothers', 'lindbergh-flight', 'galapagos-darwin',
-  'columbus-voyage', 'everest-summit', 'wilhelm-tell', 'gotthard-tunnel',
-  'einstein-relativity', 'berlin-wall-fall', 'mandela-freedom'
+  'wilhelm-tell', 'printing-press', 'columbus-voyage', 'galapagos-darwin',
+  'gotthard-tunnel', 'wright-brothers', 'einstein-relativity', 'lindbergh-flight',
+  'everest-summit', 'moon-landing', 'berlin-wall-fall', 'mandela-freedom'
 ];
 
 export const historicalEventGroups: HistoricalEventGroup[] = [
@@ -310,11 +310,11 @@ export const historicalEvents: HistoricalEvent[] = [
   { id: 'swiss-womens-vote', name: { en: 'Swiss Women Win the Vote', de: 'Schweizer Frauenstimmrecht', fr: 'Droit de vote des femmes suisses' }, shortName: { en: 'Women\'s Vote', de: 'Frauenstimmrecht', fr: 'Vote des femmes' }, emoji: '🗳️', year: 1971, category: 'swiss' },
 
   // Exploration & Discovery
-  { id: 'moon-landing', name: { en: 'First Moon Landing', de: 'Erste Mondlandung', fr: 'Premier pas sur la Lune' }, shortName: { en: 'Moon Landing', de: 'Mondlandung', fr: 'Alunissage' }, emoji: '🌙', year: 1969, category: 'exploration', mainPerson: 'Neil Armstrong' },
-  { id: 'columbus-voyage', name: { en: 'Columbus Reaches the Americas', de: 'Kolumbus erreicht Amerika', fr: 'Colomb atteint les Amériques' }, shortName: { en: 'Discovery of America', de: 'Entdeckung Amerikas', fr: 'Découverte de l\'Amérique' }, emoji: '⛵', year: 1492, category: 'exploration', mainPerson: 'Christopher Columbus' },
-  { id: 'wright-brothers', name: { en: 'First Powered Flight', de: 'Erster Motorflug', fr: 'Premier vol motorisé' }, shortName: { en: 'First Flight', de: 'Erster Flug', fr: 'Premier vol' }, emoji: '✈️', year: 1903, category: 'exploration', mainPerson: 'Wright Brothers' },
-  { id: 'lindbergh-flight', name: { en: 'First Solo Atlantic Crossing', de: 'Erster Atlantik-Soloflug', fr: 'Première traversée solitaire' }, shortName: { en: 'Atlantic Flight', de: 'Atlantikflug', fr: 'Vol Atlantique' }, emoji: '🛩️', year: 1927, category: 'exploration', mainPerson: 'Charles Lindbergh' },
-  { id: 'everest-summit', name: { en: 'First Everest Summit', de: 'Erste Everest-Besteigung', fr: 'Premier sommet de l\'Everest' }, shortName: { en: 'Climbing Everest', de: 'Everest-Besteigung', fr: 'Ascension Everest' }, emoji: '🏔️', year: 1953, category: 'exploration', mainPerson: 'Edmund Hillary & Tenzing Norgay' },
+  { id: 'moon-landing', name: { en: 'Neil Armstrong Lands on the Moon', de: 'Neil Armstrong landet auf dem Mond', fr: 'Neil Armstrong marche sur la Lune' }, shortName: { en: 'Moon Landing', de: 'Mondlandung', fr: 'Alunissage' }, emoji: '🌙', year: 1969, category: 'exploration', mainPerson: 'Neil Armstrong' },
+  { id: 'columbus-voyage', name: { en: 'Columbus Reaches the Americas', de: 'Kolumbus erreicht Amerika', fr: 'Colomb atteint les Amériques' }, shortName: { en: 'Columbus', de: 'Kolumbus', fr: 'Colomb' }, emoji: '⛵', year: 1492, category: 'exploration', mainPerson: 'Christopher Columbus' },
+  { id: 'wright-brothers', name: { en: 'Wright Brothers Invent Powered Flight', de: 'Gebrüder Wright erfinden den Motorflug', fr: 'Les frères Wright inventent le vol motorisé' }, shortName: { en: 'First Flight', de: 'Erster Flug', fr: 'Premier vol' }, emoji: '✈️', year: 1903, category: 'exploration', mainPerson: 'Wright Brothers' },
+  { id: 'lindbergh-flight', name: { en: 'Lindbergh Crosses the Atlantic Solo', de: 'Lindbergh überquert den Atlantik allein', fr: 'Lindbergh traverse l\'Atlantique en solo' }, shortName: { en: 'Atlantic Flight', de: 'Atlantikflug', fr: 'Vol Atlantique' }, emoji: '🛩️', year: 1927, category: 'exploration', mainPerson: 'Charles Lindbergh' },
+  { id: 'everest-summit', name: { en: 'Hillary & Tenzing Summit Everest', de: 'Hillary & Tenzing besteigen den Everest', fr: 'Hillary & Tenzing au sommet de l\'Everest' }, shortName: { en: 'Climbing Everest', de: 'Everest-Besteigung', fr: 'Ascension Everest' }, emoji: '🏔️', year: 1953, category: 'exploration', mainPerson: 'Edmund Hillary & Tenzing Norgay' },
   { id: 'south-pole', name: { en: 'First to the South Pole', de: 'Erster am Südpol', fr: 'Premier au Pôle Sud' }, shortName: { en: 'South Pole', de: 'Südpol', fr: 'Pôle Sud' }, emoji: '❄️', year: 1911, category: 'exploration', mainPerson: 'Roald Amundsen' },
   { id: 'magellan-circumnavigation', name: { en: 'First Circumnavigation', de: 'Erste Weltumsegelung', fr: 'Premier tour du monde' }, shortName: { en: 'Around the World', de: 'Weltumsegelung', fr: 'Tour du monde' }, emoji: '🌍', year: 1522, category: 'exploration', mainPerson: 'Ferdinand Magellan' },
   { id: 'mariana-trench', name: { en: 'Deepest Ocean Dive', de: 'Tiefster Meerstauchgang', fr: 'Plongée la plus profonde' }, shortName: { en: 'Deep Sea Dive', de: 'Tiefseetauchen', fr: 'Plongée profonde' }, emoji: '🌊', year: 1960, category: 'exploration', mainPerson: 'Jacques Piccard' },
@@ -325,8 +325,8 @@ export const historicalEvents: HistoricalEvent[] = [
   { id: 'vaccine-discovery', name: { en: 'First Vaccine', de: 'Erste Impfung', fr: 'Premier vaccin' }, shortName: { en: 'First Vaccine', de: 'Erste Impfung', fr: 'Premier vaccin' }, emoji: '💉', year: 1796, category: 'science', mainPerson: 'Edward Jenner' },
   { id: 'dna-discovery', name: { en: 'DNA Structure Discovered', de: 'DNA-Struktur entdeckt', fr: 'Structure ADN découverte' }, shortName: { en: 'DNA Discovery', de: 'DNA-Entdeckung', fr: 'Découverte ADN' }, emoji: '🧬', year: 1953, category: 'science', mainPerson: 'Watson & Crick' },
   { id: 'dinosaur-discovery', name: { en: 'First Dinosaur Named', de: 'Erster Dinosaurier benannt', fr: 'Premier dinosaure nommé' }, shortName: { en: 'Dinosaur Discovery', de: 'Dinosaurier-Entdeckung', fr: 'Découverte dinosaure' }, emoji: '🦕', year: 1824, category: 'science', mainPerson: 'William Buckland' },
-  { id: 'einstein-relativity', name: { en: 'Einstein\'s Relativity', de: 'Einsteins Relativitätstheorie', fr: 'Relativité d\'Einstein' }, shortName: { en: 'Einstein\'s Theory', de: 'Einsteins Theorie', fr: 'Théorie d\'Einstein' }, emoji: '🧠', year: 1905, category: 'science', mainPerson: 'Albert Einstein' },
-  { id: 'galapagos-darwin', name: { en: 'Darwin Visits Galápagos', de: 'Darwin auf Galápagos', fr: 'Darwin aux Galápagos' }, shortName: { en: 'Darwin\'s Voyage', de: 'Darwins Reise', fr: 'Voyage de Darwin' }, emoji: '🐢', year: 1835, category: 'science', mainPerson: 'Charles Darwin' },
+  { id: 'einstein-relativity', name: { en: 'Einstein Discovers Relativity', de: 'Einstein entdeckt die Relativität', fr: 'Einstein découvre la relativité' }, shortName: { en: 'Einstein\'s Theory', de: 'Einsteins Theorie', fr: 'Théorie d\'Einstein' }, emoji: '🧠', year: 1905, category: 'science', mainPerson: 'Albert Einstein' },
+  { id: 'galapagos-darwin', name: { en: 'Darwin Visits the Galápagos', de: 'Darwin besucht die Galápagos', fr: 'Darwin visite les Galápagos' }, shortName: { en: 'Darwin\'s Voyage', de: 'Darwins Reise', fr: 'Voyage de Darwin' }, emoji: '🐢', year: 1835, category: 'science', mainPerson: 'Charles Darwin' },
   { id: 'first-heart-transplant', name: { en: 'First Heart Transplant', de: 'Erste Herztransplantation', fr: 'Première greffe cardiaque' }, shortName: { en: 'Heart Transplant', de: 'Herztransplantation', fr: 'Greffe cardiaque' }, emoji: '❤️', year: 1967, category: 'science', mainPerson: 'Christiaan Barnard' },
   { id: 'human-genome', name: { en: 'Human Genome Decoded', de: 'Menschliches Genom entschlüsselt', fr: 'Génome humain décodé' }, shortName: { en: 'Genome Project', de: 'Genom-Projekt', fr: 'Projet Génome' }, emoji: '🧪', year: 2003, category: 'science' },
   { id: 'hubble-launch', name: { en: 'Hubble Telescope Launch', de: 'Hubble-Teleskop Start', fr: 'Lancement télescope Hubble' }, shortName: { en: 'Hubble Telescope', de: 'Hubble-Teleskop', fr: 'Télescope Hubble' }, emoji: '🔭', year: 1990, category: 'science' },
@@ -334,7 +334,7 @@ export const historicalEvents: HistoricalEvent[] = [
   // Inventions
   { id: 'telephone-invention', name: { en: 'First Telephone Call', de: 'Erster Telefonanruf', fr: 'Premier appel téléphonique' }, shortName: { en: 'Telephone', de: 'Telefon', fr: 'Téléphone' }, emoji: '📞', year: 1876, category: 'invention', mainPerson: 'Alexander Graham Bell' },
   { id: 'light-bulb', name: { en: 'Edison\'s Light Bulb', de: 'Edisons Glühbirne', fr: 'Ampoule d\'Edison' }, shortName: { en: 'Light Bulb', de: 'Glühbirne', fr: 'Ampoule' }, emoji: '💡', year: 1879, category: 'invention', mainPerson: 'Thomas Edison' },
-  { id: 'printing-press', name: { en: 'Gutenberg\'s Printing Press', de: 'Gutenbergs Buchdruck', fr: 'Presse de Gutenberg' }, shortName: { en: 'Printing Press', de: 'Buchdruck', fr: 'Imprimerie' }, emoji: '📖', year: 1440, category: 'invention', mainPerson: 'Johannes Gutenberg' },
+  { id: 'printing-press', name: { en: 'Gutenberg Invents the Printing Press', de: 'Gutenberg erfindet den Buchdruck', fr: 'Gutenberg invente l\'imprimerie' }, shortName: { en: 'Printing Press', de: 'Buchdruck', fr: 'Imprimerie' }, emoji: '📖', year: 1440, category: 'invention', mainPerson: 'Johannes Gutenberg' },
   { id: 'internet-creation', name: { en: 'Birth of the World Wide Web', de: 'Geburt des World Wide Web', fr: 'Naissance du Web' }, shortName: { en: 'The Web', de: 'Das Internet', fr: 'Le Web' }, emoji: '🌐', year: 1991, category: 'invention', mainPerson: 'Tim Berners-Lee' },
 
   // Human Rights & Freedom
@@ -342,7 +342,7 @@ export const historicalEvents: HistoricalEvent[] = [
   { id: 'womens-suffrage', name: { en: 'Women Win the Vote', de: 'Frauenwahlrecht', fr: 'Droit de vote des femmes' }, shortName: { en: 'Women\'s Vote', de: 'Frauenwahlrecht', fr: 'Vote des femmes' }, emoji: '🗳️', year: 1920, category: 'rights' },
   { id: 'rosa-parks', name: { en: 'Rosa Parks & Bus Boycott', de: 'Rosa Parks & Busboykott', fr: 'Rosa Parks & Boycott des bus' }, shortName: { en: 'Rosa Parks', de: 'Rosa Parks', fr: 'Rosa Parks' }, emoji: '🚌', year: 1955, category: 'rights', mainPerson: 'Rosa Parks' },
   { id: 'berlin-wall-fall', name: { en: 'Fall of the Berlin Wall', de: 'Fall der Berliner Mauer', fr: 'Chute du mur de Berlin' }, shortName: { en: 'Berlin Wall Fall', de: 'Fall der Berliner Mauer', fr: 'Chute du Mur de Berlin' }, emoji: '🧱', year: 1989, category: 'rights' },
-  { id: 'mandela-freedom', name: { en: 'Mandela Released', de: 'Mandela befreit', fr: 'Mandela libéré' }, shortName: { en: 'Mandela Free', de: 'Mandela frei', fr: 'Mandela libre' }, emoji: '✊', year: 1990, category: 'rights', mainPerson: 'Nelson Mandela' },
+  { id: 'mandela-freedom', name: { en: 'Mandela Wins Freedom', de: 'Mandela erringt die Freiheit', fr: 'Mandela gagne sa liberté' }, shortName: { en: 'Mandela Free', de: 'Mandela frei', fr: 'Mandela libre' }, emoji: '✊', year: 1990, category: 'rights', mainPerson: 'Nelson Mandela' },
 
   // Great Constructions
   { id: 'pyramids', name: { en: 'Building the Great Pyramids', de: 'Bau der Pyramiden', fr: 'Construction des Pyramides' }, shortName: { en: 'The Pyramids', de: 'Die Pyramiden', fr: 'Les Pyramides' }, emoji: '🔺', year: '-2560', category: 'construction' },

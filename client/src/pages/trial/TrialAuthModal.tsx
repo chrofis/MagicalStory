@@ -248,8 +248,8 @@ export default function TrialAuthModal({ characterData, storyInput, onClose }: P
               <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
               <ul className="text-xs text-gray-600 space-y-1">
                 {t.upsellFeatures.map((f, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-indigo-500 mt-0.5">+</span> {f}
+                  <li key={i} className="flex items-center gap-1.5">
+                    <span className="text-indigo-500 font-bold">+</span> {f}
                   </li>
                 ))}
               </ul>
@@ -272,8 +272,8 @@ export default function TrialAuthModal({ characterData, storyInput, onClose }: P
               <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
               <ul className="text-xs text-gray-600 space-y-1">
                 {t.upsellFeatures.map((f, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="text-indigo-500 mt-0.5">+</span> {f}
+                  <li key={i} className="flex items-center gap-1.5">
+                    <span className="text-indigo-500 font-bold">+</span> {f}
                   </li>
                 ))}
               </ul>
