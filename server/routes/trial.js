@@ -266,8 +266,8 @@ ${langInstruction} Write EVERYTHING in that language.`;
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (500 max tokens — title + 100-200 word summary)
-    const streamStory1 = callTextModelStreaming(prompt1, 500, (delta, fullText) => {
+    // Stream Story 1 (800 max tokens — title + 100-200 word summary)
+    const streamStory1 = callTextModelStreaming(prompt1, 800, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
@@ -288,8 +288,8 @@ ${langInstruction} Write EVERYTHING in that language.`;
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 (500 max tokens — title + 100-200 word summary)
-    const streamStory2 = callTextModelStreaming(prompt2, 500, (delta, fullText) => {
+    // Stream Story 2 (800 max tokens — title + 100-200 word summary)
+    const streamStory2 = callTextModelStreaming(prompt2, 800, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
         res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
@@ -344,12 +344,20 @@ async function saveTrialCharacter(pool, userId, characterData) {
 
   // Build the character object matching the format used by characters.js
   const charId = Date.now();
+
+  // Convert flat traits array to structured format expected by the wizard
+  // Trial sends ['brave', 'curious'], wizard expects { strengths: [...], flaws: [], challenges: [] }
+  const rawTraits = characterData.traits || [];
+  const structuredTraits = Array.isArray(rawTraits)
+    ? { strengths: rawTraits, flaws: [], challenges: [] }
+    : rawTraits;
+
   const character = {
     id: charId,
     name: characterData.name || 'Child',
     age: characterData.age || '',
     gender: characterData.gender || '',
-    traits: characterData.traits || [],
+    traits: structuredTraits,
     role: 'main',
     isMainCharacter: true,
     photos: characterData.photos || {},
@@ -425,7 +433,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     pages,
     language: storyInput.language || 'English',
     languageLevel: 'standard',
-    artStyle: 'anime',
+    artStyle: 'watercolor',
     storyCategory: storyInput.storyCategory || '',
     storyTopic: storyInput.storyTopic || '',
     storyTheme: storyInput.storyTheme || '',
@@ -782,14 +790,21 @@ async function triggerAvatarGenerationForUser(userId) {
       return;
     }
 
+    const rowId = rows[0].id;
     const charData = rows[0].data || {};
     const characters = charData.characters || [];
 
-    for (const char of characters) {
-      // Skip characters that already have avatars
+    for (let i = 0; i < characters.length; i++) {
+      const char = characters[i];
+
+      // Skip characters that already have avatars or are already generating
       const avatars = char.avatars;
       if (avatars?.standard || avatars?.winter || avatars?.summer || avatars?.hasFullAvatars) {
         log.debug(`[TRIAL] Character ${char.name} already has avatars - skipping`);
+        continue;
+      }
+      if (avatars?.status === 'generating') {
+        log.debug(`[TRIAL] Character ${char.name} already generating - skipping`);
         continue;
       }
 
@@ -799,6 +814,18 @@ async function triggerAvatarGenerationForUser(userId) {
         log.debug(`[TRIAL] Character ${char.name} has no photo - skipping avatar generation`);
         continue;
       }
+
+      // Mark avatar status as 'generating' in DB so frontend knows not to trigger a duplicate
+      // and can show appropriate UI (spinner with "generating" message)
+      const generatingStatus = JSON.stringify({ status: 'generating' });
+      await dbQuery(
+        `UPDATE characters SET
+           data = jsonb_set(data, '{characters,${i},avatars}', $1::jsonb, true),
+           metadata = jsonb_set(metadata, '{characters,${i},avatars}', $1::jsonb, true)
+         WHERE id = $2`,
+        [generatingStatus, rowId]
+      );
+      log.debug(`[TRIAL] Marked ${char.name} avatars as 'generating' in DB`);
 
       // Create a background avatar job
       const jobId = `avatar_claim_${crypto.randomBytes(8).toString('hex')}`;
@@ -825,12 +852,25 @@ async function triggerAvatarGenerationForUser(userId) {
       const user = { id: userId };
 
       log.info(`[TRIAL] Triggering background avatar generation for ${char.name} (job: ${jobId})`);
-      processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKey).catch(err => {
+      processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKey).catch(async (err) => {
         log.error(`[TRIAL] Avatar generation failed for ${char.name}: ${err.message}`);
         const job = avatarJobs.get(jobId);
         if (job) {
           job.status = 'failed';
           job.error = err.message;
+        }
+        // Mark as failed in DB so frontend can retry
+        try {
+          const failedStatus = JSON.stringify({ status: 'failed' });
+          await dbQuery(
+            `UPDATE characters SET
+               data = jsonb_set(data, '{characters,${i},avatars}', $1::jsonb, true),
+               metadata = jsonb_set(metadata, '{characters,${i},avatars}', $1::jsonb, true)
+             WHERE id = $2`,
+            [failedStatus, rowId]
+          );
+        } catch (dbErr) {
+          log.error(`[TRIAL] Failed to mark avatar status as failed: ${dbErr.message}`);
         }
       });
     }

@@ -1266,6 +1266,47 @@ export default function StoryWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
 
+  // Poll for avatar completion when any character has status 'generating'
+  // This handles background avatar generation triggered by account claim
+  useEffect(() => {
+    const hasGenerating = characters.some(c => c.avatars?.status === 'generating');
+    if (!hasGenerating || !isAuthenticated) return;
+
+    const POLL_INTERVAL = 5000; // 5 seconds
+    const MAX_POLL_TIME = 120000; // 2 minutes timeout
+    const startTime = Date.now();
+
+    const interval = setInterval(async () => {
+      // Timeout: stop polling after 2 minutes
+      if (Date.now() - startTime > MAX_POLL_TIME) {
+        log.warn('Avatar generation polling timed out after 2 minutes');
+        clearInterval(interval);
+        // Mark timed-out characters as failed locally
+        setCharacters(prev => prev.map(c =>
+          c.avatars?.status === 'generating'
+            ? { ...c, avatars: { ...c.avatars, status: 'failed' as const } }
+            : c
+        ));
+        return;
+      }
+
+      try {
+        const data = await characterService.getCharacterData(false);
+        const stillGenerating = data.characters.some((c: Character) => c.avatars?.status === 'generating');
+        // Update characters with fresh data (preserves any local edits to currentCharacter)
+        setCharacters(data.characters);
+        if (!stillGenerating) {
+          log.info('Avatar generation completed - stopping poll');
+          clearInterval(interval);
+        }
+      } catch (err) {
+        log.warn('Failed to poll character data:', err);
+      }
+    }, POLL_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [characters.map(c => c.avatars?.status).join(','), isAuthenticated]);
+
   // Auto-fetch dev metadata when developer mode is toggled ON while viewing an existing story
   useEffect(() => {
     // Only fetch if:
