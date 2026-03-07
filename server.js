@@ -3384,61 +3384,84 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       // Phases 5b-5g: Unified repair pipeline
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
-      log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
+      const skipQualityEval = inputData.skipQualityEval === true;
 
-      const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
-        characters: inputData.characters,
-        modelOverrides,
-        usageTracker: (provider, usage, funcName, modelId) => addUsage(provider, usage, funcName, modelId),
-        visualBible,
-        artStyle: inputData.artStyle,
-        jobId,
-        dbPool
-      }, {
-        maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
-        evalConcurrency: 10,
-        qualityModelOverride: modelOverrides.qualityModel,
-        useIteratePage: false  // Fresh generation by default during story creation
-      });
+      if (skipQualityEval) {
+        // Trial/lightweight mode: skip evaluation and repair entirely
+        log.info(`⏭️ [UNIFIED] Skipping quality evaluation and repair pipeline (skipQualityEval=true)`);
+        allImages = rawImages.map(img => ({
+          pageNumber: img.pageNumber,
+          text: img.text,
+          description: img.sceneDescription,
+          outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          imageData: img.imageData,
+          generatedAt: new Date().toISOString(),
+          prompt: img.prompt,
+          sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+          sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
+          referencePhotos: img.characterPhotos,
+          landmarkPhotos: img.landmarkPhotos,
+          sceneCharacters: img.sceneCharacters,
+          sceneCharacterClothing: img.perCharClothing,
+          imageVersions: [],
+        }));
+      } else {
+        log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
 
-      // Hoist pipeline data for use outside this block (finalChecksReport)
-      pipelineEntityReport = pipelineResult[0]?.entityReport || null;
-      pipelineCharFixDetails = charFixDetails;
+        const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
+          characters: inputData.characters,
+          modelOverrides,
+          usageTracker: (provider, usage, funcName, modelId) => addUsage(provider, usage, funcName, modelId),
+          visualBible,
+          artStyle: inputData.artStyle,
+          jobId,
+          dbPool
+        }, {
+          maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
+          evalConcurrency: 10,
+          qualityModelOverride: modelOverrides.qualityModel,
+          useIteratePage: false  // Fresh generation by default during story creation
+        });
 
-      // Map pipeline results to allImages format
-      allImages = pipelineResult.map(img => ({
-        pageNumber: img.pageNumber,
-        text: img.text,
-        description: img.sceneDescription,
-        outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
-        imageData: img.imageData,
-        generatedAt: new Date().toISOString(),
-        prompt: img.prompt,
-        sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
-        sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
-        qualityScore: img.qualityScore,
-        qualityReasoning: img.qualityReasoning,
-        thinkingText: img.thinkingText || null,
-        wasRegenerated: img.wasRegenerated,
-        wasCharacterFixed: img.wasCharacterFixed,
-        bestSource: img.bestSource,
-        referencePhotos: img.characterPhotos,
-        landmarkPhotos: img.landmarkPhotos,
-        visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
-        sceneCharacters: img.sceneCharacters,
-        sceneCharacterClothing: img.perCharClothing,
-        bboxDetection: img.bboxDetection,
-        bboxOverlayImage: img.bboxOverlayImage,
-        fixTargets: img.fixTargets || [],
-        fixableIssues: img.fixableIssues || [],
-        semanticResult: img.semanticResult || null,
-        semanticScore: img.semanticScore ?? null,
-        issuesSummary: img.issuesSummary || null,
-        verdict: img.verdict || null,
-        imageVersions: img.imageVersions || [],
-        retryHistory: img.retryHistory || [],
-        entityReport: img.entityReport || null
-      }));
+        // Hoist pipeline data for use outside this block (finalChecksReport)
+        pipelineEntityReport = pipelineResult[0]?.entityReport || null;
+        pipelineCharFixDetails = charFixDetails;
+
+        // Map pipeline results to allImages format
+        allImages = pipelineResult.map(img => ({
+          pageNumber: img.pageNumber,
+          text: img.text,
+          description: img.sceneDescription,
+          outlineExtract: img.scene?.outlineExtract || img.scene?.sceneHint || '',
+          imageData: img.imageData,
+          generatedAt: new Date().toISOString(),
+          prompt: img.prompt,
+          sceneDescriptionPrompt: img.scene?.sceneDescriptionPrompt,
+          sceneDescriptionModelId: img.scene?.sceneDescriptionModelId,
+          qualityScore: img.qualityScore,
+          qualityReasoning: img.qualityReasoning,
+          thinkingText: img.thinkingText || null,
+          wasRegenerated: img.wasRegenerated,
+          wasCharacterFixed: img.wasCharacterFixed,
+          bestSource: img.bestSource,
+          referencePhotos: img.characterPhotos,
+          landmarkPhotos: img.landmarkPhotos,
+          visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
+          sceneCharacters: img.sceneCharacters,
+          sceneCharacterClothing: img.perCharClothing,
+          bboxDetection: img.bboxDetection,
+          bboxOverlayImage: img.bboxOverlayImage,
+          fixTargets: img.fixTargets || [],
+          fixableIssues: img.fixableIssues || [],
+          semanticResult: img.semanticResult || null,
+          semanticScore: img.semanticScore ?? null,
+          issuesSummary: img.issuesSummary || null,
+          verdict: img.verdict || null,
+          imageVersions: img.imageVersions || [],
+          retryHistory: img.retryHistory || [],
+          entityReport: img.entityReport || null
+        }));
+      }
 
     }
 
