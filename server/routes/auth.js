@@ -553,7 +553,7 @@ router.get('/verify-email/:token', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      // Debug: check if token exists but is expired
+      // Check if token exists but is expired
       const expiredCheck = await pool.query(
         'SELECT id, email, email_verified, email_verification_expires FROM users WHERE email_verification_token = $1',
         [token]
@@ -561,14 +561,13 @@ router.get('/verify-email/:token', async (req, res) => {
       if (expiredCheck.rows.length > 0) {
         const u = expiredCheck.rows[0];
         log.warn(`[AUTH] verify-email: token found but expired for ${u.email} (expired: ${u.email_verification_expires}, verified: ${u.email_verified})`);
-      } else {
-        // Check if user exists with this email but token is NULL (already verified or cleared)
-        const allTrialUsers = await pool.query(
-          "SELECT id, email, email_verified, is_trial, email_verification_token IS NOT NULL as has_token FROM users WHERE is_trial = true ORDER BY created_at DESC LIMIT 5"
-        );
-        log.warn(`[AUTH] verify-email: token not found. Recent trial users: ${JSON.stringify(allTrialUsers.rows)}`);
+        return res.status(400).json({ error: 'Verification link has expired. Please register again.' });
       }
-      return res.status(400).json({ error: 'Invalid or expired verification token' });
+
+      // Token not found at all — likely already used (token cleared after verification)
+      // Check if there's a verified trial user who recently used this flow
+      log.info(`[AUTH] verify-email: token not found (likely already consumed)`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified?already=true`);
     }
 
     const user = result.rows[0];
