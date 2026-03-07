@@ -62,7 +62,7 @@ export const storyCategories: StoryCategory[] = [
 
 // Popular adventure theme IDs (shown in expanded "Popular" section)
 export const popularAdventureThemeIds = [
-  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'easter'
+  'pirate', 'knight', 'cowboy', 'ninja', 'wizard', 'dragon', 'superhero', 'detective', 'easter', 'unicorn', 'mermaid', 'roman'
 ];
 
 export const adventureThemeGroups: AdventureThemeGroup[] = [
@@ -182,8 +182,8 @@ export const lifeChallenges: LifeChallenge[] = [
 // Popular life challenge IDs (shown in expanded "Popular" section)
 export const popularLifeChallengeIds = [
   'going-to-bed', 'cleaning-up', 'first-kindergarten', 'first-school',
-  'losing-game', 'dealing-bully', 'telling-truth', 'spending-wisely',
-  'moving-house', 'screen-time'
+  'losing-game', 'dealing-bully', 'telling-truth', 'screen-time',
+  'moving-house', 'sharing', 'brushing-teeth', 'eating-vegetables'
 ];
 
 export const lifeChallengeGroups: LifeChallengeGroup[] = [
@@ -273,8 +273,9 @@ export const educationalGroups: EducationalGroup[] = [
 // =============================================================================
 // Popular historical event IDs (shown in expanded "Popular" section)
 export const popularHistoricalEventIds = [
-  'wilhelm-tell', 'gotthard-tunnel', 'moon-landing', 'columbus-voyage',
-  'wright-brothers', 'lindbergh-flight', 'galapagos-darwin', 'berlin-wall-fall', 'golden-gate'
+  'moon-landing', 'wright-brothers', 'lindbergh-flight', 'galapagos-darwin',
+  'columbus-voyage', 'everest-summit', 'wilhelm-tell', 'gotthard-tunnel',
+  'einstein-relativity', 'berlin-wall-fall', 'mandela-freedom'
 ];
 
 export const historicalEventGroups: HistoricalEventGroup[] = [
@@ -367,14 +368,14 @@ export const historicalEvents: HistoricalEvent[] = [
 
 export function getStoryTypesByGroup(groupId: AdventureThemeGroupId): StoryType[] {
   if (groupId === 'popular') {
-    return storyTypes.filter(t => popularAdventureThemeIds.includes(t.id));
+    return popularAdventureThemeIds.map(id => storyTypes.find(t => t.id === id)).filter((t): t is StoryType => !!t);
   }
   return storyTypes.filter(t => t.group === groupId);
 }
 
 export function getLifeChallengesByGroup(groupId: string): LifeChallenge[] {
   if (groupId === 'popular') {
-    return lifeChallenges.filter(c => popularLifeChallengeIds.includes(c.id));
+    return popularLifeChallengeIds.map(id => lifeChallenges.find(c => c.id === id)).filter((c): c is LifeChallenge => !!c);
   }
   return lifeChallenges.filter(c => c.ageGroup === groupId);
 }
@@ -405,7 +406,7 @@ export function getStoryCategoryById(id: string): StoryCategory | undefined {
 
 export function getHistoricalEventsByGroup(groupId: string): HistoricalEvent[] {
   if (groupId === 'popular') {
-    return historicalEvents.filter(e => popularHistoricalEventIds.includes(e.id));
+    return popularHistoricalEventIds.map(id => historicalEvents.find(e => e.id === id)).filter((e): e is HistoricalEvent => !!e);
   }
   return historicalEvents.filter(e => e.category === groupId);
 }
