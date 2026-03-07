@@ -17,17 +17,20 @@ You write children's stories. Create a complete {PAGES}-scene story.
 - **Characters**: {CHARACTERS}
 - **Story Idea**: {STORY_DETAILS}
 
+{COSTUME_INSTRUCTION}
+
 # Scene Hint Format
 
 ```
 SCENE HINT:
 [1-2 sentences describing the key visual moment]
 Characters:
-- [Name] (left/right/center): standard
+- [Name] (left/right/center): [standard | costumed:type]
 Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
 ```
 
 MAX 2 characters per scene hint. Every character needs a position (left/right/center). Use n/a for indoor weather.
+**Clothing**: Use `costumed:type` when the story has a themed setting (e.g., roman, pirate, knight). Use `standard` only for modern/everyday scenes.
 
 # OUTPUT FORMAT
 
@@ -41,7 +44,8 @@ TITLE: [A creative, specific title in {LANGUAGE}]
 {
   "clothingRequirements": {
     "[CharacterName]": {
-      "standard": { "used": true, "signature": "none" }
+      "standard": { "used": true/false, "signature": "none" },
+      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit - CLOTHING ONLY, no face coverings]" }
     }
   }
 }
@@ -79,7 +83,7 @@ TEXT:
 SCENE HINT:
 [Visual description]
 Characters:
-- [Name] (position): standard
+- [Name] (position): [standard or costumed:type]
 Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
 
 --- Page 2 ---
@@ -87,6 +91,9 @@ TEXT:
 [Story continues...]
 
 SCENE HINT:
-[...]
+[Visual description]
+Characters:
+- [Name] (position): [standard or costumed:type]
+Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
 
 ... continue for ALL {PAGES} pages ...
