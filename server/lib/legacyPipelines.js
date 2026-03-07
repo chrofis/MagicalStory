@@ -15,7 +15,7 @@
 // --- Module imports (same as server.js) ---
 const { CREDIT_CONFIG } = require('../config/credits');
 const pLimit = require('p-limit');
-const { getActiveIndexAfterPush } = require('./versionManager');
+
 const { GenerationLogger } = require('./generationLogger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const {
@@ -115,7 +115,7 @@ const {
   convertClothingToCurrentFormat
 } = require('./storyHelpers');
 const { OutlineParser, ProgressiveUnifiedParser } = require('./outlineParser');
-const { initializePool, saveStoryData, upsertStory, saveStoryImage, setActiveVersion, getPool } = require('../services/database');
+const { initializePool, saveStoryData, upsertStory, saveStoryImage, getPool } = require('../services/database');
 
 // --- Server.js-local dependencies received via init() ---
 let deps = {};
@@ -2264,16 +2264,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 [STORYBOOK] Story ${storyId} saved to stories table`);
 
-    // Initialize image_version_meta with active versions for all pages
-    if (storyData.sceneImages?.length > 0) {
-      for (const scene of storyData.sceneImages) {
-        if (scene.imageVersions?.length > 0) {
-          const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
-          await setActiveVersion(storyId, scene.pageNumber, activeIndex);
-        }
-      }
-      log.debug(`📚 [STORYBOOK] Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
-    }
+    // No need to initialize image_version_meta here — the primary/best image is
+    // saved at version_index 0 by upsertStory, and getActiveVersion defaults to 0.
+    // Setting it here was WRONG: getActiveIndexAfterPush(imageVersions) pointed to
+    // a non-primary version (imageVersions excludes the best image).
 
     // Log credit completion (credits were already reserved at job creation)
     try {
@@ -4202,16 +4196,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     await upsertStory(storyId, userId, storyData);
     log.debug(`📚 Story ${storyId} saved to stories table`);
 
-    // Initialize image_version_meta with active versions for all pages
-    if (storyData.sceneImages?.length > 0) {
-      for (const scene of storyData.sceneImages) {
-        if (scene.imageVersions?.length > 0) {
-          const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
-          await setActiveVersion(storyId, scene.pageNumber, activeIndex);
-        }
-      }
-      log.debug(`📚 Initialized image_version_meta for ${storyData.sceneImages.length} pages`);
-    }
+    // No need to initialize image_version_meta here — the primary/best image is
+    // saved at version_index 0 by upsertStory, and getActiveVersion defaults to 0.
+    // Setting it here was WRONG: getActiveIndexAfterPush(imageVersions) pointed to
+    // a non-primary version (imageVersions excludes the best image).
 
     // Log credit completion (credits were already reserved at job creation)
     try {
