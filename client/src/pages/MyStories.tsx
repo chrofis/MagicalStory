@@ -59,7 +59,7 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
       className="bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ring-2 ring-indigo-400 cursor-pointer"
     >
       {/* Animated gradient thumbnail */}
-      <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 via-purple-100 to-pink-100 flex items-center justify-center overflow-hidden">
+      <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 via-indigo-100 to-pink-100 flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
         <Loader2 size={48} className="animate-spin text-indigo-600" />
       </div>
@@ -79,7 +79,7 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
         <div className="mt-auto">
           <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-500"
+              className="h-full bg-gradient-to-r from-indigo-500 via-indigo-500 to-pink-500 transition-all duration-500"
               style={{ width: `${percentage}%` }}
             />
           </div>
@@ -179,7 +179,7 @@ const StoryCard = memo(function StoryCard({
           </div>
         ) : (
           // No cover image available
-          <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+          <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 to-indigo-100 flex items-center justify-center">
             <Book className="w-12 h-12 text-indigo-300" />
           </div>
         )}

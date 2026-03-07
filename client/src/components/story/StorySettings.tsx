@@ -225,7 +225,7 @@ export function StorySettings({
 
       {/* Story Settings Bar - 3 columns: Story, Art Style, Language (shown when story type is complete) */}
       {isStoryTypeComplete && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-3">
+        <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 border border-indigo-200 rounded-xl p-3">
           <div className="grid grid-cols-3 gap-2 text-sm">
             {/* LEFT: Story Topic/Theme - clickable */}
             <div className="relative">
@@ -273,9 +273,9 @@ export function StorySettings({
                   setIsStoryDropdownOpen(false);
                   setIsLanguageDropdownOpen(false);
                 }}
-                className="w-full inline-flex items-center justify-center gap-1 bg-white border border-purple-200 rounded-lg px-2 py-2 hover:border-purple-400 transition-colors"
+                className="w-full inline-flex items-center justify-center gap-1 bg-white border border-indigo-200 rounded-lg px-2 py-2 hover:border-indigo-400 transition-colors"
               >
-                <Palette size={14} className="text-purple-600" />
+                <Palette size={14} className="text-indigo-600" />
                 <span className="font-medium text-gray-700 truncate">{getArtStyleName()}</span>
               </button>
               {isArtStyleDropdownOpen && (
@@ -288,7 +288,7 @@ export function StorySettings({
                         setIsArtStyleDropdownOpen(false);
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-gray-50 first:rounded-t-lg last:rounded-b-lg ${
-                        artStyle === style.id ? 'bg-purple-50' : ''
+                        artStyle === style.id ? 'bg-indigo-50' : ''
                       }`}
                     >
                       <span>{style.emoji}</span>

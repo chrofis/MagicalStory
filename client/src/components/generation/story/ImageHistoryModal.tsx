@@ -171,7 +171,7 @@ export function ImageHistoryModal({
                     {detailVersion.semanticScore != null && (
                       <>
                         <span className="text-gray-400">|</span>
-                        <span className="text-purple-600">Semantic: {detailVersion.semanticScore}%</span>
+                        <span className="text-indigo-600">Semantic: {detailVersion.semanticScore}%</span>
                       </>
                     )}
                     {detailVersion.entityPenalty != null && detailVersion.entityPenalty > 0 && (
@@ -257,7 +257,7 @@ export function ImageHistoryModal({
 function DetailBlock({ label, color, children }: { label: string; color: string; children: React.ReactNode }) {
   const [expanded, setExpanded] = useState(false);
   const colorMap: Record<string, { label: string; bg: string; border: string }> = {
-    purple: { label: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
+    purple: { label: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200' },
     amber: { label: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200' },
     blue: { label: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200' },
     gray: { label: 'text-gray-700', bg: 'bg-gray-50', border: 'border-gray-200' },

@@ -118,7 +118,7 @@ function PageFeedbackCard({
             </span>
           )}
           {feedback.semanticScore != null && (
-            <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
               Semantic: {feedback.semanticScore}%
             </span>
           )}
@@ -166,19 +166,19 @@ function PageFeedbackCard({
           {feedback.issuesSummary && feedback.issuesSummary !== 'none' && (
             <p className={`text-xs pl-2 border-l-2 ${
               feedback.issuesSummary.includes('SEMANTIC:')
-                ? 'text-purple-700 border-purple-400 bg-purple-50 p-1 rounded-r'
+                ? 'text-indigo-700 border-indigo-400 bg-indigo-50 p-1 rounded-r'
                 : 'text-gray-600 border-gray-300'
             }`}>
               {feedback.issuesSummary}
             </p>
           )}
           {feedback.semanticResult && (
-            <div className="text-xs text-purple-700 pl-2 border-l-2 border-purple-400 bg-purple-50 p-1 rounded-r mt-1">
+            <div className="text-xs text-indigo-700 pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1 rounded-r mt-1">
               <span className="font-medium">Semantic Analysis (Score: {feedback.semanticResult.score ?? 'N/A'}):</span>
               {feedback.semanticResult.visible && (
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-white p-2 rounded border border-purple-200">
-                    <div className="font-medium text-purple-800 mb-1">Visible:</div>
+                  <div className="bg-white p-2 rounded border border-indigo-200">
+                    <div className="font-medium text-indigo-800 mb-1">Visible:</div>
                     {feedback.semanticResult.visible.characters && feedback.semanticResult.visible.characters.length > 0 && (
                       <div><span className="text-gray-500">Characters:</span> {feedback.semanticResult.visible.characters.join(', ')}</div>
                     )}
@@ -192,8 +192,8 @@ function PageFeedbackCard({
                       <div><span className="text-gray-500">Action:</span> {feedback.semanticResult.visible.action}</div>
                     )}
                   </div>
-                  <div className="bg-white p-2 rounded border border-purple-200">
-                    <div className="font-medium text-purple-800 mb-1">Expected:</div>
+                  <div className="bg-white p-2 rounded border border-indigo-200">
+                    <div className="font-medium text-indigo-800 mb-1">Expected:</div>
                     {feedback.semanticResult.expected?.characters && feedback.semanticResult.expected.characters.length > 0 && (
                       <div><span className="text-gray-500">Characters:</span> {feedback.semanticResult.expected.characters.join(', ')}</div>
                     )}
@@ -256,7 +256,7 @@ function PageFeedbackCard({
                     {issue.source && (
                       <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
                     )}
-                    <span className="px-1 rounded bg-purple-100 text-purple-700">{issue.character}</span>
+                    <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.character}</span>
                     <span className={`px-1 rounded ${
                       issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
                       issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
@@ -302,7 +302,7 @@ function PageFeedbackCard({
                     )}
                     <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.type.replace(/_/g, ' ')}</span>
                     {issue.characterInvolved && (
-                      <span className="px-1 rounded bg-purple-100 text-purple-700">{issue.characterInvolved}</span>
+                      <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.characterInvolved}</span>
                     )}
                     <span className={`px-1 rounded ${
                       issue.severity === 'high' ? 'bg-red-100 text-red-700' :
@@ -522,11 +522,11 @@ export function RepairWorkflowPanel({
       {isExpanded && (
         <div className="p-4 space-y-3">
           {/* Full Automated Workflow Button */}
-          <div className="p-4 bg-gradient-to-r from-purple-50 to-amber-50 border border-purple-200 rounded-lg">
+          <div className="p-4 bg-gradient-to-r from-indigo-50 to-amber-50 border border-indigo-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="font-bold text-purple-800">Automated Full Repair</h4>
-                <p className="text-sm text-purple-600">
+                <h4 className="font-bold text-indigo-800">Automated Full Repair</h4>
+                <p className="text-sm text-indigo-600">
                   Runs all steps automatically. Pages retry up to 2 times, keeping the best result.
                 </p>
               </div>
@@ -548,7 +548,7 @@ export function RepairWorkflowPanel({
                 <button
                   onClick={handleRunFullWorkflow}
                   disabled={isRunning || isRunningFullWorkflow}
-                  className="flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-medium"
+                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium"
                 >
                   {isRunningFullWorkflow ? (
                     <>
@@ -565,11 +565,11 @@ export function RepairWorkflowPanel({
               </div>
             </div>
             {fullWorkflowProgress && (
-              <div className="mt-3 p-2 bg-white/50 rounded border border-purple-100">
+              <div className="mt-3 p-2 bg-white/50 rounded border border-indigo-100">
                 <div className="flex items-center gap-2 text-sm">
-                  <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                  <span className="font-medium text-purple-700">{fullWorkflowProgress.step}:</span>
-                  <span className="text-purple-600">{fullWorkflowProgress.detail}</span>
+                  <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
+                  <span className="font-medium text-indigo-700">{fullWorkflowProgress.step}:</span>
+                  <span className="text-indigo-600">{fullWorkflowProgress.detail}</span>
                 </div>
               </div>
             )}
@@ -631,7 +631,7 @@ export function RepairWorkflowPanel({
                             </span>
                           )}
                           {characterIssues > 0 && (
-                            <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">
+                            <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded">
                               Character Consistency: {characterIssues}
                             </span>
                           )}
@@ -746,7 +746,7 @@ export function RepairWorkflowPanel({
                       <p className="text-xs text-gray-500">Passes current image to Gemini — preserves composition, fixes details</p>
                     </div>
                   </label>
-                  <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'blackout' ? 'bg-purple-50 border border-purple-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
+                  <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'blackout' ? 'bg-indigo-50 border border-indigo-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
                     <input type="radio" name="redoMode" checked={redoMode === 'blackout'} onChange={() => setRedoMode('blackout')} disabled={isRunning} className="mt-0.5" />
                     <div>
                       <span className="text-sm font-medium">Blackout issues</span>
@@ -811,9 +811,9 @@ export function RepairWorkflowPanel({
                                 {detail.blackoutImage && (
                                   <div className="text-center">
                                     <img src={detail.blackoutImage.startsWith('data:') ? detail.blackoutImage : `data:image/jpeg;base64,${detail.blackoutImage}`}
-                                         className="w-16 h-16 object-cover rounded cursor-pointer border-2 border-purple-300 hover:ring-2 hover:ring-purple-400"
+                                         className="w-16 h-16 object-cover rounded cursor-pointer border-2 border-indigo-300 hover:ring-2 hover:ring-indigo-400"
                                          onClick={() => setGridLightbox(detail.blackoutImage!.startsWith('data:') ? detail.blackoutImage! : `data:image/jpeg;base64,${detail.blackoutImage}`)} />
-                                    <span className="text-[10px] text-purple-500">Blackout</span>
+                                    <span className="text-[10px] text-indigo-500">Blackout</span>
                                   </div>
                                 )}
                                 <span className="text-gray-400 self-center">&rarr;</span>
@@ -885,7 +885,7 @@ export function RepairWorkflowPanel({
                                 Quality: {qualityScore}%
                               </span>
                               {semanticScore !== null && semanticScore !== undefined && (
-                                <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                                <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
                                   Semantic: {semanticScore}%
                                 </span>
                               )}
@@ -919,21 +919,21 @@ export function RepairWorkflowPanel({
                             {result.issuesSummary && result.issuesSummary !== 'none' && (
                               <p className={`text-xs pl-2 border-l-2 ${
                                 result.issuesSummary.includes('SEMANTIC:')
-                                  ? 'text-purple-700 border-purple-400 bg-purple-50 p-1 rounded-r'
+                                  ? 'text-indigo-700 border-indigo-400 bg-indigo-50 p-1 rounded-r'
                                   : 'text-gray-600 border-gray-300'
                               }`}>
                                 {result.issuesSummary}
                               </p>
                             )}
                             {result.semanticResult && (
-                              <div className="text-xs text-purple-700 pl-2 border-l-2 border-purple-400 bg-purple-50 p-1 rounded-r mt-1">
+                              <div className="text-xs text-indigo-700 pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1 rounded-r mt-1">
                                 <span className="font-medium">🔍 Semantic Analysis (Score: {result.semanticResult.score ?? 'N/A'}):</span>
 
                                 {/* Show visible vs expected */}
                                 {result.semanticResult.visible && (
                                   <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                                    <div className="bg-white p-2 rounded border border-purple-200">
-                                      <div className="font-medium text-purple-800 mb-1">👁️ Visible:</div>
+                                    <div className="bg-white p-2 rounded border border-indigo-200">
+                                      <div className="font-medium text-indigo-800 mb-1">👁️ Visible:</div>
                                       {result.semanticResult.visible.characters && result.semanticResult.visible.characters.length > 0 && (
                                         <div><span className="text-gray-500">Characters:</span> {result.semanticResult.visible.characters.join(', ')}</div>
                                       )}
@@ -947,8 +947,8 @@ export function RepairWorkflowPanel({
                                         <div><span className="text-gray-500">Action:</span> {result.semanticResult.visible.action}</div>
                                       )}
                                     </div>
-                                    <div className="bg-white p-2 rounded border border-purple-200">
-                                      <div className="font-medium text-purple-800 mb-1">🎯 Expected:</div>
+                                    <div className="bg-white p-2 rounded border border-indigo-200">
+                                      <div className="font-medium text-indigo-800 mb-1">🎯 Expected:</div>
                                       {result.semanticResult.expected?.characters && result.semanticResult.expected.characters.length > 0 && (
                                         <div><span className="text-gray-500">Characters:</span> {result.semanticResult.expected.characters.join(', ')}</div>
                                       )}
@@ -1126,7 +1126,7 @@ export function RepairWorkflowPanel({
                         <span className="font-medium">Characters needing repair:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {charactersWithIssues.map(name => (
-                            <span key={name} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                            <span key={name} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-xs">
                               {name}
                             </span>
                           ))}
@@ -1177,7 +1177,7 @@ export function RepairWorkflowPanel({
                           setSelectedCharacterPages(severePages);
                         }}
                         disabled={isRunning || workflowState.stepStatus['consistency-check'] !== 'completed'}
-                        className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+                        className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                         title="Auto-select pages with major/critical issues"
                       >
                         <Zap className="w-3 h-3" />
@@ -1197,7 +1197,7 @@ export function RepairWorkflowPanel({
                           }}
                           className={`px-2 py-1 text-xs rounded border transition-colors ${
                             selectedCharacterPages.includes(scene.pageNumber)
-                              ? 'bg-purple-100 border-purple-300 text-purple-700'
+                              ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
                           disabled={isRunning}
@@ -1254,7 +1254,7 @@ export function RepairWorkflowPanel({
                     }
                   }}
                   disabled={isRunning || !selectedCharacter || selectedCharacterPages.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   <Wrench className="w-4 h-4" />
                   Repair {selectedCharacter || 'Character'} on {selectedCharacterPages.length} pages
@@ -1274,7 +1274,7 @@ export function RepairWorkflowPanel({
                               <span className="text-sm font-medium text-green-800">Page {page.pageNumber}</span>
                               {page.method && (
                                 <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${
-                                  page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                                  page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'
                                 }`}>
                                   {page.method === 'magicapi' ? 'MagicAPI' : 'Gemini'}
                                 </span>

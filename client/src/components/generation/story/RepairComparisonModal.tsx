@@ -62,7 +62,7 @@ export function RepairComparisonModal({
             {/* Diff */}
             {diffImage && (
               <div className="flex flex-col items-center">
-                <span className="text-sm font-semibold text-gray-700 mb-2 bg-purple-100 px-3 py-1 rounded-full">
+                <span className="text-sm font-semibold text-gray-700 mb-2 bg-indigo-100 px-3 py-1 rounded-full">
                   Diff (changes in magenta)
                 </span>
                 <img

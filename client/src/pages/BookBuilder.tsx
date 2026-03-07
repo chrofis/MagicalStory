@@ -378,7 +378,7 @@ export default function BookBuilder() {
                       className="w-16 h-16 rounded-lg object-cover"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-indigo-100 to-indigo-100 flex items-center justify-center">
                       <Book size={24} className="text-indigo-300" />
                     </div>
                   )}
@@ -542,7 +542,7 @@ export default function BookBuilder() {
 
             {/* Price summary */}
             {!isOverLimit && price && (
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 sm:p-6 mb-6">
+              <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 sm:p-6 mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-gray-700">{t.price}</span>
                   <span className="text-3xl font-bold text-indigo-700">CHF {price}.-</span>
@@ -557,7 +557,7 @@ export default function BookBuilder() {
             <button
               onClick={handleCheckout}
               disabled={isOverLimit || isCheckingOut}
-              className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-4 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white rounded-xl font-bold text-lg hover:from-indigo-700 hover:to-indigo-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isCheckingOut ? (
                 <>
@@ -577,11 +577,11 @@ export default function BookBuilder() {
               <button
                 onClick={handlePrintPdf}
                 disabled={isPrintingPdf || stories.length === 0}
-                className="w-full mt-3 py-3 bg-purple-100 text-purple-700 border-2 border-purple-300 rounded-xl font-semibold hover:bg-purple-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="w-full mt-3 py-3 bg-indigo-100 text-indigo-700 border-2 border-indigo-300 rounded-xl font-semibold hover:bg-indigo-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isPrintingPdf ? (
                   <>
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-purple-700 border-t-transparent" />
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-indigo-700 border-t-transparent" />
                     {t.generatingPdf}
                   </>
                 ) : (

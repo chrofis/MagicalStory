@@ -232,21 +232,21 @@ export function StoryCategorySelector({
               onClick={() => handleCategorySelect(category.id as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom')}
               className={`p-3 md:p-6 rounded-xl border-2 transition-all ${
                 category.id === 'custom'
-                  ? 'border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50'
+                  ? 'border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50'
                   : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
               }`}
             >
               {/* Mobile: horizontal layout with emoji left, title centered */}
               <div className="flex md:hidden items-center gap-3">
                 <div className="text-3xl flex-shrink-0">{category.emoji}</div>
-                <div className={`flex-1 text-center font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
+                <div className={`flex-1 text-center font-bold text-lg ${category.id === 'custom' ? 'text-indigo-700' : 'text-gray-800'}`}>
                   {category.name[lang] || category.name.en}
                 </div>
               </div>
               {/* Desktop: vertical layout with emoji, title, description */}
               <div className="hidden md:block text-left">
                 <div className="text-4xl mb-3">{category.emoji}</div>
-                <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
+                <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-indigo-700' : 'text-gray-800'}`}>
                   {category.name[lang] || category.name.en}
                 </div>
                 <div className="text-sm text-gray-600 mt-1">
@@ -795,7 +795,7 @@ export function StoryCategorySelector({
                 category.id === storyCategory
                   ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
                   : category.id === 'custom'
-                    ? 'border-dashed border-purple-300 hover:border-purple-500 hover:bg-purple-50'
+                    ? 'border-dashed border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50'
                     : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
               }`}
             >
@@ -803,7 +803,7 @@ export function StoryCategorySelector({
               <div className="flex items-center gap-3 text-left">
                 <div className="text-4xl flex-shrink-0">{category.emoji}</div>
                 <div>
-                  <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-purple-700' : 'text-gray-800'}`}>
+                  <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-indigo-700' : 'text-gray-800'}`}>
                     {category.name[lang] || category.name.en}
                   </div>
                   <div className="text-sm text-gray-600">

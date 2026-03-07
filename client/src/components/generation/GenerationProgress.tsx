@@ -433,7 +433,7 @@ export function GenerationProgress({
               if (currentItem.type === 'character' && currentCharDisplay) {
                 return (
                   <div key={`char-${currentItem.char.id}-${rotationIndex}`} className="flex flex-col items-center gap-3 animate-fade-in">
-                    <div className="w-32 md:w-40 h-44 md:h-56 rounded-xl overflow-hidden border-4 border-indigo-200 shadow-lg bg-gradient-to-b from-indigo-50 to-purple-50">
+                    <div className="w-32 md:w-40 h-44 md:h-56 rounded-xl overflow-hidden border-4 border-indigo-200 shadow-lg bg-gradient-to-b from-indigo-50 to-indigo-50">
                       <img
                         src={currentCharDisplay.avatarUrl}
                         alt={currentItem.char.name}
@@ -450,7 +450,7 @@ export function GenerationProgress({
                              messageKey === 'emailInfo' ? <Mail size={20} className="text-indigo-500 shrink-0" /> :
                              <CheckCircle size={20} className="text-indigo-500 shrink-0" />;
                 return (
-                  <div className="flex items-start gap-3 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 max-w-sm animate-fade-in">
+                  <div className="flex items-start gap-3 bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 max-w-sm animate-fade-in">
                     {icon}
                     <p className="text-sm text-gray-700">{messageText}</p>
                   </div>
@@ -463,7 +463,7 @@ export function GenerationProgress({
 
         {/* Cover preview section */}
         {hasAnyCovers && (
-          <div className="mb-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4">
+          <div className="mb-4 bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4">
             <h3 className="text-sm font-medium text-indigo-700 text-center mb-3">{t.coversPreview}</h3>
             <div className="flex justify-center gap-4">
               <CoverThumbnail

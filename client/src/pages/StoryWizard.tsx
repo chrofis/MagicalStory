@@ -4948,7 +4948,7 @@ export default function StoryWizard() {
                           type="checkbox"
                           checked={enableFullRepair}
                           onChange={(e) => setEnableFullRepair(e.target.checked)}
-                          className="rounded border-purple-300 text-purple-600 focus:ring-purple-500"
+                          className="rounded border-indigo-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span className="text-gray-700">{language === 'de' ? 'Volle Reparatur nach Generierung' : language === 'fr' ? 'Réparation complète après génération' : 'Full repair after generation'}</span>
                       </label>

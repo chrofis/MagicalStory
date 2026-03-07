@@ -243,7 +243,7 @@ export function SceneEditModal({
                    `Fixed at ${new Date(consistencyRegen.timestamp).toLocaleString()}`}
                 </p>
                 {consistencyRegen.clothing && (
-                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">
                     🎨 {consistencyRegen.clothing}
                   </span>
                 )}

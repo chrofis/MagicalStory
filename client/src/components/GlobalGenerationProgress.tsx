@@ -54,7 +54,7 @@ export function GlobalGenerationProgress() {
       <div className="h-1 bg-gray-200 dark:bg-gray-700">
         {/* Animated progress fill */}
         <div
-          className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all duration-500 ease-out relative overflow-hidden"
+          className="h-full bg-gradient-to-r from-indigo-500 via-indigo-500 to-pink-500 transition-all duration-500 ease-out relative overflow-hidden"
           style={{ width: `${percentage}%` }}
         >
           {/* Shimmer effect */}

@@ -239,7 +239,7 @@ export default function EmailVerified() {
           )}
 
           {/* Upsell banner */}
-          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-5 mt-6 border border-indigo-100 text-left">
+          <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-5 mt-6 border border-indigo-100 text-left">
             <p className="text-sm font-semibold text-indigo-700 mb-3">{t.upsellTitle}</p>
             <ul className="text-sm text-gray-600 space-y-1.5">
               {t.upsellFeatures.map((f, i) => (

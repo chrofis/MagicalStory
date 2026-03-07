@@ -1416,11 +1416,11 @@ export function CharacterForm({
                 <button
                   onClick={handleGenerateAvatarOptions}
                   disabled={isGeneratingOptions || isRegeneratingAvatars || isRegeneratingAvatarsWithTraits || !character.photos?.original}
-                  className="w-full px-2 py-1 text-[10px] font-medium bg-purple-100 text-purple-700 rounded hover:bg-purple-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                  className="w-full px-2 py-1 text-[10px] font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
                 >
                   {isGeneratingOptions ? (
                     <>
-                      <div className="w-3 h-3 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3 h-3 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
                       {language === 'de' ? 'Generiere 3...' : 'Generating 3...'}
                     </>
                   ) : (
@@ -1477,10 +1477,10 @@ export function CharacterForm({
             {/* Developer mode: show avatar generation input (source photo + user traits) */}
             {(developerMode || isImpersonating) && (
               <details className="mt-1 text-left">
-                <summary className="text-[10px] font-medium cursor-pointer text-purple-600">
+                <summary className="text-[10px] font-medium cursor-pointer text-indigo-600">
                   Avatar Gen Input
                 </summary>
-                <div className="mt-1 p-2 rounded text-[9px] border bg-purple-50 border-purple-200 space-y-2">
+                <div className="mt-1 p-2 rounded text-[9px] border bg-indigo-50 border-indigo-200 space-y-2">
                   <div className="flex gap-2">
                     <div>
                       <span className="font-semibold block mb-1">Source Photo:</span>
@@ -1511,7 +1511,7 @@ export function CharacterForm({
                         return (
                           <ul className="space-y-0.5">
                             {userTraits.map(trait => (
-                              <li key={trait} className="text-purple-700">
+                              <li key={trait} className="text-indigo-700">
                                 <span className="font-medium">{trait}:</span> {character.physical?.[trait as keyof typeof character.physical] || '?'}
                               </li>
                             ))}
@@ -1610,12 +1610,12 @@ export function CharacterForm({
 
       {/* Developer Mode: Show raw Gemini response from photo analysis */}
       {(developerMode || isImpersonating) && photoAnalysisDebug?.rawResponse && (
-        <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-          <summary className="text-xs font-semibold text-purple-700 cursor-pointer">
+        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+          <summary className="text-xs font-semibold text-indigo-700 cursor-pointer">
             Raw Gemini Response (Photo Analysis)
             {photoAnalysisDebug.error && <span className="text-red-500 ml-2">⚠️ {photoAnalysisDebug.error}</span>}
           </summary>
-          <pre className="mt-2 p-2 bg-white rounded text-[10px] whitespace-pre-wrap overflow-auto max-h-64 border border-purple-200 font-mono">
+          <pre className="mt-2 p-2 bg-white rounded text-[10px] whitespace-pre-wrap overflow-auto max-h-64 border border-indigo-200 font-mono">
             {photoAnalysisDebug.rawResponse}
           </pre>
         </details>
@@ -1911,10 +1911,10 @@ export function CharacterForm({
 
       {/* Styled Avatars (developer only - pre-converted to art styles) */}
       {(developerMode || isImpersonating) && character.avatars?.styledAvatars && Object.keys(character.avatars.styledAvatars).length > 0 && (
-        <div className="bg-purple-50 border border-purple-300 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
+        <div className="bg-indigo-50 border border-indigo-300 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-indigo-700 mb-3 flex items-center gap-2">
             🎨 {language === 'de' ? 'Stilisierte Avatare' : language === 'fr' ? 'Avatars stylisés' : 'Styled Avatars'}
-            <span className="text-xs font-normal text-purple-500">
+            <span className="text-xs font-normal text-indigo-500">
               ({Object.keys(character.avatars.styledAvatars).length} {language === 'de' ? 'Stile' : 'styles'})
             </span>
           </h4>
@@ -1942,8 +1942,8 @@ export function CharacterForm({
               const costumeTypes = costumedAvatars ? Object.keys(costumedAvatars) : [];
 
               return (
-                <div key={artStyle} className="border border-purple-200 rounded-lg p-3 bg-white">
-                  <h5 className="text-xs font-semibold text-purple-600 mb-2">
+                <div key={artStyle} className="border border-indigo-200 rounded-lg p-3 bg-white">
+                  <h5 className="text-xs font-semibold text-indigo-600 mb-2">
                     {styleInfo.emoji} {language === 'de' ? styleInfo.de : styleInfo.en}
                   </h5>
                   {/* Standard clothing avatars */}
@@ -1960,12 +1960,12 @@ export function CharacterForm({
                     draggable={false}
                               src={avatar}
                               alt={`${character.name} - ${artStyle} - ${category}`}
-                              className="w-full h-32 object-contain rounded border border-purple-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                              className="w-full h-32 object-contain rounded border border-indigo-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
                               onClick={() => setLightboxImage(avatar)}
                               title="Click to enlarge"
                             />
                           ) : (
-                            <div className="w-full h-32 rounded border border-dashed border-purple-200 bg-purple-50/50 flex items-center justify-center text-purple-300 text-[10px]">
+                            <div className="w-full h-32 rounded border border-dashed border-indigo-200 bg-indigo-50/50 flex items-center justify-center text-indigo-300 text-[10px]">
                               —
                             </div>
                           )}
@@ -1975,7 +1975,7 @@ export function CharacterForm({
                   </div>
                   {/* Costumed avatars (from visual bible) */}
                   {costumeTypes.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-purple-200">
+                    <div className="mt-3 pt-3 border-t border-indigo-200">
                       <div className="text-[10px] font-medium text-orange-600 mb-2">
                         🎭 {language === 'de' ? 'Kostümierte Avatare' : 'Costumed Avatars'}
                       </div>
@@ -2016,14 +2016,14 @@ export function CharacterForm({
 
       {/* Developer Mode: Full API Response (readable, full-width) */}
       {(developerMode || isImpersonating) && character.avatars?.rawEvaluation && (
-        <details className="bg-purple-50 border border-purple-300 rounded-lg p-4">
-          <summary className="text-sm font-semibold text-purple-700 cursor-pointer flex items-center gap-2">
+        <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-4">
+          <summary className="text-sm font-semibold text-indigo-700 cursor-pointer flex items-center gap-2">
             <span>📊 Full API Response (Avatar Evaluation)</span>
-            <span className="text-xs font-normal text-purple-500">
+            <span className="text-xs font-normal text-indigo-500">
               Click to expand
             </span>
           </summary>
-          <pre className="mt-3 p-4 bg-white rounded-lg text-xs whitespace-pre-wrap overflow-auto max-h-[600px] border border-purple-200 font-mono leading-relaxed">
+          <pre className="mt-3 p-4 bg-white rounded-lg text-xs whitespace-pre-wrap overflow-auto max-h-[600px] border border-indigo-200 font-mono leading-relaxed">
             {JSON.stringify(character.avatars.rawEvaluation, null, 2)}
           </pre>
         </details>

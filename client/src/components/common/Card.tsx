@@ -21,7 +21,7 @@ export function Card({
       className={`
         bg-white rounded-2xl shadow-lg p-6
         ${hoverable ? 'hover:shadow-xl hover:scale-[1.02] transition-all duration-200 cursor-pointer' : ''}
-        ${selected ? 'ring-2 ring-purple-500 bg-purple-50' : ''}
+        ${selected ? 'ring-2 ring-indigo-500 bg-indigo-50' : ''}
         ${className}
       `}
     >

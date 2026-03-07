@@ -148,7 +148,7 @@ export default function Pricing() {
             </div>
           )}
           {/* Table Header */}
-          <div className="grid grid-cols-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+          <div className="grid grid-cols-3 bg-gradient-to-r from-indigo-600 to-indigo-600 text-white">
             <div className="p-4 font-semibold">{t.pages}</div>
             <div className="p-4 text-center border-l border-indigo-500">
               <div className="flex flex-col items-center gap-1">
@@ -186,7 +186,7 @@ export default function Pricing() {
         </div>
 
         {/* Features */}
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl p-6 mb-8">
+        <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-2xl p-6 mb-8">
           <h2 className="text-xl font-bold text-gray-800 mb-4">{t.features}</h2>
           <div className="grid md:grid-cols-2 gap-3">
             {[t.feature1, t.feature2, t.feature3, t.feature4].map((feature, idx) => (

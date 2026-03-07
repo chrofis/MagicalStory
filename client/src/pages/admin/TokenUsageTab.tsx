@@ -110,13 +110,13 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
           </p>
         </div>
 
-        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200">
-          <div className="flex items-center gap-2 text-purple-600 mb-2">
+        <div className="bg-gradient-to-br from-indigo-50 to-indigo-50 rounded-xl p-4 border border-indigo-200">
+          <div className="flex items-center gap-2 text-indigo-600 mb-2">
             <TrendingUp size={20} />
             <span className="font-medium">{texts.anthropic}</span>
           </div>
-          <p className="text-2xl font-bold text-purple-700">{formatCost(tokenData.costs.anthropic.total)}</p>
-          <p className="text-xs text-purple-600 mt-1">
+          <p className="text-2xl font-bold text-indigo-700">{formatCost(tokenData.costs.anthropic.total)}</p>
+          <p className="text-xs text-indigo-600 mt-1">
             {formatTokens(tokenData.totals.anthropic.input_tokens)} in / {formatTokens(tokenData.totals.anthropic.output_tokens)} out
           </p>
         </div>
@@ -206,7 +206,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{day.date}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{day.storyCount}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{day.totalBookPages}</td>
-                      <td className="px-4 py-3 text-sm text-right text-purple-600">{formatCost(anthropicCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-indigo-600">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(day.totalCost)}</td>
@@ -267,7 +267,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{month.month}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{month.storyCount}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{month.totalBookPages}</td>
-                      <td className="px-4 py-3 text-sm text-right text-purple-600">{formatCost(anthropicCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-indigo-600">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(month.totalCost)}</td>
@@ -336,7 +336,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">{user.email || user.name || 'Unknown'}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{user.storyCount}</td>
                       <td className="px-4 py-3 text-sm text-right text-gray-600">{user.totalBookPages}</td>
-                      <td className="px-4 py-3 text-sm text-right text-purple-600">{formatCost(anthropicCost)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-indigo-600">{formatCost(anthropicCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-blue-600">{formatCost(geminiCost)}</td>
                       <td className="px-4 py-3 text-sm text-right text-orange-600">{formatCost(runwareCost)}</td>
                       <td className="px-4 py-3 text-sm text-right font-semibold text-green-700">{formatCost(costPerStory)}</td>

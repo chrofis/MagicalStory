@@ -53,7 +53,7 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
             {user.username} {user.role === 'admin' && '👑'}
           </div>
           <div className={`text-xs px-2 py-1 rounded inline-block ${
-            isUnlimited ? 'bg-purple-600 text-white' :
+            isUnlimited ? 'bg-indigo-600 text-white' :
             credits === 0 ? 'bg-red-600 text-white' :
             credits < 50 ? 'bg-yellow-600 text-white' :
             'bg-green-600 text-white'

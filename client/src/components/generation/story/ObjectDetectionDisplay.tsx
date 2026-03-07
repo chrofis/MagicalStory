@@ -244,14 +244,14 @@ export function ObjectDetectionDisplay({
 
           {/* Expected Positions from Scene Description */}
           {bboxDetection.expectedPositions && Object.keys(bboxDetection.expectedPositions).length > 0 && (
-            <div className="bg-purple-50 p-3 rounded border border-purple-200">
-              <div className="font-medium text-purple-800 mb-2">
+            <div className="bg-indigo-50 p-3 rounded border border-indigo-200">
+              <div className="font-medium text-indigo-800 mb-2">
                 📍 {language === 'de' ? 'Erwartete Positionen' : 'Expected Positions'}
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm">
                 {Object.entries(bboxDetection.expectedPositions).map(([charName, position]) => (
                   <div key={charName} className="bg-white p-2 rounded border flex justify-between items-center">
-                    <span className="font-medium text-purple-700">{charName}</span>
+                    <span className="font-medium text-indigo-700">{charName}</span>
                     <span className="text-gray-600 text-xs">{position}</span>
                   </div>
                 ))}
@@ -271,7 +271,7 @@ export function ObjectDetectionDisplay({
                     <div className="font-medium text-yellow-700">{mismatch.character}</div>
                     <div className="text-xs text-gray-600 mt-1 flex gap-3">
                       <span>
-                        {language === 'de' ? 'Erwartet' : 'Expected'}: <span className="font-medium text-purple-600">{mismatch.expected}</span>
+                        {language === 'de' ? 'Erwartet' : 'Expected'}: <span className="font-medium text-indigo-600">{mismatch.expected}</span>
                         <span className="text-gray-400 ml-1">({mismatch.expectedLCR})</span>
                       </span>
                       <span className="text-gray-400">→</span>

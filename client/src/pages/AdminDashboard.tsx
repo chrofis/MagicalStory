@@ -546,7 +546,7 @@ export default function AdminDashboard() {
   // Wait for auth to finish loading before showing access denied
   if (isAuthLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-blue-50">
         <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
       </div>
     );
@@ -555,7 +555,7 @@ export default function AdminDashboard() {
   // Allow access for admins or impersonating admins
   if (!isAuthenticated || (user?.role !== 'admin' && !isImpersonating)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-blue-50">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
           <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-4">{texts.accessDenied}</h2>
@@ -570,14 +570,14 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-indigo-50 via-pink-50 to-blue-50">
         <Loader2 className="w-12 h-12 animate-spin text-indigo-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50 py-8 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-pink-50 to-blue-50 py-8 px-4">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -691,7 +691,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                 <StatCard
-                  icon={<Users className="w-8 h-8 text-purple-600" />}
+                  icon={<Users className="w-8 h-8 text-indigo-600" />}
                   title={texts.totalUsers}
                   value={stats?.totalUsers ?? 0}
                 />
@@ -862,7 +862,7 @@ export default function AdminDashboard() {
                       <td className="px-4 py-3 cursor-pointer" onClick={() => handleViewUserDetails(u)}>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           u.role === 'admin'
-                            ? 'bg-purple-100 text-purple-700'
+                            ? 'bg-indigo-100 text-indigo-700'
                             : 'bg-gray-100 text-gray-700'
                         }`}>
                           {u.role}
@@ -889,7 +889,7 @@ export default function AdminDashboard() {
                           <button
                             onClick={() => handleToggleRole(u)}
                             className={`p-1 rounded hover:bg-gray-100 ${
-                              u.role === 'admin' ? 'text-yellow-600' : 'text-purple-600'
+                              u.role === 'admin' ? 'text-yellow-600' : 'text-indigo-600'
                             }`}
                             title={u.role === 'admin' ? texts.removeAdmin : texts.makeAdmin}
                             disabled={u.id === user?.id}
@@ -1050,7 +1050,7 @@ export default function AdminDashboard() {
                           <td className="px-4 py-3">
                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                               product.cover_type === 'hardcover'
-                                ? 'bg-purple-100 text-purple-700'
+                                ? 'bg-indigo-100 text-indigo-700'
                                 : 'bg-blue-100 text-blue-700'
                             }`}>
                               {product.cover_type === 'hardcover' ? texts.hardcover : texts.softcover}
@@ -1135,7 +1135,7 @@ export default function AdminDashboard() {
                                 <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">{size}</span>
                               )}
                               <span className={`px-2 py-0.5 text-xs rounded ${
-                                isHardcover ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                                isHardcover ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'
                               }`}>
                                 {isHardcover ? texts.hardcover : texts.softcover}
                               </span>
@@ -1365,7 +1365,7 @@ export default function AdminDashboard() {
                           tx.type === 'story_reserve' ? 'bg-yellow-100 text-yellow-700' :
                           tx.type === 'story_complete' ? 'bg-green-100 text-green-700' :
                           tx.type === 'story_refund' ? 'bg-blue-100 text-blue-700' :
-                          tx.type === 'admin_add' ? 'bg-purple-100 text-purple-700' :
+                          tx.type === 'admin_add' ? 'bg-indigo-100 text-indigo-700' :
                           tx.type === 'admin_deduct' ? 'bg-red-100 text-red-700' :
                           tx.type === 'initial' ? 'bg-gray-100 text-gray-700' :
                           tx.type === 'book_purchase_reward' ? 'bg-amber-100 text-amber-700' :
@@ -1415,7 +1415,7 @@ export default function AdminDashboard() {
           ) : userDetails ? (
             <>
               {/* User Info Section */}
-              <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4">
+              <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-lg p-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-500">{texts.email}</p>
@@ -1425,7 +1425,7 @@ export default function AdminDashboard() {
                     <p className="text-xs text-gray-500">{texts.role}</p>
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                       userDetails.user.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700'
+                        ? 'bg-indigo-100 text-indigo-700'
                         : 'bg-gray-100 text-gray-700'
                     }`}>
                       {userDetails.user.role}
@@ -1655,7 +1655,7 @@ export default function AdminDashboard() {
                               </td>
                               <td className="py-2">
                                 <span className={`px-2 py-0.5 rounded-full text-xs ${
-                                  tx.type === 'admin_add' ? 'bg-purple-100 text-purple-700' :
+                                  tx.type === 'admin_add' ? 'bg-indigo-100 text-indigo-700' :
                                   tx.type === 'story_complete' ? 'bg-green-100 text-green-700' :
                                   tx.type === 'story_refund' ? 'bg-blue-100 text-blue-700' :
                                   tx.type === 'story_reserve' ? 'bg-yellow-100 text-yellow-700' :

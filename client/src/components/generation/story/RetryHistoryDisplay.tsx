@@ -356,8 +356,8 @@ export function RetryHistoryDisplay({
         </div>
       )}
 
-      <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-        <summary className="cursor-pointer text-sm font-semibold text-purple-700 flex items-center justify-between">
+      <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-indigo-700 flex items-center justify-between">
           <span className="flex items-center gap-2">
             <History size={14} />
             {language === 'de' ? 'Generierungshistorie' : language === 'fr' ? 'Historique de génération' : 'Generation History'}
@@ -368,7 +368,7 @@ export function RetryHistoryDisplay({
               </span>
             )}
           </span>
-          <span className="text-purple-600">
+          <span className="text-indigo-600">
             {totalAttempts} {language === 'de' ? 'Versuche' : language === 'fr' ? 'tentatives' : 'attempts'}
           </span>
         </summary>
@@ -499,10 +499,10 @@ export function RetryHistoryDisplay({
                           </div>
                           {detection.success && (
                             <div className="grid grid-cols-2 gap-3 text-xs">
-                              <div className={`p-2 rounded ${detection.faceBox ? 'bg-purple-100' : 'bg-gray-100'}`}>
-                                <span className="font-medium text-purple-800">Face Box:</span>
+                              <div className={`p-2 rounded ${detection.faceBox ? 'bg-indigo-100' : 'bg-gray-100'}`}>
+                                <span className="font-medium text-indigo-800">Face Box:</span>
                                 {detection.faceBox ? (
-                                  <span className="ml-1 font-mono text-purple-600">
+                                  <span className="ml-1 font-mono text-indigo-600">
                                     [{detection.faceBox.map(v => (v * 100).toFixed(0) + '%').join(', ')}]
                                   </span>
                                 ) : (
@@ -952,7 +952,7 @@ export function RetryHistoryDisplay({
                                               <img
                                                 src={`data:image/jpeg;base64,${repair.diffImage}`}
                                                 alt="Diff"
-                                                className="w-16 h-16 object-contain cursor-pointer hover:ring-2 hover:ring-purple-400 rounded border"
+                                                className="w-16 h-16 object-contain cursor-pointer hover:ring-2 hover:ring-indigo-400 rounded border"
                                                 onClick={() => setEnlargedImg({
                                                   src: `data:image/jpeg;base64,${repair.diffImage}`,
                                                   title: `${repair.letter}: Diff`

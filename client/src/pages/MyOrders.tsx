@@ -70,7 +70,7 @@ function OrderStatusBadge({ status, language }: { status: string; language: stri
         return {
           icon: <Clock size={14} />,
           text: language === 'de' ? 'Wird gedruckt' : language === 'fr' ? 'Impression' : 'Printing',
-          className: 'bg-purple-100 text-purple-800'
+          className: 'bg-indigo-100 text-indigo-800'
         };
       case 'cancelled':
       case 'canceled':

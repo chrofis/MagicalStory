@@ -116,7 +116,7 @@ export function ReferencePhotosDisplay({
       case 'face': return 'bg-yellow-100 text-yellow-700 border-yellow-300';
       case 'clothing-winter': return 'bg-cyan-100 text-cyan-700 border-cyan-300';
       case 'clothing-summer': return 'bg-orange-100 text-orange-700 border-orange-300';
-      case 'clothing-formal': return 'bg-purple-100 text-purple-700 border-purple-300';
+      case 'clothing-formal': return 'bg-indigo-100 text-indigo-700 border-indigo-300';
       case 'clothing-standard': return 'bg-teal-100 text-teal-700 border-teal-300';
       case 'none': return 'bg-red-100 text-red-700 border-red-300';
       default: return 'bg-gray-100 text-gray-700 border-gray-300';
@@ -196,12 +196,12 @@ export function ReferencePhotosDisplay({
                     <img
                       src={photo.photoUrl}
                       alt={`${photo.name} - ${getPhotoTypeLabel(photo.photoType || 'unknown')}`}
-                      className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-purple-400 ring-2 ring-purple-200' : 'border-gray-200'}`}
+                      className={`w-full max-h-32 object-contain rounded border bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity ${photo.isStyled ? 'border-indigo-400 ring-2 ring-indigo-200' : 'border-gray-200'}`}
                       onClick={() => setLightboxImage(photo.photoUrl)}
                       title="Click to enlarge"
                     />
                     {photo.isStyled && (
-                      <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-purple-500 text-white rounded">
+                      <span className="absolute top-1 right-1 px-1 py-0.5 text-[9px] font-bold bg-indigo-500 text-white rounded">
                         🎨 STYLED
                       </span>
                     )}

@@ -1478,17 +1478,17 @@ export function StoryDisplay({
         <div className="space-y-4 mt-6">
           {/* Full Outline/Combined Generation Output */}
           {outline && (
-            <details className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-              <summary className="cursor-pointer text-lg font-bold text-purple-800 hover:text-purple-900 flex items-center gap-2">
+            <details className="bg-indigo-50 border-2 border-indigo-200 rounded-xl p-4">
+              <summary className="cursor-pointer text-lg font-bold text-indigo-800 hover:text-indigo-900 flex items-center gap-2">
                 <FileText size={20} />
                 {isPictureBook
                   ? (language === 'de' ? 'Vollständige API-Ausgabe (Kombiniert)' : language === 'fr' ? 'Sortie API complète (Combinée)' : 'Full API Output (Combined)')
                   : (language === 'de' ? 'Vollständige API-Ausgabe (Outline)' : language === 'fr' ? 'Sortie API complète (Plan)' : 'Full API Output (Outline)')}
                 {outlineModelId && (
-                  <span className="ml-2 text-sm font-normal text-purple-600">({outlineModelId})</span>
+                  <span className="ml-2 text-sm font-normal text-indigo-600">({outlineModelId})</span>
                 )}
                 {outlineUsage && (
-                  <span className="ml-2 text-xs font-normal text-purple-500">
+                  <span className="ml-2 text-xs font-normal text-indigo-500">
                     [{outlineUsage.input_tokens.toLocaleString()} in / {outlineUsage.output_tokens.toLocaleString()} out]
                   </span>
                 )}
@@ -1497,22 +1497,22 @@ export function StoryDisplay({
                 {/* Input: The prompt sent to the API */}
                 {outlinePrompt && (
                   <div>
-                    <h4 className="text-sm font-bold text-purple-700 mb-2">
+                    <h4 className="text-sm font-bold text-indigo-700 mb-2">
                       {language === 'de' ? '📤 Prompt (Eingabe)' : language === 'fr' ? '📤 Prompt (Entrée)' : '📤 Prompt (Input)'}
                     </h4>
-                    <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                       {outlinePrompt}
                     </pre>
                   </div>
                 )}
                 {/* Output: The outline/combined response */}
                 <div>
-                  <h4 className="text-sm font-bold text-purple-700 mb-2">
+                  <h4 className="text-sm font-bold text-indigo-700 mb-2">
                     {isPictureBook
                       ? (language === 'de' ? '📥 API-Antwort (Kombiniert)' : language === 'fr' ? '📥 Réponse API (Combinée)' : '📥 API Response (Combined)')
                       : (language === 'de' ? '📥 API-Antwort (Outline)' : language === 'fr' ? '📥 Réponse API (Plan)' : '📥 API Response (Outline)')}
                   </h4>
-                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-purple-200 overflow-x-auto max-h-[400px] overflow-y-auto">
+                  <pre className="text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-4 rounded-lg border border-indigo-200 overflow-x-auto max-h-[400px] overflow-y-auto">
                     {outline}
                   </pre>
                 </div>
@@ -1598,15 +1598,15 @@ export function StoryDisplay({
 
                 {/* Main Characters - Style Analysis */}
                 {visualBible.mainCharacters && visualBible.mainCharacters.length > 0 && (
-                  <div className="bg-white border border-purple-300 rounded-lg p-3">
-                    <h4 className="text-sm font-bold text-purple-700 mb-2 flex items-center gap-2">
+                  <div className="bg-white border border-indigo-300 rounded-lg p-3">
+                    <h4 className="text-sm font-bold text-indigo-700 mb-2 flex items-center gap-2">
                       <span className="text-lg">👗</span>
                       {language === 'de' ? 'Hauptcharaktere (Style Profile)' : language === 'fr' ? 'Personnages Principaux (Profil Style)' : 'Main Characters (Style Profile)'}
                     </h4>
                     <div className="space-y-3">
                       {visualBible.mainCharacters.map((char) => (
-                        <details key={char.id} className="bg-purple-50 p-2 rounded text-sm">
-                          <summary className="cursor-pointer font-semibold text-purple-800 hover:text-purple-900">
+                        <details key={char.id} className="bg-indigo-50 p-2 rounded text-sm">
+                          <summary className="cursor-pointer font-semibold text-indigo-800 hover:text-indigo-900">
                             {char.name}
                             {Object.keys(char.generatedOutfits || {}).length > 0 && (
                               <span className="ml-2 px-1.5 py-0.5 bg-green-100 text-green-700 rounded text-xs">
@@ -1625,12 +1625,12 @@ export function StoryDisplay({
                             </div>
                             {/* Generated Outfits */}
                             {char.generatedOutfits && Object.keys(char.generatedOutfits).length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-purple-200">
+                              <div className="mt-2 pt-2 border-t border-indigo-200">
                                 <span className="font-medium text-gray-600 text-xs">Generated Outfits:</span>
                                 <div className="mt-1 space-y-1">
                                   {Object.entries(char.generatedOutfits).map(([pageNum, outfit]) => (
                                     <div key={pageNum} className="bg-white p-1.5 rounded text-xs">
-                                      <span className="font-medium text-purple-600">Page {pageNum}:</span>
+                                      <span className="font-medium text-indigo-600">Page {pageNum}:</span>
                                       <span className="text-gray-700 ml-1">{outfit.outfit?.substring(0, 80)}...</span>
                                       <span className={`ml-1 px-1 py-0.5 rounded text-[10px] ${
                                         outfit.setting === 'outdoor-cold' ? 'bg-blue-100 text-blue-700' :
@@ -1670,7 +1670,7 @@ export function StoryDisplay({
                                   {entry.source === 'outline' ? 'Outline' : 'Story'}
                                 </span>
                               )}
-                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">has ref</span>}
                               {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                             </div>
                           {editingEntry?.type === 'secondaryCharacter' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
@@ -1735,7 +1735,7 @@ export function StoryDisplay({
                                   {entry.source === 'outline' ? 'Outline' : 'Story'}
                                 </span>
                               )}
-                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">has ref</span>}
                               {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                             </div>
                           {editingEntry?.type === 'animal' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
@@ -1800,7 +1800,7 @@ export function StoryDisplay({
                                   {entry.source === 'outline' ? 'Outline' : 'Story'}
                                 </span>
                               )}
-                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">has ref</span>}
                               {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                             </div>
                           {editingEntry?.type === 'artifact' && editingEntry?.id === entry.id && editingEntry?.field === 'description' ? (
@@ -1875,7 +1875,7 @@ export function StoryDisplay({
                                   📷 Photo
                                 </span>
                               )}
-                              {!entry.isRealLandmark && entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {!entry.isRealLandmark && entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">has ref</span>}
                               {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                             </div>
                           {entry.isRealLandmark && entry.landmarkQuery && (
@@ -1960,7 +1960,7 @@ export function StoryDisplay({
                                   {entry.source === 'outline' ? 'Outline' : 'Story'}
                                 </span>
                               )}
-                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">has ref</span>}
+                              {entry.hasReferenceImage && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">has ref</span>}
                               {entry.appearsInPages?.length > 0 && <span className="text-xs text-rose-600">(Pages: {entry.appearsInPages.join(', ')})</span>}
                             </div>
                             <div className="text-gray-700 text-xs mt-1">{entry.description}</div>
@@ -1988,7 +1988,7 @@ export function StoryDisplay({
                           <div className="font-semibold text-rose-800 flex items-center gap-2">
                             {entry.name}
                             {entry.id && <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 font-mono">{entry.id}</span>}
-                            {entry.wornBy && <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">worn by {entry.wornBy}</span>}
+                            {entry.wornBy && <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-700">worn by {entry.wornBy}</span>}
                             {entry.source && (
                               <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.source === 'outline' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                                 {entry.source === 'outline' ? 'Outline' : 'Story'}
@@ -2023,7 +2023,7 @@ export function StoryDisplay({
                         <div key={idx} className="bg-amber-50 p-2 rounded text-xs border-l-2 border-amber-400">
                           <div className="flex items-center gap-2">
                             <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                              entry.type === 'mainCharacter' ? 'bg-purple-100 text-purple-700' :
+                              entry.type === 'mainCharacter' ? 'bg-indigo-100 text-indigo-700' :
                               entry.type === 'secondaryCharacter' ? 'bg-rose-100 text-rose-700' :
                               entry.type === 'generatedOutfit' ? 'bg-green-100 text-green-700' :
                               entry.type === 'animal' ? 'bg-orange-100 text-orange-700' :
@@ -2115,7 +2115,7 @@ export function StoryDisplay({
                         )}
                       </div>
                       {/* Costumed */}
-                      <div className={`p-2 rounded ${requirements.costumed?.used ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50 border border-gray-200 opacity-50'}`}>
+                      <div className={`p-2 rounded ${requirements.costumed?.used ? 'bg-indigo-50 border border-indigo-200' : 'bg-gray-50 border border-gray-200 opacity-50'}`}>
                         <div className="font-semibold text-gray-700 flex items-center gap-1">
                           {requirements.costumed?.used ? '🎭' : '⬜'} Costumed
                         </div>
@@ -2203,8 +2203,8 @@ export function StoryDisplay({
 
                       {/* Prompt */}
                       {entry.prompt && (
-                        <details className="bg-purple-50 p-2 rounded text-xs">
-                          <summary className="cursor-pointer font-semibold text-purple-700 hover:text-purple-800">
+                        <details className="bg-indigo-50 p-2 rounded text-xs">
+                          <summary className="cursor-pointer font-semibold text-indigo-700 hover:text-indigo-800">
                             Prompt ({entry.prompt.length} chars)
                           </summary>
                           <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-[500px] overflow-y-auto">
@@ -2346,8 +2346,8 @@ export function StoryDisplay({
 
                       {/* Prompt */}
                       {entry.prompt && (
-                        <details className="bg-purple-50 p-2 rounded text-xs">
-                          <summary className="cursor-pointer font-semibold text-purple-700 hover:text-purple-800">
+                        <details className="bg-indigo-50 p-2 rounded text-xs">
+                          <summary className="cursor-pointer font-semibold text-indigo-700 hover:text-indigo-800">
                             Prompt ({entry.prompt.length} chars)
                           </summary>
                           <pre className="mt-2 text-gray-700 whitespace-pre-wrap text-[10px] max-h-[500px] overflow-y-auto">
@@ -2479,7 +2479,7 @@ export function StoryDisplay({
                     {/* Stage badge */}
                     <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
                       entry.stage === 'outline' ? 'bg-blue-100 text-blue-700' :
-                      entry.stage === 'avatars' ? 'bg-purple-100 text-purple-700' :
+                      entry.stage === 'avatars' ? 'bg-indigo-100 text-indigo-700' :
                       entry.stage === 'scenes' ? 'bg-green-100 text-green-700' :
                       entry.stage === 'images' ? 'bg-orange-100 text-orange-700' :
                       entry.stage === 'covers' ? 'bg-pink-100 text-pink-700' :
@@ -2567,7 +2567,7 @@ export function StoryDisplay({
                             {clothingCat && (
                               <span className={`ml-1.5 text-xs font-normal px-1.5 py-0.5 rounded ${
                                 clothingCat.startsWith('costumed:')
-                                  ? 'bg-purple-100 text-purple-700'
+                                  ? 'bg-indigo-100 text-indigo-700'
                                   : clothingCat === 'winter'
                                     ? 'bg-blue-100 text-blue-700'
                                     : clothingCat === 'summer'
@@ -2744,7 +2744,7 @@ export function StoryDisplay({
                                       );
                                     })()}
                                     {(issue as { clothingCategory?: string }).clothingCategory && (
-                                      <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">
+                                      <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px]">
                                         {(issue as { clothingCategory?: string }).clothingCategory}
                                       </span>
                                     )}
@@ -3125,7 +3125,7 @@ export function StoryDisplay({
                                     {issue.type?.replace(/_/g, ' ')}
                                   </span>
                                   {issue.characterInvolved && (
-                                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded text-[10px]">
+                                    <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[10px]">
                                       {issue.characterInvolved}
                                     </span>
                                   )}
@@ -3226,15 +3226,15 @@ export function StoryDisplay({
                         </details>
                         {/* Raw responses (collapsible) - for debugging/fine-tuning */}
                         {check.rawResponses && check.rawResponses.length > 0 && (
-                          <details className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
-                            <summary className="cursor-pointer text-xs font-medium text-purple-800">
+                          <details className="mt-3 bg-indigo-50 border border-indigo-200 rounded p-2">
+                            <summary className="cursor-pointer text-xs font-medium text-indigo-800">
                               📝 View Raw Response{check.rawResponses.length > 1 ? `s (${check.rawResponses.length} batches)` : ''}
                             </summary>
                             <div className="mt-2 space-y-3">
                               {check.rawResponses.map((response, respIdx) => (
                                 <div key={respIdx}>
                                   {(check.rawResponses?.length ?? 0) > 1 && (
-                                    <div className="text-xs font-semibold text-purple-700 mb-1">Batch {respIdx + 1}:</div>
+                                    <div className="text-xs font-semibold text-indigo-700 mb-1">Batch {respIdx + 1}:</div>
                                   )}
                                   <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto bg-white p-2 rounded border">
                                     {response}
@@ -3346,8 +3346,8 @@ export function StoryDisplay({
                       )}
                       {/* Raw API response (collapsible) - for debugging */}
                       {finalChecksReport.textCheck.rawResponse && (
-                        <details className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
-                          <summary className="cursor-pointer text-xs font-medium text-purple-800">
+                        <details className="mt-3 bg-indigo-50 border border-indigo-200 rounded p-2">
+                          <summary className="cursor-pointer text-xs font-medium text-indigo-800">
                             📝 View Raw Response
                           </summary>
                           <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-sans max-h-[500px] overflow-y-auto">
@@ -3420,8 +3420,8 @@ export function StoryDisplay({
                       )}
                       {/* Scene Prompt (Art Director) */}
                       {scene.scenePrompt && (
-                        <div className="bg-purple-50 p-2 rounded text-xs">
-                          <span className="font-semibold text-purple-700">Scene Prompt:</span>
+                        <div className="bg-indigo-50 p-2 rounded text-xs">
+                          <span className="font-semibold text-indigo-700">Scene Prompt:</span>
                           <p className="text-gray-700 mt-1 whitespace-pre-wrap">{scene.scenePrompt}</p>
                         </div>
                       )}
@@ -3479,7 +3479,7 @@ export function StoryDisplay({
             </p>
             <div className="relative">
               {isCoverLazyLoading ? (
-                <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
+                <div className="aspect-[3/4] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-lg flex flex-col items-center justify-center">
                   <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                   <p className="text-indigo-600 font-medium">
                     {storyLang === 'de' ? 'Cover wird geladen...' : storyLang === 'fr' ? 'Chargement de la couverture...' : 'Loading cover...'}
@@ -3896,7 +3896,7 @@ export function StoryDisplay({
 
       {/* Progressive Mode: Waiting for story text after cover */}
       {progressiveMode && !story && coverImages?.frontCover && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-8 mt-6">
+        <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 border-2 border-indigo-200 rounded-xl p-8 mt-6">
           <div className="flex flex-col items-center text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
             <h3 className="text-xl font-semibold text-indigo-700">
@@ -3948,7 +3948,7 @@ export function StoryDisplay({
                   <div className="flex flex-col items-center max-w-2xl mx-auto">
                     {/* Image on top - show placeholder if waiting for image or lazy loading */}
                     {(isWaitingForImage || isLazyLoading) ? (
-                      <div className="w-full mb-4 aspect-[4/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-md flex flex-col items-center justify-center">
+                      <div className="w-full mb-4 aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-300 border-t-indigo-600 mb-4"></div>
                         <p className="text-indigo-600 font-medium">
                           {isLazyLoading
@@ -4043,8 +4043,8 @@ export function StoryDisplay({
                                     }
                                   }}
                                   disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
-                                  className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
                                 >
@@ -4061,18 +4061,18 @@ export function StoryDisplay({
                                   )}
                                 </button>
                                 {iterateOptionsPage === pageNumber && (
-                                  <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                                  <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
                                     <div className="space-y-1">
                                       <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-purple-600" />
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-600" />
                                         <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
                                       </label>
                                       <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-purple-600" />
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-600" />
                                         <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
                                       </label>
                                       <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-purple-600" />
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-600" />
                                         <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
                                       </label>
                                     </div>
@@ -4089,13 +4089,13 @@ export function StoryDisplay({
                                           useOriginalAsReference: iterateMode === 'reference',
                                           blackoutIssues: iterateMode === 'blackout',
                                         })}
-                                        className="flex-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-purple-700"
+                                        className="flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700"
                                       >
                                         {language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration'}
                                       </button>
                                       <button
                                         onClick={() => setIterateOptionsPage(null)}
-                                        className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-purple-100"
+                                        className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-indigo-100"
                                       >
                                         ✕
                                       </button>
@@ -4240,8 +4240,8 @@ export function StoryDisplay({
 
                             {/* 2. Scene Prompt (Art Director) */}
                             {getScenePrompt(pageNumber) && (
-                              <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900">
+                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-indigo-800 hover:text-indigo-900">
                                   {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -4316,8 +4316,8 @@ export function StoryDisplay({
 
                             {/* Semantic Fidelity Score (scene vs story text match) */}
                             {image?.semanticResult && (
-                              <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-purple-700 hover:text-purple-900 flex items-center justify-between">
+                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-indigo-700 hover:text-indigo-900 flex items-center justify-between">
                                   <span className="flex items-center gap-2">
                                     {language === 'de' ? 'Semantische Treue' : language === 'fr' ? 'Fidélité sémantique' : 'Semantic Fidelity'}
                                   </span>
@@ -4333,8 +4333,8 @@ export function StoryDisplay({
                                   {/* Visible vs Expected comparison */}
                                   {image.semanticResult.visible && (
                                     <div className="grid grid-cols-2 gap-2 mb-2">
-                                      <div className="bg-white p-2 rounded border border-purple-200">
-                                        <div className="font-medium text-purple-800 mb-1">👁️ Visible:</div>
+                                      <div className="bg-white p-2 rounded border border-indigo-200">
+                                        <div className="font-medium text-indigo-800 mb-1">👁️ Visible:</div>
                                         {(image.semanticResult.visible.characters?.length ?? 0) > 0 && (
                                           <div><span className="text-gray-500">Characters:</span> {image.semanticResult.visible.characters?.join(', ')}</div>
                                         )}
@@ -4348,8 +4348,8 @@ export function StoryDisplay({
                                           <div><span className="text-gray-500">Action:</span> {image.semanticResult.visible.action}</div>
                                         )}
                                       </div>
-                                      <div className="bg-white p-2 rounded border border-purple-200">
-                                        <div className="font-medium text-purple-800 mb-1">🎯 Expected:</div>
+                                      <div className="bg-white p-2 rounded border border-indigo-200">
+                                        <div className="font-medium text-indigo-800 mb-1">🎯 Expected:</div>
                                         {(image.semanticResult.expected?.characters?.length ?? 0) > 0 && (
                                           <div><span className="text-gray-500">Characters:</span> {image.semanticResult.expected?.characters?.join(', ')}</div>
                                         )}
@@ -4367,7 +4367,7 @@ export function StoryDisplay({
                                   )}
                                   {/* Semantic issues */}
                                   {image.semanticResult.semanticIssues?.length > 0 && (
-                                    <ul className="list-disc list-inside text-purple-700 bg-white p-2 rounded border border-purple-200">
+                                    <ul className="list-disc list-inside text-indigo-700 bg-white p-2 rounded border border-indigo-200">
                                       {image.semanticResult.semanticIssues.map((issue, idx) => (
                                         <li key={idx}>
                                           <span className={`font-medium ${
@@ -4445,7 +4445,7 @@ export function StoryDisplay({
                         )}
                       </div>
                     ) : (
-                      <div className={`w-full flex flex-col items-center justify-center rounded-lg p-8 mb-4 ${isGenerating ? 'bg-gradient-to-br from-indigo-100 to-purple-100' : 'bg-gray-100'}`}>
+                      <div className={`w-full flex flex-col items-center justify-center rounded-lg p-8 mb-4 ${isGenerating ? 'bg-gradient-to-br from-indigo-100 to-indigo-100' : 'bg-gray-100'}`}>
                         {isGenerating ? (
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
@@ -4483,7 +4483,7 @@ export function StoryDisplay({
                     {/* Image on the left - show placeholder if lazy loading */}
                     {isLazyLoading ? (
                       <div className="flex flex-col">
-                        <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg shadow-md flex flex-col items-center justify-center">
+                        <div className="aspect-[4/3] bg-gradient-to-br from-indigo-100 to-indigo-100 rounded-lg shadow-md flex flex-col items-center justify-center">
                           <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
                           <p className="text-indigo-600 font-medium text-sm">
                             {storyLang === 'de' ? 'Bild wird geladen...' : storyLang === 'fr' ? 'Chargement de l\'image...' : 'Loading image...'}
@@ -4572,8 +4572,8 @@ export function StoryDisplay({
                                     }
                                   }}
                                   disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
-                                  className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                                  className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
                                 >
@@ -4590,18 +4590,18 @@ export function StoryDisplay({
                                   )}
                                 </button>
                                 {iterateOptionsPage === pageNumber && (
-                                  <div className="mt-2 bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                                  <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
                                     <div className="space-y-1">
                                       <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-purple-600" />
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'fresh'} onChange={() => setIterateMode('fresh')} className="text-indigo-600" />
                                         <span className="text-sm text-gray-700">{language === 'de' ? 'Neue Generierung' : 'Fresh generation'}</span>
                                       </label>
                                       <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-purple-600" />
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'reference'} onChange={() => setIterateMode('reference')} className="text-indigo-600" />
                                         <span className="text-sm text-gray-700">{language === 'de' ? 'Aktuelles Bild als Referenz' : 'Use original as reference'}</span>
                                       </label>
                                       <label className="flex items-center gap-2 cursor-pointer">
-                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-purple-600" />
+                                        <input type="radio" name={`iterateMode-${pageNumber}`} checked={iterateMode === 'blackout'} onChange={() => setIterateMode('blackout')} className="text-indigo-600" />
                                         <span className="text-sm text-gray-700">{language === 'de' ? 'Fehler schwärzen' : 'Blackout issues'}</span>
                                       </label>
                                     </div>
@@ -4618,13 +4618,13 @@ export function StoryDisplay({
                                           useOriginalAsReference: iterateMode === 'reference',
                                           blackoutIssues: iterateMode === 'blackout',
                                         })}
-                                        className="flex-1 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-purple-700"
+                                        className="flex-1 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-700"
                                       >
                                         {language === 'de' ? 'Iteration starten' : language === 'fr' ? 'Démarrer l\'itération' : 'Start Iteration'}
                                       </button>
                                       <button
                                         onClick={() => setIterateOptionsPage(null)}
-                                        className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-purple-100"
+                                        className="px-3 py-1.5 rounded-lg text-sm text-gray-600 hover:bg-indigo-100"
                                       >
                                         ✕
                                       </button>
@@ -4769,8 +4769,8 @@ export function StoryDisplay({
 
                             {/* 2. Scene Prompt (Art Director) */}
                             {getScenePrompt(pageNumber) && (
-                              <details className="bg-purple-50 border border-purple-300 rounded-lg p-3">
-                                <summary className="cursor-pointer text-sm font-semibold text-purple-800 hover:text-purple-900">
+                              <details className="bg-indigo-50 border border-indigo-300 rounded-lg p-3">
+                                <summary className="cursor-pointer text-sm font-semibold text-indigo-800 hover:text-indigo-900">
                                   {language === 'de' ? 'Szenen-Prompt' : language === 'fr' ? 'Prompt de scène' : 'Scene Prompt'}
                                 </summary>
                                 <pre className="mt-2 text-xs text-gray-700 whitespace-pre-wrap font-mono bg-white p-3 rounded border border-gray-200 overflow-x-auto max-h-[500px] overflow-y-auto">
@@ -4903,7 +4903,7 @@ export function StoryDisplay({
                         )}
                       </div>
                     ) : (
-                      <div className={`flex flex-col items-center justify-center rounded-lg p-8 ${isGenerating ? 'bg-gradient-to-br from-indigo-100 to-purple-100' : 'bg-gray-100'}`}>
+                      <div className={`flex flex-col items-center justify-center rounded-lg p-8 ${isGenerating ? 'bg-gradient-to-br from-indigo-100 to-indigo-100' : 'bg-gray-100'}`}>
                         {isGenerating ? (
                           <>
                             <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-300 border-t-indigo-600 mb-3"></div>
@@ -5158,7 +5158,7 @@ export function StoryDisplay({
 
       {/* Bottom Action Buttons - for users who scrolled to the end */}
       {hasImages && story && (
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4 mt-6">
+        <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 border-2 border-indigo-200 rounded-xl p-4 mt-6">
           <h3 className="text-base font-bold text-gray-800 mb-3 text-center">
             {language === 'de' ? 'Was möchten Sie als Nächstes tun?' : language === 'fr' ? 'Que souhaitez-vous faire ensuite ?' : 'What would you like to do next?'}
           </h3>

@@ -243,7 +243,7 @@ export default function TrialAuthModal({ characterData, storyInput, onClose }: P
               <p className="text-gray-600 mb-4">{t.verifyingDesc}</p>
               <p className="text-sm text-gray-400 mb-5">{t.verifyingNote}</p>
             </div>
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+            <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 border border-indigo-100">
               <p className="text-sm font-semibold text-indigo-700 mb-2">{t.upsellTitle}</p>
               <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
               <ul className="text-xs text-gray-600 space-y-1">
@@ -261,13 +261,13 @@ export default function TrialAuthModal({ characterData, storyInput, onClose }: P
         {state === 'generating' && (
           <div className="py-4">
             <div className="text-center">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Sparkles className="w-8 h-8 text-purple-600 animate-pulse" />
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
               </div>
               <h2 className="text-2xl font-bold text-gray-800 mb-2">{t.generatingTitle}</h2>
               <p className="text-gray-600 mb-5">{t.generatingDesc}</p>
             </div>
-            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+            <div className="bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 border border-indigo-100">
               <p className="text-sm font-semibold text-indigo-700 mb-2">{t.upsellTitle}</p>
               <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
               <ul className="text-xs text-gray-600 space-y-1">
