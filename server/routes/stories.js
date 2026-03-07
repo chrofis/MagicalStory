@@ -2112,6 +2112,12 @@ router.get('/:id/cover', authenticateToken, async (req, res) => {
       }
     }
 
+    // FALLBACK: Use first page scene image if no cover exists
+    const firstPageImage = await getStoryImage(id, 'scene', 1, 0);
+    if (firstPageImage) {
+      return res.json({ coverImage: firstPageImage.imageData });
+    }
+
     return res.status(404).json({ error: 'Cover image not found' });
   } catch (err) {
     console.error('❌ Error fetching cover image:', err);
