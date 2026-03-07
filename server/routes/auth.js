@@ -586,7 +586,8 @@ router.get('/verify-email/:token', async (req, res) => {
           : user.trial_data;
 
         // Save character to characters table
-        const characterId = await saveTrialCharacter(pool, user.id, trialData.characterData);
+        const { characterId, charId } = await saveTrialCharacter(pool, user.id, trialData.characterData);
+        trialData.characterData._charId = charId;
 
         // Create story job (reserves credits)
         const jobId = await createTrialStoryJob(pool, user.id, characterId, trialData.characterData, trialData.storyInput);

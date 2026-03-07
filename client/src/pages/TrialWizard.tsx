@@ -125,63 +125,16 @@ export default function TrialWizard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Same navigation bar as the rest of the site */}
-      <Navigation hideSteps />
+      {/* Navigation bar with step indicators matching the main wizard */}
+      <Navigation
+        currentStep={currentStepIndex + 1}
+        onStepClick={(s) => setCurrentStep(STEPS[s - 1])}
+        customSteps={STEPS.map(step => ({ key: step, label: labels[step] }))}
+      />
 
       {/* Main content */}
       <div className="px-3 md:px-8 py-4 md:py-8">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
-          {/* Progress indicator */}
-          <div className="max-w-4xl mx-auto pt-4 pb-2">
-            <div className="flex items-center justify-center gap-2">
-              {STEPS.map((step, index) => {
-                const isActive = index === currentStepIndex;
-                const isCompleted = index < currentStepIndex;
-                const isClickable = isCompleted;
-                return (
-                  <div key={step} className="flex items-center gap-2">
-                    <div
-                      className={`flex flex-col items-center ${isClickable ? 'cursor-pointer' : ''}`}
-                      onClick={() => isClickable && setCurrentStep(STEPS[index])}
-                    >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                          isActive
-                            ? 'bg-indigo-600 text-white ring-2 ring-indigo-300 scale-110'
-                            : isCompleted
-                              ? 'bg-indigo-500 text-white hover:bg-indigo-600'
-                              : 'bg-gray-200 text-gray-400'
-                        }`}
-                      >
-                        {isCompleted ? (
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                          index + 1
-                        )}
-                      </div>
-                      <span
-                        className={`text-xs mt-1 font-medium ${
-                          isActive ? 'text-indigo-700' : isCompleted ? 'text-indigo-500' : 'text-gray-400'
-                        }`}
-                      >
-                        {labels[step]}
-                      </span>
-                    </div>
-                    {index < STEPS.length - 1 && (
-                      <div
-                        className={`w-12 h-0.5 mb-5 ${
-                          index < currentStepIndex ? 'bg-indigo-500' : 'bg-gray-200'
-                        }`}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Step content */}
           <div className="max-w-4xl mx-auto pb-12">
             {currentStep === 'character' && (

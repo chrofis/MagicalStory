@@ -350,12 +350,15 @@ async function saveTrialCharacter(pool, userId, characterData) {
   const characterId = `characters_${userId}`;
 
   // Build the character object matching the format used by characters.js
+  const charId = Date.now();
   const character = {
+    id: charId,
     name: characterData.name || 'Child',
     age: characterData.age || '',
     gender: characterData.gender || '',
     traits: characterData.traits || [],
     role: 'main',
+    isMainCharacter: true,
     photos: characterData.photos || {},
     // Photos stored as top-level fields too (used by story pipeline)
     photoUrl: characterData.photos?.face || null,
@@ -391,7 +394,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
   );
 
   log.debug(`[TRIAL] Saved character for user ${userId}: ${character.name}`);
-  return characterId;
+  return { characterId, charId };
 }
 
 /**
@@ -413,6 +416,20 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
 
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+  // Build character object for inputData (stripped version - full data loaded from DB during processing)
+  const trialCharacter = {
+    id: characterData._charId,
+    name: characterData.name || 'Child',
+    age: characterData.age || '',
+    gender: characterData.gender || '',
+    traits: characterData.traits || [],
+    role: 'main',
+    isMainCharacter: true,
+    photoUrl: characterData.photos?.face || null,
+    bodyPhotoUrl: characterData.photos?.body || null,
+    bodyNoBgUrl: characterData.photos?.bodyNoBg || null,
+  };
+
   // Build input_data matching the format expected by processStoryJob
   const inputData = {
     pages,
@@ -424,6 +441,9 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     storyTheme: storyInput.storyTheme || '',
     storyDetails: storyInput.storyDetails || '',
     characterId,
+    characters: [trialCharacter],
+    mainCharacters: [trialCharacter.id],
+    skipCovers: true, // Trial stories don't generate covers
   };
 
   // Reserve credits from the trial user
@@ -687,7 +707,8 @@ router.post('/register-google', trialRegisterLimiter, async (req, res) => {
       );
 
       // Save character and create job using existing user
-      const characterId = await saveTrialCharacter(pool, existingUser.id, characterData);
+      const { characterId, charId } = await saveTrialCharacter(pool, existingUser.id, characterData);
+      characterData._charId = charId;
       const jobId = await createTrialStoryJob(pool, existingUser.id, characterId, characterData, storyInput);
 
       // Fetch full user for token generation
@@ -745,7 +766,8 @@ router.post('/register-google', trialRegisterLimiter, async (req, res) => {
     );
 
     // Save character to characters table
-    const characterId = await saveTrialCharacter(pool, userId, characterData);
+    const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
+    characterData._charId = charId;
 
     // Create story job
     const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput);

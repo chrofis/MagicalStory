@@ -8,6 +8,11 @@ import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from './CreditsModal';
 import { UserMenu } from './UserMenu';
 
+interface CustomStep {
+  key: string;
+  label: string;
+}
+
 interface NavigationProps {
   currentStep?: number;
   onStepClick?: (step: number) => void;
@@ -16,6 +21,7 @@ interface NavigationProps {
   onDeveloperModeChange?: (enabled: boolean) => void;
   hideSteps?: boolean;  // Hide step navigation (e.g., when viewing a saved story)
   onShowGenerationProgress?: () => void;  // Called to show generation progress when already on /create
+  customSteps?: CustomStep[];  // Custom steps (e.g., trial wizard with 3 steps)
 }
 
 // Step labels for desktop view
@@ -25,7 +31,7 @@ const stepLabels: Record<string, Record<number, string>> = {
   fr: { 1: 'Personnages', 2: 'Livre', 3: 'Histoire', 4: 'Style', 5: 'Résumé' },
 };
 
-export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false, onShowGenerationProgress }: NavigationProps) {
+export function Navigation({ currentStep = 0, onStepClick, canAccessStep, developerMode = false, onDeveloperModeChange, hideSteps = false, onShowGenerationProgress, customSteps }: NavigationProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
@@ -88,7 +94,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
         </div>
 
         {/* Center: Step Navigation (hidden when viewing saved story) */}
-        {!hideSteps && currentStep > 0 && onStepClick && canAccessStep && (
+        {!hideSteps && currentStep > 0 && onStepClick && canAccessStep && !customSteps && (
           <div className="flex items-center flex-1 justify-center">
             {[1, 2, 3, 4, 5].map(s => {
               const canAccess = canAccessStep(s);
@@ -118,6 +124,45 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                     </span>
                   </div>
                   {s < 5 && <div className={`w-3 md:w-4 h-0.5 self-start mt-2.5 md:mt-3.5 mx-0.5 md:mx-1 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Center: Custom Step Navigation (e.g., trial wizard) */}
+        {customSteps && customSteps.length > 0 && onStepClick && (
+          <div className="flex items-center flex-1 justify-center">
+            {customSteps.map((step, index) => {
+              const s = index + 1;
+              const isActive = currentStep === s;
+              const isCompleted = s < currentStep;
+              const canAccess = isCompleted;
+              return (
+                <div key={step.key} className="flex items-center">
+                  <div className="flex flex-col items-center">
+                    <button
+                      onClick={() => canAccess && onStepClick(s)}
+                      disabled={!canAccess}
+                      className={`w-5 h-5 md:w-7 md:h-7 rounded-full flex items-center justify-center text-[10px] md:text-xs font-bold transition-all ${
+                        isActive
+                          ? 'bg-indigo-500 text-white ring-2 ring-white scale-110 shadow-lg shadow-indigo-500/50'
+                          : canAccess
+                            ? 'bg-indigo-600 text-white hover:bg-indigo-500 cursor-pointer hover:scale-110'
+                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {s}
+                    </button>
+                    <span className={`hidden md:block text-[10px] mt-0.5 transition-all ${
+                      isActive ? 'text-white font-semibold' : 'text-gray-400'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                  {index < customSteps.length - 1 && (
+                    <div className={`w-3 md:w-4 h-0.5 self-start mt-2.5 md:mt-3.5 mx-0.5 md:mx-1 ${canAccess ? 'bg-indigo-500' : 'bg-gray-600'}`} />
+                  )}
                 </div>
               );
             })}
