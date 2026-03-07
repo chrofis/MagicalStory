@@ -190,7 +190,7 @@ export default function LandingPage() {
   }, [searchParams]);
 
   const handleStartJourney = () => {
-    setShowAuthModal(true);
+    navigate('/try');
   };
 
   const handleAuthSuccess = async () => {
