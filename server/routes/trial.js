@@ -245,9 +245,9 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Minimal prompt — just title + short summary
     const buildTrialPrompt = (variant) => `Generate a children's story idea for a SHORT 5-scene story. Character: ${charDesc}. ${categoryContext} ${variant}
 
-This is a short story (5 scenes, 150-200 words each) — keep the plot simple: one clear conflict, one resolution. No subplots.
+Keep the plot simple: one clear conflict, one resolution. No subplots.
 
-Plain text only, no markdown. Line 1: title. Lines 2-3: 2-sentence plot summary.
+Plain text only, no markdown. Line 1: title. Then a 200-300 word story summary describing the plot arc.
 ${langInstruction} Write EVERYTHING in that language.`;
 
     const prompt1 = buildTrialPrompt('Make it engaging and fun.');
@@ -266,8 +266,8 @@ ${langInstruction} Write EVERYTHING in that language.`;
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (500 max tokens — title + summary)
-    const streamStory1 = callTextModelStreaming(prompt1, 500, (delta, fullText) => {
+    // Stream Story 1 (800 max tokens — title + 200-300 word summary)
+    const streamStory1 = callTextModelStreaming(prompt1, 800, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
         res.write(`data: ${JSON.stringify({ story1: fullText.trim() })}\n\n`);
@@ -288,8 +288,8 @@ ${langInstruction} Write EVERYTHING in that language.`;
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 (500 max tokens)
-    const streamStory2 = callTextModelStreaming(prompt2, 500, (delta, fullText) => {
+    // Stream Story 2 (800 max tokens — title + 200-300 word summary)
+    const streamStory2 = callTextModelStreaming(prompt2, 800, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
         res.write(`data: ${JSON.stringify({ story2: fullText.trim() })}\n\n`);
