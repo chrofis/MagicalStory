@@ -158,6 +158,8 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'dealing-bully', name: { en: 'Dealing with Bullies', de: 'Mit Hänseleien umgehen', fr: 'Faire face aux moqueries' }, emoji: '🛡️', ageGroup: 'early-school' },
   { id: 'telling-truth', name: { en: 'Telling the Truth', de: 'Die Wahrheit sagen', fr: 'Dire la vérité' }, emoji: '✅', ageGroup: 'early-school' },
   { id: 'trying-new-things', name: { en: 'Trying New Things', de: 'Neues ausprobieren', fr: 'Essayer de nouvelles choses' }, emoji: '🌟', ageGroup: 'early-school' },
+  { id: 'tattling-vs-telling', name: { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: 'Rapporter vs Demander de l\'aide' }, emoji: '🗣️', ageGroup: 'preschool' },
+  { id: 'understanding-rules', name: { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non' }, emoji: '🚦', ageGroup: 'preschool' },
 
   // Family Changes (All ages)
   { id: 'moving-house', name: { en: 'Moving to a New Home', de: 'Umzug', fr: 'Déménagement' }, emoji: '🏠', ageGroup: 'family' },

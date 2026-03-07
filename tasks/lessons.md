@@ -220,3 +220,75 @@ Each lesson should include:
 - If using functional state updates (`prev =>`), audit what fields are preserved vs overwritten
 - Pattern: `{ ...newData, fieldA: existing?.fieldA || newData.fieldA }` must list ALL fields that could come from a different source
 - Test: load a page fresh and verify all data appears without user interaction
+
+---
+
+### 2026-03-06: Don't Mention "AI" in Customer-Facing Content
+
+**Context**: Email templates had tagline "Personalized AI-Generated Children's Books" in footers
+
+**Mistake**: Used the technical tagline in customer-facing emails. Mentioning "AI-Generated" undermines the magical, premium feel of the product.
+
+**Correction**: User asked "No AI in the tagline" — changed to "Creating Magical Moments, One Story at a Time"
+
+**Rule**:
+- Never mention AI/ML/algorithm in customer-facing content (emails, marketing, UI copy)
+- Use benefit-oriented language ("magical", "personalized", "unique") instead of technical descriptors
+- Technical accuracy matters in docs/code, but customer messaging should sell the experience
+
+---
+
+### 2026-03-06: Email Footers Need Compliance Info for Deliverability
+
+**Context**: Simplified email footer to just a centered logo + website link
+
+**Mistake**: Removed company info (tagline, contact email, physical location) from footer. This hurts spam filter scoring and CAN-SPAM compliance.
+
+**Correction**: User pointed out the original footer had company info and asked if it's needed for spam filters. Yes — CAN-SPAM requires physical address, and contact info improves deliverability scoring.
+
+**Rule**:
+- Email footers MUST include: company name, website, contact email, physical location
+- Use table-based layout for logo + text side-by-side (no flexbox in emails)
+- Footer text should be translated per language section
+- Test with real email clients (not just code review)
+
+---
+
+### 2026-03-06: Don't Hardcode Product Details That May Change
+
+**Context**: Email templates said "Order a printed hardcover book"
+
+**Mistake**: Hardcoded "hardcover" in email copy when the actual product might not always be hardcover.
+
+**Correction**: User asked to remove "hardcover" — changed to "Order a printed book"
+
+**Rule**:
+- Don't over-specify product details in templates unless they're guaranteed
+- Keep product descriptions generic enough to remain accurate as offerings change
+
+---
+
+### 2026-03-06: German UI Copy Should Use Imperative Form
+
+**Context**: German email bullet point "Ein gedrucktes Buch bestellen" (infinitive)
+
+**Correction**: User said "Bestelle ein gedrucktes Buch" (imperative) is better
+
+**Rule**:
+- German action items / bullet points should use imperative form ("Bestelle...", "Sieh dir an...") not infinitive ("Bestellen...", "Ansehen...")
+- Imperative is more natural and direct in German UI/marketing copy
+
+---
+
+### 2026-03-07: Race Conditions in Multi-Writer Save Endpoints
+
+**Context**: Avatar generation failed with "CHARACTER NOT FOUND" after 30 retries because `POST /api/characters` overwrote the DB, deleting characters created by photo analysis
+
+**Mistake**: Proposed a complex retry/create mechanism in the avatar route instead of fixing the root cause.
+
+**Correction**: User pushed back: "This sounds complicated, is this really state of the art?" — the real fix was a 10-line guard in the POST route to preserve DB-only characters that the frontend doesn't know about yet.
+
+**Rule**:
+- When endpoint A creates data and endpoint B overwrites the table, fix the WRITER (B), not the READER (A)
+- Always preserve DB records that aren't in the incoming payload — they may have been created by another process
+- Prefer simple root-cause fixes over complex workarounds. If a fix feels hacky, step back and find the real cause

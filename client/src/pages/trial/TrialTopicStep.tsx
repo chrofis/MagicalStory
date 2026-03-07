@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 import type { StoryInput } from '../TrialWizard';
 import {
@@ -37,47 +37,39 @@ const strings: Record<string, {
   pickTheme: string;
   pickTopic: string;
   pickStyle: string;
-  orCustom: string;
-  customPlaceholder: string;
   back: string;
   next: string;
   change: string;
 }> = {
   en: {
-    title: 'Choose Your Story',
-    subtitle: 'What kind of adventure should we create?',
+    title: 'Choose Your Topic',
+    subtitle: 'What kind of adventure do you want to create?',
     pickCategory: 'Pick a story type',
     pickTheme: 'Pick a theme',
     pickTopic: 'Pick a topic',
-    pickStyle: 'Pick a story style',
-    orCustom: 'Or describe your own topic:',
-    customPlaceholder: 'e.g. Learning to share toys with a sibling',
+    pickStyle: 'Pick a style',
     back: 'Back',
     next: 'Next',
     change: 'Change',
   },
   de: {
-    title: 'Wähle deine Geschichte',
-    subtitle: 'Welches Abenteuer sollen wir erschaffen?',
+    title: 'Wähle dein Thema',
+    subtitle: 'Welches Abenteuer willst du erschaffen?',
     pickCategory: 'Wähle eine Geschichtsart',
     pickTheme: 'Wähle ein Thema',
     pickTopic: 'Wähle ein Thema',
     pickStyle: 'Wähle einen Stil',
-    orCustom: 'Oder beschreibe dein eigenes Thema:',
-    customPlaceholder: 'z.B. Spielzeug mit Geschwistern teilen lernen',
     back: 'Zurück',
     next: 'Weiter',
     change: 'Ändern',
   },
   fr: {
-    title: 'Choisis ton histoire',
-    subtitle: 'Quel type d\'aventure allons-nous créer?',
+    title: 'Choisis ton sujet',
+    subtitle: 'Quel type d\'aventure veux-tu créer ?',
     pickCategory: 'Choisis un type d\'histoire',
     pickTheme: 'Choisis un thème',
     pickTopic: 'Choisis un sujet',
     pickStyle: 'Choisis un style',
-    orCustom: 'Ou décrivez votre propre sujet:',
-    customPlaceholder: 'ex. Apprendre à partager ses jouets avec un frère ou une sœur',
     back: 'Retour',
     next: 'Suivant',
     change: 'Changer',
@@ -89,9 +81,6 @@ const strings: Record<string, {
 export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }: Props) {
   const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
-
-  // Custom topic input for life challenges
-  const [customTopic, setCustomTopic] = useState('');
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -126,14 +115,9 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
       storyTheme: '',
       storyDetails: '',
     });
-    setCustomTopic('');
   };
 
   const handleNext = () => {
-    // If custom topic entered for life challenges, save it to storyDetails
-    if (storyInput.storyCategory === 'life-challenge' && customTopic.trim() && !storyInput.storyTopic) {
-      onChange({ ...storyInput, storyTopic: 'custom', storyDetails: customTopic.trim() });
-    }
     onNext();
   };
 
@@ -143,7 +127,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
     if (!storyInput.storyCategory) return false;
     if (storyInput.storyCategory === 'adventure') return !!storyInput.storyTheme;
     if (storyInput.storyCategory === 'historical') return !!storyInput.storyTopic;
-    if (storyInput.storyCategory === 'life-challenge') return (!!storyInput.storyTopic || !!customTopic.trim()) && !!storyInput.storyTheme;
+    if (storyInput.storyCategory === 'life-challenge') return !!storyInput.storyTopic && !!storyInput.storyTheme;
     return !!storyInput.storyTopic;
   })();
 
@@ -243,7 +227,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
   if (storyInput.storyCategory === 'life-challenge') {
     const catData = trialCategories.find((c) => c.id === 'life-challenge');
-    const hasTopicSelected = !!storyInput.storyTopic || !!customTopic.trim();
+    const hasTopicSelected = !!storyInput.storyTopic;
     const popularThemes = getStoryTypesByGroup('popular');
 
     return (
@@ -272,7 +256,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
           {getLifeChallengesByGroup('popular').map((challenge) => (
             <button
               key={challenge.id}
-              onClick={() => { handleTopicSelect(challenge.id); setCustomTopic(''); }}
+              onClick={() => handleTopicSelect(challenge.id)}
               className={`p-2.5 rounded-lg border transition-all text-left flex items-center gap-2 ${
                 storyInput.storyTopic === challenge.id
                   ? 'border-indigo-500 bg-indigo-50 ring-1 ring-indigo-200'
@@ -285,24 +269,6 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
               </span>
             </button>
           ))}
-        </div>
-
-        {/* Custom topic input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-600 mb-2">{t.orCustom}</label>
-          <input
-            type="text"
-            value={customTopic}
-            onChange={(e) => {
-              setCustomTopic(e.target.value);
-              if (e.target.value.trim()) {
-                onChange({ ...storyInput, storyTopic: '' });
-              }
-            }}
-            placeholder={t.customPlaceholder}
-            maxLength={200}
-            className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400"
-          />
         </div>
 
         {/* Adventure style selector — shown when a topic is selected */}

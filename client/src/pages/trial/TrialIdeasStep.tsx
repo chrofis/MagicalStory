@@ -38,8 +38,8 @@ const strings: Record<string, {
   errorRetry: string;
 }> = {
   en: {
-    title: 'Your Story Ideas',
-    subtitle: 'We created two unique story ideas just for you. Pick your favorite!',
+    title: 'Ideas for Your Story',
+    subtitle: 'Here are two unique story plots. Pick your favorite!',
     editHint: 'You can click into the text to edit the story idea before creating.',
     generating: 'Creating magical story ideas...',
     idea: 'Story Idea',
@@ -52,8 +52,8 @@ const strings: Record<string, {
     errorRetry: 'Try Again',
   },
   de: {
-    title: 'Deine Geschichtenideen',
-    subtitle: 'Wir haben zwei einzigartige Ideen nur für dich erstellt. Wähle deinen Favoriten!',
+    title: 'Ideen für deine Geschichte',
+    subtitle: 'Hier sind zwei Vorschläge. Wähle deinen Favoriten!',
     editHint: 'Du kannst in den Text klicken, um die Idee vor dem Erstellen zu bearbeiten.',
     generating: 'Magische Geschichtenideen werden erstellt...',
     idea: 'Geschichtenidee',
@@ -66,8 +66,8 @@ const strings: Record<string, {
     errorRetry: 'Erneut versuchen',
   },
   fr: {
-    title: 'Vos idées d\'histoire',
-    subtitle: 'Nous avons créé deux idées uniques rien que pour vous. Choisissez votre préférée !',
+    title: 'Idées pour ton histoire',
+    subtitle: 'Voici deux idées uniques. Choisis ta préférée !',
     editHint: 'Vous pouvez cliquer sur le texte pour modifier l\'idée avant de créer.',
     generating: 'Création d\'idées magiques...',
     idea: 'Idée d\'histoire',
