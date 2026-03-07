@@ -446,6 +446,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     skipCovers: true, // Trial stories don't generate covers
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
+    trialMode: true, // Use lightweight story prompt
   };
 
   // Reserve credits from the trial user

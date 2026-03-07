@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Loader2, X, ArrowRight, CheckSquare, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { CharacterData } from '../TrialWizard';
@@ -101,22 +101,22 @@ const strings: Record<string, {
     photoError: 'Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
   },
   fr: {
-    title: 'Creez votre personnage',
-    photoTitle: 'Telecharger une photo',
-    photoHint: 'Telechargez une photo claire pour creer un personnage personnalise',
+    title: 'Créez votre personnage',
+    photoTitle: 'Télécharger une photo',
+    photoHint: 'Téléchargez une photo claire pour créer un personnage personnalisé',
     photoGuidelines: 'Conseil : Visage clair, haut du corps visible fonctionne le mieux',
-    dropOrClick: 'Deposez une photo ici ou cliquez pour telecharger',
+    dropOrClick: 'Déposez une photo ici ou cliquez pour télécharger',
     analyzing: 'Analyse de la photo...',
     changPhoto: 'Changer la photo',
-    nameLabel: 'Prenom',
-    namePlaceholder: "Prenom de l'enfant",
-    ageLabel: 'Age',
+    nameLabel: 'Prénom',
+    namePlaceholder: "Prénom de l'enfant",
+    ageLabel: 'Âge',
     agePlaceholder: 'ex. 5',
     genderLabel: 'Genre',
-    boy: 'Garcon',
+    boy: 'Garçon',
     girl: 'Fille',
-    traitsLabel: 'Traits de personnalite',
-    customTraitsLabel: 'Caracteristiques supplementaires',
+    traitsLabel: 'Traits de personnalité',
+    customTraitsLabel: 'Caractéristiques supplémentaires',
     customTraitsPlaceholder: 'ex. Aime les dinosaures, a peur du noir, a une petite soeur...',
     next: 'Suivant',
     consent1: 'Je confirme que j\'ai le droit d\'utiliser les photos téléchargées et, pour les photos de mineurs, je suis le parent/tuteur ou j\'ai obtenu leur consentement.',
@@ -126,10 +126,10 @@ const strings: Record<string, {
     privacyLink: 'Politique de Confidentialité',
     consentPeriod: ', y compris le traitement de ces photos par l\'IA pour créer des avatars illustrés.',
     pleaseAccept: 'Veuillez accepter les conditions ci-dessus pour télécharger une photo',
-    selectFace: 'Selectionnez le bon visage',
-    noFaceDetected: 'Aucun visage detecte. Veuillez essayer une autre photo.',
-    multipleFaces: 'Plusieurs visages detectes. Veuillez selectionner le bon.',
-    photoError: "Echec de l'analyse de la photo. Veuillez reessayer.",
+    selectFace: 'Sélectionnez le bon visage',
+    noFaceDetected: 'Aucun visage détecté. Veuillez essayer une autre photo.',
+    multipleFaces: 'Plusieurs visages détectés. Veuillez sélectionner le bon.',
+    photoError: "Échec de l'analyse de la photo. Veuillez réessayer.",
   },
 };
 
@@ -159,6 +159,10 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
   const [consent2Checked, setConsent2Checked] = useState(false);
   const hasConsented = !!characterData.consentGiven;
   const canUpload = hasConsented || (consent1Checked && consent2Checked);
+
+  // Keep a ref to the latest characterData so async callbacks don't use stale closures
+  const characterDataRef = useRef(characterData);
+  useEffect(() => { characterDataRef.current = characterData; }, [characterData]);
 
   // Photo analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -205,9 +209,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
           setCachedFacesData(result.cachedFaces);
           setOriginalImageData(base64);
         } else {
-          // Single face - update character photos
+          // Single face - use ref to get latest characterData (user may have edited fields during analysis)
           onChange({
-            ...characterData,
+            ...characterDataRef.current,
             consentGiven: true,
             photos: {
               original: base64,
@@ -227,7 +231,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
     } finally {
       setIsAnalyzing(false);
     }
-  }, [characterData, onChange, t]);
+  }, [onChange, t]);
 
   const handleFileSelect = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) return;
