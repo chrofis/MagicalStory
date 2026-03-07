@@ -208,6 +208,29 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/stories/debug/:id/images - Debug endpoint to check story images (admin only)
+router.get('/debug/:id/images', authenticateToken, async (req, res) => {
+  try {
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { id } = req.params;
+    const images = await dbQuery(
+      'SELECT image_type, page_number, version_index, LENGTH(image_data) as len FROM story_images WHERE story_id = $1 ORDER BY image_type, page_number, version_index',
+      [id]
+    );
+    const meta = await dbQuery('SELECT image_version_meta FROM stories WHERE id = $1', [id]);
+    res.json({
+      storyId: id,
+      imageCount: images.length,
+      images: images.map(r => ({ type: r.image_type, page: r.page_number, version: r.version_index, len: r.len })),
+      versionMeta: meta[0]?.image_version_meta || null
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/stories/debug/:id - Debug endpoint to check story existence (admin only)
 router.get('/debug/:id', authenticateToken, async (req, res) => {
   try {
