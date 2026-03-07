@@ -598,7 +598,10 @@ router.post('/register-email', trialRegisterLimiter, async (req, res) => {
       // User was created but email failed - still return success so they can retry
     }
 
-    log.info(`[TRIAL] New trial user registered: ${normalizedEmail} (id: ${userId})`);
+    // Verify the token was actually stored
+    const verifyInsert = await pool.query('SELECT email_verification_token FROM users WHERE id = $1', [userId]);
+    const storedToken = verifyInsert.rows[0]?.email_verification_token;
+    log.info(`[TRIAL] New trial user registered: ${normalizedEmail} (id: ${userId}, token stored: ${storedToken ? storedToken.substring(0, 8) + '...' : 'NULL!'})`);
     res.json({ success: true, message: 'Verification email sent' });
 
   } catch (err) {
