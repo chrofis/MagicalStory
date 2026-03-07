@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Share2, Copy, Check, Loader2, Link2, Link2Off, MessageCircle } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
@@ -33,11 +33,11 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
     disableSharing: language === 'de' ? 'Link deaktivieren' : language === 'fr' ? 'Désactiver le lien' : 'Disable sharing',
     copyLink: language === 'de' ? 'Link kopieren' : language === 'fr' ? 'Copier le lien' : 'Copy link',
     copied: language === 'de' ? 'Kopiert!' : language === 'fr' ? 'Copié!' : 'Copied!',
-    shareWhatsApp: language === 'de' ? 'Per WhatsApp teilen' : language === 'fr' ? 'Partager sur WhatsApp' : 'Share on WhatsApp',
     sharingEnabled: language === 'de' ? 'Teilen aktiv' : language === 'fr' ? 'Partage actif' : 'Sharing enabled',
     sharingDisabled: language === 'de' ? 'Teilen inaktiv' : language === 'fr' ? 'Partage inactif' : 'Sharing disabled',
     anyoneWithLink: language === 'de' ? 'Jeder mit dem Link kann die Geschichte lesen' : language === 'fr' ? 'Toute personne avec le lien peut lire l\'histoire' : 'Anyone with the link can read the story',
     errorLoading: language === 'de' ? 'Fehler beim Laden' : language === 'fr' ? 'Erreur de chargement' : 'Error loading',
+    shareWhatsApp: language === 'de' ? 'Via WhatsApp teilen' : language === 'fr' ? 'Partager via WhatsApp' : 'Share via WhatsApp',
   };
 
   // Fetch share status when dropdown opens
@@ -116,10 +116,23 @@ export function ShareButton({ storyId, onShareStatusChange, variant = 'compact' 
   };
 
   const shareOnWhatsApp = () => {
-    if (!shareStatus?.shareUrl) return;
-    const text = encodeURIComponent(shareStatus.shareUrl);
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    if (shareStatus?.shareUrl) {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareStatus.shareUrl)}`, '_blank');
+    }
   };
+
+  // Mobile: use native share API if available
+  const pendingMobileShare = useRef(false);
+
+  useEffect(() => {
+    if (pendingMobileShare.current && shareStatus?.isShared && shareStatus.shareUrl) {
+      pendingMobileShare.current = false;
+      navigator.share({
+        title: t.shareStory,
+        url: shareStatus.shareUrl,
+      }).catch(() => {});
+    }
+  }, [shareStatus]);
 
   return (
     <div className="relative">

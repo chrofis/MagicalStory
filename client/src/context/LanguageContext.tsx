@@ -20,8 +20,8 @@ function detectBrowserLanguage(): Language {
   if (browserLang.startsWith('de')) return 'de';
   if (browserLang.startsWith('fr')) return 'fr';
   if (browserLang.startsWith('en')) return 'en';
-  // If language is detected but not supported, use English
-  return 'en';
+  // If language is detected but not supported, default to German (Swiss market)
+  return 'de';
 }
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
