@@ -5,23 +5,23 @@ import { Sparkles, BookOpen, ArrowLeft } from 'lucide-react';
 const translations = {
   en: {
     title: 'Your story is being created!',
-    description: 'We\'ll email you the finished story with a PDF in about 5-10 minutes.',
-    tip: 'Keep an eye on your inbox (and spam folder, just in case).',
+    description: 'We\'ll email you the finished story as PDF in about 5-10 minutes.',
+    tip: 'Keep an eye on your inbox\n(and spam folder, just in case).',
     backHome: 'Back to home',
     brand: 'Magical Story',
   },
   de: {
     title: 'Deine Geschichte wird erstellt!',
-    description: 'Wir senden dir die fertige Geschichte mit einem PDF in etwa 5-10 Minuten per E-Mail.',
-    tip: 'Behalte deinen Posteingang im Auge (und den Spam-Ordner, nur fuer den Fall).',
-    backHome: 'Zurueck zur Startseite',
+    description: 'Du erhältst die fertige Geschichte als PDF in etwa 5-10 Minuten.',
+    tip: 'Behalte deinen Posteingang im Auge\n(und den Spam-Ordner, nur für den Fall).',
+    backHome: 'Zurück zur Startseite',
     brand: 'Magical Story',
   },
   fr: {
-    title: 'Votre histoire est en cours de creation !',
-    description: 'Nous vous enverrons l\'histoire terminee avec un PDF dans environ 5 a 10 minutes.',
-    tip: 'Gardez un oeil sur votre boite de reception (et le dossier spam, au cas ou).',
-    backHome: 'Retour a l\'accueil',
+    title: 'Votre histoire est en cours de création !',
+    description: 'Vous recevrez l\'histoire terminée en PDF dans environ 5 à 10 minutes.',
+    tip: 'Gardez un œil sur votre boîte de réception\n(et le dossier spam, au cas où).',
+    backHome: 'Retour à l\'accueil',
     brand: 'Magical Story',
   },
 };
@@ -55,7 +55,7 @@ export default function TrialStarted() {
 
           <h1 className="text-3xl font-bold text-gray-800 mb-3">{t.title}</h1>
           <p className="text-gray-600 mb-4 text-lg">{t.description}</p>
-          <p className="text-sm text-gray-400 mb-8">{t.tip}</p>
+          <p className="text-sm text-gray-400 mb-8 whitespace-pre-line">{t.tip}</p>
 
           <button
             onClick={() => navigate('/')}
