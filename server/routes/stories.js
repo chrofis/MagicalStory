@@ -127,7 +127,8 @@ router.get('/', authenticateToken, async (req, res) => {
       // Also check story_images for frontCover (metadata.hasThumbnail can be stale)
       const rows = await dbQuery(
         `SELECT s.metadata, s.share_token, CASE WHEN s.metadata IS NULL THEN s.data ELSE NULL END as data,
-         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover') as has_cover_image
+         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'frontCover') as has_cover_image,
+         EXISTS(SELECT 1 FROM story_images si WHERE si.story_id = s.id AND si.image_type = 'scene') as has_any_image
          FROM stories s WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT $2 OFFSET $3`,
         [req.user.id, limit, offset]
       );
@@ -178,7 +179,7 @@ router.get('/', authenticateToken, async (req, res) => {
           languageLevel: meta.languageLevel,
           characters: meta.characters || [],
           pageCount,
-          hasThumbnail: meta.hasThumbnail || row.has_cover_image || false,
+          hasThumbnail: meta.hasThumbnail || row.has_cover_image || row.has_any_image || false,
           isPartial: meta.isPartial || false,
           generatedPages: meta.generatedPages,
           totalPages: meta.totalPages,
