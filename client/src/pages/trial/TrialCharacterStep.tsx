@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Loader2, X, ArrowRight, CheckSquare, Square } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Turnstile } from '@marsidev/react-turnstile';
 import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import type { CharacterData } from '../TrialWizard';
@@ -159,6 +159,7 @@ interface TrialCharacterStepProps {
 
 export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, onAccountCreated, sessionToken, language }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
+  const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Turnstile + Fingerprint for abuse prevention
@@ -279,8 +280,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       const accountResult = await accountResponse.json();
 
       if (!accountResponse.ok) {
-        setAvatarError(accountResult.error || 'Account creation failed');
-        setIsCreatingAccount(false);
+        // On any block (Turnstile, fingerprint, rate limit) — redirect to landing with sign-up prompt
+        navigate('/?signup=true');
         return;
       }
 

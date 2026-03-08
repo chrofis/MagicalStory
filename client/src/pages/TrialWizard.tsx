@@ -209,7 +209,7 @@ export default function TrialWizard() {
             <h1 className="text-xl font-bold text-gray-800 mb-2">{tu.title}</h1>
             <p className="text-gray-600 text-sm mb-6">{tu.desc}</p>
             <Link
-              to="/register"
+              to="/?signup=true"
               className="inline-block w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
             >
               {tu.signUp}

@@ -136,7 +136,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { t, language } = useLanguage();
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(() => searchParams.get('signup') === 'true');
   const st = sectionTranslations[language] || sectionTranslations.en;
 
   // Scroll indicator state
