@@ -650,8 +650,9 @@ router.get('/verify-email/:token', async (req, res) => {
 
     // Keep the token so the link works on repeated clicks (issues a fresh JWT each time).
     // The expiry still limits how long the link stays valid.
+    // Also set anonymous = false now that email is verified (trial users stay anonymous until verification)
     await pool.query(
-      'UPDATE users SET email_verified = TRUE WHERE id = $1',
+      'UPDATE users SET email_verified = TRUE, anonymous = false WHERE id = $1',
       [user.id]
     );
 

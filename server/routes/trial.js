@@ -778,9 +778,9 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
     const { getPool } = require('../services/database');
     const pool = getPool();
 
-    // Check user is still anonymous
+    // Check user exists and email not yet verified
     const userResult = await pool.query(
-      'SELECT id, anonymous FROM users WHERE id = $1 AND is_trial = true',
+      'SELECT id, anonymous, email, email_verified FROM users WHERE id = $1 AND is_trial = true',
       [userId]
     );
 
@@ -788,8 +788,9 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
       return res.status(404).json({ error: 'Account not found' });
     }
 
-    if (!userResult.rows[0].anonymous) {
-      return res.status(409).json({ error: 'Email already linked' });
+    // Allow re-submitting if email not yet verified (e.g. typo in email)
+    if (userResult.rows[0].email_verified) {
+      return res.status(409).json({ error: 'Email already verified' });
     }
 
     // Check email not already used by another user
@@ -809,12 +810,11 @@ router.post('/link-email', verifySessionToken, async (req, res) => {
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // Update user with email, mark as no longer anonymous
+    // Store email and verification token (keep anonymous until verified)
     await pool.query(
       `UPDATE users SET
          email = $1,
          username = $1,
-         anonymous = false,
          email_verification_token = $2,
          email_verification_expires = $3
        WHERE id = $4`,
@@ -1455,9 +1455,12 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
         VISUAL_BIBLE: '',
       });
 
-      // Generate the cover image
-      log.info(`[TRIAL TITLE] Generating title page image for "${title}"`);
-      const result = await generateImageOnly(coverPrompt, coverPhotos);
+      // Generate the cover image (use cover model, not page model)
+      const { MODEL_DEFAULTS } = require('../config/models');
+      log.info(`[TRIAL TITLE] Generating title page image for "${title}" (model: ${MODEL_DEFAULTS.coverImage})`);
+      const result = await generateImageOnly(coverPrompt, coverPhotos, {
+        imageModelOverride: MODEL_DEFAULTS.coverImage,
+      });
 
       if (!result || !result.imageData) {
         log.warn(`[TRIAL TITLE] Image generation returned no image`);
