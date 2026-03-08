@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, ArrowRight, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation } from '@/components/common';
 import TrialCharacterStep from './trial/TrialCharacterStep';
@@ -49,6 +49,24 @@ const stepLabels: Record<string, Record<TrialStep, string>> = {
   en: { character: 'Character', topic: 'Topic', ideas: 'Ideas' },
   de: { character: 'Figur', topic: 'Thema', ideas: 'Ideen' },
   fr: { character: 'Personnage', topic: 'Sujet', ideas: 'Idées' },
+};
+
+const meetStrings: Record<string, { ready: (name: string, gender: string) => string; continue: string; generating: string }> = {
+  en: {
+    ready: (name, gender) => `${name} is ready for ${gender === 'female' ? 'her' : 'his'} first adventure!`,
+    continue: 'Choose a Story',
+    generating: 'Creating avatar...',
+  },
+  de: {
+    ready: (name, gender) => `${name} ist bereit für ${gender === 'female' ? 'ihr' : 'sein'} erstes Abenteuer!`,
+    continue: 'Geschichte wählen',
+    generating: 'Avatar wird erstellt...',
+  },
+  fr: {
+    ready: (name, gender) => `${name} est prêt${gender === 'female' ? 'e' : ''} pour sa première aventure !`,
+    continue: 'Choisir une histoire',
+    generating: 'Création de l\'avatar...',
+  },
 };
 
 const trialUsedStrings: Record<string, { title: string; desc: string; signUp: string; checkInbox: string }> = {
@@ -122,6 +140,7 @@ export default function TrialWizard() {
   );
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
+  const [showMeetScreen, setShowMeetScreen] = useState(false);
 
   // Check if trial is already used on mount
   useEffect(() => {
@@ -160,6 +179,11 @@ export default function TrialWizard() {
   const currentStepIndex = STEPS.indexOf(currentStep);
 
   const goNext = () => {
+    // After character step, show the avatar meet screen before topic
+    if (currentStep === 'character') {
+      setShowMeetScreen(true);
+      return;
+    }
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
@@ -198,9 +222,15 @@ export default function TrialWizard() {
     });
   }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, navigate]);
 
+  const handleMeetContinue = () => {
+    setShowMeetScreen(false);
+    setCurrentStep('topic');
+  };
+
   // ─── Trial already used ─────────────────────────────────────────────────────
 
   const tu = trialUsedStrings[language] || trialUsedStrings.en;
+  const mt = meetStrings[language] || meetStrings.en;
 
   if (trialUsed) {
     return (
@@ -228,6 +258,54 @@ export default function TrialWizard() {
             </Link>
             <p className="text-xs text-gray-400 mt-4">{tu.checkInbox}</p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Meet screen (avatar reveal) ────────────────────────────────────────────
+
+  if (showMeetScreen) {
+    const avatarReady = !!previewAvatar;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex flex-col items-center justify-center p-6">
+        <div className="max-w-sm w-full text-center">
+          {/* Avatar image */}
+          <div className="mb-6">
+            {avatarReady ? (
+              <img
+                src={previewAvatar!}
+                alt={characterData.name}
+                className="w-64 h-64 mx-auto rounded-2xl shadow-xl object-cover border-4 border-white"
+              />
+            ) : (
+              <div className="w-64 h-64 mx-auto rounded-2xl shadow-xl bg-white border-4 border-white flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="w-10 h-10 text-indigo-400 animate-spin mx-auto mb-3" />
+                  <p className="text-sm text-gray-400">{mt.generating}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Message */}
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">
+            {mt.ready(characterData.name || 'Your hero', characterData.gender)}
+          </h2>
+
+          {/* Continue button */}
+          <button
+            onClick={handleMeetContinue}
+            disabled={!avatarReady}
+            className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
+              avatarReady
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {mt.continue}
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     );
