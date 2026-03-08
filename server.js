@@ -2320,6 +2320,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       inputData._trialClothingRequirements = trialClothingRequirements;
       inputData._trialCostumeType = costume?.costumeType || null;
 
+      // Look up pre-defined title for trial
+      const { getTrialTitle } = require('./server/config/trialTitles');
+      const preDefinedTitle = getTrialTitle(
+        inputData.storyTopic || inputData.storyTheme || '',
+        inputData.storyCategory || 'adventure',
+        mainChar?.gender || '',
+        inputData.language || 'en'
+      );
+      if (preDefinedTitle) {
+        inputData._trialPreDefinedTitle = preDefinedTitle;
+        log.debug(`📖 [TRIAL] Pre-defined title: "${preDefinedTitle}"`);
+      }
+
       const trialAvatarRequirements = (inputData.characters || []).flatMap(char => {
         const cats = ['standard'];
         if (costume) cats.push(`costumed:${costume.costumeType}`);
@@ -2738,7 +2751,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Progressive parser with callbacks for streaming updates AND parallel task initiation
     const progressiveParser = new ProgressiveUnifiedParser({
       onTitle: (title) => {
-        streamingTitle = title;
+        // TRIAL MODE: Use pre-defined title (Claude should echo it, but fallback to config)
+        streamingTitle = (inputData.trialMode && inputData._trialPreDefinedTitle)
+          ? inputData._trialPreDefinedTitle
+          : title;
 
         // TRIAL MODE: Start title page generation as soon as title is known
         // Must wait for avatar styling to complete first (started before streaming)

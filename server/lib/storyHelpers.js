@@ -3330,12 +3330,19 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
   if (PROMPT_TEMPLATES.storyTrial) {
     // Look up costume from config
     const { getTrialCostume } = require('../config/trialCostumes');
+    const { getTrialTitle } = require('../config/trialTitles');
     const mainChar = (inputData.characters || [])[0];
-    const costume = getTrialCostume(
-      inputData.storyTopic || inputData.storyTheme || '',
-      inputData.storyCategory || 'adventure',
-      mainChar?.gender || ''
-    );
+    const topic = inputData.storyTopic || inputData.storyTheme || '';
+    const category = inputData.storyCategory || 'adventure';
+    const gender = mainChar?.gender || '';
+
+    const costume = getTrialCostume(topic, category, gender);
+
+    // Look up pre-defined title
+    const preDefinedTitle = getTrialTitle(topic, category, gender, language);
+    const titleInstruction = preDefinedTitle
+      ? `TITLE: ${preDefinedTitle}`
+      : `TITLE: [A creative, specific title in ${getLanguageNameEnglish(language)}]`;
 
     // Build avatar selection section (only if costume available)
     let avatarSelection = '';
@@ -3358,6 +3365,7 @@ NO face coverings — faces must stay visible at all times.`;
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: inputData.storyDetails || inputData.storyTheme || 'A fun adventure',
       AVATAR_SELECTION: avatarSelection,
+      TITLE_INSTRUCTION: titleInstruction,
     });
   }
 

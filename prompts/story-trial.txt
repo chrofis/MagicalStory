@@ -44,7 +44,7 @@ MAX 2 characters per scene hint. Every character needs a position (left/right/ce
 Output ALL sections in this EXACT order. Do not skip any.
 
 ---TITLE---
-TITLE: [A creative, specific title in {LANGUAGE}]
+{TITLE_INSTRUCTION}
 
 ---VISUAL BIBLE---
 ```json
