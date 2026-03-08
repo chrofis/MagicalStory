@@ -4077,7 +4077,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (userResult.rows.length > 0 && userResult.rows[0].email) {
         const user = userResult.rows[0];
         const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
-        const emailLanguage = user.preferred_language || inputData.language || 'English';
+        // Prefer story language over DB default (DB defaults to 'English' for trial users)
+        const emailLanguage = inputData.language || user.preferred_language || 'English';
 
         const emailOptions = {};
 
@@ -4808,8 +4809,8 @@ async function _processStoryJobImpl(jobId) {
           // Notify customer
           if (user.email) {
             const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
-            // Get language for email localization - prefer user's preference, fall back to story language
-            const emailLanguage = user.preferred_language || inputData.language || 'English';
+            // Prefer story language over DB default (DB defaults to 'English' for trial users)
+            const emailLanguage = inputData.language || user.preferred_language || 'English';
             await email.sendStoryFailedEmail(user.email, firstName, emailLanguage);
           }
         }

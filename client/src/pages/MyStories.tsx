@@ -269,6 +269,7 @@ export default function MyStories() {
   const [totalStories, setTotalStories] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadAttemptedRef = useRef(false);
+  const [activeJob, setActiveJob] = useState<{ id: string; progress: number; message: string } | null>(null);
 
   // Set-password banner state
   const [newPassword, setNewPassword] = useState('');
@@ -582,6 +583,33 @@ export default function MyStories() {
     }
   }, [stories.length, hasMore, isLoading, isLoadingMore]);
 
+  // Poll for active jobs when no stories are loaded (e.g., trial user lands here while story generates)
+  useEffect(() => {
+    if (isLoading || stories.length > 0 || !isAuthenticated) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const jobs = await storyService.getActiveJobs();
+        if (cancelled) return;
+        if (jobs.length > 0) {
+          const job = jobs[0];
+          setActiveJob({ id: job.id, progress: job.progress, message: job.progress_message });
+        } else {
+          setActiveJob(null);
+          // No active jobs and no stories — try refreshing stories (job may have just completed)
+          storiesCache = { data: null, total: 0, timestamp: 0, userId: null };
+          loadAttemptedRef.current = false;
+          loadStories();
+        }
+      } catch { /* ignore */ }
+    };
+
+    poll(); // Initial check
+    const interval = setInterval(poll, 10000); // Poll every 10s
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [isLoading, stories.length, isAuthenticated]);
+
   // Load cover image for a story
   const loadCover = useCallback(async (storyId: string) => {
     try {
@@ -836,16 +864,27 @@ export default function MyStories() {
             </button>
           </div>
         ) : stories.length === 0 ? (
-          <div className="text-center py-12">
-            <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-500 text-lg">{t.noStories}</p>
-            <button
-              onClick={() => navigate('/create?new=true')}
-              className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
-            >
-              {t.createStory}
-            </button>
-          </div>
+          activeJob ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <GeneratingStoryCard
+                storyTitle=""
+                progress={{ current: activeJob.progress, total: 100, message: activeJob.message }}
+                language={language}
+                onView={() => {}}
+              />
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Book className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg">{t.noStories}</p>
+              <button
+                onClick={() => navigate('/create?new=true')}
+                className="mt-4 px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700"
+              >
+                {t.createStory}
+              </button>
+            </div>
+          )
         ) : (
           <>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

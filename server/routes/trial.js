@@ -648,9 +648,10 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
     };
 
     // Store trial data for later claim (stories_generated already incremented atomically above)
+    // Also set preferred_language so emails (story complete, etc.) use the right language
     await pool.query(
-      'UPDATE users SET trial_data = $1 WHERE id = $2',
-      [JSON.stringify({ characterData, storyInput }), userId]
+      'UPDATE users SET trial_data = $1, preferred_language = $2 WHERE id = $3',
+      [JSON.stringify({ characterData, storyInput }), storyInput.language || 'en', userId]
     );
 
     const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage);
