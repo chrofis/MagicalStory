@@ -2280,7 +2280,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const artStyle = inputData.artStyle || 'pixar';
 
     // Track streaming progress and parallel tasks
-    let streamingTitle = null;
+    // For trial mode with pre-defined title, set it immediately (prompt skips ---TITLE--- section)
+    let streamingTitle = (inputData.trialMode && inputData._trialPreDefinedTitle)
+      ? inputData._trialPreDefinedTitle : null;
     let streamingClothingRequirements = null;
     let streamingVisualBible = null;
     let streamingCoverHints = null;
