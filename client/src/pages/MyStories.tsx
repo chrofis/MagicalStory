@@ -72,7 +72,9 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
             {storyTitle || (language === 'de' ? 'Wird erstellt...' : language === 'fr' ? 'Création en cours...' : 'Generating...')}
           </h3>
           <p className="text-sm text-indigo-600 mb-3">
-            {progress.message || (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : 'Starting...')}
+            {percentage > 0
+              ? `${percentage}%`
+              : (language === 'de' ? 'Starte...' : language === 'fr' ? 'Démarrage...' : 'Starting...')}
           </p>
         </div>
 
