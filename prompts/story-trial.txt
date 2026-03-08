@@ -25,21 +25,40 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 # Scene Hint Format
 
-Each scene hint must be detailed enough for direct image generation (no further expansion).
-Include: setting details, mood, lighting, colors, textures, atmosphere, character positions, key actions.
+Each scene hint is a JSON block for direct image generation (no further expansion).
+It must be detailed enough to illustrate without additional context.
 
-```
-SCENE HINT:
-[2-3 detailed sentences describing the visual scene. Include specific colors, lighting, atmosphere, character expressions and poses.]
-Characters:
-- [Name] (left/right/center): [standard | costumed:{type}]
-Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
-Location: [Location Name [LOC001]] or [none]
-Key objects: [Name [OBJ001], Name [ART001]] or [none]
+```json
+{
+  "scene": {
+    "imageSummary": "[2-3 sentences: the visual moment with character positions, mood, colors, lighting, atmosphere]",
+    "setting": {
+      "location": "[Location Name [LOC001]]" or "none",
+      "indoorOutdoor": "[indoor/outdoor]",
+      "description": "[visual setting details: colors, textures, atmosphere]",
+      "lighting": "[time of day + light quality]",
+      "weather": "[sunny/cloudy/rainy/snowy/n/a]"
+    },
+    "characters": [
+      {
+        "name": "[Name]",
+        "position": "[left/right/center]",
+        "action": "[what they're doing]",
+        "expression": "[facial expression]",
+        "clothing": "[standard | costumed:{type}]"
+      }
+    ],
+    "objects": [
+      {"id": "[OBJ001]", "name": "[Object name]", "position": "[where in scene]"}
+    ]
+  }
+}
 ```
 
-- MAX 2 characters per scene hint. Every character needs a position (left/right/center). Use n/a for indoor weather.
-- **Location and Key objects lines MUST include both the name and the [ID]** from the visual bible. Example: `Location: Holzbrücke Baden [LOC001]`, `Key objects: Superhelden-Umhang [OBJ001]`
+- MAX 2 characters per scene. Use character names, not descriptions.
+- `setting.location`: use `"Name [LOC001]"` format referencing visual bible location IDs.
+- `objects`: include visual bible items visible in the scene with their IDs.
+- Use `"n/a"` for weather in indoor scenes.
 
 # OUTPUT FORMAT
 
@@ -69,23 +88,17 @@ TEXT:
 [Story text, 150-200 words]
 
 SCENE HINT:
-[2-3 detailed sentences for image generation]
-Characters:
-- [Name] (position): [standard or costumed:{type}]
-Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
-Location: [Name [LOC001]] or [none]
-Key objects: [Name [OBJ001]] or [none]
+```json
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"..."},"characters":[{"name":"...","position":"...","action":"...","expression":"...","clothing":"..."}],"objects":[]}}
+```
 
 --- Page 2 ---
 TEXT:
 [Story continues...]
 
 SCENE HINT:
-[2-3 detailed sentences for image generation]
-Characters:
-- [Name] (position): [standard or costumed:{type}]
-Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
-Location: [Name [LOC001]] or [none]
-Key objects: [Name [OBJ001]] or [none]
+```json
+{"scene":{"imageSummary":"...","setting":{"location":"...","indoorOutdoor":"...","description":"...","lighting":"...","weather":"..."},"characters":[{"name":"...","position":"...","action":"...","expression":"...","clothing":"..."}],"objects":[]}}
+```
 
 ... continue for ALL {PAGES} pages ...
