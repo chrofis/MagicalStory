@@ -2536,9 +2536,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         return;
       }
 
-      // TRIAL MODE: Re-check DB for pre-generated title page (may have been saved after job started)
-      if (coverType === 'titlePage' && inputData.trialMode && inputData.characterId) {
-        streamingCoverPromises.set(coverType, (async () => {
+      const coverPromise = streamCoverLimit(async () => {
+        // TRIAL MODE: Re-check DB for pre-generated title page (may have been saved after job started)
+        if (coverType === 'titlePage' && inputData.trialMode && inputData.characterId) {
           try {
             const charResult = await dbPool.query(
               'SELECT data FROM characters WHERE id = $1',
@@ -2559,17 +2559,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           } catch (e) {
             log.debug(`[COVER] DB re-check for pre-generated title page failed: ${e.message}`);
           }
-          // Not found — fall through to normal generation below
-          return null;
-        })());
-        // Check if DB had it; if so, we're done
-        const dbResult = await streamingCoverPromises.get(coverType);
-        if (dbResult) return;
-        // Not in DB — remove placeholder and fall through to normal generation
-        streamingCoverPromises.delete(coverType);
-      }
+        }
 
-      const coverPromise = streamCoverLimit(async () => {
         // Wait for visual bible if not yet available
         while (!streamingVisualBible) {
           await new Promise(r => setTimeout(r, 100));
