@@ -161,6 +161,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const t = strings[language] || strings.en;
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const turnstileRef = useRef<any>(null);
 
   // Turnstile + Fingerprint for abuse prevention
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -257,6 +258,18 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     setIsCreatingAccount(true);
     setAvatarError(null);
 
+    // If Turnstile token expired, trigger a reset and wait briefly for a fresh one
+    let token = turnstileToken;
+    if (!token && TURNSTILE_SITE_KEY && turnstileRef.current) {
+      turnstileRef.current.reset();
+      // Wait up to 5s for fresh token
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        token = turnstileRef.current?.getResponse?.() || null;
+        if (token) break;
+      }
+    }
+
     try {
       const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
         method: 'POST',
@@ -272,7 +285,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           bodyNoBgPhoto: characterData.photos.bodyNoBg,
           faceBox: characterData.photos.faceBox,
           previewAvatar: previewAvatar || undefined, // Save to DB if already generated
-          turnstileToken,
+          turnstileToken: token,
           fingerprint,
         }),
       });
@@ -720,9 +733,10 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       {/* Invisible Turnstile widget for bot protection */}
       {TURNSTILE_SITE_KEY && (
         <Turnstile
+          ref={turnstileRef}
           siteKey={TURNSTILE_SITE_KEY}
           onSuccess={(token) => { setTurnstileToken(token); setTurnstileReady(true); }}
-          onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); }}
+          onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); turnstileRef.current?.reset(); }}
           onError={() => setTurnstileReady(true)} // allow fallback on widget error
           options={{ size: 'invisible' }}
         />
