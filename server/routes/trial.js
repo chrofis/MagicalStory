@@ -248,13 +248,8 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     // Sanitize name for logging (strip newlines to prevent log injection)
     const safeName = name.replace(/[\r\n]/g, '');
 
-    // Layer 1: Verify Turnstile token
-    const turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
-    if (!turnstileValid) {
-      return res.status(403).json({ error: 'Verification failed. Please try again.' });
-    }
-
-    // Layer 2: Check fingerprint
+    // Layer 1: Check fingerprint (Turnstile verified at account creation instead —
+    // preview avatars are non-critical and the token is single-use)
     if (!checkFingerprint(fingerprint)) {
       return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
     }
