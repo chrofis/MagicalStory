@@ -103,14 +103,7 @@ async function initializeDatabase() {
     ];
 
     for (const { table, column, type } of columnsToAdd) {
-      await dbPool.query(`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='${table}' AND column_name='${column}') THEN
-            ALTER TABLE ${table} ADD COLUMN ${column} ${type};
-          END IF;
-        END $$;
-      `);
+      await dbPool.query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS ${column} ${type}`);
     }
 
     // Update existing users with NULL credits
