@@ -99,10 +99,10 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         <img
           src={previewAvatar}
           alt={characterName}
-          className="w-20 h-20 rounded-xl object-cover shadow-md flex-shrink-0"
+          className="w-32 h-32 rounded-xl object-cover shadow-md flex-shrink-0"
         />
       ) : (
-        <div className="w-20 h-20 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+        <div className="w-32 h-32 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
           <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
         </div>
       )}
