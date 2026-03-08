@@ -2301,9 +2301,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
       const { getTrialCostume } = require('./server/config/trialCostumes');
       const mainChar = (inputData.characters || [])[0];
+      // For life-challenge: storyTheme has the adventure type (pirate), storyTopic has the challenge (cleaning-up)
+      // For adventure: storyTheme has the theme, storyTopic may be empty
+      // For historical: storyTopic has the event ID
+      const lookupCategory = inputData.storyCategory === 'historical' ? 'historical' : 'adventure';
+      const lookupTopic = inputData.storyCategory === 'historical'
+        ? (inputData.storyTopic || '')
+        : (inputData.storyTheme || inputData.storyTopic || '');
       const costume = getTrialCostume(
-        inputData.storyTopic || inputData.storyTheme || '',
-        inputData.storyCategory || 'adventure',
+        lookupTopic,
+        lookupCategory,
         mainChar?.gender || ''
       );
 
@@ -2322,11 +2329,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       inputData._trialClothingRequirements = trialClothingRequirements;
       inputData._trialCostumeType = costume?.costumeType || null;
 
-      // Look up pre-defined title for trial
+      // Look up pre-defined title for trial (uses same lookupTopic/lookupCategory as costume)
       const { getTrialTitle } = require('./server/config/trialTitles');
       const preDefinedTitle = getTrialTitle(
-        inputData.storyTopic || inputData.storyTheme || '',
-        inputData.storyCategory || 'adventure',
+        lookupTopic,
+        lookupCategory,
         mainChar?.gender || '',
         inputData.language || 'en'
       );
