@@ -2514,9 +2514,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (coverType === 'titlePage' && inputData.preGeneratedTitlePage) {
         log.info(`⏭️ [COVER] Skipping titlePage generation — using pre-generated title page`);
         streamingCoverPromises.set(coverType, Promise.resolve({
+          type: coverType,
           imageData: inputData.preGeneratedTitlePage,
-          score: 80,
-          reasoning: 'Pre-generated during trial step 3',
+          qualityScore: 80,
+          qualityReasoning: 'Pre-generated during trial step 3',
         }));
         return;
       }
