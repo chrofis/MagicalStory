@@ -392,23 +392,19 @@ export default function TrialGenerationPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-indigo-50 via-white to-indigo-50">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center">
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-indigo-700 font-bold text-lg hover:opacity-80 transition-opacity"
-          >
-            <BookOpen className="w-5 h-5" />
-            {t.brand}
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation bar matching the trial wizard */}
+      <nav className="bg-black text-white px-3 py-3">
+        <div className="flex justify-between items-center">
+          <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80">
+            ✨ {t.brand}
           </button>
         </div>
-      </header>
+      </nav>
 
-      {/* Content — single centered card */}
-      <div className="flex-1 flex items-start justify-center p-4 pt-8 md:pt-16">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
+      {/* Content */}
+      <div className="px-3 md:px-8 py-4 md:py-8">
+        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
 
           {/* ── Avatar + Progress ─────────────────────────────────────── */}
           <div className="flex flex-col items-center text-center mb-6">

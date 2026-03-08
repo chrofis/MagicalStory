@@ -253,7 +253,7 @@ export default function TrialIdeasStep({
   // Fire prepare-title in background on mount (parallel with idea generation)
   const titlePageStartedRef = useRef(false);
   useEffect(() => {
-    if (!sessionToken || !storyInput.storyTopic || titlePageStartedRef.current) return;
+    if (!sessionToken || (!storyInput.storyTopic && !storyInput.storyTheme) || titlePageStartedRef.current) return;
     titlePageStartedRef.current = true;
 
     const apiUrl = import.meta.env.VITE_API_URL || '';
@@ -266,6 +266,7 @@ export default function TrialIdeasStep({
       body: JSON.stringify({
         storyTopic: storyInput.storyTopic,
         storyCategory: storyInput.storyCategory,
+        storyTheme: storyInput.storyTheme,
         language: storyInput.language,
       }),
     })

@@ -212,17 +212,16 @@ export default function TrialWizard() {
 
   if (trialUsed) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-indigo-50 flex flex-col">
-        <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100">
-          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center">
-            <Link to="/" className="flex items-center gap-2 text-indigo-700 font-bold text-lg hover:opacity-80 transition-opacity">
-              <BookOpen className="w-5 h-5" />
-              Magical Story
+      <div className="min-h-screen bg-gray-50">
+        <nav className="bg-black text-white px-3 py-3">
+          <div className="flex justify-between items-center">
+            <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80">
+              ✨ Magical Story
             </Link>
           </div>
-        </header>
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+        </nav>
+        <div className="px-3 md:px-8 py-4 md:py-8">
+          <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <BookOpen className="w-8 h-8 text-indigo-600" />
             </div>
