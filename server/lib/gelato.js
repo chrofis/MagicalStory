@@ -174,17 +174,21 @@ async function processBookOrder(dbPool, sessionId, userId, storyIds, customerInf
     // Estimate Gelato page count from story data
     // Gelato pageCount = interior pages only (dedication + story content)
     // Does NOT count: cover spread, inside front blank, inside back cover blank
-    // For multi-story books: story 2+ adds front cover + initial page + back cover + separator blank
+    // For multi-story books: story 2+ adds blank + title (2 pages)
+    //   plus back cover + separator (2 pages) if back cover exists, otherwise skip both
     const { parseStoryPages } = require('./pdf');
     let storyContentPages = 0;
     for (let si = 0; si < stories.length; si++) {
       const storyPages = parseStoryPages(stories[si].data);
       const isPictureBook = stories[si].data.languageLevel === '1st-grade';
       storyContentPages += isPictureBook ? storyPages.length : storyPages.length * 2;
-      // Story 2+ adds: front cover, initial page, back cover, separator blank (except last story has no separator)
       if (si > 0) {
-        storyContentPages += 3; // front cover + initial page + back cover
-        if (si < stories.length - 1) storyContentPages += 1; // separator blank between stories
+        storyContentPages += 2; // blank + title page (always)
+        const hasBackCover = !!stories[si].data?.coverImages?.backCover;
+        if (hasBackCover) {
+          storyContentPages += 1; // back cover
+          if (si < stories.length - 1) storyContentPages += 1; // separator blank between stories
+        }
       }
     }
     let estimatedPageCount = 1 + storyContentPages; // dedication + content (trailing blank = inside back cover, not counted)

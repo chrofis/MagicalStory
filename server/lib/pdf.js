@@ -556,7 +556,14 @@ async function generateCombinedBookPdf(stories, options = {}) {
       // STORY 1: Cover spread - use exact Gelato dimensions
       doc.addPage({ size: [coverSpreadWidth, coverSpreadHeight], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-      const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+      // If first story has no back cover (e.g. trial), borrow from another story
+      let backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
+      if (!backCoverImageData) {
+        for (let i = stories.length - 1; i > 0; i--) {
+          backCoverImageData = getCoverImageData(stories[i].data.coverImages?.backCover);
+          if (backCoverImageData) break;
+        }
+      }
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
 
       if (backCoverImageData && frontCoverImageData) {
@@ -580,7 +587,7 @@ async function generateCombinedBookPdf(stories, options = {}) {
       // Blank left page (required by Gelato - left side of first spread)
       doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
 
-      // Introduction/dedication page (right side of first spread)
+      // Introduction/dedication page (right side of first spread) — blank if missing (e.g. trial)
       const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
       doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
       if (initialPageImageData) {
@@ -591,39 +598,35 @@ async function generateCombinedBookPdf(stories, options = {}) {
       addStoryContentPages(storyData, storyPages);
 
     } else {
-      // STORY 2+: Front cover (title page)
+      // STORY 2+: Blank page (LEFT) then title page (RIGHT)
+      // This ensures story content starts on LEFT (text) / RIGHT (image) alignment
+      doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      totalStoryPages++;
+
+      doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+      totalStoryPages++;
       const frontCoverImageData = getCoverImageData(storyData.coverImages?.frontCover);
       if (frontCoverImageData) {
-        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-        totalStoryPages++;
         const frontCoverBuffer = Buffer.from(frontCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(frontCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
       }
 
-      // Introduction page
-      const initialPageImageData = getCoverImageData(storyData.coverImages?.initialPage);
-      if (initialPageImageData) {
-        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-        totalStoryPages++;
-        const initialPageBuffer = Buffer.from(initialPageImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
-        doc.image(initialPageBuffer, bleed, bleed, { width: PAGE_SIZE });
-      }
-
       addStoryContentPages(storyData, storyPages);
 
-      // Back cover for this story
+      // Back cover (LEFT) + blank separator (RIGHT) — only if story has a back cover
+      // If no back cover, skip both pages (reduces page count by 2, preserves alignment)
       const backCoverImageData = getCoverImageData(storyData.coverImages?.backCover);
       if (backCoverImageData) {
         doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
         totalStoryPages++;
         const backCoverBuffer = Buffer.from(backCoverImageData.replace(/^data:image\/\w+;base64,/, ''), 'base64');
         doc.image(backCoverBuffer, bleed, bleed, { width: PAGE_SIZE });
-      }
 
-      // Blank page between stories (if not last story)
-      if (storyIndex < stories.length - 1) {
-        doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
-        totalStoryPages++;
+        // Blank separator after back cover (if not last story)
+        if (storyIndex < stories.length - 1) {
+          doc.addPage({ size: [interiorPageSize, interiorPageSize], margins: { top: 0, bottom: 0, left: 0, right: 0 } });
+          totalStoryPages++;
+        }
       }
     }
   }

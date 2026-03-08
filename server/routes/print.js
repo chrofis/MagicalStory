@@ -1468,8 +1468,17 @@ router.post('/stripe/create-checkout-session', authenticateToken, async (req, re
       totalPages += isPictureBook ? sceneCount : sceneCount * 2;
     }
 
-    // Add 3 pages per story for covers and title page
-    totalPages += stories.length * 3;
+    // Story 1: 1 page (dedication, blank if trial)
+    // Story 2+: 2 pages (blank + title) + back cover + separator if applicable
+    totalPages += 1; // dedication for first story
+    for (let si = 1; si < stories.length; si++) {
+      totalPages += 2; // blank + title page
+      const hasBackCover = !!stories[si].data?.coverImages?.backCover;
+      if (hasBackCover) {
+        totalPages += 1; // back cover
+        if (si < stories.length - 1) totalPages += 1; // separator
+      }
+    }
 
     // Calculate price based on pages and cover type (using database pricing)
     const isHardcover = coverType === 'hardcover';
