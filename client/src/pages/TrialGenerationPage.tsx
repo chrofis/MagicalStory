@@ -463,7 +463,7 @@ export default function TrialGenerationPage() {
 
       {/* Content */}
       <div className="px-3 md:px-8 py-4 md:py-8">
-        <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8">
+        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8">
 
           {/* ── Avatar + Progress ─────────────────────────────────────── */}
           <div className="flex flex-col items-center text-center mb-6">
@@ -473,7 +473,7 @@ export default function TrialGenerationPage() {
                 <img
                   src={titlePageImage}
                   alt={titlePageTitle || 'Story cover'}
-                  className="w-full max-w-[320px] h-auto rounded-xl shadow-lg mx-auto"
+                  className="w-full h-auto rounded-xl shadow-lg mx-auto"
                 />
               </div>
             ) : state.previewAvatar ? (
