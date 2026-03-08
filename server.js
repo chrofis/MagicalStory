@@ -2354,6 +2354,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       );
       if (preDefinedTitle) {
         inputData._trialPreDefinedTitle = preDefinedTitle;
+        streamingTitle = preDefinedTitle; // Set immediately (line 2297 runs before this block)
         log.debug(`📖 [TRIAL] Pre-defined title: "${preDefinedTitle}"`);
       }
 
@@ -2533,6 +2534,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           qualityReasoning: 'Pre-generated during trial step 3',
         }));
         return;
+      }
+
+      // TRIAL MODE: Re-check DB for pre-generated title page (may have been saved after job started)
+      if (coverType === 'titlePage' && inputData.trialMode && inputData.characterId) {
+        streamingCoverPromises.set(coverType, (async () => {
+          try {
+            const charResult = await dbPool.query(
+              'SELECT data FROM characters WHERE id = $1',
+              [inputData.characterId]
+            );
+            const charData = charResult.rows[0]?.data;
+            const parsed = typeof charData === 'string' ? JSON.parse(charData) : charData;
+            const titlePageImage = parsed?.characters?.[0]?.preGeneratedTitlePage;
+            if (titlePageImage) {
+              log.info(`⏭️ [COVER] Found pre-generated title page in DB (late arrival) — skipping generation`);
+              return {
+                type: coverType,
+                imageData: titlePageImage,
+                qualityScore: 80,
+                qualityReasoning: 'Pre-generated during trial step 3 (fetched from DB)',
+              };
+            }
+          } catch (e) {
+            log.debug(`[COVER] DB re-check for pre-generated title page failed: ${e.message}`);
+          }
+          // Not found — fall through to normal generation below
+          return null;
+        })());
+        // Check if DB had it; if so, we're done
+        const dbResult = await streamingCoverPromises.get(coverType);
+        if (dbResult) return;
+        // Not in DB — remove placeholder and fall through to normal generation
+        streamingCoverPromises.delete(coverType);
       }
 
       const coverPromise = streamCoverLimit(async () => {
