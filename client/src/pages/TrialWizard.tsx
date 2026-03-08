@@ -1,10 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation } from '@/components/common';
 import TrialCharacterStep from './trial/TrialCharacterStep';
 import TrialTopicStep from './trial/TrialTopicStep';
 import TrialIdeasStep from './trial/TrialIdeasStep';
-import TrialAuthModal from './trial/TrialAuthModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,6 +55,7 @@ const stepLabels: Record<string, Record<TrialStep, string>> = {
 
 export default function TrialWizard() {
   const { language } = useLanguage();
+  const navigate = useNavigate();
 
   // Wizard step
   const [currentStep, setCurrentStep] = useState<TrialStep>('character');
@@ -93,8 +94,17 @@ export default function TrialWizard() {
   // Preview avatar (generated before topic selection, used by future "Meet [Name]!" screen)
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
 
-  // Auth modal (triggered from ideas step)
-  const [showEmailModal, setShowEmailModal] = useState(false);
+  // Anonymous session state
+  const [sessionToken, setSessionToken] = useState<string | null>(() =>
+    localStorage.getItem('trial_session_token')
+  );
+  const [characterId, setCharacterId] = useState<string | null>(null);
+
+  const handleAccountCreated = useCallback((token: string, charId: string) => {
+    setSessionToken(token);
+    setCharacterId(charId);
+    localStorage.setItem('trial_session_token', token);
+  }, []);
 
   const labels = useMemo(() => stepLabels[language] || stepLabels.en, [language]);
 
@@ -120,17 +130,24 @@ export default function TrialWizard() {
   }, []);
 
   const handleCreate = useCallback(() => {
-    if (selectedIdeaIndex === null) return;
-    // Store the selected idea in storyDetails for downstream use
+    if (selectedIdeaIndex === null || !sessionToken) return;
     const selectedIdea = generatedIdeas[selectedIdeaIndex];
-    if (selectedIdea) {
-      setStoryInput(prev => ({
-        ...prev,
-        storyDetails: selectedIdea.title + '\n' + selectedIdea.summary,
-      }));
-    }
-    setShowEmailModal(true);
-  }, [selectedIdeaIndex, generatedIdeas]);
+    const finalStoryInput = {
+      ...storyInput,
+      storyDetails: selectedIdea
+        ? selectedIdea.title + '\n' + selectedIdea.summary
+        : storyInput.storyDetails,
+    };
+    navigate('/trial-generation', {
+      state: {
+        sessionToken,
+        characterId,
+        storyInput: finalStoryInput,
+        characterName: characterData.name,
+        previewAvatar,
+      },
+    });
+  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, navigate]);
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -155,6 +172,8 @@ export default function TrialWizard() {
                 onNext={goNext}
                 previewAvatar={previewAvatar}
                 onAvatarGenerated={setPreviewAvatar}
+                onAccountCreated={handleAccountCreated}
+                sessionToken={sessionToken}
                 language={language}
               />
             )}
@@ -181,15 +200,6 @@ export default function TrialWizard() {
           </div>
         </div>
       </div>
-
-      {/* Auth modal */}
-      {showEmailModal && (
-        <TrialAuthModal
-          characterData={characterData}
-          storyInput={storyInput}
-          onClose={() => setShowEmailModal(false)}
-        />
-      )}
     </div>
   );
 }

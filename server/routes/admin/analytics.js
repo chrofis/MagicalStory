@@ -12,6 +12,7 @@ const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING } = require('../../config/models');
+const { getTrialStats } = require('../trial');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -742,6 +743,11 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
     console.error('❌ [ADMIN] Error fetching token usage:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// GET /api/admin/trial-stats - Daily trial generation counters
+router.get('/trial-stats', authenticateToken, requireAdmin, (req, res) => {
+  res.json(getTrialStats());
 });
 
 module.exports = router;

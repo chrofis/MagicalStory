@@ -47,9 +47,59 @@ const trialRegisterLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// ─── Abuse Prevention: Turnstile + Fingerprint ──────────────────────────────
+// ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 
-const { trialAvatarLimiter } = require('../middleware/rateLimit');
+const { trialAvatarLimiter, jobStatusLimiter } = require('../middleware/rateLimit');
+
+// Global daily trial story counter (spending cap — max $27/day regardless of attack)
+const dailyTrialCounter = {
+  count: 0,
+  date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+  avatarCount: 0,
+};
+const DAILY_TRIAL_STORY_CAP = 50;
+const DAILY_TRIAL_AVATAR_CAP = 100; // Avatars are cheaper ($0.04 each)
+
+function checkAndIncrementTrialCap(type = 'story') {
+  const today = new Date().toISOString().slice(0, 10);
+  if (dailyTrialCounter.date !== today) {
+    // New day — reset counters
+    dailyTrialCounter.count = 0;
+    dailyTrialCounter.avatarCount = 0;
+    dailyTrialCounter.date = today;
+  }
+
+  if (type === 'avatar') {
+    if (dailyTrialCounter.avatarCount >= DAILY_TRIAL_AVATAR_CAP) {
+      log.warn(`[TRIAL CAP] Daily avatar cap reached (${dailyTrialCounter.avatarCount}/${DAILY_TRIAL_AVATAR_CAP})`);
+      return false;
+    }
+    dailyTrialCounter.avatarCount++;
+    return true;
+  }
+
+  if (dailyTrialCounter.count >= DAILY_TRIAL_STORY_CAP) {
+    log.warn(`[TRIAL CAP] Daily story cap reached (${dailyTrialCounter.count}/${DAILY_TRIAL_STORY_CAP})`);
+    return false;
+  }
+  dailyTrialCounter.count++;
+  return true;
+}
+
+/** Get current trial stats for admin dashboard */
+function getTrialStats() {
+  const today = new Date().toISOString().slice(0, 10);
+  if (dailyTrialCounter.date !== today) {
+    return { date: today, storiesGenerated: 0, storyCap: DAILY_TRIAL_STORY_CAP, avatarsGenerated: 0, avatarCap: DAILY_TRIAL_AVATAR_CAP };
+  }
+  return {
+    date: dailyTrialCounter.date,
+    storiesGenerated: dailyTrialCounter.count,
+    storyCap: DAILY_TRIAL_STORY_CAP,
+    avatarsGenerated: dailyTrialCounter.avatarCount,
+    avatarCap: DAILY_TRIAL_AVATAR_CAP,
+  };
+}
 
 /**
  * Verify Cloudflare Turnstile token server-side.
@@ -127,6 +177,47 @@ setInterval(() => {
   if (cleaned > 0) log.debug(`[FINGERPRINT] Cleaned ${cleaned} stale entries`);
 }, 60 * 60 * 1000).unref();
 
+// ─── Session Token for Anonymous Trial Users ─────────────────────────────────
+
+const jwt = require('jsonwebtoken');
+
+/**
+ * Middleware to verify anonymous session tokens.
+ * Session tokens have payload: { userId, anonymous: true }
+ * They grant limited permissions: create story, poll status, view own story, link email.
+ */
+function verifySessionToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer <token>
+
+  if (!token) {
+    return res.status(401).json({ error: 'Session token required' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.anonymous) {
+      return res.status(403).json({ error: 'Invalid session token' });
+    }
+    req.sessionUser = { userId: decoded.userId, anonymous: true };
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Session expired. Please start over.' });
+  }
+}
+
+/**
+ * Generate a limited session token for anonymous trial users.
+ * 24h expiry, minimal payload.
+ */
+function generateSessionToken(userId) {
+  return jwt.sign(
+    { userId, anonymous: true },
+    process.env.JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+}
+
 // ─── Task 0: Trial Preview Avatar Generation ────────────────────────────────
 
 /**
@@ -166,6 +257,11 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     // Layer 2: Check fingerprint
     if (!checkFingerprint(fingerprint)) {
       return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
+    }
+
+    // Layer 3: Check daily cap
+    if (!checkAndIncrementTrialCap('avatar')) {
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.' });
     }
 
     log.info(`[TRIAL AVATAR] Generating preview avatar for "${safeName}" (age: ${age}, gender: ${gender})`);
@@ -278,6 +374,38 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
     log.info(`[TRIAL AVATAR] ✅ Generated preview avatar for "${safeName}" (${inputTokens} in / ${outputTokens} out)`);
 
+    // If session token provided, save avatar to character in DB
+    const authHeader = req.headers['authorization'];
+    const sessionTokenStr = authHeader && authHeader.split(' ')[1];
+    if (sessionTokenStr && req.body.characterId) {
+      try {
+        const decoded = jwt.verify(sessionTokenStr, process.env.JWT_SECRET);
+        if (decoded.anonymous && decoded.userId) {
+          const { getPool } = require('../services/database');
+          const pool = getPool();
+          const charResult = await pool.query(
+            'SELECT data FROM characters WHERE id = $1 AND user_id = $2',
+            [req.body.characterId, decoded.userId]
+          );
+          if (charResult.rows.length > 0) {
+            const charData = typeof charResult.rows[0].data === 'string'
+              ? JSON.parse(charResult.rows[0].data)
+              : charResult.rows[0].data;
+            if (charData.characters && charData.characters[0]) {
+              charData.characters[0].previewAvatar = finalImage;
+              await pool.query(
+                'UPDATE characters SET data = $1 WHERE id = $2',
+                [JSON.stringify(charData), req.body.characterId]
+              );
+              log.debug(`[TRIAL AVATAR] Saved avatar to character ${req.body.characterId}`);
+            }
+          }
+        }
+      } catch (saveErr) {
+        log.warn(`[TRIAL AVATAR] Failed to save avatar to DB: ${saveErr.message}`);
+      }
+    }
+
     res.json({ avatarImage: finalImage });
 
   } catch (err) {
@@ -285,6 +413,488 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     res.status(500).json({ error: 'Avatar generation failed. Please try again.' });
   }
 });
+
+// ─── Anonymous Account Endpoints ────────────────────────────────────────────
+
+/**
+ * POST /api/trial/create-anonymous-account
+ *
+ * Creates an anonymous user + character in the database.
+ * Protected by: IP rate limit + Turnstile + fingerprint + daily cap.
+ * Returns a session token for subsequent trial API calls.
+ */
+router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) => {
+  try {
+    const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, turnstileToken, fingerprint } = req.body;
+
+    if (!facePhoto || !name) {
+      return res.status(400).json({ error: 'Name and photo are required' });
+    }
+    if (typeof name !== 'string' || name.length > 50) {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
+    if (gender && !['male', 'female'].includes(gender)) {
+      return res.status(400).json({ error: 'Invalid gender' });
+    }
+    if (age && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
+      return res.status(400).json({ error: 'Invalid age' });
+    }
+
+    const safeName = name.replace(/[\r\n]/g, '');
+
+    // Layer 1: Verify Turnstile
+    const turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
+    if (!turnstileValid) {
+      return res.status(403).json({ error: 'Verification failed. Please try again.' });
+    }
+
+    // Layer 2: Check fingerprint
+    if (!checkFingerprint(fingerprint)) {
+      return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
+    }
+
+    log.info(`[TRIAL] Creating anonymous account for "${safeName}"`);
+
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    const userId = crypto.randomUUID();
+    const bcrypt = require('bcryptjs');
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+    const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+    await pool.query(
+      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, is_trial, anonymous)
+       VALUES ($1, $2, $3, $4, 'user', 1, 0, 0, true, true)`,
+      [userId, `anon_${userId}`, `anon_${userId}@anonymous`, hashedPassword]
+    );
+
+    const characterData = {
+      name: safeName,
+      age: age || '',
+      gender: gender || '',
+      traits: traits || [],
+      customTraits: customTraits || '',
+      photos: {
+        face: facePhoto,
+        body: bodyPhoto || null,
+        bodyNoBg: bodyNoBgPhoto || null,
+        faceBox: faceBox || null,
+      },
+    };
+
+    const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
+    const sessionToken = generateSessionToken(userId);
+
+    log.info(`[TRIAL] Anonymous account created: ${userId} for "${safeName}"`);
+
+    res.json({ sessionToken, userId, characterId, charId });
+  } catch (err) {
+    log.error(`[TRIAL] create-anonymous-account error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to create account. Please try again.' });
+  }
+});
+
+/**
+ * POST /api/trial/create-story
+ *
+ * Start story generation for an anonymous trial user.
+ * Protected by: session token + 1 story per account + daily cap.
+ */
+router.post('/create-story', verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { storyCategory, storyTopic, storyTheme, storyDetails, language } = req.body;
+
+    if (!storyCategory && !storyTopic) {
+      return res.status(400).json({ error: 'Story topic is required' });
+    }
+
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    // Atomic check-and-increment to prevent race condition (two simultaneous requests)
+    const userResult = await pool.query(
+      `UPDATE users SET stories_generated = stories_generated + 1
+       WHERE id = $1 AND is_trial = true AND stories_generated < 1
+       RETURNING id, stories_generated`,
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      // Either user doesn't exist or already used their trial
+      const exists = await pool.query('SELECT id FROM users WHERE id = $1 AND is_trial = true', [userId]);
+      if (exists.rows.length === 0) {
+        return res.status(404).json({ error: 'Account not found' });
+      }
+      return res.status(409).json({ error: 'Trial story already used', code: 'TRIAL_USED' });
+    }
+
+    const characterId = `characters_${userId}`;
+    const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+
+    if (charResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Character not found. Please start over.' });
+    }
+
+    const charData = typeof charResult.rows[0].data === 'string'
+      ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
+
+    const mainChar = charData.characters[0];
+    const characterData = {
+      name: mainChar.name,
+      age: mainChar.age,
+      gender: mainChar.gender,
+      traits: mainChar.traits,
+      photos: mainChar.photos || {},
+      _charId: mainChar.id,
+    };
+
+    const storyInput = {
+      storyCategory: storyCategory || '',
+      storyTopic: storyTopic || '',
+      storyTheme: storyTheme || '',
+      storyDetails: storyDetails || '',
+      language: language || 'en',
+    };
+
+    // Store trial data for later claim (stories_generated already incremented atomically above)
+    await pool.query(
+      'UPDATE users SET trial_data = $1 WHERE id = $2',
+      [JSON.stringify({ characterData, storyInput }), userId]
+    );
+
+    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput);
+
+    if (deps.processStoryJob) {
+      deps.processStoryJob(jobId).catch(err => {
+        log.error(`[TRIAL] Job ${jobId} processing failed:`, err);
+      });
+    }
+
+    log.info(`[TRIAL] Story job ${jobId} started for anonymous user ${userId}`);
+    res.json({ jobId });
+  } catch (err) {
+    if (err.code === 'TRIAL_CAP_REACHED') {
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.' });
+    }
+    log.error(`[TRIAL] create-story error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to start story generation. Please try again.' });
+  }
+});
+
+/**
+ * GET /api/trial/job-status/:jobId
+ *
+ * Poll story generation progress for anonymous trial users.
+ */
+router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { jobId } = req.params;
+
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    const result = await pool.query(
+      'SELECT id, status, progress, progress_message, error_message, created_at, completed_at FROM story_jobs WHERE id = $1 AND user_id = $2',
+      [jobId, userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Job not found' });
+    }
+
+    const job = result.rows[0];
+
+    const response = {
+      jobId: job.id,
+      status: job.status,
+      progress: job.progress || 0,
+      progressMessage: job.progress_message || '',
+      createdAt: job.created_at,
+      completedAt: job.completed_at,
+    };
+
+    if (job.status === 'completed') {
+      const storyResult = await pool.query(
+        'SELECT id FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      if (storyResult.rows.length > 0) {
+        response.result = { storyId: storyResult.rows[0].id };
+      }
+    }
+
+    if (job.status === 'failed') {
+      response.errorMessage = job.error_message || 'Story generation failed';
+    }
+
+    res.json(response);
+  } catch (err) {
+    log.error(`[TRIAL] job-status error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to check job status' });
+  }
+});
+
+// ─── Link Email to Anonymous Account ────────────────────────────────────────
+
+/**
+ * POST /api/trial/link-email
+ *
+ * Link an email to an anonymous trial account.
+ * Sends verification email. Account transitions from anonymous to email-linked.
+ */
+router.post('/link-email', verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'Email is required' });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedEmail = email.toLowerCase().trim();
+    if (!emailRegex.test(normalizedEmail)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    // Check user is still anonymous
+    const userResult = await pool.query(
+      'SELECT id, anonymous FROM users WHERE id = $1 AND is_trial = true',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    if (!userResult.rows[0].anonymous) {
+      return res.status(409).json({ error: 'Email already linked' });
+    }
+
+    // Check email not already used by another user
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      [normalizedEmail, userId]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({
+        error: 'This email is already associated with an account',
+        code: 'EMAIL_EXISTS',
+      });
+    }
+
+    // Generate verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // Update user with email, mark as no longer anonymous
+    await pool.query(
+      `UPDATE users SET
+         email = $1,
+         username = $1,
+         anonymous = false,
+         email_verification_token = $2,
+         email_verification_expires = $3
+       WHERE id = $4`,
+      [normalizedEmail, verificationToken, verificationExpires, userId]
+    );
+
+    // Send verification email
+    const emailService = require('../../email');
+
+    // Get character name for personalization
+    const charResult = await pool.query(
+      'SELECT metadata FROM characters WHERE user_id = $1',
+      [userId]
+    );
+    const charMeta = charResult.rows[0]?.metadata;
+    const parsedMeta = typeof charMeta === 'string' ? JSON.parse(charMeta) : charMeta;
+    const displayName = parsedMeta?.characters?.[0]?.name || normalizedEmail.split('@')[0];
+
+    // Get story language
+    const trialResult = await pool.query('SELECT trial_data FROM users WHERE id = $1', [userId]);
+    const trialData = trialResult.rows[0]?.trial_data;
+    const parsedTrial = typeof trialData === 'string' ? JSON.parse(trialData) : trialData;
+    const language = parsedTrial?.storyInput?.language || 'en';
+
+    const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
+    await emailService.sendEmailVerificationEmail(normalizedEmail, displayName, verifyUrl, language);
+
+    log.info(`[TRIAL] Email linked for anonymous user ${userId}: ${normalizedEmail}`);
+    res.json({ success: true, message: 'Verification email sent' });
+  } catch (err) {
+    log.error(`[TRIAL] link-email error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to link email. Please try again.' });
+  }
+});
+
+// ─── Link Google Account to Anonymous Account ───────────────────────────────
+
+/**
+ * POST /api/trial/link-google
+ *
+ * Link a Google account to an anonymous trial user.
+ * Google verifies email automatically → converts to non-anonymous.
+ * Returns a full auth token (replaces session token).
+ */
+router.post('/link-google', verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({ error: 'Google token is required' });
+    }
+
+    // Verify Firebase token
+    const admin = require('firebase-admin');
+    if (!admin.apps.length) {
+      return res.status(503).json({ error: 'Google authentication not configured' });
+    }
+
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const googleEmail = decodedToken.email;
+
+    if (!googleEmail) {
+      return res.status(400).json({ error: 'Could not get email from Google account' });
+    }
+
+    const normalizedEmail = googleEmail.toLowerCase().trim();
+
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    // Check user exists and is trial
+    const userResult = await pool.query(
+      'SELECT id, anonymous FROM users WHERE id = $1 AND is_trial = true',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    // Check email not used by another user
+    const existing = await pool.query(
+      "SELECT id FROM users WHERE email = $1 AND id != $2",
+      [normalizedEmail, userId]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({
+        error: 'This email is already associated with an account',
+        code: 'EMAIL_EXISTS',
+      });
+    }
+
+    // Update user: link Google, set email, mark verified, remove anonymous
+    await pool.query(
+      `UPDATE users SET
+         email = $1,
+         username = $1,
+         anonymous = false,
+         email_verified = true,
+         firebase_uid = $2
+       WHERE id = $3`,
+      [normalizedEmail, decodedToken.uid, userId]
+    );
+
+    // Generate full auth token
+    const { generateToken } = require('../middleware/auth');
+    const updatedUser = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
+    const user = updatedUser.rows[0];
+    const fullToken = generateToken(user);
+
+    log.info(`[TRIAL] Google account linked for user ${userId}: ${normalizedEmail}`);
+
+    res.json({
+      success: true,
+      token: fullToken,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        credits: user.credits,
+        storyQuota: user.story_quota,
+        storiesGenerated: user.stories_generated,
+        emailVerified: true,
+      },
+    });
+  } catch (err) {
+    log.error(`[TRIAL] link-google error: ${err.message}`);
+    if (err.code === 'auth/id-token-expired') {
+      return res.status(401).json({ error: 'Token expired. Please sign in again.' });
+    }
+    res.status(500).json({ error: 'Failed to link Google account. Please try again.' });
+  }
+});
+
+// ─── Anonymous Account Cleanup ──────────────────────────────────────────────
+
+// Cleanup abandoned anonymous accounts every 6 hours
+// Deletes anonymous users older than 48h who never linked an email
+setInterval(async () => {
+  try {
+    const { getPool, isDatabaseMode } = require('../services/database');
+    if (!isDatabaseMode()) return;
+
+    const pool = getPool();
+    const client = await pool.connect();
+
+    try {
+      await client.query('BEGIN');
+
+      // Delete story_jobs for abandoned anonymous users
+      const jobsResult = await client.query(`
+        DELETE FROM story_jobs
+        WHERE user_id IN (
+          SELECT id FROM users
+          WHERE anonymous = true
+            AND created_at < NOW() - INTERVAL '48 hours'
+        )
+      `);
+
+      // Delete characters for abandoned anonymous users
+      const charsResult = await client.query(`
+        DELETE FROM characters
+        WHERE user_id IN (
+          SELECT id FROM users
+          WHERE anonymous = true
+            AND created_at < NOW() - INTERVAL '48 hours'
+        )
+      `);
+
+      // Delete the anonymous users themselves
+      const usersResult = await client.query(`
+        DELETE FROM users
+        WHERE anonymous = true
+          AND created_at < NOW() - INTERVAL '48 hours'
+        RETURNING id
+      `);
+
+      await client.query('COMMIT');
+
+      if (usersResult.rowCount > 0) {
+        log.info(`[TRIAL CLEANUP] Deleted ${usersResult.rowCount} abandoned anonymous accounts (${charsResult.rowCount} characters, ${jobsResult.rowCount} jobs)`);
+      }
+    } catch (txErr) {
+      await client.query('ROLLBACK');
+      throw txErr;
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    log.warn(`[TRIAL CLEANUP] Error: ${err.message}`);
+  }
+}, 6 * 60 * 60 * 1000).unref();
 
 // ─── Task A: Trial Photo Analysis ────────────────────────────────────────────
 
@@ -651,6 +1261,13 @@ async function saveTrialCharacter(pool, userId, characterData) {
  * @returns {string} jobId
  */
 async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput) {
+  // Check daily trial story cap (spending safety net)
+  if (!checkAndIncrementTrialCap('story')) {
+    const err = new Error('Daily trial story limit reached. Please try again tomorrow.');
+    err.code = 'TRIAL_CAP_REACHED';
+    throw err;
+  }
+
   const pages = 10;
 
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1383,3 +2000,5 @@ module.exports = router;
 module.exports.initTrialRoutes = initTrialRoutes;
 module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;
+module.exports.getTrialStats = getTrialStats;
+module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;

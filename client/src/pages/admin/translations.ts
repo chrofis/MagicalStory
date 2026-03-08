@@ -120,6 +120,9 @@ export const adminTranslations = {
     runware: 'Runware',
     thinkingTokens: 'Thinking',
     calls: 'Calls',
+    // Trial Stats
+    trialStoriesToday: 'Trial Stories Today',
+    trialAvatarsToday: 'Trial Avatars Today',
     // Failed Jobs Tab
     failedJobs: 'Failed Jobs',
   },
@@ -240,6 +243,9 @@ export const adminTranslations = {
     runware: 'Runware',
     thinkingTokens: 'Denken',
     calls: 'Aufrufe',
+    // Trial Stats
+    trialStoriesToday: 'Trial-Geschichten heute',
+    trialAvatarsToday: 'Trial-Avatare heute',
     // Failed Jobs Tab
     failedJobs: 'Fehlgeschlagene Jobs',
   },
@@ -360,6 +366,9 @@ export const adminTranslations = {
     runware: 'Runware',
     thinkingTokens: 'Réflexion',
     calls: 'Appels',
+    // Trial Stats
+    trialStoriesToday: 'Histoires trial aujourd\'hui',
+    trialAvatarsToday: 'Avatars trial aujourd\'hui',
     // Failed Jobs Tab
     failedJobs: 'Jobs échoués',
   },

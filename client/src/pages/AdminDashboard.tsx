@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
-import { adminService, type DashboardStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob } from '@/services';
+import { adminService, type DashboardStats, type TrialStats, type AdminUser, type CreditTransaction, type UserDetailsResponse, type PrintProduct, type GelatoProduct, type PaginationInfo, type FailedJob } from '@/services';
 import {
   Users,
   BookOpen,
@@ -37,7 +37,8 @@ import {
   ToggleRight,
   TrendingUp,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Activity
 } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -55,6 +56,7 @@ export default function AdminDashboard() {
   const initialTab = tabFromUrl && ['stats', 'users', 'products', 'tokens', 'jobs'].includes(tabFromUrl) ? tabFromUrl : 'stats';
 
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [trialStats, setTrialStats] = useState<TrialStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [userSearch, setUserSearch] = useState('');
@@ -111,8 +113,12 @@ export default function AdminDashboard() {
     if (stats) return; // Already loaded
     setIsLoadingStats(true);
     try {
-      const statsData = await adminService.getStats();
+      const [statsData, trialData] = await Promise.all([
+        adminService.getStats(),
+        adminService.getTrialStats().catch(() => null),
+      ]);
       setStats(statsData);
+      if (trialData) setTrialStats(trialData);
     } catch (err) {
       console.error('Failed to load stats:', err);
     } finally {
@@ -721,6 +727,22 @@ export default function AdminDashboard() {
                   value={stats?.databaseSize ?? 'N/A'}
                   isString
                 />
+                {trialStats && (
+                  <>
+                    <StatCard
+                      icon={<Activity className="w-8 h-8 text-orange-600" />}
+                      title={texts.trialStoriesToday}
+                      value={`${trialStats.storiesGenerated} / ${trialStats.storyCap}`}
+                      isString
+                    />
+                    <StatCard
+                      icon={<Camera className="w-8 h-8 text-teal-600" />}
+                      title={texts.trialAvatarsToday}
+                      value={`${trialStats.avatarsGenerated} / ${trialStats.avatarCap}`}
+                      isString
+                    />
+                  </>
+                )}
               </div>
             )}
 

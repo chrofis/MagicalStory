@@ -150,12 +150,14 @@ interface TrialCharacterStepProps {
   onNext: () => void;
   previewAvatar?: string | null;
   onAvatarGenerated?: (avatarImage: string) => void;
+  onAccountCreated?: (sessionToken: string, characterId: string) => void;
+  sessionToken?: string | null;
   language: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, language }: TrialCharacterStepProps) {
+export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, onAccountCreated, sessionToken, language }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -199,49 +201,92 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const hasPhoto = !!characterData.photos.face;
   const canProceed = characterData.name.trim() && characterData.gender && hasPhoto && turnstileReady;
 
-  // Generate preview avatar and advance to next step
+  // Create anonymous account, generate preview avatar, and advance to next step
   const handleNext = async () => {
     if (!canProceed || !characterData.photos.face) return;
 
-    // Skip avatar generation if already generated (e.g. user navigated back)
-    if (onAvatarGenerated && !previewAvatar) {
-      setIsGeneratingAvatar(true);
-      setAvatarError(null);
+    // If user already has a session (navigated back and forward), skip account creation and avatar generation
+    if (sessionToken) {
+      onNext();
+      return;
+    }
 
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: characterData.name,
-            age: characterData.age,
-            gender: characterData.gender,
-            facePhoto: characterData.photos.face,
-            turnstileToken,
-            fingerprint,
-          }),
-        });
+    setIsGeneratingAvatar(true);
+    setAvatarError(null);
 
-        const result = await response.json();
+    try {
+      // Step 1: Create anonymous account
+      const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: characterData.name,
+          age: characterData.age,
+          gender: characterData.gender,
+          traits: characterData.traits,
+          customTraits: characterData.customTraits,
+          facePhoto: characterData.photos.face,
+          bodyPhoto: characterData.photos.body,
+          bodyNoBgPhoto: characterData.photos.bodyNoBg,
+          faceBox: characterData.photos.faceBox,
+          turnstileToken,
+          fingerprint,
+        }),
+      });
 
-        if (!response.ok) {
-          setAvatarError(result.error || 'Avatar generation failed');
-          setIsGeneratingAvatar(false);
-          return;
-        }
+      const accountResult = await accountResponse.json();
 
-        if (result.avatarImage) {
-          onAvatarGenerated(result.avatarImage);
-        }
-      } catch {
-        setAvatarError('Avatar generation failed. Please try again.');
+      if (!accountResponse.ok) {
+        setAvatarError(accountResult.error || 'Account creation failed');
         setIsGeneratingAvatar(false);
         return;
       }
 
+      const newSessionToken = accountResult.sessionToken;
+      const newCharacterId = accountResult.characterId || accountResult.charId;
+
+      // Notify parent about the created account
+      if (onAccountCreated && newSessionToken && newCharacterId) {
+        onAccountCreated(newSessionToken, newCharacterId);
+      }
+
+      // Step 2: Generate preview avatar with session token (saves to DB)
+      if (onAvatarGenerated && !previewAvatar) {
+        try {
+          const avatarResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${newSessionToken}`,
+            },
+            body: JSON.stringify({
+              name: characterData.name,
+              age: characterData.age,
+              gender: characterData.gender,
+              facePhoto: characterData.photos.face,
+              characterId: newCharacterId,
+              turnstileToken,
+              fingerprint,
+            }),
+          });
+
+          const avatarResult = await avatarResponse.json();
+
+          if (avatarResponse.ok && avatarResult.avatarImage) {
+            onAvatarGenerated(avatarResult.avatarImage);
+          }
+          // Avatar generation failure is non-blocking — continue to next step
+        } catch {
+          // Avatar generation failure is non-blocking
+        }
+      }
+    } catch {
+      setAvatarError('Account creation failed. Please try again.');
       setIsGeneratingAvatar(false);
+      return;
     }
 
+    setIsGeneratingAvatar(false);
     onNext();
   };
 

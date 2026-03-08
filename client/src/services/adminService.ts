@@ -9,6 +9,14 @@ export interface DashboardStats {
   databaseSize: string;
 }
 
+export interface TrialStats {
+  date: string;
+  storiesGenerated: number;
+  storyCap: number;
+  avatarsGenerated: number;
+  avatarCap: number;
+}
+
 export interface AdminUser {
   id: string;
   username: string;
@@ -402,6 +410,11 @@ export const adminService = {
 
   async deletePrintProduct(id: number): Promise<void> {
     return api.delete(`/api/admin/print-products/${id}`);
+  },
+
+  // Trial Stats
+  async getTrialStats(): Promise<TrialStats> {
+    return api.get<TrialStats>('/api/admin/trial-stats');
   },
 
   // Token Usage Analytics
