@@ -34,10 +34,12 @@ SCENE HINT:
 Characters:
 - [Name] (left/right/center): [standard | costumed:{type}]
 Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
-Key objects: [list any visual bible objects visible in scene]
+Location: [Location Name [LOC001]] or [none]
+Key objects: [Name [OBJ001], Name [ART001]] or [none]
 ```
 
-MAX 2 characters per scene hint. Every character needs a position (left/right/center). Use n/a for indoor weather.
+- MAX 2 characters per scene hint. Every character needs a position (left/right/center). Use n/a for indoor weather.
+- **Location and Key objects lines MUST include both the name and the [ID]** from the visual bible. Example: `Location: Holzbrücke Baden [LOC001]`, `Key objects: Superhelden-Umhang [OBJ001]`
 
 # OUTPUT FORMAT
 
@@ -71,7 +73,8 @@ SCENE HINT:
 Characters:
 - [Name] (position): [standard or costumed:{type}]
 Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
-Key objects: [objects from visual bible, if any]
+Location: [Name [LOC001]] or [none]
+Key objects: [Name [OBJ001]] or [none]
 
 --- Page 2 ---
 TEXT:
@@ -82,6 +85,7 @@ SCENE HINT:
 Characters:
 - [Name] (position): [standard or costumed:{type}]
 Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
-Key objects: [objects from visual bible, if any]
+Location: [Name [LOC001]] or [none]
+Key objects: [Name [OBJ001]] or [none]
 
 ... continue for ALL {PAGES} pages ...
