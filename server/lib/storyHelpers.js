@@ -3328,18 +3328,27 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
   }).join('\n');
 
   if (PROMPT_TEMPLATES.storyTrial) {
-    // Themes that require costumed characters
-    const costumedThemes = {
-      pirate: 'pirate', knight: 'knight', viking: 'viking', roman: 'roman',
-      cowboy: 'cowboy', egyptian: 'egyptian', greek: 'greek', caveman: 'caveman',
-      samurai: 'samurai', ninja: 'ninja', wizard: 'wizard', superhero: 'superhero',
-      mermaid: 'mermaid'
-    };
-    const theme = inputData.storyTheme || '';
-    const costumeType = costumedThemes[theme];
-    const costumeInstruction = costumeType
-      ? `# COSTUME REQUIREMENT\nThis story has a **${theme}** theme. Characters MUST wear period/themed costumes on the MAJORITY of pages (at least 4 out of ${pageCount}).\n- Use \`costumed:${costumeType}\` for clothing in scene hints\n- Use \`standard\` only for the opening scene before the adventure begins (if applicable)\n- In the clothing requirements, mark \`costumed\` as used with a full outfit description\n- NO face coverings (helmets, masks, hats) — faces must stay visible`
-      : '';
+    // Look up costume from config
+    const { getTrialCostume } = require('../config/trialCostumes');
+    const mainChar = (inputData.characters || [])[0];
+    const costume = getTrialCostume(
+      inputData.storyTopic || inputData.storyTheme || '',
+      inputData.storyCategory || 'adventure',
+      mainChar?.gender || ''
+    );
+
+    // Build avatar selection section (only if costume available)
+    let avatarSelection = '';
+    if (costume) {
+      avatarSelection = `# Avatar Selection
+The main character has two avatar styles available:
+- \`standard\` — everyday modern clothes
+- \`costumed:${costume.costumeType}\` — ${costume.description}
+
+Use \`standard\` for the opening scene (before the adventure begins).
+Use \`costumed:${costume.costumeType}\` for all other scenes.
+NO face coverings — faces must stay visible at all times.`;
+    }
 
     return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
@@ -3348,7 +3357,7 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
       LANGUAGE_NOTE: getLanguageNote(language),
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: inputData.storyDetails || inputData.storyTheme || 'A fun adventure',
-      COSTUME_INSTRUCTION: costumeInstruction,
+      AVATAR_SELECTION: avatarSelection,
     });
   }
 

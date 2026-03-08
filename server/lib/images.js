@@ -63,6 +63,84 @@ function extractThinkingFromParts(parts, logPrefix = 'IMAGE GEN') {
 }
 
 // =============================================================================
+// PROMPT SANITIZATION FOR GEMINI SAFETY BLOCKS
+// Progressive sanitization levels for retrying blocked image prompts
+// =============================================================================
+
+// Problematic words that may trigger Gemini content filtering
+const PROBLEMATIC_WORDS = [
+  // Violence
+  'weapon', 'sword', 'knife', 'dagger', 'spear', 'axe', 'bow and arrow',
+  'blood', 'bleeding', 'wound', 'injured', 'injury',
+  'kill', 'killing', 'death', 'dead', 'dying', 'corpse',
+  'attack', 'attacking', 'fight', 'fighting', 'combat', 'battle', 'war',
+  'explosion', 'exploding', 'bomb', 'gun', 'pistol', 'rifle', 'shoot', 'shooting',
+  'violent', 'violence', 'aggressive',
+  // Horror
+  'scary', 'horror', 'terrifying', 'nightmare', 'monster',
+  'torture', 'torment', 'suffering', 'agony',
+  'poison', 'poisonous', 'toxic', 'venom',
+  // Fire/destruction
+  'fire', 'burning', 'flames', 'ablaze', 'inferno',
+  'destroy', 'destruction', 'devastation', 'ruins',
+  // Other
+  'slave', 'slavery', 'chains', 'shackles', 'prisoner',
+  'drunk', 'alcohol', 'wine', 'beer',
+  'naked', 'nude', 'undressed',
+  'evil', 'demonic', 'devil', 'satan', 'hell',
+  'skull', 'skeleton', 'bones'
+];
+
+/**
+ * Remove problematic words from a prompt (Level 1 sanitization)
+ */
+function sanitizePromptLevel1(prompt) {
+  let sanitized = prompt;
+  for (const word of PROBLEMATIC_WORDS) {
+    // Replace whole words only (case-insensitive)
+    const regex = new RegExp(`\\b${word}\\b`, 'gi');
+    sanitized = sanitized.replace(regex, '');
+  }
+  // Clean up double spaces and empty lines
+  sanitized = sanitized.replace(/  +/g, ' ').replace(/\n\s*\n\s*\n/g, '\n\n');
+  return sanitized;
+}
+
+/**
+ * Simplify prompt to core scene elements only (Level 2 sanitization)
+ * Keeps: art style, character names/positions, setting, time, weather
+ * Removes: detailed descriptions, mood, atmosphere
+ */
+function sanitizePromptLevel2(prompt) {
+  // Try to extract key elements from the prompt
+  const settingMatch = prompt.match(/Setting:\s*([^\n|]+)/i);
+  const timeMatch = prompt.match(/Time:\s*([^\n|]+)/i);
+  const styleMatch = prompt.match(/(?:art\s*style|style):\s*([^\n,]+)/i);
+  const charMatches = prompt.match(/(?:Characters?|Character Reference).*?(?:\n|:)([\s\S]*?)(?=Setting:|Key objects:|$)/i);
+
+  const setting = settingMatch ? settingMatch[1].trim() : 'a scenic location';
+  const time = timeMatch ? timeMatch[1].trim() : 'daytime';
+  const style = styleMatch ? styleMatch[1].trim() : 'watercolor';
+
+  // Extract just character names
+  let characters = 'a child';
+  if (charMatches) {
+    const names = charMatches[1].match(/[\w]+(?:\s+[\w]+)?(?=\s*\()/g);
+    if (names) characters = names.join(' and ');
+  }
+
+  return `A ${style} illustration of ${characters} in ${setting} during ${time}. Warm, friendly, child-appropriate scene. Bright colors, soft lighting.`;
+}
+
+/**
+ * Build minimal fallback prompt (Level 3 sanitization)
+ */
+function sanitizePromptLevel3(artStyle) {
+  const style = artStyle || 'watercolor';
+  return `A beautiful ${style} illustration of a happy child on an adventure in a colorful, magical setting. Bright, warm colors. Friendly atmosphere. Child-appropriate.`;
+}
+
+// =============================================================================
 // LRU CACHE IMPLEMENTATION
 // Prevents memory leaks by limiting cache size and implementing eviction
 // =============================================================================
@@ -2580,7 +2658,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     visualBibleGrid = null,
     pageNumber = null,
     onImageReady = null,
-    skipCache = false
+    skipCache = false,
+    artStyle = 'watercolor'
   } = options;
 
   // Check cache first (include previousImage presence and page number in cache key)
@@ -2850,84 +2929,126 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   log.debug(`🖼️  [IMAGE GEN-ONLY] Calling Gemini API with prompt (${prompt.length} chars), model: ${modelId}, temperature: ${modelTemp}, systemInstruction: ${!!systemInstruction}`);
 
-  const data = await withRetry(async () => {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }
-    );
+  // Progressive retry with sanitization on safety blocks
+  const sanitizationLevels = [
+    null,                                                    // Level 0: original prompt
+    () => sanitizePromptLevel1(prompt),                      // Level 1: remove problematic words
+    () => sanitizePromptLevel2(prompt),                      // Level 2: simplify to core scene
+    () => sanitizePromptLevel3(artStyle)                     // Level 3: minimal fallback
+  ];
 
-    if (!response.ok) {
-      const error = await response.text();
-      log.error('❌ [IMAGE GEN-ONLY] Gemini API error response:', error);
-      const err = new Error(`Gemini API error (${response.status}): ${error}`);
-      err.status = response.status;
-      throw err;
+  for (let sanitizationLevel = 0; sanitizationLevel < sanitizationLevels.length; sanitizationLevel++) {
+    // Apply sanitization if needed
+    let currentPrompt = prompt;
+    if (sanitizationLevel > 0) {
+      currentPrompt = sanitizationLevels[sanitizationLevel]();
+      parts[0] = { text: currentPrompt };
+      log.info(`🔄 [IMAGE GEN-ONLY] Retry with sanitization level ${sanitizationLevel}, prompt: ${currentPrompt.substring(0, 100)}...`);
     }
 
-    return response.json();
-  }, { maxRetries: 2, baseDelay: 2000 });
-
-  // Extract token usage
-  const usage = {
-    input_tokens: data.usageMetadata?.promptTokenCount || 0,
-    output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
-    thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
-  };
-
-  if (!data.candidates || data.candidates.length === 0) {
-    log.error('❌ [IMAGE GEN-ONLY] No candidates in response');
-    throw new Error('No image generated - no candidates in response');
-  }
-
-  // Extract image data
-  const candidate = data.candidates[0];
-
-  // Extract thinking text from response
-  const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
-
-  if (candidate.content && candidate.content.parts) {
-    for (const part of candidate.content.parts) {
-      const inlineData = part.inlineData || part.inline_data;
-      if (inlineData && inlineData.data) {
-        const pngImageData = `data:image/png;base64,${inlineData.data}`;
-
-        // Compress PNG to JPEG
-        const compressedImageData = await compressImageToJPEG(pngImageData);
-
-        // Call onImageReady callback immediately
-        if (onImageReady) {
-          try {
-            await onImageReady(compressedImageData, modelId);
-          } catch (callbackError) {
-            log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+    try {
+      const data = await withRetry(async () => {
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody)
           }
+        );
+
+        if (!response.ok) {
+          const error = await response.text();
+          log.error('❌ [IMAGE GEN-ONLY] Gemini API error response:', error);
+          const err = new Error(`Gemini API error (${response.status}): ${error}`);
+          err.status = response.status;
+          throw err;
         }
 
-        const result = {
-          imageData: compressedImageData,
-          modelId,
-          thinkingText,
-          usage
-        };
+        return response.json();
+      }, { maxRetries: 2, baseDelay: 2000 });
 
-        if (!skipCache) imageCache.set(genOnlyCacheKey, result);
-        log.info(`✅ [IMAGE GEN-ONLY] Image generated successfully`);
-        return result;
+      // Extract token usage
+      const usage = {
+        input_tokens: data.usageMetadata?.promptTokenCount || 0,
+        output_tokens: data.usageMetadata?.candidatesTokenCount || 0,
+        thinking_tokens: data.usageMetadata?.thoughtsTokenCount || 0
+      };
+
+      if (!data.candidates || data.candidates.length === 0) {
+        // No candidates = likely safety block
+        log.warn(`⚠️ [IMAGE GEN-ONLY] No candidates (safety block?) at level ${sanitizationLevel}`);
+        if (sanitizationLevel < sanitizationLevels.length - 1) continue;
+        throw new Error('No image generated - no candidates in response');
       }
+
+      const candidate = data.candidates[0];
+      const thinkingText = extractThinkingFromParts(candidate.content?.parts, 'IMAGE GEN-ONLY');
+
+      // Check for safety block at candidate level
+      const finishReason = candidate.finishReason;
+      if (finishReason === 'SAFETY' || finishReason === 'PROHIBITED_CONTENT') {
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Content blocked (${finishReason}) at level ${sanitizationLevel}`);
+        if (sanitizationLevel < sanitizationLevels.length - 1) continue;
+        throw new Error(`Image blocked by API: reason=${finishReason}`);
+      }
+
+      if (candidate.content && candidate.content.parts) {
+        for (const part of candidate.content.parts) {
+          const inlineData = part.inlineData || part.inline_data;
+          if (inlineData && inlineData.data) {
+            const pngImageData = `data:image/png;base64,${inlineData.data}`;
+            const compressedImageData = await compressImageToJPEG(pngImageData);
+
+            if (onImageReady) {
+              try {
+                await onImageReady(compressedImageData, modelId);
+              } catch (callbackError) {
+                log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+              }
+            }
+
+            const result = {
+              imageData: compressedImageData,
+              modelId,
+              thinkingText,
+              usage,
+              sanitizationLevel // Track which level succeeded
+            };
+
+            if (!skipCache) imageCache.set(genOnlyCacheKey, result);
+            if (sanitizationLevel > 0) {
+              log.info(`✅ [IMAGE GEN-ONLY] Image generated with sanitization level ${sanitizationLevel}`);
+            } else {
+              log.info(`✅ [IMAGE GEN-ONLY] Image generated successfully`);
+            }
+            return result;
+          }
+        }
+      }
+
+      // No image data in response but also not explicitly blocked
+      const reason = candidate.finishReason || 'unknown';
+      log.warn(`⚠️ [IMAGE GEN-ONLY] No image data, reason=${reason} at level ${sanitizationLevel}`);
+      if (sanitizationLevel < sanitizationLevels.length - 1) continue;
+      throw new Error(`Image blocked by API: reason=${reason}`);
+
+    } catch (error) {
+      const errorMsg = error.message?.toLowerCase() || '';
+      const isSafetyBlock = errorMsg.includes('blocked') || errorMsg.includes('safety') ||
+                            errorMsg.includes('prohibited') || errorMsg.includes('filtered') ||
+                            errorMsg.includes('no candidates') || errorMsg.includes('no image generated');
+
+      if (isSafetyBlock && sanitizationLevel < sanitizationLevels.length - 1) {
+        log.warn(`⚠️ [IMAGE GEN-ONLY] Safety block at level ${sanitizationLevel}, trying level ${sanitizationLevel + 1}...`);
+        continue;
+      }
+      throw error;
     }
-  } else {
-    const reason = candidate.finishReason || 'unknown';
-    const message = candidate.finishMessage || 'no message';
-    log.error(`❌ [IMAGE GEN-ONLY] Image blocked: reason=${reason}`);
-    throw new Error(`Image blocked by API: reason=${reason}, message=${message}`);
   }
 
-  log.error('❌ [IMAGE GEN-ONLY] No image data found in response');
-  throw new Error('No image data in response');
+  // Should not reach here, but just in case
+  throw new Error('Image generation failed after all sanitization levels');
 }
 
 // =============================================================================
@@ -8727,7 +8848,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   const {
     minAppearances = 2,
     maxPerBatch = 4,
-    imageModel = null
+    imageModel = null,
+    maxElements = null
   } = options;
 
   // DEBUG: Log visual bible contents to diagnose reference image generation
@@ -8756,7 +8878,15 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
   const { getElementsNeedingReferenceImages, updateElementReferenceImage } = require('./visualBible');
 
   // Get elements that need reference images
-  const needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances);
+  let needsReference = getElementsNeedingReferenceImages(visualBible, minAppearances);
+
+  // Limit elements if maxElements specified (trial mode)
+  if (maxElements && needsReference.length > maxElements) {
+    // Sort by page count descending, then alphabetically
+    needsReference.sort((a, b) => b.pageCount - a.pageCount || a.name.localeCompare(b.name));
+    needsReference.length = maxElements;
+    log.info(`[REF-SHEET] Limited to top ${maxElements} elements (trial mode)`);
+  }
 
   if (needsReference.length === 0) {
     log.info('[REF-SHEET] No elements need reference images (none with 2+ page appearances)');

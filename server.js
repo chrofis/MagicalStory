@@ -2284,6 +2284,53 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const streamingExpandedPages = new Map(); // pageNum -> page data (for scene expansion)
     let coversStartedDuringStreaming = false;
 
+    // TRIAL MODE: Start avatar styling immediately using pre-defined costumes
+    // This runs in parallel with story generation (no need to wait for outline clothing)
+    if (inputData.trialMode && !skipImages && artStyle !== 'realistic') {
+      const { getTrialCostume } = require('./server/config/trialCostumes');
+      const mainChar = (inputData.characters || [])[0];
+      const costume = getTrialCostume(
+        inputData.storyTopic || inputData.storyTheme || '',
+        inputData.storyCategory || 'adventure',
+        mainChar?.gender || ''
+      );
+
+      // Build clothing requirements from config (not from outline)
+      const trialClothingRequirements = {};
+      for (const char of (inputData.characters || [])) {
+        trialClothingRequirements[char.name] = {
+          standard: { used: true, signature: 'none' },
+          costumed: costume
+            ? { used: true, costume: costume.costumeType, description: costume.description }
+            : { used: false }
+        };
+      }
+
+      // Store for later use (skip outline-generated clothing)
+      inputData._trialClothingRequirements = trialClothingRequirements;
+      inputData._trialCostumeType = costume?.costumeType || null;
+
+      const trialAvatarRequirements = (inputData.characters || []).flatMap(char => {
+        const cats = ['standard'];
+        if (costume) cats.push(`costumed:${costume.costumeType}`);
+        return cats.map(cat => ({
+          pageNumber: 'pre-cover',
+          clothingCategory: cat,
+          characterNames: [char.name]
+        }));
+      });
+
+      log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
+      streamingAvatarStylingPromise = (async () => {
+        try {
+          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage);
+          log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
+        } catch (error) {
+          log.warn(`⚠️ [TRIAL] Early avatar styling failed: ${error.message}`);
+        }
+      })();
+    }
+
     // Rate limiters for streaming tasks (aggressive parallelism)
     const streamSceneLimit = pLimit(10);   // Scene expansions are text-only, can parallelize heavily
     const streamCoverLimit = pLimit(3);    // Only 3 covers total anyway
@@ -2424,7 +2471,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Helper: Start cover generation
     const startCoverGeneration = (coverType, hint) => {
-      if (streamingCoverPromises.has(coverType) || skipImages || skipCovers) return;
+      if (streamingCoverPromises.has(coverType) || skipImages) return;
+      if (inputData.titlePageOnly && coverType !== 'titlePage') return;
+      if (skipCovers) return;
 
       const coverPromise = streamCoverLimit(async () => {
         // Wait for visual bible if not yet available
@@ -2680,6 +2729,27 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const progressiveParser = new ProgressiveUnifiedParser({
       onTitle: (title) => {
         streamingTitle = title;
+
+        // TRIAL MODE: Start title page generation as soon as title is known
+        if (inputData.trialMode && inputData.titlePageOnly && !skipImages) {
+          const mainCharNames = (inputData.characters || [])
+            .filter(c => c.isMainCharacter)
+            .map(c => c.name)
+            .join(', ') || 'the main character';
+          const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
+          const titlePageHint = {
+            hint: `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
+            characterClothing: {}
+          };
+          // Use trial costume for title page character clothing
+          if (inputData._trialCostumeType) {
+            for (const char of (inputData.characters || [])) {
+              titlePageHint.characterClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+            }
+          }
+          startCoverGeneration('titlePage', titlePageHint);
+          log.info(`🎨 [TRIAL] Started title page generation (title: "${title}")`);
+        }
       },
       onClothingRequirements: (requirements) => {
         streamingClothingRequirements = requirements;
@@ -2694,7 +2764,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // START AVATAR STYLING EARLY - we have everything we need now
         // This saves ~3min by running in parallel with story text generation
-        if (!skipImages && artStyle !== 'realistic' && !streamingAvatarStylingPromise) {
+        if (!inputData.trialMode && !skipImages && artStyle !== 'realistic' && !streamingAvatarStylingPromise) {
           log.debug(`🎨 [STREAM] Starting early avatar styling (${reqCharCount} characters, ${artStyle} style)...`);
           streamingAvatarStylingPromise = (async () => {
             try {
@@ -2759,8 +2829,10 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         genLog.info('page_streamed', `Page ${page.pageNumber} parsed from stream`, null, { pageNumber: page.pageNumber, textLength: page.text?.length || 0 });
         // Store page data for scene expansion
         streamingExpandedPages.set(page.pageNumber, page);
-        // Start scene expansion immediately
-        startSceneExpansion(page);
+        // Only start scene expansion for non-trial (trial uses rich hints directly)
+        if (!inputData.trialMode) {
+          startSceneExpansion(page);
+        }
       },
       onProgress: async (type, message, pageNum) => {
         // Rate limit progress updates (max once per 500ms)
@@ -2822,7 +2894,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Parse the unified response (full parse for complete data)
     const parser = new UnifiedStoryParser(unifiedResponse);
     const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
-    const clothingRequirements = parser.extractClothingRequirements() || streamingClothingRequirements;
+    const clothingRequirements = inputData.trialMode
+      ? inputData._trialClothingRequirements
+      : (parser.extractClothingRequirements() || streamingClothingRequirements);
     const visualBible = parser.extractVisualBible() || streamingVisualBible || {};
     const coverHints = parser.extractCoverHints();
     // Debug: log cover hints character clothing
@@ -2904,7 +2978,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const styleDescription = ART_STYLES[artStyle] || ART_STYLES.pixar;
       referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {
         minAppearances: 2, // Elements appearing on 2+ pages
-        maxPerBatch: 4     // Max 4 elements per grid for quality
+        maxPerBatch: 4,    // Max 4 elements per grid for quality
+        maxElements: inputData.trialMode ? 3 : null  // Trial: top 3 only
       }).catch(err => {
         log.warn(`⚠️ [UNIFIED] Reference sheet generation failed: ${err.message}`);
         return { generated: 0, failed: 0, elements: [] };
@@ -3053,7 +3128,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
     if (!skipImages && !skipCovers && coverHints) {
-      const coverTypes = ['titlePage', 'initialPage', 'backCover'];
+      const coverTypes = inputData.titlePageOnly
+        ? ['titlePage']
+        : ['titlePage', 'initialPage', 'backCover'];
       for (const coverType of coverTypes) {
         const hint = coverHints[coverType];
         if (hint && !streamingCoverPromises.has(coverType)) {
@@ -3063,57 +3140,71 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations (avatars ready)`);
     }
 
-    // PHASE 3: Wait for scene expansion to complete (most should be done by now)
-    genLog.setStage('scenes');
-    await dbPool.query(
-      'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
-      [30, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]
-    );
+    // PHASE 3: Scene descriptions
+    let expandedScenes;
 
-    // Start any missing scene expansions (pages that weren't detected during streaming)
-    for (const page of storyPages) {
-      if (!streamingSceneExpansionPromises.has(page.pageNumber)) {
-        log.debug(`⚡ [UNIFIED] Starting late scene expansion for page ${page.pageNumber}`);
-        startSceneExpansion(page);
-      }
-    }
+    if (inputData.trialMode) {
+      // Trial mode: use enriched scene hints directly as scene descriptions
+      log.info(`⏭️ [TRIAL] Skipping scene expansion — using rich scene hints directly`);
+      expandedScenes = storyPages.map(page => ({
+        pageNumber: page.pageNumber,
+        text: page.text,
+        sceneHint: page.sceneHint,
+        sceneDescription: page.sceneHint,
+        sceneDescriptionPrompt: null,
+        sceneDescriptionModelId: null,
+        characterClothing: page.characterClothing || {},
+        characters: page.characters
+      }));
+    } else {
+      // Normal flow: wait for scene expansions
+      genLog.setStage('scenes');
+      await dbPool.query(
+        'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
+        [30, `Finalizing ${streamingSceneExpansionPromises.size} scene expansions...`, jobId]
+      );
 
-    // Wait for all scene expansions
-    log.debug(`⏳ [UNIFIED] Waiting for ${streamingSceneExpansionPromises.size} scene expansions...`);
-    const sceneResults = await Promise.all(
-      Array.from(streamingSceneExpansionPromises.values())
-    );
-
-    // Sort by page number and create expandedScenes array
-    const expandedScenes = sceneResults.sort((a, b) => a.pageNumber - b.pageNumber);
-    log.debug(`✅ [UNIFIED] All ${expandedScenes.length} scene expansions complete`);
-    genLog.info('scenes_complete', `All ${expandedScenes.length} scene expansions complete`);
-
-    // FIX: Update characterClothing from full re-parse to fix truncated costume names from streaming
-    // Streaming can truncate costume names (e.g., "costumed:gla" instead of "costumed:gladiator")
-    // The full re-parse in storyPages has complete data
-    for (const scene of expandedScenes) {
-      const fullParsePage = storyPages.find(p => p.pageNumber === scene.pageNumber);
-      if (fullParsePage?.characterClothing && Object.keys(fullParsePage.characterClothing).length > 0) {
-        // Check if streaming truncated any costume names
-        const streamingClothing = scene.characterClothing || {};
-        const fullClothing = fullParsePage.characterClothing;
-        let updated = false;
-        for (const [charName, fullValue] of Object.entries(fullClothing)) {
-          const streamingValue = streamingClothing[charName];
-          if (streamingValue && fullValue && streamingValue !== fullValue) {
-            log.debug(`[CLOTHING FIX] Page ${scene.pageNumber} ${charName}: "${streamingValue}" -> "${fullValue}"`);
-            updated = true;
-          }
+      // Start any missing scene expansions
+      for (const page of storyPages) {
+        if (!streamingSceneExpansionPromises.has(page.pageNumber)) {
+          log.debug(`⚡ [UNIFIED] Starting late scene expansion for page ${page.pageNumber}`);
+          startSceneExpansion(page);
         }
-        // Always use the full parse data
-        scene.characterClothing = fullClothing;
+      }
+
+      // Wait for all scene expansions
+      log.debug(`⏳ [UNIFIED] Waiting for ${streamingSceneExpansionPromises.size} scene expansions...`);
+      const sceneResults = await Promise.all(
+        Array.from(streamingSceneExpansionPromises.values())
+      );
+
+      // Sort by page number
+      expandedScenes = sceneResults.sort((a, b) => a.pageNumber - b.pageNumber);
+      log.debug(`✅ [UNIFIED] All ${expandedScenes.length} scene expansions complete`);
+      genLog.info('scenes_complete', `All ${expandedScenes.length} scene expansions complete`);
+
+      // FIX: Update characterClothing from full re-parse
+      for (const scene of expandedScenes) {
+        const fullParsePage = storyPages.find(p => p.pageNumber === scene.pageNumber);
+        if (fullParsePage?.characterClothing && Object.keys(fullParsePage.characterClothing).length > 0) {
+          const streamingClothing = scene.characterClothing || {};
+          const fullClothing = fullParsePage.characterClothing;
+          for (const [charName, fullValue] of Object.entries(fullClothing)) {
+            const streamingValue = streamingClothing[charName];
+            if (streamingValue && fullValue && streamingValue !== fullValue) {
+              log.debug(`[CLOTHING FIX] Page ${scene.pageNumber} ${charName}: "${streamingValue}" -> "${fullValue}"`);
+            }
+          }
+          scene.characterClothing = fullClothing;
+        }
       }
     }
 
-    // Log streaming efficiency
-    const pagesFromStreaming = streamingExpandedPages.size;
-    log.debug(`📊 [UNIFIED] Streaming efficiency: ${pagesFromStreaming}/${storyPages.length} pages started during streaming`);
+    // Log streaming efficiency (for non-trial)
+    if (!inputData.trialMode) {
+      const pagesFromStreaming = streamingExpandedPages.size;
+      log.debug(`📊 [UNIFIED] Streaming efficiency: ${pagesFromStreaming}/${storyPages.length} pages started during streaming`);
+    }
 
     // Create allSceneDescriptions array for storage compatibility
     const allSceneDescriptions = expandedScenes.map(scene => {

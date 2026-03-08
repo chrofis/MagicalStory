@@ -1,10 +1,10 @@
-# Trial Story Generation (Lightweight)
+# Trial Story Generation
+{LANGUAGE_INSTRUCTION}
 
-You write children's stories. Create a complete {PAGES}-scene story.
-This is a SHORT story — {PAGES} scenes is all you have. Keep it focused:
+You write children's stories. Create a {PAGES}-scene story.
+SHORT story — {PAGES} scenes. Keep it focused:
 - One clear conflict, one resolution. No subplots.
-- Introduce the situation quickly (scene 1), build tension (scenes 2-3), resolve it (scenes 4-5).
-- No covers or extra pages — just {PAGES} story scenes.
+- Introduce quickly (scene 1), build tension (2-3), resolve (4-5).
 
 **Rules:**
 - Write EVERYTHING in {LANGUAGE}. All text, title, scene hints — 100% in {LANGUAGE}. {LANGUAGE_NOTE}
@@ -21,20 +21,23 @@ This is a SHORT story — {PAGES} scenes is all you have. Keep it focused:
 - **Characters**: {CHARACTERS}
 - **Story Idea**: {STORY_DETAILS}
 
-{COSTUME_INSTRUCTION}
+{AVATAR_SELECTION}
 
 # Scene Hint Format
 
+Each scene hint must be detailed enough for direct image generation (no further expansion).
+Include: setting details, mood, lighting, colors, textures, atmosphere, character positions, key actions.
+
 ```
 SCENE HINT:
-[1-2 sentences describing the key visual moment]
+[2-3 detailed sentences describing the visual scene. Include specific colors, lighting, atmosphere, character expressions and poses.]
 Characters:
-- [Name] (left/right/center): [standard | costumed:type]
+- [Name] (left/right/center): [standard | costumed:{type}]
 Setting: [indoor/outdoor] | Time: [morning/afternoon/evening/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
+Key objects: [list any visual bible objects visible in scene]
 ```
 
 MAX 2 characters per scene hint. Every character needs a position (left/right/center). Use n/a for indoor weather.
-**Clothing**: Use `costumed:type` when the story has a themed setting (e.g., roman, pirate, knight). Use `standard` only for modern/everyday scenes.
 
 # OUTPUT FORMAT
 
@@ -43,40 +46,18 @@ Output ALL sections in this EXACT order. Do not skip any.
 ---TITLE---
 TITLE: [A creative, specific title in {LANGUAGE}]
 
----CLOTHING REQUIREMENTS---
-```json
-{
-  "clothingRequirements": {
-    "[CharacterName]": {
-      "standard": { "used": true/false, "signature": "none" },
-      "costumed": { "used": true/false, "costume": "[type]", "description": "[full outfit - CLOTHING ONLY, no face coverings]" }
-    }
-  }
-}
-```
-
 ---VISUAL BIBLE---
 ```json
 {
-  "secondaryCharacters": [],
-  "animals": [],
-  "artifacts": [],
   "locations": [
-    {
-      "id": "LOC001",
-      "name": "[Main location]",
-      "pages": [1, 2, 3],
-      "type": "[type]",
-      "description": "[colors, style, key features]"
-    }
+    { "id": "LOC001", "name": "[Main location name]", "pages": [1, 2, 3], "type": "location", "description": "[key visual features: colors, architectural style, lighting, atmosphere]" }
   ],
-  "vehicles": [],
-  "clothing": []
+  "keyObjects": [
+    { "id": "OBJ001", "name": "[Important object]", "pages": [2, 3, 4], "type": "artifact", "description": "[appearance: shape, color, material, size, distinctive features]" }
+  ]
 }
 ```
-
----COVER SCENE HINTS---
-No covers needed.
+Keep it minimal: max 2-3 locations, 1-2 key objects. Only include elements that appear on 2+ pages.
 
 ---STORY PAGES---
 
@@ -85,19 +66,21 @@ TEXT:
 [Story text, 150-200 words]
 
 SCENE HINT:
-[Visual description]
+[2-3 detailed sentences for image generation]
 Characters:
-- [Name] (position): [standard or costumed:type]
+- [Name] (position): [standard or costumed:{type}]
 Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
+Key objects: [objects from visual bible, if any]
 
 --- Page 2 ---
 TEXT:
 [Story continues...]
 
 SCENE HINT:
-[Visual description]
+[2-3 detailed sentences for image generation]
 Characters:
-- [Name] (position): [standard or costumed:type]
+- [Name] (position): [standard or costumed:{type}]
 Setting: [indoor/outdoor] | Time: [time] | Weather: [weather]
+Key objects: [objects from visual bible, if any]
 
 ... continue for ALL {PAGES} pages ...

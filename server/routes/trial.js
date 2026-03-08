@@ -432,7 +432,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
   // Build input_data matching the format expected by processStoryJob
   const inputData = {
     pages,
-    language: storyInput.language || 'English',
+    language: storyInput.language || 'en',
     languageLevel: 'standard',
     artStyle: 'watercolor',
     storyCategory: storyInput.storyCategory || '',
@@ -442,7 +442,8 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     characterId,
     characters: [trialCharacter],
     mainCharacters: [trialCharacter.id],
-    skipCovers: true, // Trial stories don't generate covers
+    skipCovers: false,
+    titlePageOnly: true, // Only generate title page, skip initialPage and backCover
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
     trialMode: true, // Use lightweight story prompt

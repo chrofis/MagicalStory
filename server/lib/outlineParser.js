@@ -1578,10 +1578,12 @@ class ProgressiveUnifiedParser {
     if (this.emitted.title) return;
 
     // Title is complete when we see the next section marker
+    // Full flow: TITLE → CLOTHING REQUIREMENTS
+    // Trial flow: TITLE → VISUAL BIBLE
     if (!this._hasMarker('TITLE')) return;
-    if (!this._hasMarker('CLOTHING REQUIREMENTS')) return;
+    if (!this._hasMarker('CLOTHING REQUIREMENTS') && !this._hasMarker('VISUAL BIBLE')) return;
 
-    const match = this.fullText.match(/---\s*TITLE\s*---\s*(?:TITLE:\s*)?(.+?)(?:\n|---\s*CLOTHING)/i);
+    const match = this.fullText.match(/---\s*TITLE\s*---\s*(?:TITLE:\s*)?(.+?)(?:\n|---\s*(?:CLOTHING|VISUAL))/i);
     if (match) {
       const title = match[1].trim()
         .replace(/^\*{1,2}|\*{1,2}$/g, '')  // Strip markdown bold
@@ -1682,10 +1684,13 @@ class ProgressiveUnifiedParser {
   _checkVisualBible() {
     if (this.emitted.visualBible) return;
 
+    // Visual Bible is complete when we see the next section marker
+    // Full flow: VISUAL BIBLE → COVER SCENE HINTS
+    // Trial flow: VISUAL BIBLE → STORY PAGES
     if (!this._hasMarker('VISUAL BIBLE')) return;
-    if (!this._hasMarker('COVER SCENE HINTS')) return;
+    if (!this._hasMarker('COVER SCENE HINTS') && !this._hasMarker('STORY PAGES')) return;
 
-    const sectionMatch = this.fullText.match(/---\s*VISUAL\s+BIBLE\s*---\s*([\s\S]*?)(?=---\s*COVER\s+SCENE\s+HINTS\s*---)/i);
+    const sectionMatch = this.fullText.match(/---\s*VISUAL\s+BIBLE\s*---\s*([\s\S]*?)(?=---\s*(?:COVER\s+SCENE\s+HINTS|STORY\s+PAGES)\s*---)/i);
     if (!sectionMatch) return;
 
     const section = sectionMatch[1];
