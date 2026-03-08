@@ -609,8 +609,10 @@ router.get('/verify-email/:token', async (req, res) => {
 
     const user = result.rows[0];
 
+    // Keep the token so the link works on repeated clicks (issues a fresh JWT each time).
+    // The expiry still limits how long the link stays valid.
     await pool.query(
-      'UPDATE users SET email_verified = TRUE, email_verification_token = NULL, email_verification_expires = NULL WHERE id = $1',
+      'UPDATE users SET email_verified = TRUE WHERE id = $1',
       [user.id]
     );
 
