@@ -165,7 +165,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   // Turnstile + Fingerprint for abuse prevention
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [turnstileReady, setTurnstileReady] = useState(!TURNSTILE_SITE_KEY); // ready immediately if no key configured
   const [fingerprint, setFingerprint] = useState<string | null>(null);
 
   // Initialize fingerprint on mount
@@ -735,9 +734,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         <Turnstile
           ref={turnstileRef}
           siteKey={TURNSTILE_SITE_KEY}
-          onSuccess={(token) => { setTurnstileToken(token); setTurnstileReady(true); }}
-          onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); turnstileRef.current?.reset(); }}
-          onError={() => setTurnstileReady(true)} // allow fallback on widget error
+          onSuccess={(token) => { setTurnstileToken(token); }}
+          onExpire={() => { setTurnstileToken(null); turnstileRef.current?.reset(); }}
+          onError={() => {}} // widget error is non-blocking; token fetched at submit time
           options={{ size: 'invisible' }}
         />
       )}
