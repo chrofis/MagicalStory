@@ -248,13 +248,10 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     // Sanitize name for logging (strip newlines to prevent log injection)
     const safeName = name.replace(/[\r\n]/g, '');
 
-    // Layer 1: Check fingerprint (Turnstile verified at account creation instead —
-    // preview avatars are non-critical and the token is single-use)
-    if (!checkFingerprint(fingerprint)) {
-      return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
-    }
+    // Fingerprint + Turnstile verified at account creation instead —
+    // preview avatars are non-critical and already rate-limited by trialAvatarLimiter.
 
-    // Layer 3: Check daily cap
+    // Check daily cap
     if (!checkAndIncrementTrialCap('avatar')) {
       return res.status(503).json({ error: 'Service temporarily unavailable. Please try again tomorrow.' });
     }
