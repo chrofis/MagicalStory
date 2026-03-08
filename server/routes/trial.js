@@ -1371,73 +1371,75 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     }
 
     // Lazy require the styled avatar and story helper modules
-    const { prepareStyledAvatars, applyStyledAvatars } = require('../lib/styledAvatars');
+    const { runInCacheScope, prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache } = require('../lib/styledAvatars');
     const { ART_STYLES, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
     const { generateImageOnly } = require('../lib/images');
 
-    // Prepare styled avatars (standard + costumed)
-    await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
-    log.info(`[TRIAL TITLE] Avatar styling complete for "${character.name}"`);
+    // Run avatar styling inside a cache scope to prevent cross-user collisions
+    await runInCacheScope(`title-${userId}`, async () => {
+      // Prepare styled avatars (standard + costumed)
+      await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
+      log.info(`[TRIAL TITLE] Avatar styling complete for "${character.name}"`);
 
-    // Get character photo details with clothing
-    let coverPhotos = getCharacterPhotoDetails(
-      characters,
-      costume ? 'costumed' : 'standard',
-      costumeType,
-      'watercolor',
-      coverClothingRequirements
-    );
-
-    // Apply styled avatars
-    coverPhotos = applyStyledAvatars(coverPhotos, 'watercolor');
-
-    // Build the cover scene description
-    const sceneDescription = `A magical, eye-catching front cover scene featuring ${character.name} in a ${storyTopic}-themed setting. The main character is prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
-
-    // Fill the front cover template
-    const styleDescription = ART_STYLES.watercolor;
-    const characterRefList = buildCharacterReferenceList(coverPhotos, characters);
-    const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-      TITLE_PAGE_SCENE: sceneDescription,
-      STYLE_DESCRIPTION: styleDescription,
-      STORY_TITLE: title,
-      CHARACTER_REFERENCE_LIST: characterRefList,
-      VISUAL_BIBLE: '',
-    });
-
-    // Generate the cover image
-    log.info(`[TRIAL TITLE] Generating title page image for "${title}"`);
-    const result = await generateImageOnly(coverPrompt, coverPhotos);
-
-    if (!result || !result.imageData) {
-      log.warn(`[TRIAL TITLE] Image generation returned no image`);
-      return res.json({ titlePageImage: null, title: null, costumeType: null });
-    }
-
-    const titlePageImage = result.imageData;
-
-    // Store result on character data in DB
-    try {
-      charData.characters[0].preGeneratedTitlePage = titlePageImage;
-      charData.characters[0].preGeneratedTitle = title;
-      charData.characters[0].preGeneratedCostumeType = costumeType;
-      await pool.query(
-        'UPDATE characters SET data = $1 WHERE id = $2',
-        [JSON.stringify(charData), characterId]
+      // Get character photo details with clothing
+      let coverPhotos = getCharacterPhotoDetails(
+        characters,
+        costume ? 'costumed' : 'standard',
+        costumeType,
+        'watercolor',
+        coverClothingRequirements
       );
-      log.debug(`[TRIAL TITLE] Saved pre-generated title page to character ${characterId}`);
-    } catch (dbErr) {
-      log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
-    }
 
-    // NOTE: Do NOT clear styled avatar cache here — processStoryJob starts avatar styling
-    // in parallel and shares the same global cache. Clearing here wipes out avatars the
-    // job already cached, causing cache misses for all page images. The job clears the
-    // cache itself when generation completes.
+      // Apply styled avatars
+      coverPhotos = applyStyledAvatars(coverPhotos, 'watercolor');
 
-    log.info(`[TRIAL TITLE] Title page ready for "${title}" (costumeType: ${costumeType})`);
-    res.json({ titlePageImage, title, costumeType });
+      // Build the cover scene description
+      const sceneDescription = `A magical, eye-catching front cover scene featuring ${character.name} in a ${storyTopic}-themed setting. The main character is prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
+
+      // Fill the front cover template
+      const styleDescription = ART_STYLES.watercolor;
+      const characterRefList = buildCharacterReferenceList(coverPhotos, characters);
+      const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+        TITLE_PAGE_SCENE: sceneDescription,
+        STYLE_DESCRIPTION: styleDescription,
+        STORY_TITLE: title,
+        CHARACTER_REFERENCE_LIST: characterRefList,
+        VISUAL_BIBLE: '',
+      });
+
+      // Generate the cover image
+      log.info(`[TRIAL TITLE] Generating title page image for "${title}"`);
+      const result = await generateImageOnly(coverPrompt, coverPhotos);
+
+      if (!result || !result.imageData) {
+        log.warn(`[TRIAL TITLE] Image generation returned no image`);
+        res.json({ titlePageImage: null, title: null, costumeType: null });
+        return;
+      }
+
+      const titlePageImage = result.imageData;
+
+      // Store result on character data in DB
+      try {
+        charData.characters[0].preGeneratedTitlePage = titlePageImage;
+        charData.characters[0].preGeneratedTitle = title;
+        charData.characters[0].preGeneratedCostumeType = costumeType;
+        await pool.query(
+          'UPDATE characters SET data = $1 WHERE id = $2',
+          [JSON.stringify(charData), characterId]
+        );
+        log.debug(`[TRIAL TITLE] Saved pre-generated title page to character ${characterId}`);
+      } catch (dbErr) {
+        log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
+      }
+
+      // Clear this title-page's scoped cache to free memory
+      clearStyledAvatarCache();
+
+      log.info(`[TRIAL TITLE] Title page ready for "${title}" (costumeType: ${costumeType})`);
+      res.json({ titlePageImage, title, costumeType });
+    });
 
   } catch (err) {
     log.error(`[TRIAL TITLE] Error generating title page: ${err.message}`);

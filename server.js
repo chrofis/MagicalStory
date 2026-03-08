@@ -116,6 +116,7 @@ const {
   applyStyledAvatars,
   collectAvatarRequirements,
   setStyledAvatar,
+  runInCacheScope,
   clearStyledAvatarCache,
   invalidateStyledAvatarForCategory,
   getStyledAvatarCacheStats,
@@ -4160,6 +4161,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 // Background worker function to process a story generation job
 // NEW STREAMING ARCHITECTURE: Generate images as story batches complete
 async function processStoryJob(jobId) {
+  // Run entire job inside a cache scope so styled avatars don't collide between concurrent jobs
+  return runInCacheScope(jobId, () => _processStoryJobImpl(jobId));
+}
+
+async function _processStoryJobImpl(jobId) {
   console.log(`🎬 Starting processing for job ${jobId}`);
 
   // Generation logger for tracking API usage and debugging

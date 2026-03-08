@@ -86,10 +86,20 @@ function loadStyleSampleImage(artStyle) {
   }
 }
 
-// In-memory cache for styled avatars
-// Key: `${characterName}_${clothingCategory}_${artStyle}`
+// In-memory cache for styled avatars, scoped per job to prevent cross-job collisions
+// Key: `${scopePrefix}${characterName}_${clothingCategory}_${artStyle}`
 // Value: base64 image data (downsized)
 const styledAvatarCache = new Map();
+
+// AsyncLocalStorage for per-job cache scoping (supports concurrent jobs)
+const { AsyncLocalStorage } = require('async_hooks');
+const cacheContext = new AsyncLocalStorage();
+
+/** Get the current cache scope prefix from async context */
+function getCacheScope() {
+  const scope = cacheContext.getStore();
+  return scope ? `${scope}::` : '';
+}
 
 // In-progress conversions (Promise-based locking)
 // Key: same as cache
@@ -184,7 +194,7 @@ function buildPhysicalTraitsString(character) {
  * @returns {string}
  */
 function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
-  return `${characterName.trim().toLowerCase()}_${clothingCategory.trim().toLowerCase()}_${artStyle}`;
+  return `${getCacheScope()}${characterName.trim().toLowerCase()}_${clothingCategory.trim().toLowerCase()}_${artStyle}`;
 }
 
 /**
@@ -775,8 +785,8 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
   let styledAvatar = styledAvatarCache.get(cacheKey);
   if (!styledAvatar && clothingCategory.startsWith('costumed:')) {
-    // Prefix match: find any costumed avatar for this character+style
-    const prefix = `${characterName.toLowerCase()}_costumed:`;
+    // Prefix match: find any costumed avatar for this character+style (within current scope)
+    const prefix = `${getCacheScope()}${characterName.toLowerCase()}_costumed:`;
     const suffix = `_${artStyle}`;
     for (const [key, value] of styledAvatarCache.entries()) {
       if (key.startsWith(prefix) && key.endsWith(suffix)) {
@@ -819,14 +829,47 @@ function setStyledAvatar(characterName, clothingCategory, artStyle, imageData) {
 }
 
 /**
- * Clear the styled avatar cache
- * Call this at the end of story generation to free memory
+ * Run a callback within a cache scope (call at start of each story job).
+ * All cache operations inside the callback will be prefixed with this scope,
+ * preventing cross-job collisions when multiple jobs run concurrently.
+ * Uses AsyncLocalStorage so concurrent jobs each see their own scope.
+ * @param {string} scopeId - Unique scope identifier (e.g., jobId)
+ * @param {Function} fn - Async function to run within the scope
+ * @returns {Promise} Result of fn
+ */
+function runInCacheScope(scopeId, fn) {
+  log.debug(`🔒 [STYLED AVATARS] Running in cache scope: ${scopeId}`);
+  return cacheContext.run(scopeId, fn);
+}
+
+/**
+ * Clear the styled avatar cache for the current scope only.
+ * Call this at the end of story generation to free memory.
  */
 function clearStyledAvatarCache() {
-  const size = styledAvatarCache.size;
-  styledAvatarCache.clear();
-  conversionInProgress.clear();
-  log.debug(`🗑️ [STYLED AVATARS] Cache cleared (${size} entries)`);
+  const scope = getCacheScope();
+  if (scope) {
+    // Only clear entries belonging to the current scope
+    let cleared = 0;
+    for (const key of [...styledAvatarCache.keys()]) {
+      if (key.startsWith(scope)) {
+        styledAvatarCache.delete(key);
+        cleared++;
+      }
+    }
+    for (const key of [...conversionInProgress.keys()]) {
+      if (key.startsWith(scope)) {
+        conversionInProgress.delete(key);
+      }
+    }
+    log.debug(`🗑️ [STYLED AVATARS] Cleared ${cleared} entries for scope ${scope} (${styledAvatarCache.size} remain)`);
+  } else {
+    // No scope set — clear everything (backward compat)
+    const size = styledAvatarCache.size;
+    styledAvatarCache.clear();
+    conversionInProgress.clear();
+    log.debug(`🗑️ [STYLED AVATARS] Cache cleared (${size} entries)`);
+  }
 }
 
 /**
@@ -834,8 +877,18 @@ function clearStyledAvatarCache() {
  * @returns {Object} Cache statistics including size
  */
 function getStyledAvatarCacheStats() {
+  // Count only entries in current scope
+  const scope = getCacheScope();
+  let scopedSize = 0;
+  if (scope) {
+    for (const key of styledAvatarCache.keys()) {
+      if (key.startsWith(scope)) scopedSize++;
+    }
+  } else {
+    scopedSize = styledAvatarCache.size;
+  }
   return {
-    size: styledAvatarCache.size,
+    size: scopedSize,
     inProgress: 0 // No longer tracked, kept for backward compatibility with logging
   };
 }
@@ -850,13 +903,14 @@ function getStyledAvatarCacheStats() {
  */
 function invalidateStyledAvatarForCategory(characterName, clothingCategory, character = null) {
   const charLower = characterName.toLowerCase();
+  const scope = getCacheScope();
   let clearedCount = 0;
 
-  // Clear from in-memory cache for all art styles
+  // Clear from in-memory cache for all art styles (within current scope)
   const keysToDelete = [];
   for (const key of styledAvatarCache.keys()) {
-    // Key format: charactername_clothingcategory_artstyle
-    if (key.startsWith(`${charLower}_${clothingCategory}_`)) {
+    // Key format: scope::charactername_clothingcategory_artstyle
+    if (key.startsWith(`${scope}${charLower}_${clothingCategory}_`)) {
       keysToDelete.push(key);
     }
   }
@@ -1185,8 +1239,8 @@ function getStyledAvatarsForCharacter(characterName, artStyle) {
     }
   }
 
-  // Check for costumed sub-types in cache (pattern: charactername_costumed:type_artstyle)
-  const charPrefix = `${characterName.toLowerCase()}_costumed:`;
+  // Check for costumed sub-types in cache (pattern: scope::charactername_costumed:type_artstyle)
+  const charPrefix = `${getCacheScope()}${characterName.toLowerCase()}_costumed:`;
   const styleSuffix = `_${artStyle}`;
   for (const [key, value] of styledAvatarCache.entries()) {
     if (key.startsWith(charPrefix) && key.endsWith(styleSuffix)) {
@@ -1253,6 +1307,7 @@ module.exports = {
   collectAvatarRequirements,
 
   // Cache access
+  runInCacheScope,
   getStyledAvatar,
   setStyledAvatar,
   hasStyledAvatar,
