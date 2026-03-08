@@ -3357,6 +3357,17 @@ Use \`costumed:${costume.costumeType}\` for all other scenes.
 NO face coverings — faces must stay visible at all times.`;
     }
 
+    // Build landmarks instruction for the visual bible
+    let landmarksInstruction = '';
+    if (inputData.availableLandmarks?.length > 0) {
+      const top3 = inputData.availableLandmarks.slice(0, 3);
+      const landmarkNames = top3.map(l => l.name).join(', ');
+      landmarksInstruction = `# Local Landmarks
+At least one scene MUST take place at one of these real local landmarks: ${landmarkNames}.
+Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
+Reference the landmark by its LOC ID in the relevant scene hints.`;
+    }
+
     return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
       PAGES: pageCount,
@@ -3366,6 +3377,7 @@ NO face coverings — faces must stay visible at all times.`;
       STORY_DETAILS: inputData.storyDetails || inputData.storyTheme || 'A fun adventure',
       AVATAR_SELECTION: avatarSelection,
       TITLE_INSTRUCTION: titleInstruction,
+      LANDMARKS: landmarksInstruction,
     });
   }
 

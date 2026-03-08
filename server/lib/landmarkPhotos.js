@@ -2274,7 +2274,7 @@ async function getIndexedLandmarks(city, limit = 30) {
     const result = await pool.query(`
       SELECT * FROM landmark_index
       WHERE LOWER(translate(nearest_city, 'üùäàâöôéèêëîïçñß', 'uuaaaooeeeeiicns')) = $1
-      ORDER BY score DESC
+      ORDER BY score DESC, name ASC
       LIMIT $2
     `, [normalizedCity, limit]);
 

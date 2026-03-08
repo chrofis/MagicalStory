@@ -23,6 +23,8 @@ SHORT story — {PAGES} scenes. Keep it focused:
 
 {AVATAR_SELECTION}
 
+{LANDMARKS}
+
 # Scene Hint Format
 
 Each scene hint must be detailed enough for direct image generation (no further expansion).
