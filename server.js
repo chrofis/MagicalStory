@@ -4501,6 +4501,11 @@ async function _processStoryJobImpl(jobId) {
       qualityModel: MODEL_DEFAULTS.qualityEval,
       ...filteredUserOverrides  // Only non-null user overrides
     };
+    // Trial mode: use Haiku for faster, cheaper story generation
+    if (inputData.trialMode) {
+      modelOverrides.outlineModel = 'claude-haiku-4-5-20251001';
+      log.info(`⚡ [TRIAL] Using Haiku for story generation (faster + cheaper)`);
+    }
     // Always log model defaults being used
     log.debug(`🔧 [PIPELINE] Models: outline=${modelOverrides.outlineModel}, text=${modelOverrides.textModel}, scene=${modelOverrides.sceneDescriptionModel}, sceneIter=${modelOverrides.sceneIterationModel}, quality=${modelOverrides.qualityModel}`);
     if (Object.keys(filteredUserOverrides).length > 0) {
