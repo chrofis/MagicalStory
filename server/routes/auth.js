@@ -229,7 +229,8 @@ router.get('/me', authenticateToken, async (req, res) => {
           preferredLanguage: dbUser.preferred_language || 'English',
           emailVerified: emailVerifiedResult,
           photoConsentAt: dbUser.photo_consent_at || null,
-          hasPassword: !!dbUser.password,
+          // Trial/anonymous users have a random password they don't know — treat as no password
+          hasPassword: !!dbUser.password && !dbUser.anonymous,
         }
       });
     } else {
@@ -472,18 +473,20 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, password FROM users WHERE id = $1', [userId]);
+    const result = await pool.query('SELECT id, password, anonymous FROM users WHERE id = $1', [userId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (result.rows[0].password) {
+    // Allow setting password for anonymous/trial users (they have a random password they don't know)
+    if (result.rows[0].password && !result.rows[0].anonymous) {
       return res.status(400).json({ error: 'Password already set. Use change-password instead.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, userId]);
+    // Clear anonymous flag so hasPassword returns true from now on
+    await pool.query('UPDATE users SET password = $1, anonymous = false WHERE id = $2', [hashedPassword, userId]);
 
     log.info(`[AUTH] Password set for user ${userId}`);
     res.json({ success: true });
