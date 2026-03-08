@@ -61,12 +61,12 @@ const translations = {
     accountReady: 'Account ready!',
     waitingForStory: 'Your story is almost done. You\'ll be redirected automatically.',
     verifiedWaiting: 'Email verified! Your story is still being created...',
-    upsellTitle: 'Want even more?',
-    upsellDesc: 'With a full account you unlock:',
+    upsellTitle: 'This is a trial story. With a free account you can create full stories:',
+    upsellDesc: '',
     upsellFeatures: [
       'Multiple characters in one story',
-      'Longer stories',
-      'Multiple drawing styles',
+      'Longer stories with more pages',
+      'Different drawing styles',
       'Higher image quality and title page',
       'Order as a printed book',
     ],
@@ -99,11 +99,11 @@ const translations = {
     accountReady: 'Konto bereit!',
     waitingForStory: 'Deine Geschichte ist fast fertig. Du wirst automatisch weitergeleitet.',
     verifiedWaiting: 'E-Mail bestätigt! Deine Geschichte wird noch erstellt...',
-    upsellTitle: 'Du willst noch mehr?',
-    upsellDesc: 'Mit einem vollständigen Konto erhältst du:',
+    upsellTitle: 'Das ist eine Probegeschichte. Mit einem kostenlosen Konto kannst du vollständige Geschichten erstellen:',
+    upsellDesc: '',
     upsellFeatures: [
       'Mehrere Figuren in einer Geschichte',
-      'Längere Geschichten',
+      'Längere Geschichten mit mehr Seiten',
       'Verschiedene Zeichenstile',
       'Höhere Bildqualität und Titelseite',
       'Als gedrucktes Buch bestellen',
@@ -137,7 +137,7 @@ const translations = {
     accountReady: 'Compte prêt !',
     waitingForStory: 'Votre histoire est presque terminée. Vous serez redirigé automatiquement.',
     verifiedWaiting: 'E-mail vérifié ! Votre histoire est encore en cours de création...',
-    upsellTitle: 'Vous en voulez plus ?',
+    upsellTitle: 'Ceci est une histoire d\'essai. Avec un compte gratuit, vous pouvez créer des histoires complètes :',
     upsellDesc: 'Avec un compte complet, vous débloquez :',
     upsellFeatures: [
       'Plusieurs personnages dans une même histoire',
@@ -468,63 +468,30 @@ export default function TrialGenerationPage() {
       <div className="px-3 md:px-8 py-4 md:py-8">
         <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8">
 
-          {/* ── Avatar + Progress ─────────────────────────────────────── */}
-          <div className="flex flex-col items-center text-center mb-6">
-            {/* Title page or avatar preview */}
-            {titlePageImage ? (
-              <div className="mb-4 w-full">
-                <img
-                  src={titlePageImage}
-                  alt={titlePageTitle || 'Story cover'}
-                  className="w-full h-auto rounded-xl shadow-lg mx-auto"
-                />
-              </div>
-            ) : state.previewAvatar ? (
-              <div className="mb-4">
-                <img
-                  src={state.previewAvatar}
-                  alt={state.characterName || 'Character'}
-                  className="w-72 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg mx-auto"
-                />
-              </div>
-            ) : (
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-                <BookOpen className="w-8 h-8 text-indigo-600" />
-              </div>
-            )}
-
-            {/* Title */}
-            <h1 className="text-xl font-bold text-gray-800 mb-1">
-              {pageState === 'completed'
-                ? t.storyComplete
-                : t.creatingStory}
-            </h1>
-
-            {/* Character name */}
-            {state.characterName && (
-              <p className="text-indigo-600 font-medium text-sm mb-3">
-                {state.characterName}
-              </p>
-            )}
-
-            {/* Progress bar — % only, no text messages */}
+          {/* ── Progress / Status (compact, on top) ────────────────── */}
+          <div className="flex flex-col items-center text-center mb-3">
+            {/* Progress: spinner + text + bar */}
             {(pageState === 'starting' || pageState === 'generating') && (
-              <div className="w-full">
-                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                  <div
-                    className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${Math.max(progress, 3)}%` }}
-                  />
-                </div>
-                <p className="text-xs text-gray-400 mt-1.5">{Math.round(progress)}%</p>
+              <div className="w-full flex items-center gap-3 mb-2">
+                <Loader2 className="w-4 h-4 text-indigo-600 animate-spin flex-shrink-0" />
+                <span className="text-sm text-gray-600">{t.creatingStory}</span>
+                <span className="text-xs text-gray-400 ml-auto">{Math.round(progress)}%</span>
+              </div>
+            )}
+            {(pageState === 'starting' || pageState === 'generating') && (
+              <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden mb-2">
+                <div
+                  className="bg-indigo-600 h-1.5 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${Math.max(progress, 3)}%` }}
+                />
               </div>
             )}
 
-            {/* Completed checkmark */}
+            {/* Completed */}
             {pageState === 'completed' && (
-              <div className="flex items-center gap-1.5 text-green-600">
+              <div className="flex items-center gap-2 text-green-600 mb-2">
                 <CheckCircle className="w-4 h-4" />
-                <span className="text-sm font-medium">100%</span>
+                <span className="text-sm font-medium">{t.storyComplete}</span>
               </div>
             )}
 
@@ -545,6 +512,29 @@ export default function TrialGenerationPage() {
               </div>
             )}
           </div>
+
+          {/* ── Image preview (smaller) ────────────────────────────── */}
+          {pageState !== 'failed' && (
+            <div className="flex justify-center mb-4">
+              {titlePageImage ? (
+                <img
+                  src={titlePageImage}
+                  alt={titlePageTitle || 'Story cover'}
+                  className="w-[70%] h-auto rounded-xl shadow-lg"
+                />
+              ) : state.previewAvatar ? (
+                <img
+                  src={state.previewAvatar}
+                  alt={state.characterName || 'Character'}
+                  className="w-48 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
+                  <BookOpen className="w-8 h-8 text-indigo-600" />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Divider ──────────────────────────────────────────────── */}
           {pageState !== 'failed' && <div className="h-px bg-gray-200 mb-6" />}
