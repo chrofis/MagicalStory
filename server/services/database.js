@@ -99,6 +99,7 @@ async function initializeDatabase() {
       { table: 'users', column: 'password_reset_expires', type: 'TIMESTAMP' },
       { table: 'users', column: 'photo_consent_at', type: 'TIMESTAMP' },
       { table: 'users', column: 'has_set_password', type: 'BOOLEAN DEFAULT TRUE' },
+      { table: 'users', column: 'anonymous', type: 'BOOLEAN DEFAULT FALSE' },
     ];
 
     for (const { table, column, type } of columnsToAdd) {
