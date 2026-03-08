@@ -7,7 +7,6 @@ SHORT story — {PAGES} scenes. Keep it focused:
 - Introduce quickly (scene 1), build tension (2-3), resolve (4-5).
 
 **Rules:**
-- Write EVERYTHING in {LANGUAGE}. All text, title, scene hints — 100% in {LANGUAGE}. {LANGUAGE_NOTE}
 - NO questions, just produce the output
 - Keep it simple, warm, and age-appropriate
 - 150-200 words per page, flowing paragraphs
@@ -17,7 +16,6 @@ SHORT story — {PAGES} scenes. Keep it focused:
 # Story Parameters
 
 - **Scenes**: {PAGES}
-- **Language**: {LANGUAGE}
 - **Characters**: {CHARACTERS}
 - **Story Idea**: {STORY_DETAILS}
 
