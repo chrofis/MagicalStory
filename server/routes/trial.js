@@ -599,7 +599,7 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
 router.post('/create-story', verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
-    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation } = req.body;
+    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation, preGeneratedTitlePage: clientTitlePage } = req.body;
 
     if (!storyCategory && !storyTopic) {
       return res.status(400).json({ error: 'Story topic is required' });
@@ -636,7 +636,8 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
 
     const mainChar = charData.characters[0];
-    const preGeneratedTitlePage = mainChar.preGeneratedTitlePage || null;
+    // Prefer client-sent title page (always up-to-date), fall back to DB (may not be saved yet)
+    const preGeneratedTitlePage = clientTitlePage || mainChar.preGeneratedTitlePage || null;
     const characterData = {
       name: mainChar.name,
       age: mainChar.age,

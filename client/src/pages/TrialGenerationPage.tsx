@@ -245,7 +245,10 @@ export default function TrialGenerationPage() {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${state.sessionToken}`,
           },
-          body: JSON.stringify(state.storyInput),
+          body: JSON.stringify({
+            ...state.storyInput,
+            ...(state.titlePageData?.titlePageImage ? { preGeneratedTitlePage: state.titlePageData.titlePageImage } : {}),
+          }),
         });
 
         const data = await response.json();
