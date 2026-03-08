@@ -347,15 +347,37 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     const genderWord = isFemale ? 'girl' : 'boy';
 
     // Use the same "standard" clothing style as the real avatar generation
-    const { getClothingStylePrompt } = require('./avatars');
+    const { getClothingStylePrompt, extractTraitsWithGemini } = require('./avatars');
     const standardClothing = getClothingStylePrompt('standard', isFemale);
+
+    // Extract physical traits from photo (especially hair) for consistent avatar generation
+    let hairDescription = '';
+    let extractedTraits = null;
+    try {
+      const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${resizedBase64}`;
+      const traitsResult = await extractTraitsWithGemini(photoDataUri);
+      if (traitsResult?.traits) {
+        extractedTraits = traitsResult.traits;
+        const { buildHairDescription } = require('../lib/storyHelpers');
+        hairDescription = buildHairDescription(extractedTraits);
+        if (hairDescription) {
+          log.info(`[TRIAL AVATAR] Extracted hair traits: "${hairDescription}"`);
+        }
+      }
+    } catch (traitErr) {
+      log.debug(`[TRIAL AVATAR] Trait extraction failed (non-critical): ${traitErr.message}`);
+    }
+
+    const hairInstruction = hairDescription
+      ? `\n- HAIR: ${hairDescription}. Reproduce this EXACTLY — do not change length, color, or style.`
+      : '';
 
     const prompt = `Create a full-body watercolor illustration of this ${ageGroup} ${genderWord} as a children's book character.
 
 REFERENCE: The attached photo shows the child's face. Match their facial features, skin tone, eye color, and hair color/style EXACTLY.
 - Biometric precision: The face must not be averaged or replaced.
 - Hair and face must be fully visible. Avoid hats and hoods.
-- Ultra-sharp focus on facial features.
+- Ultra-sharp focus on facial features.${hairInstruction}
 
 STYLE: Soft watercolor illustration style for a children's storybook. Warm, friendly, age-appropriate.
 
@@ -465,11 +487,24 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
               : charResult.rows[0].data;
             if (charData.characters && charData.characters[0]) {
               charData.characters[0].previewAvatar = finalImage;
+              // Save extracted physical traits for story generation pipeline
+              if (extractedTraits) {
+                const physical = charData.characters[0].physical || {};
+                if (extractedTraits.hairColor) physical.hairColor = extractedTraits.hairColor;
+                if (extractedTraits.hairLength) physical.hairLength = extractedTraits.hairLength;
+                if (extractedTraits.hairStyle) physical.hairStyle = extractedTraits.hairStyle;
+                if (extractedTraits.hairDensity) physical.hairDensity = extractedTraits.hairDensity;
+                if (extractedTraits.eyeColor) physical.eyeColor = extractedTraits.eyeColor;
+                if (extractedTraits.skinTone) physical.skinTone = extractedTraits.skinTone;
+                if (extractedTraits.apparentAge) physical.apparentAge = extractedTraits.apparentAge;
+                if (extractedTraits.detailedHairAnalysis) physical.detailedHairAnalysis = extractedTraits.detailedHairAnalysis;
+                charData.characters[0].physical = physical;
+              }
               await pool.query(
                 'UPDATE characters SET data = $1 WHERE id = $2',
                 [JSON.stringify(charData), req.body.characterId]
               );
-              log.debug(`[TRIAL AVATAR] Saved avatar to character ${req.body.characterId}`);
+              log.debug(`[TRIAL AVATAR] Saved avatar${extractedTraits ? ' + physical traits' : ''} to character ${req.body.characterId}`);
             }
           }
         }
