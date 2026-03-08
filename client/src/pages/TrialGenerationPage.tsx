@@ -37,8 +37,8 @@ const translations = {
     brand: 'Magical Story',
     creatingStory: 'Creating your story...',
     storyComplete: 'Your story is ready!',
-    signInToSee: 'Sign in to see your story',
-    signInDesc: 'Enter your email or sign in with Google to view your story.',
+    signInToSee: 'Sign in to read your story',
+    signInDesc: 'Your story will be ready in a few minutes. Create a free account now so you can read it as soon as it\'s done!',
     googleButton: 'Continue with Google',
     orDivider: 'or',
     emailLabel: 'Email address',
@@ -68,8 +68,8 @@ const translations = {
     brand: 'Magical Story',
     creatingStory: 'Deine Geschichte wird erstellt...',
     storyComplete: 'Deine Geschichte ist fertig!',
-    signInToSee: 'Melde dich an, um deine Geschichte zu sehen',
-    signInDesc: 'Gib deine E-Mail ein oder melde dich mit Google an, um deine Geschichte anzusehen.',
+    signInToSee: 'Melde dich an, um deine Geschichte zu lesen',
+    signInDesc: 'Deine Geschichte ist in wenigen Minuten fertig. Erstelle jetzt ein kostenloses Konto, damit du sie sofort lesen kannst!',
     googleButton: 'Weiter mit Google',
     orDivider: 'oder',
     emailLabel: 'E-Mail-Adresse',
@@ -99,8 +99,8 @@ const translations = {
     brand: 'Magical Story',
     creatingStory: 'Votre histoire est en cours de création...',
     storyComplete: 'Votre histoire est prête !',
-    signInToSee: 'Connectez-vous pour voir votre histoire',
-    signInDesc: 'Entrez votre e-mail ou connectez-vous avec Google pour voir votre histoire.',
+    signInToSee: 'Connectez-vous pour lire votre histoire',
+    signInDesc: 'Votre histoire sera prête dans quelques minutes. Créez un compte gratuit maintenant pour la lire dès qu\'elle est terminée !',
     googleButton: 'Continuer avec Google',
     orDivider: 'ou',
     emailLabel: 'Adresse e-mail',
@@ -469,8 +469,8 @@ export default function TrialGenerationPage() {
               {!isLinked && (
                 <>
                   <div className="text-center mb-5">
-                    <h2 className="text-lg font-bold text-gray-800 mb-1">{t.signInToSee}</h2>
-                    <p className="text-gray-500 text-sm">{t.signInDesc}</p>
+                    <h2 className="text-xl font-bold text-gray-800 mb-2">{t.signInToSee}</h2>
+                    <p className="text-gray-600 text-sm">{t.signInDesc}</p>
                   </div>
 
                   {/* Error */}
