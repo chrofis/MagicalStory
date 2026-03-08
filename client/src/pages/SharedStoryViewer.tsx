@@ -400,9 +400,9 @@ export default function SharedStoryViewer() {
             const page = story.pages[currentEntry.storyPageIdx];
             if (!page) return null;
             return (
-              <div className="md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
-                {/* Text - 50% width, scrollable */}
-                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden md:order-1 order-2">
+              <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
+                {/* Text — left on desktop, bottom on mobile */}
+                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden order-2 md:order-1">
                   <div className="flex-1 overflow-y-auto min-h-0">
                     <p className="text-sm md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
                       {page.text}
@@ -412,8 +412,8 @@ export default function SharedStoryViewer() {
                     Page {currentEntry.storyPageIdx + 1} of {story.pages.length}
                   </div>
                 </div>
-                {/* Image - 50% width */}
-                <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center md:order-2 order-1">
+                {/* Image — right on desktop, top on mobile */}
+                <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center order-1 md:order-2">
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
