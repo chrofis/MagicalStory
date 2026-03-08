@@ -466,11 +466,11 @@ export default function TrialGenerationPage() {
           <div className="flex flex-col items-center text-center mb-6">
             {/* Title page or avatar preview */}
             {titlePageImage ? (
-              <div className="mb-4">
+              <div className="mb-4 w-full">
                 <img
                   src={titlePageImage}
                   alt={titlePageTitle || 'Story cover'}
-                  className="w-48 h-auto rounded-xl shadow-lg mx-auto"
+                  className="w-full max-w-[320px] h-auto rounded-xl shadow-lg mx-auto"
                 />
               </div>
             ) : state.previewAvatar ? (
@@ -478,7 +478,7 @@ export default function TrialGenerationPage() {
                 <img
                   src={state.previewAvatar}
                   alt={state.characterName || 'Character'}
-                  className="w-48 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-md"
+                  className="w-72 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-lg mx-auto"
                 />
               </div>
             ) : (
