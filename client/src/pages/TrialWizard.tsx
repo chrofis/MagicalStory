@@ -130,11 +130,23 @@ export default function TrialWizard() {
     fetch(`${API_URL}/api/trial/check-status`, {
       headers: { 'Authorization': `Bearer ${sessionToken}` },
     })
-      .then(r => r.json())
-      .then(data => {
-        if (data.trialUsed) setTrialUsed(true);
+      .then(r => {
+        if (!r.ok) {
+          // Token expired/invalid — clear stale session so fresh account gets created
+          setSessionToken(null);
+          localStorage.removeItem('trial_session_token');
+          return null;
+        }
+        return r.json();
       })
-      .catch(() => {}); // Ignore errors, allow wizard to proceed
+      .then(data => {
+        if (data?.trialUsed) setTrialUsed(true);
+      })
+      .catch(() => {
+        // Network error — clear stale token to be safe
+        setSessionToken(null);
+        localStorage.removeItem('trial_session_token');
+      });
   }, [sessionToken]);
 
   const handleAccountCreated = useCallback((token: string, charId: string) => {
