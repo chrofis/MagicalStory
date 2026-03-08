@@ -31,6 +31,10 @@ RUN cd client && npm install
 # Copy all application files
 COPY . .
 
+# Pass VITE_ env vars as build args so they're baked into the frontend bundle
+ARG VITE_TURNSTILE_SITE_KEY
+ARG VITE_API_URL
+
 # Build the React client (outputs to ./dist in root, per vite.config.ts)
 RUN cd client && npm run build
 
