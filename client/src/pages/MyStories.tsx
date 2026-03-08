@@ -275,7 +275,6 @@ export default function MyStories() {
 
   // Set-password banner state
   const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [passwordSet, setPasswordSet] = useState(false);
@@ -287,10 +286,6 @@ export default function MyStories() {
     setPasswordError('');
     if (newPassword.length < 8) {
       setPasswordError(language === 'de' ? 'Mindestens 8 Zeichen' : language === 'fr' ? 'Au moins 8 caractères' : 'At least 8 characters');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError(language === 'de' ? 'Passwörter stimmen nicht überein' : language === 'fr' ? 'Les mots de passe ne correspondent pas' : 'Passwords do not match');
       return;
     }
     setIsSettingPassword(true);
@@ -307,8 +302,12 @@ export default function MyStories() {
         return;
       }
       setPasswordSet(true);
-      refreshUser(); // Update AuthContext so hasPassword reflects the change
-      showSuccess(language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : 'Password set!');
+      refreshUser(); // Update AuthContext so hasPassword and credits reflect the change
+      const resData = await res.json();
+      const creditsMsg = resData.credits
+        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : `Password set! ${resData.credits} credits received.`)
+        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : 'Password set!');
+      showSuccess(creditsMsg);
     } catch {
       setPasswordError('Failed to set password');
     } finally {
@@ -746,11 +745,16 @@ export default function MyStories() {
               <Lock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold text-amber-800 text-sm mb-1">
-                  {language === 'de' ? 'Setze ein Passwort, um den Zugang zu deinen Geschichten zu sichern'
-                    : language === 'fr' ? 'Définissez un mot de passe pour sécuriser l\'accès à vos histoires'
-                    : 'Set a password to keep access to your stories'}
+                  {language === 'de' ? 'Setze ein Passwort und erhalte 500 Credits für weitere Geschichten!'
+                    : language === 'fr' ? 'Définissez un mot de passe et recevez 500 crédits pour plus d\'histoires !'
+                    : 'Set a password and get 500 credits for more stories!'}
                 </p>
-                <form onSubmit={handleSetPassword} className="flex flex-col sm:flex-row gap-2 mt-2">
+                <p className="text-amber-700 text-xs mb-2">
+                  {language === 'de' ? 'Sichere deinen Zugang und schalte alle Funktionen frei.'
+                    : language === 'fr' ? 'Sécurisez votre accès et débloquez toutes les fonctionnalités.'
+                    : 'Secure your account and unlock all features.'}
+                </p>
+                <form onSubmit={handleSetPassword} className="flex flex-col sm:flex-row gap-2">
                   <input
                     type="password"
                     value={newPassword}
@@ -759,18 +763,10 @@ export default function MyStories() {
                     className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none flex-1"
                     disabled={isSettingPassword}
                   />
-                  <input
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder={language === 'de' ? 'Bestätigen' : language === 'fr' ? 'Confirmer' : 'Confirm'}
-                    className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none flex-1"
-                    disabled={isSettingPassword}
-                  />
                   <button
                     type="submit"
                     disabled={isSettingPassword}
-                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
                   >
                     {isSettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
                     {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}

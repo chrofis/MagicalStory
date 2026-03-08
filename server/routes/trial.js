@@ -1204,12 +1204,12 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     const langInstruction = getLanguageInstruction(language);
 
-    // Minimal prompt — just title + short summary
-    const buildTrialPrompt = (variant) => `Generate a children's story idea for a SHORT 5-scene story. Character: ${charDesc}. ${categoryContext} ${variant}
+    // Minimal prompt — just a short idea (2-3 sentences)
+    const buildTrialPrompt = (variant) => `Write ONLY a 2-3 sentence story idea. Nothing else. No title, no scene breakdown, no details.
 
-Keep the plot simple: one clear conflict, one resolution. No subplots.
+Character: ${charDesc}. ${categoryContext} ${variant}
 
-Plain text only, no markdown. Line 1: title. Then a 100-200 word story summary describing the plot arc.
+Respond with ONLY 2-3 sentences describing the core idea of the story. Maximum 40 words. Plain text, no markdown, no labels.
 ${langInstruction} Write EVERYTHING in that language.`;
 
     const prompt1 = buildTrialPrompt('Make it engaging and fun.');
@@ -1228,7 +1228,7 @@ ${langInstruction} Write EVERYTHING in that language.`;
 
     log.debug('  Starting parallel story generation...');
 
-    // Stream Story 1 (800 max tokens — title + 100-200 word summary)
+    // Stream Story 1 (800 max tokens — 2-3 sentence idea)
     const streamStory1 = callTextModelStreaming(prompt1, 800, (delta, fullText) => {
       fullResponse1 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory1Length + 30) {
@@ -1250,7 +1250,7 @@ ${langInstruction} Write EVERYTHING in that language.`;
       res.write(`data: ${JSON.stringify({ error: 'Failed to generate first story idea' })}\n\n`);
     });
 
-    // Stream Story 2 (800 max tokens — title + 100-200 word summary)
+    // Stream Story 2 (800 max tokens — 2-3 sentence idea)
     const streamStory2 = callTextModelStreaming(prompt2, 800, (delta, fullText) => {
       fullResponse2 = fullText;
       if (fullText.length > 30 && fullText.length > lastStory2Length + 30) {
@@ -2013,3 +2013,4 @@ module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
+module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;

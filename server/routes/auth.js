@@ -486,10 +486,46 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await pool.query('UPDATE users SET password = $1, has_set_password = true WHERE id = $2', [hashedPassword, userId]);
 
-    log.info(`[AUTH] Password set for user ${userId}`);
-    res.json({ success: true });
+    // Check if this is a trial user — if so, convert to full account with credits
+    const user = result.rows[0];
+    const userInfo = await pool.query('SELECT is_trial, credits, email FROM users WHERE id = $1', [userId]);
+    const isTrial = userInfo.rows[0]?.is_trial;
+
+    if (isTrial) {
+      // Convert trial → full account with welcome credits
+      const { CREDIT_CONFIG } = require('../config/credits');
+      const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 500
+      await pool.query(
+        `UPDATE users SET password = $1, has_set_password = true, is_trial = FALSE, credits = $2 WHERE id = $3`,
+        [hashedPassword, fullCredits, userId]
+      );
+
+      // Log credit transaction
+      try {
+        await pool.query(
+          'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+          [userId, fullCredits, fullCredits, 'initial', 'Welcome credits for setting password']
+        );
+      } catch (txErr) {
+        log.warn(`[AUTH] Failed to log credit transaction: ${txErr.message}`);
+      }
+
+      // Trigger background avatar generation (non-blocking)
+      try {
+        const { triggerAvatarGenerationForUser } = require('./trial');
+        triggerAvatarGenerationForUser(userId);
+      } catch (avatarErr) {
+        log.warn(`[AUTH] Failed to trigger avatar generation: ${avatarErr.message}`);
+      }
+
+      log.info(`[AUTH] Trial user ${userId} converted to full account with ${fullCredits} credits`);
+      res.json({ success: true, credits: fullCredits });
+    } else {
+      await pool.query('UPDATE users SET password = $1, has_set_password = true WHERE id = $2', [hashedPassword, userId]);
+      log.info(`[AUTH] Password set for user ${userId}`);
+      res.json({ success: true });
+    }
   } catch (err) {
     log.error('Set password error:', err);
     res.status(500).json({ error: 'Failed to set password' });
