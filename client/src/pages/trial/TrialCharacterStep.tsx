@@ -209,13 +209,14 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     if (!hasPhoto || previewAvatar || isGeneratingAvatar) return;
     if (!characterData.photos.face) return;
 
-    const facePhoto = characterData.photos.face;
     setIsGeneratingAvatar(true);
 
     const generateAvatar = async () => {
       try {
         // Use current character data for prompt hints (defaults if not yet filled in)
         const data = characterDataRef.current;
+        // Prefer bodyNoBg (shows clothing) with face as fallback
+        const photoToSend = data.photos.bodyNoBg || data.photos.face;
         const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -223,7 +224,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
             name: data.name || 'Child',
             age: data.age || '7',
             gender: data.gender || '',
-            facePhoto,
+            facePhoto: photoToSend,
             fingerprint,
           }),
         });
