@@ -19,7 +19,10 @@ html {
 body {
   @apply bg-white min-h-screen;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+  /* NOTE: Do NOT set overflow-x:hidden here. Per CSS spec, setting overflow on one axis
+     implicitly makes the other axis 'auto', turning body into a scroll container.
+     When both html AND body are scroll containers, mouse wheel scrolling can break.
+     html's overflow-x:hidden already prevents horizontal scroll. */
   overscroll-behavior: none; /* Prevent pull-to-refresh and rubber-band on mobile */
   -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
 }
