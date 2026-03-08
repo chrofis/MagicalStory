@@ -197,25 +197,67 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   // Avatar generation state
   const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   const hasPhoto = !!characterData.photos.face;
   const canProceed = characterData.name.trim() && characterData.gender && hasPhoto && turnstileReady;
 
-  // Create anonymous account, generate preview avatar, and advance to next step
+  // Start avatar generation in the background as soon as photo is ready
+  // Runs while user fills in name/age/gender/traits — doesn't block anything
+  useEffect(() => {
+    if (!hasPhoto || previewAvatar || isGeneratingAvatar || !turnstileReady) return;
+    if (!characterData.photos.face) return;
+
+    const facePhoto = characterData.photos.face;
+    setIsGeneratingAvatar(true);
+
+    const generateAvatar = async () => {
+      try {
+        // Use current character data for prompt hints (defaults if not yet filled in)
+        const data = characterDataRef.current;
+        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: data.name || 'Child',
+            age: data.age || '7',
+            gender: data.gender || '',
+            facePhoto,
+            turnstileToken,
+            fingerprint,
+          }),
+        });
+
+        const result = await response.json();
+        if (response.ok && result.avatarImage) {
+          onAvatarGenerated?.(result.avatarImage);
+        }
+      } catch {
+        // Avatar generation failure is non-blocking
+      } finally {
+        setIsGeneratingAvatar(false);
+      }
+    };
+
+    generateAvatar();
+  // Only trigger when photo becomes available and turnstile is ready
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPhoto, turnstileReady]);
+
+  // Create anonymous account and advance to next step
   const handleNext = async () => {
     if (!canProceed || !characterData.photos.face) return;
 
-    // If user already has a session (navigated back and forward), skip account creation and avatar generation
+    // If user already has a session (navigated back and forward), skip account creation
     if (sessionToken) {
       onNext();
       return;
     }
 
-    setIsGeneratingAvatar(true);
+    setIsCreatingAccount(true);
     setAvatarError(null);
 
     try {
-      // Step 1: Create anonymous account
       const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -229,6 +271,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           bodyPhoto: characterData.photos.body,
           bodyNoBgPhoto: characterData.photos.bodyNoBg,
           faceBox: characterData.photos.faceBox,
+          previewAvatar: previewAvatar || undefined, // Save to DB if already generated
           turnstileToken,
           fingerprint,
         }),
@@ -238,55 +281,23 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
       if (!accountResponse.ok) {
         setAvatarError(accountResult.error || 'Account creation failed');
-        setIsGeneratingAvatar(false);
+        setIsCreatingAccount(false);
         return;
       }
 
       const newSessionToken = accountResult.sessionToken;
       const newCharacterId = accountResult.characterId || accountResult.charId;
 
-      // Notify parent about the created account
       if (onAccountCreated && newSessionToken && newCharacterId) {
         onAccountCreated(newSessionToken, newCharacterId);
       }
-
-      // Step 2: Generate preview avatar with session token (saves to DB)
-      if (onAvatarGenerated && !previewAvatar) {
-        try {
-          const avatarResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${newSessionToken}`,
-            },
-            body: JSON.stringify({
-              name: characterData.name,
-              age: characterData.age,
-              gender: characterData.gender,
-              facePhoto: characterData.photos.face,
-              characterId: newCharacterId,
-              turnstileToken,
-              fingerprint,
-            }),
-          });
-
-          const avatarResult = await avatarResponse.json();
-
-          if (avatarResponse.ok && avatarResult.avatarImage) {
-            onAvatarGenerated(avatarResult.avatarImage);
-          }
-          // Avatar generation failure is non-blocking — continue to next step
-        } catch {
-          // Avatar generation failure is non-blocking
-        }
-      }
     } catch {
       setAvatarError('Account creation failed. Please try again.');
-      setIsGeneratingAvatar(false);
+      setIsCreatingAccount(false);
       return;
     }
 
-    setIsGeneratingAvatar(false);
+    setIsCreatingAccount(false);
     onNext();
   };
 
@@ -686,17 +697,16 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       <div className="mt-6">
         <button
           onClick={handleNext}
-          disabled={!canProceed || isGeneratingAvatar}
+          disabled={!canProceed || isCreatingAccount}
           className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
-            canProceed && !isGeneratingAvatar
+            canProceed && !isCreatingAccount
               ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {isGeneratingAvatar ? (
+          {isCreatingAccount ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? "Création de l'avatar..." : 'Creating avatar...'}
             </>
           ) : (
             <>

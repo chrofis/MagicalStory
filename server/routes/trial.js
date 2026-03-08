@@ -425,7 +425,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
  */
 router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) => {
   try {
-    const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, turnstileToken, fingerprint } = req.body;
+    const { name, age, gender, traits, customTraits, facePhoto, bodyPhoto, bodyNoBgPhoto, faceBox, previewAvatar, turnstileToken, fingerprint } = req.body;
 
     if (!facePhoto || !name) {
       return res.status(400).json({ error: 'Name and photo are required' });
@@ -484,6 +484,24 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     };
 
     const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
+
+    // If preview avatar was already generated (background generation), save it to the character
+    if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
+      try {
+        const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+        if (charResult.rows.length > 0) {
+          const charData = typeof charResult.rows[0].data === 'string'
+            ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
+          if (charData.characters && charData.characters[0]) {
+            charData.characters[0].previewAvatar = previewAvatar;
+            await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
+          }
+        }
+      } catch (avatarErr) {
+        log.warn(`[TRIAL] Failed to save preview avatar: ${avatarErr.message}`);
+      }
+    }
+
     const sessionToken = generateSessionToken(userId);
 
     log.info(`[TRIAL] Anonymous account created: ${userId} for "${safeName}"`);
