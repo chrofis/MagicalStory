@@ -426,7 +426,7 @@ export default function TrialGenerationPage() {
                 <img
                   src={state.previewAvatar}
                   alt={state.characterName || 'Character'}
-                  className="w-48 h-48 rounded-full object-cover border-4 border-indigo-100 shadow-md"
+                  className="w-48 h-auto rounded-xl object-cover border-4 border-indigo-100 shadow-md"
                 />
               </div>
             ) : (
