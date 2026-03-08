@@ -71,6 +71,13 @@ export default function StoryWizard() {
   const { showSuccess, showInfo, showError } = useToast();
   const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, markCompletionViewed, hasUnviewedCompletion, error: contextGenerationError, clearError: clearContextError } = useGeneration();
 
+  // Block access if user hasn't set password (trial user needs to set password first for credits)
+  useEffect(() => {
+    if (!isAuthLoading && user && user.hasPassword === false) {
+      navigate('/stories', { replace: true });
+    }
+  }, [user, isAuthLoading, navigate]);
+
   // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Start at step 1 if ?new=true (creating new story)
   // Otherwise restore from localStorage to preserve step when navigating away and back

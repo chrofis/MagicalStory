@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Book, Trash2, Eye, Pencil, AlertTriangle, BookOpen, Tag, Loader2, Lock, CheckCircle, X } from 'lucide-react';
+import { Book, Trash2, Eye, Pencil, AlertTriangle, BookOpen, Tag, Loader2, Lock, CheckCircle, X, Plus } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -452,6 +452,8 @@ export default function MyStories() {
       add: 'Add',
       remove: 'Remove',
       loadAll: 'Load All',
+      nextStoryLine: 'Every child deserves their own adventure',
+      nextStoryButton: 'Create next story',
     },
     de: {
       myStories: 'Meine Geschichten',
@@ -466,6 +468,8 @@ export default function MyStories() {
       add: 'Hinzufügen',
       remove: 'Entfernen',
       loadAll: 'Alle laden',
+      nextStoryLine: 'Jedes Kind verdient sein eigenes Abenteuer',
+      nextStoryButton: 'Nächste Geschichte erstellen',
     },
     fr: {
       myStories: 'Mes histoires',
@@ -480,6 +484,8 @@ export default function MyStories() {
       add: 'Ajouter',
       remove: 'Retirer',
       loadAll: 'Tout charger',
+      nextStoryLine: 'Chaque enfant mérite sa propre aventure',
+      nextStoryButton: 'Créer la prochaine histoire',
     },
   };
 
@@ -921,6 +927,32 @@ export default function MyStories() {
                   t={{ add: t.add, remove: t.remove }}
                 />
               ))}
+
+              {/* Create next story card */}
+              <button
+                onClick={() => needsPassword ? scrollToPasswordBanner() : navigate('/create?new=true')}
+                className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg border-2 border-dashed ${
+                  needsPassword ? 'border-gray-200 cursor-not-allowed' : 'border-indigo-200 hover:border-indigo-400'
+                }`}
+              >
+                <div className={`w-full h-48 flex items-center justify-center ${
+                  needsPassword ? 'bg-gray-50' : 'bg-gradient-to-br from-indigo-50 to-purple-50'
+                }`}>
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    needsPassword ? 'bg-gray-200' : 'bg-indigo-100'
+                  }`}>
+                    <Plus className={`w-8 h-8 ${needsPassword ? 'text-gray-400' : 'text-indigo-500'}`} />
+                  </div>
+                </div>
+                <div className="p-4 flex-1 flex flex-col items-center justify-center text-center">
+                  <h3 className={`font-semibold mb-1 ${needsPassword ? 'text-gray-400' : 'text-gray-800'}`}>
+                    {t.nextStoryButton}
+                  </h3>
+                  <p className={`text-sm ${needsPassword ? 'text-gray-300' : 'text-gray-500'}`}>
+                    {t.nextStoryLine}
+                  </p>
+                </div>
+              </button>
             </div>
 
             {/* Load All button - only shown after auto-loading first 18 stories */}

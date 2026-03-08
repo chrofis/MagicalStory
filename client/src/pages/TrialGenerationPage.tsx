@@ -51,6 +51,7 @@ const translations = {
     emailSent: 'Check your inbox!',
     emailSentDesc: 'We sent a link to your email. Click it to access your story.',
     emailSentNote: 'Didn\'t get it? Check your spam folder.',
+    differentEmail: 'Use a different email',
     linkedSuccess: 'Account linked successfully!',
     redirecting: 'Redirecting to your story...',
     error: 'Something went wrong. Please try again.',
@@ -88,6 +89,7 @@ const translations = {
     emailSent: 'Prüfe deinen Posteingang!',
     emailSentDesc: 'Wir haben dir einen Link per E-Mail gesendet. Klicke darauf, um auf deine Geschichte zuzugreifen.',
     emailSentNote: 'Nicht erhalten? Prüfe deinen Spam-Ordner.',
+    differentEmail: 'Andere E-Mail verwenden',
     linkedSuccess: 'Konto erfolgreich verknüpft!',
     redirecting: 'Weiterleitung zu deiner Geschichte...',
     error: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
@@ -125,6 +127,7 @@ const translations = {
     emailSent: 'Vérifiez votre boîte de réception !',
     emailSentDesc: 'Nous vous avons envoyé un lien par e-mail. Cliquez dessus pour accéder à votre histoire.',
     emailSentNote: 'Pas reçu ? Vérifiez votre dossier spam.',
+    differentEmail: 'Utiliser une autre adresse',
     linkedSuccess: 'Compte lié avec succès !',
     redirecting: 'Redirection vers votre histoire...',
     error: 'Quelque chose s\'est mal passé. Veuillez réessayer.',
@@ -571,7 +574,13 @@ export default function TrialGenerationPage() {
                   </div>
                   <h2 className="text-lg font-bold text-gray-800 mb-1">{t.emailSent}</h2>
                   <p className="text-gray-600 text-sm mb-1">{t.emailSentDesc}</p>
-                  <p className="text-xs text-gray-400">{t.emailSentNote}</p>
+                  <p className="text-xs text-gray-400 mb-3">{t.emailSentNote}</p>
+                  <button
+                    onClick={() => { setEmailLinked(false); setEmail(''); setAuthError(''); }}
+                    className="text-indigo-600 text-sm font-medium hover:text-indigo-800 underline underline-offset-2"
+                  >
+                    {t.differentEmail}
+                  </button>
                 </div>
               )}
 

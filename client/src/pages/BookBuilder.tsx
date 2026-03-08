@@ -34,6 +34,13 @@ export default function BookBuilder() {
   const { showToast } = useToast();
   const isAdmin = user?.role === 'admin' || isImpersonating;
 
+  // Block access if user hasn't set password (trial user needs to set password first for credits)
+  useEffect(() => {
+    if (!isAuthLoading && user && user.hasPassword === false) {
+      navigate('/stories', { replace: true });
+    }
+  }, [user, isAuthLoading, navigate]);
+
   const [stories, setStories] = useState<SelectedStory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [coverType, setCoverType] = useState<'softcover' | 'hardcover'>('softcover');
