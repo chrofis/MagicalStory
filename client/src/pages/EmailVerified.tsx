@@ -89,8 +89,23 @@ export default function EmailVerified() {
     if (token && isTrial) {
       localStorage.setItem('auth_token', token);
       localStorage.removeItem('trial_session_token');
-      // Full page reload to reset AuthContext (SPA navigate would keep old user cached)
-      window.location.href = '/stories';
+      // Fetch user profile before redirecting — AuthContext requires both
+      // auth_token AND current_user in localStorage to restore the session
+      const API_URL = import.meta.env.VITE_API_URL || '';
+      fetch(`${API_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (data?.user) {
+            localStorage.setItem('current_user', JSON.stringify(data.user));
+          }
+        })
+        .catch(() => {}) // Best-effort — AuthContext will still try to refresh
+        .finally(() => {
+          // Full page reload to reset AuthContext
+          window.location.href = '/stories';
+        });
       return;
     }
   }, [searchParams, navigate]);
