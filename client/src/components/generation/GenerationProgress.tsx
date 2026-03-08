@@ -437,7 +437,7 @@ export function GenerationProgress({
                       <img
                         src={currentCharDisplay.avatarUrl}
                         alt={currentItem.char.name}
-                        className="w-full h-full object-cover object-top"
+                        className="w-full h-full object-contain"
                       />
                     </div>
                     <p className="text-sm text-center text-gray-600 max-w-xs italic">{currentCharDisplay.message}</p>
