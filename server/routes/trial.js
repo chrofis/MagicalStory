@@ -1211,7 +1211,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
         const { getIndexedLandmarks } = require('../lib/landmarkPhotos');
         const landmarks = await getIndexedLandmarks(userLocation.city, 3);
         if (landmarks.length > 0) {
-          landmarksText = 'Set the story near these real local landmarks: ' + landmarks.map(l => l.name).join(', ') + '.';
+          landmarksText = 'At least one scene must take place at one of these real local landmarks: ' + landmarks.map(l => l.name).join(', ') + '.';
           log.debug(`  [LANDMARK] Including ${landmarks.length} landmarks: ${landmarks.map(l => l.name).join(', ')}`);
         }
       } catch (err) {
@@ -1227,17 +1227,14 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
     // Load prompt template from prompts/trial-idea.txt
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
-    const buildTrialPrompt = (variant) => fillTemplate(PROMPT_TEMPLATES.trialIdea, {
+    const prompt1 = fillTemplate(PROMPT_TEMPLATES.trialIdea, {
       CHARACTER: charDesc,
       CATEGORY_CONTEXT: categoryContext,
       TITLE: trialTitle || '',
       LANDMARKS: landmarksText,
-      VARIANT: variant,
       LANG_INSTRUCTION: langInstruction,
     });
-
-    const prompt1 = buildTrialPrompt('Make it engaging and fun.');
-    const prompt2 = buildTrialPrompt('Create a DIFFERENT story — different setting, different conflict.');
+    const prompt2 = prompt1 + '\nGenerate a DIFFERENT idea than the first one — different conflict, different setting.';
 
     // Send initial event
     res.write(`data: ${JSON.stringify({ status: 'generating', model: modelToUse })}\n\n`);
