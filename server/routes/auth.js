@@ -577,50 +577,49 @@ router.get('/verify-email/:token', async (req, res) => {
       [user.id]
     );
 
-    // Handle trial user: save character, create story job, start processing
-    if (user.is_trial && user.trial_data) {
+    // Handle trial user: issue JWT and redirect to /stories
+    if (user.is_trial) {
       try {
-        // Check if a story job was already created (anonymous flow creates one before email verification)
-        const existingJob = await pool.query(
-          'SELECT id FROM story_jobs WHERE user_id = $1 LIMIT 1',
+        // If trial_data still exists and no job yet, create one
+        if (user.trial_data) {
+          const existingJob = await pool.query(
+            'SELECT id FROM story_jobs WHERE user_id = $1 LIMIT 1',
+            [user.id]
+          );
+
+          if (existingJob.rows.length === 0) {
+            const trialData = typeof user.trial_data === 'string'
+              ? JSON.parse(user.trial_data)
+              : user.trial_data;
+
+            const { characterId, charId } = await saveTrialCharacter(pool, user.id, trialData.characterData);
+            trialData.characterData._charId = charId;
+
+            const jobId = await createTrialStoryJob(pool, user.id, characterId, trialData.characterData, trialData.storyInput);
+
+            if (authDeps.processStoryJob) {
+              authDeps.processStoryJob(jobId).catch(err => {
+                log.error(`[AUTH] Trial job ${jobId} failed:`, err);
+              });
+            }
+            log.info(`[AUTH] Trial user ${user.email} verified - job ${jobId} started`);
+          } else {
+            log.info(`[AUTH] Trial user ${user.email} verified - story job already exists (${existingJob.rows[0].id})`);
+          }
+
+          await pool.query('UPDATE users SET trial_data = NULL WHERE id = $1', [user.id]);
+        }
+
+        // Issue JWT so the user is logged in when they land on /stories
+        const fullUser = await pool.query(
+          'SELECT id, username, email, role, email_verified FROM users WHERE id = $1',
           [user.id]
         );
-
-        if (existingJob.rows.length > 0) {
-          log.info(`[AUTH] Trial user ${user.email} verified - story job already exists (${existingJob.rows[0].id}), skipping creation`);
-          await pool.query('UPDATE users SET trial_data = NULL WHERE id = $1', [user.id]);
-          return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/trial-started`);
-        }
-
-        const trialData = typeof user.trial_data === 'string'
-          ? JSON.parse(user.trial_data)
-          : user.trial_data;
-
-        // Save character to characters table
-        const { characterId, charId } = await saveTrialCharacter(pool, user.id, trialData.characterData);
-        trialData.characterData._charId = charId;
-
-        // Create story job (reserves credits)
-        const jobId = await createTrialStoryJob(pool, user.id, characterId, trialData.characterData, trialData.storyInput);
-
-        // Clear trial_data now that it's been processed
-        await pool.query('UPDATE users SET trial_data = NULL WHERE id = $1', [user.id]);
-
-        // Start processing the job asynchronously
-        if (authDeps.processStoryJob) {
-          authDeps.processStoryJob(jobId).catch(err => {
-            log.error(`[AUTH] Trial job ${jobId} failed:`, err);
-          });
-        } else {
-          log.warn(`[AUTH] processStoryJob not available - trial job ${jobId} created but not started`);
-        }
-
-        log.info(`[AUTH] Trial user ${user.email} verified - job ${jobId} started`);
-        return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/trial-started`);
+        const token = generateToken(fullUser.rows[0]);
+        log.info(`[AUTH] Trial user ${user.email} verified - redirecting to /stories with token`);
+        return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified?token=${token}&trial=true`);
       } catch (trialErr) {
-        log.error(`[AUTH] Failed to start trial job for user ${user.id}:`, trialErr);
-        // Email is verified but trial job failed - redirect to email-verified
-        // so the user at least knows their account is set up
+        log.error(`[AUTH] Failed to process trial verification for user ${user.id}:`, trialErr);
         return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
       }
     }

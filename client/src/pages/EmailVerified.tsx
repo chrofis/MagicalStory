@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
@@ -70,6 +70,7 @@ type Status = 'checking' | 'other_window' | 'manual';
 
 export default function EmailVerified() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { language } = useLanguage();
   const { user, refreshUser } = useAuth();
   const t = translations[language as keyof typeof translations] || translations.en;
@@ -81,11 +82,27 @@ export default function EmailVerified() {
   const isMountedRef = useRef(true);
   const hasHandledRef = useRef(false);
 
+  // Handle trial user redirect: ?token=...&trial=true
+  useEffect(() => {
+    const token = searchParams.get('token');
+    const isTrial = searchParams.get('trial') === 'true';
+    if (token && isTrial) {
+      localStorage.setItem('auth_token', token);
+      localStorage.removeItem('trial_session_token');
+      navigate('/stories', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
   useEffect(() => {
     isMountedRef.current = true;
 
     // Prevent duplicate handling (React Strict Mode runs effects twice)
     if (hasHandledRef.current) {
+      return;
+    }
+
+    // Skip if trial redirect will handle it
+    if (searchParams.get('token') && searchParams.get('trial') === 'true') {
       return;
     }
 
