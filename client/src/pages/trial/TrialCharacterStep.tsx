@@ -617,14 +617,16 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         <div>
           {/* Name */}
           <div className="mb-5">
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.nameLabel}</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.nameLabel} <span className="text-red-400">*</span></label>
             <input
               type="text"
               value={characterData.name}
               onChange={(e) => updateField('name', e.target.value)}
               placeholder={t.namePlaceholder}
               maxLength={30}
-              className="w-full px-4 py-2.5 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all text-gray-900 placeholder-gray-400"
+              className={`w-full px-4 py-2.5 rounded-lg border outline-none transition-all text-gray-900 placeholder-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 ${
+                hasPhoto && !characterData.name.trim() ? 'border-red-300 bg-red-50/30' : 'border-gray-300'
+              }`}
             />
           </div>
 
@@ -643,8 +645,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
               />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.genderLabel}</label>
-              <div className="flex gap-2">
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">{t.genderLabel} <span className="text-red-400">*</span></label>
+              <div className={`flex gap-2 rounded-lg ${hasPhoto && !characterData.gender ? 'ring-2 ring-red-200' : ''}`}>
                 {[
                   { value: 'male', label: t.boy },
                   { value: 'female', label: t.girl },
@@ -655,7 +657,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                     className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       characterData.gender === value
                         ? 'bg-indigo-600 text-white shadow-md'
-                        : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
+                        : hasPhoto && !characterData.gender
+                          ? 'bg-red-50/30 border border-red-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
+                          : 'bg-white border border-gray-300 text-gray-700 hover:border-indigo-400 hover:bg-indigo-50'
                     }`}
                   >
                     {label}
