@@ -4503,7 +4503,7 @@ async function _processStoryJobImpl(jobId) {
     };
     // Trial mode: use Haiku for faster, cheaper story generation
     if (inputData.trialMode) {
-      modelOverrides.outlineModel = 'claude-haiku-4-5-20251001';
+      modelOverrides.outlineModel = 'claude-haiku';
       log.info(`⚡ [TRIAL] Using Haiku for story generation (faster + cheaper)`);
     }
     // Always log model defaults being used
