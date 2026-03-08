@@ -3391,6 +3391,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       AVATAR_SELECTION: avatarSelection,
       TITLE_SECTION: titleSection,
       LANDMARKS: landmarksInstruction,
+      MAIN_CHARACTER_NAME: mainChar?.name || 'the main character',
     });
   }
 

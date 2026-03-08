@@ -67,19 +67,26 @@ Output ALL sections in this EXACT order. Do not skip any.
 {TITLE_SECTION}---VISUAL BIBLE---
 ```json
 {
-  "locations": [
-    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "type": "location", "description": "[key visual features]", "isRealLandmark": false, "landmarkQuery": null }
+  "secondaryCharacters": [
+    { "id": "CHR001", "name": "[Name]", "pages": [1, 3, 5], "age": "[age category]", "build": "[height, body type]", "hair": "[color, style, length]", "face": "[eye color, skin tone, distinctive features]", "signatureLook": "[ONE memorable visual element]", "clothing": "[specific colors and details]" }
   ],
-  "keyObjects": [
-    { "id": "OBJ001", "name": "[Important object]", "pages": [2, 3, 4], "type": "artifact", "description": "[appearance: shape, color, material, size, distinctive features]" }
+  "artifacts": [
+    { "id": "ART001", "name": "[Important object]", "pages": [2, 3, 4], "type": "[what kind of object]", "description": "[appearance: shape, color, material, size, distinctive features]" }
+  ],
+  "locations": [
+    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "setting": "[indoor/outdoor, type]", "colors": "[specific colors]", "features": "[distinctive visual elements]", "signatureElement": "[ONE unique detail]", "isRealLandmark": false, "landmarkQuery": null }
   ]
 }
 ```
+**Do NOT include the main character ({MAIN_CHARACTER_NAME}) — they have reference photos.**
+Only include characters that YOU invent (friends, shopkeepers, etc.) as `secondaryCharacters`.
+Use empty arrays `[]` for categories with no elements.
+
 **REAL-WORLD LANDMARKS:** For real buildings, monuments, or landmarks:
 - Set `"isRealLandmark": true`
 - Set `"landmarkQuery"` to the EXACT landmark name for photo lookup (e.g. "Holzbrücke Baden")
 
-Keep it minimal: max 2-3 locations, 1-2 key objects. Only include elements that appear on 2+ pages.
+Keep it minimal: max 2-3 locations, 1-2 key objects, only secondary characters.
 
 ---STORY PAGES---
 
