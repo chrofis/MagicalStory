@@ -1381,7 +1381,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     }
 
     // Lazy require the styled avatar and story helper modules
-    const { prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache } = require('../lib/styledAvatars');
+    const { prepareStyledAvatars, applyStyledAvatars } = require('../lib/styledAvatars');
     const { ART_STYLES, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
     const { generateImageOnly } = require('../lib/images');
@@ -1422,8 +1422,6 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
     if (!result || !result.imageData) {
       log.warn(`[TRIAL TITLE] Image generation returned no image`);
-      // Clear cache to avoid cross-contamination
-      clearStyledAvatarCache();
       return res.json({ titlePageImage: null, title: null, costumeType: null });
     }
 
@@ -1443,8 +1441,10 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
       log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
     }
 
-    // Clear styled avatar cache (standalone call, avoid cross-contamination)
-    clearStyledAvatarCache();
+    // NOTE: Do NOT clear styled avatar cache here — processStoryJob starts avatar styling
+    // in parallel and shares the same global cache. Clearing here wipes out avatars the
+    // job already cached, causing cache misses for all page images. The job clears the
+    // cache itself when generation completes.
 
     log.info(`[TRIAL TITLE] Title page ready for "${title}" (costumeType: ${costumeType})`);
     res.json({ titlePageImage, title, costumeType });

@@ -1266,6 +1266,40 @@ export default function StoryWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isAuthLoading]);
 
+  // Load all avatar thumbnails in background for GenerationProgress variety
+  // The initial load only includes 'standard' faceThumbnail to keep payload small.
+  // This fetches all face + body thumbnails and merges them into character state.
+  useEffect(() => {
+    if (!initialCharacterLoadDone || characters.length === 0 || !isAuthenticated) return;
+    // Only load if characters have avatars (not just photos)
+    const hasAvatars = characters.some(c => c.avatars?.status === 'complete');
+    if (!hasAvatars) return;
+
+    let cancelled = false;
+    characterService.getThumbnails().then(thumbnails => {
+      if (cancelled || !thumbnails.length) return;
+      setCharacters(prev => prev.map(char => {
+        const thumb = thumbnails.find(t => t.id === char.id);
+        if (!thumb) return char;
+        return {
+          ...char,
+          avatars: {
+            ...char.avatars,
+            ...(thumb.faceThumbnails && { faceThumbnails: thumb.faceThumbnails }),
+            ...(thumb.bodyThumbnails && { bodyThumbnails: thumb.bodyThumbnails }),
+          },
+        };
+      }));
+      log.info(`Loaded avatar thumbnails for ${thumbnails.length} characters`);
+    }).catch(err => {
+      // Non-critical - GenerationProgress falls back to standard thumbnail
+      log.warn('Failed to load avatar thumbnails:', err);
+    });
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCharacterLoadDone, isAuthenticated]);
+
   // Poll for avatar completion when any character has status 'generating'
   // This handles background avatar generation triggered by account claim
   useEffect(() => {

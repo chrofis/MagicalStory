@@ -135,6 +135,53 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// GET /api/characters/thumbnails - Get all avatar thumbnails for all characters
+// Lightweight endpoint using JSONB extraction (avoids loading full 14MB data column into memory)
+// Used by GenerationProgress for avatar variety during story generation
+router.get('/thumbnails', authenticateToken, async (req, res) => {
+  try {
+    if (!isDatabaseMode()) {
+      return res.status(501).json({ error: 'File storage mode not supported' });
+    }
+
+    const characterId = `characters_${req.user.id}`;
+
+    // Extract only id + thumbnails from JSONB, avoiding full data column parse
+    const result = await dbQuery(`
+      SELECT jsonb_agg(
+        jsonb_build_object(
+          'id', (c->>'id')::int,
+          'faceThumbnails', c->'avatars'->'faceThumbnails',
+          'bodyThumbnails', c->'avatars'->'bodyThumbnails'
+        )
+      ) as thumbnails
+      FROM characters, jsonb_array_elements(data->'characters') c
+      WHERE id = $1
+    `, [characterId]);
+
+    if (!result.length || !result[0].thumbnails) {
+      // Try legacy format (subquery to get latest row first, then expand)
+      const legacy = await dbQuery(`
+        SELECT jsonb_agg(
+          jsonb_build_object(
+            'id', (c->>'id')::int,
+            'faceThumbnails', c->'avatars'->'faceThumbnails',
+            'bodyThumbnails', c->'avatars'->'bodyThumbnails'
+          )
+        ) as thumbnails
+        FROM (SELECT data FROM characters WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1) chars,
+             jsonb_array_elements(chars.data->'characters') c
+      `, [req.user.id]);
+      return res.json({ thumbnails: legacy[0]?.thumbnails || [] });
+    }
+
+    res.json({ thumbnails: result[0].thumbnails });
+  } catch (err) {
+    console.error('Error fetching character thumbnails:', err);
+    res.status(500).json({ error: 'Failed to fetch thumbnails' });
+  }
+});
+
 // PUT /api/characters/roles - Update story roles for characters
 // IMPORTANT: This must be BEFORE /:characterId routes to avoid "roles" being matched as an ID
 // Body: { roles: { [characterId]: 'main' | 'in' | 'out' } }

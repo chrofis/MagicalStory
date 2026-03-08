@@ -372,6 +372,16 @@ export const characterService = {
     };
   },
 
+  /**
+   * Get all avatar thumbnails (face + body) for all characters.
+   * Lightweight endpoint — returns only thumbnails, not full avatar grids.
+   * Used to enrich character data for GenerationProgress avatar variety.
+   */
+  async getThumbnails(): Promise<Array<{ id: number; faceThumbnails?: Record<string, string>; bodyThumbnails?: Record<string, string> }>> {
+    const response = await api.get<{ thumbnails: Array<{ id: number; faceThumbnails?: Record<string, string>; bodyThumbnails?: Record<string, string> }> }>('/api/characters/thumbnails');
+    return response.thumbnails || [];
+  },
+
   async saveCharacters(characters: Character[]): Promise<void> {
     await api.post('/api/characters', {
       characters: characters.map(mapCharacterToApi),
