@@ -258,7 +258,7 @@ export default function MyStories() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { language } = useLanguage();
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, user, refreshUser } = useAuth();
   const { showSuccess, showInfo, showError } = useToast();
   const generation = useGenerationOptional();
   const isGeneratingStory = generation?.activeJob && !generation?.isComplete && !generation?.error;
@@ -304,6 +304,7 @@ export default function MyStories() {
         return;
       }
       setPasswordSet(true);
+      refreshUser(); // Update AuthContext so hasPassword reflects the change
       showSuccess(language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : 'Password set!');
     } catch {
       setPasswordError('Failed to set password');

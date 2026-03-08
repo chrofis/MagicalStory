@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, BookOpen, Mail } from 'lucide-react';
+import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGoogle, getIdToken } from '@/services/firebase';
 import { useLanguage } from '@/context/LanguageContext';
@@ -54,6 +54,9 @@ const translations = {
     linkedSuccess: 'Account linked successfully!',
     redirecting: 'Redirecting to your story...',
     error: 'Something went wrong. Please try again.',
+    failedTitle: 'Something went wrong',
+    failedDesc: 'Story generation failed. Please try again.',
+    tryAgain: 'Try Again',
     upsellTitle: 'Want even more?',
     upsellDesc: 'With a full account you unlock:',
     upsellFeatures: [
@@ -85,6 +88,9 @@ const translations = {
     linkedSuccess: 'Konto erfolgreich verknüpft!',
     redirecting: 'Weiterleitung zu deiner Geschichte...',
     error: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
+    failedTitle: 'Etwas ist schiefgelaufen',
+    failedDesc: 'Die Geschichte konnte nicht erstellt werden. Bitte versuche es erneut.',
+    tryAgain: 'Erneut versuchen',
     upsellTitle: 'Du willst noch mehr?',
     upsellDesc: 'Mit einem vollständigen Konto erhältst du:',
     upsellFeatures: [
@@ -116,6 +122,9 @@ const translations = {
     linkedSuccess: 'Compte lié avec succès !',
     redirecting: 'Redirection vers votre histoire...',
     error: 'Quelque chose s\'est mal passé. Veuillez réessayer.',
+    failedTitle: 'Quelque chose s\'est mal passé',
+    failedDesc: 'La création de l\'histoire a échoué. Veuillez réessayer.',
+    tryAgain: 'Réessayer',
     upsellTitle: 'Vous en voulez plus ?',
     upsellDesc: 'Avec un compte complet, vous débloquez :',
     upsellFeatures: [
@@ -163,10 +172,19 @@ export default function TrialGenerationPage() {
   const isLinked = emailLinked || googleLinked;
 
   // Poll for email verification after email is linked — auto-redirect when verified
+  // Stops after 10 minutes to avoid running forever if user never verifies
   useEffect(() => {
     if (!emailLinked || !state?.sessionToken) return;
 
+    const startTime = Date.now();
+    const TEN_MINUTES = 10 * 60 * 1000;
+
     const interval = setInterval(async () => {
+      if (Date.now() - startTime > TEN_MINUTES) {
+        clearInterval(interval);
+        return;
+      }
+
       try {
         const statusRes = await fetch(`${API_URL}/api/trial/check-status`, {
           headers: { 'Authorization': `Bearer ${state.sessionToken}` },
@@ -195,7 +213,7 @@ export default function TrialGenerationPage() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [emailLinked, state?.sessionToken, navigate]);
+  }, [emailLinked, state?.sessionToken]);
 
   // Start story generation on mount
   useEffect(() => {
@@ -466,13 +484,30 @@ export default function TrialGenerationPage() {
                 <span className="text-sm font-medium">100%</span>
               </div>
             )}
+
+            {/* Failed state */}
+            {pageState === 'failed' && (
+              <div className="text-center">
+                <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <AlertTriangle className="w-7 h-7 text-red-600" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-800 mb-1">{t.failedTitle}</h2>
+                <p className="text-gray-500 text-sm mb-4">{t.failedDesc}</p>
+                <button
+                  onClick={() => navigate('/try', { replace: true })}
+                  className="text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+                >
+                  {t.tryAgain}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Divider ──────────────────────────────────────────────── */}
-          <div className="h-px bg-gray-200 mb-6" />
+          {pageState !== 'failed' && <div className="h-px bg-gray-200 mb-6" />}
 
-          {/* ── Sign-in section (always shown — even on failure, drive sign-up) */}
-          {(
+          {/* ── Sign-in section (hidden on failure) */}
+          {pageState !== 'failed' && (
             <>
               {/* Linked success states */}
               {googleLinked && (

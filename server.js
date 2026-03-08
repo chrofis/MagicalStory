@@ -2287,6 +2287,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     let lastProgressUpdate = Date.now();
     let landmarkDescriptionsPromise = null; // Promise for loading landmark photo descriptions
     let streamingAvatarStylingPromise = null; // Promise for early avatar styling (started when clothing requirements ready)
+    let earlyAvatarStylingSucceeded = false; // Track whether early styling actually cached avatars
 
     // Track parallel tasks started during streaming
     const streamingSceneExpansionPromises = new Map(); // pageNum -> promise
@@ -2347,6 +2348,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       streamingAvatarStylingPromise = (async () => {
         try {
           await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage);
+          earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [TRIAL] Early avatar styling failed: ${error.message}`);
@@ -2842,6 +2844,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                 }));
               });
               await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage);
+              earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
               log.warn(`⚠️ [STREAM] Early avatar styling failed: ${error.message}`);
@@ -3156,8 +3159,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // For costumed/signature avatars, use server/lib/storyAvatarGeneration.js if needed.
 
     // Prepare styled avatars (convert existing avatars to target art style)
-    // Skip if early avatar styling already completed (avoids duplicate costumed avatar generation)
-    if (avatarRequirements.length > 0 && artStyle !== 'realistic' && !streamingAvatarStylingPromise) {
+    // Skip if early avatar styling already succeeded (avoids duplicate costumed avatar generation)
+    // If early styling was attempted but failed (promise exists but succeeded=false), run PHASE 2 as fallback
+    if (avatarRequirements.length > 0 && artStyle !== 'realistic' && !earlyAvatarStylingSucceeded) {
       // Validate that characters have base avatars
       const charactersWithoutAvatars = (inputData.characters || []).filter(c =>
         !c.avatars?.standard && !c.photoUrl && !c.bodyNoBgUrl
@@ -3168,7 +3172,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle} (early styling did not run)`);
       await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage);
-    } else if (streamingAvatarStylingPromise) {
+    } else if (earlyAvatarStylingSucceeded) {
       log.debug(`⏭️ [UNIFIED] Skipping PHASE 2 avatar styling - early styling already completed (${getStyledAvatarCacheStats().size} cached)`);
     }
 

@@ -22,7 +22,6 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const Impressum = lazy(() => import('./pages/Impressum'));
 const SharedStoryViewer = lazy(() => import('./pages/SharedStoryViewer'));
 const TrialWizard = lazy(() => import('./pages/TrialWizard'));
-const TrialStarted = lazy(() => import('./pages/TrialStarted'));
 const TrialGenerationPage = lazy(() => import('./pages/TrialGenerationPage'));
 const ClaimAccount = lazy(() => import('./pages/ClaimAccount'));
 
@@ -49,7 +48,6 @@ function App() {
           <Route path="/impressum" element={<Impressum />} />
           <Route path="/shared/:shareToken" element={<SharedStoryViewer />} />
           <Route path="/try" element={<TrialWizard />} />
-          <Route path="/trial-started" element={<TrialStarted />} />
           <Route path="/trial-generation" element={<TrialGenerationPage />} />
           <Route path="/claim/:token" element={<ClaimAccount />} />
         </Routes>
