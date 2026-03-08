@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Sparkles, Loader2 } from 'lucide-react';
 import type { StoryInput } from '../TrialWizard';
 import {
   storyCategories,
@@ -19,6 +19,9 @@ interface Props {
   onChange: (data: StoryInput) => void;
   onBack: () => void;
   onNext: () => void;
+  previewAvatar?: string | null;
+  characterName?: string;
+  characterGender?: string;
 }
 
 type TrialCategory = 'adventure' | 'life-challenge' | 'historical';
@@ -40,6 +43,8 @@ const strings: Record<string, {
   back: string;
   next: string;
   change: string;
+  avatarReady: (name: string, gender: string) => string;
+  avatarLoading: (name: string) => string;
 }> = {
   en: {
     title: 'Choose Your Topic',
@@ -51,6 +56,8 @@ const strings: Record<string, {
     back: 'Back',
     next: 'Next',
     change: 'Change',
+    avatarReady: (name, gender) => `${name} is ready for ${gender === 'female' ? 'her' : 'his'} first adventure!`,
+    avatarLoading: (name) => `${name} is getting ready for the story. You can already select a topic below.`,
   },
   de: {
     title: 'Wähle dein Thema',
@@ -62,6 +69,8 @@ const strings: Record<string, {
     back: 'Zurück',
     next: 'Weiter',
     change: 'Ändern',
+    avatarReady: (name, gender) => `${name} ist bereit für ${gender === 'female' ? 'ihr' : 'sein'} erstes Abenteuer!`,
+    avatarLoading: (name) => `${name} macht sich bereit für die Geschichte. Du kannst bereits ein Thema wählen.`,
   },
   fr: {
     title: 'Choisis ton sujet',
@@ -73,14 +82,37 @@ const strings: Record<string, {
     back: 'Retour',
     next: 'Suivant',
     change: 'Changer',
+    avatarReady: (name, gender) => `${name} est prêt${gender === 'female' ? 'e' : ''} pour sa première aventure !`,
+    avatarLoading: (name) => `${name} se prépare pour l'histoire. Tu peux déjà choisir un sujet.`,
   },
 };
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }: Props) {
+export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, previewAvatar, characterName, characterGender }: Props) {
   const lang = (storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en') as Language;
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
+
+  const avatarBanner = characterName ? (
+    <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+      {previewAvatar ? (
+        <img
+          src={previewAvatar}
+          alt={characterName}
+          className="w-20 h-20 rounded-xl object-cover shadow-md flex-shrink-0"
+        />
+      ) : (
+        <div className="w-20 h-20 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+          <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+        </div>
+      )}
+      <p className="text-sm font-medium text-gray-700">
+        {previewAvatar
+          ? t.avatarReady(characterName, characterGender || '')
+          : t.avatarLoading(characterName)}
+      </p>
+    </div>
+  ) : null;
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
@@ -136,6 +168,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
   if (!storyInput.storyCategory) {
     return (
       <div className="max-w-4xl mx-auto pt-4">
+        {avatarBanner}
         <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
         <p className="text-gray-500 text-center mb-8">{t.subtitle}</p>
 
@@ -176,6 +209,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
     return (
       <div className="max-w-4xl mx-auto pt-4">
+        {avatarBanner}
         {/* Selected category chip */}
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
@@ -232,6 +266,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
     return (
       <div className="max-w-4xl mx-auto pt-4">
+        {avatarBanner}
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
             <span className="text-lg">{catData?.emoji}</span>
@@ -325,6 +360,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
     return (
       <div className="max-w-4xl mx-auto pt-4">
+        {avatarBanner}
         <div className="flex items-center gap-2 mb-5">
           <div className="inline-flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-indigo-200 shadow-sm text-sm">
             <span className="text-lg">{catData?.emoji}</span>
@@ -387,6 +423,7 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext }:
 
   return (
     <div className="max-w-4xl mx-auto pt-4">
+      {avatarBanner}
       <h2 className="text-2xl font-bold text-gray-900 text-center mb-6">{t.title}</h2>
 
       {/* Summary cards */}
