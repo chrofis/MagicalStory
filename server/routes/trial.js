@@ -464,8 +464,8 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
     const hashedPassword = await bcrypt.hash(randomPassword, 10);
 
     await pool.query(
-      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, is_trial, anonymous)
-       VALUES ($1, $2, $3, $4, 'user', 1, 0, 0, true, true)`,
+      `INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, is_trial, anonymous, has_set_password)
+       VALUES ($1, $2, $3, $4, 'user', 1, 0, 0, true, true, false)`,
       [userId, `anon_${userId}`, `anon_${userId}@anonymous`, hashedPassword]
     );
 
@@ -718,6 +718,24 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
     if (job.status === 'failed') {
       // Don't expose internal error details to trial users
       response.errorMessage = 'Story generation failed';
+    }
+
+    // Include pre-generated title page image if requested and available
+    if (req.query.needTitlePage === '1') {
+      try {
+        const charResult = await pool.query(
+          'SELECT data FROM characters WHERE id = $1',
+          [`characters_${userId}`]
+        );
+        const titlePageImage = charResult.rows[0]?.data?.characters?.[0]?.preGeneratedTitlePage;
+        const titleText = charResult.rows[0]?.data?.characters?.[0]?.preGeneratedTitle;
+        if (titlePageImage) {
+          response.titlePageImage = titlePageImage;
+          response.titlePageTitle = titleText || null;
+        }
+      } catch (e) {
+        // Non-critical, ignore
+      }
     }
 
     res.json(response);

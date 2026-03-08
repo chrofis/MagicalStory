@@ -146,7 +146,7 @@ router.post('/login', authLimiter, async (req, res) => {
     let user;
 
     if (isDatabaseMode()) {
-      const rows = await dbQuery('SELECT * FROM users WHERE username = $1', [username]);
+      const rows = await dbQuery('SELECT * FROM users WHERE username = $1 OR email = $1', [username]);
       if (rows.length === 0) {
         return res.status(401).json({ error: 'Email not registered', code: 'EMAIL_NOT_REGISTERED' });
       }
@@ -229,8 +229,9 @@ router.get('/me', authenticateToken, async (req, res) => {
           preferredLanguage: dbUser.preferred_language || 'English',
           emailVerified: emailVerifiedResult,
           photoConsentAt: dbUser.photo_consent_at || null,
-          // Trial/anonymous users have a random password they don't know — treat as no password
-          hasPassword: !!dbUser.password && !dbUser.anonymous,
+          // has_set_password tracks whether user explicitly set their own password
+          // (trial users get a random password they don't know)
+          hasPassword: dbUser.has_set_password !== false,
         }
       });
     } else {
@@ -408,7 +409,7 @@ router.post('/reset-password/confirm', passwordResetLimiter, validateBody(schema
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await pool.query(
-      'UPDATE users SET password = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
+      'UPDATE users SET password = $1, has_set_password = true, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2',
       [hashedPassword, user.id]
     );
 
@@ -473,20 +474,19 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     }
 
     const pool = getPool();
-    const result = await pool.query('SELECT id, password, anonymous FROM users WHERE id = $1', [userId]);
+    const result = await pool.query('SELECT id, password, has_set_password FROM users WHERE id = $1', [userId]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Allow setting password for anonymous/trial users (they have a random password they don't know)
-    if (result.rows[0].password && !result.rows[0].anonymous) {
+    // Allow setting password for trial users (they have a random password they don't know)
+    if (result.rows[0].password && result.rows[0].has_set_password !== false) {
       return res.status(400).json({ error: 'Password already set. Use change-password instead.' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    // Clear anonymous flag so hasPassword returns true from now on
-    await pool.query('UPDATE users SET password = $1, anonymous = false WHERE id = $2', [hashedPassword, userId]);
+    await pool.query('UPDATE users SET password = $1, has_set_password = true WHERE id = $2', [hashedPassword, userId]);
 
     log.info(`[AUTH] Password set for user ${userId}`);
     res.json({ success: true });

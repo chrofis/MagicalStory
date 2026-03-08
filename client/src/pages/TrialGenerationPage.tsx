@@ -57,6 +57,9 @@ const translations = {
     failedTitle: 'Something went wrong',
     failedDesc: 'Story generation failed. Please try again.',
     tryAgain: 'Try Again',
+    accountReady: 'Account ready!',
+    waitingForStory: 'Your story is almost done. You\'ll be redirected automatically.',
+    verifiedWaiting: 'Email verified! Your story is still being created...',
     upsellTitle: 'Want even more?',
     upsellDesc: 'With a full account you unlock:',
     upsellFeatures: [
@@ -91,6 +94,9 @@ const translations = {
     failedTitle: 'Etwas ist schiefgelaufen',
     failedDesc: 'Die Geschichte konnte nicht erstellt werden. Bitte versuche es erneut.',
     tryAgain: 'Erneut versuchen',
+    accountReady: 'Konto bereit!',
+    waitingForStory: 'Deine Geschichte ist fast fertig. Du wirst automatisch weitergeleitet.',
+    verifiedWaiting: 'E-Mail bestätigt! Deine Geschichte wird noch erstellt...',
     upsellTitle: 'Du willst noch mehr?',
     upsellDesc: 'Mit einem vollständigen Konto erhältst du:',
     upsellFeatures: [
@@ -125,6 +131,9 @@ const translations = {
     failedTitle: 'Quelque chose s\'est mal passé',
     failedDesc: 'La création de l\'histoire a échoué. Veuillez réessayer.',
     tryAgain: 'Réessayer',
+    accountReady: 'Compte prêt !',
+    waitingForStory: 'Votre histoire est presque terminée. Vous serez redirigé automatiquement.',
+    verifiedWaiting: 'E-mail vérifié ! Votre histoire est encore en cours de création...',
     upsellTitle: 'Vous en voulez plus ?',
     upsellDesc: 'Avec un compte complet, vous débloquez :',
     upsellFeatures: [
@@ -162,12 +171,21 @@ export default function TrialGenerationPage() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartRef = useRef<number>(0);
 
+  // Title page image (may arrive late via polling if not ready at navigation time)
+  const [titlePageImage, setTitlePageImage] = useState<string | null>(
+    state?.titlePageData?.titlePageImage || null
+  );
+  const [titlePageTitle, setTitlePageTitle] = useState<string | null>(
+    state?.titlePageData?.title || null
+  );
+
   // Auth state
   const [email, setEmail] = useState('');
   const [authError, setAuthError] = useState('');
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [emailLinked, setEmailLinked] = useState(false);
   const [googleLinked, setGoogleLinked] = useState(false);
+  const [isVerified, setIsVerified] = useState(false);
 
   const isLinked = emailLinked || googleLinked;
 
@@ -204,8 +222,7 @@ export default function TrialGenerationPage() {
             localStorage.setItem('auth_token', token);
             localStorage.removeItem('trial_session_token');
           }
-          // Full page reload to reset AuthContext (SPA navigate would keep old user cached)
-          window.location.href = '/stories';
+          setIsVerified(true);
         }
       } catch {
         // Ignore polling errors
@@ -253,9 +270,12 @@ export default function TrialGenerationPage() {
   }, [state]);
 
   // Poll job status
-  const pollJobStatus = useCallback(async (currentJobId: string, token: string) => {
+  const pollJobStatus = useCallback(async (currentJobId: string, token: string, needTitlePage: boolean) => {
     try {
-      const response = await fetch(`${API_URL}/api/trial/job-status/${currentJobId}`, {
+      const url = needTitlePage
+        ? `${API_URL}/api/trial/job-status/${currentJobId}?needTitlePage=1`
+        : `${API_URL}/api/trial/job-status/${currentJobId}`;
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -269,6 +289,13 @@ export default function TrialGenerationPage() {
       }
 
       if (data.progress !== undefined) setProgress(data.progress);
+
+      // Pick up title page image from poll response (stop asking once received)
+      if (data.titlePageImage) {
+        setTitlePageImage(data.titlePageImage);
+        needTitlePageRef.current = false;
+        if (data.titlePageTitle) setTitlePageTitle(data.titlePageTitle);
+      }
 
       if (data.status === 'completed') {
         setPageState('completed');
@@ -288,12 +315,15 @@ export default function TrialGenerationPage() {
     }
   }, []);
 
+  // Track whether we still need to fetch the title page (ref so polling closure sees latest value)
+  const needTitlePageRef = useRef(!state?.titlePageData?.titlePageImage);
+
   useEffect(() => {
     if (!jobId || !state?.sessionToken) return;
 
     // Initial poll
     pollStartRef.current = Date.now();
-    pollJobStatus(jobId, state.sessionToken);
+    pollJobStatus(jobId, state.sessionToken, needTitlePageRef.current);
 
     // Set up interval with 15-minute timeout
     pollIntervalRef.current = setInterval(async () => {
@@ -305,7 +335,7 @@ export default function TrialGenerationPage() {
         setPageState('failed');
         return;
       }
-      const shouldStop = await pollJobStatus(jobId, state.sessionToken);
+      const shouldStop = await pollJobStatus(jobId, state.sessionToken, needTitlePageRef.current);
       if (shouldStop && pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
@@ -319,6 +349,17 @@ export default function TrialGenerationPage() {
       }
     };
   }, [jobId, state?.sessionToken, pollJobStatus]);
+
+  // ── Auto-redirect when story is complete AND user is verified ──────────────
+  useEffect(() => {
+    if (pageState === 'completed' && (isVerified || googleLinked)) {
+      // Small delay so user sees the "100% complete" state
+      const timer = setTimeout(() => {
+        window.location.href = '/stories';
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [pageState, isVerified, googleLinked]);
 
   // ── Email linking ──────────────────────────────────────────────────────────
 
@@ -389,11 +430,7 @@ export default function TrialGenerationPage() {
       }
 
       setGoogleLinked(true);
-
-      // Full page reload to reset AuthContext (SPA navigate would keep old user cached)
-      setTimeout(() => {
-        window.location.href = '/stories';
-      }, 2000);
+      setIsVerified(true);
     } catch (err) {
       // Don't show error for redirect-based auth
       if (err instanceof Error && err.message === 'Redirecting to Google...') {
@@ -428,11 +465,11 @@ export default function TrialGenerationPage() {
           {/* ── Avatar + Progress ─────────────────────────────────────── */}
           <div className="flex flex-col items-center text-center mb-6">
             {/* Title page or avatar preview */}
-            {state.titlePageData?.titlePageImage ? (
+            {titlePageImage ? (
               <div className="mb-4">
                 <img
-                  src={state.titlePageData.titlePageImage}
-                  alt={state.titlePageData.title || 'Story cover'}
+                  src={titlePageImage}
+                  alt={titlePageTitle || 'Story cover'}
                   className="w-48 h-auto rounded-xl shadow-lg mx-auto"
                 />
               </div>
@@ -515,12 +552,16 @@ export default function TrialGenerationPage() {
                   <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <CheckCircle className="w-7 h-7 text-green-600" />
                   </div>
-                  <h2 className="text-lg font-bold text-gray-800 mb-1">{t.linkedSuccess}</h2>
-                  <p className="text-gray-500 text-sm">{t.redirecting}</p>
+                  <h2 className="text-lg font-bold text-gray-800 mb-1">{t.accountReady}</h2>
+                  {pageState !== 'completed' ? (
+                    <p className="text-gray-500 text-sm">{t.waitingForStory}</p>
+                  ) : (
+                    <p className="text-gray-500 text-sm">{t.redirecting}</p>
+                  )}
                 </div>
               )}
 
-              {emailLinked && (
+              {emailLinked && !isVerified && (
                 <div className="py-6 text-center">
                   <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Mail className="w-7 h-7 text-indigo-600" />
@@ -528,6 +569,20 @@ export default function TrialGenerationPage() {
                   <h2 className="text-lg font-bold text-gray-800 mb-1">{t.emailSent}</h2>
                   <p className="text-gray-600 text-sm mb-1">{t.emailSentDesc}</p>
                   <p className="text-xs text-gray-400">{t.emailSentNote}</p>
+                </div>
+              )}
+
+              {emailLinked && isVerified && (
+                <div className="py-6 text-center">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="w-7 h-7 text-green-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-800 mb-1">{t.accountReady}</h2>
+                  {pageState !== 'completed' ? (
+                    <p className="text-gray-500 text-sm">{t.verifiedWaiting}</p>
+                  ) : (
+                    <p className="text-gray-500 text-sm">{t.redirecting}</p>
+                  )}
                 </div>
               )}
 
