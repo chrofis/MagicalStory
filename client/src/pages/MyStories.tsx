@@ -280,6 +280,17 @@ export default function MyStories() {
   const [passwordSet, setPasswordSet] = useState(false);
   const [passwordBannerDismissed, setPasswordBannerDismissed] = useState(false);
   const showPasswordBanner = user && user.hasPassword === false && !passwordSet && !passwordBannerDismissed;
+  const needsPassword = user && user.hasPassword === false && !passwordSet;
+  const passwordBannerRef = useRef<HTMLDivElement>(null);
+  const scrollToPasswordBanner = () => {
+    setPasswordBannerDismissed(false);
+    // Use setTimeout so the banner renders before we scroll
+    setTimeout(() => {
+      passwordBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      passwordBannerRef.current?.classList.add('ring-2', 'ring-amber-500');
+      setTimeout(() => passwordBannerRef.current?.classList.remove('ring-2', 'ring-amber-500'), 2000);
+    }, 50);
+  };
 
   const handleSetPassword = async (e: FormEvent) => {
     e.preventDefault();
@@ -734,7 +745,7 @@ export default function MyStories() {
       {/* Set-password banner for trial users without a password */}
       {showPasswordBanner && (
         <div className="px-4 md:px-8 pt-4 max-w-6xl mx-auto">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 relative">
+          <div ref={passwordBannerRef} className="bg-amber-50 border border-amber-200 rounded-xl p-4 relative transition-all">
             <button
               onClick={() => setPasswordBannerDismissed(true)}
               className="absolute top-3 right-3 text-amber-400 hover:text-amber-600"
@@ -792,8 +803,8 @@ export default function MyStories() {
           <div className="flex items-center justify-center md:justify-end gap-2">
             {/* See Pricing button - icon only on mobile */}
             <button
-              onClick={() => navigate('/pricing')}
-              className="flex items-center gap-1 px-2 md:px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-colors"
+              onClick={() => needsPassword ? scrollToPasswordBanner() : navigate('/pricing')}
+              className={`flex items-center gap-1 px-2 md:px-4 py-2 border-2 rounded-lg font-medium transition-colors ${needsPassword ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
               title={t.seePricing}
             >
               <Tag size={18} />
@@ -803,14 +814,14 @@ export default function MyStories() {
             {/* Create Book button */}
             {canSelectForBook && (
               <button
-                onClick={goToBookBuilder}
-                disabled={selectedStories.length === 0 || isOverLimit}
-                className="flex items-center gap-1 px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={() => needsPassword ? scrollToPasswordBanner() : goToBookBuilder()}
+                disabled={!needsPassword && (selectedStories.length === 0 || isOverLimit)}
+                className={`flex items-center gap-1 px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors ${needsPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed'}`}
                 title={t.createBook}
               >
                 <BookOpen size={18} />
                 <span className="text-sm md:text-base">{t.createBook}</span>
-                {selectedStories.length > 0 && (
+                {!needsPassword && selectedStories.length > 0 && (
                   <span className="bg-white text-indigo-600 text-xs px-1.5 py-0.5 rounded-full">
                     {selectedStories.length}
                   </span>
@@ -820,8 +831,8 @@ export default function MyStories() {
 
             {/* Create Story button */}
             <button
-              onClick={() => navigate('/create?new=true')}
-              className="flex items-center gap-1 px-3 md:px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-semibold transition-colors"
+              onClick={() => needsPassword ? scrollToPasswordBanner() : navigate('/create?new=true')}
+              className={`flex items-center gap-1 px-3 md:px-4 py-2 rounded-lg font-semibold transition-colors ${needsPassword ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
               title={t.createStory}
             >
               <span className="text-sm md:text-base">{t.createStory}</span>
@@ -953,10 +964,10 @@ export default function MyStories() {
               )}
             </div>
             <button
-              onClick={goToBookBuilder}
-              disabled={isOverLimit}
+              onClick={() => needsPassword ? scrollToPasswordBanner() : goToBookBuilder()}
+              disabled={!needsPassword && isOverLimit}
               className={`flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-colors ${
-                isOverLimit
+                needsPassword || isOverLimit
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-indigo-600 text-white hover:bg-indigo-700'
               }`}
