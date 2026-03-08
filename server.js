@@ -3234,6 +3234,31 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         : ['titlePage', 'initialPage', 'backCover'];
       for (const coverType of coverTypes) {
         if (streamingCoverPromises.has(coverType)) continue;
+        // Trial mode with pre-defined title: use prepare-title's image instead of generating a new one
+        if (coverType === 'titlePage' && inputData._trialPreDefinedTitle && inputData.characterId) {
+          // Poll DB for the pre-generated title page (prepare-title may still be running)
+          streamingCoverPromises.set(coverType, (async () => {
+            const maxWait = 90000; // 90s max wait
+            const pollInterval = 3000; // check every 3s
+            const start = Date.now();
+            while (Date.now() - start < maxWait) {
+              try {
+                const charResult = await dbPool.query('SELECT data FROM characters WHERE id = $1', [inputData.characterId]);
+                const charData = charResult.rows[0]?.data;
+                const parsed = typeof charData === 'string' ? JSON.parse(charData) : charData;
+                const titlePageImage = parsed?.characters?.[0]?.preGeneratedTitlePage;
+                if (titlePageImage) {
+                  log.info(`⏭️ [COVER] Using pre-generated title page from DB (waited ${Date.now() - start}ms)`);
+                  return { type: coverType, imageData: titlePageImage, qualityScore: 80, qualityReasoning: 'Pre-generated during trial step 3' };
+                }
+              } catch (e) { /* ignore DB errors, retry */ }
+              await new Promise(r => setTimeout(r, pollInterval));
+            }
+            log.warn(`[COVER] Pre-generated title page not found after ${maxWait}ms — generating fallback`);
+            return null; // will be filtered out
+          })());
+          continue;
+        }
         const hint = coverHints?.[coverType];
         if (hint) {
           startCoverGeneration(coverType, hint);
