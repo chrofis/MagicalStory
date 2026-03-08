@@ -716,15 +716,17 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
         </button>
       </div>
 
-      {/* Invisible Turnstile widget for bot protection */}
+      {/* Invisible Turnstile widget for bot protection — positioned off-flow to prevent scroll blocking */}
       {TURNSTILE_SITE_KEY && (
-        <Turnstile
-          siteKey={TURNSTILE_SITE_KEY}
-          onSuccess={(token) => { setTurnstileToken(token); setTurnstileReady(true); }}
-          onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); }}
-          onError={() => setTurnstileReady(true)} // allow fallback on widget error
-          options={{ size: 'invisible' }}
-        />
+        <div style={{ position: 'fixed', bottom: 0, left: 0, width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }}>
+          <Turnstile
+            siteKey={TURNSTILE_SITE_KEY}
+            onSuccess={(token) => { setTurnstileToken(token); setTurnstileReady(true); }}
+            onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); }}
+            onError={() => setTurnstileReady(true)} // allow fallback on widget error
+            options={{ size: 'invisible' }}
+          />
+        </div>
       )}
     </div>
   );
