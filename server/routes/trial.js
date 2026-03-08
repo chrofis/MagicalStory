@@ -288,6 +288,9 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     const prompt = `Create a full-body watercolor illustration of this ${ageGroup} ${genderWord} as a children's book character.
 
 REFERENCE: The attached photo shows the child's face. Match their facial features, skin tone, eye color, and hair color/style EXACTLY.
+- Biometric precision: The face must not be averaged or replaced.
+- Hair and face must be fully visible. Avoid hats and hoods.
+- Ultra-sharp focus on facial features.
 
 STYLE: Soft watercolor illustration style for a children's storybook. Warm, friendly, age-appropriate.
 
