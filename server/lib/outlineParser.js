@@ -1946,11 +1946,14 @@ class ProgressiveUnifiedParser {
     this._checkPages();
 
     // Warn about required sections that weren't detected during streaming
+    // Only warn about sections that actually exist in the response (trial mode skips clothing/covers)
+    const hasClothingSection = this.fullText.includes('---') && this.fullText.includes('CLOTHING REQUIREMENTS');
+    const hasCoverSection = this.fullText.includes('---') && this.fullText.includes('COVER SCENE HINTS');
     const missingSections = [];
     if (!this.emitted.title) missingSections.push('TITLE');
-    if (!this.emitted.clothingRequirements) missingSections.push('CLOTHING REQUIREMENTS');
+    if (!this.emitted.clothingRequirements && hasClothingSection) missingSections.push('CLOTHING REQUIREMENTS');
     if (!this.emitted.visualBible) missingSections.push('VISUAL BIBLE');
-    if (!this.emitted.coverHints) missingSections.push('COVER SCENE HINTS');
+    if (!this.emitted.coverHints && hasCoverSection) missingSections.push('COVER SCENE HINTS');
 
     if (missingSections.length > 0) {
       log.warn(`⚠️ [STREAM-UNIFIED] Missing sections not detected during streaming: ${missingSections.join(', ')}`);

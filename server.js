@@ -2731,6 +2731,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         streamingTitle = title;
 
         // TRIAL MODE: Start title page generation as soon as title is known
+        // Must wait for avatar styling to complete first (started before streaming)
         if (inputData.trialMode && inputData.titlePageOnly && !skipImages) {
           const mainCharNames = (inputData.characters || [])
             .filter(c => c.isMainCharacter)
@@ -2747,8 +2748,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               titlePageHint.characterClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
             }
           }
-          startCoverGeneration('titlePage', titlePageHint);
-          log.info(`🎨 [TRIAL] Started title page generation (title: "${title}")`);
+          // Wait for avatar styling before starting cover (runs in background, doesn't block streaming)
+          (async () => {
+            if (streamingAvatarStylingPromise) {
+              log.debug(`🎨 [TRIAL] Waiting for avatar styling before title page...`);
+              await streamingAvatarStylingPromise;
+              log.debug(`🎨 [TRIAL] Avatars ready, starting title page generation`);
+            }
+            startCoverGeneration('titlePage', titlePageHint);
+            log.info(`🎨 [TRIAL] Started title page generation (title: "${title}")`);
+          })();
         }
       },
       onClothingRequirements: (requirements) => {
