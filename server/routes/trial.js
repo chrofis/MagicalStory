@@ -596,7 +596,7 @@ router.post('/claim-session', verifySessionToken, async (req, res) => {
 router.post('/create-story', verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
-    const { storyCategory, storyTopic, storyTheme, storyDetails, language } = req.body;
+    const { storyCategory, storyTopic, storyTheme, storyDetails, language, userLocation } = req.body;
 
     if (!storyCategory && !storyTopic) {
       return res.status(400).json({ error: 'Story topic is required' });
@@ -658,7 +658,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       [JSON.stringify({ characterData, storyInput }), storyInput.language || 'en', userId]
     );
 
-    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage);
+    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage, userLocation);
 
     if (deps.processStoryJob) {
       deps.processStoryJob(jobId).catch(err => {
@@ -1175,7 +1175,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
   res.flushHeaders();
 
   try {
-    const { storyCategory, storyTopic, storyTheme, language, characters } = req.body;
+    const { storyCategory, storyTopic, storyTheme, language, characters, userLocation } = req.body;
 
     log.debug(`[TRIAL] [STREAM] Generating story ideas (unauthenticated)`);
     log.debug(`  Category: ${storyCategory}, Topic: ${storyTopic}, Theme: ${storyTheme}, Language: ${language}`);
@@ -1204,13 +1204,37 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     const langInstruction = getLanguageInstruction(language);
 
-    // Minimal prompt — just a short idea (2-3 sentences)
-    const buildTrialPrompt = (variant) => `Write ONLY a 2-3 sentence story idea. Nothing else. No title, no scene breakdown, no details.
+    // Look up landmarks if user location is available (best-effort, top 3)
+    let landmarksText = '';
+    if (userLocation?.city && storyCategory !== 'historical') {
+      try {
+        const { getIndexedLandmarks } = require('../lib/landmarkPhotos');
+        const landmarks = await getIndexedLandmarks(userLocation.city, 3);
+        if (landmarks.length > 0) {
+          landmarksText = 'Set the story near these real local landmarks: ' + landmarks.map(l => l.name).join(', ') + '.';
+          log.debug(`  [LANDMARK] Including ${landmarks.length} landmarks: ${landmarks.map(l => l.name).join(', ')}`);
+        }
+      } catch (err) {
+        log.debug(`  [LANDMARK] Lookup failed: ${err.message}`);
+      }
+    }
 
-Character: ${charDesc}. ${categoryContext} ${variant}
+    // Look up pre-defined title for this topic
+    const { getTrialTitle } = require('../config/trialTitles');
+    const mainGender = mainChar?.gender || 'male';
+    const trialTitle = getTrialTitle(storyTopic, storyCategory, mainGender, language);
 
-Respond with ONLY 2-3 sentences describing the core idea of the story. Maximum 40 words. Plain text, no markdown, no labels.
-${langInstruction} Write EVERYTHING in that language.`;
+    // Load prompt template from prompts/trial-idea.txt
+    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+
+    const buildTrialPrompt = (variant) => fillTemplate(PROMPT_TEMPLATES.trialIdea, {
+      CHARACTER: charDesc,
+      CATEGORY_CONTEXT: categoryContext,
+      TITLE: trialTitle || '',
+      LANDMARKS: landmarksText,
+      VARIANT: variant,
+      LANG_INSTRUCTION: langInstruction,
+    });
 
     const prompt1 = buildTrialPrompt('Make it engaging and fun.');
     const prompt2 = buildTrialPrompt('Create a DIFFERENT story — different setting, different conflict.');
@@ -1553,7 +1577,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
  * @param {object} storyInput - { storyCategory, storyTopic, storyTheme, storyDetails, language }
  * @returns {string} jobId
  */
-async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage = null) {
+async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage = null, userLocation = null) {
   // Check daily trial story cap (spending safety net)
   if (!checkAndIncrementTrialCap('story')) {
     const err = new Error('Daily trial story limit reached. Please try again tomorrow.');
@@ -1598,6 +1622,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     skipQualityEval: true, // Skip quality evaluation to save cost
     trialMode: true, // Use lightweight story prompt
     preGeneratedTitlePage: preGeneratedTitlePage || null, // Pre-generated from prepare-title endpoint
+    ...(userLocation?.city ? { userLocation } : {}), // IP-based location for landmark personalization
   };
 
   // Trial stories are free — no credit deduction

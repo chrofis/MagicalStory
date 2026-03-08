@@ -123,6 +123,14 @@ export default function TrialWizard() {
     costumeType: string | null;
   } | null>(null);
 
+  // User location (IP-based, for landmark personalization)
+  const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
+
+  useEffect(() => {
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/user/location`).then(r => r.json()).then(setUserLocation).catch(() => {});
+  }, []);
+
   // Anonymous session state
   const [sessionToken, setSessionToken] = useState<string | null>(() =>
     localStorage.getItem('trial_session_token')
@@ -193,6 +201,7 @@ export default function TrialWizard() {
       storyDetails: selectedIdea
         ? selectedIdea.title + '\n' + selectedIdea.summary
         : storyInput.storyDetails,
+      ...(userLocation?.city ? { userLocation } : {}),
     };
     navigate('/trial-generation', {
       state: {
@@ -291,6 +300,7 @@ export default function TrialWizard() {
                 onCreate={handleCreate}
                 sessionToken={sessionToken}
                 onTitlePageReady={setTitlePageData}
+                userLocation={userLocation}
               />
             )}
           </div>

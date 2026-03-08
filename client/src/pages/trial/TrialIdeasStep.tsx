@@ -15,6 +15,7 @@ interface Props {
   onCreate: () => void;
   sessionToken?: string | null;
   onTitlePageReady?: (data: { titlePageImage: string | null; title: string | null; costumeType: string | null }) => void;
+  userLocation?: { city: string | null; region: string | null; country: string | null } | null;
 }
 
 interface StreamingIdea {
@@ -96,6 +97,7 @@ export default function TrialIdeasStep({
   onCreate,
   sessionToken,
   onTitlePageReady,
+  userLocation,
 }: Props) {
   const lang = storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en';
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
@@ -150,6 +152,7 @@ export default function TrialIdeasStep({
               traits: characterData.traits,
             },
           ],
+          ...(userLocation?.city ? { userLocation } : {}),
         }),
         signal: controller.signal,
       });

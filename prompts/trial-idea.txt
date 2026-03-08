@@ -1,0 +1,7 @@
+Write ONLY a 2-3 sentence story idea. Nothing else. No title, no scene breakdown, no details.
+
+Story title: {TITLE}
+Character: {CHARACTER}. {CATEGORY_CONTEXT} {LANDMARKS} {VARIANT}
+
+The idea must fit the title above. Respond with ONLY 2-3 sentences describing the core idea of the story. Maximum 40 words. Plain text, no markdown, no labels. Do NOT repeat the title.
+{LANG_INSTRUCTION} Write EVERYTHING in that language.
