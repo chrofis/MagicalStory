@@ -2813,14 +2813,16 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // Progressive parser with callbacks for streaming updates AND parallel task initiation
     const progressiveParser = new ProgressiveUnifiedParser({
       onTitle: (title) => {
-        // TRIAL MODE: Use pre-defined title (Claude should echo it, but fallback to config)
+        // TRIAL MODE: Use pre-defined title (Claude may output ---TITLE--- even when not asked)
         streamingTitle = (inputData.trialMode && inputData._trialPreDefinedTitle)
           ? inputData._trialPreDefinedTitle
           : title;
 
         // TRIAL MODE: Start title page generation as soon as title is known
+        // Skip if pre-defined title exists — prepare-title endpoint is already generating the cover,
+        // and the DB re-check in startCoverGeneration will find it when the pipeline needs it.
         // Must wait for avatar styling to complete first (started before streaming)
-        if (inputData.trialMode && inputData.titlePageOnly && !skipImages) {
+        if (inputData.trialMode && inputData.titlePageOnly && !skipImages && !inputData._trialPreDefinedTitle) {
           const mainCharNames = (inputData.characters || [])
             .filter(c => c.isMainCharacter)
             .map(c => c.name)
@@ -3226,14 +3228,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     }
 
     // Start cover generation NOW that avatars are ready (covers need avatars as reference photos)
-    if (!skipImages && !skipCovers && coverHints) {
+    if (!skipImages && !skipCovers) {
       const coverTypes = inputData.titlePageOnly
         ? ['titlePage']
         : ['titlePage', 'initialPage', 'backCover'];
       for (const coverType of coverTypes) {
-        const hint = coverHints[coverType];
-        if (hint && !streamingCoverPromises.has(coverType)) {
+        if (streamingCoverPromises.has(coverType)) continue;
+        const hint = coverHints?.[coverType];
+        if (hint) {
           startCoverGeneration(coverType, hint);
+        } else if (coverType === 'titlePage') {
+          // Trial mode: Claude may not output cover hints — use a default hint
+          const mainCharNames = inputData.characters
+            ?.filter(c => c.isMainCharacter)
+            .map(c => c.name)
+            .join(', ') || inputData.characters?.map(c => c.name).slice(0, 3).join(', ') || 'the main character';
+          const theme = inputData.storyTopic || inputData.storyTheme || 'adventure';
+          const defaultHint = {
+            hint: `A magical, eye-catching front cover scene featuring ${mainCharNames} in a ${theme}-themed setting. The main characters are prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`,
+            characterClothing: {}
+          };
+          if (inputData._trialCostumeType) {
+            for (const char of (inputData.characters || [])) {
+              defaultHint.characterClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+            }
+          }
+          startCoverGeneration(coverType, defaultHint);
         }
       }
       log.debug(`⚡ [UNIFIED] Started ${streamingCoverPromises.size} cover generations (avatars ready)`);
