@@ -47,13 +47,17 @@ Output ALL sections in this EXACT order. Do not skip any.
 ```json
 {
   "locations": [
-    { "id": "LOC001", "name": "[Main location name]", "pages": [1, 2, 3], "type": "location", "description": "[key visual features: colors, architectural style, lighting, atmosphere]" }
+    { "id": "LOC001", "name": "[Location name]", "pages": [1, 2, 3], "type": "location", "description": "[key visual features]", "isRealLandmark": false, "landmarkQuery": null }
   ],
   "keyObjects": [
     { "id": "OBJ001", "name": "[Important object]", "pages": [2, 3, 4], "type": "artifact", "description": "[appearance: shape, color, material, size, distinctive features]" }
   ]
 }
 ```
+**REAL-WORLD LANDMARKS:** For real buildings, monuments, or landmarks:
+- Set `"isRealLandmark": true`
+- Set `"landmarkQuery"` to the EXACT landmark name for photo lookup (e.g. "Holzbrücke Baden")
+
 Keep it minimal: max 2-3 locations, 1-2 key objects. Only include elements that appear on 2+ pages.
 
 ---STORY PAGES---
