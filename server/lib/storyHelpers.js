@@ -3350,11 +3350,7 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
       avatarSelection = `# Avatar Selection
 The main character has two avatar styles available:
 - \`standard\` — everyday modern clothes
-- \`costumed:${costume.costumeType}\` — ${costume.description}
-
-Use \`standard\` for the opening scene (before the adventure begins).
-Use \`costumed:${costume.costumeType}\` for all other scenes.
-NO face coverings — faces must stay visible at all times.`;
+- \`costumed:${costume.costumeType}\` — ${costume.description}`;
     }
 
     // Build landmarks instruction for the visual bible
@@ -3362,10 +3358,15 @@ NO face coverings — faces must stay visible at all times.`;
     if (inputData.availableLandmarks?.length > 0) {
       const top3 = inputData.availableLandmarks.slice(0, 3);
       const landmarkNames = top3.map(l => l.name).join(', ');
-      landmarksInstruction = `# Local Landmarks
+      const cityName = inputData.userLocation?.city || '';
+      landmarksInstruction = `# Location${cityName ? `: ${cityName}` : ''}
+The story takes place in ${cityName || 'the child\'s hometown'}. Use real place names — do NOT invent fictional city names.
 At least one scene MUST take place at one of these real local landmarks: ${landmarkNames}.
 Include the chosen landmark(s) in the visual bible locations section with their real name and accurate visual description.
 Reference the landmark by its LOC ID in the relevant scene hints.`;
+    } else if (inputData.userLocation?.city) {
+      landmarksInstruction = `# Location: ${inputData.userLocation.city}
+The story takes place in ${inputData.userLocation.city}. Use real place names — do NOT invent fictional city names.`;
     }
 
     return fillTemplate(PROMPT_TEMPLATES.storyTrial, {
