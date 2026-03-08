@@ -94,23 +94,24 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
 
   const avatarBanner = characterName ? (
-    <div className="flex items-center gap-4 mb-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+    <div className="flex flex-col items-center text-center mb-8">
       {previewAvatar ? (
         <img
           src={previewAvatar}
           alt={characterName}
-          className="w-32 h-auto max-h-48 rounded-xl object-contain shadow-md flex-shrink-0"
+          className="w-40 h-auto max-h-56 rounded-xl object-contain shadow-lg mb-4"
         />
       ) : (
-        <div className="w-32 h-32 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
-          <Loader2 className="w-6 h-6 text-indigo-400 animate-spin" />
+        <div className="w-32 h-32 rounded-xl bg-indigo-100 flex items-center justify-center mb-4">
+          <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
         </div>
       )}
-      <p className="text-sm font-medium text-gray-700">
+      <h2 className="text-2xl font-bold text-gray-900 mb-1">
         {previewAvatar
           ? t.avatarReady(characterName, characterGender || '')
           : t.avatarLoading(characterName)}
-      </p>
+      </h2>
+      <p className="text-gray-500">{t.subtitle}</p>
     </div>
   ) : null;
 
@@ -169,8 +170,12 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
     return (
       <div className="max-w-4xl mx-auto pt-4">
         {avatarBanner}
-        <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
-        <p className="text-gray-500 text-center mb-8">{t.subtitle}</p>
+        {!characterName && (
+          <>
+            <h2 className="text-2xl font-bold text-gray-900 text-center mb-2">{t.title}</h2>
+            <p className="text-gray-500 text-center mb-8">{t.subtitle}</p>
+          </>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           {trialCategories.map((category) => (
