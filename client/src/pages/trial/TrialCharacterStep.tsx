@@ -202,12 +202,12 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   const hasPhoto = !!characterData.photos.face;
-  const canProceed = characterData.name.trim() && characterData.gender && hasPhoto && turnstileReady;
+  const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
 
   // Start avatar generation in the background as soon as photo is ready
   // Runs while user fills in name/age/gender/traits — doesn't block anything
   useEffect(() => {
-    if (!hasPhoto || previewAvatar || isGeneratingAvatar || !turnstileReady) return;
+    if (!hasPhoto || previewAvatar || isGeneratingAvatar) return;
     if (!characterData.photos.face) return;
 
     const facePhoto = characterData.photos.face;
@@ -241,9 +241,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     };
 
     generateAvatar();
-  // Only trigger when photo becomes available and turnstile is ready
+  // Only trigger when photo becomes available
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPhoto, turnstileReady]);
+  }, [hasPhoto]);
 
   // Create anonymous account and advance to next step
   const handleNext = async () => {
