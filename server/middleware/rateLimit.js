@@ -1,5 +1,6 @@
 // Rate Limiting Middleware
 const rateLimit = require('express-rate-limit');
+const { MemoryStore } = rateLimit;
 
 // Rate limiting for authentication endpoints (prevent brute force attacks)
 const authLimiter = rateLimit({
@@ -85,13 +86,20 @@ const imageRegenerationLimiter = rateLimit({
 });
 
 // Trial avatar preview rate limiter (prevent abuse of free avatar generation)
+const trialAvatarStore = new MemoryStore();
 const trialAvatarLimiter = rateLimit({
   windowMs: 24 * 60 * 60 * 1000, // 24 hours
   max: 2, // 2 avatar generations per IP per day
+  store: trialAvatarStore,
   message: { error: 'Too many attempts. Please try again tomorrow.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+/** Reset trial-related stores from this module */
+function resetTrialMiddlewareStores() {
+  trialAvatarStore.resetAll();
+}
 
 module.exports = {
   authLimiter,
@@ -103,5 +111,6 @@ module.exports = {
   errorLoggingLimiter,
   imageRegenerationLimiter,
   jobStatusLimiter,
-  trialAvatarLimiter
+  trialAvatarLimiter,
+  resetTrialMiddlewareStores,
 };

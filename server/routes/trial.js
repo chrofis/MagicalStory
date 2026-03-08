@@ -23,25 +23,33 @@ function initTrialRoutes(serverDeps) {
 }
 
 // Rate limiters for unauthenticated trial endpoints
+// Explicit MemoryStore refs so admin can call resetAll()
+const { MemoryStore } = rateLimit;
+const trialPhotoStore = new MemoryStore();
 const trialPhotoLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 20,
+  store: trialPhotoStore,
   message: { error: 'Too many photo uploads. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
+const trialIdeasStore = new MemoryStore();
 const trialIdeasLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 10,
+  store: trialIdeasStore,
   message: { error: 'Too many idea generations. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
 
+const trialRegisterStore = new MemoryStore();
 const trialRegisterLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 3,
+  store: trialRegisterStore,
   message: { error: 'Too many registration attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -2035,9 +2043,30 @@ router.post('/claim-google', trialClaimLimiter, async (req, res) => {
   }
 });
 
+/** Reset all in-memory trial rate limiters (admin use) */
+function resetTrialRateLimits() {
+  // Reset express-rate-limit stores
+  trialPhotoStore.resetAll();
+  trialIdeasStore.resetAll();
+  trialRegisterStore.resetAll();
+
+  // Reset fingerprint tracker
+  const fpCount = fingerprintTracker.size;
+  fingerprintTracker.clear();
+
+  // Reset daily counters
+  dailyTrialCounter.count = 0;
+  dailyTrialCounter.avatarCount = 0;
+  dailyTrialCounter.date = new Date().toISOString().slice(0, 10);
+
+  log.info(`[TRIAL] Rate limits reset: fingerprints cleared (${fpCount}), daily counters zeroed`);
+  return { fingerprintsCleared: fpCount };
+}
+
 module.exports = router;
 module.exports.initTrialRoutes = initTrialRoutes;
 module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
+module.exports.resetTrialRateLimits = resetTrialRateLimits;

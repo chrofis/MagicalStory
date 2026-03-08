@@ -140,7 +140,6 @@ export default function TrialWizard() {
   );
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
-  const [showMeetScreen, setShowMeetScreen] = useState(false);
 
   // Check if trial is already used on mount
   useEffect(() => {
@@ -179,11 +178,6 @@ export default function TrialWizard() {
   const currentStepIndex = STEPS.indexOf(currentStep);
 
   const goNext = () => {
-    // After character step, show the avatar meet screen before topic
-    if (currentStep === 'character') {
-      setShowMeetScreen(true);
-      return;
-    }
     const nextIndex = currentStepIndex + 1;
     if (nextIndex < STEPS.length) {
       setCurrentStep(STEPS[nextIndex]);
@@ -222,15 +216,9 @@ export default function TrialWizard() {
     });
   }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, navigate]);
 
-  const handleMeetContinue = () => {
-    setShowMeetScreen(false);
-    setCurrentStep('topic');
-  };
-
   // ─── Trial already used ─────────────────────────────────────────────────────
 
   const tu = trialUsedStrings[language] || trialUsedStrings.en;
-  const mt = meetStrings[language] || meetStrings.en;
 
   if (trialUsed) {
     return (

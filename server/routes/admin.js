@@ -457,6 +457,38 @@ router.post('/jobs/:jobId/start', authenticateToken, async (req, res) => {
   }
 });
 
+// =============================================
+// TRIAL RATE LIMIT RESET
+// =============================================
+
+// POST /api/admin/reset-rate-limits — reset all in-memory trial rate limiters
+router.post('/reset-rate-limits', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { resetTrialRateLimits } = require('./trial');
+    const { resetTrialMiddlewareStores } = require('../middleware/rateLimit');
+
+    // Reset trial.js local limiters + fingerprint + daily counters
+    const trialResult = resetTrialRateLimits();
+
+    // Reset middleware rate limiters (trialAvatarLimiter)
+    resetTrialMiddlewareStores();
+
+    log.info(`[ADMIN] Rate limits reset by ${req.user.username}`);
+
+    res.json({
+      success: true,
+      message: 'All trial rate limits reset',
+      details: {
+        fingerprintsCleared: trialResult.fingerprintsCleared,
+        limitersReset: ['trialPhoto', 'trialIdeas', 'trialRegister', 'trialAvatar', 'fingerprint', 'dailyCounters'],
+      },
+    });
+  } catch (err) {
+    log.error('[ADMIN] Error resetting rate limits:', err);
+    res.status(500).json({ error: 'Failed to reset rate limits' });
+  }
+});
+
 // Mount all submodule routes
 router.use('/', adminSubroutes);
 
