@@ -506,6 +506,35 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 });
 
 /**
+ * GET /api/trial/check-status
+ *
+ * Check if this trial user has already used their free story.
+ * Returns { trialUsed: boolean }
+ */
+router.get('/check-status', verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    const result = await pool.query(
+      'SELECT stories_generated, story_quota FROM users WHERE id = $1 AND is_trial = true',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const user = result.rows[0];
+    res.json({ trialUsed: user.stories_generated >= user.story_quota });
+  } catch (err) {
+    log.error(`[TRIAL] Check status error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to check status' });
+  }
+});
+
+/**
  * POST /api/trial/create-story
  *
  * Start story generation for an anonymous trial user.

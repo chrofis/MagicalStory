@@ -186,6 +186,10 @@ export default function TrialGenerationPage() {
         const data = await response.json();
 
         if (!response.ok) {
+          if (data.code === 'TRIAL_USED') {
+            navigate('/try', { replace: true });
+            return;
+          }
           setPageState('failed');
           setErrorMessage(data.error || t.error);
           return;

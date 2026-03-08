@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { BookOpen } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation } from '@/components/common';
 import TrialCharacterStep from './trial/TrialCharacterStep';
@@ -48,6 +49,27 @@ const stepLabels: Record<string, Record<TrialStep, string>> = {
   en: { character: 'Character', topic: 'Topic', ideas: 'Ideas' },
   de: { character: 'Figur', topic: 'Thema', ideas: 'Ideen' },
   fr: { character: 'Personnage', topic: 'Sujet', ideas: 'Idées' },
+};
+
+const trialUsedStrings: Record<string, { title: string; desc: string; signUp: string; checkInbox: string }> = {
+  en: {
+    title: 'You already created your free story!',
+    desc: 'Sign up for a full account to create more stories with multiple characters, longer plots, and printed books.',
+    signUp: 'Sign up now',
+    checkInbox: 'Already signed up? Check your inbox for the verification link.',
+  },
+  de: {
+    title: 'Du hast bereits deine kostenlose Geschichte erstellt!',
+    desc: 'Erstelle ein Konto, um weitere Geschichten mit mehreren Figuren, längeren Handlungen und gedruckten Büchern zu erstellen.',
+    signUp: 'Jetzt registrieren',
+    checkInbox: 'Bereits registriert? Prüfe deinen Posteingang für den Bestätigungslink.',
+  },
+  fr: {
+    title: 'Vous avez déjà créé votre histoire gratuite !',
+    desc: 'Créez un compte pour créer plus d\'histoires avec plusieurs personnages, des intrigues plus longues et des livres imprimés.',
+    signUp: 'S\'inscrire maintenant',
+    checkInbox: 'Déjà inscrit ? Vérifiez votre boîte de réception pour le lien de vérification.',
+  },
 };
 
 
@@ -99,6 +121,21 @@ export default function TrialWizard() {
     localStorage.getItem('trial_session_token')
   );
   const [characterId, setCharacterId] = useState<string | null>(null);
+  const [trialUsed, setTrialUsed] = useState(false);
+
+  // Check if trial is already used on mount
+  useEffect(() => {
+    if (!sessionToken) return;
+    const API_URL = import.meta.env.VITE_API_URL || '';
+    fetch(`${API_URL}/api/trial/check-status`, {
+      headers: { 'Authorization': `Bearer ${sessionToken}` },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.trialUsed) setTrialUsed(true);
+      })
+      .catch(() => {}); // Ignore errors, allow wizard to proceed
+  }, [sessionToken]);
 
   const handleAccountCreated = useCallback((token: string, charId: string) => {
     setSessionToken(token);
@@ -148,6 +185,41 @@ export default function TrialWizard() {
       },
     });
   }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, navigate]);
+
+  // ─── Trial already used ─────────────────────────────────────────────────────
+
+  const tu = trialUsedStrings[language] || trialUsedStrings.en;
+
+  if (trialUsed) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-indigo-50 flex flex-col">
+        <header className="bg-white/80 backdrop-blur-sm border-b border-gray-100">
+          <div className="max-w-5xl mx-auto px-4 py-3 flex items-center">
+            <Link to="/" className="flex items-center gap-2 text-indigo-700 font-bold text-lg hover:opacity-80 transition-opacity">
+              <BookOpen className="w-5 h-5" />
+              Magical Story
+            </Link>
+          </div>
+        </header>
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="w-8 h-8 text-indigo-600" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-800 mb-2">{tu.title}</h1>
+            <p className="text-gray-600 text-sm mb-6">{tu.desc}</p>
+            <Link
+              to="/register"
+              className="inline-block w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              {tu.signUp}
+            </Link>
+            <p className="text-xs text-gray-400 mt-4">{tu.checkInbox}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
