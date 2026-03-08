@@ -69,17 +69,17 @@ function parseCharacterClothingBlock(content) {
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];
     // Match "Name: category" entries - supports both multi-line (with bullets) and single-line comma-separated
-    // (?:^|,\s*) - start of line OR after comma (for single-line format)
-    // [-*]?\s* - optional bullet point
-    // ((?:[^:\r\n,(]+|\([^)]*\))+) - name: non-special chars OR parenthesized groups (allows commas inside parens)
-    // :\s* - colon separator
-    // (standard|winter|summer|formal|costumed:[^\r\n,]+) - clothing category (stops at comma or newline)
-    // Note: [^\r\n,] handles both Unix (\n) and Windows (\r\n) line endings
-    const linePattern = /(?:^|,\s*)[-*]?\s*((?:[^:\r\n,(]+|\([^)]*\))+):\s*(standard|winter|summer|formal|costumed:[^\r\n,]+)/gim;
+    // IMPORTANT: Uses lazy quantifier [^:\r\n]+? for name to avoid catastrophic backtracking.
+    // The old pattern ((?:[^:\r\n,(]+|\([^)]*\))+) had nested quantifiers that caused O(2^n) backtracking
+    // when AI generated costumed:{description with commas} format.
+    // Clothing pattern handles costumed:{...} (braces with commas inside) and costumed:type (plain).
+    const linePattern = /(?:^|,\s*)[-*]?\s*([^:\r\n]+?):\s*(standard|winter|summer|formal|costumed:(?:\{[^}]*\}|[^\r\n,]+))/gim;
     let lineMatch;
     while ((lineMatch = linePattern.exec(block)) !== null) {
       const rawName = lineMatch[1].trim();
-      const clothing = lineMatch[2].trim().toLowerCase().replace(/\r$/, ''); // Strip trailing \r if present
+      let clothing = lineMatch[2].trim().toLowerCase().replace(/\r$/, ''); // Strip trailing \r if present
+      // Strip curly brace wrapper from costumed descriptions: costumed:{desc} -> costumed:desc
+      clothing = clothing.replace(/^(costumed:)\{([^}]*)\}$/, '$1$2');
       // Extract base name (remove alias in parentheses for lookup, keep for display)
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
       characters.push(rawName);
