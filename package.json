@@ -7,7 +7,7 @@
   },
   "main": "server.js",
   "scripts": {
-    "start": "node --max-old-space-size=1024 server.js",
+    "start": "node --max-old-space-size=2048 server.js",
     "dev": "node server.js",
     "dev:log": "node server.js 2>&1 | tee logs/server.log",
     "dev:client": "cd client && npm run dev",

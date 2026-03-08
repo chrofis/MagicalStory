@@ -1512,7 +1512,7 @@ Your task is to create a 2x2 grid:
     const duration = Date.now() - startTime;
     log.debug(`✅ [STYLED COSTUME] Generated ${costumeType}@${artStyle} avatar for ${character.name} in ${duration}ms`);
 
-    // Log generation details for developer mode auditing (no image data — saves memory)
+    // Log generation details for developer mode auditing
     pushGenerationLog({
       timestamp: new Date().toISOString(),
       characterName: character.name,
@@ -1531,25 +1531,30 @@ Your task is to create a 2x2 grid:
       inputs: {
         facePhoto: (facePhoto && typeof facePhoto === 'string') ? {
           identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto)
+          sizeKB: getImageSizeKB(facePhoto),
+          imageData: facePhoto
         } : null,
         standardAvatar: {
           identifier: getImageIdentifier(standardAvatar),
-          sizeKB: getImageSizeKB(standardAvatar)
+          sizeKB: getImageSizeKB(standardAvatar),
+          imageData: standardAvatar
         },
         referenceAvatar: {
           identifier: getImageIdentifier(standardAvatar),
-          sizeKB: getImageSizeKB(standardAvatar)
+          sizeKB: getImageSizeKB(standardAvatar),
+          imageData: standardAvatar
         },
         styleSample: styleSample ? {
           identifier: getImageIdentifier(styleSample),
-          sizeKB: getImageSizeKB(styleSample)
+          sizeKB: getImageSizeKB(styleSample),
+          imageData: styleSample
         } : null
       },
       prompt: avatarPrompt,
       output: {
         identifier: getImageIdentifier(finalImageData),
-        sizeKB: getImageSizeKB(finalImageData)
+        sizeKB: getImageSizeKB(finalImageData),
+        imageData: finalImageData
       }
     });
 
@@ -1578,7 +1583,8 @@ Your task is to create a 2x2 grid:
       inputs: {
         referenceAvatar: standardAvatar ? {
           identifier: getImageIdentifier(standardAvatar),
-          sizeKB: getImageSizeKB(standardAvatar)
+          sizeKB: getImageSizeKB(standardAvatar),
+          imageData: standardAvatar
         } : null
       }
     });
@@ -1803,7 +1809,7 @@ Your task is to create a 2x2 grid:
     const duration = Date.now() - startTime;
     log.debug(`✅ [STYLED SIGNATURE] Generated ${category}@${artStyle} avatar with signature for ${character.name} in ${duration}ms`);
 
-    // Log generation details for developer mode auditing (no image data — saves memory)
+    // Log generation details for developer mode auditing
     pushGenerationLog({
       timestamp: new Date().toISOString(),
       characterName: character.name,
@@ -1816,13 +1822,15 @@ Your task is to create a 2x2 grid:
       inputs: {
         referenceAvatar: {
           identifier: getImageIdentifier(baseAvatar),
-          sizeKB: getImageSizeKB(baseAvatar)
+          sizeKB: getImageSizeKB(baseAvatar),
+          imageData: baseAvatar
         }
       },
       prompt: avatarPrompt,
       output: {
         identifier: getImageIdentifier(finalImageData),
-        sizeKB: getImageSizeKB(finalImageData)
+        sizeKB: getImageSizeKB(finalImageData),
+        imageData: finalImageData
       }
     });
 
@@ -1852,7 +1860,8 @@ Your task is to create a 2x2 grid:
       inputs: {
         referenceAvatar: baseAvatar ? {
           identifier: getImageIdentifier(baseAvatar),
-          sizeKB: getImageSizeKB(baseAvatar)
+          sizeKB: getImageSizeKB(baseAvatar),
+          imageData: baseAvatar
         } : null
       }
     });
