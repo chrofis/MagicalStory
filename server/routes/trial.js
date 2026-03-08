@@ -59,14 +59,57 @@ const titlePageLimiter = rateLimit({
 
 const { trialAvatarLimiter, jobStatusLimiter } = require('../middleware/rateLimit');
 
-// Global daily trial story counter (spending cap — max $27/day regardless of attack)
+// Global daily trial counter — in-memory cache backed by DB persistence
+// In-memory for fast cap checks, synced to DB for history across deploys
 const dailyTrialCounter = {
   count: 0,
   date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
   avatarCount: 0,
+  loaded: false, // true once we've loaded from DB
 };
 const DAILY_TRIAL_STORY_CAP = 50;
 const DAILY_TRIAL_AVATAR_CAP = 100; // Avatars are cheaper ($0.04 each)
+
+/** Load today's counters from DB on startup (call once after DB init) */
+async function loadTrialCountersFromDb() {
+  try {
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+    if (!pool) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const result = await pool.query(
+      'SELECT stories_generated, avatars_generated FROM trial_daily_stats WHERE date = $1',
+      [today]
+    );
+    if (result.rows.length > 0) {
+      dailyTrialCounter.count = result.rows[0].stories_generated;
+      dailyTrialCounter.avatarCount = result.rows[0].avatars_generated;
+      dailyTrialCounter.date = today;
+      log.info(`[TRIAL CAP] Loaded from DB: ${dailyTrialCounter.count} stories, ${dailyTrialCounter.avatarCount} avatars for ${today}`);
+    }
+    dailyTrialCounter.loaded = true;
+  } catch (err) {
+    log.warn(`[TRIAL CAP] Failed to load from DB: ${err.message}`);
+  }
+}
+
+/** Persist current counters to DB (fire-and-forget) */
+function syncTrialCountersToDb() {
+  try {
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+    if (!pool) return;
+    pool.query(
+      `INSERT INTO trial_daily_stats (date, stories_generated, avatars_generated, updated_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (date) DO UPDATE SET
+         stories_generated = $2, avatars_generated = $3, updated_at = NOW()`,
+      [dailyTrialCounter.date, dailyTrialCounter.count, dailyTrialCounter.avatarCount]
+    ).catch(err => log.warn(`[TRIAL CAP] DB sync failed: ${err.message}`));
+  } catch (err) {
+    log.warn(`[TRIAL CAP] DB sync error: ${err.message}`);
+  }
+}
 
 function checkAndIncrementTrialCap(type = 'story') {
   const today = new Date().toISOString().slice(0, 10);
@@ -83,6 +126,7 @@ function checkAndIncrementTrialCap(type = 'story') {
       return false;
     }
     dailyTrialCounter.avatarCount++;
+    syncTrialCountersToDb();
     return true;
   }
 
@@ -91,6 +135,7 @@ function checkAndIncrementTrialCap(type = 'story') {
     return false;
   }
   dailyTrialCounter.count++;
+  syncTrialCountersToDb();
   return true;
 }
 
@@ -107,6 +152,26 @@ function getTrialStats() {
     avatarsGenerated: dailyTrialCounter.avatarCount,
     avatarCap: DAILY_TRIAL_AVATAR_CAP,
   };
+}
+
+/** Get trial stats history for admin dashboard */
+async function getTrialStatsHistory(days = 30) {
+  try {
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+    if (!pool) return [];
+    const result = await pool.query(
+      `SELECT date, stories_generated, avatars_generated
+       FROM trial_daily_stats
+       ORDER BY date DESC
+       LIMIT $1`,
+      [days]
+    );
+    return result.rows;
+  } catch (err) {
+    log.warn(`[TRIAL CAP] Failed to load history: ${err.message}`);
+    return [];
+  }
 }
 
 /**
@@ -2027,10 +2092,11 @@ function resetTrialRateLimits() {
   const fpCount = fingerprintTracker.size;
   fingerprintTracker.clear();
 
-  // Reset daily counters
+  // Reset daily counters (in-memory + DB)
   dailyTrialCounter.count = 0;
   dailyTrialCounter.avatarCount = 0;
   dailyTrialCounter.date = new Date().toISOString().slice(0, 10);
+  syncTrialCountersToDb();
 
   log.info(`[TRIAL] Rate limits reset: fingerprints cleared (${fpCount}), daily counters zeroed`);
   return { fingerprintsCleared: fpCount };
@@ -2041,6 +2107,8 @@ module.exports.initTrialRoutes = initTrialRoutes;
 module.exports.saveTrialCharacter = saveTrialCharacter;
 module.exports.createTrialStoryJob = createTrialStoryJob;
 module.exports.getTrialStats = getTrialStats;
+module.exports.getTrialStatsHistory = getTrialStatsHistory;
+module.exports.loadTrialCountersFromDb = loadTrialCountersFromDb;
 module.exports.checkAndIncrementTrialCap = checkAndIncrementTrialCap;
 module.exports.resetTrialRateLimits = resetTrialRateLimits;
 module.exports.triggerAvatarGenerationForUser = triggerAvatarGenerationForUser;

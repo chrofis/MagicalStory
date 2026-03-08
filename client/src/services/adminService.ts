@@ -17,6 +17,12 @@ export interface TrialStats {
   avatarCap: number;
 }
 
+export interface TrialStatsHistoryEntry {
+  date: string;
+  stories_generated: number;
+  avatars_generated: number;
+}
+
 export interface AdminUser {
   id: string;
   username: string;
@@ -415,6 +421,10 @@ export const adminService = {
   // Trial Stats
   async getTrialStats(): Promise<TrialStats> {
     return api.get<TrialStats>('/api/admin/trial-stats');
+  },
+
+  async getTrialStatsHistory(days = 30): Promise<TrialStatsHistoryEntry[]> {
+    return api.get<TrialStatsHistoryEntry[]>(`/api/admin/trial-stats/history?days=${days}`);
   },
 
   // Token Usage Analytics

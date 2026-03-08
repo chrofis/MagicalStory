@@ -12,7 +12,7 @@ const { dbQuery, getPool, isDatabaseMode } = require('../../services/database');
 const { authenticateToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const { MODEL_PRICING } = require('../../config/models');
-const { getTrialStats } = require('../trial');
+const { getTrialStats, getTrialStatsHistory } = require('../trial');
 
 // Middleware to check admin role
 const requireAdmin = (req, res, next) => {
@@ -748,6 +748,17 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
 // GET /api/admin/trial-stats - Daily trial generation counters
 router.get('/trial-stats', authenticateToken, requireAdmin, (req, res) => {
   res.json(getTrialStats());
+});
+
+// GET /api/admin/trial-stats/history - Trial stats over past N days
+router.get('/trial-stats/history', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const days = parseInt(req.query.days) || 30;
+    const history = await getTrialStatsHistory(days);
+    res.json(history);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load trial stats history' });
+  }
 });
 
 module.exports = router;

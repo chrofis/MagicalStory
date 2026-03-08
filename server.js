@@ -4882,6 +4882,10 @@ async function initialize() {
       await initializeDatabase();
       // Preload historical locations from DB into memory cache
       await preloadHistoricalLocations();
+      // Load trial counters from DB so they survive deploys
+      if (trialRoutes.loadTrialCountersFromDb) {
+        await trialRoutes.loadTrialCountersFromDb();
+      }
     } catch (err) {
       log.error('⚠️  Database initialization failed, falling back to file storage');
       await initializeDataFiles();
