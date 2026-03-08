@@ -650,7 +650,6 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
       jobId: job.id,
       status: job.status,
       progress: job.progress || 0,
-      progressMessage: job.progress_message || '',
       createdAt: job.created_at,
       completedAt: job.completed_at,
     };
@@ -666,7 +665,8 @@ router.get('/job-status/:jobId', jobStatusLimiter, verifySessionToken, async (re
     }
 
     if (job.status === 'failed') {
-      response.errorMessage = job.error_message || 'Story generation failed';
+      // Don't expose internal error details to trial users
+      response.errorMessage = 'Story generation failed';
     }
 
     res.json(response);

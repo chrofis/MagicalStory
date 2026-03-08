@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, BookOpen, AlertCircle, Mail } from 'lucide-react';
+import { Loader2, CheckCircle, BookOpen, Mail } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGoogle, getIdToken } from '@/services/firebase';
 import { useLanguage } from '@/context/LanguageContext';
@@ -32,9 +32,6 @@ const translations = {
     brand: 'Magical Story',
     creatingStory: 'Creating your story...',
     storyComplete: 'Your story is ready!',
-    storyFailed: 'Something went wrong',
-    storyFailedDesc: 'We couldn\'t create your story. Please try again.',
-    tryAgain: 'Try again',
     signInToSee: 'Sign in to see your story',
     signInDesc: 'Enter your email or sign in with Google to view your story.',
     googleButton: 'Continue with Google',
@@ -66,9 +63,6 @@ const translations = {
     brand: 'Magical Story',
     creatingStory: 'Deine Geschichte wird erstellt...',
     storyComplete: 'Deine Geschichte ist fertig!',
-    storyFailed: 'Etwas ist schiefgelaufen',
-    storyFailedDesc: 'Die Geschichte konnte nicht erstellt werden. Bitte versuche es erneut.',
-    tryAgain: 'Erneut versuchen',
     signInToSee: 'Melde dich an, um deine Geschichte zu sehen',
     signInDesc: 'Gib deine E-Mail ein oder melde dich mit Google an, um deine Geschichte anzusehen.',
     googleButton: 'Weiter mit Google',
@@ -100,9 +94,6 @@ const translations = {
     brand: 'Magical Story',
     creatingStory: 'Votre histoire est en cours de création...',
     storyComplete: 'Votre histoire est prête !',
-    storyFailed: 'Quelque chose s\'est mal passé',
-    storyFailedDesc: 'Nous n\'avons pas pu créer votre histoire. Veuillez réessayer.',
-    tryAgain: 'Réessayer',
     signInToSee: 'Connectez-vous pour voir votre histoire',
     signInDesc: 'Entrez votre e-mail ou connectez-vous avec Google pour voir votre histoire.',
     googleButton: 'Continuer avec Google',
@@ -153,7 +144,6 @@ export default function TrialGenerationPage() {
   const [pageState, setPageState] = useState<PageState>('starting');
   const [progress, setProgress] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasStartedRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartRef = useRef<number>(0);
@@ -191,7 +181,6 @@ export default function TrialGenerationPage() {
             return;
           }
           setPageState('failed');
-          setErrorMessage(data.error || t.error);
           return;
         }
 
@@ -199,12 +188,11 @@ export default function TrialGenerationPage() {
         setPageState('generating');
       } catch {
         setPageState('failed');
-        setErrorMessage(t.error);
       }
     };
 
     startGeneration();
-  }, [state, t.error]);
+  }, [state]);
 
   // Poll job status
   const pollJobStatus = useCallback(async (currentJobId: string, token: string) => {
@@ -219,7 +207,6 @@ export default function TrialGenerationPage() {
 
       if (!response.ok) {
         setPageState('failed');
-        setErrorMessage(data.error || t.error);
         return true; // stop polling
       }
 
@@ -233,7 +220,6 @@ export default function TrialGenerationPage() {
 
       if (data.status === 'failed') {
         setPageState('failed');
-        setErrorMessage(data.errorMessage || t.error);
         return true; // stop polling
       }
 
@@ -242,7 +228,7 @@ export default function TrialGenerationPage() {
       // Network error — continue polling, don't fail immediately
       return false;
     }
-  }, [t.error]);
+  }, []);
 
   useEffect(() => {
     if (!jobId || !state?.sessionToken) return;
@@ -259,7 +245,6 @@ export default function TrialGenerationPage() {
           pollIntervalRef.current = null;
         }
         setPageState('failed');
-        setErrorMessage(t.error);
         return;
       }
       const shouldStop = await pollJobStatus(jobId, state.sessionToken);
@@ -399,25 +384,19 @@ export default function TrialGenerationPage() {
               </div>
             ) : (
               <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
-                {pageState === 'failed' ? (
-                  <AlertCircle className="w-8 h-8 text-red-600" />
-                ) : (
-                  <BookOpen className="w-8 h-8 text-indigo-600" />
-                )}
+                <BookOpen className="w-8 h-8 text-indigo-600" />
               </div>
             )}
 
-            {/* Title — generating or completed or failed */}
+            {/* Title */}
             <h1 className="text-xl font-bold text-gray-800 mb-1">
-              {pageState === 'failed'
-                ? t.storyFailed
-                : pageState === 'completed'
-                  ? t.storyComplete
-                  : t.creatingStory}
+              {pageState === 'completed'
+                ? t.storyComplete
+                : t.creatingStory}
             </h1>
 
             {/* Character name */}
-            {state.characterName && pageState !== 'failed' && (
+            {state.characterName && (
               <p className="text-indigo-600 font-medium text-sm mb-3">
                 {state.characterName}
               </p>
@@ -443,28 +422,13 @@ export default function TrialGenerationPage() {
                 <span className="text-sm font-medium">100%</span>
               </div>
             )}
-
-            {/* Failed state */}
-            {pageState === 'failed' && (
-              <div className="mt-2">
-                <p className="text-gray-600 text-sm mb-3">
-                  {errorMessage || t.storyFailedDesc}
-                </p>
-                <button
-                  onClick={() => navigate('/try', { replace: true })}
-                  className="text-indigo-600 hover:text-indigo-800 font-medium text-sm transition-colors"
-                >
-                  {t.tryAgain}
-                </button>
-              </div>
-            )}
           </div>
 
           {/* ── Divider ──────────────────────────────────────────────── */}
-          {pageState !== 'failed' && <div className="h-px bg-gray-200 mb-6" />}
+          <div className="h-px bg-gray-200 mb-6" />
 
-          {/* ── Sign-in section ───────────────────────────────────────── */}
-          {pageState !== 'failed' && (
+          {/* ── Sign-in section (always shown — even on failure, drive sign-up) */}
+          {(
             <>
               {/* Linked success states */}
               {googleLinked && (
