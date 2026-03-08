@@ -3427,7 +3427,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }
         let pagePhotos = getCharacterPhotoDetails(sceneCharacters, defaultClothing, null, inputData.artStyle, sceneClothingRequirements);
         pagePhotos = applyStyledAvatars(pagePhotos, inputData.artStyle);
-        const sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        let sceneMetadata = extractSceneMetadata(scene.sceneDescription);
+        // Trial mode fallback: scene hints are plain text, so extract LOC IDs manually
+        if (!sceneMetadata && scene.sceneDescription) {
+          const locMatches = [...scene.sceneDescription.matchAll(/\[LOC(\d+)\]/gi)];
+          const locNameMatches = [...scene.sceneDescription.matchAll(/([A-Za-zÀ-ÿ][\w\s()-]*?)\s*\[LOC\d+\]/gi)];
+          if (locMatches.length > 0) {
+            sceneMetadata = {
+              objects: locMatches.map((m, i) => {
+                const name = locNameMatches[i]?.[1]?.trim() || '';
+                return name ? `${name} [LOC${m[1].padStart(3, '0')}]` : `LOC${m[1].padStart(3, '0')}`;
+              }),
+              setting: {},
+              isJsonFormat: false,
+            };
+          }
+        }
         const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
         const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
         const secondaryLandmarks = pageLandmarkPhotos.slice(1);
