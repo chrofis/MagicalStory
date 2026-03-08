@@ -580,6 +580,18 @@ router.get('/verify-email/:token', async (req, res) => {
     // Handle trial user: save character, create story job, start processing
     if (user.is_trial && user.trial_data) {
       try {
+        // Check if a story job was already created (anonymous flow creates one before email verification)
+        const existingJob = await pool.query(
+          'SELECT id FROM story_jobs WHERE user_id = $1 LIMIT 1',
+          [user.id]
+        );
+
+        if (existingJob.rows.length > 0) {
+          log.info(`[AUTH] Trial user ${user.email} verified - story job already exists (${existingJob.rows[0].id}), skipping creation`);
+          await pool.query('UPDATE users SET trial_data = NULL WHERE id = $1', [user.id]);
+          return res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/trial-started`);
+        }
+
         const trialData = typeof user.trial_data === 'string'
           ? JSON.parse(user.trial_data)
           : user.trial_data;
