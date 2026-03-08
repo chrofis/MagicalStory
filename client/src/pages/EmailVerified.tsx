@@ -89,7 +89,9 @@ export default function EmailVerified() {
     if (token && isTrial) {
       localStorage.setItem('auth_token', token);
       localStorage.removeItem('trial_session_token');
-      navigate('/stories', { replace: true });
+      // Full page reload to reset AuthContext (SPA navigate would keep old user cached)
+      window.location.href = '/stories';
+      return;
     }
   }, [searchParams, navigate]);
 

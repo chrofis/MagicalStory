@@ -186,7 +186,8 @@ export default function TrialGenerationPage() {
             localStorage.setItem('auth_token', token);
             localStorage.removeItem('trial_session_token');
           }
-          navigate('/stories', { replace: true });
+          // Full page reload to reset AuthContext (SPA navigate would keep old user cached)
+          window.location.href = '/stories';
         }
       } catch {
         // Ignore polling errors
@@ -371,9 +372,9 @@ export default function TrialGenerationPage() {
 
       setGoogleLinked(true);
 
-      // Navigate to stories page after a brief moment
+      // Full page reload to reset AuthContext (SPA navigate would keep old user cached)
       setTimeout(() => {
-        navigate('/stories', { replace: true });
+        window.location.href = '/stories';
       }, 2000);
     } catch (err) {
       // Don't show error for redirect-based auth
