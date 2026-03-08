@@ -275,11 +275,15 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
       .toBuffer();
     const resizedBase64 = resizedBuffer.toString('base64');
 
-    // Build a simple avatar prompt (standard pose, watercolor style)
+    // Build avatar prompt using standard clothing from the main avatar prompt template
     const isFemale = gender === 'female';
     const ageNum = parseInt(age) || 7;
     const ageGroup = ageNum <= 5 ? 'toddler' : ageNum <= 8 ? 'young child' : ageNum <= 12 ? 'child' : 'teenager';
     const genderWord = isFemale ? 'girl' : 'boy';
+
+    // Use the same "standard" clothing style as the real avatar generation
+    const { getClothingStylePrompt } = require('./avatars');
+    const standardClothing = getClothingStylePrompt('standard', isFemale);
 
     const prompt = `Create a full-body watercolor illustration of this ${ageGroup} ${genderWord} as a children's book character.
 
@@ -289,7 +293,7 @@ STYLE: Soft watercolor illustration style for a children's storybook. Warm, frie
 
 POSE: Standing naturally, facing slightly toward the viewer, with a warm smile. Full body visible from head to feet.
 
-CLOTHING: Casual, age-appropriate outfit. Simple and cheerful colors.
+CLOTHING: ${standardClothing}
 
 BACKGROUND: Simple, clean white or very light watercolor wash background.
 

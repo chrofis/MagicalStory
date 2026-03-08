@@ -4082,3 +4082,4 @@ module.exports.clearCostumedAvatarGenerationLog = clearCostumedAvatarGenerationL
 module.exports.evaluateAvatarFaceMatch = evaluateAvatarFaceMatch;
 module.exports.avatarJobs = avatarJobs; // Export for testing
 module.exports.processAvatarJobInBackground = processAvatarJobInBackground;
+module.exports.getClothingStylePrompt = getClothingStylePrompt;
