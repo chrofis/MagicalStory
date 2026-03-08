@@ -771,7 +771,7 @@ export default function MyStories() {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder={language === 'de' ? 'Passwort (min. 8 Zeichen)' : language === 'fr' ? 'Mot de passe (min. 8 car.)' : 'Password (min. 8 characters)'}
-                    className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none flex-1"
+                    className="px-3 py-2 border border-amber-300 rounded-lg text-base focus:ring-2 focus:ring-amber-400 outline-none flex-1"
                     disabled={isSettingPassword}
                   />
                   <button
