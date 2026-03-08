@@ -3393,6 +3393,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           ...(sceneMetadataForClothing?.characterClothing || {}),
           ...(scene.characterClothing || {})
         };
+        // Trial mode: override main character clothing to use costumed variant on all pages
+        if (inputData.trialMode && inputData._trialCostumeType) {
+          for (const char of (inputData.characters || [])) {
+            if (char.isMainCharacter) {
+              perCharClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+            }
+          }
+        }
         const defaultClothing = 'standard';
         const sceneClothingRequirements = { ...clothingRequirements };
         for (const char of sceneCharacters) {
