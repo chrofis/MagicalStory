@@ -86,7 +86,16 @@ function loadStyleSampleImage(artStyle) {
 
 // Generation log for developer mode auditing
 // Tracks all costumed avatar generations with inputs, prompts, outputs, timing
+// Capped at 50 entries to prevent unbounded memory growth
 let costumedAvatarGenerationLog = [];
+const MAX_GENERATION_LOG_ENTRIES = 50;
+
+function pushGenerationLog(entry) {
+  costumedAvatarGenerationLog.push(entry);
+  if (costumedAvatarGenerationLog.length > MAX_GENERATION_LOG_ENTRIES) {
+    costumedAvatarGenerationLog = costumedAvatarGenerationLog.slice(-MAX_GENERATION_LOG_ENTRIES);
+  }
+}
 
 // ============================================================================
 // FACE EVALUATION TOGGLE (for performance optimization)
@@ -1503,8 +1512,8 @@ Your task is to create a 2x2 grid:
     const duration = Date.now() - startTime;
     log.debug(`✅ [STYLED COSTUME] Generated ${costumeType}@${artStyle} avatar for ${character.name} in ${duration}ms`);
 
-    // Log generation details for developer mode auditing
-    costumedAvatarGenerationLog.push({
+    // Log generation details for developer mode auditing (no image data — saves memory)
+    pushGenerationLog({
       timestamp: new Date().toISOString(),
       characterName: character.name,
       costumeType,
@@ -1522,30 +1531,25 @@ Your task is to create a 2x2 grid:
       inputs: {
         facePhoto: (facePhoto && typeof facePhoto === 'string') ? {
           identifier: getImageIdentifier(facePhoto),
-          sizeKB: getImageSizeKB(facePhoto),
-          imageData: facePhoto
+          sizeKB: getImageSizeKB(facePhoto)
         } : null,
         standardAvatar: {
           identifier: getImageIdentifier(standardAvatar),
-          sizeKB: getImageSizeKB(standardAvatar),
-          imageData: standardAvatar
+          sizeKB: getImageSizeKB(standardAvatar)
         },
         referenceAvatar: {
           identifier: getImageIdentifier(standardAvatar),
-          sizeKB: getImageSizeKB(standardAvatar),
-          imageData: standardAvatar
+          sizeKB: getImageSizeKB(standardAvatar)
         },
         styleSample: styleSample ? {
           identifier: getImageIdentifier(styleSample),
-          sizeKB: getImageSizeKB(styleSample),
-          imageData: styleSample
+          sizeKB: getImageSizeKB(styleSample)
         } : null
       },
       prompt: avatarPrompt,
       output: {
         identifier: getImageIdentifier(finalImageData),
-        sizeKB: getImageSizeKB(finalImageData),
-        imageData: finalImageData
+        sizeKB: getImageSizeKB(finalImageData)
       }
     });
 
@@ -1562,7 +1566,7 @@ Your task is to create a 2x2 grid:
     log.error(`❌ [STYLED COSTUME] Error:`, err.message);
 
     // Log failed generation
-    costumedAvatarGenerationLog.push({
+    pushGenerationLog({
       timestamp: new Date().toISOString(),
       characterName: character.name,
       costumeType,
@@ -1572,11 +1576,9 @@ Your task is to create a 2x2 grid:
       success: false,
       error: err.message,
       inputs: {
-        // standardAvatar is used as the reference image (contains face + body)
         referenceAvatar: standardAvatar ? {
           identifier: getImageIdentifier(standardAvatar),
-          sizeKB: getImageSizeKB(standardAvatar),
-          imageData: standardAvatar
+          sizeKB: getImageSizeKB(standardAvatar)
         } : null
       }
     });
@@ -1801,8 +1803,8 @@ Your task is to create a 2x2 grid:
     const duration = Date.now() - startTime;
     log.debug(`✅ [STYLED SIGNATURE] Generated ${category}@${artStyle} avatar with signature for ${character.name} in ${duration}ms`);
 
-    // Log generation details for developer mode auditing (reuse costumed log)
-    costumedAvatarGenerationLog.push({
+    // Log generation details for developer mode auditing (no image data — saves memory)
+    pushGenerationLog({
       timestamp: new Date().toISOString(),
       characterName: character.name,
       costumeType: `${category}+signature`,
@@ -1814,15 +1816,13 @@ Your task is to create a 2x2 grid:
       inputs: {
         referenceAvatar: {
           identifier: getImageIdentifier(baseAvatar),
-          sizeKB: getImageSizeKB(baseAvatar),
-          imageData: baseAvatar
+          sizeKB: getImageSizeKB(baseAvatar)
         }
       },
       prompt: avatarPrompt,
       output: {
         identifier: getImageIdentifier(finalImageData),
-        sizeKB: getImageSizeKB(finalImageData),
-        imageData: finalImageData
+        sizeKB: getImageSizeKB(finalImageData)
       }
     });
 
@@ -1840,7 +1840,7 @@ Your task is to create a 2x2 grid:
     log.error(`❌ [STYLED SIGNATURE] Error:`, err.message);
 
     // Log failed generation
-    costumedAvatarGenerationLog.push({
+    pushGenerationLog({
       timestamp: new Date().toISOString(),
       characterName: character.name,
       costumeType: `${category}+signature`,
@@ -1852,8 +1852,7 @@ Your task is to create a 2x2 grid:
       inputs: {
         referenceAvatar: baseAvatar ? {
           identifier: getImageIdentifier(baseAvatar),
-          sizeKB: getImageSizeKB(baseAvatar),
-          imageData: baseAvatar
+          sizeKB: getImageSizeKB(baseAvatar)
         } : null
       }
     });

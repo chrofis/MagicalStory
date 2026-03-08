@@ -211,6 +211,19 @@ const FINGERPRINT_MAX = 10;
 const FINGERPRINT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
 const FINGERPRINT_MAX_ENTRIES = 50000; // Memory cap to prevent DoS
 
+// Clean up expired fingerprint entries every hour
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [fp, record] of fingerprintTracker.entries()) {
+    if (now - record.firstSeen > FINGERPRINT_WINDOW) {
+      fingerprintTracker.delete(fp);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) log.debug(`[FINGERPRINT] Cleaned ${cleaned} expired entries, ${fingerprintTracker.size} remaining`);
+}, 60 * 60 * 1000);
+
 function checkFingerprint(fingerprint) {
   if (!fingerprint) return true; // No fingerprint provided, allow (other layers protect)
 

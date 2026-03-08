@@ -21,6 +21,17 @@ const { discoverLandmarksForLocation, getIndexedLandmarks } = require('../lib/la
 
 // Landmark discovery cache (module-level, same as was in server.js)
 const userLandmarkCache = new Map();
+const LANDMARK_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 1 week
+
+// Clean up expired landmark cache entries every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of userLandmarkCache.entries()) {
+    if (now - (entry.timestamp || 0) > LANDMARK_CACHE_TTL) {
+      userLandmarkCache.delete(key);
+    }
+  }
+}, 60 * 60 * 1000);
 
 /**
  * Build the shared prompt context for story idea generation.

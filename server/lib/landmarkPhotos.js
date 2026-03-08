@@ -15,6 +15,19 @@ const { TEXT_MODELS } = require('../config/models');
 const photoCache = new Map();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
+// Clean up expired photo cache entries every hour
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [key, entry] of photoCache.entries()) {
+    if (now - (entry.timestamp || 0) > CACHE_TTL) {
+      photoCache.delete(key);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) log.debug(`[PHOTO CACHE] Cleaned ${cleaned} expired entries, ${photoCache.size} remaining`);
+}, 60 * 60 * 1000);
+
 // Normalize string for comparison: lowercase + convert umlauts/accents to ASCII
 function normalizeForCompare(str) {
   return str
