@@ -401,17 +401,8 @@ export default function SharedStoryViewer() {
             if (!page) return null;
             return (
               <div className="md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
-                {/* Image - 50% width */}
-                <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center">
-                  <img
-                    src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
-                    alt={`Page ${currentEntry.storyPageIdx + 1}`}
-                    className="w-full h-full object-contain"
-                    loading="eager"
-                  />
-                </div>
                 {/* Text - 50% width, scrollable */}
-                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden">
+                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden md:order-1 order-2">
                   <div className="flex-1 overflow-y-auto min-h-0">
                     <p className="text-sm md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
                       {page.text}
@@ -420,6 +411,15 @@ export default function SharedStoryViewer() {
                   <div className="mt-2 pt-2 border-t border-indigo-100 text-right text-indigo-400 text-xs flex-shrink-0">
                     Page {currentEntry.storyPageIdx + 1} of {story.pages.length}
                   </div>
+                </div>
+                {/* Image - 50% width */}
+                <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center md:order-2 order-1">
+                  <img
+                    src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
+                    alt={`Page ${currentEntry.storyPageIdx + 1}`}
+                    className="w-full h-full object-contain"
+                    loading="eager"
+                  />
                 </div>
               </div>
             );
