@@ -1,9 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Camera, Loader2, X, ArrowRight, CheckSquare, Square } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Turnstile } from '@marsidev/react-turnstile';
+import FingerprintJS from '@fingerprintjs/fingerprintjs';
 import type { CharacterData } from '../TrialWizard';
 import { defaultStrengths } from '@/constants/traits';
 import type { Language } from '@/types/story';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY || '';
 
 // ─── Localized strings ──────────────────────────────────────────────────────
 
@@ -144,14 +148,30 @@ interface TrialCharacterStepProps {
   characterData: CharacterData;
   onChange: (data: CharacterData) => void;
   onNext: () => void;
+  previewAvatar?: string | null;
+  onAvatarGenerated?: (avatarImage: string) => void;
   language: string;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function TrialCharacterStep({ characterData, onChange, onNext, language }: TrialCharacterStepProps) {
+export default function TrialCharacterStep({ characterData, onChange, onNext, previewAvatar, onAvatarGenerated, language }: TrialCharacterStepProps) {
   const t = strings[language] || strings.en;
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Turnstile + Fingerprint for abuse prevention
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReady, setTurnstileReady] = useState(!TURNSTILE_SITE_KEY); // ready immediately if no key configured
+  const [fingerprint, setFingerprint] = useState<string | null>(null);
+
+  // Initialize fingerprint on mount
+  useEffect(() => {
+    FingerprintJS.load().then(fp => fp.get()).then(result => {
+      setFingerprint(result.visitorId);
+    }).catch(() => {
+      // Fingerprint failed — other layers still protect
+    });
+  }, []);
 
   // Consent state — once both are checked and a photo is uploaded, don't ask again
   // consentGiven is stored in characterData (parent state) so it survives component remounts
@@ -172,8 +192,58 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
   const [originalImageData, setOriginalImageData] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Avatar generation state
+  const [isGeneratingAvatar, setIsGeneratingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
   const hasPhoto = !!characterData.photos.face;
-  const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
+  const canProceed = characterData.name.trim() && characterData.gender && hasPhoto && turnstileReady;
+
+  // Generate preview avatar and advance to next step
+  const handleNext = async () => {
+    if (!canProceed || !characterData.photos.face) return;
+
+    // Skip avatar generation if already generated (e.g. user navigated back)
+    if (onAvatarGenerated && !previewAvatar) {
+      setIsGeneratingAvatar(true);
+      setAvatarError(null);
+
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/generate-preview-avatar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: characterData.name,
+            age: characterData.age,
+            gender: characterData.gender,
+            facePhoto: characterData.photos.face,
+            turnstileToken,
+            fingerprint,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          setAvatarError(result.error || 'Avatar generation failed');
+          setIsGeneratingAvatar(false);
+          return;
+        }
+
+        if (result.avatarImage) {
+          onAvatarGenerated(result.avatarImage);
+        }
+      } catch {
+        setAvatarError('Avatar generation failed. Please try again.');
+        setIsGeneratingAvatar(false);
+        return;
+      }
+
+      setIsGeneratingAvatar(false);
+    }
+
+    onNext();
+  };
 
   // ─── Photo upload ────────────────────────────────────────────────────────────
 
@@ -562,21 +632,46 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, la
         </div>
       </div>
 
+      {/* Avatar generation error */}
+      {avatarError && (
+        <p className="mt-4 text-sm text-red-600 text-center">{avatarError}</p>
+      )}
+
       {/* Next button — full width below both columns */}
       <div className="mt-6">
         <button
-          onClick={onNext}
-          disabled={!canProceed}
+          onClick={handleNext}
+          disabled={!canProceed || isGeneratingAvatar}
           className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all ${
-            canProceed
+            canProceed && !isGeneratingAvatar
               ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           }`}
         >
-          {t.next}
-          <ArrowRight className="w-4 h-4" />
+          {isGeneratingAvatar ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {language === 'de' ? 'Avatar wird erstellt...' : language === 'fr' ? "Création de l'avatar..." : 'Creating avatar...'}
+            </>
+          ) : (
+            <>
+              {t.next}
+              <ArrowRight className="w-4 h-4" />
+            </>
+          )}
         </button>
       </div>
+
+      {/* Invisible Turnstile widget for bot protection */}
+      {TURNSTILE_SITE_KEY && (
+        <Turnstile
+          siteKey={TURNSTILE_SITE_KEY}
+          onSuccess={(token) => { setTurnstileToken(token); setTurnstileReady(true); }}
+          onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); }}
+          onError={() => setTurnstileReady(true)} // allow fallback on widget error
+          options={{ size: 'invisible' }}
+        />
+      )}
     </div>
   );
 }

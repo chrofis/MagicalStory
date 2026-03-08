@@ -12,6 +12,7 @@ const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
+const sharp = require('sharp');
 const { log } = require('../utils/logger');
 
 // Server.js-local dependencies received via initTrialRoutes()
@@ -44,6 +45,245 @@ const trialRegisterLimiter = rateLimit({
   message: { error: 'Too many registration attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+// ─── Abuse Prevention: Turnstile + Fingerprint ──────────────────────────────
+
+const { trialAvatarLimiter } = require('../middleware/rateLimit');
+
+/**
+ * Verify Cloudflare Turnstile token server-side.
+ * Returns true if valid, false if invalid or Turnstile unavailable (graceful fallback).
+ */
+async function verifyTurnstile(token, remoteip) {
+  const secret = process.env.TURNSTILE_SECRET_KEY;
+  if (!secret) {
+    log.warn('[TURNSTILE] No TURNSTILE_SECRET_KEY configured, skipping verification');
+    return true; // Graceful fallback — don't block if not configured
+  }
+  if (!token) {
+    log.warn('[TURNSTILE] No token provided');
+    return false;
+  }
+  try {
+    const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret, response: token, remoteip }),
+    });
+    const data = await response.json();
+    if (!data.success) {
+      log.warn(`[TURNSTILE] Verification failed: ${JSON.stringify(data['error-codes'] || [])}`);
+    }
+    return data.success === true;
+  } catch (err) {
+    log.warn(`[TURNSTILE] Verification error: ${err.message}`);
+    return true; // Graceful fallback — don't block if Turnstile is down
+  }
+}
+
+// In-memory fingerprint tracker (resets on deploy, acceptable — single Railway instance)
+const fingerprintTracker = new Map(); // fingerprint -> { count, firstSeen }
+const FINGERPRINT_MAX = 3;
+const FINGERPRINT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
+const FINGERPRINT_MAX_ENTRIES = 50000; // Memory cap to prevent DoS
+
+function checkFingerprint(fingerprint) {
+  if (!fingerprint) return true; // No fingerprint provided, allow (other layers protect)
+
+  // Memory cap — if the map is huge, something is wrong; allow (IP limiter handles it)
+  if (fingerprintTracker.size >= FINGERPRINT_MAX_ENTRIES) {
+    log.warn(`[FINGERPRINT] Tracker at capacity (${fingerprintTracker.size}), skipping check`);
+    return true;
+  }
+
+  const now = Date.now();
+  const record = fingerprintTracker.get(fingerprint);
+
+  if (!record || (now - record.firstSeen) > FINGERPRINT_WINDOW) {
+    fingerprintTracker.set(fingerprint, { count: 1, firstSeen: now });
+    return true;
+  }
+
+  if (record.count >= FINGERPRINT_MAX) {
+    log.warn(`[FINGERPRINT] Blocked: ${fingerprint.substring(0, 8)}... (${record.count} attempts)`);
+    return false;
+  }
+
+  record.count++;
+  return true;
+}
+
+// Cleanup stale fingerprint entries every hour (.unref() so it doesn't keep process alive in tests)
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [fp, record] of fingerprintTracker) {
+    if ((now - record.firstSeen) > FINGERPRINT_WINDOW) {
+      fingerprintTracker.delete(fp);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) log.debug(`[FINGERPRINT] Cleaned ${cleaned} stale entries`);
+}, 60 * 60 * 1000).unref();
+
+// ─── Task 0: Trial Preview Avatar Generation ────────────────────────────────
+
+/**
+ * POST /api/trial/generate-preview-avatar
+ *
+ * Generate a single preview avatar for the "Meet [Name]!" celebration screen.
+ * Protected by: IP rate limit + Turnstile + fingerprint.
+ * Does NOT create a user account or store anything in the database.
+ */
+router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => {
+  try {
+    const { name, age, gender, facePhoto, turnstileToken, fingerprint } = req.body;
+
+    // Validate required fields
+    if (!facePhoto || !name) {
+      return res.status(400).json({ error: 'Name and photo are required' });
+    }
+    if (typeof name !== 'string' || name.length > 50) {
+      return res.status(400).json({ error: 'Invalid name' });
+    }
+    if (gender && !['male', 'female'].includes(gender)) {
+      return res.status(400).json({ error: 'Invalid gender' });
+    }
+    if (age && (isNaN(parseInt(age)) || parseInt(age) < 1 || parseInt(age) > 18)) {
+      return res.status(400).json({ error: 'Invalid age' });
+    }
+
+    // Sanitize name for logging (strip newlines to prevent log injection)
+    const safeName = name.replace(/[\r\n]/g, '');
+
+    // Layer 1: Verify Turnstile token
+    const turnstileValid = await verifyTurnstile(turnstileToken, req.ip);
+    if (!turnstileValid) {
+      return res.status(403).json({ error: 'Verification failed. Please try again.' });
+    }
+
+    // Layer 2: Check fingerprint
+    if (!checkFingerprint(fingerprint)) {
+      return res.status(429).json({ error: 'Too many attempts. Please try again tomorrow.' });
+    }
+
+    log.info(`[TRIAL AVATAR] Generating preview avatar for "${safeName}" (age: ${age}, gender: ${gender})`);
+
+    // Resize face photo for Gemini
+    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const inputBuffer = Buffer.from(base64Input, 'base64');
+    const resizedBuffer = await sharp(inputBuffer)
+      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+    const resizedBase64 = resizedBuffer.toString('base64');
+
+    // Build a simple avatar prompt (standard pose, watercolor style)
+    const isFemale = gender === 'female';
+    const ageNum = parseInt(age) || 7;
+    const ageGroup = ageNum <= 5 ? 'toddler' : ageNum <= 8 ? 'young child' : ageNum <= 12 ? 'child' : 'teenager';
+    const genderWord = isFemale ? 'girl' : 'boy';
+
+    const prompt = `Create a full-body watercolor illustration of this ${ageGroup} ${genderWord} as a children's book character.
+
+REFERENCE: The attached photo shows the child's face. Match their facial features, skin tone, eye color, and hair color/style EXACTLY.
+
+STYLE: Soft watercolor illustration style for a children's storybook. Warm, friendly, age-appropriate.
+
+POSE: Standing naturally, facing slightly toward the viewer, with a warm smile. Full body visible from head to feet.
+
+CLOTHING: Casual, age-appropriate outfit. Simple and cheerful colors.
+
+BACKGROUND: Simple, clean white or very light watercolor wash background.
+
+OUTPUT: A single character illustration. No text, no borders, no additional elements.`;
+
+    const geminiApiKey = process.env.GEMINI_API_KEY;
+    if (!geminiApiKey) {
+      log.error('[TRIAL AVATAR] No GEMINI_API_KEY configured');
+      return res.status(503).json({ error: 'Avatar generation service unavailable' });
+    }
+
+    const requestBody = {
+      contents: [{
+        parts: [
+          {
+            inline_data: {
+              mime_type: 'image/jpeg',
+              data: resizedBase64
+            }
+          },
+          { text: prompt }
+        ]
+      }],
+      generationConfig: {
+        temperature: 0.3,
+        responseModalities: ['TEXT', 'IMAGE'],
+        imageConfig: { aspectRatio: '9:16' }
+      },
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' }
+      ]
+    };
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      log.error(`[TRIAL AVATAR] Gemini API error ${response.status}: ${errorText.substring(0, 200)}`);
+      return res.status(502).json({ error: 'Avatar generation failed. Please try again.' });
+    }
+
+    const data = await response.json();
+
+    // Check for safety blocks
+    if (data.promptFeedback?.blockReason) {
+      log.warn(`[TRIAL AVATAR] Blocked by safety: ${data.promptFeedback.blockReason}`);
+      return res.status(422).json({ error: 'Photo could not be processed. Please try a different photo.' });
+    }
+
+    // Extract image
+    let avatarImage = null;
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      for (const part of data.candidates[0].content.parts) {
+        if (part.inlineData?.mimeType?.startsWith('image/')) {
+          avatarImage = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+          break;
+        }
+      }
+    }
+
+    if (!avatarImage) {
+      log.error('[TRIAL AVATAR] No image in Gemini response');
+      return res.status(502).json({ error: 'Avatar generation failed. Please try again.' });
+    }
+
+    // Compress to JPEG
+    const { compressImageToJPEG } = require('../lib/images');
+    const compressed = await compressImageToJPEG(avatarImage, 85, 768);
+    const finalImage = compressed || avatarImage;
+
+    const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+    const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+    log.info(`[TRIAL AVATAR] ✅ Generated preview avatar for "${safeName}" (${inputTokens} in / ${outputTokens} out)`);
+
+    res.json({ avatarImage: finalImage });
+
+  } catch (err) {
+    log.error(`[TRIAL AVATAR] Error: ${err.message}`);
+    res.status(500).json({ error: 'Avatar generation failed. Please try again.' });
+  }
 });
 
 // ─── Task A: Trial Photo Analysis ────────────────────────────────────────────

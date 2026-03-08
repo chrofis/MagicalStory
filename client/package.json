@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fingerprintjs/fingerprintjs": "^5.1.0",
+    "@marsidev/react-turnstile": "^1.4.2",
     "firebase": "^10.7.1",
     "html2pdf.js": "^0.10.1",
     "lucide-react": "^0.460.0",

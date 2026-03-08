@@ -90,6 +90,9 @@ export default function TrialWizard() {
   const [generatedIdeas, setGeneratedIdeas] = useState<GeneratedIdea[]>([]);
   const [selectedIdeaIndex, setSelectedIdeaIndex] = useState<number | null>(null);
 
+  // Preview avatar (generated before topic selection, used by future "Meet [Name]!" screen)
+  const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
+
   // Auth modal (triggered from ideas step)
   const [showEmailModal, setShowEmailModal] = useState(false);
 
@@ -150,6 +153,8 @@ export default function TrialWizard() {
                 characterData={characterData}
                 onChange={setCharacterData}
                 onNext={goNext}
+                previewAvatar={previewAvatar}
+                onAvatarGenerated={setPreviewAvatar}
                 language={language}
               />
             )}

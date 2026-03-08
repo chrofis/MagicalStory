@@ -84,6 +84,15 @@ const imageRegenerationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Trial avatar preview rate limiter (prevent abuse of free avatar generation)
+const trialAvatarLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24 hours
+  max: 5, // 5 avatar generations per IP per day
+  message: { error: 'Too many attempts. Please try again tomorrow.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   authLimiter,
   registerLimiter,
@@ -93,5 +102,6 @@ module.exports = {
   passwordResetLimiter,
   errorLoggingLimiter,
   imageRegenerationLimiter,
-  jobStatusLimiter
+  jobStatusLimiter,
+  trialAvatarLimiter
 };
