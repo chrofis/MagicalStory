@@ -23,6 +23,11 @@ interface LocationState {
   };
   characterName: string;
   previewAvatar: string | null;
+  titlePageData?: {
+    titlePageImage: string | null;
+    title: string | null;
+    costumeType: string | null;
+  } | null;
 }
 
 // ─── Translations ────────────────────────────────────────────────────────────
@@ -373,8 +378,16 @@ export default function TrialGenerationPage() {
 
           {/* ── Avatar + Progress ─────────────────────────────────────── */}
           <div className="flex flex-col items-center text-center mb-6">
-            {/* Preview avatar */}
-            {state.previewAvatar ? (
+            {/* Title page or avatar preview */}
+            {state.titlePageData?.titlePageImage ? (
+              <div className="mb-4">
+                <img
+                  src={state.titlePageData.titlePageImage}
+                  alt={state.titlePageData.title || 'Story cover'}
+                  className="w-48 h-auto rounded-xl shadow-lg mx-auto"
+                />
+              </div>
+            ) : state.previewAvatar ? (
               <div className="mb-4">
                 <img
                   src={state.previewAvatar}

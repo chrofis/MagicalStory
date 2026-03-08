@@ -55,6 +55,16 @@ const trialRegisterLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+const titlePageStore = new MemoryStore();
+const titlePageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  store: titlePageStore,
+  message: { error: 'Too many title page requests' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // ─── Abuse Prevention: Turnstile + Fingerprint + Daily Cap ──────────────────
 
 const { trialAvatarLimiter, jobStatusLimiter } = require('../middleware/rateLimit');
@@ -588,6 +598,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
 
     const mainChar = charData.characters[0];
+    const preGeneratedTitlePage = mainChar.preGeneratedTitlePage || null;
     const characterData = {
       name: mainChar.name,
       age: mainChar.age,
@@ -611,7 +622,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       [JSON.stringify({ characterData, storyInput }), userId]
     );
 
-    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput);
+    const jobId = await createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage);
 
     if (deps.processStoryJob) {
       deps.processStoryJob(jobId).catch(err => {
@@ -1225,6 +1236,178 @@ ${langInstruction} Write EVERYTHING in that language.`;
   }
 });
 
+// ─── Pre-generate Title Page ─────────────────────────────────────────────────
+
+/**
+ * POST /api/trial/prepare-title
+ *
+ * Pre-generate the title page image while the user is picking a story idea.
+ * This is a non-critical optimization — failures return nulls gracefully.
+ * Protected by: session token + rate limit.
+ */
+router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { storyTopic, storyCategory, language } = req.body;
+
+    if (!storyTopic || !storyCategory) {
+      return res.status(400).json({ error: 'storyTopic and storyCategory are required' });
+    }
+
+    log.info(`[TRIAL TITLE] Preparing title page for user ${userId} (topic: ${storyTopic}, category: ${storyCategory})`);
+
+    // Load character from DB
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+    const characterId = `characters_${userId}`;
+
+    const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
+    if (charResult.rows.length === 0) {
+      log.warn(`[TRIAL TITLE] No character found for user ${userId}`);
+      return res.json({ titlePageImage: null, title: null, costumeType: null });
+    }
+
+    const charData = typeof charResult.rows[0].data === 'string'
+      ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
+    const mainChar = charData.characters?.[0];
+    if (!mainChar) {
+      log.warn(`[TRIAL TITLE] No main character in data for user ${userId}`);
+      return res.json({ titlePageImage: null, title: null, costumeType: null });
+    }
+
+    const gender = mainChar.gender || 'male';
+    const lang = language || 'en';
+
+    // Look up costume and title
+    const { getTrialCostume } = require('../config/trialCostumes');
+    const { getTrialTitle } = require('../config/trialTitles');
+    const costume = getTrialCostume(storyTopic, storyCategory, gender);
+    const title = getTrialTitle(storyTopic, storyCategory, gender, lang);
+
+    if (!title) {
+      log.warn(`[TRIAL TITLE] No pre-defined title found for topic=${storyTopic}, category=${storyCategory}, gender=${gender}, lang=${lang}`);
+      return res.json({ titlePageImage: null, title: null, costumeType: null });
+    }
+
+    // Build character object for styled avatar pipeline
+    const character = {
+      name: mainChar.name,
+      age: mainChar.age,
+      gender: mainChar.gender,
+      isMainCharacter: true,
+      photos: mainChar.photos || {},
+      avatars: { standard: mainChar.previewAvatar || null },
+      physical: mainChar.physical || {},
+    };
+    const characters = [character];
+
+    // Determine clothing requirements (two formats needed)
+    const costumeType = costume ? costume.costumeType : null;
+    const clothingKey = costume ? `costumed:${costume.costumeType}` : 'standard';
+
+    // Format for prepareStyledAvatars (needs standard/costumed config for on-demand generation)
+    const avatarClothingRequirements = {
+      [character.name]: {
+        standard: { used: true, signature: 'none' },
+        costumed: costume
+          ? { used: true, costume: costume.costumeType, description: costume.description }
+          : { used: false },
+      },
+    };
+
+    // Format for getCharacterPhotoDetails (needs _currentClothing)
+    const coverClothingRequirements = {
+      [character.name]: { _currentClothing: clothingKey },
+    };
+
+    // Build avatar requirements for prepareStyledAvatars
+    const avatarRequirements = [
+      { pageNumber: 'cover', clothingCategory: 'standard', characterNames: [character.name] },
+    ];
+    if (costume) {
+      avatarRequirements.push({
+        pageNumber: 'cover',
+        clothingCategory: `costumed:${costume.costumeType}`,
+        characterNames: [character.name],
+      });
+    }
+
+    // Lazy require the styled avatar and story helper modules
+    const { prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache } = require('../lib/styledAvatars');
+    const { ART_STYLES, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
+    const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+    const { generateImageOnly } = require('../lib/images');
+
+    // Prepare styled avatars (standard + costumed)
+    await prepareStyledAvatars(characters, 'watercolor', avatarRequirements, avatarClothingRequirements, null);
+    log.info(`[TRIAL TITLE] Avatar styling complete for "${character.name}"`);
+
+    // Get character photo details with clothing
+    let coverPhotos = getCharacterPhotoDetails(
+      characters,
+      costume ? 'costumed' : 'standard',
+      costumeType,
+      'watercolor',
+      coverClothingRequirements
+    );
+
+    // Apply styled avatars
+    coverPhotos = applyStyledAvatars(coverPhotos, 'watercolor');
+
+    // Build the cover scene description
+    const sceneDescription = `A magical, eye-catching front cover scene featuring ${character.name} in a ${storyTopic}-themed setting. The main character is prominently displayed, looking excited and ready for adventure. The composition leaves space at the top for the title.`;
+
+    // Fill the front cover template
+    const styleDescription = ART_STYLES.watercolor;
+    const characterRefList = buildCharacterReferenceList(coverPhotos, characters);
+    const coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+      TITLE_PAGE_SCENE: sceneDescription,
+      STYLE_DESCRIPTION: styleDescription,
+      STORY_TITLE: title,
+      CHARACTER_REFERENCE_LIST: characterRefList,
+      VISUAL_BIBLE: '',
+    });
+
+    // Generate the cover image
+    log.info(`[TRIAL TITLE] Generating title page image for "${title}"`);
+    const result = await generateImageOnly(coverPrompt, coverPhotos);
+
+    if (!result || !result.imageData) {
+      log.warn(`[TRIAL TITLE] Image generation returned no image`);
+      // Clear cache to avoid cross-contamination
+      clearStyledAvatarCache();
+      return res.json({ titlePageImage: null, title: null, costumeType: null });
+    }
+
+    const titlePageImage = result.imageData;
+
+    // Store result on character data in DB
+    try {
+      charData.characters[0].preGeneratedTitlePage = titlePageImage;
+      charData.characters[0].preGeneratedTitle = title;
+      charData.characters[0].preGeneratedCostumeType = costumeType;
+      await pool.query(
+        'UPDATE characters SET data = $1 WHERE id = $2',
+        [JSON.stringify(charData), characterId]
+      );
+      log.debug(`[TRIAL TITLE] Saved pre-generated title page to character ${characterId}`);
+    } catch (dbErr) {
+      log.warn(`[TRIAL TITLE] Failed to save title page to DB: ${dbErr.message}`);
+    }
+
+    // Clear styled avatar cache (standalone call, avoid cross-contamination)
+    clearStyledAvatarCache();
+
+    log.info(`[TRIAL TITLE] Title page ready for "${title}" (costumeType: ${costumeType})`);
+    res.json({ titlePageImage, title, costumeType });
+
+  } catch (err) {
+    log.error(`[TRIAL TITLE] Error generating title page: ${err.message}`);
+    // Non-critical optimization — return nulls gracefully
+    res.json({ titlePageImage: null, title: null, costumeType: null });
+  }
+});
+
 // ─── Helper: Save trial character to DB ─────────────────────────────────────
 
 /**
@@ -1307,7 +1490,7 @@ async function saveTrialCharacter(pool, userId, characterData) {
  * @param {object} storyInput - { storyCategory, storyTopic, storyTheme, storyDetails, language }
  * @returns {string} jobId
  */
-async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput) {
+async function createTrialStoryJob(pool, userId, characterId, characterData, storyInput, preGeneratedTitlePage = null) {
   // Check daily trial story cap (spending safety net)
   if (!checkAndIncrementTrialCap('story')) {
     const err = new Error('Daily trial story limit reached. Please try again tomorrow.');
@@ -1351,6 +1534,7 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     enableFullRepair: false, // No repair workflow for trial stories
     skipQualityEval: true, // Skip quality evaluation to save cost
     trialMode: true, // Use lightweight story prompt
+    preGeneratedTitlePage: preGeneratedTitlePage || null, // Pre-generated from prepare-title endpoint
   };
 
   // Trial stories are free — no credit deduction
@@ -2049,6 +2233,7 @@ function resetTrialRateLimits() {
   trialPhotoStore.resetAll();
   trialIdeasStore.resetAll();
   trialRegisterStore.resetAll();
+  titlePageStore.resetAll();
 
   // Reset fingerprint tracker
   const fpCount = fingerprintTracker.size;

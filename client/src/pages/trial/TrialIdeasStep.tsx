@@ -13,6 +13,8 @@ interface Props {
   onSelectIdea: (index: number) => void;
   onBack: () => void;
   onCreate: () => void;
+  sessionToken?: string | null;
+  onTitlePageReady?: (data: { titlePageImage: string | null; title: string | null; costumeType: string | null }) => void;
 }
 
 interface StreamingIdea {
@@ -92,6 +94,8 @@ export default function TrialIdeasStep({
   onSelectIdea,
   onBack,
   onCreate,
+  sessionToken,
+  onTitlePageReady,
 }: Props) {
   const lang = storyInput.language?.startsWith('de') ? 'de' : storyInput.language === 'fr' ? 'fr' : 'en';
   const t = useMemo(() => strings[lang] || strings.en, [lang]);
@@ -243,6 +247,37 @@ export default function TrialIdeasStep({
     return () => {
       abortControllerRef.current?.abort();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fire prepare-title in background on mount (parallel with idea generation)
+  const titlePageStartedRef = useRef(false);
+  useEffect(() => {
+    if (!sessionToken || !storyInput.storyTopic || titlePageStartedRef.current) return;
+    titlePageStartedRef.current = true;
+
+    const apiUrl = import.meta.env.VITE_API_URL || '';
+    fetch(`${apiUrl}/api/trial/prepare-title`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        storyTopic: storyInput.storyTopic,
+        storyCategory: storyInput.storyCategory,
+        language: storyInput.language,
+      }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.titlePageImage) {
+          onTitlePageReady?.(data);
+        }
+      })
+      .catch(() => {
+        // Non-critical — story pipeline will generate title page if this fails
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

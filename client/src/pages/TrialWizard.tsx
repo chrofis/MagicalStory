@@ -116,6 +116,13 @@ export default function TrialWizard() {
   // Preview avatar (generated before topic selection, used by future "Meet [Name]!" screen)
   const [previewAvatar, setPreviewAvatar] = useState<string | null>(null);
 
+  // Pre-generated title page (generated during step 3 in background)
+  const [titlePageData, setTitlePageData] = useState<{
+    titlePageImage: string | null;
+    title: string | null;
+    costumeType: string | null;
+  } | null>(null);
+
   // Anonymous session state
   const [sessionToken, setSessionToken] = useState<string | null>(() =>
     localStorage.getItem('trial_session_token')
@@ -194,9 +201,10 @@ export default function TrialWizard() {
         storyInput: finalStoryInput,
         characterName: characterData.name,
         previewAvatar,
+        titlePageData,
       },
     });
-  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, navigate]);
+  }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, titlePageData, navigate]);
 
   // ─── Trial already used ─────────────────────────────────────────────────────
 
@@ -282,6 +290,8 @@ export default function TrialWizard() {
                 onSelectIdea={setSelectedIdeaIndex}
                 onBack={goBack}
                 onCreate={handleCreate}
+                sessionToken={sessionToken}
+                onTitlePageReady={setTitlePageData}
               />
             )}
           </div>

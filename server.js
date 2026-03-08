@@ -2498,6 +2498,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       if (inputData.titlePageOnly && coverType !== 'titlePage') return;
       if (skipCovers) return;
 
+      // Skip if pre-generated title page exists (from prepare-title endpoint)
+      if (coverType === 'titlePage' && inputData.preGeneratedTitlePage) {
+        log.info(`⏭️ [COVER] Skipping titlePage generation — using pre-generated title page`);
+        streamingCoverPromises.set(coverType, Promise.resolve({
+          imageData: inputData.preGeneratedTitlePage,
+          score: 80,
+          reasoning: 'Pre-generated during trial step 3',
+        }));
+        return;
+      }
+
       const coverPromise = streamCoverLimit(async () => {
         // Wait for visual bible if not yet available
         while (!streamingVisualBible) {
