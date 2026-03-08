@@ -643,6 +643,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       age: mainChar.age,
       gender: mainChar.gender,
       traits: mainChar.traits,
+      customTraits: mainChar.traits?.specialDetails || '',
       photos: mainChar.photos || {},
       _charId: mainChar.id,
     };
@@ -1517,10 +1518,10 @@ async function saveTrialCharacter(pool, userId, characterData) {
   const charId = Date.now();
 
   // Convert flat traits array to structured format expected by the wizard
-  // Trial sends ['brave', 'curious'], wizard expects { strengths: [...], flaws: [], challenges: [] }
+  // Trial sends ['brave', 'curious'], wizard expects { strengths: [...], flaws: [], challenges: [], specialDetails: '...' }
   const rawTraits = characterData.traits || [];
   const structuredTraits = Array.isArray(rawTraits)
-    ? { strengths: rawTraits, flaws: [], challenges: [] }
+    ? { strengths: rawTraits, flaws: [], challenges: [], ...(characterData.customTraits ? { specialDetails: characterData.customTraits } : {}) }
     : rawTraits;
 
   const character = {

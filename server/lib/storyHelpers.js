@@ -3323,7 +3323,18 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
     const parts = [char.name];
     if (char.age) parts.push(`age ${char.age}`);
     if (char.gender) parts.push(char.gender);
-    if (char.traits?.length) parts.push(`traits: ${char.traits.join(', ')}`);
+    // Traits can be a flat array or structured { strengths, flaws, challenges, specialDetails }
+    const t = char.traits;
+    if (Array.isArray(t) && t.length) {
+      parts.push(`traits: ${t.join(', ')}`);
+    } else if (t && typeof t === 'object') {
+      const traitParts = [];
+      if (t.strengths?.length) traitParts.push(t.strengths.join(', '));
+      if (t.flaws?.length) traitParts.push(`flaws: ${t.flaws.join(', ')}`);
+      if (t.challenges?.length) traitParts.push(`challenges: ${t.challenges.join(', ')}`);
+      if (t.specialDetails) traitParts.push(t.specialDetails);
+      if (traitParts.length) parts.push(`traits: ${traitParts.join('; ')}`);
+    }
     return parts.join(', ');
   }).join('\n');
 
@@ -3340,9 +3351,10 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
 
     // Look up pre-defined title
     const preDefinedTitle = getTrialTitle(topic, category, gender, language);
-    const titleInstruction = preDefinedTitle
-      ? `TITLE: ${preDefinedTitle}`
-      : `TITLE: [A creative, specific title in ${getLanguageNameEnglish(language)}]`;
+    // If pre-defined title exists, skip the TITLE section entirely (saves tokens, title is set in server.js)
+    const titleSection = preDefinedTitle
+      ? ''
+      : `---TITLE---\nTITLE: [A creative, specific title in ${getLanguageNameEnglish(language)}]\n\n`;
 
     // Build avatar selection section (only if costume available)
     let avatarSelection = '';
@@ -3377,7 +3389,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       CHARACTERS: characterDesc || 'A child',
       STORY_DETAILS: inputData.storyDetails || inputData.storyTheme || 'A fun adventure',
       AVATAR_SELECTION: avatarSelection,
-      TITLE_INSTRUCTION: titleInstruction,
+      TITLE_SECTION: titleSection,
       LANDMARKS: landmarksInstruction,
     });
   }
