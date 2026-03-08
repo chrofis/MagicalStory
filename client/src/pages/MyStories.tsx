@@ -803,8 +803,8 @@ export default function MyStories() {
           <div className="flex items-center justify-center md:justify-end gap-2">
             {/* See Pricing button - icon only on mobile */}
             <button
-              onClick={() => needsPassword ? scrollToPasswordBanner() : navigate('/pricing')}
-              className={`flex items-center gap-1 px-2 md:px-4 py-2 border-2 rounded-lg font-medium transition-colors ${needsPassword ? 'border-gray-200 text-gray-400 cursor-not-allowed' : 'border-gray-300 text-gray-600 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+              onClick={() => navigate('/pricing')}
+              className="flex items-center gap-1 px-2 md:px-4 py-2 border-2 border-gray-300 text-gray-600 rounded-lg hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 font-medium transition-colors"
               title={t.seePricing}
             >
               <Tag size={18} />
