@@ -8,6 +8,7 @@ export interface User {
   storiesGenerated?: number;
   preferredLanguage?: 'English' | 'German' | 'French';
   emailVerified?: boolean;
+  hasPassword?: boolean;
   photoConsentAt?: string | null;
 }
 

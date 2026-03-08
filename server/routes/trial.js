@@ -536,7 +536,7 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
     const pool = getPool();
 
     const result = await pool.query(
-      'SELECT stories_generated, story_quota FROM users WHERE id = $1 AND is_trial = true',
+      'SELECT stories_generated, story_quota, email_verified, email FROM users WHERE id = $1 AND is_trial = true',
       [userId]
     );
 
@@ -545,10 +545,51 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
     }
 
     const user = result.rows[0];
-    res.json({ trialUsed: user.stories_generated >= user.story_quota });
+    res.json({
+      trialUsed: user.stories_generated >= user.story_quota,
+      emailVerified: user.email_verified === true,
+      hasEmail: !!user.email,
+    });
   } catch (err) {
     log.error(`[TRIAL] Check status error: ${err.message}`);
     res.status(500).json({ error: 'Failed to check status' });
+  }
+});
+
+/**
+ * POST /api/trial/claim-session
+ *
+ * Exchange a trial session token for a full JWT auth token.
+ * Only works if the user's email has been verified.
+ */
+router.post('/claim-session', verifySessionToken, async (req, res) => {
+  try {
+    const { userId } = req.sessionUser;
+    const { getPool } = require('../services/database');
+    const pool = getPool();
+
+    const result = await pool.query(
+      'SELECT id, username, email, role, email_verified FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Account not found' });
+    }
+
+    const user = result.rows[0];
+    if (!user.email_verified) {
+      return res.status(403).json({ error: 'Email not yet verified' });
+    }
+
+    const { generateToken } = require('../middleware/auth');
+    const token = generateToken(user);
+
+    log.info(`[TRIAL] Session claimed for user ${userId} (${user.email})`);
+    res.json({ token });
+  } catch (err) {
+    log.error(`[TRIAL] Claim session error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to claim session' });
   }
 });
 
@@ -1248,13 +1289,20 @@ ${langInstruction} Write EVERYTHING in that language.`;
 router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, res) => {
   try {
     const { userId } = req.sessionUser;
-    const { storyTopic, storyCategory, language } = req.body;
+    const { storyTopic, storyCategory, storyTheme, language } = req.body;
 
-    if (!storyTopic || !storyCategory) {
-      return res.status(400).json({ error: 'storyTopic and storyCategory are required' });
+    if (!storyCategory || (!storyTopic && !storyTheme)) {
+      return res.status(400).json({ error: 'storyCategory and storyTopic or storyTheme are required' });
     }
 
-    log.info(`[TRIAL TITLE] Preparing title page for user ${userId} (topic: ${storyTopic}, category: ${storyCategory})`);
+    // Resolve which topic/category to look up titles and costumes from:
+    // - adventure: storyTheme has the theme (pirate, knight, etc.), storyTopic is empty
+    // - life-challenge: storyTopic has the challenge, storyTheme has the adventure theme → use storyTheme
+    // - historical: storyTopic has the event ID → use storyTopic
+    const lookupTopic = storyCategory === 'historical' ? storyTopic : (storyTheme || storyTopic);
+    const lookupCategory = storyCategory === 'historical' ? 'historical' : 'adventure';
+
+    log.info(`[TRIAL TITLE] Preparing title page for user ${userId} (topic: ${storyTopic}, category: ${storyCategory}, theme: ${storyTheme || 'none'}, lookup: ${lookupCategory}/${lookupTopic})`);
 
     // Load character from DB
     const { getPool } = require('../services/database');
@@ -1278,11 +1326,11 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     const gender = mainChar.gender || 'male';
     const lang = language || 'en';
 
-    // Look up costume and title
+    // Look up costume and title using the resolved lookup topic/category
     const { getTrialCostume } = require('../config/trialCostumes');
     const { getTrialTitle } = require('../config/trialTitles');
-    const costume = getTrialCostume(storyTopic, storyCategory, gender);
-    const title = getTrialTitle(storyTopic, storyCategory, gender, lang);
+    const costume = getTrialCostume(lookupTopic, lookupCategory, gender);
+    const title = getTrialTitle(lookupTopic, lookupCategory, gender, lang);
 
     if (!title) {
       log.warn(`[TRIAL TITLE] No pre-defined title found for topic=${storyTopic}, category=${storyCategory}, gender=${gender}, lang=${lang}`);

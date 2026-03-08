@@ -162,6 +162,40 @@ export default function TrialGenerationPage() {
 
   const isLinked = emailLinked || googleLinked;
 
+  // Poll for email verification after email is linked — auto-redirect when verified
+  useEffect(() => {
+    if (!emailLinked || !state?.sessionToken) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const statusRes = await fetch(`${API_URL}/api/trial/check-status`, {
+          headers: { 'Authorization': `Bearer ${state.sessionToken}` },
+        });
+        if (!statusRes.ok) return;
+        const statusData = await statusRes.json();
+
+        if (statusData.emailVerified) {
+          clearInterval(interval);
+          // Exchange session token for a full JWT
+          const claimRes = await fetch(`${API_URL}/api/trial/claim-session`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${state.sessionToken}` },
+          });
+          if (claimRes.ok) {
+            const { token } = await claimRes.json();
+            localStorage.setItem('auth_token', token);
+            localStorage.removeItem('trial_session_token');
+          }
+          navigate('/stories', { replace: true });
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [emailLinked, state?.sessionToken, navigate]);
+
   // Start story generation on mount
   useEffect(() => {
     if (!state?.sessionToken || hasStartedRef.current) return;

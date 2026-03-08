@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, memo, FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Book, Trash2, Eye, Pencil, AlertTriangle, BookOpen, Tag, Loader2 } from 'lucide-react';
+import { Book, Trash2, Eye, Pencil, AlertTriangle, BookOpen, Tag, Loader2, Lock, CheckCircle, X } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
@@ -269,6 +269,48 @@ export default function MyStories() {
   const [totalStories, setTotalStories] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadAttemptedRef = useRef(false);
+
+  // Set-password banner state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [isSettingPassword, setIsSettingPassword] = useState(false);
+  const [passwordSet, setPasswordSet] = useState(false);
+  const [passwordBannerDismissed, setPasswordBannerDismissed] = useState(false);
+  const showPasswordBanner = user && user.hasPassword === false && !passwordSet && !passwordBannerDismissed;
+
+  const handleSetPassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    if (newPassword.length < 8) {
+      setPasswordError(language === 'de' ? 'Mindestens 8 Zeichen' : language === 'fr' ? 'Au moins 8 caractères' : 'At least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError(language === 'de' ? 'Passwörter stimmen nicht überein' : language === 'fr' ? 'Les mots de passe ne correspondent pas' : 'Passwords do not match');
+      return;
+    }
+    setIsSettingPassword(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/set-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setPasswordError(data.error || 'Failed');
+        return;
+      }
+      setPasswordSet(true);
+      showSuccess(language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : 'Password set!');
+    } catch {
+      setPasswordError('Failed to set password');
+    } finally {
+      setIsSettingPassword(false);
+    }
+  };
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     // Restore selection from sessionStorage
     try {
@@ -658,6 +700,57 @@ export default function MyStories() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <Navigation currentStep={0} />
+
+      {/* Set-password banner for trial users without a password */}
+      {showPasswordBanner && (
+        <div className="px-4 md:px-8 pt-4 max-w-6xl mx-auto">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 relative">
+            <button
+              onClick={() => setPasswordBannerDismissed(true)}
+              className="absolute top-3 right-3 text-amber-400 hover:text-amber-600"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-start gap-3">
+              <Lock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800 text-sm mb-1">
+                  {language === 'de' ? 'Setze ein Passwort, um den Zugang zu deinen Geschichten zu sichern'
+                    : language === 'fr' ? 'Définissez un mot de passe pour sécuriser l\'accès à vos histoires'
+                    : 'Set a password to keep access to your stories'}
+                </p>
+                <form onSubmit={handleSetPassword} className="flex flex-col sm:flex-row gap-2 mt-2">
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder={language === 'de' ? 'Passwort (min. 8 Zeichen)' : language === 'fr' ? 'Mot de passe (min. 8 car.)' : 'Password (min. 8 characters)'}
+                    className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none flex-1"
+                    disabled={isSettingPassword}
+                  />
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder={language === 'de' ? 'Bestätigen' : language === 'fr' ? 'Confirmer' : 'Confirm'}
+                    className="px-3 py-2 border border-amber-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 outline-none flex-1"
+                    disabled={isSettingPassword}
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSettingPassword}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg text-sm font-medium hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {isSettingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    {language === 'de' ? 'Speichern' : language === 'fr' ? 'Enregistrer' : 'Save'}
+                  </button>
+                </form>
+                {passwordError && <p className="text-red-600 text-xs mt-1">{passwordError}</p>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="px-4 md:px-8 py-4 md:py-8 max-w-6xl mx-auto">
         {/* Header - stacked on mobile, side-by-side on desktop */}
