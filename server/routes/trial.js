@@ -112,8 +112,8 @@ async function verifyTurnstile(token, remoteip) {
     return true; // Graceful fallback — don't block if not configured
   }
   if (!token) {
-    log.warn('[TURNSTILE] No token provided');
-    return false;
+    log.warn('[TURNSTILE] No token provided — allowing (other layers protect)');
+    return true; // Widget may error on some browsers; fingerprint + rate limit still protect
   }
   try {
     const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {

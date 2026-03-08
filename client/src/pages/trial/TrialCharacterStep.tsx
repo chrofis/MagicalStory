@@ -162,7 +162,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Turnstile + Fingerprint for abuse prevention
-  const turnstileRef = useRef<any>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReady, setTurnstileReady] = useState(!TURNSTILE_SITE_KEY); // ready immediately if no key configured
   const [fingerprint, setFingerprint] = useState<string | null>(null);
@@ -258,26 +257,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     setAvatarError(null);
 
     try {
-      // Reset Turnstile to get a fresh single-use token for account creation
-      let freshToken = turnstileToken;
-      if (TURNSTILE_SITE_KEY && turnstileRef.current) {
-        turnstileRef.current.reset();
-        // Wait for fresh token (up to 10s)
-        freshToken = await new Promise<string | null>((resolve) => {
-          const timeout = setTimeout(() => resolve(null), 10000);
-          const check = setInterval(() => {
-            // The onSuccess callback will update turnstileToken state,
-            // but we need a direct way to get the response
-            const response = turnstileRef.current?.getResponse?.();
-            if (response) {
-              clearInterval(check);
-              clearTimeout(timeout);
-              resolve(response);
-            }
-          }, 200);
-        });
-      }
-
       const accountResponse = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/trial/create-anonymous-account`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -292,7 +271,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
           bodyNoBgPhoto: characterData.photos.bodyNoBg,
           faceBox: characterData.photos.faceBox,
           previewAvatar: previewAvatar || undefined, // Save to DB if already generated
-          turnstileToken: freshToken,
+          turnstileToken,
           fingerprint,
         }),
       });
@@ -740,7 +719,6 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
       {/* Invisible Turnstile widget for bot protection */}
       {TURNSTILE_SITE_KEY && (
         <Turnstile
-          ref={turnstileRef}
           siteKey={TURNSTILE_SITE_KEY}
           onSuccess={(token) => { setTurnstileToken(token); setTurnstileReady(true); }}
           onExpire={() => { setTurnstileToken(null); setTurnstileReady(false); }}
