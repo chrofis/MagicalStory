@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, CheckCircle, BookOpen, AlertCircle, Mail, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle, BookOpen, AlertCircle, Mail } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
 import { signInWithGoogle, getIdToken } from '@/services/firebase';
 import { useLanguage } from '@/context/LanguageContext';
@@ -30,20 +30,18 @@ interface LocationState {
 const translations = {
   en: {
     brand: 'Magical Story',
-    creatingStory: 'Your story is being created!',
-    startingGeneration: 'Starting story generation...',
+    creatingStory: 'Creating your story...',
     storyComplete: 'Your story is ready!',
     storyFailed: 'Something went wrong',
     storyFailedDesc: 'We couldn\'t create your story. Please try again.',
     tryAgain: 'Try again',
-    saveYourStory: 'Save your story',
-    saveDescription: 'Enter your email or sign in with Google to save your story and receive it as a PDF.',
-    saveDescriptionComplete: 'Your story is ready! Enter your email or sign in with Google to access it.',
+    signInToSee: 'Sign in to see your story',
+    signInDesc: 'Enter your email or sign in with Google to view your story.',
     googleButton: 'Continue with Google',
     orDivider: 'or',
     emailLabel: 'Email address',
     emailPlaceholder: 'you@example.com',
-    emailSubmit: 'Save my story',
+    emailSubmit: 'View my story',
     terms: 'By continuing, you agree to our',
     termsLink: 'Terms of Service',
     and: 'and',
@@ -66,20 +64,18 @@ const translations = {
   },
   de: {
     brand: 'Magical Story',
-    creatingStory: 'Deine Geschichte wird erstellt!',
-    startingGeneration: 'Geschichten-Erstellung wird gestartet...',
+    creatingStory: 'Deine Geschichte wird erstellt...',
     storyComplete: 'Deine Geschichte ist fertig!',
     storyFailed: 'Etwas ist schiefgelaufen',
     storyFailedDesc: 'Die Geschichte konnte nicht erstellt werden. Bitte versuche es erneut.',
     tryAgain: 'Erneut versuchen',
-    saveYourStory: 'Sichere deine Geschichte',
-    saveDescription: 'Gib deine E-Mail ein oder melde dich mit Google an, um deine Geschichte zu speichern und als PDF zu erhalten.',
-    saveDescriptionComplete: 'Deine Geschichte ist fertig! Gib deine E-Mail ein oder melde dich mit Google an, um darauf zuzugreifen.',
+    signInToSee: 'Melde dich an, um deine Geschichte zu sehen',
+    signInDesc: 'Gib deine E-Mail ein oder melde dich mit Google an, um deine Geschichte anzusehen.',
     googleButton: 'Weiter mit Google',
     orDivider: 'oder',
     emailLabel: 'E-Mail-Adresse',
     emailPlaceholder: 'du@beispiel.com',
-    emailSubmit: 'Geschichte speichern',
+    emailSubmit: 'Geschichte ansehen',
     terms: 'Mit der Fortsetzung stimmst du unseren',
     termsLink: 'Nutzungsbedingungen',
     and: 'und',
@@ -102,20 +98,18 @@ const translations = {
   },
   fr: {
     brand: 'Magical Story',
-    creatingStory: 'Votre histoire est en cours de création !',
-    startingGeneration: 'Démarrage de la création...',
+    creatingStory: 'Votre histoire est en cours de création...',
     storyComplete: 'Votre histoire est prête !',
     storyFailed: 'Quelque chose s\'est mal passé',
     storyFailedDesc: 'Nous n\'avons pas pu créer votre histoire. Veuillez réessayer.',
     tryAgain: 'Réessayer',
-    saveYourStory: 'Sauvegardez votre histoire',
-    saveDescription: 'Entrez votre e-mail ou connectez-vous avec Google pour sauvegarder votre histoire et la recevoir en PDF.',
-    saveDescriptionComplete: 'Votre histoire est prête ! Entrez votre e-mail ou connectez-vous avec Google pour y accéder.',
+    signInToSee: 'Connectez-vous pour voir votre histoire',
+    signInDesc: 'Entrez votre e-mail ou connectez-vous avec Google pour voir votre histoire.',
     googleButton: 'Continuer avec Google',
     orDivider: 'ou',
     emailLabel: 'Adresse e-mail',
     emailPlaceholder: 'vous@exemple.com',
-    emailSubmit: 'Sauvegarder mon histoire',
+    emailSubmit: 'Voir mon histoire',
     terms: 'En continuant, vous acceptez nos',
     termsLink: 'Conditions d\'utilisation',
     and: 'et',
@@ -158,7 +152,6 @@ export default function TrialGenerationPage() {
   // Generation state
   const [pageState, setPageState] = useState<PageState>('starting');
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState(t.startingGeneration);
   const [jobId, setJobId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const hasStartedRef = useRef(false);
@@ -227,7 +220,6 @@ export default function TrialGenerationPage() {
       }
 
       if (data.progress !== undefined) setProgress(data.progress);
-      if (data.progressMessage) setProgressMessage(data.progressMessage);
 
       if (data.status === 'completed') {
         setPageState('completed');
@@ -386,178 +378,151 @@ export default function TrialGenerationPage() {
         </div>
       </header>
 
-      {/* Content */}
+      {/* Content — single centered card */}
       <div className="flex-1 flex items-start justify-center p-4 pt-8 md:pt-16">
-        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
 
-          {/* ── Left: Progress ─────────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 flex flex-col items-center text-center">
+          {/* ── Avatar + Progress ─────────────────────────────────────── */}
+          <div className="flex flex-col items-center text-center mb-6">
             {/* Preview avatar */}
-            {state.previewAvatar && (
-              <div className="mb-6">
+            {state.previewAvatar ? (
+              <div className="mb-4">
                 <img
                   src={state.previewAvatar}
                   alt={state.characterName || 'Character'}
-                  className="w-28 h-28 rounded-full object-cover border-4 border-indigo-100 shadow-md"
+                  className="w-24 h-24 rounded-full object-cover border-4 border-indigo-100 shadow-md"
                 />
               </div>
-            )}
-
-            {/* Status icon */}
-            {!state.previewAvatar && (
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-6">
-                {pageState === 'completed' ? (
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                ) : pageState === 'failed' ? (
+            ) : (
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+                {pageState === 'failed' ? (
                   <AlertCircle className="w-8 h-8 text-red-600" />
                 ) : (
-                  <Sparkles className="w-8 h-8 text-indigo-600 animate-pulse" />
+                  <BookOpen className="w-8 h-8 text-indigo-600" />
                 )}
               </div>
             )}
 
-            {/* Title */}
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">
-              {pageState === 'completed'
-                ? t.storyComplete
-                : pageState === 'failed'
-                  ? t.storyFailed
+            {/* Title — generating or completed or failed */}
+            <h1 className="text-xl font-bold text-gray-800 mb-1">
+              {pageState === 'failed'
+                ? t.storyFailed
+                : pageState === 'completed'
+                  ? t.storyComplete
                   : t.creatingStory}
             </h1>
 
-            {/* Character name subtitle */}
+            {/* Character name */}
             {state.characterName && pageState !== 'failed' && (
-              <p className="text-indigo-600 font-medium mb-4">
+              <p className="text-indigo-600 font-medium text-sm mb-3">
                 {state.characterName}
               </p>
             )}
 
-            {/* Progress bar */}
+            {/* Progress bar — % only, no text messages */}
             {(pageState === 'starting' || pageState === 'generating') && (
-              <div className="w-full mb-4">
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div className="w-full">
+                <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
                   <div
-                    className="bg-indigo-600 h-3 rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${Math.max(progress, 5)}%` }}
+                    className="bg-indigo-600 h-2.5 rounded-full transition-all duration-500 ease-out"
+                    style={{ width: `${Math.max(progress, 3)}%` }}
                   />
                 </div>
-                <p className="text-sm text-gray-500 mt-2">{progressMessage}</p>
+                <p className="text-xs text-gray-400 mt-1.5">{Math.round(progress)}%</p>
               </div>
             )}
 
-            {/* Loading spinner for starting/generating */}
-            {(pageState === 'starting' || pageState === 'generating') && (
-              <Loader2 className="w-6 h-6 text-indigo-500 animate-spin mt-2" />
-            )}
-
-            {/* Completed icon when avatar is shown */}
-            {pageState === 'completed' && state.previewAvatar && (
-              <div className="flex items-center gap-2 text-green-600 mb-2">
-                <CheckCircle className="w-5 h-5" />
-                <span className="font-medium">{t.storyComplete}</span>
+            {/* Completed checkmark */}
+            {pageState === 'completed' && (
+              <div className="flex items-center gap-1.5 text-green-600">
+                <CheckCircle className="w-4 h-4" />
+                <span className="text-sm font-medium">100%</span>
               </div>
             )}
 
             {/* Failed state */}
             {pageState === 'failed' && (
               <div className="mt-2">
-                <p className="text-gray-600 mb-4">
+                <p className="text-gray-600 text-sm mb-3">
                   {errorMessage || t.storyFailedDesc}
                 </p>
                 <button
                   onClick={() => navigate('/try', { replace: true })}
-                  className="text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
+                  className="text-indigo-600 hover:text-indigo-800 font-medium text-sm transition-colors"
                 >
                   {t.tryAgain}
                 </button>
               </div>
             )}
-
-            {/* Upsell box */}
-            {pageState !== 'failed' && (
-              <div className="mt-6 w-full bg-gradient-to-r from-indigo-50 to-indigo-50 rounded-xl p-4 border border-indigo-100 text-left">
-                <p className="text-sm font-semibold text-indigo-700 mb-2">{t.upsellTitle}</p>
-                <p className="text-xs text-gray-600 mb-2">{t.upsellDesc}</p>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  {t.upsellFeatures.map((f, i) => (
-                    <li key={i} className="flex items-center gap-1.5">
-                      <span className="text-indigo-500 font-bold">+</span> {f}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
 
-          {/* ── Right: Email/Google sign-in ──────────────────────────── */}
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            {/* Linked success state */}
-            {googleLinked && (
-              <div className="py-8 text-center">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">{t.linkedSuccess}</h2>
-                <p className="text-gray-500">{t.redirecting}</p>
-              </div>
-            )}
+          {/* ── Divider ──────────────────────────────────────────────── */}
+          {pageState !== 'failed' && <div className="h-px bg-gray-200 mb-6" />}
 
-            {emailLinked && (
-              <div className="py-8 text-center">
-                <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Mail className="w-8 h-8 text-indigo-600" />
-                </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">{t.emailSent}</h2>
-                <p className="text-gray-600 mb-2">{t.emailSentDesc}</p>
-                <p className="text-sm text-gray-400">{t.emailSentNote}</p>
-              </div>
-            )}
-
-            {/* Input form */}
-            {!isLinked && (
-              <>
-                <div className="text-center mb-6">
-                  <h2 className="text-xl font-bold text-gray-800 mb-1">{t.saveYourStory}</h2>
-                  <p className="text-gray-500 text-sm">
-                    {pageState === 'completed' ? t.saveDescriptionComplete : t.saveDescription}
-                  </p>
-                </div>
-
-                {/* Error display */}
-                {authError && (
-                  <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-4 text-sm">
-                    {authError}
+          {/* ── Sign-in section ───────────────────────────────────────── */}
+          {pageState !== 'failed' && (
+            <>
+              {/* Linked success states */}
+              {googleLinked && (
+                <div className="py-6 text-center">
+                  <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <CheckCircle className="w-7 h-7 text-green-600" />
                   </div>
-                )}
-
-                {/* Google button */}
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={isAuthLoading}
-                  className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  {isAuthLoading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <GoogleIcon />
-                  )}
-                  {t.googleButton}
-                </button>
-
-                {/* Divider */}
-                <div className="flex items-center gap-3 my-5">
-                  <div className="flex-1 h-px bg-gray-200" />
-                  <span className="text-sm text-gray-400 font-medium">{t.orDivider}</span>
-                  <div className="flex-1 h-px bg-gray-200" />
+                  <h2 className="text-lg font-bold text-gray-800 mb-1">{t.linkedSuccess}</h2>
+                  <p className="text-gray-500 text-sm">{t.redirecting}</p>
                 </div>
+              )}
 
-                {/* Email form */}
-                <form onSubmit={handleEmailSubmit} className="space-y-3">
-                  <div>
-                    <label htmlFor="trial-gen-email" className="block text-sm font-medium text-gray-700 mb-1">
-                      {t.emailLabel}
-                    </label>
+              {emailLinked && (
+                <div className="py-6 text-center">
+                  <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Mail className="w-7 h-7 text-indigo-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-gray-800 mb-1">{t.emailSent}</h2>
+                  <p className="text-gray-600 text-sm mb-1">{t.emailSentDesc}</p>
+                  <p className="text-xs text-gray-400">{t.emailSentNote}</p>
+                </div>
+              )}
+
+              {/* Sign-in form */}
+              {!isLinked && (
+                <>
+                  <div className="text-center mb-5">
+                    <h2 className="text-lg font-bold text-gray-800 mb-1">{t.signInToSee}</h2>
+                    <p className="text-gray-500 text-sm">{t.signInDesc}</p>
+                  </div>
+
+                  {/* Error */}
+                  {authError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 mb-4 text-sm">
+                      {authError}
+                    </div>
+                  )}
+
+                  {/* Google button */}
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignIn}
+                    disabled={isAuthLoading}
+                    className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50"
+                  >
+                    {isAuthLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <GoogleIcon />
+                    )}
+                    {t.googleButton}
+                  </button>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-sm text-gray-400 font-medium">{t.orDivider}</span>
+                    <div className="flex-1 h-px bg-gray-200" />
+                  </div>
+
+                  {/* Email form */}
+                  <form onSubmit={handleEmailSubmit} className="space-y-3">
                     <input
                       id="trial-gen-email"
                       type="email"
@@ -566,39 +531,48 @@ export default function TrialGenerationPage() {
                       placeholder={t.emailPlaceholder}
                       required
                       disabled={isAuthLoading}
+                      aria-label={t.emailLabel}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all disabled:opacity-50 disabled:bg-gray-50"
                     />
+
+                    <button
+                      type="submit"
+                      disabled={isAuthLoading || !email.trim()}
+                      className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {isAuthLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+                      {t.emailSubmit}
+                    </button>
+                  </form>
+
+                  {/* Terms */}
+                  <p className="text-xs text-gray-400 text-center mt-4">
+                    {t.terms}{' '}
+                    <a href="/terms" target="_blank" className="underline hover:text-gray-600">
+                      {t.termsLink}
+                    </a>{' '}
+                    {t.and}{' '}
+                    <a href="/privacy" target="_blank" className="underline hover:text-gray-600">
+                      {t.privacyLink}
+                    </a>
+                    .
+                  </p>
+
+                  {/* Upsell — compact */}
+                  <div className="mt-5 bg-indigo-50 rounded-xl p-3 border border-indigo-100 text-left">
+                    <p className="text-xs font-semibold text-indigo-700 mb-1">{t.upsellTitle}</p>
+                    <ul className="text-xs text-gray-600 space-y-0.5">
+                      {t.upsellFeatures.map((f, i) => (
+                        <li key={i} className="flex items-center gap-1.5">
+                          <span className="text-indigo-500 font-bold">+</span> {f}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={isAuthLoading || !email.trim()}
-                    className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isAuthLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <CheckCircle className="w-5 h-5" />
-                    )}
-                    {t.emailSubmit}
-                  </button>
-                </form>
-
-                {/* Terms note */}
-                <p className="text-xs text-gray-400 text-center mt-4">
-                  {t.terms}{' '}
-                  <a href="/terms" target="_blank" className="underline hover:text-gray-600">
-                    {t.termsLink}
-                  </a>{' '}
-                  {t.and}{' '}
-                  <a href="/privacy" target="_blank" className="underline hover:text-gray-600">
-                    {t.privacyLink}
-                  </a>
-                  .
-                </p>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </>
+          )}
         </div>
       </div>
     </div>
