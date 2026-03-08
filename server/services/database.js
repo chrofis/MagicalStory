@@ -119,6 +119,8 @@ async function initializeDatabase() {
     await dbPool.query(`UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL`);
     // Set existing users as having consented to photo uploads (retroactive consent)
     await dbPool.query(`UPDATE users SET photo_consent_at = CURRENT_TIMESTAMP WHERE photo_consent_at IS NULL`);
+    // Trial users with random passwords they don't know should have has_set_password = false
+    await dbPool.query(`UPDATE users SET has_set_password = FALSE WHERE is_trial = TRUE AND has_set_password IS NOT FALSE`);
 
     // Config table
     await dbPool.query(`
