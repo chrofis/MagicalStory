@@ -193,8 +193,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Invalid stored data, clear it
         storage.clearAuthStorage();
       }
+      setIsLoading(false);
+    } else if (token && !userJson) {
+      // Token exists but no stored user data (e.g. trial email verification redirect).
+      // Fetch user profile from API to complete the session.
+      logger.info('Token found without user data, fetching profile from API...');
+      fetch(`${API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to fetch user')))
+        .then(data => {
+          if (data?.user) {
+            const user = data.user as User;
+            storage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
+            if (user.role !== 'admin') {
+              storage.removeItem('developer_mode');
+            }
+            setState({
+              isAuthenticated: true,
+              user,
+              token,
+              isImpersonating: false,
+              originalAdmin: null,
+            });
+            logger.info(`Session restored from API for ${user.username}`);
+            scheduleTokenRefresh(token);
+          } else {
+            storage.clearAuthStorage();
+          }
+        })
+        .catch(() => {
+          logger.warn('Failed to fetch user profile, clearing token');
+          storage.clearAuthStorage();
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [getTokenExpiry, scheduleTokenRefresh]);
 
   // Save auth data to storage
