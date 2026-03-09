@@ -138,6 +138,7 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'going-to-bed', name: { en: 'Going to Bed', de: 'Ins Bett gehen', fr: 'Aller au lit' }, emoji: '🛏️', ageGroup: 'toddler' },
   { id: 'saying-goodbye', name: { en: 'Saying Goodbye', de: 'Abschied nehmen', fr: 'Dire au revoir' }, emoji: '👋', ageGroup: 'toddler' },
   { id: 'no-pacifier', name: { en: 'No More Pacifier', de: 'Ohne Schnuller', fr: 'Plus de tétine' }, emoji: '🍼', ageGroup: 'toddler' },
+  { id: 'getting-dressed', name: { en: 'Getting Dressed by Myself', de: 'Sich alleine anziehen', fr: 'S\'habiller tout seul' }, emoji: '👕', ageGroup: 'toddler' },
 
   // Preschool (4-6 years)
   { id: 'cleaning-up', name: { en: 'Cleaning Up Toys', de: 'Aufräumen', fr: 'Ranger les jouets' }, emoji: '🧹', ageGroup: 'preschool' },
@@ -148,6 +149,12 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'making-friends', name: { en: 'Making Real Friends', de: 'Echte Freunde finden', fr: 'Se faire de vrais amis' }, emoji: '👫', ageGroup: 'preschool' },
   { id: 'being-brave', name: { en: 'Being Brave', de: 'Mutig sein', fr: 'Être courageux' }, emoji: '💪', ageGroup: 'preschool' },
   { id: 'new-sibling', name: { en: 'New Baby Sibling', de: 'Neues Geschwisterchen', fr: 'Nouveau bébé dans la famille' }, emoji: '👶', ageGroup: 'preschool' },
+  { id: 'managing-emotions', name: { en: 'Managing Big Emotions', de: 'Grosse Gefühle bewältigen', fr: 'Gérer les grandes émotions' }, emoji: '😤', ageGroup: 'preschool' },
+  { id: 'whining', name: { en: 'Using a Nice Voice', de: 'Nicht jammern', fr: 'Parler sans pleurnicher' }, emoji: '🗣️', ageGroup: 'preschool' },
+  { id: 'saying-sorry', name: { en: 'Saying Sorry & Meaning It', de: 'Sich aufrichtig entschuldigen', fr: 'S\'excuser sincèrement' }, emoji: '🙏', ageGroup: 'preschool' },
+  { id: 'picky-eating', name: { en: 'Trying New Foods', de: 'Neues Essen probieren', fr: 'Goûter de nouveaux aliments' }, emoji: '🍽️', ageGroup: 'preschool' },
+  { id: 'table-manners', name: { en: 'Table Manners', de: 'Tischmanieren', fr: 'Bonnes manières à table' }, emoji: '🍴', ageGroup: 'preschool' },
+  { id: 'being-patient', name: { en: 'Learning to Be Patient', de: 'Geduld lernen', fr: 'Apprendre la patience' }, emoji: '🐢', ageGroup: 'preschool' },
 
   // Early School (6-9 years)
   { id: 'first-school', name: { en: 'First Day of School', de: 'Erster Schultag', fr: 'Premier jour d\'école' }, emoji: '🏫', ageGroup: 'early-school' },
@@ -158,6 +165,15 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'dealing-bully', name: { en: 'Standing Up for Yourself', de: 'Für sich einstehen', fr: 'S\'affirmer face aux autres' }, emoji: '🛡️', ageGroup: 'early-school' },
   { id: 'telling-truth', name: { en: 'Telling the Truth', de: 'Die Wahrheit sagen', fr: 'Dire la vérité' }, emoji: '✅', ageGroup: 'early-school' },
   { id: 'trying-new-things', name: { en: 'Growing & Learning', de: 'Wachsen & Lernen', fr: 'Grandir & Apprendre' }, emoji: '🌟', ageGroup: 'early-school' },
+  { id: 'sibling-fighting', name: { en: 'Getting Along with Siblings', de: 'Geschwisterstreit', fr: 'S\'entendre avec ses frères et sœurs' }, emoji: '👧👦', ageGroup: 'early-school' },
+  { id: 'jealousy', name: { en: 'Dealing with Jealousy', de: 'Mit Eifersucht umgehen', fr: 'Gérer la jalousie' }, emoji: '💚', ageGroup: 'early-school' },
+  { id: 'not-giving-up', name: { en: 'Not Giving Up', de: 'Nicht aufgeben', fr: 'Ne pas abandonner' }, emoji: '🧗', ageGroup: 'early-school' },
+  { id: 'being-left-out', name: { en: 'Being Left Out', de: 'Ausgeschlossen werden', fr: 'Être mis à l\'écart' }, emoji: '😔', ageGroup: 'early-school' },
+  { id: 'taking-care-belongings', name: { en: 'Taking Care of Things', de: 'Auf Sachen aufpassen', fr: 'Prendre soin de ses affaires' }, emoji: '🎒', ageGroup: 'early-school' },
+  { id: 'helping-at-home', name: { en: 'Helping at Home', de: 'Im Haushalt helfen', fr: 'Aider à la maison' }, emoji: '🏡', ageGroup: 'early-school' },
+  { id: 'dealing-disappointment', name: { en: 'Dealing with Disappointment', de: 'Mit Enttäuschung umgehen', fr: 'Gérer la déception' }, emoji: '😞', ageGroup: 'early-school' },
+  { id: 'anxiety-worrying', name: { en: 'Worry & Anxiety', de: 'Sorgen & Ängste', fr: 'Soucis & Anxiété' }, emoji: '😰', ageGroup: 'early-school' },
+  { id: 'caring-for-pet', name: { en: 'Caring for a Pet', de: 'Sich um ein Haustier kümmern', fr: 'Prendre soin d\'un animal' }, emoji: '🐕', ageGroup: 'early-school' },
   { id: 'tattling-vs-telling', name: { en: 'Tattling vs Telling', de: 'Petzen vs Um Hilfe bitten', fr: 'Rapporter vs Demander de l\'aide' }, emoji: '🗣️', ageGroup: 'preschool' },
   { id: 'understanding-rules', name: { en: 'Why Parents Say No', de: 'Warum Eltern Nein sagen', fr: 'Pourquoi les parents disent non' }, emoji: '🚦', ageGroup: 'preschool' },
 
@@ -179,6 +195,9 @@ export const lifeChallenges: LifeChallenge[] = [
   { id: 'responsibility', name: { en: 'Taking Responsibility', de: 'Verantwortung übernehmen', fr: 'Prendre ses responsabilités' }, emoji: '🎯', ageGroup: 'preteen' },
   { id: 'managing-time', name: { en: 'Managing Time', de: 'Zeitmanagement', fr: 'Gestion du temps' }, emoji: '⏰', ageGroup: 'preteen' },
   { id: 'online-safety', name: { en: 'Online Safety', de: 'Sicherheit im Internet', fr: 'Sécurité en ligne' }, emoji: '🔒', ageGroup: 'preteen' },
+  { id: 'being-active', name: { en: 'Being Active & Going Outdoors', de: 'Aktiv sein & Rausgehen', fr: 'Être actif & Sortir dehors' }, emoji: '🏃', ageGroup: 'preteen' },
+  { id: 'comparing-others', name: { en: 'Comparing Yourself to Others', de: 'Sich mit anderen vergleichen', fr: 'Se comparer aux autres' }, emoji: '📊', ageGroup: 'preteen' },
+  { id: 'test-stress', name: { en: 'Test & Exam Stress', de: 'Prüfungsangst', fr: 'Stress des examens' }, emoji: '📋', ageGroup: 'preteen' },
 ];
 
 // Popular life challenge IDs (shown in expanded "Popular" section)

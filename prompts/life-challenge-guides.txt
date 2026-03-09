@@ -195,6 +195,31 @@ Story guidance:
 - The baby will grow up to be a playmate
 Key messages: Love grows bigger for everyone. Being a big sibling is special. Your feelings matter too.
 
+[tattling-vs-telling]
+Help children understand when to tell an adult and when to handle things themselves.
+Story guidance:
+- Telling is when someone is hurt, in danger, or being treated badly - ALWAYS tell an adult
+- Tattling is trying to get someone in trouble for small things
+- Ask yourself: "Is someone getting hurt or in danger?" If yes, tell. If no, try to solve it yourself
+- It's brave to speak up when something is really wrong
+- Nobody likes a tattletale, but everyone needs someone who speaks up about real problems
+- Show examples of both: "She took my crayon" (solve yourself) vs "He's hitting someone" (tell adult)
+- Sometimes it's hard to tell the difference - when in doubt, it's okay to ask an adult
+Key messages: Speak up when it matters. Try to solve small problems yourself. Keeping people safe is always right.
+
+[understanding-rules]
+Help children understand why parents set rules and boundaries.
+Story guidance:
+- Rules aren't to ruin your fun - they exist to keep you safe and healthy
+- Parents say "no" because they can see dangers you can't see yet
+- Some rules are about safety (don't touch the stove), some about health (brush your teeth), some about respect (don't interrupt)
+- When you understand WHY a rule exists, it's easier to follow
+- You can ask "why?" respectfully - understanding is good
+- As you grow and show responsibility, rules change and you get more freedom
+- Every family has different rules - that's okay
+- Show what happens when rules are ignored (natural consequences, not punishment)
+Key messages: Rules keep you safe. "Why?" is a great question. More responsibility means more freedom.
+
 # =============================================================================
 # EARLY SCHOOL (Ages 6-9)
 # =============================================================================
@@ -482,3 +507,250 @@ Story guidance:
 - Privacy settings are important
 - It's okay to log off when something makes you uncomfortable
 Key messages: Protect your information. Trust your gut feelings. Adults can help with online problems.
+
+[sibling-fighting]
+Help children learn to get along with their brothers and sisters.
+Story guidance:
+- Siblings sometimes argue - that's normal, but we can learn to handle it better
+- Show common triggers: sharing toys, personal space, feeling things are unfair
+- Teach conflict resolution: use words instead of hitting, take turns, compromise
+- Each sibling is different and special in their own way - no need to compare
+- Sometimes you need space - it's okay to take a break and cool down
+- Show empathy: how does your sibling feel when you say/do that?
+- Parents love all their children equally, even if attention isn't always 50/50
+- Highlight the positive side: siblings can be your best friends and allies
+- Working together as a team is more fun than fighting
+Key messages: Disagreements are normal. Use words, not hands. Your sibling can be your best friend.
+
+[being-active]
+Motivate children to be physically active and spend time outdoors instead of just sitting inside.
+Story guidance:
+- Show the contrast: feeling sluggish and bored indoors vs. energized and happy after being active
+- Physical activity isn't just organized sports - it's also playing, exploring, cycling, swimming, hiking
+- Getting outside means adventures: discovering nature, playing with friends, fresh air
+- Your body needs movement to stay strong and healthy, like a machine needs fuel
+- Start small: even a short walk or 10 minutes of play counts
+- Show that it gets easier and more fun the more you do it
+- Friends can make being active more fun - invite someone to join
+- Balance is key: some screen time is fine, but your body also needs to move
+- Feeling proud after accomplishing something physical (climbed a hill, learned to ride a bike)
+Key messages: Your body loves to move. Outdoor adventures are waiting for you. Start small - every step counts.
+
+[getting-dressed]
+Help toddlers feel proud about dressing themselves.
+Story guidance:
+- Show the steps: pick clothes, figure out front/back, arms in sleeves, legs in pants, shoes on feet
+- It's okay if it takes a while or things end up backwards - that's how you learn!
+- Let children make choices about what to wear (within reason)
+- Celebrate each small victory: "I did my buttons!"
+- Some things are tricky (zippers, laces, buttons) - keep practicing
+- Getting dressed by yourself is a big-kid skill to be proud of
+- Morning routines go smoother when you can dress yourself
+Key messages: You're learning a big-kid skill. Practice makes it easier. Be proud of what you can do.
+
+[managing-emotions]
+Help children understand and manage big feelings like anger, frustration, and sadness.
+Story guidance:
+- All feelings are okay - there are no "bad" emotions. What matters is what we do with them
+- Help name the feeling: "I feel angry because..." - naming it helps tame it
+- Show physical signs: tight fists, hot face, tears, wanting to scream
+- Teach calming strategies: deep breaths, counting to 10, squeezing a pillow, going to a calm corner
+- It's never okay to hit, kick, or break things even when you're really upset
+- After calming down, talk about what happened and find solutions
+- Adults have big feelings too - everyone has to learn to manage them
+- Show the reward: feeling better after calming down, solving the problem together
+Key messages: All feelings are okay. You can learn to calm down. Big feelings don't last forever.
+
+[whining]
+Help children learn to express needs and frustrations without whining or constant complaining.
+Story guidance:
+- Show the difference between a whiny voice and a normal/polite voice
+- Adults want to help, but whining makes it hard to listen and understand
+- Teach the "try again" approach: "Can you say that in your regular voice?"
+- Sometimes the answer is still "no" even when you ask nicely - and that's okay
+- Show that using words clearly gets better results than whining
+- Acknowledge the frustration: it's okay to be disappointed, but express it differently
+- Practice phrases: "Can I please...", "I feel frustrated because..."
+Key messages: People listen better when you use your regular voice. You can express feelings without whining.
+
+[saying-sorry]
+Help children understand what a real apology means and why it matters.
+Story guidance:
+- Sorry isn't just a word - it means you understand you hurt someone
+- A real apology has parts: what I did, how it made you feel, what I'll do differently
+- You can't just say sorry and do the same thing again
+- Sometimes it's hard to apologize - that's normal, but it's important
+- Show how the other person feels before and after a genuine apology
+- Making mistakes is human - apologizing shows strength, not weakness
+- After saying sorry, try to make it right (fix what you broke, include who you left out)
+Key messages: A real sorry comes from the heart. Everyone makes mistakes. Apologizing takes courage.
+
+[picky-eating]
+Encourage children to be open to trying new and different foods.
+Story guidance:
+- It's okay not to like everything, but you should at least try before deciding
+- Our taste buds change as we grow - something yucky today might be yummy later
+- The "one bite rule": just try one bite of something new
+- Show the adventure side: foods from different countries, new flavors, fun textures
+- Eating the same 3 things gets boring - there's a whole world of food to discover
+- Cooking together can make new foods more exciting
+- No pressure: trying is what counts, not finishing the whole plate
+- Show other characters enjoying foods the main character hasn't tried yet
+Key messages: Be a food explorer. One bite is all it takes to try. Your taste buds grow with you.
+
+[table-manners]
+Teach children age-appropriate table manners and eating etiquette.
+Story guidance:
+- Sit at the table during meals - no running around with food
+- Use your fork and spoon (or chopsticks) instead of just fingers
+- Chew with your mouth closed - nobody wants to see chewed-up food
+- Say please and thank you when asking for things at the table
+- Wait until everyone is served before starting (or follow family rules)
+- Don't play with your food - mealtime is for eating and talking together
+- Ask to be excused when you're done
+- Show that meals are a nice family time, not just about rules
+Key messages: Good manners show respect. Mealtimes are for family togetherness. Small habits make a big difference.
+
+[being-patient]
+Help children learn that not everything happens instantly and waiting is a skill.
+Story guidance:
+- Some things take time and can't be rushed: growing a plant, waiting for a birthday, baking a cake
+- Wanting everything RIGHT NOW is normal, but learning to wait is important
+- Teach waiting strategies: find something else to do, count, play a game
+- Show that good things often come to those who wait
+- The difference between needing something now (help when hurt) vs wanting something now (a toy)
+- Interrupting others because you can't wait is not fair to them
+- Delayed gratification: saving up for something special feels better than instant small rewards
+Key messages: Good things take time. You can learn to wait. Patience is a superpower.
+
+[jealousy]
+Help children understand and cope with feelings of jealousy and envy.
+Story guidance:
+- Jealousy is a normal feeling - even adults feel it sometimes
+- Name it: "I feel jealous because..." - understanding the feeling helps
+- Just because someone has something doesn't mean you have less
+- Everyone has different things - compare less, appreciate more
+- Jealousy of attention: parents/teachers giving attention to others doesn't mean they love you less
+- Wanting what others have vs being happy with what you have
+- Turn jealousy into motivation: "I'd like to learn that too" instead of "it's not fair"
+- Celebrate others' successes - being happy for friends feels good too
+Key messages: Jealousy is normal but doesn't have to control you. You have your own special things. Be happy for others.
+
+[not-giving-up]
+Help children develop perseverance and deal with frustration when things are hard.
+Story guidance:
+- Learning anything new is hard at first - walking, reading, riding a bike, all of it
+- The moment you want to quit is often right before you'd succeed
+- "I can't do it" should become "I can't do it YET"
+- Break big challenges into small steps - each step is progress
+- Failing isn't the end - it's information about what to try differently
+- Show famous examples: things that took many attempts before succeeding
+- Ask for help when stuck - that's not giving up, that's being smart
+- Celebrate effort and progress, not just the final result
+Key messages: Hard things get easier with practice. "Yet" is a powerful word. Every expert was once a beginner.
+
+[being-left-out]
+Help children cope with social exclusion and feeling left out.
+Story guidance:
+- Being left out hurts - that feeling is real and valid
+- Sometimes it's not personal - groups form naturally and change over time
+- What to do: approach and ask to join, find other people to play with, tell an adult if it's deliberate
+- You don't need everyone to like you - a few good friends are enough
+- Being left out doesn't mean something is wrong with you
+- Remember how it feels so you include others when you can
+- Show the character finding new friends or activities when excluded
+- Adults can help if someone is being deliberately left out repeatedly
+Key messages: Being left out hurts, but it doesn't define you. You can find your people. Include others when you can.
+
+[taking-care-belongings]
+Teach children to look after their things and be responsible with possessions.
+Story guidance:
+- Your things won't last if you don't take care of them
+- Put things back where they belong so you can find them later
+- School supplies, toys, clothes - they all need care
+- Losing things means going without or needing to replace them
+- Treat borrowed things even better than your own
+- A place for everything: backpack packed the night before, toys in their spot
+- Show the consequence of carelessness (lost favorite toy) and the reward of responsibility
+- Taking care of things shows you're growing up and can be trusted with more
+Key messages: Take care of what you have. Being organized saves time and tears. Responsibility earns trust.
+
+[helping-at-home]
+Motivate children to contribute to household tasks and chores.
+Story guidance:
+- A family is a team - everyone helps to make the home nice
+- Age-appropriate chores: setting table, feeding pets, tidying room, putting clothes in hamper
+- Helping isn't punishment - it's being part of the family
+- Show pride in contributing: "I helped make dinner!" "I cleaned my room by myself!"
+- Doing chores without being asked is extra impressive
+- Working together as a family can be fun - put on music, race to finish, make it a game
+- The house is everyone's space - everyone helps keep it nice
+- Show that parents also do chores they don't always enjoy
+Key messages: Helping makes you a team player. Everyone does their part. Small jobs make a big difference.
+
+[dealing-disappointment]
+Help children cope when things don't go as planned or expected.
+Story guidance:
+- Disappointment is a normal feeling when expectations aren't met
+- Plans change, promises sometimes break, things don't always work out
+- It's okay to feel sad or frustrated - those feelings are valid
+- What happened can't be changed, but you can choose what to do next
+- Look for the silver lining or an alternative plan
+- Throwing a tantrum won't change the situation - but talking about it helps
+- Some disappointments lead to unexpected good things
+- Show the character processing disappointment and moving forward
+Key messages: Disappointment is part of life. Feel it, then move forward. New plans can be good too.
+
+[anxiety-worrying]
+Help children understand and manage worry and anxiety.
+Story guidance:
+- Worry is your brain trying to protect you, but sometimes it worries too much
+- The "worry monster" makes things seem scarier than they really are
+- Name your worries out loud - they often shrink when you say them
+- Ask: "Is this worry helping me or just making me feel bad?"
+- Calming techniques: deep breathing, visualization, talking to someone
+- Most things we worry about never actually happen
+- It's okay to ask for help when worry feels too big
+- Bedtime worries: write them down or tell them to a worry doll, then let them go for the night
+- Show the difference between useful caution and unnecessary anxiety
+Key messages: Worries aren't facts. You are braver than you think. Talking about worries makes them smaller.
+
+[caring-for-pet]
+Teach children the responsibility that comes with having a pet.
+Story guidance:
+- A pet is a living creature that depends on you - not just a toy
+- Daily responsibilities: feeding, fresh water, cleaning, exercise, attention
+- Pets need love AND routine - they count on you every day, not just when it's fun
+- Different pets have different needs - learn what your pet requires
+- Walking the dog even when it's cold or raining - commitment matters
+- Recognizing when your pet is happy, scared, hungry, or sick
+- Vet visits are important - taking care of health is part of the job
+- The reward: unconditional love, a loyal companion, learning responsibility
+Key messages: Pets depend on you every day. Responsibility means doing it even when you don't feel like it. The love you give comes back to you.
+
+[comparing-others]
+Help pre-teens stop constantly comparing themselves to peers and social media.
+Story guidance:
+- Everyone's highlight reel looks amazing - but nobody shows the hard parts
+- Social media shows filtered, edited, carefully chosen moments - not real life
+- Comparing your beginning to someone else's middle isn't fair to yourself
+- Everyone has strengths and struggles - you only see others' strengths
+- "They have more followers/better clothes/higher grades" - but you have your own gifts
+- Focus on your own progress: compare yourself to yesterday-you, not to others
+- Unfollowing or muting accounts that make you feel bad is okay and smart
+- Show that the person being envied also has insecurities and problems
+Key messages: Comparison steals joy. Your path is your own. Focus on growing, not measuring.
+
+[test-stress]
+Help children manage anxiety and pressure around tests, exams, and performance.
+Story guidance:
+- Some nervousness before a test is normal - it shows you care
+- Too much stress blocks your brain from remembering what you actually know
+- Preparation is the best anti-stress weapon: study in small chunks, not all at once
+- The night before: relax, get enough sleep, have everything ready
+- During the test: breathe, read carefully, skip hard questions and come back
+- A test score doesn't define who you are or how smart you are
+- Parents and teachers want you to do your best, not to be perfect
+- Show what happens when a character bombs a test - it's not the end of the world
+- Mistakes on tests show what to learn next, not that you're a failure
+Key messages: Prepare well, then trust yourself. One test doesn't define you. Mistakes show where to grow.
