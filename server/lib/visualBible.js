@@ -1823,6 +1823,60 @@ function getElementReferenceImagesForPage(visualBible, pageNumber, maxRefs = 4) 
   return relevantRefs.slice(0, maxRefs);
 }
 
+/**
+ * Get visual bible elements by their IDs (from scene hint parsing).
+ * Fallback for when appearsInPages doesn't match actual scene content.
+ * @param {Object} visualBible
+ * @param {string[]} elementIds - IDs like ["CHR001", "ART002"]
+ * @returns {Array} elements with referenceImageData
+ */
+function getElementReferenceImagesByIds(visualBible, elementIds) {
+  if (!visualBible || !elementIds || elementIds.length === 0) return [];
+
+  const results = [];
+  const idSet = new Set(elementIds.map(id => id.toUpperCase()));
+
+  const priorities = { character: 1, animal: 2, artifact: 3, vehicle: 4, location: 5 };
+  const searchArrays = [
+    [visualBible.secondaryCharacters, 'character'],
+    [visualBible.animals, 'animal'],
+    [visualBible.artifacts, 'artifact'],
+    [visualBible.vehicles, 'vehicle'],
+  ];
+
+  for (const [entries, type] of searchArrays) {
+    for (const entry of entries || []) {
+      if (!entry.referenceImageData) continue;
+      if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
+      results.push({
+        id: entry.id,
+        name: entry.name,
+        type,
+        description: entry.extractedDescription || entry.description,
+        referenceImageData: entry.referenceImageData,
+        priority: priorities[type]
+      });
+    }
+  }
+
+  // Non-landmark locations
+  for (const entry of visualBible.locations || []) {
+    if (entry.isRealLandmark) continue;
+    if (!entry.referenceImageData) continue;
+    if (!entry.id || !idSet.has(entry.id.toUpperCase())) continue;
+    results.push({
+      id: entry.id,
+      name: entry.name,
+      type: 'location',
+      description: entry.extractedDescription || entry.description,
+      referenceImageData: entry.referenceImageData,
+      priority: priorities.location
+    });
+  }
+
+  return results;
+}
+
 // ============================================================================
 // EXPORTS
 // ============================================================================
@@ -1867,5 +1921,6 @@ module.exports = {
   // Reference image support
   getElementsNeedingReferenceImages,
   updateElementReferenceImage,
-  getElementReferenceImagesForPage
+  getElementReferenceImagesForPage,
+  getElementReferenceImagesByIds
 };

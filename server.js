@@ -168,7 +168,8 @@ const {
   extractStoryTextFromOutput,
   linkPreDiscoveredLandmarks,
   injectHistoricalLocations,
-  getElementReferenceImagesForPage
+  getElementReferenceImagesForPage,
+  getElementReferenceImagesByIds
 } = require('./server/lib/visualBible');
 const {
   prefetchLandmarkPhotos,
@@ -3530,7 +3531,29 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           }
         }
         const pageLandmarkPhotos = await getLandmarkPhotosForScene(visualBible, sceneMetadata);
-        const elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+        let elementReferences = getElementReferenceImagesForPage(visualBible, pageNum, 6);
+        // Fallback: also match by IDs found in scene hint (covers page mismatch between VB and scene)
+        if (sceneMetadata?.fullData) {
+          const sceneIds = [];
+          // Extract CHR IDs from characters
+          for (const char of sceneMetadata.fullData.characters || []) {
+            if (char.id && char.id !== 'null') sceneIds.push(char.id);
+          }
+          // Extract ART/OBJ IDs from objects
+          for (const obj of sceneMetadata.fullData.objects || []) {
+            const id = typeof obj === 'string' ? obj.match(/((?:ART|OBJ|CHR|VEH)\d+)/i)?.[1] : obj?.id;
+            if (id && !id.startsWith('LOC')) sceneIds.push(id);
+          }
+          if (sceneIds.length > 0) {
+            const idBasedRefs = getElementReferenceImagesByIds(visualBible, sceneIds);
+            const existingIds = new Set(elementReferences.map(r => r.id));
+            const newRefs = idBasedRefs.filter(r => !existingIds.has(r.id));
+            if (newRefs.length > 0) {
+              log.info(`🔗 [VB-MATCH] Page ${pageNum}: Added ${newRefs.length} element(s) by scene hint ID: ${newRefs.map(r => r.id).join(', ')}`);
+              elementReferences = [...elementReferences, ...newRefs].slice(0, 6);
+            }
+          }
+        }
         const secondaryLandmarks = pageLandmarkPhotos.slice(1);
         let vbGrid = null;
         if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
@@ -4115,7 +4138,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     const stripImageData = (img) => {
       if (!img) return img;
       const { imageData, referencePhotos, landmarkPhotos, visualBibleGrid, bboxOverlayImage, ...metadata } = img;
-      const stripped = { ...metadata, hasImage: !!imageData };
+      const stripped = { ...metadata, hasImage: !!imageData, hasVisualBibleGrid: !!visualBibleGrid };
       // Strip imageData from imageVersions
       if (stripped.imageVersions) {
         stripped.imageVersions = stripped.imageVersions.map(v => {
