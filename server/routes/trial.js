@@ -367,7 +367,7 @@ router.post('/generate-preview-avatar', trialAvatarLimiter, async (req, res) => 
     let hairDescription = '';
     let extractedTraits = null;
     try {
-      const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${resizedBase64}`;
+      const photoDataUri = `data:image/jpeg;base64,${resizedBase64}`;
       const traitsResult = await extractTraitsWithGemini(photoDataUri);
       if (traitsResult?.traits) {
         extractedTraits = traitsResult.traits;
