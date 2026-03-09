@@ -2379,6 +2379,26 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         }));
       });
 
+      // Seed cache with pre-generated styled avatars from prepare-title (avoid re-generating)
+      const preGenAvatars = (inputData.characters || [])[0]?.preGeneratedStyledAvatars;
+      if (preGenAvatars) {
+        let seeded = 0;
+        for (const [charName, avatars] of Object.entries(preGenAvatars)) {
+          for (const [category, imageData] of Object.entries(avatars)) {
+            if (category === 'costumed' && typeof avatars.costumed === 'object') {
+              for (const [costumeType, img] of Object.entries(avatars.costumed)) {
+                setStyledAvatar(charName, `costumed:${costumeType}`, artStyle, img);
+                seeded++;
+              }
+            } else if (category !== 'costumed') {
+              setStyledAvatar(charName, category, artStyle, imageData);
+              seeded++;
+            }
+          }
+        }
+        if (seeded > 0) log.info(`♻️ [TRIAL] Seeded ${seeded} styled avatars from prepare-title cache`);
+      }
+
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
       streamingAvatarStylingPromise = (async () => {
         try {

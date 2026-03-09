@@ -1573,7 +1573,7 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
     }
 
     // Lazy require the styled avatar and story helper modules
-    const { runInCacheScope, prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache } = require('../lib/styledAvatars');
+    const { runInCacheScope, prepareStyledAvatars, applyStyledAvatars, clearStyledAvatarCache, exportStyledAvatarsForPersistence } = require('../lib/styledAvatars');
     const { ART_STYLES, getCharacterPhotoDetails, buildCharacterReferenceList } = require('../lib/storyHelpers');
     const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
     const { generateImageOnly } = require('../lib/images');
@@ -1625,11 +1625,19 @@ router.post('/prepare-title', titlePageLimiter, verifySessionToken, async (req, 
 
       const titlePageImage = result.imageData;
 
+      // Export styled avatars so the pipeline can reuse them (avoid regenerating)
+      const styledAvatarExport = exportStyledAvatarsForPersistence(characters, 'watercolor');
+      const styledAvatarsData = {};
+      for (const [charName, avatars] of styledAvatarExport) {
+        styledAvatarsData[charName] = avatars;
+      }
+
       // Store result on character data in DB
       try {
         charData.characters[0].preGeneratedTitlePage = titlePageImage;
         charData.characters[0].preGeneratedTitle = title;
         charData.characters[0].preGeneratedCostumeType = costumeType;
+        charData.characters[0].preGeneratedStyledAvatars = styledAvatarsData;
         await pool.query(
           'UPDATE characters SET data = $1 WHERE id = $2',
           [JSON.stringify(charData), characterId]
