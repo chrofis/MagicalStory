@@ -454,7 +454,7 @@ export default function TrialGenerationPage() {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Navigation bar matching the trial wizard */}
       <nav className="bg-black text-white px-3 py-3">
         <div className="flex justify-between items-center">
@@ -466,7 +466,7 @@ export default function TrialGenerationPage() {
 
       {/* Content */}
       <div className="px-3 md:px-8 py-4 md:py-8">
-        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-8">
+        <div className="max-w-lg mx-auto bg-white rounded-2xl shadow-xl p-5 md:p-8">
 
           {/* ── Progress / Status (compact, on top) ────────────────── */}
           <div className="flex flex-col items-center text-center mb-3">
