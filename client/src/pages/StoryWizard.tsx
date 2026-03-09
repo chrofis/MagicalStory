@@ -418,6 +418,7 @@ export default function StoryWizard() {
                 referencePhotoNames: meta.referencePhotoNames?.length ? meta.referencePhotoNames : v.referencePhotoNames,
                 prompt: meta.prompt ?? v.prompt,
                 description: meta.description ?? v.description,
+                type: (meta.type ?? v.type) as ImageVersion['type'],
               };
             }) ?? img.imageVersions,
           };

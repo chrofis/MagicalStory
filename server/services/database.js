@@ -524,7 +524,7 @@ async function saveStoryData(storyId, storyData) {
         if (!hasSeparateImages) {
           // First-time extraction: save v0 to story_images
           await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
-            qualityScore: img.qualityScore || img.score,
+            qualityScore: img.qualityScore ?? img.score,
             generatedAt: img.generatedAt,
             versionIndex: 0
           });
@@ -540,7 +540,7 @@ async function saveStoryData(storyId, storyData) {
             // Skip versions that were rehydrated from DB (marked by rehydrateStoryImages)
             if (!version._rehydrated) {
               await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
-                qualityScore: version.qualityScore || version.score,
+                qualityScore: version.qualityScore ?? version.score,
                 generatedAt: version.generatedAt,
                 versionIndex: arrayToDbIndex(i, 'scene')
               });
@@ -588,7 +588,7 @@ async function saveStoryData(storyId, storyData) {
         if (!hasSeparateImages) {
           // First-time extraction: save v0 to story_images
           await saveStoryImage(storyId, coverType, null, coverData.imageData, {
-            qualityScore: coverData.qualityScore || null,
+            qualityScore: coverData.qualityScore ?? null,
             generatedAt: coverData.generatedAt || null,
             versionIndex: 0
           });
@@ -657,7 +657,7 @@ async function saveScenePageData(storyId, pageNumber, sceneData) {
       const version = dataForStorage.imageVersions[i];
       if (version.imageData && !version._rehydrated) {
         await saveStoryImage(storyId, 'scene', pageNumber, version.imageData, {
-          qualityScore: version.qualityScore || version.score,
+          qualityScore: version.qualityScore ?? version.score,
           generatedAt: version.generatedAt,
           versionIndex: arrayToDbIndex(i, 'scene')
         });
@@ -828,7 +828,7 @@ async function upsertStory(storyId, userId, storyData) {
       if (img.imageData) {
         // Save to story_images table
         await saveStoryImage(storyId, 'scene', img.pageNumber, img.imageData, {
-          qualityScore: img.qualityScore || img.score,
+          qualityScore: img.qualityScore ?? img.score,
           generatedAt: img.generatedAt,
           versionIndex: 0
         });
@@ -842,7 +842,7 @@ async function upsertStory(storyId, userId, storyData) {
           const version = img.imageVersions[i];
           if (version.imageData) {
             await saveStoryImage(storyId, 'scene', img.pageNumber, version.imageData, {
-              qualityScore: version.qualityScore || version.score,
+              qualityScore: version.qualityScore ?? version.score,
               generatedAt: version.generatedAt,
               versionIndex: arrayToDbIndex(i, 'scene')
             });
@@ -889,7 +889,7 @@ async function upsertStory(storyId, userId, storyData) {
       console.log(`💾 [UPSERT] Cover ${coverType}: hasData=${!!imageData}, dataLength=${imageData?.length || 0}`);
       if (imageData) {
         await saveStoryImage(storyId, coverType, null, imageData, {
-          qualityScore: coverData.qualityScore || null,
+          qualityScore: coverData.qualityScore ?? null,
           generatedAt: coverData.generatedAt || null,
           versionIndex: 0
         });

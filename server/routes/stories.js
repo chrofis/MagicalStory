@@ -709,7 +709,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
             modelId: v.modelId || null,
             createdAt: v.createdAt || null,
             isActive: v.isActive || false,
-            type: v.type || null,
+            type: v.type || v.source || null,
             qualityScore: v.qualityScore ?? null,
             qualityReasoning: v.qualityReasoning || null,
             fixTargets: v.fixTargets || [],
