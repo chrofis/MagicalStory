@@ -1699,22 +1699,9 @@ function getElementsNeedingReferenceImages(visualBible, minAppearances = 2) {
     }
   };
 
-  // Secondary characters: always generate reference sheets (even 1 appearance)
-  // Characters need visual consistency more than objects do
-  for (const entry of visualBible.secondaryCharacters || []) {
-    if (entry.referenceImageGenerated) continue;
-    if (entry.referenceImageData) continue;
-    if (!entry.appearsInPages || entry.appearsInPages.length < 1) continue;
-
-    needsReference.push({
-      ...entry,
-      type: 'character',
-      pageCount: entry.appearsInPages.length
-    });
-  }
-
-  // Include artifacts, animals, and vehicles (require minAppearances)
+  // Include secondary characters, artifacts, animals, and vehicles
   // Skip clothing (worn by characters) - they appear on character reference images
+  checkEntries(visualBible.secondaryCharacters, 'character');
   checkEntries(visualBible.artifacts, 'artifact');
   checkEntries(visualBible.animals, 'animal');
   checkEntries(visualBible.vehicles, 'vehicle');
