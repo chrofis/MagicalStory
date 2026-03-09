@@ -1852,7 +1852,7 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
           return {
             ...v,
             imageData: v.imageData ? normalizeImageData(v.imageData) : undefined,
-            isActive: (i + 1) === activeVersion,
+            isActive: v.versionIndex === activeVersion,
             description: meta.description,
             prompt: meta.prompt,
             userInput: meta.userInput,
@@ -1867,9 +1867,8 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
       console.log(`📷 [IMAGE] ${id}/page${pageNum} - ${Math.round(imageSize/1024)}KB, ${versionsCount} versions, active=${activeVersion}, ${Date.now() - startTime}ms`);
 
       // Return active version's imageData as the main imageData
-      const activeImageData = activeVersion === 0
-        ? normalizeImageData(separateImage.imageData)
-        : (allVersions[activeVersion]?.imageData || normalizeImageData(separateImage.imageData));
+      const activeEntry = allVersions.find(v => v.isActive);
+      const activeImageData = activeEntry?.imageData || normalizeImageData(separateImage.imageData);
 
       return res.json({
         pageNumber: pageNum,
@@ -1893,9 +1892,10 @@ router.get('/:id/image/:pageNumber', authenticateToken, async (req, res) => {
     }
 
     // Mark isActive based on image_version_meta (or fallback to legacy isActive in data)
+    // activeVersion is a DB version_index; imageVersions[i] maps to DB index i+1 for scenes
     const versionsWithActive = sceneImage.imageVersions?.map((v, i) => ({
       ...v,
-      isActive: i === activeVersion
+      isActive: activeVersion > 0 && i === dbToArrayIndex(activeVersion, 'scene')
     }));
 
     const imageSize = sceneImage.imageData?.length || 0;
@@ -2092,12 +2092,15 @@ router.get('/:id', authenticateToken, async (req, res) => {
           const activeVersions = await getAllActiveVersions(id);
           for (const scene of story.sceneImages) {
             if (scene.imageVersions && scene.imageVersions.length > 0) {
-              const activeVersion = activeVersions[scene.pageNumber] ?? 0;
+              const activeDbIndex = activeVersions[scene.pageNumber] ?? 0;
+              // Convert DB version_index to array index (scenes: dbIndex - 1)
+              // DB index 0 = original (not in imageVersions array), so activeArrayIdx = -1 means "original"
+              const activeArrayIdx = activeDbIndex === 0 ? -1 : dbToArrayIndex(activeDbIndex, 'scene');
               scene.imageVersions.forEach((v, idx) => {
-                v.isActive = idx === activeVersion;
+                v.isActive = idx === activeArrayIdx;
               });
-              // Track active version index for frontend
-              scene.activeVersionIndex = activeVersion;
+              // Track active version as array index for frontend
+              scene.activeVersionIndex = activeArrayIdx;
             }
           }
         }
@@ -2507,13 +2510,19 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       return res.status(400).json({ error: 'Valid versionIndex is required' });
     }
 
-    console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - Selecting version ${versionIndex}`);
-
     if (!isDatabaseMode()) {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
 
     const pool = getPool();
+    const { arrayToDbIndex } = require('../lib/versionManager');
+
+    // Convert frontend array index to DB version_index
+    // Array index 0 = original (DB version_index 0)
+    // Array index 1+ = regenerations (DB version_index = arrayToDbIndex(i, 'scene'))
+    const dbVersionIndex = versionIndex === 0 ? 0 : arrayToDbIndex(versionIndex, 'scene');
+
+    console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - array idx ${versionIndex} → DB idx ${dbVersionIndex}`);
 
     // Verify story ownership (fast query, no data loading)
     const ownerCheck = await pool.query(
@@ -2529,7 +2538,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     const versionCheck = await pool.query(
       `SELECT 1 FROM story_images
        WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
-      [id, pageNum, versionIndex]
+      [id, pageNum, dbVersionIndex]
     );
 
     if (versionCheck.rows.length === 0) {
@@ -2552,7 +2561,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     }
 
     // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
-    await setActiveVersion(id, pageNum, versionIndex);
+    await setActiveVersion(id, pageNum, dbVersionIndex);
 
     // Also update metadata timestamp
     await pool.query(
@@ -2562,7 +2571,7 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       [JSON.stringify(new Date().toISOString()), id]
     );
 
-    console.log(`✅ Active image set to version ${versionIndex} for page ${pageNum} (fast path)`);
+    console.log(`✅ Active image set to version ${versionIndex} (DB idx ${dbVersionIndex}) for page ${pageNum}`);
 
     res.json({
       success: true,

@@ -1013,6 +1013,7 @@ async function getStoryImageWithVersions(storyId, imageType, pageNumber) {
   const versions = rows
     .filter(r => r.version_index > 0)
     .map(r => ({
+      versionIndex: r.version_index,
       imageData: r.image_data,
       qualityScore: r.quality_score,
       generatedAt: r.generated_at
@@ -1322,12 +1323,17 @@ async function rehydrateStoryImages(storyId, storyData) {
       }
 
       // Populate imageVersions with their imageData from database
-      // imageVersions[i] → DB version_index via arrayToDbIndex (scenes: i+1, covers: i)
+      // imageVersions[0] with type='original' → DB version_index 0 (the original/main image)
+      // Other entries: imageVersions[i] → DB version_index via arrayToDbIndex (scenes: i+1)
       if (scene.imageVersions && scene.imageVersions.length > 0) {
         for (let vIdx = 0; vIdx < scene.imageVersions.length; vIdx++) {
           const version = scene.imageVersions[vIdx];
           if (!version.imageData) {
-            const dbVersionIndex = arrayToDbIndex(vIdx, 'scene');
+            // The 'original' entry at index 0 is a metadata-only placeholder for the
+            // main image, which lives at DB version_index 0 (not arrayToDbIndex(0)=1)
+            const dbVersionIndex = (vIdx === 0 && version.type === 'original')
+              ? 0
+              : arrayToDbIndex(vIdx, 'scene');
             const versionImg = allVersionImages.find(
               i => i.image_type === 'scene' && i.page_number === scene.pageNumber && i.version_index === dbVersionIndex
             );
