@@ -150,7 +150,7 @@ router.get('/thumbnails', authenticateToken, async (req, res) => {
     const result = await dbQuery(`
       SELECT jsonb_agg(
         jsonb_build_object(
-          'id', (c->>'id')::int,
+          'id', (c->>'id')::bigint,
           'faceThumbnails', c->'avatars'->'faceThumbnails',
           'bodyThumbnails', c->'avatars'->'bodyThumbnails'
         )
@@ -164,7 +164,7 @@ router.get('/thumbnails', authenticateToken, async (req, res) => {
       const legacy = await dbQuery(`
         SELECT jsonb_agg(
           jsonb_build_object(
-            'id', (c->>'id')::int,
+            'id', (c->>'id')::bigint,
             'faceThumbnails', c->'avatars'->'faceThumbnails',
             'bodyThumbnails', c->'avatars'->'bodyThumbnails'
           )

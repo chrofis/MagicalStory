@@ -2021,7 +2021,20 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
             }
             log.info(`📸 [PHOTO] Updated existing character ${characterId} with new photo for user ${req.user.id}`);
           } else {
-            log.warn(`📸 [PHOTO] Existing character ${characterId} not found in DB, will be updated by avatar job`);
+            // Character not in DB yet (wizard hasn't saved) — create a minimal entry
+            // so the avatar job can find it later
+            log.warn(`📸 [PHOTO] Existing character ${characterId} not found in DB — creating placeholder entry`);
+            const newCharacter = {
+              id: characterId,
+              name: '',  // Will be filled when wizard saves
+              gender: undefined,
+              age: '',
+              photos: photosObj,
+              physical: {},
+              avatars: { status: 'pending' },
+              traits: { strengths: [], flaws: [], challenges: [], specialDetails: '' }
+            };
+            characters.push(newCharacter);
           }
         } else {
           // Create new character with photo data

@@ -1480,6 +1480,16 @@ async function initializeDatabase() {
       )
     `);
 
+    // Trial daily stats (persistent, survives deploys)
+    await dbPool.query(`
+      CREATE TABLE IF NOT EXISTS trial_daily_stats (
+        date DATE PRIMARY KEY,
+        stories_generated INT DEFAULT 0,
+        avatars_generated INT DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     await dbPool.query(`
       CREATE TABLE IF NOT EXISTS logs (
         id SERIAL PRIMARY KEY,
