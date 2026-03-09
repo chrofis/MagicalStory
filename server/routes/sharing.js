@@ -146,6 +146,13 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
 
     const isOwner = !!req.user && req.user.id === story.userId;
 
+    // Check if owner needs to set a password (trial user without password)
+    let needsPassword = false;
+    if (isOwner) {
+      const userResult = await dbQuery('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+      needsPassword = userResult.length > 0 && !userResult[0].password_hash;
+    }
+
     // Return only safe public data (no user info, no prompts)
     const data = story.data;
 
@@ -183,6 +190,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       covers,
       isOwner,
       isShared: story.isShared,
+      needsPassword,
     });
   } catch (err) {
     log.error('Error fetching shared story:', err);

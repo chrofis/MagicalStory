@@ -1,34 +1,40 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil, Globe, Lock, Share2, Menu } from 'lucide-react';
+import { BookOpen, Loader2, AlertCircle, Sparkles, ChevronLeft, ChevronRight, Pencil, Globe, Lock, Share2, Menu, BookOpenCheck, Plus } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { UserMenu } from '@/components/common/UserMenu';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from '@/components/common/CreditsModal';
 
-// Swipe detection hook
+// Swipe detection hook — only triggers on the image area, not scrollable text
 function useSwipe(onSwipeLeft: () => void, onSwipeRight: () => void) {
-  const touchStart = useRef<number | null>(null);
-  const touchEnd = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const touchEnd = useRef<{ x: number; y: number } | null>(null);
   const minSwipeDistance = 50;
 
   const onTouchStart = (e: React.TouchEvent) => {
+    // Only allow swipe on image area — skip if touch started in a scrollable text container
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-text-scroll]')) return;
     touchEnd.current = null;
-    touchStart.current = e.targetTouches[0].clientX;
+    touchStart.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    touchEnd.current = e.targetTouches[0].clientX;
+    if (!touchStart.current) return;
+    touchEnd.current = { x: e.targetTouches[0].clientX, y: e.targetTouches[0].clientY };
   };
 
   const onTouchEnd = () => {
     if (!touchStart.current || !touchEnd.current) return;
-    const distance = touchStart.current - touchEnd.current;
-    const isLeftSwipe = distance > minSwipeDistance;
-    const isRightSwipe = distance < -minSwipeDistance;
-    if (isLeftSwipe) onSwipeLeft();
-    if (isRightSwipe) onSwipeRight();
+    const dx = touchStart.current.x - touchEnd.current.x;
+    const dy = Math.abs(touchStart.current.y - touchEnd.current.y);
+    // Only count as swipe if horizontal distance exceeds vertical (not a scroll)
+    if (dy > Math.abs(dx)) { touchStart.current = null; return; }
+    if (dx > minSwipeDistance) onSwipeLeft();
+    if (dx < -minSwipeDistance) onSwipeRight();
+    touchStart.current = null;
   };
 
   return { onTouchStart, onTouchMove, onTouchEnd };
@@ -54,13 +60,61 @@ interface SharedStoryData {
   };
   isOwner?: boolean;
   isShared?: boolean;
+  needsPassword?: boolean;
 }
 
 type PageEntry =
   | { type: 'frontCover' }
   | { type: 'initialPage' }
   | { type: 'story'; storyPageIdx: number }
-  | { type: 'backCover' };
+  | { type: 'backCover' }
+  | { type: 'endPage' };
+
+// End page translations keyed by story language
+const endPageText: Record<string, Record<string, string>> = {
+  de: {
+    secureTitle: 'Sichere deine Geschichte!',
+    secureDesc: 'Setze ein Passwort, damit du jederzeit auf deine Geschichte zugreifen kannst. Ohne Passwort geht deine Geschichte verloren.',
+    setPassword: 'Passwort setzen',
+    benefits: 'Mit deinem kostenlosen Konto kannst du:',
+    endTitle: 'Ende der Geschichte',
+    printBook: 'Als Buch drucken',
+    newStory: 'Neue Geschichte erstellen',
+    f1: 'Mehrere Figuren in einer Geschichte',
+    f2: 'Längere Geschichten mit mehr Seiten',
+    f3: 'Verschiedene Zeichenstile',
+    f4: 'Höhere Bildqualität und Titelseite',
+    f5: 'Als gedrucktes Buch bestellen',
+  },
+  en: {
+    secureTitle: 'Secure your story!',
+    secureDesc: 'Set a password so you can access your story anytime. Without a password your story will be lost.',
+    setPassword: 'Set password',
+    benefits: 'With your free account you can:',
+    endTitle: 'The End',
+    printBook: 'Print as a book',
+    newStory: 'Create a new story',
+    f1: 'Multiple characters in one story',
+    f2: 'Longer stories with more pages',
+    f3: 'Different drawing styles',
+    f4: 'Higher image quality and title page',
+    f5: 'Order as a printed book',
+  },
+  fr: {
+    secureTitle: 'Sécurisez votre histoire !',
+    secureDesc: 'Définissez un mot de passe pour accéder à votre histoire à tout moment. Sans mot de passe, votre histoire sera perdue.',
+    setPassword: 'Définir un mot de passe',
+    benefits: 'Avec votre compte gratuit, vous pouvez :',
+    endTitle: 'Fin de l\'histoire',
+    printBook: 'Imprimer en livre',
+    newStory: 'Créer une nouvelle histoire',
+    f1: 'Plusieurs personnages dans une même histoire',
+    f2: 'Des histoires plus longues',
+    f3: 'Différents styles de dessin',
+    f4: 'Meilleure qualité d\'image et page de titre',
+    f5: 'Commander en livre imprimé',
+  },
+};
 
 export default function SharedStoryViewer() {
   const { shareToken } = useParams<{ shareToken: string }>();
@@ -77,6 +131,7 @@ export default function SharedStoryViewer() {
   const [showCreditsModal, setShowCreditsModal] = useState(false);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const textScrollRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -201,6 +256,7 @@ export default function SharedStoryViewer() {
       list.push({ type: 'story', storyPageIdx: i });
     }
     if (c.backCover) list.push({ type: 'backCover' });
+    list.push({ type: 'endPage' });
     return list;
   })() : [];
 
@@ -216,6 +272,7 @@ export default function SharedStoryViewer() {
       const idx = currentPage + offset;
       if (idx < 0 || idx >= totalPages) continue;
       const entry = pageList[idx];
+      if (entry.type === 'endPage') continue;
       const img = new Image();
       if (entry.type === 'story') {
         img.src = `/api/shared/${shareToken}/image/${story.pages[entry.storyPageIdx].pageNumber}${tokenParam}`;
@@ -225,11 +282,16 @@ export default function SharedStoryViewer() {
     }
   }, [currentPage, story, shareToken, totalPages]);
 
-  const goToPage = (page: number) => {
+  // Scroll text back to top when page changes
+  useEffect(() => {
+    textScrollRef.current?.scrollTo(0, 0);
+  }, [currentPage]);
+
+  const goToPage = useCallback((page: number) => {
     if (page >= 0 && page < totalPages) {
       setCurrentPage(page);
     }
-  };
+  }, [totalPages]);
 
   const swipeHandlers = useSwipe(
     () => goToPage(currentPage + 1), // swipe left = next
@@ -382,11 +444,14 @@ export default function SharedStoryViewer() {
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden border-2 border-indigo-200 flex-1 max-w-6xl">
           {/* Cover pages (frontCover, initialPage, backCover) */}
           {currentEntry && (currentEntry.type === 'frontCover' || currentEntry.type === 'initialPage' || currentEntry.type === 'backCover') && (
-            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4">
+            <div
+              className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 p-4 cursor-pointer"
+              onClick={() => goToPage(currentPage + 1)}
+            >
               <img
                 src={`/api/shared/${shareToken}/cover-image/${currentEntry.type}${tokenParam}`}
                 alt={currentEntry.type === 'frontCover' ? story.title : currentEntry.type === 'initialPage' ? 'Dedication' : 'Back Cover'}
-                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg"
+                className="max-h-[calc(100vh-200px)] max-w-full object-contain rounded-lg shadow-lg pointer-events-none"
                 loading="eager"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none';
@@ -403,8 +468,8 @@ export default function SharedStoryViewer() {
               <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
                 {/* Text — left on desktop, bottom on mobile */}
                 <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden order-2 md:order-1">
-                  <div className="flex-1 overflow-y-auto min-h-0">
-                    <p className="text-sm md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
+                  <div ref={textScrollRef} className="flex-1 overflow-y-auto min-h-0" data-text-scroll>
+                    <p className="text-base md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
                       {page.text}
                     </p>
                   </div>
@@ -412,16 +477,78 @@ export default function SharedStoryViewer() {
                     Page {currentEntry.storyPageIdx + 1} of {story.pages.length}
                   </div>
                 </div>
-                {/* Image — right on desktop, top on mobile */}
-                <div className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center order-1 md:order-2">
+                {/* Image — right on desktop, top on mobile. Tap to go to next page */}
+                <div
+                  className="h-1/2 md:h-full bg-gradient-to-br from-indigo-50 to-blue-50 flex items-center justify-center order-1 md:order-2 cursor-pointer"
+                  onClick={() => goToPage(currentPage + 1)}
+                >
                   <img
                     src={`/api/shared/${shareToken}/image/${page.pageNumber}${tokenParam}`}
                     alt={`Page ${currentEntry.storyPageIdx + 1}`}
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-contain pointer-events-none"
                     loading="eager"
                   />
                 </div>
               </div>
+            );
+          })()}
+
+          {/* End Page — CTA after last page */}
+          {currentEntry && currentEntry.type === 'endPage' && (() => {
+            const lang = (story.language || 'en').split('-')[0].toLowerCase();
+            const et = endPageText[lang] || endPageText.en;
+            return (
+            <div className="flex items-center justify-center bg-gradient-to-br from-indigo-100 to-blue-100 min-h-[400px] h-[calc(100vh-200px)] max-h-[800px] p-6">
+              <div className="text-center max-w-md">
+                {story.needsPassword ? (
+                  <>
+                    <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Lock className="w-8 h-8 text-amber-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{et.secureTitle}</h2>
+                    <p className="text-gray-600 mb-4">{et.secureDesc}</p>
+                    <button
+                      onClick={() => setShowChangePasswordModal(true)}
+                      className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors mb-4"
+                    >
+                      {et.setPassword}
+                    </button>
+                    <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-100 text-left">
+                      <p className="text-xs font-semibold text-indigo-700 mb-2">{et.benefits}</p>
+                      <ul className="text-xs text-gray-600 space-y-1">
+                        {[et.f1, et.f2, et.f3, et.f4, et.f5].map((f, i) => (
+                          <li key={i} className="flex items-center gap-1.5"><span className="text-indigo-500 font-bold">+</span> {f}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <BookOpenCheck className="w-8 h-8 text-indigo-600" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-2">{et.endTitle}</h2>
+                    <p className="text-gray-500 mb-6">{story.title}</p>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={() => navigate('/stories')}
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <BookOpen className="w-5 h-5" />
+                        {et.printBook}
+                      </button>
+                      <button
+                        onClick={() => navigate('/create?new=true')}
+                        className="w-full bg-white text-indigo-600 py-3 rounded-lg font-semibold border-2 border-indigo-200 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-5 h-5" />
+                        {et.newStory}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
             );
           })()}
 
