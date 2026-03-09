@@ -37,6 +37,16 @@ const handleChunkError = (event: ErrorEvent | PromiseRejectionEvent) => {
 window.addEventListener('error', handleChunkError);
 window.addEventListener('unhandledrejection', handleChunkError);
 
+// iOS Safari kills JS context in background tabs after a while.
+// When the user returns, the page may show a white screen because
+// the frozen page is restored from bfcache with dead JS state.
+// Force a reload to recover.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    window.location.reload();
+  }
+});
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
