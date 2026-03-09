@@ -48,9 +48,10 @@ const translations = {
     termsLink: 'Terms of Service',
     and: 'and',
     privacyLink: 'Privacy Policy',
-    emailSent: 'Check your inbox!',
-    emailSentDesc: 'We sent a link to your email. Click it to access your story.',
+    emailSent: 'Almost there — check your email!',
+    emailSentDesc: 'Click the link in your email to finish setting up your account and access your story.',
     emailSentNote: 'Didn\'t get it? Check your spam folder.',
+    emailSentWarning: 'Without verification your story will be lost.',
     differentEmail: 'Use a different email',
     linkedSuccess: 'Account linked successfully!',
     redirecting: 'Redirecting to your story...',
@@ -86,9 +87,10 @@ const translations = {
     termsLink: 'Nutzungsbedingungen',
     and: 'und',
     privacyLink: 'Datenschutzrichtlinien',
-    emailSent: 'Prüfe deinen Posteingang!',
-    emailSentDesc: 'Wir haben dir einen Link per E-Mail gesendet. Klicke darauf, um auf deine Geschichte zuzugreifen.',
+    emailSent: 'Fast geschafft — prüfe deine E-Mails!',
+    emailSentDesc: 'Klicke auf den Link in deiner E-Mail, um dein Konto einzurichten und deine Geschichte zu lesen.',
     emailSentNote: 'Nicht erhalten? Prüfe deinen Spam-Ordner.',
+    emailSentWarning: 'Ohne Bestätigung geht deine Geschichte verloren.',
     differentEmail: 'Andere E-Mail verwenden',
     linkedSuccess: 'Konto erfolgreich verknüpft!',
     redirecting: 'Weiterleitung zu deiner Geschichte...',
@@ -124,9 +126,10 @@ const translations = {
     termsLink: 'Conditions d\'utilisation',
     and: 'et',
     privacyLink: 'Politique de confidentialité',
-    emailSent: 'Vérifiez votre boîte de réception !',
-    emailSentDesc: 'Nous vous avons envoyé un lien par e-mail. Cliquez dessus pour accéder à votre histoire.',
+    emailSent: 'Presque terminé — vérifiez vos e-mails !',
+    emailSentDesc: 'Cliquez sur le lien dans votre e-mail pour finaliser votre compte et accéder à votre histoire.',
     emailSentNote: 'Pas reçu ? Vérifiez votre dossier spam.',
+    emailSentWarning: 'Sans vérification, votre histoire sera perdue.',
     differentEmail: 'Utiliser une autre adresse',
     linkedSuccess: 'Compte lié avec succès !',
     redirecting: 'Redirection vers votre histoire...',
@@ -458,9 +461,9 @@ export default function TrialGenerationPage() {
       {/* Navigation bar matching the trial wizard */}
       <nav className="bg-black text-white px-3 py-3">
         <div className="flex justify-between items-center">
-          <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80">
+          <span className="text-sm md:text-base font-bold whitespace-nowrap">
             ✨ {t.brand}
-          </button>
+          </span>
         </div>
       </nav>
 
@@ -559,11 +562,12 @@ export default function TrialGenerationPage() {
 
               {emailLinked && !isVerified && (
                 <div className="py-6 text-center">
-                  <div className="w-14 h-14 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Mail className="w-7 h-7 text-indigo-600" />
+                  <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <Mail className="w-7 h-7 text-amber-600" />
                   </div>
                   <h2 className="text-lg font-bold text-gray-800 mb-1">{t.emailSent}</h2>
-                  <p className="text-gray-600 text-sm mb-1">{t.emailSentDesc}</p>
+                  <p className="text-gray-600 text-sm mb-2">{t.emailSentDesc}</p>
+                  <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs font-medium mb-3">{t.emailSentWarning}</p>
                   <p className="text-xs text-gray-400 mb-3">{t.emailSentNote}</p>
                   <button
                     onClick={() => { setEmailLinked(false); setEmail(''); setAuthError(''); }}
