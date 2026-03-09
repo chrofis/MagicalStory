@@ -4836,8 +4836,8 @@ export default function StoryWizard() {
         }}
       />
 
-      {/* Main content - full width */}
-      <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1">
+      {/* Main content - full width, overflow-x-hidden prevents tiny horizontal scroll on iOS */}
+      <div className="px-3 md:px-8 mt-2 md:mt-8 flex-1 overflow-x-hidden">
         <div className="md:bg-white md:rounded-2xl md:shadow-xl md:p-8">
           {isLoading && !isGenerating && step !== 6 ? (
             /* Show loading spinner only for steps 1-5, not for story display (step 6) */

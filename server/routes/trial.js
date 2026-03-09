@@ -207,7 +207,7 @@ async function verifyTurnstile(token, remoteip) {
 
 // In-memory fingerprint tracker (resets on deploy, acceptable — single Railway instance)
 const fingerprintTracker = new Map(); // fingerprint -> { count, firstSeen }
-const FINGERPRINT_MAX = 10;
+const FINGERPRINT_MAX = 1;
 const FINGERPRINT_WINDOW = 24 * 60 * 60 * 1000; // 24 hours
 const FINGERPRINT_MAX_ENTRIES = 50000; // Memory cap to prevent DoS
 

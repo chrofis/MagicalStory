@@ -415,7 +415,7 @@ export function WizardStep3BookSettings({
       {/* Reading Level Selection */}
       <div>
         <label className="block text-xl font-semibold mb-3">{t.readingLevel}</label>
-        <div className="flex overflow-x-auto gap-3 pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex overflow-x-auto gap-3 pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:pb-0 -mx-3 px-3 md:mx-0 md:px-0">
           {readingLevels.map((level) => (
             <button
               key={level.value}
