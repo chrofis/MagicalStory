@@ -41,6 +41,7 @@ It must be detailed enough to illustrate without additional context.
     },
     "characters": [
       {
+        "id": "[CHR001 or null for main character]",
         "name": "[Name]",
         "position": "[left/right/center]",
         "action": "[what they're doing]",
@@ -56,6 +57,7 @@ It must be detailed enough to illustrate without additional context.
 ```
 
 - MAX 2 characters per scene. Use character names, not descriptions.
+- `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
 - `setting.location`: use `"Name [LOC001]"` format referencing visual bible location IDs.
 - `objects`: include visual bible items visible in the scene with their IDs.
 - Use `"n/a"` for weather in indoor scenes.

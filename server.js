@@ -3079,7 +3079,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       referenceSheetPromise = generateReferenceSheet(visualBible, styleDescription, {
         minAppearances: 2, // Elements appearing on 2+ pages
         maxPerBatch: 4,    // Max 4 elements per grid for quality
-        maxElements: inputData.trialMode ? 3 : null  // Trial: top 3 only
+        maxElements: null  // Generate reference sheets for all qualifying elements
       }).catch(err => {
         log.warn(`⚠️ [UNIFIED] Reference sheet generation failed: ${err.message}`);
         return { generated: 0, failed: 0, elements: [] };
