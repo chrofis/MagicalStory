@@ -198,10 +198,10 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="bg-gray-50">
+    <div className="bg-stone-50">
 
       {/* Navigation - Fixed at top */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gray-50">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-stone-50">
         <Navigation currentStep={0} />
       </div>
 
@@ -309,7 +309,7 @@ export default function LandingPage() {
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce hidden lg:block">
-          <ChevronDown size={32} className="text-gray-400" />
+          <ChevronDown size={32} className="text-stone-400" />
         </div>
       </section>
 
@@ -325,24 +325,24 @@ export default function LandingPage() {
                 </div>
                 <span className="text-indigo-600 font-semibold text-lg">{st.step1}</span>
               </div>
-              <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
+              <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.createCharacters}
               </h2>
-              <p className="text-lg text-gray-600 mb-4">
+              <p className="text-lg text-stone-600 mb-4">
                 {st.createCharactersDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
                   <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.addFamily}</span>
+                  <span className="text-stone-600">{st.addFamily}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.defineNames}</span>
+                  <span className="text-stone-600">{st.defineNames}</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <Users className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.consistentCharacters}</span>
+                  <span className="text-stone-600">{st.consistentCharacters}</span>
                 </li>
               </ul>
             </div>
@@ -359,40 +359,40 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-stone-50">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-amber-100 p-3 rounded-full">
-                  <BookOpen className="w-6 h-6 text-amber-600" />
+                <div className="bg-indigo-100 p-3 rounded-full">
+                  <BookOpen className="w-6 h-6 text-indigo-600" />
                 </div>
-                <span className="text-amber-600 font-semibold text-lg">{st.step2}</span>
+                <span className="text-indigo-600 font-semibold text-lg">{st.step2}</span>
               </div>
-              <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
+              <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.tellStory}
               </h2>
-              <p className="text-lg text-gray-600 mb-4">
+              <p className="text-lg text-stone-600 mb-4">
                 {st.tellStoryDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <BookOpen className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.selectThemes}</span>
+                  <BookOpen className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.selectThemes}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Heart className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.customElements}</span>
+                  <Heart className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.customElements}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <BookOpen className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.readingLevel}</span>
+                  <BookOpen className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.readingLevel}</span>
                 </li>
               </ul>
               <Link
                 to="/themes"
-                className="inline-flex items-center gap-1 mt-4 text-amber-600 hover:text-amber-800 font-medium text-sm"
+                className="inline-flex items-center gap-1 mt-4 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
               >
                 {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : 'Browse all themes'} <ArrowRight size={16} />
               </Link>
@@ -416,29 +416,29 @@ export default function LandingPage() {
             {/* Text Content - First on mobile */}
             <div className="w-full lg:w-1/2 order-1 lg:order-1">
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-pink-100 p-3 rounded-full">
-                  <Palette className="w-6 h-6 text-pink-600" />
+                <div className="bg-indigo-100 p-3 rounded-full">
+                  <Palette className="w-6 h-6 text-indigo-600" />
                 </div>
-                <span className="text-pink-600 font-semibold text-lg">{st.step3}</span>
+                <span className="text-indigo-600 font-semibold text-lg">{st.step3}</span>
               </div>
-              <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
+              <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.chooseStyle}
               </h2>
-              <p className="text-lg text-gray-600 mb-4">
+              <p className="text-lg text-stone-600 mb-4">
                 {st.chooseStyleDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-pink-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.artStyles}</span>
+                  <Palette className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.artStyles}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-pink-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.consistentStyle}</span>
+                  <Palette className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.consistentStyle}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Palette className="w-5 h-5 text-pink-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.bookLength}</span>
+                  <Palette className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.bookLength}</span>
                 </li>
               </ul>
             </div>
@@ -455,35 +455,35 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-stone-50">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
             <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
-                <div className="bg-emerald-100 p-3 rounded-full">
-                  <Printer className="w-6 h-6 text-emerald-600" />
+                <div className="bg-indigo-100 p-3 rounded-full">
+                  <Printer className="w-6 h-6 text-indigo-600" />
                 </div>
-                <span className="text-emerald-600 font-semibold text-lg">{st.step4}</span>
+                <span className="text-indigo-600 font-semibold text-lg">{st.step4}</span>
               </div>
-              <h2 className="text-3xl lg:text-4xl font-title text-gray-900 mb-6">
+              <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
                 {st.printShare}
               </h2>
-              <p className="text-lg text-gray-600 mb-4">
+              <p className="text-lg text-stone-600 mb-4">
                 {st.printShareDesc}
               </p>
               <ul className="space-y-3">
                 <li className="flex items-start gap-3">
-                  <Download className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.pdfDownload}</span>
+                  <Download className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.pdfDownload}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Printer className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.printOptions}</span>
+                  <Printer className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.printOptions}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Printer className="w-5 h-5 text-emerald-600 mt-1 flex-shrink-0" />
-                  <span className="text-gray-600">{st.shipping}</span>
+                  <Printer className="w-5 h-5 text-indigo-600 mt-1 flex-shrink-0" />
+                  <span className="text-stone-600">{st.shipping}</span>
                 </li>
               </ul>
             </div>
@@ -510,7 +510,7 @@ export default function LandingPage() {
           </p>
           <button
             onClick={handleStartJourney}
-            className="inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-gray-100 text-indigo-600 shadow-lg hover:shadow-xl"
+            className="inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-stone-100 text-indigo-600 shadow-lg hover:shadow-xl"
           >
             <Sparkles size={24} />
             {t.startJourney}

@@ -37,29 +37,29 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="bg-gray-100 border-t border-gray-200 py-4 px-4">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-600">
+    <footer className="bg-stone-100 border-t border-stone-200 py-4 px-4">
+      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-stone-600">
         <div className="flex items-center gap-4 flex-wrap">
           <Link to="/themes" className="hover:text-indigo-600 hover:underline">
             {texts.themes}
           </Link>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <Link to="/faq" className="hover:text-indigo-600 hover:underline">
             {texts.faq}
           </Link>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <Link to="/about" className="hover:text-indigo-600 hover:underline">
             {texts.about}
           </Link>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <Link to="/contact" className="hover:text-indigo-600 hover:underline">
             {texts.contact}
           </Link>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <Link to="/terms" className="hover:text-indigo-600 hover:underline">
             {texts.terms}
           </Link>
-          <span className="text-gray-300">|</span>
+          <span className="text-stone-300">|</span>
           <Link to="/privacy" className="hover:text-indigo-600 hover:underline">
             {texts.privacy}
           </Link>

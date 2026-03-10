@@ -82,8 +82,8 @@ export default function Themes() {
       id: 'adventure',
       path: '/themes/adventure',
       emoji: '\u{1F5E1}\u{FE0F}',
-      gradient: 'from-indigo-500 to-blue-500',
-      borderColor: 'border-indigo-200',
+      gradient: 'from-indigo-500 to-indigo-600',
+      borderColor: 'border-stone-200',
       name: { en: 'Adventure', de: 'Abenteuer', fr: 'Aventure' },
       description: {
         en: 'Exciting journeys and heroic quests — pirates, knights, wizards, and more',
@@ -99,8 +99,8 @@ export default function Themes() {
       id: 'life-challenges',
       path: '/themes/life-challenges',
       emoji: '\u{1F4AA}',
-      gradient: 'from-emerald-500 to-teal-500',
-      borderColor: 'border-emerald-200',
+      gradient: 'from-indigo-500 to-indigo-600',
+      borderColor: 'border-stone-200',
       name: { en: 'Life Skills', de: 'Lebenskompetenzen', fr: 'Compétences de vie' },
       description: {
         en: 'Help your child overcome everyday challenges with empowering stories',
@@ -116,8 +116,8 @@ export default function Themes() {
       id: 'educational',
       path: '/themes/educational',
       emoji: '\u{1F4DA}',
-      gradient: 'from-purple-500 to-pink-500',
-      borderColor: 'border-purple-200',
+      gradient: 'from-indigo-500 to-indigo-600',
+      borderColor: 'border-stone-200',
       name: { en: 'Learning', de: 'Lernen', fr: 'Apprentissage' },
       description: {
         en: 'Fun stories that teach something new — letters, numbers, science, and more',
@@ -133,8 +133,8 @@ export default function Themes() {
       id: 'historical',
       path: '/themes/historical',
       emoji: '\u{1F3DB}\u{FE0F}',
-      gradient: 'from-amber-500 to-orange-500',
-      borderColor: 'border-amber-200',
+      gradient: 'from-indigo-500 to-indigo-600',
+      borderColor: 'border-stone-200',
       name: { en: 'History', de: 'Geschichte', fr: 'Histoire' },
       description: {
         en: 'Experience real historical events — from ancient times to the modern era',
@@ -169,17 +169,17 @@ export default function Themes() {
   ].filter(Boolean) as { id: string; name: string; emoji: string; path: string }[];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       <Navigation currentStep={0} />
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-10 pb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
             <Compass className="w-8 h-8 text-indigo-600" />
           </div>
-          <h1 className="font-title text-3xl md:text-4xl font-bold text-gray-900 mb-3">{t.title}</h1>
-          <p className="text-gray-500 text-lg max-w-2xl mx-auto">{t.subtitle}</p>
+          <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-3">{t.title}</h1>
+          <p className="text-stone-500 text-lg max-w-2xl mx-auto">{t.subtitle}</p>
         </div>
       </div>
 
@@ -198,16 +198,16 @@ export default function Themes() {
                 <div className="flex items-start gap-4 mb-4">
                   <span className="text-3xl">{cat.emoji}</span>
                   <div className="flex-1">
-                    <h2 className="font-title text-xl font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">
+                    <h2 className="font-title text-xl font-bold text-stone-900 group-hover:text-indigo-600 transition-colors">
                       {cat.name[language] || cat.name.en}
                     </h2>
-                    <p className="text-gray-500 text-sm mt-1">
+                    <p className="text-stone-500 text-sm mt-1">
                       {cat.description[language] || cat.description.en}
                     </p>
                   </div>
                 </div>
 
-                <div className="text-sm text-gray-400 mb-3">
+                <div className="text-sm text-stone-400 mb-3">
                   {cat.count} {t.themesLabel}
                 </div>
 
@@ -216,7 +216,7 @@ export default function Themes() {
                   {cat.popularIds.map((themeId) => (
                     <span
                       key={themeId}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-50 text-xs text-gray-600 border border-gray-100"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-stone-50 text-xs text-stone-600 border border-stone-100"
                     >
                       <span>{cat.getThemeEmoji(themeId)}</span>
                       {cat.getThemeName(themeId)}
@@ -235,18 +235,18 @@ export default function Themes() {
         {/* Popular Across All */}
         <div className="mb-16">
           <div className="text-center mb-8">
-            <h2 className="font-title text-2xl font-bold text-gray-900 mb-2">{t.popularTitle}</h2>
-            <p className="text-gray-500">{t.popularSubtitle}</p>
+            <h2 className="font-title text-2xl font-bold text-stone-900 mb-2">{t.popularTitle}</h2>
+            <p className="text-stone-500">{t.popularSubtitle}</p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {popularThemes.map((theme) => (
               <Link
                 key={theme.id}
                 to={theme.path}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
+                className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
               >
                 <span className="text-3xl block mb-2">{theme.emoji}</span>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-600 transition-colors">
+                <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-600 transition-colors">
                   {theme.name}
                 </span>
               </Link>
@@ -255,7 +255,7 @@ export default function Themes() {
         </div>
 
         {/* CTA Section */}
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link

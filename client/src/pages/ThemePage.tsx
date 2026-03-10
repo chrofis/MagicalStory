@@ -232,27 +232,27 @@ export default function ThemePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       <Navigation currentStep={0} />
 
       {/* Breadcrumb */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-4 pb-0">
-          <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+          <nav className="flex items-center gap-1.5 text-sm text-stone-500">
             <Link to="/themes" className="hover:text-indigo-600 transition-colors">{t.breadcrumbRoot}</Link>
-            <ChevronRight size={14} className="text-gray-300" />
+            <ChevronRight size={14} className="text-stone-300" />
             <Link to={`/themes/${category}`} className="hover:text-indigo-600 transition-colors">{categoryName}</Link>
-            <ChevronRight size={14} className="text-gray-300" />
-            <span className="text-gray-800 font-medium">{themeName}</span>
+            <ChevronRight size={14} className="text-stone-300" />
+            <span className="text-stone-800 font-medium">{themeName}</span>
           </nav>
         </div>
       </div>
 
       {/* Hero Section */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <span className="text-6xl block mb-5">{theme.emoji}</span>
-          <h1 className="font-title text-3xl md:text-4xl font-bold text-gray-900 mb-4">{themeName}</h1>
+          <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-4">{themeName}</h1>
 
           {/* Year and person badges for historical */}
           {catSlug === 'historical' && (theme.year || theme.mainPerson) && (
@@ -270,7 +270,7 @@ export default function ThemePage() {
             </div>
           )}
 
-          <p className="text-gray-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
+          <p className="text-stone-500 text-lg max-w-xl mx-auto mb-6">{description}</p>
 
           <Link
             to="/try"
@@ -284,15 +284,15 @@ export default function ThemePage() {
       <div className="flex-1 max-w-4xl mx-auto px-4 py-10 w-full">
         {/* What to Expect */}
         <div className="mb-12">
-          <h2 className="font-title text-xl font-bold text-gray-900 mb-5 text-center">{t.whatToExpect}</h2>
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">{t.whatToExpect}</h2>
+          <div className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6">
             <div className="space-y-3">
               {bullets.map((bullet, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-6 h-6 rounded-full bg-indigo-50 flex items-center justify-center mt-0.5">
                     <Check size={14} className="text-indigo-600" />
                   </div>
-                  <span className="text-gray-700">{bullet}</span>
+                  <span className="text-stone-700">{bullet}</span>
                 </div>
               ))}
             </div>
@@ -301,20 +301,20 @@ export default function ThemePage() {
 
         {/* How It Works */}
         <div className="mb-12">
-          <h2 className="font-title text-xl font-bold text-gray-900 mb-5 text-center">{t.howItWorks}</h2>
+          <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">{t.howItWorks}</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {howSteps.map((step, i) => {
               const Icon = step.icon;
               return (
-                <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
+                <div key={i} className="bg-white rounded-2xl shadow-sm border border-stone-100 p-6 text-center">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-50 mb-4">
                     <Icon size={22} className="text-indigo-600" />
                   </div>
                   <div className="text-xs font-semibold text-indigo-500 mb-2">
                     {i + 1}.
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-1">{step.title}</h3>
-                  <p className="text-sm text-gray-500">{step.desc}</p>
+                  <h3 className="font-semibold text-stone-800 mb-1">{step.title}</h3>
+                  <p className="text-sm text-stone-500">{step.desc}</p>
                 </div>
               );
             })}
@@ -324,20 +324,20 @@ export default function ThemePage() {
         {/* Related Themes */}
         {relatedThemes.length > 0 && (
           <div className="mb-12">
-            <h2 className="font-title text-xl font-bold text-gray-900 mb-5 text-center">{t.relatedThemes}</h2>
+            <h2 className="font-title text-xl font-bold text-stone-900 mb-5 text-center">{t.relatedThemes}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {relatedThemes.map((related) => (
                 <Link
                   key={related.id}
                   to={`/themes/${category}/${related.id}`}
-                  className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
+                  className="bg-white rounded-2xl shadow-sm border border-stone-100 p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all group"
                 >
                   <span className="text-2xl block mb-2">{related.emoji}</span>
-                  <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-600 transition-colors">
+                  <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-600 transition-colors">
                     {related.name[language] || related.name.en}
                   </span>
                   {catSlug === 'historical' && related.year && (
-                    <span className="block text-xs text-gray-400 mt-0.5">{related.year}</span>
+                    <span className="block text-xs text-stone-400 mt-0.5">{related.year}</span>
                   )}
                 </Link>
               ))}
@@ -346,7 +346,7 @@ export default function ThemePage() {
         )}
 
         {/* CTA Section */}
-        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link

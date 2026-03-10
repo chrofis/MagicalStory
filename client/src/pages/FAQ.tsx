@@ -62,8 +62,8 @@ const faqContent: Record<string, {
       {
         id: 'your-story',
         icon: Palette,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Your Story',
         items: [
           {
@@ -83,8 +83,8 @@ const faqContent: Record<string, {
       {
         id: 'printing',
         icon: Printer,
-        color: 'text-emerald-600',
-        bgColor: 'bg-emerald-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Printing & Quality',
         items: [
           {
@@ -100,8 +100,8 @@ const faqContent: Record<string, {
       {
         id: 'shipping',
         icon: Truck,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Shipping',
         items: [
           {
@@ -113,8 +113,8 @@ const faqContent: Record<string, {
       {
         id: 'pricing',
         icon: CreditCard,
-        color: 'text-amber-600',
-        bgColor: 'bg-amber-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Pricing',
         items: [
           {
@@ -126,8 +126,8 @@ const faqContent: Record<string, {
       {
         id: 'privacy',
         icon: Lock,
-        color: 'text-rose-600',
-        bgColor: 'bg-rose-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Privacy & Data',
         items: [
           {
@@ -171,8 +171,8 @@ const faqContent: Record<string, {
       {
         id: 'your-story',
         icon: Palette,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Deine Geschichte',
         items: [
           {
@@ -192,8 +192,8 @@ const faqContent: Record<string, {
       {
         id: 'printing',
         icon: Printer,
-        color: 'text-emerald-600',
-        bgColor: 'bg-emerald-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Druck & Qualität',
         items: [
           {
@@ -209,8 +209,8 @@ const faqContent: Record<string, {
       {
         id: 'shipping',
         icon: Truck,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Versand',
         items: [
           {
@@ -222,8 +222,8 @@ const faqContent: Record<string, {
       {
         id: 'pricing',
         icon: CreditCard,
-        color: 'text-amber-600',
-        bgColor: 'bg-amber-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Preise',
         items: [
           {
@@ -235,8 +235,8 @@ const faqContent: Record<string, {
       {
         id: 'privacy',
         icon: Lock,
-        color: 'text-rose-600',
-        bgColor: 'bg-rose-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Datenschutz',
         items: [
           {
@@ -280,8 +280,8 @@ const faqContent: Record<string, {
       {
         id: 'your-story',
         icon: Palette,
-        color: 'text-purple-600',
-        bgColor: 'bg-purple-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Votre histoire',
         items: [
           {
@@ -301,8 +301,8 @@ const faqContent: Record<string, {
       {
         id: 'printing',
         icon: Printer,
-        color: 'text-emerald-600',
-        bgColor: 'bg-emerald-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Impression & Qualité',
         items: [
           {
@@ -318,8 +318,8 @@ const faqContent: Record<string, {
       {
         id: 'shipping',
         icon: Truck,
-        color: 'text-blue-600',
-        bgColor: 'bg-blue-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Livraison',
         items: [
           {
@@ -331,8 +331,8 @@ const faqContent: Record<string, {
       {
         id: 'pricing',
         icon: CreditCard,
-        color: 'text-amber-600',
-        bgColor: 'bg-amber-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Tarifs',
         items: [
           {
@@ -344,8 +344,8 @@ const faqContent: Record<string, {
       {
         id: 'privacy',
         icon: Lock,
-        color: 'text-rose-600',
-        bgColor: 'bg-rose-50',
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
         label: 'Confidentialité',
         items: [
           {
@@ -362,17 +362,17 @@ function FAQAccordion({ item, defaultOpen = false }: { item: FAQItem; defaultOpe
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="border-b border-gray-100 last:border-b-0">
+    <div className="border-b border-stone-100 last:border-b-0">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between py-5 text-left group"
         aria-expanded={open}
       >
-        <span className="text-base font-medium text-gray-800 pr-4 group-hover:text-indigo-600 transition-colors">{item.question}</span>
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${open ? 'bg-indigo-100' : 'bg-gray-100 group-hover:bg-indigo-50'}`}>
+        <span className="text-base font-medium text-stone-800 pr-4 group-hover:text-indigo-600 transition-colors">{item.question}</span>
+        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${open ? 'bg-indigo-100' : 'bg-stone-100 group-hover:bg-indigo-50'}`}>
           <ChevronDown
             size={18}
-            className={`transition-transform duration-300 ${open ? 'rotate-180 text-indigo-600' : 'text-gray-400'}`}
+            className={`transition-transform duration-300 ${open ? 'rotate-180 text-indigo-600' : 'text-stone-400'}`}
           />
         </div>
       </button>
@@ -380,7 +380,7 @@ function FAQAccordion({ item, defaultOpen = false }: { item: FAQItem; defaultOpe
         className={`grid transition-all duration-300 ease-in-out ${open ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
       >
         <div className="overflow-hidden">
-          <div className="pb-5 text-gray-600 leading-relaxed text-[15px]">
+          <div className="pb-5 text-stone-600 leading-relaxed text-[15px]">
             {item.answer}
           </div>
         </div>
@@ -408,27 +408,27 @@ export default function FAQ() {
   }, [search, content.categories]);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       <Navigation currentStep={0} />
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-8 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
             <HelpCircle className="w-8 h-8 text-indigo-600" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{content.title}</h1>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto mb-8">{content.subtitle}</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3">{content.title}</h1>
+          <p className="text-stone-500 text-lg max-w-xl mx-auto mb-8">{content.subtitle}</p>
 
           {/* Search */}
           <div className="relative max-w-md mx-auto">
-            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={content.searchPlaceholder}
-              className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-gray-700 placeholder-gray-400"
+              className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 bg-stone-50 focus:bg-white focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-stone-700 placeholder-gray-400"
             />
           </div>
         </div>
@@ -459,8 +459,8 @@ export default function FAQ() {
       <div className="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
         {filteredCategories.length === 0 ? (
           <div className="text-center py-12">
-            <Search size={40} className="mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">{content.noResults}</p>
+            <Search size={40} className="mx-auto text-stone-300 mb-4" />
+            <p className="text-stone-500">{content.noResults}</p>
           </div>
         ) : (
           <div className="space-y-6">
@@ -472,9 +472,9 @@ export default function FAQ() {
                     <div className={`w-9 h-9 rounded-lg ${category.bgColor} flex items-center justify-center`}>
                       <Icon size={18} className={category.color} />
                     </div>
-                    <h2 className="text-lg font-semibold text-gray-800">{category.label}</h2>
+                    <h2 className="text-lg font-semibold text-stone-800">{category.label}</h2>
                   </div>
-                  <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6">
+                  <div className="bg-white rounded-2xl shadow-sm border border-stone-100 px-6">
                     {category.items.map((item, index) => (
                       <FAQAccordion key={index} item={item} defaultOpen={!!search.trim()} />
                     ))}
@@ -486,12 +486,12 @@ export default function FAQ() {
         )}
 
         {/* Contact CTA */}
-        <div className="mt-12 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center border border-indigo-100">
+        <div className="mt-12 bg-indigo-50 rounded-2xl p-8 text-center border border-indigo-100">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-indigo-100 mb-4">
             <Mail className="w-6 h-6 text-indigo-600" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">{content.contactTitle}</h3>
-          <p className="text-gray-600 mb-5 max-w-md mx-auto">{content.contactText}</p>
+          <h3 className="text-xl font-semibold text-stone-800 mb-2">{content.contactTitle}</h3>
+          <p className="text-stone-600 mb-5 max-w-md mx-auto">{content.contactText}</p>
           <Link
             to="/contact"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"

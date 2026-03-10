@@ -121,9 +121,9 @@ const iconMap = {
 };
 
 const iconColors = {
-  shield: { bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-100' },
-  book: { bg: 'bg-emerald-50', text: 'text-emerald-500', border: 'border-emerald-100' },
-  heart: { bg: 'bg-purple-50', text: 'text-purple-500', border: 'border-purple-100' },
+  shield: { bg: 'bg-indigo-50', text: 'text-indigo-500', border: 'border-indigo-100' },
+  book: { bg: 'bg-indigo-50', text: 'text-indigo-500', border: 'border-indigo-100' },
+  heart: { bg: 'bg-indigo-50', text: 'text-indigo-500', border: 'border-indigo-100' },
 };
 
 export default function About() {
@@ -131,34 +131,34 @@ export default function About() {
   const content = aboutContent[language] || aboutContent.en;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       <Navigation currentStep={0} />
 
       {/* Hero header */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-stone-100">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
             <Sparkles className="w-8 h-8 text-indigo-600" />
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{content.title}</h1>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">{content.tagline}</p>
+          <h1 className="text-3xl md:text-4xl font-bold text-stone-900 mb-3">{content.title}</h1>
+          <p className="text-stone-500 text-lg max-w-xl mx-auto">{content.tagline}</p>
         </div>
       </div>
 
       <div className="flex-1 max-w-3xl mx-auto px-4 py-10 w-full">
         {/* Mission */}
         <div className="mb-10">
-          <h2 className="text-xl font-semibold text-gray-800 mb-5">{content.missionTitle}</h2>
+          <h2 className="text-xl font-semibold text-stone-800 mb-5">{content.missionTitle}</h2>
           <div className="space-y-4">
             {content.missionText.map((paragraph, i) => (
-              <p key={i} className="text-gray-600 leading-relaxed text-[15px]">{paragraph}</p>
+              <p key={i} className="text-stone-600 leading-relaxed text-[15px]">{paragraph}</p>
             ))}
           </div>
         </div>
 
         {/* Values */}
         <div className="mb-10">
-          <h2 className="text-xl font-semibold text-gray-800 mb-5">{content.valuesTitle}</h2>
+          <h2 className="text-xl font-semibold text-stone-800 mb-5">{content.valuesTitle}</h2>
           <div className="grid gap-4 md:grid-cols-3">
             {content.values.map((value, index) => {
               const Icon = iconMap[value.icon as keyof typeof iconMap];
@@ -168,8 +168,8 @@ export default function About() {
                   <div className={`${colors.bg} w-11 h-11 rounded-xl flex items-center justify-center mb-4`}>
                     <Icon className={`w-5 h-5 ${colors.text}`} />
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-2">{value.title}</h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">{value.text}</p>
+                  <h3 className="font-semibold text-stone-800 mb-2">{value.title}</h3>
+                  <p className="text-stone-500 text-sm leading-relaxed">{value.text}</p>
                 </div>
               );
             })}
@@ -177,20 +177,20 @@ export default function About() {
         </div>
 
         {/* Swiss badge */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 flex items-start gap-5 mb-10">
+        <div className="bg-white rounded-2xl border border-stone-100 p-6 md:p-8 flex items-start gap-5 mb-10">
           <div className="bg-red-50 w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0">
             <MapPin className="w-5 h-5 text-red-500" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-800 mb-1">{content.swissTitle}</h2>
-            <p className="text-gray-500 text-[15px] leading-relaxed">{content.swissText}</p>
+            <h2 className="text-lg font-semibold text-stone-800 mb-1">{content.swissTitle}</h2>
+            <p className="text-stone-500 text-[15px] leading-relaxed">{content.swissText}</p>
           </div>
         </div>
 
         {/* CTA */}
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center border border-indigo-100">
-          <h3 className="text-xl font-semibold text-gray-800 mb-2">{content.ctaTitle}</h3>
-          <p className="text-gray-600 mb-5 max-w-md mx-auto">{content.ctaText}</p>
+        <div className="bg-indigo-50 rounded-2xl p-8 text-center border border-indigo-100">
+          <h3 className="text-xl font-semibold text-stone-800 mb-2">{content.ctaTitle}</h3>
+          <p className="text-stone-600 mb-5 max-w-md mx-auto">{content.ctaText}</p>
           <Link
             to="/try"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"

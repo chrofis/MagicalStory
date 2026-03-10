@@ -160,15 +160,15 @@ export default function ThemeCategory() {
   const categoryName = config.name[language] || config.name.en;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-stone-50 flex flex-col">
       <Navigation currentStep={0} />
 
       {/* Header */}
-      <div className="bg-white border-b border-gray-100">
+      <div className="bg-white border-b border-stone-100">
         <div className="max-w-4xl mx-auto px-4 pt-10 pb-8 text-center">
           <span className="text-5xl block mb-4">{config.emoji}</span>
-          <h1 className="font-title text-3xl md:text-4xl font-bold text-gray-900 mb-3">{categoryName}</h1>
-          <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+          <h1 className="font-title text-3xl md:text-4xl font-bold text-stone-900 mb-3">{categoryName}</h1>
+          <p className="text-stone-500 text-lg max-w-2xl mx-auto">
             {config.description[language] || config.description.en}
           </p>
         </div>
@@ -176,10 +176,10 @@ export default function ThemeCategory() {
 
       {/* Breadcrumb */}
       <div className="max-w-5xl mx-auto px-4 pt-6 w-full">
-        <nav className="flex items-center gap-1.5 text-sm text-gray-500">
+        <nav className="flex items-center gap-1.5 text-sm text-stone-500">
           <Link to="/themes" className="hover:text-indigo-600 transition-colors">{t.breadcrumbRoot}</Link>
-          <ChevronRight size={14} className="text-gray-300" />
-          <span className="text-gray-800 font-medium">{categoryName}</span>
+          <ChevronRight size={14} className="text-stone-300" />
+          <span className="text-stone-800 font-medium">{categoryName}</span>
         </nav>
       </div>
 
@@ -196,25 +196,25 @@ export default function ThemeCategory() {
               <div key={group.id}>
                 <div className="flex items-center gap-2 mb-4">
                   {groupIcon && <span className="text-lg">{groupIcon}</span>}
-                  <h2 className="font-title text-lg font-semibold text-gray-800">
+                  <h2 className="font-title text-lg font-semibold text-stone-800">
                     {group.name[language] || group.name.en}
                   </h2>
-                  <span className="text-sm text-gray-400">({themes.length})</span>
+                  <span className="text-sm text-stone-400">({themes.length})</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {themes.map((theme) => (
                     <Link
                       key={theme.id}
                       to={`/themes/${category}/${theme.id}`}
-                      className="bg-white rounded-2xl shadow-sm border border-gray-100 px-4 py-3.5 flex items-center gap-3 hover:shadow-md hover:border-indigo-200 transition-all group"
+                      className="bg-white rounded-2xl shadow-sm border border-stone-100 px-4 py-3.5 flex items-center gap-3 hover:shadow-md hover:border-indigo-200 transition-all group"
                     >
                       <span className="text-2xl flex-shrink-0">{theme.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <span className="text-sm font-medium text-gray-700 group-hover:text-indigo-600 transition-colors block truncate">
+                        <span className="text-sm font-medium text-stone-700 group-hover:text-indigo-600 transition-colors block truncate">
                           {theme.name[language] || theme.name.en}
                         </span>
                         {category === 'historical' && 'year' in theme && (
-                          <span className="text-xs text-gray-400">{theme.year}</span>
+                          <span className="text-xs text-stone-400">{theme.year}</span>
                         )}
                       </div>
                       <span className="text-xs text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 flex-shrink-0">
@@ -229,7 +229,7 @@ export default function ThemeCategory() {
         </div>
 
         {/* CTA Section */}
-        <div className="mt-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-8 md:p-12 text-center text-white">
+        <div className="mt-16 bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
           <Link
