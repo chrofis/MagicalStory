@@ -24,8 +24,18 @@ function detectBrowserLanguage(): Language {
   return 'de';
 }
 
+function detectUrlLanguage(): Language | null {
+  const params = new URLSearchParams(window.location.search);
+  const lang = params.get('lang');
+  if (lang && ['en', 'de', 'fr'].includes(lang)) return lang as Language;
+  return null;
+}
+
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
+    // URL ?lang= param takes highest priority (used by hreflang SEO links)
+    const urlLang = detectUrlLanguage();
+    if (urlLang) return urlLang;
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && ['en', 'de', 'fr'].includes(saved)) {
       return saved as Language;

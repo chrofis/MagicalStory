@@ -27,6 +27,9 @@ const ClaimAccount = lazy(() => import('./pages/ClaimAccount'));
 const FAQ = lazy(() => import('./pages/FAQ'));
 const About = lazy(() => import('./pages/About'));
 const Contact = lazy(() => import('./pages/Contact'));
+const Themes = lazy(() => import('./pages/Themes'));
+const ThemeCategory = lazy(() => import('./pages/ThemeCategory'));
+const ThemePage = lazy(() => import('./pages/ThemePage'));
 
 function App() {
   return (
@@ -52,6 +55,9 @@ function App() {
           <Route path="/faq" element={<FAQ />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/themes" element={<Themes />} />
+          <Route path="/themes/:category" element={<ThemeCategory />} />
+          <Route path="/themes/:category/:themeId" element={<ThemePage />} />
           <Route path="/shared/:shareToken" element={<SharedStoryViewer />} />
           <Route path="/s/:shareToken" element={<SharedStoryViewer />} />
           <Route path="/try" element={<TrialWizard />} />

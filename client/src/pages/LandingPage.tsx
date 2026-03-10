@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown, Heart } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
@@ -390,6 +390,12 @@ export default function LandingPage() {
                   <span className="text-gray-600">{st.readingLevel}</span>
                 </li>
               </ul>
+              <Link
+                to="/themes"
+                className="inline-flex items-center gap-1 mt-4 text-amber-600 hover:text-amber-800 font-medium text-sm"
+              >
+                {language === 'de' ? 'Alle Themen entdecken' : language === 'fr' ? 'Découvrir tous les thèmes' : 'Browse all themes'} <ArrowRight size={16} />
+              </Link>
             </div>
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">

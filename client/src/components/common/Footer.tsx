@@ -3,6 +3,7 @@ import { useLanguage } from '@/context/LanguageContext';
 
 const footerTexts = {
   en: {
+    themes: 'Themes',
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
     faq: 'FAQ',
@@ -11,6 +12,7 @@ const footerTexts = {
     copyright: 'Magical Story. All rights reserved.',
   },
   de: {
+    themes: 'Themen',
     terms: 'Nutzungsbedingungen',
     privacy: 'Datenschutz',
     faq: 'FAQ',
@@ -19,6 +21,7 @@ const footerTexts = {
     copyright: 'Magical Story. Alle Rechte vorbehalten.',
   },
   fr: {
+    themes: 'Thèmes',
     terms: 'Conditions d\'Utilisation',
     privacy: 'Confidentialité',
     faq: 'FAQ',
@@ -37,6 +40,10 @@ export function Footer() {
     <footer className="bg-gray-100 border-t border-gray-200 py-4 px-4">
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-600">
         <div className="flex items-center gap-4 flex-wrap">
+          <Link to="/themes" className="hover:text-indigo-600 hover:underline">
+            {texts.themes}
+          </Link>
+          <span className="text-gray-300">|</span>
           <Link to="/faq" className="hover:text-indigo-600 hover:underline">
             {texts.faq}
           </Link>

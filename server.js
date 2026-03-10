@@ -249,6 +249,7 @@ const { getActiveIndexAfterPush } = require('./server/lib/versionManager');
 const legacyPipelines = require('./server/lib/legacyPipelines');
 const { GenerationLogger } = require('./server/lib/generationLogger');
 const { hasPhotos: hasCharacterPhotos, getFacePhoto } = require('./server/lib/characterPhotos');
+const { getMetaForRoute, injectMeta, generateSitemap } = require('./server/lib/seoMeta');
 const configRoutes = require('./server/routes/config');
 const healthRoutes = require('./server/routes/health');
 const authRoutes = require('./server/routes/auth');
@@ -4989,27 +4990,30 @@ app.get('/robots.txt', (req, res) => {
   if (hasDistFolder && require('fs').existsSync(robotsPath)) {
     res.type('text/plain').sendFile(robotsPath);
   } else {
-    // Fallback inline robots.txt
-    res.type('text/plain').send(`User-agent: *\nAllow: /\nAllow: /api/shared/\nDisallow: /api/\nDisallow: /admin/\nSitemap: https://magicalstory.ch/sitemap.xml`);
+    res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /create/\nDisallow: /stories\nDisallow: /orders\nDisallow: /book-builder\nDisallow: /welcome\nDisallow: /trial-generation\nDisallow: /claim/\nDisallow: /reset-password/\nDisallow: /email-verified\n\nSitemap: https://magicalstory.ch/sitemap.xml`);
   }
 });
 
 app.get('/sitemap.xml', (req, res) => {
-  const sitemapPath = path.join(distPath, 'sitemap.xml');
-  if (hasDistFolder && require('fs').existsSync(sitemapPath)) {
-    res.type('application/xml').sendFile(sitemapPath);
-  } else {
-    // Fallback inline sitemap
-    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://magicalstory.ch/</loc><priority>1.0</priority></url>
-</urlset>`);
-  }
+  res.type('application/xml').send(generateSitemap());
 });
 
 // NOTE: Public shared story routes moved to server/routes/sharing.js
 
-// SPA fallback - serve index.html for client-side routing
+// Cache the HTML template at startup for SPA fallback with SEO meta injection
+let cachedHtmlTemplate = null;
+const indexHtmlPath = hasDistFolder
+  ? path.join(distPath, 'index.html')
+  : path.join(__dirname, 'client', 'index.html');
+
+try {
+  cachedHtmlTemplate = require('fs').readFileSync(indexHtmlPath, 'utf-8');
+  log.debug('Cached HTML template for SEO meta injection');
+} catch (err) {
+  log.warn(`Could not cache HTML template from ${indexHtmlPath}: ${err.message}`);
+}
+
+// SPA fallback - serve index.html with injected SEO meta tags
 // This must be the LAST route, after all API routes
 app.get('*', (req, res, next) => {
   // Skip API routes
@@ -5017,11 +5021,15 @@ app.get('*', (req, res, next) => {
     return next();
   }
 
-  // If dist folder exists, serve the built React app
-  if (hasDistFolder) {
+  // If we have a cached HTML template, inject SEO meta and serve
+  if (cachedHtmlTemplate) {
+    const lang = req.query.lang || 'de';
+    const meta = getMetaForRoute(req.path, lang);
+    const html = injectMeta(cachedHtmlTemplate, meta);
+    res.type('html').send(html);
+  } else if (hasDistFolder) {
     res.sendFile(path.join(distPath, 'index.html'));
   } else {
-    // Fallback to legacy index.html
     res.sendFile(path.join(__dirname, 'index.html'));
   }
 });
