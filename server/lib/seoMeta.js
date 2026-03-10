@@ -201,14 +201,14 @@ const THEMES = {
 const STATIC_ROUTES = {
   '/': {
     title: {
-      en: 'Magical Story – Personalized Children\'s Books',
-      de: 'Magical Story – Personalisierte Kinderbücher',
-      fr: 'Magical Story – Livres personnalisés pour enfants',
+      en: 'Magical Story – Your Child as the Hero of Their Own Book',
+      de: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
+      fr: 'Magical Story – Votre enfant héros de son propre livre',
     },
     description: {
-      en: 'Create personalized children\'s books with AI illustrations featuring your child. Upload a photo and get a unique story in minutes.',
-      de: 'Erstelle personalisierte Kinderbücher mit KI-Illustrationen deines Kindes. Foto hochladen und in Minuten eine einzigartige Geschichte erhalten.',
-      fr: 'Créez des livres personnalisés pour enfants avec des illustrations IA de votre enfant. Téléchargez une photo et obtenez une histoire unique.',
+      en: 'Your child becomes the hero of a beautifully illustrated story. Upload a photo, pick a theme, and hold a finished book in your hands. First story free.',
+      de: 'Dein Kind wird zum Helden einer wunderschön illustrierten Geschichte. Foto hochladen, Thema wählen und ein fertiges Buch in den Händen halten. Erste Geschichte gratis.',
+      fr: 'Votre enfant devient le héros d\'une histoire magnifiquement illustrée. Téléchargez une photo, choisissez un thème et tenez un vrai livre entre vos mains. Première histoire gratuite.',
     },
   },
   '/pricing': {
@@ -242,9 +242,9 @@ const STATIC_ROUTES = {
       fr: 'À propos – Magical Story',
     },
     description: {
-      en: 'Learn about Magical Story, the Swiss platform for personalized AI-illustrated children\'s books.',
-      de: 'Erfahre mehr über Magical Story, die Schweizer Plattform für personalisierte KI-illustrierte Kinderbücher.',
-      fr: 'Découvrez Magical Story, la plateforme suisse de livres personnalisés pour enfants illustrés par IA.',
+      en: 'Magical Story is made in Switzerland. We believe every child deserves to see themselves as the hero of their own story.',
+      de: 'Magical Story wird in der Schweiz entwickelt. Wir glauben, dass jedes Kind verdient, der Held seiner eigenen Geschichte zu sein.',
+      fr: 'Magical Story est conçu en Suisse. Nous croyons que chaque enfant mérite d\'être le héros de sa propre histoire.',
     },
   },
   '/contact': {
@@ -338,7 +338,7 @@ const FAQ_JSON_LD = {
       name: 'How does it work?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Upload a photo of your child, choose a story theme, and we generate a fully illustrated personalized story in minutes using AI. Each illustration features your child as the main character.',
+        text: 'Upload a photo of your child, choose a story theme, and get a fully illustrated personalized story in minutes. Your child appears as the main character on every page.',
       },
     },
     {
@@ -346,7 +346,7 @@ const FAQ_JSON_LD = {
       name: 'How long does it take?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your first free story is ready in under 3 minutes. The AI generates the story text and all illustrations automatically.',
+        text: 'Your first free story is ready in under 3 minutes. Story text and all illustrations are generated automatically.',
       },
     },
     {
@@ -487,8 +487,8 @@ function getMetaForRoute(routePath, lang) {
 
   // 5. Fallback — unknown route
   return {
-    title: 'Magical Story – Personalized Children\'s Books',
-    description: 'Create personalized children\'s books with AI illustrations featuring your child.',
+    title: 'Magical Story – Your Child as the Hero of Their Own Book',
+    description: 'Your child becomes the hero of a beautifully illustrated story. Upload a photo, pick a theme, and hold a finished book in your hands.',
     canonical: `${BASE_URL}${cleanPath === '/' ? '' : cleanPath}`,
     path: cleanPath,
     noindex: false,
