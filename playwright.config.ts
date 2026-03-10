@@ -54,7 +54,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/],
+      testIgnore: [/auth\.setup\.ts/, /auth\.spec\.ts/, /analysis\.spec\.ts/, /setup-test-family\.spec\.ts/, /demo-story\.spec\.ts/],
     },
 
     // Chromium without auth (for unauthenticated tests - auth flow tests and UX analysis)
@@ -73,6 +73,15 @@ export default defineConfig({
       },
       dependencies: ['setup'],
       testMatch: /setup-test-family\.spec\.ts/,
+    },
+
+    // Demo story generation (run manually with npm run test:demo)
+    {
+      name: 'demo-story',
+      use: {
+        ...devices['Desktop Chrome'],
+      },
+      testMatch: /demo-story\.spec\.ts/,
     },
 
     {

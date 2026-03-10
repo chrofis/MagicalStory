@@ -27,7 +27,10 @@
     "test:e2e:avatar": "npx playwright test tests/avatar.spec.ts --project=chromium --workers=1",
     "test:e2e:avatar:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/avatar.spec.ts --project=chromium --workers=1 --headed",
     "test:concurrency": "npx playwright test tests/concurrency --workers=1",
-    "test:avatar:all": "npm run test:unit && npm run test:api && npm run test:e2e:avatar"
+    "test:avatar:all": "npm run test:unit && npm run test:api && npm run test:e2e:avatar",
+    "test:demo": "npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
+    "test:demo:local": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1",
+    "test:demo:headed": "cross-env TEST_BASE_URL=http://localhost:5173 npx playwright test tests/demo-story.spec.ts --project=demo-story --workers=1 --headed"
   },
   "keywords": [
     "storytelling",
