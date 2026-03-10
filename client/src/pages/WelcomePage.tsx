@@ -142,7 +142,7 @@ export default function WelcomePage() {
             {steps.map((step, index) => (
               <div
                 key={index}
-                className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 flex items-start gap-4"
+                className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-start gap-4"
               >
                 <div className={`${step.color} rounded-full p-3 flex-shrink-0`}>
                   <step.icon className="w-6 h-6 text-white" />

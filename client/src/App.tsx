@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { ScrollToTop } from './components/common/ScrollToTop';
@@ -47,9 +47,11 @@ function App() {
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/impressum" element={<Impressum />} />
           <Route path="/shared/:shareToken" element={<SharedStoryViewer />} />
+          <Route path="/s/:shareToken" element={<SharedStoryViewer />} />
           <Route path="/try" element={<TrialWizard />} />
           <Route path="/trial-generation" element={<TrialGenerationPage />} />
           <Route path="/claim/:token" element={<ClaimAccount />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </GenerationProvider>

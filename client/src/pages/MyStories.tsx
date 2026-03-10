@@ -57,7 +57,7 @@ const GeneratingStoryCard = memo(function GeneratingStoryCard({
   return (
     <div
       onClick={onView}
-      className="bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ring-2 ring-indigo-400 cursor-pointer"
+      className="bg-white rounded-2xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ring-2 ring-indigo-400 cursor-pointer"
     >
       {/* Animated gradient thumbnail */}
       <div className="relative w-full h-48 bg-gradient-to-br from-indigo-100 via-indigo-100 to-pink-100 flex items-center justify-center overflow-hidden">
@@ -154,7 +154,7 @@ const StoryCard = memo(function StoryCard({
   return (
     <div
       ref={cardRef}
-      className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ${
+      className={`bg-white rounded-2xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg ${
         story.isPartial ? 'ring-2 ring-amber-400' : ''
       } ${
         isSelected ? 'ring-8 ring-green-500' : ''
@@ -931,7 +931,7 @@ export default function MyStories() {
               {/* Create next story card */}
               <button
                 onClick={() => needsPassword ? scrollToPasswordBanner() : navigate('/create?new=true')}
-                className={`bg-white rounded-xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg border-2 border-dashed ${
+                className={`bg-white rounded-2xl shadow-md overflow-hidden transition-all flex flex-col hover:shadow-lg border-2 border-dashed ${
                   needsPassword ? 'border-gray-200 cursor-not-allowed' : 'border-indigo-200 hover:border-indigo-400'
                 }`}
               >

@@ -116,7 +116,7 @@ export default function ResetPassword() {
       <Navigation currentStep={0} />
 
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-8">
+        <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8">
           {success ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">

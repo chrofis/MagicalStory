@@ -157,7 +157,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
       </div>
 
       {/* Daily Usage Table */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <button
           onClick={() => setExpandedSection(expandedSection === 'daily' ? null : 'daily')}
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
@@ -220,7 +220,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
       </div>
 
       {/* Monthly Usage Table */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <button
           onClick={() => setExpandedSection(expandedSection === 'monthly' ? null : 'monthly')}
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"
@@ -282,7 +282,7 @@ export function TokenUsageTab({ texts }: TokenUsageTabProps) {
       </div>
 
       {/* By User Table */}
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
         <button
           onClick={() => setExpandedSection(expandedSection === 'user' ? null : 'user')}
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50"

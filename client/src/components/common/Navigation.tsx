@@ -84,7 +84,7 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   }, [showMenu]);
 
   return (
-    <nav className="bg-black text-white px-3 py-3">
+    <nav className="bg-gray-900 text-white px-3 py-3">
       <div className="flex justify-between items-center">
         {/* Left: Title */}
         <div className="flex-shrink-0">

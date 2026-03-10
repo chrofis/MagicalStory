@@ -375,7 +375,7 @@ export default function BookBuilder() {
               {stories.map((story, index) => (
                 <div
                   key={story.id}
-                  className="bg-white rounded-xl shadow-md p-3 sm:p-4 flex items-center gap-3 sm:gap-4"
+                  className="bg-white rounded-2xl shadow-md p-3 sm:p-4 flex items-center gap-3 sm:gap-4"
                 >
                   {/* Thumbnail */}
                   {story.thumbnail ? (

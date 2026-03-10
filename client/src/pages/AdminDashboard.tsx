@@ -1225,7 +1225,7 @@ export default function AdminDashboard() {
 
         {/* Failed Jobs Tab */}
         {activeTab === 'jobs' && (
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
                 <AlertCircle className="text-red-500" />

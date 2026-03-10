@@ -121,7 +121,7 @@ function CreditOrderCard({
   formatAmount: (amount: number, currency: string) => string;
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border-l-4 border-amber-400">
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-shadow border-l-4 border-amber-400">
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between mb-3">
@@ -195,7 +195,7 @@ function BookOrderCard({
   }, [order.thumbnailUrl]);
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       {/* Thumbnail header */}
       {thumbnailData && (
         <div className="h-32 bg-gray-100 overflow-hidden">

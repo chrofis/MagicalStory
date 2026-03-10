@@ -457,7 +457,7 @@ export default function TermsOfService() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">{content.title}</h1>
         <p className="text-gray-500 mb-8">{content.lastUpdated}</p>
 
-        <div className="bg-white rounded-xl shadow-sm p-6 md:p-8 space-y-8">
+        <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8 space-y-8">
           {content.sections.map((section, index) => (
             <section key={index}>
               <h2 className="text-xl font-semibold text-gray-800 mb-3">{section.title}</h2>

@@ -191,7 +191,7 @@ export default function EmailVerified() {
       <Navigation currentStep={0} />
 
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg max-w-md w-full p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-lg max-w-md w-full p-8 text-center">
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
             status === 'other_window' ? 'bg-indigo-100' : 'bg-green-100'
           }`}>

@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
-import { Navigation, Footer } from '@/components/common';
+import { Navigation, Footer, Button } from '@/components/common';
 import { storyService } from '@/services';
 
 // Scroll indicator component - subtle dots on the right
@@ -35,21 +35,21 @@ const sectionTranslations = {
     // Section 1: Characters
     step1: 'Step 1',
     createCharacters: 'Create Your Characters',
-    createCharactersDesc: 'Upload photos of your loved ones and watch them transform into beautiful illustrated characters. Our AI analyzes each photo to capture unique features, expressions, and personality.',
+    createCharactersDesc: 'Upload photos of your family and watch them appear as illustrated characters throughout the story. Each character keeps their unique look on every page.',
     addFamily: 'Add your whole family - children, parents, grandparents, or friends',
     defineNames: 'Define names, ages, and relationships between characters',
     consistentCharacters: 'Characters appear consistently throughout your entire story',
     // Section 2: Story
     step2: 'Step 2',
     tellStory: 'Tell Your Story',
-    tellStoryDesc: "Choose from magical themes or describe your own adventure. Whether it's a birthday surprise, a bedtime tale, or an educational journey - you're in control of the narrative.",
+    tellStoryDesc: "Pick a theme or describe your own adventure. Birthday surprise, bedtime tale, or educational journey — you decide what happens.",
     selectThemes: 'Select from popular themes: Adventure, Fantasy, Educational, Birthday, and more',
     customElements: 'Add custom story elements and personal details',
     readingLevel: "Adjust reading level to match your child's age",
     // Section 3: Style
     step3: 'Step 3',
     chooseStyle: 'Choose Your Style',
-    chooseStyleDesc: 'Select from a variety of beautiful illustration styles. From delicate watercolors to bold 3D animation - find the perfect look for your story.',
+    chooseStyleDesc: 'Pick the illustration style that fits your story. Watercolor, 3D animation, comic, anime — each style is applied consistently across all pages.',
     artStyles: '8+ unique art styles: Pixar-style 3D, Watercolor, Comic, Anime, and more',
     consistentStyle: 'Consistent style across all pages and characters',
     bookLength: 'Choose your preferred book length - from short stories to longer adventures',
@@ -61,28 +61,28 @@ const sectionTranslations = {
     printOptions: 'Hardcover or softcover printing - 20x20cm, professional quality',
     shipping: 'Ships within Switzerland - the perfect gift for any occasion',
     // CTA
-    readyToCreate: 'Ready to Create Magic?',
-    ctaDesc: 'Transform your photos into a personalized storybook in minutes. Your child will be the hero of their very own adventure!',
+    readyToCreate: 'Ready to create your book?',
+    ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in about 10 minutes.',
   },
   de: {
     // Section 1: Characters
     step1: 'Schritt 1',
     createCharacters: 'Erstelle deine Charaktere',
-    createCharactersDesc: 'Lade Fotos deiner Liebsten hoch und sieh zu, wie sie sich in wunderschön illustrierte Charaktere verwandeln. Unsere KI analysiert jedes Foto, um einzigartige Merkmale, Ausdrücke und Persönlichkeit einzufangen.',
+    createCharactersDesc: 'Lade Fotos deiner Familie hoch und sieh sie als illustrierte Figuren in der ganzen Geschichte. Jede Figur behält ihr einzigartiges Aussehen auf jeder Seite.',
     addFamily: 'Füge deine ganze Familie hinzu - Kinder, Eltern, Grosseltern oder Freunde',
     defineNames: 'Definiere Namen, Alter und Beziehungen zwischen den Charakteren',
     consistentCharacters: 'Charaktere erscheinen einheitlich in der gesamten Geschichte',
     // Section 2: Story
     step2: 'Schritt 2',
     tellStory: 'Erzähle deine Geschichte',
-    tellStoryDesc: 'Wähle aus magischen Themen oder beschreibe dein eigenes Abenteuer. Ob Geburtstagsüberraschung, Gute-Nacht-Geschichte oder Lernreise - du bestimmst die Handlung.',
+    tellStoryDesc: 'Wähle ein Thema oder beschreibe dein eigenes Abenteuer. Geburtstagsüberraschung, Gute-Nacht-Geschichte oder Lernreise — du bestimmst, was passiert.',
     selectThemes: 'Wähle aus beliebten Themen: Abenteuer, Fantasy, Lerngeschichten, Geburtstag und mehr',
     customElements: 'Füge eigene Story-Elemente und persönliche Details hinzu',
     readingLevel: 'Passe das Leseniveau an das Alter deines Kindes an',
     // Section 3: Style
     step3: 'Schritt 3',
     chooseStyle: 'Wähle deinen Stil',
-    chooseStyleDesc: 'Wähle aus einer Vielzahl schöner Illustrationsstile. Von zarten Aquarellen bis zu kräftiger 3D-Animation - finde den perfekten Look für deine Geschichte.',
+    chooseStyleDesc: 'Wähle den Illustrationsstil, der zu deiner Geschichte passt. Aquarell, 3D-Animation, Comic, Anime — jeder Stil wird einheitlich auf allen Seiten angewendet.',
     artStyles: '8+ einzigartige Kunststile: Pixar-ähnliches 3D, Aquarell, Comic, Anime und mehr',
     consistentStyle: 'Einheitlicher Stil auf allen Seiten und bei allen Charakteren',
     bookLength: 'Wähle deine bevorzugte Buchlänge - von kurzen Geschichten bis zu längeren Abenteuern',
@@ -94,28 +94,28 @@ const sectionTranslations = {
     printOptions: 'Hardcover oder Softcover Druck - 20x20cm, professionelle Qualität',
     shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
     // CTA
-    readyToCreate: 'Bereit, Magie zu erschaffen?',
-    ctaDesc: 'Verwandle deine Fotos in Minuten in ein personalisiertes Geschichtenbuch. Dein Kind wird der Held seines eigenen Abenteuers!',
+    readyToCreate: 'Bereit für dein eigenes Buch?',
+    ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in etwa 10 Minuten fertig.',
   },
   fr: {
     // Section 1: Characters
     step1: 'Étape 1',
     createCharacters: 'Créez vos personnages',
-    createCharactersDesc: "Téléchargez des photos de vos proches et regardez-les se transformer en magnifiques personnages illustrés. Notre IA analyse chaque photo pour capter les traits uniques, les expressions et la personnalité.",
+    createCharactersDesc: "Téléchargez des photos de votre famille et retrouvez-les comme personnages illustrés tout au long de l'histoire. Chaque personnage garde son apparence unique sur chaque page.",
     addFamily: 'Ajoutez toute votre famille - les enfants, parents, grands-parents ou amis',
     defineNames: 'Définissez les noms, âges et relations entre les personnages',
     consistentCharacters: 'Les personnages apparaissent de manière cohérente tout au long de votre histoire',
     // Section 2: Story
     step2: 'Étape 2',
     tellStory: 'Racontez votre histoire',
-    tellStoryDesc: "Choisissez parmi des thèmes magiques ou décrivez votre propre aventure. Que ce soit une surprise d'anniversaire, l'histoire du soir ou un voyage éducatif - vous contrôlez le récit.",
+    tellStoryDesc: "Choisissez un thème ou décrivez votre propre aventure. Surprise d'anniversaire, histoire du soir ou voyage éducatif — c'est vous qui décidez.",
     selectThemes: "Sélectionnez parmi les thèmes populaires : aventure, fantasy, éducatif, anniversaire, et plus",
     customElements: 'Ajoutez des éléments personnalisés et des détails personnels',
     readingLevel: "Ajustez le niveau de lecture à l'âge de votre enfant",
     // Section 3: Style
     step3: 'Étape 3',
     chooseStyle: 'Choisissez votre style',
-    chooseStyleDesc: "Sélectionnez parmi une variété de beaux styles d'illustration. De l'aquarelle délicate à l'animation 3D audacieuse - trouvez le look parfait pour votre histoire.",
+    chooseStyleDesc: "Choisissez le style d'illustration qui correspond à votre histoire. Aquarelle, animation 3D, bande dessinée, anime — chaque style est appliqué de manière cohérente sur toutes les pages.",
     artStyles: "8+ styles artistiques uniques : 3D style Pixar, aquarelle, bande dessinée, anime, et plus",
     consistentStyle: 'Style cohérent sur toutes les pages et personnages',
     bookLength: 'Choisissez la longueur de livre souhaitée - des histoires courtes aux aventures plus longues',
@@ -127,8 +127,8 @@ const sectionTranslations = {
     printOptions: 'Impression reliée ou brochée - 20x20cm, qualité professionnelle',
     shipping: 'Livraison en Suisse - le cadeau parfait pour toute occasion',
     // CTA
-    readyToCreate: 'Prêt à créer de la magie ?',
-    ctaDesc: "Transformez vos photos en livre d'histoires personnalisé en quelques minutes. Votre enfant sera le héros de sa propre aventure !",
+    readyToCreate: 'Prêt à créer votre livre ?',
+    ctaDesc: "Téléchargez une photo, choisissez une aventure et votre histoire personnalisée est prête en environ 10 minutes.",
   },
 };
 
@@ -294,14 +294,15 @@ export default function LandingPage() {
               </p>
 
               {/* Button directly below text */}
-              <button
+              <Button
                 onClick={handleStartJourney}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 lg:px-12 py-4 lg:py-6 rounded-xl text-lg lg:text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-3"
+                size="xl"
+                icon={Sparkles}
+                className="font-bold"
               >
-                <Sparkles size={28} />
                 {t.startJourney}
-                <ArrowRight size={28} />
-              </button>
+                <ArrowRight size={24} />
+              </Button>
               <div className="mt-4">
                 <button
                   onClick={() => setShowAuthModal(true)}
@@ -573,14 +574,15 @@ export default function LandingPage() {
           <p className="text-xl text-indigo-100 mb-8 max-w-2xl mx-auto">
             {st.ctaDesc}
           </p>
-          <button
+          <Button
             onClick={handleStartJourney}
-            className="bg-white hover:bg-gray-100 text-indigo-600 px-8 lg:px-12 py-4 lg:py-6 rounded-xl text-lg lg:text-2xl font-bold shadow-xl hover:shadow-2xl transform hover:scale-105 transition-all inline-flex items-center gap-3"
+            size="xl"
+            icon={Sparkles}
+            className="bg-white hover:bg-gray-100 text-indigo-600 font-bold"
           >
-            <Sparkles size={28} />
             {t.startJourney}
-            <ArrowRight size={28} />
-          </button>
+            <ArrowRight size={24} />
+          </Button>
           <div className="mt-4">
             <button
               onClick={() => setShowAuthModal(true)}
