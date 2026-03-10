@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles } from 'lucide-react';
+import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles, Palette, HelpCircle, Info, Mail } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Language } from '@/types/story';
@@ -39,6 +39,10 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
     adminPanel: language === 'de' ? 'Admin Panel' : language === 'fr' ? 'Panneau Admin' : 'Admin Panel',
     manageUsers: language === 'de' ? 'Benutzer verwalten' : language === 'fr' ? 'Gérer les utilisateurs' : 'Manage Users',
     changePassword: language === 'de' ? 'Passwort ändern' : language === 'fr' ? 'Changer le mot de passe' : 'Change Password',
+    themes: language === 'de' ? 'Themen' : language === 'fr' ? 'Thèmes' : 'Themes',
+    faq: 'FAQ',
+    about: language === 'de' ? 'Über uns' : language === 'fr' ? 'À propos' : 'About',
+    contact: language === 'de' ? 'Kontakt' : language === 'fr' ? 'Contact' : 'Contact',
     legal: language === 'de' ? 'Rechtliches' : language === 'fr' ? 'Mentions légales' : 'Legal',
     terms: language === 'de' ? 'AGB' : language === 'fr' ? 'CGU' : 'Terms',
     privacy: language === 'de' ? 'Datenschutz' : language === 'fr' ? 'Confidentialité' : 'Privacy'
@@ -179,6 +183,38 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
           <span>{t.login}</span>
         </button>
       )}
+
+      {/* Site Navigation */}
+      <div className="border-t border-gray-700">
+        <button
+          onClick={() => handleNavigate('/themes')}
+          className="w-full text-left px-4 py-2.5 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center gap-2 text-sm"
+        >
+          <Palette size={14} />
+          <span>{texts.themes}</span>
+        </button>
+        <button
+          onClick={() => handleNavigate('/faq')}
+          className="w-full text-left px-4 py-2.5 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center gap-2 text-sm"
+        >
+          <HelpCircle size={14} />
+          <span>{texts.faq}</span>
+        </button>
+        <button
+          onClick={() => handleNavigate('/about')}
+          className="w-full text-left px-4 py-2.5 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center gap-2 text-sm"
+        >
+          <Info size={14} />
+          <span>{texts.about}</span>
+        </button>
+        <button
+          onClick={() => handleNavigate('/contact')}
+          className="w-full text-left px-4 py-2.5 hover:bg-gray-700 text-gray-300 hover:text-white flex items-center gap-2 text-sm"
+        >
+          <Mail size={14} />
+          <span>{texts.contact}</span>
+        </button>
+      </div>
 
       {/* Legal Links */}
       <div className="border-t border-gray-700 px-4 py-2">
