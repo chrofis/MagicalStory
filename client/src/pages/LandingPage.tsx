@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
-import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown } from 'lucide-react';
+import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown, Heart } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer, Button } from '@/components/common';
 import { storyService } from '@/services';
@@ -18,9 +18,9 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Step 2',
     tellStory: 'Tell Your Story',
-    tellStoryDesc: "Pick a theme or describe your own adventure. Birthday surprise, bedtime tale, or educational journey — you decide what happens.",
-    selectThemes: 'Select from popular themes: Adventure, Fantasy, Educational, Birthday, and more',
-    customElements: 'Add custom story elements and personal details',
+    tellStoryDesc: "Pick a theme or describe your own adventure. Birthday surprise, bedtime tale, or a story to help your child through a life challenge — you decide what happens.",
+    selectThemes: 'Adventure, fantasy, birthday, bedtime stories, and more',
+    customElements: 'Stories for life challenges: first day of school, new sibling, visiting the dentist, overcoming fears',
     readingLevel: "Adjust reading level to match your child's age",
     // Section 3: Style
     step3: 'Step 3',
@@ -51,9 +51,9 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Schritt 2',
     tellStory: 'Erzähle deine Geschichte',
-    tellStoryDesc: 'Wähle ein Thema oder beschreibe dein eigenes Abenteuer. Geburtstagsüberraschung, Gute-Nacht-Geschichte oder Lernreise — du bestimmst, was passiert.',
-    selectThemes: 'Wähle aus beliebten Themen: Abenteuer, Fantasy, Lerngeschichten, Geburtstag und mehr',
-    customElements: 'Füge eigene Story-Elemente und persönliche Details hinzu',
+    tellStoryDesc: 'Wähle ein Thema oder beschreibe dein eigenes Abenteuer. Geburtstagsüberraschung, Gute-Nacht-Geschichte oder eine Geschichte, die deinem Kind bei einer Herausforderung hilft — du bestimmst.',
+    selectThemes: 'Abenteuer, Fantasy, Geburtstag, Gute-Nacht-Geschichten und mehr',
+    customElements: 'Geschichten für Herausforderungen: erster Schultag, neues Geschwisterchen, Zahnarztbesuch, Ängste überwinden',
     readingLevel: 'Passe das Leseniveau an das Alter deines Kindes an',
     // Section 3: Style
     step3: 'Schritt 3',
@@ -84,9 +84,9 @@ const sectionTranslations = {
     // Section 2: Story
     step2: 'Étape 2',
     tellStory: 'Racontez votre histoire',
-    tellStoryDesc: "Choisissez un thème ou décrivez votre propre aventure. Surprise d'anniversaire, histoire du soir ou voyage éducatif — c'est vous qui décidez.",
-    selectThemes: "Sélectionnez parmi les thèmes populaires : aventure, fantasy, éducatif, anniversaire, et plus",
-    customElements: 'Ajoutez des éléments personnalisés et des détails personnels',
+    tellStoryDesc: "Choisissez un thème ou décrivez votre propre aventure. Surprise d'anniversaire, histoire du soir ou une histoire pour aider votre enfant à surmonter un défi — c'est vous qui décidez.",
+    selectThemes: "Aventure, fantasy, anniversaire, histoires du soir, et plus",
+    customElements: "Histoires pour les défis de la vie : premier jour d'école, nouveau bébé, visite chez le dentiste, surmonter ses peurs",
     readingLevel: "Ajustez le niveau de lecture à l'âge de votre enfant",
     // Section 3: Style
     step3: 'Étape 3',
@@ -382,7 +382,7 @@ export default function LandingPage() {
                   <span className="text-gray-600">{st.selectThemes}</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <BookOpen className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
+                  <Heart className="w-5 h-5 text-amber-600 mt-1 flex-shrink-0" />
                   <span className="text-gray-600">{st.customElements}</span>
                 </li>
                 <li className="flex items-start gap-3">
