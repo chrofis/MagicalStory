@@ -9,6 +9,7 @@ import {
   educationalTopics,
   historicalEvents,
 } from '@/constants/storyTypes';
+import { themeDescriptions } from '@/constants/themeDescriptions';
 import type { LocalizedString } from '@/types/character';
 
 type CategorySlug = 'adventure' | 'life-challenges' | 'educational' | 'historical';
@@ -105,31 +106,12 @@ function getCategoryName(category: CategorySlug, language: string): string {
   return names[category]?.[language] || names[category]?.en || category;
 }
 
-function getDescription(category: CategorySlug, themeName: string, year?: number | string, language: string = 'en'): string {
-  const descs: Record<CategorySlug, Record<string, (n: string, y?: number | string) => string>> = {
-    adventure: {
-      en: (n) => `Set off on a ${n} adventure! Your child becomes the hero in this exciting personalized story full of surprises and wonder.`,
-      de: (n) => `Brich auf zu einem ${n}-Abenteuer! Dein Kind wird zum Helden dieser spannenden personalisierten Geschichte voller Überraschungen.`,
-      fr: (n) => `Partez pour une aventure ${n} ! Votre enfant devient le héros de cette histoire personnalisée passionnante pleine de surprises.`,
-    },
-    'life-challenges': {
-      en: (n) => `Help your child with ${n}. This personalized story makes the experience positive, empowering, and age-appropriate.`,
-      de: (n) => `Hilf deinem Kind bei ${n}. Diese personalisierte Geschichte macht die Erfahrung positiv, stärkend und altersgerecht.`,
-      fr: (n) => `Aidez votre enfant avec ${n}. Cette histoire personnalisée rend l'expérience positive et adaptée à son âge.`,
-    },
-    educational: {
-      en: (n) => `Learn about ${n} through a personalized adventure! Your child discovers new things on every page of this fun educational story.`,
-      de: (n) => `Lerne ${n} durch ein personalisiertes Abenteuer! Dein Kind entdeckt auf jeder Seite dieser lustigen Lerngeschichte Neues.`,
-      fr: (n) => `Apprenez ${n} à travers une aventure personnalisée ! Votre enfant découvre de nouvelles choses à chaque page.`,
-    },
-    historical: {
-      en: (n, y) => `Travel back to ${y}! Your child experiences ${n} in this personalized historical adventure full of real details.`,
-      de: (n, y) => `Reise zurück ins Jahr ${y}! Dein Kind erlebt ${n} in diesem personalisierten historischen Abenteuer voller echter Details.`,
-      fr: (n, y) => `Voyagez en ${y} ! Votre enfant vit ${n} dans cette aventure historique personnalisée pleine de détails réels.`,
-    },
-  };
-  const fn = descs[category]?.[language] || descs[category]?.en;
-  return fn ? fn(themeName, year) : '';
+function getDescription(themeId: string, language: string = 'en'): string {
+  const desc = themeDescriptions[themeId];
+  if (desc) {
+    return desc[language as keyof typeof desc] || desc.en;
+  }
+  return '';
 }
 
 function getExpectBullets(category: CategorySlug, language: string): string[] {
@@ -222,7 +204,7 @@ export default function ThemePage() {
   const catSlug = category as CategorySlug;
   const themeName = theme.name[language] || theme.name.en;
   const categoryName = getCategoryName(catSlug, language);
-  const description = getDescription(catSlug, themeName, theme.year, language);
+  const description = getDescription(themeId!, language);
   const bullets = getExpectBullets(catSlug, language);
 
   const howSteps = [
