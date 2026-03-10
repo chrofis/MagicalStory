@@ -3787,5 +3787,8 @@ module.exports = {
 
   // Page text helpers
   getPageText,
-  updatePageText
+  updatePageText,
+
+  // Exposed for testing
+  wrapUserInput
 };
