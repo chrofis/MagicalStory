@@ -27,9 +27,8 @@ let landmarkIndexingJob = null;
 // Helper to check auth (JWT or secret)
 function checkAuth(req, res, isPost = false) {
   const secret = isPost ? req.body?.secret : req.query?.secret;
-  const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
 
-  if (secret === secretKey) {
+  if (process.env.ADMIN_SECRET && secret === process.env.ADMIN_SECRET) {
     return true;
   }
 

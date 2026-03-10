@@ -139,11 +139,25 @@ router.post('/gemini', aiProxyLimiter, authenticateToken, async (req, res) => {
 
     const { model, contents, safetySettings, generationConfig } = req.body;
 
+    // Validate model against allowlist to prevent arbitrary model access
+    const ALLOWED_GEMINI_MODELS = [
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-2.5-pro',
+      'gemini-pro-latest',
+      'gemini-2.5-flash-image',
+      'gemini-3-pro-image-preview',
+    ];
+    const effectiveModel = model || 'gemini-2.5-flash-image';
+    if (!ALLOWED_GEMINI_MODELS.some(m => effectiveModel.startsWith(m))) {
+      return res.status(400).json({ error: 'Invalid model' });
+    }
+
     await logActivity(req.user.id, req.user.username, 'GEMINI_API_CALL', {
-      model: model || 'gemini-2.5-flash-image'
+      model: effectiveModel
     });
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model || 'gemini-2.5-flash-image'}:generateContent?key=${geminiApiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${effectiveModel}:generateContent?key=${geminiApiKey}`;
 
     const requestBody = { contents };
     if (safetySettings) {

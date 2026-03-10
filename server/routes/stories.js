@@ -9,40 +9,11 @@
 const express = require('express');
 const router = express.Router();
 
-const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages } = require('../services/database');
+const { dbQuery, isDatabaseMode, logActivity, getPool, getStoryImage, getStoryImageWithVersions, hasStorySeparateImages, saveStoryData, updateStoryDataOnly, getActiveVersion, setActiveVersion, getAllActiveVersions, getAllStoryImages, getActiveStoryImages, getRetryHistoryImages, rehydrateStoryImages, buildStoryMetadata } = require('../services/database');
 const { authenticateToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 const { getEventForStory, getAllEvents, EVENT_CATEGORIES } = require('../lib/historicalEvents');
 const { dbToArrayIndex } = require('../lib/versionManager');
-
-/**
- * Build metadata object from story data for fast list queries.
- * This extracts only the fields needed for listing stories.
- */
-function buildStoryMetadata(story) {
-  const sceneCount = story.sceneImages?.length || 0;
-  const hasThumbnail = !!(
-    story.coverImages?.frontCover?.imageData ||
-    story.coverImages?.frontCover ||
-    story.thumbnail
-  );
-
-  return {
-    id: story.id,
-    title: story.title,
-    createdAt: story.createdAt,
-    updatedAt: story.updatedAt,
-    pages: story.pages,
-    language: story.language,
-    languageLevel: story.languageLevel,
-    isPartial: story.isPartial || false,
-    generatedPages: story.generatedPages,
-    totalPages: story.totalPages,
-    sceneCount,
-    hasThumbnail,
-    characters: (story.characters || []).map(c => ({ id: c.id, name: c.name })),
-  };
-}
 
 /**
  * Normalize image data to ensure it has the correct data URI prefix.

@@ -1,3 +1,8 @@
+# Temp/debug scripts
+tmp-*.js
+tmp-*.json
+fetch-prompt.js
+
 # Node modules (if any)
 node_modules/
 **/node_modules/

@@ -33,6 +33,18 @@ const { loadLandmarkPhotoVariant } = require('./landmarkPhotos');
 // ============================================================================
 
 /**
+ * Wrap user-provided text in XML boundary markers to mitigate prompt injection.
+ * The <user_input> tags signal to the AI model that the enclosed content is
+ * user-provided data and should be treated as data only, not as instructions.
+ * @param {string} value - The user-provided string
+ * @returns {string} The value wrapped in <user_input> tags, or the original if empty/None
+ */
+function wrapUserInput(value) {
+  if (!value || value === 'None') return value;
+  return `<user_input>${value}</user_input>`;
+}
+
+/**
  * Build physical traits object from character
  * Uses the characterPhysical helper to read from canonical or legacy fields
  * @param {Object} char - Character object
@@ -2102,7 +2114,7 @@ function buildBasePrompt(inputData, textPageCount = null) {
 - **Language**: ${language}${languageNote}
 - **Reading Level**: ${readingLevel}
 - **Story Type**: ${inputData.storyType || 'adventure'}
-- **Story Details**: ${inputData.storyDetails || 'None'}
+- **Story Details**: <user_input>${inputData.storyDetails || 'None'}</user_input>
 - **Characters**: ${JSON.stringify(characterSummary, null, 2)}${relationshipDescriptions}`;
 }
 
@@ -2161,10 +2173,10 @@ function buildStoryPrompt(inputData, sceneCount = null) {
 
   let categoryGuidelines = '';
   if (storyCategory === 'life-challenge') {
-    categoryGuidelines = `This is a LIFE SKILLS story about "${storyTopic}".
+    categoryGuidelines = `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Life Skills Stories:**
-- The story should help children understand and cope with the topic: ${storyTopic}
+- The story should help children understand and cope with the topic: <user_input>${storyTopic}</user_input>
 - Show the main character(s) facing this challenge naturally within the story
 - Provide positive, age-appropriate messages about handling this situation
 - Include practical tips or coping strategies woven into the narrative
@@ -2172,10 +2184,10 @@ function buildStoryPrompt(inputData, sceneCount = null) {
 - Avoid being preachy - let the lesson emerge naturally from the story
 ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}
 
-${teachingGuide ? `**SPECIFIC GUIDANCE for "${storyTopic}":**
+${teachingGuide ? `**SPECIFIC GUIDANCE for "<user_input>${storyTopic}</user_input>":**
 ${teachingGuide}` : ''}`;
   } else if (storyCategory === 'educational') {
-    categoryGuidelines = `This is an EDUCATIONAL story teaching about "${storyTopic}".
+    categoryGuidelines = `This is an EDUCATIONAL story teaching about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Educational Stories:**
 - Weave the educational content naturally into an engaging narrative
@@ -2185,8 +2197,8 @@ ${teachingGuide}` : ''}`;
 - Include moments where characters discover or apply what they're learning
 ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}
 
-${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
-${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
+${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "<user_input>${storyTopic}</user_input>":**
+${teachingGuide}` : `- The story should teach children about: <user_input>${storyTopic}</user_input>`}`;
   } else if (storyCategory === 'historical') {
     // Get historical event context from txt guide
     const historicalGuide = getTeachingGuide('historical', storyTopic);
@@ -2225,7 +2237,7 @@ ${historicalGuide}${locationsSection}
 - The story should help children understand what life was like during this event`;
     } else {
       // Fallback if event not found
-      categoryGuidelines = `This is a HISTORICAL story about "${storyTopic}".
+      categoryGuidelines = `This is a HISTORICAL story about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Historical Stories:**
 - Create a story set during this historical event or period
@@ -2238,7 +2250,7 @@ ${historicalGuide}${locationsSection}
     const customText = inputData.customThemeText || '';
     categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
 
-"${customText}"
+<user_input>${customText}</user_input>
 
 **IMPORTANT GUIDELINES for Custom Stories:**
 - Follow the user's concept closely - this is their creative vision
@@ -2276,11 +2288,11 @@ ${historicalGuide}${locationsSection}
       CHARACTER_CLOTHING: characterClothing || 'No clothing info available',
       STORY_CATEGORY: storyCategory,
       STORY_TYPE: storyCategory === 'custom' ? 'custom' : (storyTheme || inputData.storyType || 'adventure'),
-      STORY_TOPIC: storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None'),
+      STORY_TOPIC: wrapUserInput(storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None')),
       CATEGORY_GUIDELINES: categoryGuidelines,
-      STORY_DETAILS: inputData.storyDetails || 'None',
+      STORY_DETAILS: wrapUserInput(inputData.storyDetails || 'None'),
       SEASON: inputData.season ? `${inputData.season.charAt(0).toUpperCase() + inputData.season.slice(1)} - include seasonal weather, activities, and atmosphere` : 'Not specified',
-      DEDICATION: inputData.dedication || 'None',
+      DEDICATION: wrapUserInput(inputData.dedication || 'None'),
       AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection
     });
     log.debug(`[PROMPT] Outline prompt length: ${prompt.length} chars`);
@@ -2295,8 +2307,8 @@ ${historicalGuide}${locationsSection}
     Language: ${inputData.language || 'en'}
     Characters: ${JSON.stringify(characterSummary)}
     Story Type: ${inputData.storyType || 'adventure'}
-    Story Details: ${inputData.storyDetails || 'None'}
-    Dedication: ${inputData.dedication || 'None'}`;
+    Story Details: <user_input>${inputData.storyDetails || 'None'}</user_input>
+    Dedication: <user_input>${inputData.dedication || 'None'}</user_input>`;
 }
 
 /**
@@ -3165,10 +3177,10 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
 
   let categoryGuidelines = '';
   if (storyCategory === 'life-challenge') {
-    categoryGuidelines = `This is a LIFE SKILLS story about "${storyTopic}".
+    categoryGuidelines = `This is a LIFE SKILLS story about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Life Skills Stories:**
-- The story should help children understand and cope with the topic: ${storyTopic}
+- The story should help children understand and cope with the topic: <user_input>${storyTopic}</user_input>
 - Show the main character(s) facing this challenge naturally within the story
 - Provide positive, age-appropriate messages about handling this situation
 - Include practical tips or coping strategies woven into the narrative
@@ -3176,10 +3188,10 @@ function buildUnifiedStoryPrompt(inputData, sceneCount = null) {
 - Avoid being preachy - let the lesson emerge naturally from the story
 ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - integrate the life lesson into this theme creatively` : '- This is a realistic story set in everyday life situations'}
 
-${teachingGuide ? `**SPECIFIC GUIDANCE for "${storyTopic}":**
+${teachingGuide ? `**SPECIFIC GUIDANCE for "<user_input>${storyTopic}</user_input>":**
 ${teachingGuide}` : ''}`;
   } else if (storyCategory === 'educational') {
-    categoryGuidelines = `This is an EDUCATIONAL story teaching about "${storyTopic}".
+    categoryGuidelines = `This is an EDUCATIONAL story teaching about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Educational Stories:**
 - Weave the educational content naturally into an engaging narrative
@@ -3189,8 +3201,8 @@ ${teachingGuide}` : ''}`;
 - Include moments where characters discover or apply what they're learning
 ${storyTheme && storyTheme !== 'realistic' ? `- The story is wrapped in a ${storyTheme} adventure setting - make learning part of the adventure` : '- Use everyday situations to explore the educational topic'}
 
-${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "${storyTopic}":**
-${teachingGuide}` : `- The story should teach children about: ${storyTopic}`}`;
+${teachingGuide ? `**SPECIFIC TEACHING GUIDE for "<user_input>${storyTopic}</user_input>":**
+${teachingGuide}` : `- The story should teach children about: <user_input>${storyTopic}</user_input>`}`;
   } else if (storyCategory === 'historical') {
     // Get historical event context from txt guide
     const historicalGuide = getTeachingGuide('historical', storyTopic);
@@ -3229,7 +3241,7 @@ ${historicalGuide}${locationsSection}
 - The story should help children understand what life was like during this event`;
     } else {
       // Fallback if event not found
-      categoryGuidelines = `This is a HISTORICAL story about "${storyTopic}".
+      categoryGuidelines = `This is a HISTORICAL story about "<user_input>${storyTopic}</user_input>".
 
 **IMPORTANT GUIDELINES for Historical Stories:**
 - Create a story set during this historical event or period
@@ -3242,7 +3254,7 @@ ${historicalGuide}${locationsSection}
     const customText = inputData.customThemeText || '';
     categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
 
-"${customText}"
+<user_input>${customText}</user_input>
 
 **IMPORTANT GUIDELINES for Custom Stories:**
 - Follow the user's concept closely - this is their creative vision
@@ -3285,8 +3297,8 @@ ${adventureGuide}` : ''}`;
       READING_LEVEL: readingLevel,
       STORY_CATEGORY: storyCategory,
       STORY_TYPE: storyCategory === 'custom' ? 'custom' : storyTheme,
-      STORY_TOPIC: storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None'),
-      STORY_DETAILS: inputData.storyDetails || 'None',
+      STORY_TOPIC: wrapUserInput(storyTopic || (storyCategory === 'custom' ? (inputData.customThemeText || 'None') : 'None')),
+      STORY_DETAILS: wrapUserInput(inputData.storyDetails || 'None'),
       CHARACTERS: charactersJson,
       CHARACTER_NAMES: characterNames,
       MAIN_CHARACTER_NAMES: mainCharacterNames,
@@ -3305,7 +3317,7 @@ Language: ${getLanguageNameEnglish(language)}
 Reading Level: ${readingLevel}
 Characters: ${charactersJson}
 Story Type: ${storyTheme}
-Story Details: ${inputData.storyDetails || 'None'}
+Story Details: <user_input>${inputData.storyDetails || 'None'}</user_input>
 
 Output: Title, clothing requirements, character arcs, plot structure, visual bible, cover scenes, and all ${pageCount} pages with text and scene hints.`;
 }
@@ -3387,7 +3399,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
       LANGUAGE: getLanguageNameEnglish(language),
       LANGUAGE_NOTE: getLanguageNote(language),
       CHARACTERS: characterDesc || 'A child',
-      STORY_DETAILS: inputData.storyDetails || inputData.storyTheme || 'A fun adventure',
+      STORY_DETAILS: wrapUserInput(inputData.storyDetails || inputData.storyTheme || 'A fun adventure'),
       AVATAR_SELECTION: avatarSelection,
       TITLE_SECTION: titleSection,
       LANDMARKS: landmarksInstruction,
@@ -3398,7 +3410,7 @@ The story takes place in ${inputData.userLocation.city}. Use real place names â€
   // Fallback
   return `Create a ${pageCount}-page children's story in ${getLanguageNameEnglish(language)}.
 Character: ${characterDesc}
-Story: ${inputData.storyDetails || 'A fun adventure'}
+Story: <user_input>${inputData.storyDetails || 'A fun adventure'}</user_input>
 Output: Title, then each page with story text and a scene hint for illustration.`;
 }
 

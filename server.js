@@ -8,7 +8,7 @@ const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
@@ -63,9 +63,9 @@ function isUserTestMode(user) {
 }
 
 // Log Stripe configuration on startup
-console.log(`💳 Stripe Configuration:`);
-console.log(`   - Test mode (for admins): ${stripeTest || stripeLegacy ? '✅ Configured' : '❌ Not configured'}`);
-console.log(`   - Live mode (for users): ${stripeLive ? '✅ Configured' : '❌ Not configured'}`);
+log.info(`💳 Stripe Configuration:`);
+log.info(`   - Test mode (for admins): ${stripeTest || stripeLegacy ? '✅ Configured' : '❌ Not configured'}`);
+log.info(`   - Live mode (for users): ${stripeLive ? '✅ Configured' : '❌ Not configured'}`);
 if (!stripeLive) {
   log.warn(`   ⚠️  Warning: STRIPE_LIVE_SECRET_KEY not set - all users will use test mode`);
 }
@@ -76,7 +76,8 @@ const admin = require('firebase-admin');
 // Import modular routes and services
 const { initializePool: initModularPool, logActivity, isDatabaseMode, saveStoryData, upsertStory, saveStoryImage, getStoryImage, setActiveVersion, rehydrateStoryImages } = require('./server/services/database');
 const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('./server/middleware/validation');
-const { storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
+const { authenticateToken } = require('./server/middleware/auth');
+const { authLimiter, registerLimiter, apiLimiter, aiProxyLimiter, storyGenerationLimiter, imageRegenerationLimiter } = require('./server/middleware/rateLimit');
 const { PROMPT_TEMPLATES, loadPromptTemplates, fillTemplate } = require('./server/services/prompts');
 const { generatePrintPdf, generateViewPdf, generateCombinedBookPdf } = require('./server/lib/pdf');
 const { processBookOrder, getCoverDimensions } = require('./server/lib/gelato');
@@ -524,7 +525,7 @@ const STORAGE_MODE = (process.env.STORAGE_MODE === 'database' && DATABASE_URL)
                      : 'file';
 
 if (STORAGE_MODE === 'database') {
-  console.log(`🗄️  Database: PostgreSQL (Railway)`);
+  log.info(`🗄️  Database: PostgreSQL (Railway)`);
 }
 
 // Database connection pool (PostgreSQL - Railway)
@@ -595,44 +596,7 @@ app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow WhatsApp/Facebook crawlers to fetch OG images
 }));
 
-// Rate limiting for authentication endpoints (prevent brute force attacks)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // Max 10 attempts per window
-  message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-const registerLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 5, // Max 5 registrations per hour per IP
-  message: { error: 'Too many registration attempts. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// General API rate limiter (more permissive)
-const apiLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 100, // 100 requests per minute
-  message: { error: 'Too many requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// AI proxy endpoints rate limiter (prevents abuse of direct AI API calls)
-// Generous limit: 60 requests/minute per IP to allow legitimate use
-// while preventing runaway costs from abuse
-const aiProxyLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 60, // 60 requests per minute per IP
-  message: { error: 'Too many AI API requests. Please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Apply general rate limit to all API routes
+// Apply general rate limit to all API routes (limiters imported from server/middleware/rateLimit.js)
 app.use('/api/', apiLimiter);
 
 // Stripe webhook endpoint needs raw body for signature verification
@@ -660,7 +624,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       event = (stripeLive || stripeTest || stripeLegacy).webhooks.constructEvent(req.body, sig, liveWebhookSecret);
       stripeClient = stripeLive || stripeTest || stripeLegacy;
       isTestPayment = false;
-      console.log('✅ [STRIPE WEBHOOK] Verified with LIVE webhook secret');
+      log.info('✅ [STRIPE WEBHOOK] Verified with LIVE webhook secret');
     } catch (err) {
       // Live verification failed, will try test secret
     }
@@ -672,7 +636,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
       event = (stripeTest || stripeLegacy || stripeLive).webhooks.constructEvent(req.body, sig, testWebhookSecret);
       stripeClient = stripeTest || stripeLegacy || stripeLive;
       isTestPayment = true;
-      console.log('✅ [STRIPE WEBHOOK] Verified with TEST webhook secret');
+      log.info('✅ [STRIPE WEBHOOK] Verified with TEST webhook secret');
     } catch (err) {
       log.error('❌ [STRIPE WEBHOOK] Signature verification failed with both secrets:', err.message);
       return res.status(400).json({ error: 'Invalid signature' });
@@ -693,10 +657,10 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object;
 
-      console.log('✅ [STRIPE WEBHOOK] Payment successful!');
-      console.log('   Session ID:', session.id);
-      console.log('   Payment Intent:', session.payment_intent);
-      console.log('   Amount:', session.amount_total, session.currency);
+      log.info('✅ [STRIPE WEBHOOK] Payment successful!');
+      log.info('   Session ID:', session.id);
+      log.info('   Payment Intent:', session.payment_intent);
+      log.info('   Amount:', session.amount_total, session.currency);
 
       // Retrieve full session with customer details (use the same Stripe client that verified)
       try {
@@ -713,14 +677,14 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
         log.debug('📦 [STRIPE WEBHOOK] Customer Information:');
         log.debug('   Name:', customerInfo.name);
-        console.log('   Email:', customerInfo.email);
+        log.info('   Email:', customerInfo.email);
         log.debug('   Address:', JSON.stringify(customerInfo.address, null, 2));
         log.debug('   Metadata:', JSON.stringify(fullSession.metadata, null, 2));
 
         // Check if this is a credits purchase
         if (fullSession.metadata?.type === 'credits') {
           log.debug('💰 [STRIPE WEBHOOK] Processing credits purchase');
-          const userId = parseInt(fullSession.metadata?.userId);
+          const userId = fullSession.metadata?.userId;
 
           // SERVER-SIDE VALIDATION: Look up package by amount paid
           const amountPaid = fullSession.amount_total || 0; // in cents
@@ -737,7 +701,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             throw new Error('Cannot determine credits to add');
           }
 
-          if (!userId || isNaN(userId)) {
+          if (!userId) {
             log.error('❌ [STRIPE WEBHOOK] Invalid userId for credits purchase:', fullSession.metadata);
             throw new Error('Invalid userId in credits purchase metadata');
           }
@@ -768,7 +732,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
             // Update credits
             await dbPool.query('UPDATE users SET credits = $1 WHERE id = $2', [newCredits, userId]);
 
-            console.log(`✅ [STRIPE WEBHOOK] Added ${creditsToAdd} credits to user ${userId}`);
+            log.info(`✅ [STRIPE WEBHOOK] Added ${creditsToAdd} credits to user ${userId}`);
             log.debug(`   Previous balance: ${currentCredits}, New balance: ${newCredits}`);
 
             // Create transaction record
@@ -786,13 +750,13 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
 
         // Store order in database (book purchase)
         if (STORAGE_MODE === 'database') {
-          const userId = parseInt(fullSession.metadata?.userId);
+          const userId = fullSession.metadata?.userId;
           const address = fullSession.shipping?.address || fullSession.customer_details?.address || {};
           const orderCoverType = fullSession.metadata?.coverType || 'softcover';
           const orderBookFormat = fullSession.metadata?.bookFormat || 'square';
 
           // Validate required metadata
-          if (!userId || isNaN(userId)) {
+          if (!userId) {
             log.error('❌ [STRIPE WEBHOOK] Invalid or missing userId in metadata:', fullSession.metadata);
             throw new Error('Invalid userId in session metadata');
           }
@@ -950,7 +914,7 @@ app.post('/api/stripe/webhook', express.raw({ type: 'application/json' }), async
           // This prevents sending "Order Confirmed" followed by "Order Failed" if Gelato rejects
           // See Gelato webhook handler for 'passed' status
 
-          console.log('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
+          log.info('🚀 [STRIPE WEBHOOK] Background processing triggered - customer can leave');
         } else {
           log.warn('⚠️  [STRIPE WEBHOOK] Payment received but STORAGE_MODE is not "database" - order not processed!');
           log.warn('   Current STORAGE_MODE:', STORAGE_MODE);
@@ -1031,7 +995,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
               'UPDATE orders SET gelato_order_id = $1, updated_at = NOW() WHERE id = $2',
               [orderId, orderResult.rows[0].id]
             );
-            console.log('✅ [GELATO WEBHOOK] Linked order via story ID fallback:', orderResult.rows[0].id);
+            log.info('✅ [GELATO WEBHOOK] Linked order via story ID fallback:', orderResult.rows[0].id);
           }
         }
       }
@@ -1095,7 +1059,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
         `, [newStatus, newStatus, orderId]);
       }
 
-      console.log('✅ [GELATO WEBHOOK] Order status updated to:', newStatus);
+      log.info('✅ [GELATO WEBHOOK] Order status updated to:', newStatus);
 
       // Send order confirmation email when Gelato validates the order (passed or in_production)
       // This ensures customers only receive "Order Confirmed" after Gelato accepts the order
@@ -1154,7 +1118,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
               [order.id]
             );
 
-            console.log('📧 [GELATO WEBHOOK] Order confirmation email sent to:', order.customer_email);
+            log.info('📧 [GELATO WEBHOOK] Order confirmation email sent to:', order.customer_email);
           } else {
             log.debug('📧 [GELATO WEBHOOK] Confirmation email already sent for order:', order.id);
           }
@@ -1188,7 +1152,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
             },
             language
           );
-          console.log('📧 [GELATO WEBHOOK] Shipped notification sent to:', order.customer_email);
+          log.info('📧 [GELATO WEBHOOK] Shipped notification sent to:', order.customer_email);
         } catch (emailErr) {
           log.error('❌ [GELATO WEBHOOK] Failed to send shipped email:', emailErr.message);
         }
@@ -1229,7 +1193,7 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
           WHERE gelato_order_id = $3
         `, [minDeliveryDate || null, maxDeliveryDate || null, orderId]);
 
-        console.log('✅ [GELATO WEBHOOK] Delivery estimate stored for order:', order.id);
+        log.info('✅ [GELATO WEBHOOK] Delivery estimate stored for order:', order.id);
 
         // Log activity
         await logActivity(order.user_id, null, 'DELIVERY_ESTIMATE_UPDATED', {
@@ -1253,8 +1217,9 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
   }
 });
 
-app.use(express.json({ limit: '100mb' }));
-app.use(express.urlencoded({ limit: '100mb', extended: true }));
+// Default body limit is 2MB for most routes. Image/story endpoints override with higher limits.
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ limit: '2mb', extended: true }));
 
 // Protection against malformed URL attacks (e.g. /%c0 path traversal probes)
 app.use((req, res, next) => {
@@ -1319,23 +1284,23 @@ app.use('/api/config', configRoutes);
 app.use('/api', healthRoutes);  // /api/health, /api/check-ip, /api/log-error
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/characters', characterRoutes);
+app.use('/api/characters', express.json({ limit: '50mb' }), characterRoutes);
 app.use('/api/story-draft', storyDraftRoutes);
-app.use('/api/stories', storiesRoutes);
-app.use('/api/stories', regenerationRoutes);  // Image/scene/cover regeneration & repair
+app.use('/api/stories', express.json({ limit: '50mb' }), storiesRoutes);
+app.use('/api/stories', express.json({ limit: '50mb' }), regenerationRoutes);  // Image/scene/cover regeneration & repair
 app.use('/api/files', filesRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/photos', photosRoutes);
-app.use('/api', avatarsRoutes);  // /api/analyze-photo, /api/avatar-prompt, /api/generate-clothing-avatars
+app.use('/api', express.json({ limit: '50mb' }), avatarsRoutes);  // /api/analyze-photo, /api/avatar-prompt, /api/generate-clothing-avatars
 app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
 app.use('/api/jobs', jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', storyIdeasRoutes);  // Story idea generation
-app.use('/api/trial', trialRoutes);  // Anonymous trial story flow
+app.use('/api/trial', express.json({ limit: '50mb' }), trialRoutes);  // Anonymous trial story flow
 app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
 app.use('/', sharingHtmlRoutes);  // /s/:shareToken, /shared/:shareToken (HTML)
 
-console.log('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin, photos, sharing');
+log.info('📦 Modular routes loaded: config, health, auth, user, characters, story-draft, stories, files, admin, photos, sharing');
 
 // SPA fallback - serve index.html for client-side routing (only if dist exists)
 // Must be placed AFTER API routes are defined
@@ -1425,7 +1390,7 @@ async function initializeDatabase() {
   try {
     // Test connection first
     await dbPool.query('SELECT 1');
-    console.log('✓ Database connection successful');
+    log.info('✓ Database connection successful');
 
     // PostgreSQL table creation - includes all columns
     // Note: All migrations have been run, this is just for fresh database setup
@@ -1732,7 +1697,7 @@ async function initializeDatabase() {
           [tier.maxPages, tier.label, tier.softcover, tier.hardcover]
         );
       }
-      console.log('✓ Default pricing tiers seeded');
+      log.info('✓ Default pricing tiers seeded');
     }
 
     // Note: discovered_landmarks table is deprecated - all landmarks now in landmark_index
@@ -1873,7 +1838,7 @@ async function initializeDatabase() {
     `);
     await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_historical_locations_event ON historical_locations(event_id)`);
 
-    console.log('✓ Database tables initialized');
+    log.info('✓ Database tables initialized');
 
   } catch (err) {
     log.error('❌ Database initialization error:', err.message);
@@ -1978,26 +1943,6 @@ async function deleteJobCheckpoints(jobId) {
 
 // Clean up old completed/failed jobs (call when new job starts)
 
-// Middleware to verify JWT token
-function authenticateToken(req, res, next) {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    log.warn(`🔐 [AUTH] No token provided for ${req.method} ${req.path}`);
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      log.warn(`🔐 [AUTH] Token verification failed for ${req.method} ${req.path}: ${err.message}`);
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-    req.user = user;
-    next();
-  });
-}
-
 // Trigger landmark discovery early (called when user enters wizard or gets location)
 // This runs in background so landmarks are ready when story generation starts
 app.post('/api/landmarks/discover', async (req, res) => {
@@ -2069,7 +2014,7 @@ app.post('/api/landmarks/discover', async (req, res) => {
   }
 });
 // Edit page text, scene description, or image directly
-app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) => {
+app.patch('/api/stories/:id/page/:pageNum', express.json({ limit: '50mb' }), authenticateToken, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
     const { text, sceneDescription, imageData } = req.body;
@@ -2155,7 +2100,7 @@ app.patch('/api/stories/:id/page/:pageNum', authenticateToken, async (req, res) 
     // Save updated story with metadata
     await saveStoryData(id, storyData);
 
-    console.log(`✅ Page ${pageNumber} updated for story ${id}`);
+    log.info(`✅ Page ${pageNumber} updated for story ${id}`);
 
     res.json({
       success: true,
@@ -4330,7 +4275,7 @@ async function processStoryJob(jobId) {
 }
 
 async function _processStoryJobImpl(jobId) {
-  console.log(`🎬 Starting processing for job ${jobId}`);
+  log.info(`🎬 Starting processing for job ${jobId}`);
 
   // Generation logger for tracking API usage and debugging
   const genLog = new GenerationLogger();
@@ -5083,15 +5028,15 @@ app.get('*', (req, res, next) => {
 
 initialize().then(() => {
   const server = app.listen(PORT, () => {
-    console.log(`🚀 MagicalStory Server Running`);
-    console.log(`📍 URL: http://localhost:${PORT}`);
+    log.info(`🚀 MagicalStory Server Running`);
+    log.info(`📍 URL: http://localhost:${PORT}`);
   });
 
   // Configure server timeouts to prevent premature connection closures
   // This helps with Railway's edge proxy and HTTP/2 connection management
   server.keepAliveTimeout = 65000; // 65 seconds (longer than typical proxy timeout of 60s)
   server.headersTimeout = 66000;   // Slightly longer than keepAliveTimeout
-  console.log(`🔗 Keep-alive timeout: ${server.keepAliveTimeout}ms`);
+  log.info(`🔗 Keep-alive timeout: ${server.keepAliveTimeout}ms`);
 }).catch(err => {
   log.error('Failed to initialize server:', err);
   process.exit(1);

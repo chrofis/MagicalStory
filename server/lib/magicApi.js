@@ -25,7 +25,10 @@ const FACESWAP_BASE = 'https://api.magicapi.dev/api/v1/magicapi/faceswap';
 const HAIR_BASE = 'https://api.magicapi.dev/api/v1/magicapi/hair-v2';
 
 // Free image hosting for MagicAPI (requires public URLs)
-const FREEIMAGE_API_KEY = '6d207e02198a847aa98d0a2a901485a5';
+const FREEIMAGE_API_KEY = process.env.FREEIMAGE_API_KEY || '';
+if (!FREEIMAGE_API_KEY) {
+  log.warn('[MAGICAPI] FREEIMAGE_API_KEY not set - image uploads to freeimage.host will fail');
+}
 
 /**
  * Upload a buffer to freeimage.host and return the public URL

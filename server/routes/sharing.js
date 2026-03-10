@@ -149,8 +149,8 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     // Check if owner needs to set a password (trial user without password)
     let needsPassword = false;
     if (isOwner) {
-      const userResult = await dbQuery('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
-      needsPassword = userResult.length > 0 && !userResult[0].password_hash;
+      const userResult = await dbQuery('SELECT password FROM users WHERE id = $1', [req.user.id]);
+      needsPassword = userResult.length > 0 && !userResult[0].password;
     }
 
     // Return only safe public data (no user info, no prompts)

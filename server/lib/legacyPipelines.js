@@ -780,7 +780,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           }
         }
 
-        console.log(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
+        log.info(`✅ [STREAM-IMG] Page ${pageNum} image generated (score: ${imageResult.score}${imageResult.wasRegenerated ? ', regenerated' : ''})`);
 
         // Track scene rewrite usage if a safety block triggered a rewrite
         if (imageResult?.rewriteUsage) {
@@ -999,7 +999,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         await saveCheckpoint(jobId, 'partial_cover', checkpointData,
           coverType === 'titlePage' ? 0 : coverType === 'initialPage' ? 1 : 2);
 
-        console.log(`✅ [STREAM-COVER] ${coverType} cover generated during streaming (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+        log.info(`✅ [STREAM-COVER] ${coverType} cover generated during streaming (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
 
         return { type: coverKey, data: coverData };
       } catch (error) {
@@ -1129,7 +1129,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       addUsage('anthropic', streamResult.usage, 'story_text', streamingTextModelId);
       // Log time-to-first-token for performance monitoring
       if (streamResult.ttft) {
-        console.log(`[TIMING] TTFT unified story: ${streamResult.ttft}ms`);
+        log.info(`[TIMING] TTFT unified story: ${streamResult.ttft}ms`);
       }
       log.debug(`📖 [STORYBOOK] Streaming complete, received ${response?.length || 0} chars (model: ${streamingTextModelId})`);
       log.debug(`🌊 [STREAM] ${scenesEmittedCount} scenes detected during streaming, ${streamingImagePromises.length} page images started`);
@@ -1536,7 +1536,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         const modeReason = incrementalConsistencyConfig?.enabled
           ? `incremental consistency (lookback: ${incrementalConsistencyConfig.lookbackCount})`
           : 'sequential image mode';
-        console.log(`🔗 [STORYBOOK] Starting SEQUENTIAL image generation for ${allSceneDescriptions.length} scenes (${modeReason})...`);
+        log.info(`🔗 [STORYBOOK] Starting SEQUENTIAL image generation for ${allSceneDescriptions.length} scenes (${modeReason})...`);
         if (visualBible) {
           log.debug(`📖 [STORYBOOK] Using visual bible for image generation`);
         }
@@ -2658,7 +2658,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
     }
 
     if (!skipImages && !skipCovers) {
-      console.log(`📕 [PIPELINE] Starting PARALLEL cover generation for job ${jobId}`);
+      log.info(`📕 [PIPELINE] Starting PARALLEL cover generation for job ${jobId}`);
 
       // Get art style description
       const artStyleId = inputData.artStyle || 'pixar';
@@ -2818,7 +2818,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting front cover (${frontCoverCharacters.length} chars, clothing: ${frontCoverClothing})`);
           const result = await generateImageWithQualityRetry(frontCoverPrompt, frontCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'FRONT COVER', { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode });
-          console.log(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          log.info(`✅ [COVER-PARALLEL] Front cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           // Track scene rewrite usage if a safety block triggered a rewrite
           if (result?.rewriteUsage) {
             addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
@@ -2829,7 +2829,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting initial page (${initialPagePhotos.length} chars, clothing: ${initialPageClothing})`);
           const result = await generateImageWithQualityRetry(initialPagePrompt, initialPagePhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'INITIAL PAGE', { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode });
-          console.log(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          log.info(`✅ [COVER-PARALLEL] Initial page complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           // Track scene rewrite usage if a safety block triggered a rewrite
           if (result?.rewriteUsage) {
             addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
@@ -2840,7 +2840,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
         (async () => {
           log.debug(`📕 [COVER-PARALLEL] Starting back cover (${backCoverPhotos.length} chars, clothing: ${backCoverClothing})`);
           const result = await generateImageWithQualityRetry(backCoverPrompt, backCoverPhotos, null, 'cover', null, coverUsageTracker, null, pipelineCoverModelOverrides, 'BACK COVER', { isAdmin, enableAutoRepair, useGridRepair, checkOnlyMode });
-          console.log(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
+          log.info(`✅ [COVER-PARALLEL] Back cover complete (score: ${result.score}${result.wasRegenerated ? ', regenerated' : ''})`);
           // Track scene rewrite usage if a safety block triggered a rewrite
           if (result?.rewriteUsage) {
             addUsage('anthropic', result.rewriteUsage, 'scene_rewrite');
@@ -2871,13 +2871,13 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
     if (STORY_BATCH_SIZE > 0) {
       // Use configured batch size
       BATCH_SIZE = STORY_BATCH_SIZE;
-      console.log(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
+      log.info(`📚 [PIPELINE] Using configured batch size: ${BATCH_SIZE} pages per batch`);
     } else {
       // Auto-calculate optimal batch size based on model token limits and reading level
       // Token estimate: max words/page × 1.3 tokens/word × 2 (safety margin)
       const tokensPerPage = getTokensPerPage(inputData.languageLevel);
       BATCH_SIZE = calculateOptimalBatchSize(sceneCount, tokensPerPage, 1.0); // Full capacity
-      console.log(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (${tokensPerPage} tokens/page estimate, model max: ${getActiveTextModel().maxOutputTokens})`);
+      log.info(`📚 [PIPELINE] Auto-calculated batch size: ${BATCH_SIZE} pages per batch (${tokensPerPage} tokens/page estimate, model max: ${getActiveTextModel().maxOutputTokens})`);
     }
     const numBatches = Math.ceil(sceneCount / BATCH_SIZE);
 
@@ -3312,7 +3312,7 @@ Output Format:
       }
 
       fullStoryText += batchText + '\n\n';
-      console.log(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
+      log.info(`✅ [BATCH ${batchNum + 1}/${numBatches}] Story batch complete (${batchText.length} chars)`);
 
       // Add raw response to storyTextPrompts for dev mode (unfiltered API response)
       storyTextPrompts[batchNum].rawResponse = batchText;
@@ -3370,7 +3370,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
           // Parse the retry response
           const retryPages = parseStoryPages(retryText);
           if (retryPages.length > 0) {
-            console.log(`✅ [RETRY] Successfully generated page ${missingPageNum}`);
+            log.info(`✅ [RETRY] Successfully generated page ${missingPageNum}`);
             batchPages.push(...retryPages);
             fullStoryText += retryText + '\n\n';
 
@@ -3395,7 +3395,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       if (!skipImages && imageGenMode === 'parallel') {
         for (const page of batchPages) {
           if (!pagesStarted.has(page.pageNumber)) {
-            console.log(`📝 [FALLBACK] Starting image for page ${page.pageNumber} (missed by streaming)`);
+            log.info(`📝 [FALLBACK] Starting image for page ${page.pageNumber} (missed by streaming)`);
             startPageImageGeneration(page.pageNumber, page.content);
           }
         }
@@ -3874,7 +3874,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
 
       try {
         const coverResults = await coverGenerationPromise;
-        console.log(`✅ [PIPELINE] All 3 covers completed in parallel!`);
+        log.info(`✅ [PIPELINE] All 3 covers completed in parallel!`);
 
         // Build coverImages object from results
         const frontCover = coverResults.find(r => r.type === 'frontCover');
@@ -4240,7 +4240,7 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
     // Clear styled avatar cache to free memory
     clearStyledAvatarCache();
 
-    console.log(`✅ Job ${jobId} completed successfully`);
+    log.info(`✅ Job ${jobId} completed successfully`);
 
     // Send story completion email to customer
     try {

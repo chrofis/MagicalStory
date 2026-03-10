@@ -15,9 +15,8 @@ const { log } = require('../utils/logger');
 // Uses ip-api.com free service for geolocation
 router.get('/location', async (req, res) => {
   try {
-    // Get client IP (handle proxies like Railway, Cloudflare)
-    const forwardedFor = req.headers['x-forwarded-for'];
-    const ip = forwardedFor ? forwardedFor.split(',')[0].trim() : req.ip;
+    // Get client IP (Express req.ip respects trust proxy setting)
+    const ip = req.ip;
 
     // Skip for localhost/private IPs
     if (!ip || ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {

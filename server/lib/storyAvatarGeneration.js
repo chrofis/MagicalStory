@@ -14,7 +14,7 @@
  * For normal story flow, use prepareStyledAvatars() which only CONVERTS existing avatars.
  */
 
-const log = require('./logger').forModule('avatar-gen');
+const { log } = require('../utils/logger');
 const { setStyledAvatar, invalidateStyledAvatarForCategory } = require('./styledAvatars');
 
 /**

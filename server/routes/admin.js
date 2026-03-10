@@ -271,8 +271,7 @@ router.delete('/landmarks-cache', async (req, res) => {
     const { city, secret } = req.query;
 
     // Check auth: either valid admin JWT or secret key
-    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
-    const hasValidSecret = secret === secretKey;
+    const hasValidSecret = process.env.ADMIN_SECRET && secret === process.env.ADMIN_SECRET;
 
     if (!hasValidSecret) {
       // Try JWT auth
@@ -327,8 +326,7 @@ router.delete('/landmarks-cache', async (req, res) => {
 router.get('/landmarks-photos', async (req, res) => {
   try {
     const { city, secret } = req.query;
-    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
-    if (secret !== secretKey) {
+    if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
       return res.status(401).json({ error: 'Invalid secret' });
     }
     if (!city) {
@@ -376,8 +374,7 @@ router.get('/landmarks-photos', async (req, res) => {
 router.get('/job-input', async (req, res) => {
   try {
     const { jobId, secret } = req.query;
-    const secretKey = process.env.ADMIN_SECRET || 'clear-landmarks-2026';
-    if (secret !== secretKey) {
+    if (!process.env.ADMIN_SECRET || secret !== process.env.ADMIN_SECRET) {
       return res.status(401).json({ error: 'Invalid secret' });
     }
     if (!jobId) {
