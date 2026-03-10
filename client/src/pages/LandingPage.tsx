@@ -1,34 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { Sparkles, ArrowRight, Camera, Users, BookOpen, Palette, Printer, Download, ChevronDown } from 'lucide-react';
 import { AuthModal } from '@/components/auth';
 import { Navigation, Footer, Button } from '@/components/common';
 import { storyService } from '@/services';
-
-// Scroll indicator component - subtle dots on the right
-function ScrollIndicator({ activeIndex, totalSections, onDotClick }: {
-  activeIndex: number;
-  totalSections: number;
-  onDotClick: (index: number) => void;
-}) {
-  return (
-    <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden md:flex flex-col gap-2">
-      {Array.from({ length: totalSections }).map((_, index) => (
-        <button
-          key={index}
-          onClick={() => onDotClick(index)}
-          className={`w-2 h-2 rounded-full transition-all duration-300 ${
-            index === activeIndex
-              ? 'bg-indigo-600 scale-125'
-              : 'bg-gray-300 hover:bg-gray-400'
-          }`}
-          aria-label={`Go to section ${index + 1}`}
-        />
-      ))}
-    </div>
-  );
-}
 
 const sectionTranslations = {
   en: {
@@ -62,7 +38,7 @@ const sectionTranslations = {
     shipping: 'Ships within Switzerland - the perfect gift for any occasion',
     // CTA
     readyToCreate: 'Ready to create your book?',
-    ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in about 10 minutes.',
+    ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in under 3 minutes.',
   },
   de: {
     // Section 1: Characters
@@ -95,7 +71,7 @@ const sectionTranslations = {
     shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
-    ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in etwa 10 Minuten fertig.',
+    ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in unter 3 Minuten fertig.',
   },
   fr: {
     // Section 1: Characters
@@ -128,7 +104,7 @@ const sectionTranslations = {
     shipping: 'Livraison en Suisse - le cadeau parfait pour toute occasion',
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
-    ctaDesc: "Téléchargez une photo, choisissez une aventure et votre histoire personnalisée est prête en environ 10 minutes.",
+    ctaDesc: "Téléchargez une photo, choisissez une aventure et votre histoire personnalisée est prête en moins de 3 minutes.",
   },
 };
 
@@ -139,48 +115,6 @@ export default function LandingPage() {
   const [showAuthModal, setShowAuthModal] = useState(() => searchParams.get('signup') === 'true');
   const st = sectionTranslations[language] || sectionTranslations.en;
 
-  // Scroll indicator state
-  const [activeSection, setActiveSection] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const sectionRefs = useRef<(HTMLElement | null)[]>([]);
-  const TOTAL_SECTIONS = 6;
-
-  // Track scroll position with IntersectionObserver
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const index = sectionRefs.current.indexOf(entry.target as HTMLElement);
-            if (index !== -1) {
-              setActiveSection(index);
-            }
-          }
-        });
-      },
-      {
-        root: container,
-        threshold: 0.5,
-      }
-    );
-
-    sectionRefs.current.forEach((section) => {
-      if (section) observer.observe(section);
-    });
-
-    return () => observer.disconnect();
-  }, []);
-
-  // Handle dot click to scroll to section
-  const handleDotClick = useCallback((index: number) => {
-    const section = sectionRefs.current[index];
-    if (section) {
-      section.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, []);
 
   // Check for login query param
   useEffect(() => {
@@ -264,13 +198,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div ref={containerRef} className="bg-gray-50">
-      {/* Scroll Indicator */}
-      <ScrollIndicator
-        activeIndex={activeSection}
-        totalSections={TOTAL_SECTIONS}
-        onDotClick={handleDotClick}
-      />
+    <div className="bg-gray-50">
 
       {/* Navigation - Fixed at top */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-gray-50">
@@ -278,7 +206,7 @@ export default function LandingPage() {
       </div>
 
       {/* Hero Section - Full viewport height */}
-      <section ref={(el) => { sectionRefs.current[0] = el; }} className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative">
+      <section className="min-h-screen flex flex-col px-4 lg:px-8 pt-24 lg:pt-28 pb-6 lg:pb-8 relative">
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-12 w-full relative z-10 flex-1 items-center">
           {/* Left Side - Text and Button */}
           <div className="w-full lg:w-[35%] flex flex-col justify-center">
@@ -386,7 +314,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 1: Create Your Characters */}
-      <section ref={(el) => { sectionRefs.current[1] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -431,7 +359,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 2: Tell Your Story */}
-      <section ref={(el) => { sectionRefs.current[2] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -476,7 +404,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 3: Choose Your Style */}
-      <section ref={(el) => { sectionRefs.current[3] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -521,7 +449,7 @@ export default function LandingPage() {
       </section>
 
       {/* Section 4: Print & Share */}
-      <section ref={(el) => { sectionRefs.current[4] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Text Content - First on mobile */}
@@ -566,7 +494,7 @@ export default function LandingPage() {
       </section>
 
       {/* Final CTA Section */}
-      <section ref={(el) => { sectionRefs.current[5] = el; }} className="py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600">
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-3xl lg:text-5xl font-title text-white mb-6">
             {st.readyToCreate}
@@ -574,15 +502,14 @@ export default function LandingPage() {
           <p className="text-xl text-indigo-100 mb-8 max-w-2xl mx-auto">
             {st.ctaDesc}
           </p>
-          <Button
+          <button
             onClick={handleStartJourney}
-            size="xl"
-            icon={Sparkles}
-            className="bg-white hover:bg-gray-100 text-indigo-600 font-bold"
+            className="inline-flex items-center justify-center gap-2 rounded-lg font-bold transition-all duration-200 transform hover:scale-[1.02] px-8 py-4 text-lg lg:px-10 lg:py-5 lg:text-xl bg-white hover:bg-gray-100 text-indigo-600 shadow-lg hover:shadow-xl"
           >
+            <Sparkles size={24} />
             {t.startJourney}
             <ArrowRight size={24} />
-          </Button>
+          </button>
           <div className="mt-4">
             <button
               onClick={() => setShowAuthModal(true)}

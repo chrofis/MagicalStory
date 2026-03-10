@@ -1,87 +1,116 @@
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation, Footer } from '@/components/common';
-import { ArrowLeft, Shield, BookOpen, Heart } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Shield, BookOpen, Heart, Sparkles, MapPin } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const aboutContent: Record<string, {
   title: string;
-  mission: string;
-  missionText: string;
+  tagline: string;
+  missionTitle: string;
+  missionText: string[];
+  valuesTitle: string;
   values: { icon: string; title: string; text: string }[];
   swissTitle: string;
   swissText: string;
+  ctaTitle: string;
+  ctaText: string;
+  ctaButton: string;
 }> = {
   en: {
     title: 'About Magical Story',
-    mission: 'Our Mission',
-    missionText: 'We believe every child deserves to see themselves as the hero of their own story. Magical Story uses AI illustration technology to turn your family photos into personalized children\'s books — unique stories that feature your child on every page.\n\nWe built Magical Story because we wanted to create something more personal than off-the-shelf children\'s books. Something that captures who your child really is and makes reading together even more special.',
+    tagline: 'Personalized children\'s books where your child is the star.',
+    missionTitle: 'Why we built this',
+    missionText: [
+      'We believe every child deserves to see themselves as the hero of their own story. Magical Story turns your family photos into personalized children\'s books — unique stories that feature your child on every page.',
+      'We wanted to create something more personal than off-the-shelf children\'s books. Something that captures who your child really is and makes reading together even more special.',
+    ],
+    valuesTitle: 'What we stand for',
     values: [
       {
         icon: 'shield',
         title: 'Privacy First',
-        text: 'Your photos are used only to create your story. We never share, sell, or repurpose them. Your family\'s privacy is non-negotiable.',
+        text: 'Your photos are used only to create your story. We never share, sell, or repurpose them.',
       },
       {
         icon: 'book',
         title: 'Quality You Can Hold',
-        text: 'Every story is professionally printed on high-quality paper with vibrant colors. A real book, not just a digital file.',
+        text: 'Professionally printed on high-quality paper with vibrant colors. A real book, not just a digital file.',
       },
       {
         icon: 'heart',
         title: 'Made with Care',
-        text: 'We review our AI output continuously to ensure illustrations are beautiful, age-appropriate, and true to your child\'s appearance.',
+        text: 'We continuously review our output to ensure illustrations are beautiful, age-appropriate, and true to your child.',
       },
     ],
     swissTitle: 'Made in Switzerland',
-    swissText: 'Magical Story is designed and operated in Switzerland. We care about doing things right — quality, privacy, and reliability.',
+    swissText: 'Designed and operated in Switzerland. We care about doing things right — quality, privacy, and reliability.',
+    ctaTitle: 'Try it free',
+    ctaText: 'Create your first personalized story in under 3 minutes. No account needed.',
+    ctaButton: 'Create a Free Story',
   },
   de: {
     title: 'Über Magical Story',
-    mission: 'Unsere Mission',
-    missionText: 'Wir glauben, dass jedes Kind verdient, sich als Held seiner eigenen Geschichte zu sehen. Magical Story nutzt KI-Illustrationstechnologie, um aus deinen Familienfotos personalisierte Kinderbücher zu machen — einzigartige Geschichten, in denen dein Kind auf jeder Seite vorkommt.\n\nWir haben Magical Story entwickelt, weil wir etwas Persönlicheres schaffen wollten als Kinderbücher von der Stange. Etwas, das einfängt, wer dein Kind wirklich ist, und das gemeinsame Lesen noch spezieller macht.',
+    tagline: 'Personalisierte Kinderbücher, in denen dein Kind der Star ist.',
+    missionTitle: 'Warum wir das gebaut haben',
+    missionText: [
+      'Wir glauben, dass jedes Kind verdient, sich als Held seiner eigenen Geschichte zu sehen. Magical Story verwandelt deine Familienfotos in personalisierte Kinderbücher — einzigartige Geschichten, in denen dein Kind auf jeder Seite vorkommt.',
+      'Wir wollten etwas Persönlicheres schaffen als Kinderbücher von der Stange. Etwas, das einfängt, wer dein Kind wirklich ist, und das gemeinsame Lesen noch spezieller macht.',
+    ],
+    valuesTitle: 'Wofür wir stehen',
     values: [
       {
         icon: 'shield',
-        title: 'Datenschutz an erster Stelle',
-        text: 'Deine Fotos werden ausschliesslich zur Erstellung deiner Geschichte verwendet. Wir teilen, verkaufen oder verwenden sie niemals anderweitig.',
+        title: 'Datenschutz zuerst',
+        text: 'Deine Fotos werden ausschliesslich zur Erstellung deiner Geschichte verwendet. Wir teilen oder verkaufen sie niemals.',
       },
       {
         icon: 'book',
         title: 'Qualität zum Anfassen',
-        text: 'Jede Geschichte wird professionell auf hochwertigem Papier mit lebendigen Farben gedruckt. Ein echtes Buch, nicht nur eine digitale Datei.',
+        text: 'Professionell gedruckt auf hochwertigem Papier mit lebendigen Farben. Ein echtes Buch, nicht nur eine Datei.',
       },
       {
         icon: 'heart',
         title: 'Mit Sorgfalt gemacht',
-        text: 'Wir überprüfen unsere KI-Ergebnisse laufend, um sicherzustellen, dass die Illustrationen schön, altersgerecht und dem Aussehen deines Kindes treu sind.',
+        text: 'Wir überprüfen laufend unsere Ergebnisse, damit die Illustrationen schön, altersgerecht und deinem Kind treu sind.',
       },
     ],
     swissTitle: 'Made in Switzerland',
-    swissText: 'Magical Story wird in der Schweiz entwickelt und betrieben. Qualität, Datenschutz und Zuverlässigkeit sind uns wichtig.',
+    swissText: 'Entwickelt und betrieben in der Schweiz. Qualität, Datenschutz und Zuverlässigkeit sind uns wichtig.',
+    ctaTitle: 'Gratis ausprobieren',
+    ctaText: 'Erstelle deine erste personalisierte Geschichte in unter 3 Minuten. Ohne Konto.',
+    ctaButton: 'Gratis Geschichte erstellen',
   },
   fr: {
     title: 'À propos de Magical Story',
-    mission: 'Notre Mission',
-    missionText: 'Nous croyons que chaque enfant mérite de se voir comme le héros de sa propre histoire. Magical Story utilise la technologie d\'illustration par IA pour transformer vos photos de famille en livres pour enfants personnalisés — des histoires uniques où votre enfant apparaît sur chaque page.\n\nNous avons créé Magical Story parce que nous voulions quelque chose de plus personnel que les livres pour enfants standards. Quelque chose qui capture qui est vraiment votre enfant et rend la lecture ensemble encore plus spéciale.',
+    tagline: 'Des livres pour enfants personnalisés où votre enfant est la star.',
+    missionTitle: 'Pourquoi nous avons créé ceci',
+    missionText: [
+      'Nous croyons que chaque enfant mérite de se voir comme le héros de sa propre histoire. Magical Story transforme vos photos de famille en livres pour enfants personnalisés — des histoires uniques où votre enfant apparaît sur chaque page.',
+      'Nous voulions quelque chose de plus personnel que les livres pour enfants standards. Quelque chose qui capture qui est vraiment votre enfant et rend la lecture ensemble encore plus spéciale.',
+    ],
+    valuesTitle: 'Nos valeurs',
     values: [
       {
         icon: 'shield',
         title: 'Confidentialité d\'abord',
-        text: 'Vos photos sont utilisées uniquement pour créer votre histoire. Nous ne les partageons, vendons ou réutilisons jamais.',
+        text: 'Vos photos sont utilisées uniquement pour créer votre histoire. Nous ne les partageons ou vendons jamais.',
       },
       {
         icon: 'book',
-        title: 'Une qualité que vous pouvez toucher',
-        text: 'Chaque histoire est imprimée professionnellement sur du papier de haute qualité avec des couleurs vives. Un vrai livre, pas juste un fichier numérique.',
+        title: 'Qualité que vous pouvez toucher',
+        text: 'Imprimé professionnellement sur du papier de haute qualité avec des couleurs vives. Un vrai livre, pas juste un fichier.',
       },
       {
         icon: 'heart',
         title: 'Fait avec soin',
-        text: 'Nous révisons continuellement nos résultats IA pour garantir que les illustrations sont belles, adaptées à l\'âge et fidèles à l\'apparence de votre enfant.',
+        text: 'Nous révisons continuellement nos résultats pour des illustrations belles, adaptées à l\'âge et fidèles à votre enfant.',
       },
     ],
     swissTitle: 'Made in Switzerland',
-    swissText: 'Magical Story est conçu et opéré en Suisse. La qualité, la confidentialité et la fiabilité nous tiennent à cœur.',
+    swissText: 'Conçu et opéré en Suisse. La qualité, la confidentialité et la fiabilité nous tiennent à cœur.',
+    ctaTitle: 'Essayez gratuitement',
+    ctaText: 'Créez votre première histoire personnalisée en moins de 3 minutes. Sans compte.',
+    ctaButton: 'Créer une histoire gratuite',
   },
 };
 
@@ -91,54 +120,84 @@ const iconMap = {
   heart: Heart,
 };
 
+const iconColors = {
+  shield: { bg: 'bg-rose-50', text: 'text-rose-500', border: 'border-rose-100' },
+  book: { bg: 'bg-emerald-50', text: 'text-emerald-500', border: 'border-emerald-100' },
+  heart: { bg: 'bg-purple-50', text: 'text-purple-500', border: 'border-purple-100' },
+};
+
 export default function About() {
   const { language } = useLanguage();
-  const navigate = useNavigate();
   const content = aboutContent[language] || aboutContent.en;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <Navigation currentStep={0} />
 
-      <div className="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
-        <button
-          onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
-          className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 mb-6"
-        >
-          <ArrowLeft size={20} />
-          {language === 'de' ? 'Zurück' : language === 'fr' ? 'Retour' : 'Back'}
-        </button>
+      {/* Hero header */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="max-w-3xl mx-auto px-4 pt-10 pb-10 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-50 mb-5">
+            <Sparkles className="w-8 h-8 text-indigo-600" />
+          </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">{content.title}</h1>
+          <p className="text-gray-500 text-lg max-w-xl mx-auto">{content.tagline}</p>
+        </div>
+      </div>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">{content.title}</h1>
-
+      <div className="flex-1 max-w-3xl mx-auto px-4 py-10 w-full">
         {/* Mission */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8 mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">{content.mission}</h2>
-          <div className="text-gray-600 leading-relaxed whitespace-pre-line">
-            {content.missionText}
+        <div className="mb-10">
+          <h2 className="text-xl font-semibold text-gray-800 mb-5">{content.missionTitle}</h2>
+          <div className="space-y-4">
+            {content.missionText.map((paragraph, i) => (
+              <p key={i} className="text-gray-600 leading-relaxed text-[15px]">{paragraph}</p>
+            ))}
           </div>
         </div>
 
         {/* Values */}
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
-          {content.values.map((value, index) => {
-            const Icon = iconMap[value.icon as keyof typeof iconMap];
-            return (
-              <div key={index} className="bg-white rounded-2xl shadow-sm p-6 text-center">
-                <div className="bg-indigo-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <Icon className="w-6 h-6 text-indigo-600" />
+        <div className="mb-10">
+          <h2 className="text-xl font-semibold text-gray-800 mb-5">{content.valuesTitle}</h2>
+          <div className="grid gap-4 md:grid-cols-3">
+            {content.values.map((value, index) => {
+              const Icon = iconMap[value.icon as keyof typeof iconMap];
+              const colors = iconColors[value.icon as keyof typeof iconColors];
+              return (
+                <div key={index} className={`bg-white rounded-2xl border ${colors.border} p-6`}>
+                  <div className={`${colors.bg} w-11 h-11 rounded-xl flex items-center justify-center mb-4`}>
+                    <Icon className={`w-5 h-5 ${colors.text}`} />
+                  </div>
+                  <h3 className="font-semibold text-gray-800 mb-2">{value.title}</h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">{value.text}</p>
                 </div>
-                <h3 className="font-semibold text-gray-800 mb-2">{value.title}</h3>
-                <p className="text-gray-600 text-sm">{value.text}</p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
 
-        {/* Swiss */}
-        <div className="bg-white rounded-2xl shadow-sm p-6 md:p-8">
-          <h2 className="text-xl font-semibold text-gray-800 mb-3">{content.swissTitle}</h2>
-          <p className="text-gray-600">{content.swissText}</p>
+        {/* Swiss badge */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-6 md:p-8 flex items-start gap-5 mb-10">
+          <div className="bg-red-50 w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-5 h-5 text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800 mb-1">{content.swissTitle}</h2>
+            <p className="text-gray-500 text-[15px] leading-relaxed">{content.swissText}</p>
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl p-8 text-center border border-indigo-100">
+          <h3 className="text-xl font-semibold text-gray-800 mb-2">{content.ctaTitle}</h3>
+          <p className="text-gray-600 mb-5 max-w-md mx-auto">{content.ctaText}</p>
+          <Link
+            to="/try"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors"
+          >
+            <Sparkles size={18} />
+            {content.ctaButton}
+          </Link>
         </div>
       </div>
 
