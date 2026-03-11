@@ -329,8 +329,17 @@ export default function LandingPage() {
       <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
-            {/* Text Content */}
-            <div className="w-full lg:w-1/2 order-1 lg:order-1">
+            {/* Image - Left on desktop */}
+            <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
+              <img
+                src="/images/landing-why-it-works.jpg"
+                loading="lazy"
+                alt={st.whyTitle}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
+            </div>
+            {/* Text Content - Right on desktop */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-2">
               <div className="flex items-center gap-3 mb-4">
                 <div className="bg-indigo-100 p-3 rounded-full">
                   <Heart className="w-6 h-6 text-indigo-600" />
@@ -348,15 +357,6 @@ export default function LandingPage() {
               >
                 {st.whyLink} <ArrowRight size={16} />
               </Link>
-            </div>
-            {/* Image */}
-            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
-              <img
-                src="/images/landing-why-it-works.jpg"
-                loading="lazy"
-                alt={st.whyTitle}
-                className="w-full h-auto rounded-2xl shadow-lg"
-              />
             </div>
           </div>
         </div>
