@@ -1267,7 +1267,7 @@ if (authRoutes.initAuthRoutes) {
 
 if (hasDistFolder) {
   // Serve the built React app from dist/
-  app.use(express.static(distPath));
+  app.use(express.static(distPath, { index: false }));
   log.debug('📦 Serving built React app from dist/');
 } else {
   // Fallback to legacy: serve files from project root (index.html with Babel)
