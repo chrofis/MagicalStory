@@ -20,8 +20,9 @@ CHARACTER CONSISTENCY (THIS IS YOUR PRIMARY TASK):
 - HAIR IS CRITICAL: Match EXACT color, length, style, texture from reference. Never simplify or change hairstyles.
 - Preserve exact age appearance. Do not age up children or make adults look younger.
 - Match skin tone precisely from reference.
+- FACIAL HAIR IS CRITICAL: If a character has a beard, mustache, goatee, or stubble in their reference, they MUST have that SAME facial hair on EVERY page. Never remove, add, or change facial hair style between pages.
 - Use EXACTLY the clothing shown in reference images unless the prompt specifies otherwise.
-- Before generating: for EACH character, verify face shape, hair color/style, age, and clothing against their reference.
+- Before generating: for EACH character, verify face shape, hair color/style, age, facial hair, and clothing against their reference.
 
 ANTI-CORRECTION RULE:
 - Do NOT "correct" or "normalize" character appearances toward what you think looks typical.
