@@ -58,7 +58,7 @@ const strings: Record<string, {
     title: 'Ideen für deine Geschichte',
     subtitle: 'Hier sind zwei Vorschläge. Wähle deinen Favoriten!',
     editHint: 'Du kannst in den Text klicken, um die Idee vor dem Erstellen zu bearbeiten.',
-    generating: 'Magische Geschichtenideen werden erstellt...',
+    generating: 'Magische Geschichts Ideen entstehen...',
     idea: 'Geschichtenidee',
     selectIdea: 'Klicke zum Auswählen',
     selected: 'Ausgewählt',
