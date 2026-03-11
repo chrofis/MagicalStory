@@ -449,7 +449,7 @@ export default function LandingPage() {
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
               <img
-                src="/images/landing-story.jpg"
+                src="/images/landing-tell-your-story.jpg"
                 alt={st.tellStory}
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
