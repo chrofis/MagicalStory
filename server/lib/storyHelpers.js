@@ -1713,7 +1713,9 @@ function getCharacterPhotoDetails(characters, clothingCategory = null, costumeTy
         photoType,
         photoUrl,
         photoHash: getImagesModule().hashImageData(photoUrl),  // For dev mode verification
-        clothingCategory: usedClothingCategory || effectiveClothingCategory || null,
+        clothingCategory: usedClothingCategory
+          || (effectiveClothingCategory === 'costumed' && effectiveCostumeType ? `costumed:${effectiveCostumeType}` : effectiveClothingCategory)
+          || null,
         clothingDescription,  // Exact clothing from avatar eval (e.g., "red winter parka, blue jeans")
         hasPhoto: photoType !== 'none'
       };

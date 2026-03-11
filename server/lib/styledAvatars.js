@@ -784,7 +784,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 function getStyledAvatar(characterName, clothingCategory, artStyle) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
   let styledAvatar = styledAvatarCache.get(cacheKey);
-  if (!styledAvatar && clothingCategory.startsWith('costumed:')) {
+  if (!styledAvatar && (clothingCategory.startsWith('costumed:') || clothingCategory === 'costumed')) {
     // Prefix match: find any costumed avatar for this character+style (within current scope)
     const prefix = `${getCacheScope()}${characterName.toLowerCase()}_costumed:`;
     const suffix = `_${artStyle}`;
