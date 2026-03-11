@@ -694,11 +694,25 @@ function generateSitemap() {
   }
 
   // Build XML
-  const urlEntries = urls.map(u =>
-    `  <url>\n    <loc>${escapeXml(u.loc)}</loc>\n    <lastmod>${u.lastmod}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`
-  ).join('\n');
+  const urlEntries = urls.map(u => {
+    let entry = `  <url>\n    <loc>${escapeXml(u.loc)}</loc>\n    <lastmod>${u.lastmod}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>`;
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urlEntries}\n</urlset>`;
+    // Add video entry for homepage
+    if (u.loc === BASE_URL) {
+      entry += `\n    <video:video>` +
+        `\n      <video:thumbnail_loc>${BASE_URL}/images/video-poster.jpg</video:thumbnail_loc>` +
+        `\n      <video:title>MagicalStory – Personalized Children's Books with AI</video:title>` +
+        `\n      <video:description>See how MagicalStory transforms your child's photo into a personalized illustrated storybook. Upload a photo, choose a theme, and watch the magic happen.</video:description>` +
+        `\n      <video:content_loc>${BASE_URL}/images/Boy%20to%20pirat%20to%20book.mp4</video:content_loc>` +
+        `\n      <video:family_friendly>yes</video:family_friendly>` +
+        `\n    </video:video>`;
+    }
+
+    entry += `\n  </url>`;
+    return entry;
+  }).join('\n');
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${urlEntries}\n</urlset>`;
 }
 
 function escapeXml(str) {
