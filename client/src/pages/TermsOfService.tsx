@@ -78,7 +78,7 @@ We reserve the right to refuse service, remove content, and terminate accounts t
         title: '8. Copyright Claims and Takedowns',
         content: `We respect intellectual property rights and respond to valid infringement notices.
 
-• If you believe content infringes your copyright, contact us at legal@magicalstory.com with: (1) identification of the copyrighted work, (2) identification of the infringing material, (3) your contact information, (4) a statement of good faith belief, and (5) a statement under penalty of perjury that you are authorized to act
+• If you believe content infringes your copyright, contact us at legal@magicalstory.ch with: (1) identification of the copyrighted work, (2) identification of the infringing material, (3) your contact information, (4) a statement of good faith belief, and (5) a statement under penalty of perjury that you are authorized to act
 • We will investigate and may remove content that infringes intellectual property rights
 • Repeat infringers will have their accounts terminated`
       },
@@ -86,7 +86,7 @@ We reserve the right to refuse service, remove content, and terminate accounts t
         title: '9. Reporting Violations',
         content: `If you encounter content that violates these Terms or applicable laws:
 
-• Report it immediately to legal@magicalstory.com
+• Report it immediately to legal@magicalstory.ch
 • Include details of the violation and any relevant evidence
 • We will investigate all reports and take appropriate action
 • We may remove content and terminate accounts without prior notice`
@@ -140,7 +140,7 @@ We reserve the right to refuse service, remove content, and terminate accounts t
       },
       {
         title: '17. Contact',
-        content: `For questions about these Terms, please contact us at: legal@magicalstory.com`
+        content: `For questions about these Terms, please contact us at: legal@magicalstory.ch`
       }
     ]
   },
@@ -218,7 +218,7 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
         title: '8. Urheberrechtsansprüche und Löschung',
         content: `Wir respektieren geistige Eigentumsrechte und reagieren auf gültige Verletzungsanzeigen.
 
-• Wenn Sie glauben, dass Inhalte Ihr Urheberrecht verletzen, kontaktieren Sie uns unter legal@magicalstory.com mit: (1) Identifizierung des urheberrechtlich geschützten Werks, (2) Identifizierung des verletzenden Materials, (3) Ihre Kontaktdaten, (4) eine Erklärung in gutem Glauben, und (5) eine eidesstattliche Erklärung, dass Sie zur Handlung berechtigt sind
+• Wenn Sie glauben, dass Inhalte Ihr Urheberrecht verletzen, kontaktieren Sie uns unter legal@magicalstory.ch mit: (1) Identifizierung des urheberrechtlich geschützten Werks, (2) Identifizierung des verletzenden Materials, (3) Ihre Kontaktdaten, (4) eine Erklärung in gutem Glauben, und (5) eine eidesstattliche Erklärung, dass Sie zur Handlung berechtigt sind
 • Wir werden alle Ansprüche untersuchen und möglicherweise Inhalte entfernen, die geistige Eigentumsrechte verletzen
 • Wiederholte Rechtsverletzer werden ihre Konten gekündigt`
       },
@@ -226,7 +226,7 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
         title: '9. Meldung von Verstössen',
         content: `Wenn Sie Inhalte finden, die gegen diese Bedingungen oder geltendes Recht verstossen:
 
-• Melden Sie diese sofort an legal@magicalstory.com
+• Melden Sie diese sofort an legal@magicalstory.ch
 • Fügen Sie Details des Verstosses und relevante Beweise bei
 • Wir werden alle Meldungen untersuchen und entsprechende Massnahmen ergreifen
 • Wir können Inhalte entfernen und Konten ohne Vorankündigung kündigen`
@@ -280,7 +280,7 @@ Wir behalten uns das Recht vor, den Dienst zu verweigern, Inhalte zu entfernen u
       },
       {
         title: '17. Kontakt',
-        content: `Bei Fragen zu diesen Bedingungen kontaktieren Sie uns bitte unter: legal@magicalstory.com`
+        content: `Bei Fragen zu diesen Bedingungen kontaktieren Sie uns bitte unter: legal@magicalstory.ch`
       }
     ]
   },
@@ -358,7 +358,7 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
         title: '8. Réclamations de Droits d\'Auteur et Suppression',
         content: `Nous respectons les droits de propriété intellectuelle et répondons aux avis de violation valides.
 
-• Si vous pensez qu'un contenu viole vos droits d'auteur, contactez-nous à legal@magicalstory.com avec : (1) l'identification de l'œuvre protégée, (2) l'identification du matériel contrefaisant, (3) vos coordonnées, (4) une déclaration de bonne foi, et (5) une déclaration sous serment attestant que vous êtes autorisé à agir
+• Si vous pensez qu'un contenu viole vos droits d'auteur, contactez-nous à legal@magicalstory.ch avec : (1) l'identification de l'œuvre protégée, (2) l'identification du matériel contrefaisant, (3) vos coordonnées, (4) une déclaration de bonne foi, et (5) une déclaration sous serment attestant que vous êtes autorisé à agir
 • Nous examinerons et pourrons supprimer le contenu qui viole les droits de propriété intellectuelle
 • Les contrevenants récidivistes verront leurs comptes résiliés`
       },
@@ -366,7 +366,7 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
         title: '9. Signalement des Violations',
         content: `Si vous rencontrez un contenu qui viole ces Conditions ou les lois applicables :
 
-• Signalez-le immédiatement à legal@magicalstory.com
+• Signalez-le immédiatement à legal@magicalstory.ch
 • Incluez les détails de la violation et toute preuve pertinente
 • Nous examinerons tous les signalements et prendrons les mesures appropriées
 • Nous pouvons supprimer le contenu et résilier les comptes sans préavis`
@@ -420,7 +420,7 @@ Nous nous réservons le droit de refuser le service, de supprimer le contenu et 
       },
       {
         title: '17. Contact',
-        content: `Pour toute question concernant ces Conditions, veuillez nous contacter à : legal@magicalstory.com`
+        content: `Pour toute question concernant ces Conditions, veuillez nous contacter à : legal@magicalstory.ch`
       }
     ]
   }
