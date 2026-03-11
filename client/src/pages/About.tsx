@@ -23,16 +23,16 @@ const aboutContent: Record<string, {
   en: {
     title: 'About Magical Story',
     tagline: 'Personalized children\'s books where your child is the star.',
-    missionTitle: 'Why we built this',
+    missionTitle: 'Every child is a hero',
     missionText: [
-      'We believe every child deserves to see themselves as the hero of their own story. Magical Story turns your family photos into personalized children\'s books — unique stories that feature your child on every page.',
-      'We wanted to create something more personal than off-the-shelf children\'s books. Something that captures who your child really is and makes reading together even more special.',
+      'Every child has a story worth telling — and they deserve to be the hero of it. Magical Story turns your family photos into personalized children\'s books where your child stars on every page.',
+      'Not another book off the shelf. A book about them. One that captures who they really are and turns reading time into something you\'ll both treasure.',
     ],
     scienceTitle: 'Stop lecturing. Start telling them their story.',
     scienceTagline: 'Small stories, big moments.',
     scienceText: [
       'Every parent knows the moment: you\'ve explained something ten times, raised your voice twice, and nothing changed. Then one evening you read a story about a little bear who learns to share — and suddenly your child hands their toy to their sibling. Stories reach children where words alone can\'t.',
-      'That\'s what drives us. We believe personalized stories are the most powerful tool parents have. When a child sees themselves brushing their teeth, being brave on the first day of school, or standing up for a friend — they don\'t just hear about it. They feel it. They live it. And they want to do it too.',
+      'That\'s why we do this. Personalized stories are the most powerful thing parents have. When a child sees themselves brushing their teeth, being brave on the first day of school, or standing up for a friend — they don\'t just hear about it. They feel it. They live it. And they want to do it too.',
       'Research confirms what every parent senses: children remember more, engage more deeply, and build real confidence when they\'re the hero of the story. Not through lessons or rules — through adventure, laughter, and the magic of seeing yourself on every page.',
     ],
     scienceLink: 'The science behind it',
@@ -63,16 +63,16 @@ const aboutContent: Record<string, {
   de: {
     title: 'Über Magical Story',
     tagline: 'Personalisierte Kinderbücher, in denen dein Kind der Star ist.',
-    missionTitle: 'Warum wir das gebaut haben',
+    missionTitle: 'Jedes Kind ist ein Held',
     missionText: [
-      'Wir glauben, dass jedes Kind verdient, sich als Held seiner eigenen Geschichte zu sehen. Magical Story verwandelt deine Familienfotos in personalisierte Kinderbücher — einzigartige Geschichten, in denen dein Kind auf jeder Seite vorkommt.',
-      'Wir wollten etwas Persönlicheres schaffen als Kinderbücher von der Stange. Etwas, das einfängt, wer dein Kind wirklich ist, und das gemeinsame Lesen noch spezieller macht.',
+      'Jedes Kind hat eine Geschichte, die es verdient, erzählt zu werden — und dein Kind sollte der Held darin sein. Magical Story verwandelt deine Familienfotos in personalisierte Kinderbücher, in denen dein Kind auf jeder Seite die Hauptrolle spielt.',
+      'Kein Buch von der Stange. Ein Buch über dein Kind. Eines, das einfängt, wer es wirklich ist, und das gemeinsame Lesen in etwas verwandelt, auf das ihr euch beide freut.',
     ],
     scienceTitle: 'Hör auf zu ermahnen. Erzähl ihnen ihre Geschichte.',
     scienceTagline: 'Kleine Geschichten, grosse Momente.',
     scienceText: [
       'Jeder Elternteil kennt den Moment: Man hat etwas zehnmal erklärt, zweimal die Stimme erhoben, und nichts hat sich geändert. Dann liest man eines Abends eine Geschichte über einen kleinen Bären, der teilen lernt — und plötzlich reicht das Kind sein Spielzeug dem Geschwisterchen. Geschichten erreichen Kinder dort, wo Worte allein es nicht können.',
-      'Das ist es, was uns antreibt. Wir glauben, dass personalisierte Geschichten das stärkste Werkzeug sind, das Eltern haben. Wenn ein Kind sich selbst dabei sieht, wie es Zähne putzt, mutig den ersten Schultag meistert oder für einen Freund einsteht — dann hört es nicht nur davon. Es fühlt es. Es lebt es. Und es will es auch so machen.',
+      'Genau darum machen wir das. Personalisierte Geschichten sind das Wirkungsvollste, was Eltern haben. Wenn ein Kind sich selbst dabei sieht, wie es Zähne putzt, mutig den ersten Schultag meistert oder für einen Freund einsteht — dann hört es nicht nur davon. Es fühlt es. Es lebt es. Und es will es auch so machen.',
       'Forschung bestätigt, was jeder Elternteil spürt: Kinder erinnern sich an mehr, tauchen tiefer ein und bauen echtes Selbstvertrauen auf, wenn sie der Held der Geschichte sind. Nicht durch Lektionen oder Regeln — durch Abenteuer, Lachen und die Magie, sich selbst auf jeder Seite zu sehen.',
     ],
     scienceLink: 'Die Forschung dahinter',
@@ -103,16 +103,16 @@ const aboutContent: Record<string, {
   fr: {
     title: 'À propos de Magical Story',
     tagline: 'Des livres pour enfants personnalisés où votre enfant est la star.',
-    missionTitle: 'Pourquoi nous avons créé ceci',
+    missionTitle: 'Chaque enfant est un héros',
     missionText: [
-      'Nous croyons que chaque enfant mérite de se voir comme le héros de sa propre histoire. Magical Story transforme vos photos de famille en livres pour enfants personnalisés — des histoires uniques où votre enfant apparaît sur chaque page.',
-      'Nous voulions quelque chose de plus personnel que les livres pour enfants standards. Quelque chose qui capture qui est vraiment votre enfant et rend la lecture ensemble encore plus spéciale.',
+      'Chaque enfant a une histoire qui mérite d\'être racontée — et votre enfant devrait en être le héros. Magical Story transforme vos photos de famille en livres personnalisés où votre enfant joue le rôle principal sur chaque page.',
+      'Pas un livre standard. Un livre sur votre enfant. Un livre qui capture qui il est vraiment et transforme la lecture en un moment que vous attendez tous les deux avec impatience.',
     ],
     scienceTitle: 'Arrêtez les sermons. Racontez-leur leur histoire.',
     scienceTagline: 'Petites histoires, grands moments.',
     scienceText: [
       'Chaque parent connaît ce moment : on a expliqué dix fois, élevé la voix deux fois, et rien n\'a changé. Puis un soir, on lit une histoire sur un petit ours qui apprend à partager — et soudain, l\'enfant tend son jouet à son frère. Les histoires atteignent les enfants là où les mots seuls ne peuvent pas.',
-      'C\'est ce qui nous motive. Nous croyons que les histoires personnalisées sont l\'outil le plus puissant dont disposent les parents. Quand un enfant se voit en train de se brosser les dents, d\'être courageux le premier jour d\'école ou de défendre un ami — il ne fait pas qu\'en entendre parler. Il le ressent. Il le vit. Et il veut le faire aussi.',
+      'C\'est exactement pourquoi nous faisons cela. Les histoires personnalisées sont ce que les parents ont de plus puissant. Quand un enfant se voit en train de se brosser les dents, d\'être courageux le premier jour d\'école ou de défendre un ami — il ne fait pas qu\'en entendre parler. Il le ressent. Il le vit. Et il veut le faire aussi.',
       'La recherche confirme ce que chaque parent ressent : les enfants retiennent plus, s\'engagent plus profondément et développent une vraie confiance en eux quand ils sont le héros de l\'histoire. Pas par des leçons ou des règles — par l\'aventure, le rire et la magie de se voir sur chaque page.',
     ],
     scienceLink: 'La science derrière',
