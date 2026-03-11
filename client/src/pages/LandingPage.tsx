@@ -36,6 +36,10 @@ const sectionTranslations = {
     pdfDownload: 'Instant PDF download - perfect for reading on tablets or printing at home',
     printOptions: 'Hardcover or softcover printing - 20x20cm, professional quality',
     shipping: 'Ships within Switzerland - the perfect gift for any occasion',
+    // Why It Works
+    whyTitle: 'Why lecture when you can tell a story?',
+    whyDesc: "Children don't learn from nagging — they learn from stories they love. A story about brushing teeth inspires more than any argument. And when they're the hero? They can't wait to do it themselves.",
+    whyLink: 'Learn why it works',
     // CTA
     readyToCreate: 'Ready to create your book?',
     ctaDesc: 'Upload a photo, pick an adventure, and your personalized story is ready in under 3 minutes.',
@@ -69,6 +73,10 @@ const sectionTranslations = {
     pdfDownload: 'Sofortiger PDF-Download - perfekt zum Lesen auf Tablets oder zum Ausdrucken zu Hause',
     printOptions: 'Hardcover oder Softcover Druck - 20x20cm, professionelle Qualität',
     shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
+    // Why It Works
+    whyTitle: 'Warum ermahnen, wenn du eine Geschichte erzählen kannst?',
+    whyDesc: 'Kinder lernen nicht durch Schimpfen — sie lernen durch Geschichten, die sie lieben. Eine Geschichte übers Zähneputzen bewirkt mehr als jede Diskussion. Und wenn sie selbst der Held sind? Können sie es kaum erwarten, es nachzumachen.',
+    whyLink: 'Erfahre warum es wirkt',
     // CTA
     readyToCreate: 'Bereit für dein eigenes Buch?',
     ctaDesc: 'Lade ein Foto hoch, wähle ein Abenteuer und deine personalisierte Geschichte ist in unter 3 Minuten fertig.',
@@ -102,6 +110,10 @@ const sectionTranslations = {
     pdfDownload: "Téléchargement PDF instantané - parfait pour lire sur tablette ou imprimer à la maison",
     printOptions: 'Impression reliée ou brochée - 20x20cm, qualité professionnelle',
     shipping: 'Livraison en Suisse - le cadeau parfait pour toute occasion',
+    // Why It Works
+    whyTitle: 'Pourquoi sermonner quand on peut raconter une histoire ?',
+    whyDesc: "Les enfants n'apprennent pas par les sermons — ils apprennent par les histoires qu'ils aiment. Une histoire sur le brossage des dents inspire plus que n'importe quelle discussion. Et quand ils sont le héros ? Ils ont hâte de le faire eux-mêmes.",
+    whyLink: 'Découvrez pourquoi ça marche',
     // CTA
     readyToCreate: 'Prêt à créer votre livre ?',
     ctaDesc: "Téléchargez une photo, choisissez une aventure et votre histoire personnalisée est prête en moins de 3 minutes.",
@@ -310,6 +322,43 @@ export default function LandingPage() {
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce hidden lg:block">
           <ChevronDown size={32} className="text-stone-400" />
+        </div>
+      </section>
+
+      {/* Why It Works */}
+      <section className="py-16 lg:py-24 px-4 lg:px-8 bg-white">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+            {/* Text Content */}
+            <div className="w-full lg:w-1/2 order-1 lg:order-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-indigo-100 p-3 rounded-full">
+                  <Heart className="w-6 h-6 text-indigo-600" />
+                </div>
+              </div>
+              <h2 className="text-3xl lg:text-4xl font-title text-stone-900 mb-6">
+                {st.whyTitle}
+              </h2>
+              <p className="text-lg text-stone-600 mb-4">
+                {st.whyDesc}
+              </p>
+              <Link
+                to="/science"
+                className="inline-flex items-center gap-1 mt-2 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+              >
+                {st.whyLink} <ArrowRight size={16} />
+              </Link>
+            </div>
+            {/* Image */}
+            <div className="w-full lg:w-1/2 order-2 lg:order-2 flex items-center">
+              <img
+                src="/images/landing-why-it-works.jpg"
+                loading="lazy"
+                alt={st.whyTitle}
+                className="w-full h-auto rounded-2xl shadow-lg"
+              />
+            </div>
+          </div>
         </div>
       </section>
 

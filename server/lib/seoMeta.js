@@ -307,6 +307,18 @@ const STATIC_ROUTES = {
       fr: 'Mentions légales et impressum de Magical Story.',
     },
   },
+  '/science': {
+    title: {
+      en: 'Why Personalized Books Work – The Science | Magical Story',
+      de: 'Warum personalisierte Kinderbücher wirken | Magical Story',
+      fr: 'Pourquoi les livres personnalisés fonctionnent | Magical Story',
+    },
+    description: {
+      en: 'Children remember more, engage more deeply, and build confidence when they see themselves as the hero. The perfect personalized gift for birthdays and special occasions.',
+      de: 'Kinder erinnern sich an mehr, tauchen tiefer ein und bauen Selbstvertrauen auf, wenn sie der Held der Geschichte sind. Das perfekte personalisierte Geschenk für Geburtstage und besondere Anlässe.',
+      fr: 'Les enfants retiennent plus, s\'engagent plus profondément et développent leur confiance quand ils sont le héros. Le cadeau personnalisé parfait pour les anniversaires.',
+    },
+  },
   '/themes': {
     title: {
       en: 'Story Themes – Magical Story',
@@ -640,6 +652,7 @@ function generateSitemap() {
     '/try': '0.9',
     '/pricing': '0.9',
     '/themes': '0.8',
+    '/science': '0.7',
     '/faq': '0.5',
     '/about': '0.5',
     '/contact': '0.5',

@@ -1,6 +1,6 @@
 import { useLanguage } from '@/context/LanguageContext';
 import { Navigation, Footer } from '@/components/common';
-import { Shield, BookOpen, Heart, Sparkles, MapPin } from 'lucide-react';
+import { Shield, BookOpen, Heart, Sparkles, MapPin, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const aboutContent: Record<string, {
@@ -12,6 +12,10 @@ const aboutContent: Record<string, {
   values: { icon: string; title: string; text: string }[];
   swissTitle: string;
   swissText: string;
+  scienceTitle: string;
+  scienceTagline: string;
+  scienceText: string[];
+  scienceLink: string;
   ctaTitle: string;
   ctaText: string;
   ctaButton: string;
@@ -24,6 +28,14 @@ const aboutContent: Record<string, {
       'We believe every child deserves to see themselves as the hero of their own story. Magical Story turns your family photos into personalized children\'s books — unique stories that feature your child on every page.',
       'We wanted to create something more personal than off-the-shelf children\'s books. Something that captures who your child really is and makes reading together even more special.',
     ],
+    scienceTitle: 'Stop lecturing. Start telling them their story.',
+    scienceTagline: 'Small stories, big moments.',
+    scienceText: [
+      'Every parent knows the moment: you\'ve explained something ten times, raised your voice twice, and nothing changed. Then one evening you read a story about a little bear who learns to share — and suddenly your child hands their toy to their sibling. Stories reach children where words alone can\'t.',
+      'That\'s what drives us. We believe personalized stories are the most powerful tool parents have. When a child sees themselves brushing their teeth, being brave on the first day of school, or standing up for a friend — they don\'t just hear about it. They feel it. They live it. And they want to do it too.',
+      'Research confirms what every parent senses: children remember more, engage more deeply, and build real confidence when they\'re the hero of the story. Not through lessons or rules — through adventure, laughter, and the magic of seeing yourself on every page.',
+    ],
+    scienceLink: 'The science behind it',
     valuesTitle: 'What we stand for',
     values: [
       {
@@ -56,6 +68,14 @@ const aboutContent: Record<string, {
       'Wir glauben, dass jedes Kind verdient, sich als Held seiner eigenen Geschichte zu sehen. Magical Story verwandelt deine Familienfotos in personalisierte Kinderbücher — einzigartige Geschichten, in denen dein Kind auf jeder Seite vorkommt.',
       'Wir wollten etwas Persönlicheres schaffen als Kinderbücher von der Stange. Etwas, das einfängt, wer dein Kind wirklich ist, und das gemeinsame Lesen noch spezieller macht.',
     ],
+    scienceTitle: 'Hör auf zu ermahnen. Erzähl ihnen ihre Geschichte.',
+    scienceTagline: 'Kleine Geschichten, grosse Momente.',
+    scienceText: [
+      'Jeder Elternteil kennt den Moment: Man hat etwas zehnmal erklärt, zweimal die Stimme erhoben, und nichts hat sich geändert. Dann liest man eines Abends eine Geschichte über einen kleinen Bären, der teilen lernt — und plötzlich reicht das Kind sein Spielzeug dem Geschwisterchen. Geschichten erreichen Kinder dort, wo Worte allein es nicht können.',
+      'Das ist es, was uns antreibt. Wir glauben, dass personalisierte Geschichten das stärkste Werkzeug sind, das Eltern haben. Wenn ein Kind sich selbst dabei sieht, wie es Zähne putzt, mutig den ersten Schultag meistert oder für einen Freund einsteht — dann hört es nicht nur davon. Es fühlt es. Es lebt es. Und es will es auch so machen.',
+      'Forschung bestätigt, was jeder Elternteil spürt: Kinder erinnern sich an mehr, tauchen tiefer ein und bauen echtes Selbstvertrauen auf, wenn sie der Held der Geschichte sind. Nicht durch Lektionen oder Regeln — durch Abenteuer, Lachen und die Magie, sich selbst auf jeder Seite zu sehen.',
+    ],
+    scienceLink: 'Die Forschung dahinter',
     valuesTitle: 'Wofür wir stehen',
     values: [
       {
@@ -88,6 +108,14 @@ const aboutContent: Record<string, {
       'Nous croyons que chaque enfant mérite de se voir comme le héros de sa propre histoire. Magical Story transforme vos photos de famille en livres pour enfants personnalisés — des histoires uniques où votre enfant apparaît sur chaque page.',
       'Nous voulions quelque chose de plus personnel que les livres pour enfants standards. Quelque chose qui capture qui est vraiment votre enfant et rend la lecture ensemble encore plus spéciale.',
     ],
+    scienceTitle: 'Arrêtez les sermons. Racontez-leur leur histoire.',
+    scienceTagline: 'Petites histoires, grands moments.',
+    scienceText: [
+      'Chaque parent connaît ce moment : on a expliqué dix fois, élevé la voix deux fois, et rien n\'a changé. Puis un soir, on lit une histoire sur un petit ours qui apprend à partager — et soudain, l\'enfant tend son jouet à son frère. Les histoires atteignent les enfants là où les mots seuls ne peuvent pas.',
+      'C\'est ce qui nous motive. Nous croyons que les histoires personnalisées sont l\'outil le plus puissant dont disposent les parents. Quand un enfant se voit en train de se brosser les dents, d\'être courageux le premier jour d\'école ou de défendre un ami — il ne fait pas qu\'en entendre parler. Il le ressent. Il le vit. Et il veut le faire aussi.',
+      'La recherche confirme ce que chaque parent ressent : les enfants retiennent plus, s\'engagent plus profondément et développent une vraie confiance en eux quand ils sont le héros de l\'histoire. Pas par des leçons ou des règles — par l\'aventure, le rire et la magie de se voir sur chaque page.',
+    ],
+    scienceLink: 'La science derrière',
     valuesTitle: 'Nos valeurs',
     values: [
       {
@@ -154,6 +182,23 @@ export default function About() {
               <p key={i} className="text-stone-600 leading-relaxed text-[15px]">{paragraph}</p>
             ))}
           </div>
+        </div>
+
+        {/* Science / Story section */}
+        <div className="mb-10">
+          <h2 className="text-xl font-semibold text-stone-800 mb-1">{content.scienceTitle}</h2>
+          <p className="text-sm text-indigo-600 font-medium mb-5">{content.scienceTagline}</p>
+          <div className="space-y-4">
+            {content.scienceText.map((paragraph, i) => (
+              <p key={i} className="text-stone-600 leading-relaxed text-[15px]">{paragraph}</p>
+            ))}
+          </div>
+          <Link
+            to="/science"
+            className="inline-flex items-center gap-1 mt-4 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+          >
+            {content.scienceLink} <ArrowRight size={16} />
+          </Link>
         </div>
 
         {/* Values */}

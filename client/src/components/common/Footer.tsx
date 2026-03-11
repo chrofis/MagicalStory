@@ -4,6 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 const footerTexts = {
   en: {
     themes: 'Themes',
+    science: 'Science',
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
     faq: 'FAQ',
@@ -13,6 +14,7 @@ const footerTexts = {
   },
   de: {
     themes: 'Themen',
+    science: 'Forschung',
     terms: 'Nutzungsbedingungen',
     privacy: 'Datenschutz',
     faq: 'FAQ',
@@ -22,6 +24,7 @@ const footerTexts = {
   },
   fr: {
     themes: 'Thèmes',
+    science: 'Science',
     terms: 'Conditions d\'Utilisation',
     privacy: 'Confidentialité',
     faq: 'FAQ',
@@ -42,6 +45,10 @@ export function Footer() {
         <div className="flex items-center gap-4 flex-wrap">
           <Link to="/themes" className="hover:text-indigo-600 hover:underline">
             {texts.themes}
+          </Link>
+          <span className="text-stone-300">|</span>
+          <Link to="/science" className="hover:text-indigo-600 hover:underline">
+            {texts.science}
           </Link>
           <span className="text-stone-300">|</span>
           <Link to="/faq" className="hover:text-indigo-600 hover:underline">
