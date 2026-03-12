@@ -759,6 +759,8 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       customTraits: mainChar.traits?.specialDetails || '',
       photos: mainChar.photos || {},
       _charId: mainChar.id,
+      _preGeneratedStyledAvatars: mainChar.preGeneratedStyledAvatars || null,
+      _previewAvatar: mainChar.previewAvatar || null,
     };
 
     const storyInput = {
@@ -1767,6 +1769,8 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     photoUrl: characterData.photos?.face || null,
     bodyPhotoUrl: characterData.photos?.body || null,
     bodyNoBgUrl: characterData.photos?.bodyNoBg || null,
+    avatars: characterData._previewAvatar ? { standard: characterData._previewAvatar } : {},
+    preGeneratedStyledAvatars: characterData._preGeneratedStyledAvatars || null,
   };
 
   // Build input_data matching the format expected by processStoryJob

@@ -203,11 +203,22 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
   const hasPhoto = !!characterData.photos.face;
   const canProceed = characterData.name.trim() && characterData.gender && hasPhoto;
 
+  // Track which face photo the current avatar was generated for
+  const facePhotoKey = characterData.photos.face ? characterData.photos.face.slice(-40) : '';
+  const avatarPhotoKeyRef = useRef<string>('');
+
   // Start avatar generation in the background as soon as photo is ready
-  // Runs while user fills in name/age/gender/traits — doesn't block anything
+  // Re-triggers when photo changes (different face photo = different key)
   useEffect(() => {
-    if (!hasPhoto || previewAvatar || isGeneratingAvatar) return;
+    if (!hasPhoto || isGeneratingAvatar) return;
     if (!characterData.photos.face) return;
+    // Skip if avatar was already generated for this exact photo
+    if (previewAvatar && avatarPhotoKeyRef.current === facePhotoKey) return;
+
+    // Clear stale avatar from previous photo
+    if (previewAvatar && avatarPhotoKeyRef.current !== facePhotoKey) {
+      onAvatarGenerated?.(null as any);
+    }
 
     setIsGeneratingAvatar(true);
 
@@ -231,6 +242,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
         const result = await response.json();
         if (response.ok && result.avatarImage) {
+          avatarPhotoKeyRef.current = facePhotoKey;
           onAvatarGenerated?.(result.avatarImage);
         }
       } catch {
@@ -241,9 +253,9 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
     };
 
     generateAvatar();
-  // Only trigger when photo becomes available
+  // Trigger when photo changes (facePhotoKey changes when different photo uploaded)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasPhoto]);
+  }, [hasPhoto, facePhotoKey]);
 
   // Create anonymous account and advance to next step
   const handleNext = async () => {

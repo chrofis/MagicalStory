@@ -2970,7 +2970,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // Parse the unified response (full parse for complete data)
     const parser = new UnifiedStoryParser(unifiedResponse);
-    const title = parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story';
+    const title = (inputData.trialMode && inputData._trialPreDefinedTitle)
+      ? inputData._trialPreDefinedTitle
+      : (parser.extractTitle() || streamingTitle || inputData.storyType || 'Untitled Story');
     const clothingRequirements = inputData.trialMode
       ? inputData._trialClothingRequirements
       : (parser.extractClothingRequirements() || streamingClothingRequirements);
