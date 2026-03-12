@@ -331,10 +331,12 @@ export default function LandingPage() {
           <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
             {/* Image - Left on desktop */}
             <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">
-              <img
-                src="/images/landing-why-it-works.jpg"
-                loading="lazy"
-                alt={st.whyTitle}
+              <video
+                src="/images/landing-why-it-works.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
                 className="w-full h-auto rounded-2xl shadow-lg"
               />
             </div>
