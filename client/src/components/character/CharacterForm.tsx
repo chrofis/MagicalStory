@@ -1069,7 +1069,7 @@ export function CharacterForm({
               />
               {isStillGenerating && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40 rounded-lg pointer-events-none">
-                  <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-[3px] border-white border-t-transparent rounded-full animate-spin" />
                 </div>
               )}
             </div>
@@ -1083,7 +1083,7 @@ export function CharacterForm({
                   : `This is how ${character.name} will look in your story`
                 }
               </span>
-              <div className="w-10 h-10 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin my-4" />
+              <div className="w-10 h-10 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin my-4" />
               <span className="text-indigo-500 text-sm">
                 {language === 'de'
                   ? 'Du kannst warten oder direkt weiterfahren'

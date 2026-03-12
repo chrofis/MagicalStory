@@ -231,6 +231,8 @@ router.put('/roles', authenticateToken, async (req, res) => {
           // Full avatars are loaded on-demand via /api/characters/:id/avatars
           hasFullAvatars: !!(avatars.standard || avatars.winter || avatars.summer),
           status: avatars.status,
+          stale: avatars.stale,
+          generatedAt: avatars.generatedAt,
           faceThumbnails: avatars.faceThumbnails,
           // Include clothing descriptions (lightweight text, needed for story generation)
           clothing: avatars.clothing,

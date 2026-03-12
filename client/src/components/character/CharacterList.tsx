@@ -76,7 +76,7 @@ export function CharacterList({
               {language === 'de'
                 ? 'Charakter erfolgreich erstellt!'
                 : language === 'fr'
-                ? 'Personnage cre avec succes!'
+                ? 'Personnage créé avec succès!'
                 : 'Character Created Successfully!'}
             </h3>
           </div>

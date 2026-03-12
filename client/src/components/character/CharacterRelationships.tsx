@@ -102,8 +102,6 @@ export function CharacterRelationships({
         {otherCharacters.map((otherChar) => {
           // Forward key: current -> other
           const forwardKey = `${character.id}-${otherChar.id}`;
-          // Inverse key: other -> current
-          const inverseKey = `${otherChar.id}-${character.id}`;
 
           // Get current relationship values
           const forwardRelationship = relationships[forwardKey];
@@ -183,9 +181,8 @@ export function CharacterRelationships({
                     <textarea
                       value={sharedComment}
                       onChange={(e) => {
-                        // Update both keys with the same comment
-                        onRelationshipTextChange(forwardKey, e.target.value);
-                        onRelationshipTextChange(inverseKey, e.target.value);
+                        // Use canonical key only (smaller ID first) to avoid dead keys in state
+                        onRelationshipTextChange(commentKey, e.target.value);
                       }}
                       placeholder={translations.detailsPlaceholder}
                       rows={2}

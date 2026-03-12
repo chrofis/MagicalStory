@@ -18,7 +18,7 @@ const strings: Record<string, {
   photoGuidelines: string;
   dropOrClick: string;
   analyzing: string;
-  changPhoto: string;
+  changePhoto: string;
   nameLabel: string;
   namePlaceholder: string;
   ageLabel: string;
@@ -49,7 +49,7 @@ const strings: Record<string, {
     photoGuidelines: 'Face and upper body must be visible',
     dropOrClick: 'Drop photo or click to upload',
     analyzing: 'Analyzing photo...',
-    changPhoto: 'Change photo',
+    changePhoto: 'Change photo',
     nameLabel: 'Name',
     namePlaceholder: "Child's name",
     ageLabel: 'Age',
@@ -80,7 +80,7 @@ const strings: Record<string, {
     photoGuidelines: 'Gesicht und Oberkörper müssen sichtbar sein',
     dropOrClick: 'Foto hierhin ziehen oder klicken',
     analyzing: 'Foto wird analysiert...',
-    changPhoto: 'Foto ändern',
+    changePhoto: 'Foto ändern',
     nameLabel: 'Name',
     namePlaceholder: 'Name des Kindes',
     ageLabel: 'Alter',
@@ -111,7 +111,7 @@ const strings: Record<string, {
     photoGuidelines: 'Le visage et le haut du corps doivent être visibles',
     dropOrClick: 'Déposez une photo ou cliquez pour télécharger',
     analyzing: 'Analyse de la photo...',
-    changPhoto: 'Changer la photo',
+    changePhoto: 'Changer la photo',
     nameLabel: 'Prénom',
     namePlaceholder: "Prénom de l'enfant",
     ageLabel: 'Âge',
@@ -612,7 +612,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                   className="text-xs text-gray-500 hover:text-red-600 mt-1 flex items-center gap-1 transition-colors"
                 >
                   <X className="w-3 h-3" />
-                  {t.changPhoto}
+                  {t.changePhoto}
                 </button>
               </div>
             </div>

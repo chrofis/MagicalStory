@@ -159,7 +159,7 @@ export default function StoryWizard() {
         return;
       }
       const resData = await res.json();
-      refreshUser();
+      await refreshUser();
       setShowClaimModal(false);
       const creditsMsg = resData.credits
         ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : `Password set! ${resData.credits} credits received.`)
@@ -2503,6 +2503,8 @@ export default function StoryWizard() {
   const handleRegenerateAvatarsWithTraits = async () => {
     if (!currentCharacter) return;
 
+    // Save original avatars for restore on failure
+    const originalAvatars = currentCharacter.avatars;
     // Clear existing avatars in UI
     setCurrentCharacter(prev => prev ? { ...prev, avatars: undefined } : prev);
     setIsRegeneratingAvatarsWithTraits(true);
@@ -2549,10 +2551,14 @@ export default function StoryWizard() {
         }
       } else {
         log.error(`❌ Failed to regenerate avatars with traits: ${result.error}`);
+        // Restore original avatars so UI doesn't show empty
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
         showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars with traits for ${currentCharacter.name}:`, error);
+      // Restore original avatars so UI doesn't show empty
+      setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
       showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegeneratingAvatarsWithTraits(false);
@@ -2570,13 +2576,13 @@ export default function StoryWizard() {
     try {
       log.info(`💾 Saving character and regenerating avatars for ${charName}...`);
 
-      // First, save the character with current state
-      await saveCharacter();
+      // First, save the character with current state (keep currentCharacter for post-save update)
+      await saveCharacter({ keepCurrentCharacter: true });
 
       // Then regenerate avatars with the new traits
       log.info(`🔄 Regenerating avatars WITH TRAITS for ${charName}...`);
 
-      // Get the saved character from the characters array (currentCharacter is cleared after save)
+      // Get the saved character from the characters array
       const latestCharacters = await new Promise<Character[]>(resolve => {
         setCharacters(prev => {
           resolve(prev);
@@ -2709,45 +2715,18 @@ export default function StoryWizard() {
       if (result.success && result.avatars) {
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // Update ALL physical traits from extraction (not just detailedHairAnalysis)
-        const updatedPhysical = result.extractedTraits ? {
-          ...currentCharacter.physical,
-          build: result.extractedTraits.build || currentCharacter.physical?.build,
-          eyeColor: result.extractedTraits.eyeColor || currentCharacter.physical?.eyeColor,
-          eyeColorHex: result.extractedTraits.eyeColorHex || currentCharacter.physical?.eyeColorHex,
-          hairColor: result.extractedTraits.hairColor || currentCharacter.physical?.hairColor,
-          hairColorHex: result.extractedTraits.hairColorHex || currentCharacter.physical?.hairColorHex,
-          hairLength: result.extractedTraits.hairLength || currentCharacter.physical?.hairLength,
-          hairStyle: result.extractedTraits.hairStyle || currentCharacter.physical?.hairStyle,
-          facialHair: result.extractedTraits.facialHair || currentCharacter.physical?.facialHair,
-          skinTone: result.extractedTraits.skinTone || currentCharacter.physical?.skinTone,
-          skinToneHex: result.extractedTraits.skinToneHex || currentCharacter.physical?.skinToneHex,
-          face: result.extractedTraits.face || currentCharacter.physical?.face,
-          other: result.extractedTraits.other || currentCharacter.physical?.other,
-          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || currentCharacter.physical?.detailedHairAnalysis,
-        } : currentCharacter.physical;
-
-        // Update extracted clothing too
-        const updatedClothing = result.extractedClothing ? {
-          ...currentCharacter.clothing,
-          structured: {
-            upperBody: result.extractedClothing.upperBody || undefined,
-            lowerBody: result.extractedClothing.lowerBody || undefined,
-            shoes: result.extractedClothing.shoes || undefined,
-            fullBody: result.extractedClothing.fullBody || undefined,
-          },
-        } : currentCharacter.clothing;
-
-        // Update characters array first (always - using captured charId)
-        setCharacters(prev => prev.map(c =>
-          c.id === charId ? { ...c, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing } : c
-        ));
+        // Update characters array — merge inside functional update to use fresh state
+        setCharacters(prev => prev.map(c => {
+          if (c.id !== charId) return c;
+          const merged = mergeExtractedTraits(c, result.extractedTraits, result.extractedClothing);
+          return { ...c, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing };
+        }));
         // Only update currentCharacter if user is still on the same character
-        setCurrentCharacter(prev =>
-          prev && prev.id === charId
-            ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, clothing: updatedClothing }
-            : prev
-        );
+        setCurrentCharacter(prev => {
+          if (!prev || prev.id !== charId) return prev;
+          const merged = mergeExtractedTraits(prev, result.extractedTraits, result.extractedClothing);
+          return { ...prev, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing };
+        });
 
         log.success(`✅ Avatar generated for ${currentCharacter.name} (id: ${charId})`);
       } else {
@@ -2773,7 +2752,7 @@ export default function StoryWizard() {
     }
   };
 
-  const saveCharacter = async () => {
+  const saveCharacter = async (options?: { keepCurrentCharacter?: boolean }) => {
     if (!currentCharacter) return;
 
     setIsLoading(true);
@@ -2842,7 +2821,7 @@ export default function StoryWizard() {
       // Generate clothing avatars in the background (non-blocking)
       // Only if character has a photo and doesn't already have avatars
       // Guard: Skip if avatar generation already in progress for this character (prevents double generation)
-      const savedChar = updatedCharacters.find(c => c.id === currentCharacter.id);
+      const savedChar = updatedCharacters.find(c => c.id === latestCurrentChar.id);
       if (savedChar && characterService.needsAvatars(savedChar) && generatingAvatarForId !== savedChar.id) {
         // Fire and forget - the service handles generation + saving
         log.info(`🎨 Starting background avatar generation for ${savedChar.name}...`);
@@ -2872,8 +2851,10 @@ export default function StoryWizard() {
         });
       }
 
-      setCurrentCharacter(null);
-      setShowCharacterCreated(true);
+      if (!options?.keepCurrentCharacter) {
+        setCurrentCharacter(null);
+        setShowCharacterCreated(true);
+      }
     } catch (error) {
       log.error('Failed to save character:', error);
       showError(language === 'de'
@@ -3434,29 +3415,25 @@ export default function StoryWizard() {
             ));
             // Also update currentCharacter if it matches
             setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing } : prev);
-            // Save to storage — read fresh relationship state inside functional update to avoid stale closure
-            setCharacters(prevChars => {
-              const updatedCharsForSave = prevChars.map(c =>
-                c.id === char.id ? { ...c, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing } : c
-              );
-              // Read fresh relationships via set-state trick (fire-and-forget)
-              Promise.all([
-                new Promise<RelationshipMap>(resolve => { setRelationships(p => { resolve(p); return p; }); }),
-                new Promise<RelationshipTextMap>(resolve => { setRelationshipTexts(p => { resolve(p); return p; }); }),
-                new Promise<CustomRelationshipPair[]>(resolve => { setCustomRelationships(p => { resolve(p); return p; }); }),
-              ]).then(([rels, relTexts, customRels]) => {
-                characterService.saveCharacterData({
-                  characters: updatedCharsForSave,
-                  relationships: rels,
-                  relationshipTexts: relTexts,
-                  customRelationships: customRels,
-                  customStrengths: [],
-                  customWeaknesses: [],
-                  customFears: [],
-                }).catch(err => console.error('Failed to save avatar update:', err));
-              });
-              return updatedCharsForSave;
+
+            // Save to storage — read fresh state outside setState to avoid side-effects in setState callbacks
+            const latestCharsForSave = await new Promise<Character[]>(resolve => {
+              setCharacters(p => { resolve(p); return p; });
             });
+            const [rels, relTexts, customRels] = await Promise.all([
+              new Promise<RelationshipMap>(resolve => { setRelationships(p => { resolve(p); return p; }); }),
+              new Promise<RelationshipTextMap>(resolve => { setRelationshipTexts(p => { resolve(p); return p; }); }),
+              new Promise<CustomRelationshipPair[]>(resolve => { setCustomRelationships(p => { resolve(p); return p; }); }),
+            ]);
+            characterService.saveCharacterData({
+              characters: latestCharsForSave,
+              relationships: rels,
+              relationshipTexts: relTexts,
+              customRelationships: customRels,
+              customStrengths: [],
+              customWeaknesses: [],
+              customFears: [],
+            }).catch(err => console.error('Failed to save avatar update:', err));
             console.log(`[generateStory] ✅ Avatars regenerated for ${char.name}`);
           } else {
             console.warn(`[generateStory] ⚠️ Failed to regenerate avatars for ${char.name}: ${result.error}`);
@@ -3881,9 +3858,17 @@ export default function StoryWizard() {
 
               setIsLoading(true);
               try {
-                // Read latest state to avoid stale closures
-                const latestChars = charactersRef.current;
-                const latestCurrent = currentCharacterRef.current || currentCharacter;
+                // Read latest state via functional updates to avoid stale closures
+                const latestCurrent = await new Promise<Character | null>(resolve => {
+                  setCurrentCharacter(prev => { resolve(prev); return prev; });
+                });
+                const latestChars = await new Promise<Character[]>(resolve => {
+                  setCharacters(prev => { resolve(prev); return prev; });
+                });
+                if (!latestCurrent) {
+                  log.warn('📸 No currentCharacter after fresh read');
+                  return;
+                }
                 // Check if this is an edit (existing character) or new character
                 const isEdit = latestCurrent.id && latestChars.find(c => c.id === latestCurrent.id);
                 let updatedCharacters = isEdit

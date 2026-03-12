@@ -1911,6 +1911,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
         }),
         signal: AbortSignal.timeout(30000)
       });
+      if (!analyzerResponse.ok) {
+        const text = await analyzerResponse.text().catch(() => '');
+        log.error(`📸 [PHOTO] Python analyzer HTTP ${analyzerResponse.status}: ${text.substring(0, 200)}`);
+        return res.status(502).json({ error: 'Photo analysis service error', details: `HTTP ${analyzerResponse.status}` });
+      }
       const analyzerData = await analyzerResponse.json();
 
       const duration = Date.now() - startTime;
@@ -1983,9 +1988,12 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
       try {
         const rowId = `characters_${req.user.id}`;
 
-        // Get existing characters for this user
+        // Use transaction with FOR UPDATE to prevent race with avatar job writes
+        await dbQuery('BEGIN');
+
+        // Get existing characters for this user (locked)
         const existingResult = await dbQuery(
-          'SELECT data FROM characters WHERE id = $1',
+          'SELECT data FROM characters WHERE id = $1 FOR UPDATE',
           [rowId]
         );
 
@@ -2081,7 +2089,11 @@ router.post('/analyze-photo', authenticateToken, async (req, res) => {
           VALUES ($1, $2, $3, $4)
           ON CONFLICT (id) DO UPDATE SET data = $3, metadata = $4
         `, [rowId, req.user.id, JSON.stringify(charData), JSON.stringify(metadataObj)]);
+
+        await dbQuery('COMMIT');
       } catch (dbErr) {
+        // Rollback on any error
+        try { await dbQuery('ROLLBACK'); } catch (_) { /* ignore */ }
         // Log but don't fail - character creation is a nice-to-have
         log.warn(`📸 [PHOTO] Failed to create character in DB (avatar job will retry): ${dbErr.message}`);
       }
@@ -2958,8 +2970,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
               if (t.skinTone) physical.skinTone = t.skinTone;
               if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
               if (t.facialHair) physical.facialHair = t.facialHair;
-              if (t.face) physical.other = t.face;
+              if (t.face) physical.face = t.face;
               if (t.other) physical.other = t.other;
+              if (t.eyeColorHex) physical.eyeColorHex = t.eyeColorHex;
+              if (t.hairColorHex) physical.hairColorHex = t.hairColorHex;
               if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
 
               // Merge with existing physical object
@@ -3017,7 +3031,7 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           }
         } else {
           // Character still not found after all retries - fail the job
-          throw new Error(`Character not found by ID ${characterId} or name "${name}" after 10 retries - cannot save avatars`);
+          throw new Error(`Character not found by ID ${characterId} or name "${name}" after 30 retries - cannot save avatars`);
         }
       } catch (dbErr) {
         log.error(`❌ [AVATAR JOB ${jobId}] Failed to save avatars to database:`, dbErr.message);
@@ -3963,8 +3977,10 @@ These corrections OVERRIDE what is visible in the reference photo.
               if (t.skinTone) physical.skinTone = t.skinTone;
               if (t.skinToneHex) physical.skinToneHex = t.skinToneHex;
               if (t.facialHair) physical.facialHair = t.facialHair;
-              if (t.face) physical.other = t.face;
+              if (t.face) physical.face = t.face;
               if (t.other) physical.other = t.other;
+              if (t.eyeColorHex) physical.eyeColorHex = t.eyeColorHex;
+              if (t.hairColorHex) physical.hairColorHex = t.hairColorHex;
               if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
 
               // Merge with existing physical object
