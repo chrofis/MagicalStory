@@ -4,7 +4,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { useGeneration } from '@/context/GenerationContext';
-import { ArrowLeft, ArrowRight, Loader2, Sparkles, AlertTriangle, RotateCcw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, Sparkles, AlertTriangle, RotateCcw, Lock, CheckCircle } from 'lucide-react';
 
 // Components
 import { Button, LoadingSpinner, Navigation, WizardHelperText } from '@/components/common';
@@ -71,12 +71,50 @@ export default function StoryWizard() {
   const { showSuccess, showInfo, showError } = useToast();
   const { startTracking, stopTracking, activeJob, isComplete: generationComplete, completedStoryId, markCompletionViewed, hasUnviewedCompletion, error: contextGenerationError, clearError: clearContextError } = useGeneration();
 
-  // Block access if user hasn't set password (trial user needs to set password first for credits)
+  // Show claim modal for trial users without a password
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [claimPassword, setClaimPassword] = useState('');
+  const [claimError, setClaimError] = useState('');
+  const [isClaimingAccount, setIsClaimingAccount] = useState(false);
+  const needsPassword = !isAuthLoading && user && user.hasPassword === false;
+
   useEffect(() => {
-    if (!isAuthLoading && user && user.hasPassword === false) {
-      navigate('/stories', { replace: true });
+    if (needsPassword) setShowClaimModal(true);
+  }, [needsPassword]);
+
+  const handleClaimAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setClaimError('');
+    if (claimPassword.length < 8) {
+      setClaimError(language === 'de' ? 'Mindestens 8 Zeichen' : language === 'fr' ? 'Au moins 8 caractères' : 'At least 8 characters');
+      return;
     }
-  }, [user, isAuthLoading, navigate]);
+    setIsClaimingAccount(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/auth/set-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ password: claimPassword }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setClaimError(data.error || 'Failed');
+        return;
+      }
+      const resData = await res.json();
+      refreshUser();
+      setShowClaimModal(false);
+      const creditsMsg = resData.credits
+        ? (language === 'de' ? `Passwort gesetzt! ${resData.credits} Credits erhalten.` : language === 'fr' ? `Mot de passe défini ! ${resData.credits} crédits reçus.` : `Password set! ${resData.credits} credits received.`)
+        : (language === 'de' ? 'Passwort gesetzt!' : language === 'fr' ? 'Mot de passe défini !' : 'Password set!');
+      showSuccess(creditsMsg);
+    } catch {
+      setClaimError('Failed to set password');
+    } finally {
+      setIsClaimingAccount(false);
+    }
+  };
 
   // Wizard state - start at step 6 with loading if we have a storyId in URL
   // Start at step 1 if ?new=true (creating new story)
@@ -2772,7 +2810,7 @@ export default function StoryWizard() {
 
       // Check if this is an edit (existing character) or new character
       const isEdit = latestCurrentChar.id && latestCharacters.find(c => c.id === latestCurrentChar.id);
-      const updatedCharacters = isEdit
+      let updatedCharacters = isEdit
         ? latestCharacters.map(c => c.id === latestCurrentChar.id ? latestCurrentChar : c)
         : [...latestCharacters, latestCurrentChar];
 
@@ -2792,7 +2830,15 @@ export default function StoryWizard() {
       relationshipsDirty.current = false; // Reset - relationships were just saved
       log.success('Character data saved successfully');
 
-      setCharacters(updatedCharacters);
+      // Reload from server to get the true merged state (server preserves DB-only characters)
+      try {
+        const freshData = await characterService.getCharacterData(false);
+        setCharacters(freshData.characters);
+        updatedCharacters = freshData.characters;
+      } catch {
+        // Fallback to local state if reload fails
+        setCharacters(updatedCharacters);
+      }
 
       // Auto-select main characters after save
       autoSelectMainCharacters(updatedCharacters);
@@ -4821,6 +4867,64 @@ export default function StoryWizard() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* Claim account modal for trial users without password */}
+      {showClaimModal && needsPassword && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 md:p-8 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-amber-100 rounded-xl">
+                <Lock className="w-6 h-6 text-amber-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                {language === 'de' ? 'Konto sichern' : language === 'fr' ? 'Sécuriser le compte' : 'Secure Your Account'}
+              </h2>
+            </div>
+            <p className="text-gray-600 mb-2">
+              {language === 'de'
+                ? 'Setze ein Passwort, um dein Konto zu sichern und weitere Geschichten zu erstellen.'
+                : language === 'fr'
+                  ? 'Définissez un mot de passe pour sécuriser votre compte et créer plus d\'histoires.'
+                  : 'Set a password to secure your account and create more stories.'}
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-amber-800 text-sm font-medium">
+                {language === 'de' ? '🎁 Du erhältst 300 Gratis-Credits!' : language === 'fr' ? '🎁 Vous recevrez 300 crédits gratuits !' : '🎁 You\'ll receive 300 free credits!'}
+              </p>
+              <ul className="text-amber-700 text-xs mt-1 space-y-0.5">
+                <li>{language === 'de' ? '• Erstelle weitere personalisierte Geschichten' : language === 'fr' ? '• Créez plus d\'histoires personnalisées' : '• Create more personalized stories'}</li>
+                <li>{language === 'de' ? '• Alle deine Geschichten sind sicher gespeichert' : language === 'fr' ? '• Toutes vos histoires sont sauvegardées' : '• All your stories are safely stored'}</li>
+                <li>{language === 'de' ? '• Jederzeit erneut anmelden' : language === 'fr' ? '• Reconnectez-vous à tout moment' : '• Log back in anytime'}</li>
+              </ul>
+            </div>
+            <form onSubmit={handleClaimAccount} className="space-y-3">
+              <input
+                type="password"
+                value={claimPassword}
+                onChange={(e) => setClaimPassword(e.target.value)}
+                placeholder={language === 'de' ? 'Passwort (min. 8 Zeichen)' : language === 'fr' ? 'Mot de passe (min. 8 car.)' : 'Password (min. 8 characters)'}
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-base focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none"
+                disabled={isClaimingAccount}
+                autoFocus
+              />
+              {claimError && <p className="text-red-600 text-sm">{claimError}</p>}
+              <button
+                type="submit"
+                disabled={isClaimingAccount}
+                className="w-full py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isClaimingAccount ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                {language === 'de' ? 'Passwort setzen & Credits erhalten' : language === 'fr' ? 'Définir le mot de passe & recevoir les crédits' : 'Set Password & Get Credits'}
+              </button>
+            </form>
+            <button
+              onClick={() => navigate('/stories', { replace: true })}
+              className="w-full mt-3 py-2 text-gray-500 text-sm hover:text-gray-700 transition-colors"
+            >
+              {language === 'de' ? '← Zurück zu meinen Geschichten' : language === 'fr' ? '← Retour à mes histoires' : '← Back to my stories'}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Navigation with step indicators (hidden when viewing a saved story) */}
       <Navigation
         currentStep={step}
