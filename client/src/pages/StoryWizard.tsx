@@ -2454,6 +2454,9 @@ export default function StoryWizard() {
   const handleRegenerateAvatars = async () => {
     if (!currentCharacter) return;
 
+    // Save original avatars for restore on failure
+    const originalAvatars = currentCharacter.avatars;
+    const charId = currentCharacter.id;
     // Clear existing avatars in UI
     setCurrentCharacter(prev => prev ? { ...prev, avatars: undefined } : prev);
     setIsRegeneratingAvatars(true);
@@ -2463,7 +2466,7 @@ export default function StoryWizard() {
 
       // Use the robust service function that handles generation + saving
       const result = await characterService.regenerateAvatarsForCharacter(
-        currentCharacter.id,
+        charId,
         (status, message) => log.info(`[${status}] ${message}`),
         { avatarModel: modelSelections.avatarModel || undefined }
       );
@@ -2478,7 +2481,7 @@ export default function StoryWizard() {
           clothing: result.character!.clothing,
         } : prev);
         setCharacters(prev => prev.map(c =>
-          c.id === currentCharacter.id ? {
+          c.id === charId ? {
             ...c,
             avatars: freshAvatars,
             physical: result.character!.physical,
@@ -2488,10 +2491,12 @@ export default function StoryWizard() {
         log.success(`✅ Avatars and traits regenerated for ${currentCharacter.name}`);
       } else {
         log.error(`❌ Failed to regenerate avatars: ${result.error}`);
+        setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
         showError(`Failed to regenerate avatars: ${result.error || 'Unknown error'}`);
       }
     } catch (error) {
       log.error(`❌ Failed to regenerate avatars for ${currentCharacter.name}:`, error);
+      setCurrentCharacter(prev => prev ? { ...prev, avatars: originalAvatars } : prev);
       showError(`Failed to regenerate avatars: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsRegeneratingAvatars(false);
@@ -3850,73 +3855,12 @@ export default function StoryWizard() {
             onSaveAndRegenerateWithTraits={handleSaveAndRegenerateWithTraits}
             onSaveAndTryNewPhoto={async () => {
               // Save the character but keep it selected, then go to photo step
-              log.info(`📸 onSaveAndTryNewPhoto called, currentCharacter: ${currentCharacter?.name}`);
-              if (!currentCharacter) {
-                log.warn('📸 No currentCharacter, returning early');
-                return;
-              }
-
-              setIsLoading(true);
+              if (!currentCharacter) return;
               try {
-                // Read latest state via functional updates to avoid stale closures
-                const latestCurrent = await new Promise<Character | null>(resolve => {
-                  setCurrentCharacter(prev => { resolve(prev); return prev; });
-                });
-                const latestChars = await new Promise<Character[]>(resolve => {
-                  setCharacters(prev => { resolve(prev); return prev; });
-                });
-                if (!latestCurrent) {
-                  log.warn('📸 No currentCharacter after fresh read');
-                  return;
-                }
-                // Check if this is an edit (existing character) or new character
-                const isEdit = latestCurrent.id && latestChars.find(c => c.id === latestCurrent.id);
-                let updatedCharacters = isEdit
-                  ? latestChars.map(c => c.id === latestCurrent.id ? latestCurrent : c)
-                  : [...latestChars, latestCurrent];
-
-                // Read fresh relationship state to avoid stale closure
-                const latestRels = await new Promise<RelationshipMap>(resolve => {
-                  setRelationships(prev => { resolve(prev); return prev; });
-                });
-                const latestRelTexts = await new Promise<RelationshipTextMap>(resolve => {
-                  setRelationshipTexts(prev => { resolve(prev); return prev; });
-                });
-                const latestCustomRels = await new Promise<CustomRelationshipPair[]>(resolve => {
-                  setCustomRelationships(prev => { resolve(prev); return prev; });
-                });
-                // Save characters along with relationships
-                // Include photos for new characters (server preserves existing photos from DB)
-                const hasNewCharWithPhotos = !isEdit && !!latestCurrent.photos?.original;
-                await characterService.saveCharacterData({
-                  characters: updatedCharacters,
-                  relationships: latestRels,
-                  relationshipTexts: latestRelTexts,
-                  customRelationships: latestCustomRels,
-                  customStrengths: [],
-                  customWeaknesses: [],
-                  customFears: [],
-                }, { includePhotos: hasNewCharWithPhotos });
-
-                // Reload from server to get true merged state
-                try {
-                  const freshData = await characterService.getCharacterData(false);
-                  setCharacters(freshData.characters);
-                  updatedCharacters = freshData.characters;
-                } catch {
-                  setCharacters(updatedCharacters);
-                }
-                const hasRoles = updatedCharacters.some((c: Character) => c.storyRole);
-                if (!hasRoles) autoSelectMainCharacters(updatedCharacters);
-
-                // Keep current character selected and go to photo step
-                log.info(`📸 Setting characterStep to 'photo', currentCharacter still: ${currentCharacter?.name}`);
+                await saveCharacter({ keepCurrentCharacter: true });
                 setCharacterStep('photo');
               } catch (error) {
-                log.error('📸 Error saving character:', error);
-              } finally {
-                setIsLoading(false);
-                log.info(`📸 onSaveAndTryNewPhoto complete, characterStep should now be 'photo'`);
+                log.error('📸 Error in onSaveAndTryNewPhoto:', error);
               }
             }}
             relationships={relationships}

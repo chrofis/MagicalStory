@@ -1178,6 +1178,11 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
         }),
         signal: AbortSignal.timeout(30000)
       });
+      if (!analyzerResponse.ok) {
+        const text = await analyzerResponse.text().catch(() => '');
+        log.error(`[TRIAL] [PHOTO] Python analyzer HTTP ${analyzerResponse.status}: ${text.substring(0, 200)}`);
+        return res.status(502).json({ error: 'Photo analysis service error', details: `HTTP ${analyzerResponse.status}` });
+      }
       const analyzerData = await analyzerResponse.json();
 
       const duration = Date.now() - startTime;
