@@ -24,11 +24,12 @@ import { EmailVerificationModal } from '@/components/auth/EmailVerificationModal
 import { FaceSelectionModal } from '@/components/character';
 
 // Types
-import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory } from '@/types/character';
+import type { Character, RelationshipMap, RelationshipTextMap, VisualBible, ChangedTraits, DetectedFace, AgeCategory, PhysicalTraits, PhysicalTraitsSource } from '@/types/character';
 import type { LanguageLevel, SceneDescription, SceneImage, StoryLanguageCode, UILanguage, CoverImages, GenerationLogEntry, FinalChecksReport, ImageVersion } from '@/types/story';
 
 // Services & Helpers
 import { characterService, storyService, authService } from '@/services';
+import type { ExtractedTraits, ExtractedClothing } from '@/services/characterService';
 import { storyTypes } from '@/constants/storyTypes';
 import { getNotKnownRelationship, isNotKnownRelationship, findInverseRelationship, type CustomRelationshipPair } from '@/constants/relationships';
 import { createLogger } from '@/services/logger';
@@ -37,6 +38,61 @@ import { getAvatarCooldown, recordAvatarRegeneration } from '@/hooks/useAvatarCo
 
 // Create namespaced logger
 const log = createLogger('StoryWizard');
+
+// Merges extracted physical traits with existing character data, preserving user-edited values.
+// Returns updated physical traits, traits source, and clothing.
+function mergeExtractedTraits(
+  character: Character,
+  extractedTraits: ExtractedTraits | undefined,
+  extractedClothing: ExtractedClothing | undefined,
+): { physical: PhysicalTraits | undefined; physicalTraitsSource: PhysicalTraitsSource | undefined; clothing: Character['clothing'] } {
+  const source = character.physicalTraitsSource || {};
+
+  const physical = extractedTraits ? {
+    ...character.physical,
+    height: character.physical?.height,
+    eyeColor: source.eyeColor === 'user' ? character.physical?.eyeColor : extractedTraits.eyeColor,
+    eyeColorHex: source.eyeColor === 'user' ? character.physical?.eyeColorHex : extractedTraits.eyeColorHex,
+    hairColor: source.hairColor === 'user' ? character.physical?.hairColor : extractedTraits.hairColor,
+    hairColorHex: source.hairColor === 'user' ? character.physical?.hairColorHex : extractedTraits.hairColorHex,
+    hairLength: source.hairLength === 'user' ? character.physical?.hairLength : extractedTraits.hairLength,
+    hairStyle: source.hairStyle === 'user' ? character.physical?.hairStyle : extractedTraits.hairStyle,
+    build: source.build === 'user' ? character.physical?.build : extractedTraits.build,
+    face: source.face === 'user' ? character.physical?.face : extractedTraits.face,
+    facialHair: source.facialHair === 'user' ? character.physical?.facialHair : extractedTraits.facialHair,
+    other: source.other === 'user' ? character.physical?.other : extractedTraits.other,
+    skinTone: source.skinTone === 'user' ? character.physical?.skinTone : extractedTraits.skinTone,
+    skinToneHex: source.skinTone === 'user' ? character.physical?.skinToneHex : extractedTraits.skinToneHex,
+    detailedHairAnalysis: extractedTraits.detailedHairAnalysis || character.physical?.detailedHairAnalysis,
+    apparentAge: source.apparentAge === 'user' ? character.physical?.apparentAge : (extractedTraits.apparentAge as AgeCategory || character.physical?.apparentAge),
+  } : character.physical;
+
+  const physicalTraitsSource = extractedTraits ? {
+    ...source,
+    eyeColor: source.eyeColor === 'user' ? 'user' as const : (extractedTraits.eyeColor ? 'extracted' as const : undefined),
+    hairColor: source.hairColor === 'user' ? 'user' as const : (extractedTraits.hairColor ? 'extracted' as const : undefined),
+    hairLength: source.hairLength === 'user' ? 'user' as const : (extractedTraits.hairLength ? 'extracted' as const : undefined),
+    hairStyle: source.hairStyle === 'user' ? 'user' as const : (extractedTraits.hairStyle ? 'extracted' as const : undefined),
+    build: source.build === 'user' ? 'user' as const : (extractedTraits.build ? 'extracted' as const : undefined),
+    face: source.face === 'user' ? 'user' as const : (extractedTraits.face ? 'extracted' as const : undefined),
+    facialHair: source.facialHair === 'user' ? 'user' as const : (extractedTraits.facialHair ? 'extracted' as const : undefined),
+    other: source.other === 'user' ? 'user' as const : (extractedTraits.other ? 'extracted' as const : undefined),
+    skinTone: source.skinTone === 'user' ? 'user' as const : (extractedTraits.skinTone ? 'extracted' as const : undefined),
+    apparentAge: source.apparentAge === 'user' ? 'user' as const : (extractedTraits.apparentAge ? 'extracted' as const : undefined),
+  } : character.physicalTraitsSource;
+
+  const clothing = extractedClothing ? {
+    ...character.clothing,
+    structured: {
+      upperBody: extractedClothing.upperBody || undefined,
+      lowerBody: extractedClothing.lowerBody || undefined,
+      shoes: extractedClothing.shoes || undefined,
+      fullBody: extractedClothing.fullBody || undefined,
+    },
+  } : character.clothing;
+
+  return { physical, physicalTraitsSource, clothing };
+}
 
 // Helper text for each wizard step
 const wizardHelperTexts: Record<string, Record<number, string>> = {
@@ -1378,8 +1434,12 @@ export default function StoryWizard() {
       try {
         const data = await characterService.getCharacterData(false);
         const stillGenerating = data.characters.some((c: Character) => c.avatars?.status === 'generating');
-        // Update characters with fresh data (preserves any local edits to currentCharacter)
-        setCharacters(data.characters);
+        // Only update avatar data for characters that were generating — preserve local edits for all other fields
+        setCharacters(prev => prev.map(localChar => {
+          const serverChar = data.characters.find((c: Character) => c.id === localChar.id);
+          if (!serverChar || localChar.avatars?.status !== 'generating') return localChar;
+          return { ...localChar, avatars: serverChar.avatars };
+        }));
         if (!stillGenerating) {
           log.info('Avatar generation completed - stopping poll');
           clearInterval(interval);
@@ -2458,73 +2518,25 @@ export default function StoryWizard() {
         // Update local state with new avatars (explicitly clear stale flag)
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // MERGE physical traits - preserve USER edits, use extracted for non-user traits
-        // This allows multiple trait modifications to accumulate across regenerations
-        const currentSource = currentCharacter.physicalTraitsSource || {};
-        const updatedPhysical = result.extractedTraits ? {
-          height: currentCharacter.physical?.height, // Preserve height (not extracted from avatar)
-          // Preserve user-edited values, use extracted for non-user traits
-          eyeColor: currentSource.eyeColor === 'user' ? currentCharacter.physical?.eyeColor : result.extractedTraits.eyeColor,
-          eyeColorHex: currentSource.eyeColor === 'user' ? currentCharacter.physical?.eyeColorHex : result.extractedTraits.eyeColorHex,
-          hairColor: currentSource.hairColor === 'user' ? currentCharacter.physical?.hairColor : result.extractedTraits.hairColor,
-          hairColorHex: currentSource.hairColor === 'user' ? currentCharacter.physical?.hairColorHex : result.extractedTraits.hairColorHex,
-          hairLength: currentSource.hairLength === 'user' ? currentCharacter.physical?.hairLength : result.extractedTraits.hairLength,
-          hairStyle: currentSource.hairStyle === 'user' ? currentCharacter.physical?.hairStyle : result.extractedTraits.hairStyle,
-          build: currentSource.build === 'user' ? currentCharacter.physical?.build : result.extractedTraits.build,
-          face: currentSource.face === 'user' ? currentCharacter.physical?.face : result.extractedTraits.face,
-          facialHair: currentSource.facialHair === 'user' ? currentCharacter.physical?.facialHair : result.extractedTraits.facialHair,
-          other: currentSource.other === 'user' ? currentCharacter.physical?.other : result.extractedTraits.other,
-          skinTone: currentSource.skinTone === 'user' ? currentCharacter.physical?.skinTone : result.extractedTraits.skinTone,
-          skinToneHex: currentSource.skinTone === 'user' ? currentCharacter.physical?.skinToneHex : result.extractedTraits.skinToneHex,
-          // Detailed hair analysis from avatar evaluation (always use latest)
-          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || currentCharacter.physical?.detailedHairAnalysis,
-          // Apparent age from avatar evaluation (preserve user edits)
-          apparentAge: currentSource.apparentAge === 'user' ? currentCharacter.physical?.apparentAge : (result.extractedTraits.apparentAge as AgeCategory || currentCharacter.physical?.apparentAge),
-        } : currentCharacter.physical;
-
-        // PRESERVE 'user' source - only set 'extracted' for non-user traits
-        // This allows subsequent edits to accumulate without losing previous user edits
-        const updatedTraitsSource = result.extractedTraits ? {
-          eyeColor: currentSource.eyeColor === 'user' ? 'user' as const : (result.extractedTraits.eyeColor ? 'extracted' as const : undefined),
-          hairColor: currentSource.hairColor === 'user' ? 'user' as const : (result.extractedTraits.hairColor ? 'extracted' as const : undefined),
-          hairLength: currentSource.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
-          hairStyle: currentSource.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
-          build: currentSource.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
-          face: currentSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
-          facialHair: currentSource.facialHair === 'user' ? 'user' as const : (result.extractedTraits.facialHair ? 'extracted' as const : undefined),
-          other: currentSource.other === 'user' ? 'user' as const : (result.extractedTraits.other ? 'extracted' as const : undefined),
-          skinTone: currentSource.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
-          apparentAge: currentSource.apparentAge === 'user' ? 'user' as const : (result.extractedTraits.apparentAge ? 'extracted' as const : undefined),
-        } : currentCharacter.physicalTraitsSource;
-
-        // OVERWRITE clothing with extracted values from new avatar
-        const updatedClothing = result.extractedClothing ? {
-          ...currentCharacter.clothing,
-          structured: {
-            // Overwrite all structured clothing from extraction
-            upperBody: result.extractedClothing.upperBody || undefined,
-            lowerBody: result.extractedClothing.lowerBody || undefined,
-            shoes: result.extractedClothing.shoes || undefined,
-            fullBody: result.extractedClothing.fullBody || undefined,
-          }
-        } : currentCharacter.clothing;
+        // Merge physical traits - preserve USER edits, use extracted for non-user traits
+        const merged = mergeExtractedTraits(currentCharacter, result.extractedTraits, result.extractedClothing);
 
         // Update state only - DO NOT save here
         // The user will click Save which triggers saveCharacter() with the updated state
         setCurrentCharacter(prev => prev ? {
           ...prev,
           avatars: freshAvatars,
-          physical: updatedPhysical,
-          physicalTraitsSource: updatedTraitsSource,
-          clothing: updatedClothing,
+          physical: merged.physical,
+          physicalTraitsSource: merged.physicalTraitsSource,
+          clothing: merged.clothing,
         } : prev);
         setCharacters(prev => prev.map(c =>
           c.id === currentCharacter.id ? {
             ...c,
             avatars: freshAvatars,
-            physical: updatedPhysical,
-            physicalTraitsSource: updatedTraitsSource,
-            clothing: updatedClothing,
+            physical: merged.physical,
+            physicalTraitsSource: merged.physicalTraitsSource,
+            clothing: merged.clothing,
           } : c
         ));
 
@@ -2551,19 +2563,18 @@ export default function StoryWizard() {
   const handleSaveAndRegenerateWithTraits = async () => {
     if (!currentCharacter) return;
 
-    // Capture the character BEFORE saving (saveCharacter clears currentCharacter)
-    const charToRegenerate = { ...currentCharacter };
     const charId = currentCharacter.id;
+    const charName = currentCharacter.name;
 
     setIsRegeneratingAvatarsWithTraits(true);
     try {
-      log.info(`💾 Saving character and regenerating avatars for ${charToRegenerate.name}...`);
+      log.info(`💾 Saving character and regenerating avatars for ${charName}...`);
 
       // First, save the character with current state
       await saveCharacter();
 
       // Then regenerate avatars with the new traits
-      log.info(`🔄 Regenerating avatars WITH TRAITS for ${charToRegenerate.name}...`);
+      log.info(`🔄 Regenerating avatars WITH TRAITS for ${charName}...`);
 
       // Get the saved character from the characters array (currentCharacter is cleared after save)
       const latestCharacters = await new Promise<Character[]>(resolve => {
@@ -2586,72 +2597,24 @@ export default function StoryWizard() {
         // Update local state with new avatars
         const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-        // MERGE physical traits - preserve USER edits, use extracted for non-user traits
-        // This allows multiple trait modifications to accumulate across regenerations
-        const currentSource2 = latestChar.physicalTraitsSource || {};
-        const updatedPhysical2 = result.extractedTraits ? {
-          height: latestChar.physical?.height, // Preserve height (not extracted from avatar)
-          // Preserve user-edited values, use extracted for non-user traits
-          eyeColor: currentSource2.eyeColor === 'user' ? latestChar.physical?.eyeColor : result.extractedTraits.eyeColor,
-          eyeColorHex: currentSource2.eyeColor === 'user' ? latestChar.physical?.eyeColorHex : result.extractedTraits.eyeColorHex,
-          hairColor: currentSource2.hairColor === 'user' ? latestChar.physical?.hairColor : result.extractedTraits.hairColor,
-          hairColorHex: currentSource2.hairColor === 'user' ? latestChar.physical?.hairColorHex : result.extractedTraits.hairColorHex,
-          hairLength: currentSource2.hairLength === 'user' ? latestChar.physical?.hairLength : result.extractedTraits.hairLength,
-          hairStyle: currentSource2.hairStyle === 'user' ? latestChar.physical?.hairStyle : result.extractedTraits.hairStyle,
-          build: currentSource2.build === 'user' ? latestChar.physical?.build : result.extractedTraits.build,
-          face: currentSource2.face === 'user' ? latestChar.physical?.face : result.extractedTraits.face,
-          facialHair: currentSource2.facialHair === 'user' ? latestChar.physical?.facialHair : result.extractedTraits.facialHair,
-          other: currentSource2.other === 'user' ? latestChar.physical?.other : result.extractedTraits.other,
-          skinTone: currentSource2.skinTone === 'user' ? latestChar.physical?.skinTone : result.extractedTraits.skinTone,
-          skinToneHex: currentSource2.skinTone === 'user' ? latestChar.physical?.skinToneHex : result.extractedTraits.skinToneHex,
-          // Detailed hair analysis from avatar evaluation (always use latest)
-          detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || latestChar.physical?.detailedHairAnalysis,
-          // Apparent age from avatar evaluation (preserve user edits)
-          apparentAge: currentSource2.apparentAge === 'user' ? latestChar.physical?.apparentAge : (result.extractedTraits.apparentAge as AgeCategory || latestChar.physical?.apparentAge),
-        } : latestChar.physical;
-
-        // PRESERVE 'user' source - only set 'extracted' for non-user traits
-        // This allows subsequent edits to accumulate without losing previous user edits
-        const updatedTraitsSource2 = result.extractedTraits ? {
-          eyeColor: currentSource2.eyeColor === 'user' ? 'user' as const : (result.extractedTraits.eyeColor ? 'extracted' as const : undefined),
-          hairColor: currentSource2.hairColor === 'user' ? 'user' as const : (result.extractedTraits.hairColor ? 'extracted' as const : undefined),
-          hairLength: currentSource2.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
-          hairStyle: currentSource2.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
-          build: currentSource2.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
-          face: currentSource2.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
-          facialHair: currentSource2.facialHair === 'user' ? 'user' as const : (result.extractedTraits.facialHair ? 'extracted' as const : undefined),
-          other: currentSource2.other === 'user' ? 'user' as const : (result.extractedTraits.other ? 'extracted' as const : undefined),
-          skinTone: currentSource2.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
-          apparentAge: currentSource2.apparentAge === 'user' ? 'user' as const : (result.extractedTraits.apparentAge ? 'extracted' as const : undefined),
-        } : latestChar.physicalTraitsSource;
-
-        // OVERWRITE clothing with extracted values from new avatar
-        const updatedClothing2 = result.extractedClothing ? {
-          ...latestChar.clothing,
-          structured: {
-            // Overwrite all structured clothing from extraction
-            upperBody: result.extractedClothing.upperBody || undefined,
-            lowerBody: result.extractedClothing.lowerBody || undefined,
-            shoes: result.extractedClothing.shoes || undefined,
-            fullBody: result.extractedClothing.fullBody || undefined,
-          }
-        } : latestChar.clothing;
+        // Merge physical traits - preserve USER edits, use extracted for non-user traits
+        const merged = mergeExtractedTraits(latestChar, result.extractedTraits, result.extractedClothing);
 
         // Only update currentCharacter if it's still the same character (user might have switched)
         setCurrentCharacter(prev => prev && prev.id === charId ? {
           ...prev,
           avatars: freshAvatars,
-          physical: updatedPhysical2,
-          physicalTraitsSource: updatedTraitsSource2,
-          clothing: updatedClothing2,
+          physical: merged.physical,
+          physicalTraitsSource: merged.physicalTraitsSource,
+          clothing: merged.clothing,
         } : prev);
         setCharacters(prev => prev.map(c =>
           c.id === charId ? {
             ...c,
             avatars: freshAvatars,
-            physical: updatedPhysical2,
-            physicalTraitsSource: updatedTraitsSource2,
-            clothing: updatedClothing2,
+            physical: merged.physical,
+            physicalTraitsSource: merged.physicalTraitsSource,
+            clothing: merged.clothing,
           } : c
         ));
 
@@ -2661,9 +2624,9 @@ export default function StoryWizard() {
         const updatedChar = {
           ...latestChar,
           avatars: freshAvatars,
-          physical: updatedPhysical2,
-          physicalTraitsSource: updatedTraitsSource2,
-          clothing: updatedClothing2,
+          physical: merged.physical,
+          physicalTraitsSource: merged.physicalTraitsSource,
+          clothing: merged.clothing,
         };
         const latestCharacters2 = await new Promise<Character[]>(resolve => {
           setCharacters(prev => {
@@ -2675,11 +2638,22 @@ export default function StoryWizard() {
           c.id === charId ? updatedChar : c
         );
 
+        // Read fresh relationship state to avoid stale closure
+        const latestRelationships = await new Promise<RelationshipMap>(resolve => {
+          setRelationships(prev => { resolve(prev); return prev; });
+        });
+        const latestRelationshipTexts = await new Promise<RelationshipTextMap>(resolve => {
+          setRelationshipTexts(prev => { resolve(prev); return prev; });
+        });
+        const latestCustomRelationships = await new Promise<CustomRelationshipPair[]>(resolve => {
+          setCustomRelationships(prev => { resolve(prev); return prev; });
+        });
+
         await characterService.saveCharacterData({
           characters: finalCharacters,
-          relationships,
-          relationshipTexts,
-          customRelationships,
+          relationships: latestRelationships,
+          relationshipTexts: latestRelationshipTexts,
+          customRelationships: latestCustomRelationships,
           customStrengths: [],
           customWeaknesses: [],
           customFears: [],
@@ -2824,14 +2798,24 @@ export default function StoryWizard() {
         : [...latestCharacters, latestCurrentChar];
 
       log.info('Saving characters with relationships:', updatedCharacters.length);
+      // Read fresh relationship state to avoid stale closure
+      const latestRelationships = await new Promise<RelationshipMap>(resolve => {
+        setRelationships(prev => { resolve(prev); return prev; });
+      });
+      const latestRelationshipTexts = await new Promise<RelationshipTextMap>(resolve => {
+        setRelationshipTexts(prev => { resolve(prev); return prev; });
+      });
+      const latestCustomRelationships = await new Promise<CustomRelationshipPair[]>(resolve => {
+        setCustomRelationships(prev => { resolve(prev); return prev; });
+      });
       // Save characters along with relationships
       // Include photos for new characters (server preserves existing photos from DB)
       const hasNewCharWithPhotos = !isEdit && !!latestCurrentChar.photos?.original;
       await characterService.saveCharacterData({
         characters: updatedCharacters,
-        relationships,
-        relationshipTexts,
-        customRelationships,
+        relationships: latestRelationships,
+        relationshipTexts: latestRelationshipTexts,
+        customRelationships: latestCustomRelationships,
         customStrengths: [],
         customWeaknesses: [],
         customFears: [],
@@ -3140,12 +3124,9 @@ export default function StoryWizard() {
 
   // Save all character data including relationships (only if modified)
   const saveAllCharacterData = async () => {
-    // Get LATEST characters from state to avoid stale closure issues
+    // Get LATEST state from all relevant setState hooks to avoid stale closure issues
     const latestCharacters = await new Promise<Character[]>(resolve => {
-      setCharacters(prev => {
-        resolve(prev);
-        return prev;
-      });
+      setCharacters(prev => { resolve(prev); return prev; });
     });
 
     if (latestCharacters.length === 0) return;
@@ -3153,13 +3134,24 @@ export default function StoryWizard() {
       log.debug('Relationships not modified, skipping save');
       return;
     }
+
+    const latestRelationships = await new Promise<RelationshipMap>(resolve => {
+      setRelationships(prev => { resolve(prev); return prev; });
+    });
+    const latestRelationshipTexts = await new Promise<RelationshipTextMap>(resolve => {
+      setRelationshipTexts(prev => { resolve(prev); return prev; });
+    });
+    const latestCustomRelationships = await new Promise<CustomRelationshipPair[]>(resolve => {
+      setCustomRelationships(prev => { resolve(prev); return prev; });
+    });
+
     try {
       log.debug('Auto-saving character data with latest state...');
       await characterService.saveCharacterData({
         characters: latestCharacters,
-        relationships,
-        relationshipTexts,
-        customRelationships,
+        relationships: latestRelationships,
+        relationshipTexts: latestRelationshipTexts,
+        customRelationships: latestCustomRelationships,
         customStrengths: [],
         customWeaknesses: [],
         customFears: [],
@@ -3433,78 +3425,36 @@ export default function StoryWizard() {
           if (result.success && result.avatars) {
             const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
-            // MERGE physical traits - preserve USER edits, use extracted for non-user traits
-            const charSource = char.physicalTraitsSource || {};
-            const updatedPhysical = result.extractedTraits ? {
-              ...char.physical,
-              height: char.physical?.height, // Preserve height (not extracted from avatar)
-              // Preserve user-edited values, use extracted for non-user traits
-              build: charSource.build === 'user' ? char.physical?.build : result.extractedTraits.build,
-              eyeColor: charSource.eyeColor === 'user' ? char.physical?.eyeColor : result.extractedTraits.eyeColor,
-              eyeColorHex: charSource.eyeColor === 'user' ? char.physical?.eyeColorHex : result.extractedTraits.eyeColorHex,
-              hairColor: charSource.hairColor === 'user' ? char.physical?.hairColor : result.extractedTraits.hairColor,
-              hairColorHex: charSource.hairColor === 'user' ? char.physical?.hairColorHex : result.extractedTraits.hairColorHex,
-              hairLength: charSource.hairLength === 'user' ? char.physical?.hairLength : result.extractedTraits.hairLength,
-              hairStyle: charSource.hairStyle === 'user' ? char.physical?.hairStyle : result.extractedTraits.hairStyle,
-              facialHair: charSource.facialHair === 'user' ? char.physical?.facialHair : result.extractedTraits.facialHair,
-              skinTone: charSource.skinTone === 'user' ? char.physical?.skinTone : result.extractedTraits.skinTone,
-              skinToneHex: charSource.skinTone === 'user' ? char.physical?.skinToneHex : result.extractedTraits.skinToneHex,
-              face: charSource.face === 'user' ? char.physical?.face : result.extractedTraits.face,
-              other: charSource.other === 'user' ? char.physical?.other : result.extractedTraits.other,
-              // Detailed hair analysis from avatar evaluation (always use latest)
-              detailedHairAnalysis: result.extractedTraits.detailedHairAnalysis || char.physical?.detailedHairAnalysis,
-              // Apparent age from avatar evaluation (preserve user edits)
-              apparentAge: charSource.apparentAge === 'user' ? char.physical?.apparentAge : (result.extractedTraits.apparentAge as AgeCategory || char.physical?.apparentAge),
-            } : char.physical;
+            // Merge physical traits - preserve USER edits, use extracted for non-user traits
+            const merged = mergeExtractedTraits(char, result.extractedTraits, result.extractedClothing);
 
-            // PRESERVE 'user' source - only set 'extracted' for non-user traits
-            const updatedTraitsSource = result.extractedTraits ? {
-              ...charSource,
-              build: charSource.build === 'user' ? 'user' as const : (result.extractedTraits.build ? 'extracted' as const : undefined),
-              eyeColor: charSource.eyeColor === 'user' ? 'user' as const : (result.extractedTraits.eyeColor ? 'extracted' as const : undefined),
-              hairColor: charSource.hairColor === 'user' ? 'user' as const : (result.extractedTraits.hairColor ? 'extracted' as const : undefined),
-              hairLength: charSource.hairLength === 'user' ? 'user' as const : (result.extractedTraits.hairLength ? 'extracted' as const : undefined),
-              hairStyle: charSource.hairStyle === 'user' ? 'user' as const : (result.extractedTraits.hairStyle ? 'extracted' as const : undefined),
-              face: charSource.face === 'user' ? 'user' as const : (result.extractedTraits.face ? 'extracted' as const : undefined),
-              facialHair: charSource.facialHair === 'user' ? 'user' as const : (result.extractedTraits.facialHair ? 'extracted' as const : undefined),
-              other: charSource.other === 'user' ? 'user' as const : (result.extractedTraits.other ? 'extracted' as const : undefined),
-              skinTone: charSource.skinTone === 'user' ? 'user' as const : (result.extractedTraits.skinTone ? 'extracted' as const : undefined),
-              apparentAge: charSource.apparentAge === 'user' ? 'user' as const : (result.extractedTraits.apparentAge ? 'extracted' as const : undefined),
-            } : char.physicalTraitsSource;
-
-            // Update extracted clothing too
-            const updatedClothing = result.extractedClothing ? {
-              ...char.clothing,
-              structured: {
-                upperBody: result.extractedClothing.upperBody || undefined,
-                lowerBody: result.extractedClothing.lowerBody || undefined,
-                shoes: result.extractedClothing.shoes || undefined,
-                fullBody: result.extractedClothing.fullBody || undefined,
-              },
-            } : char.clothing;
-
-            // Update characters state (include physicalTraitsSource)
+            // Update characters state
             setCharacters(prev => prev.map(c =>
-              c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : c
+              c.id === char.id ? { ...c, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing } : c
             ));
             // Also update currentCharacter if it matches
-            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : prev);
-            // Save to storage using local state to preserve any unsaved changes
-            // Use functional update to get latest characters state
+            setCurrentCharacter(prev => prev && prev.id === char.id ? { ...prev, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing } : prev);
+            // Save to storage — read fresh relationship state inside functional update to avoid stale closure
             setCharacters(prevChars => {
               const updatedCharsForSave = prevChars.map(c =>
-                c.id === char.id ? { ...c, avatars: freshAvatars, physical: updatedPhysical, physicalTraitsSource: updatedTraitsSource, clothing: updatedClothing } : c
+                c.id === char.id ? { ...c, avatars: freshAvatars, physical: merged.physical, physicalTraitsSource: merged.physicalTraitsSource, clothing: merged.clothing } : c
               );
-              // Fire save in background (don't await to avoid blocking)
-              characterService.saveCharacterData({
-                characters: updatedCharsForSave,
-                relationships,
-                relationshipTexts,
-                customRelationships,
-                customStrengths: [],
-                customWeaknesses: [],
-                customFears: [],
-              }).catch(err => console.error('Failed to save avatar update:', err));
+              // Read fresh relationships via set-state trick (fire-and-forget)
+              Promise.all([
+                new Promise<RelationshipMap>(resolve => { setRelationships(p => { resolve(p); return p; }); }),
+                new Promise<RelationshipTextMap>(resolve => { setRelationshipTexts(p => { resolve(p); return p; }); }),
+                new Promise<CustomRelationshipPair[]>(resolve => { setCustomRelationships(p => { resolve(p); return p; }); }),
+              ]).then(([rels, relTexts, customRels]) => {
+                characterService.saveCharacterData({
+                  characters: updatedCharsForSave,
+                  relationships: rels,
+                  relationshipTexts: relTexts,
+                  customRelationships: customRels,
+                  customStrengths: [],
+                  customWeaknesses: [],
+                  customFears: [],
+                }).catch(err => console.error('Failed to save avatar update:', err));
+              });
               return updatedCharsForSave;
             });
             console.log(`[generateStory] ✅ Avatars regenerated for ${char.name}`);
@@ -3940,14 +3890,24 @@ export default function StoryWizard() {
                   ? latestChars.map(c => c.id === latestCurrent.id ? latestCurrent : c)
                   : [...latestChars, latestCurrent];
 
+                // Read fresh relationship state to avoid stale closure
+                const latestRels = await new Promise<RelationshipMap>(resolve => {
+                  setRelationships(prev => { resolve(prev); return prev; });
+                });
+                const latestRelTexts = await new Promise<RelationshipTextMap>(resolve => {
+                  setRelationshipTexts(prev => { resolve(prev); return prev; });
+                });
+                const latestCustomRels = await new Promise<CustomRelationshipPair[]>(resolve => {
+                  setCustomRelationships(prev => { resolve(prev); return prev; });
+                });
                 // Save characters along with relationships
                 // Include photos for new characters (server preserves existing photos from DB)
                 const hasNewCharWithPhotos = !isEdit && !!latestCurrent.photos?.original;
                 await characterService.saveCharacterData({
                   characters: updatedCharacters,
-                  relationships,
-                  relationshipTexts,
-                  customRelationships,
+                  relationships: latestRels,
+                  relationshipTexts: latestRelTexts,
+                  customRelationships: latestCustomRels,
                   customStrengths: [],
                   customWeaknesses: [],
                   customFears: [],
