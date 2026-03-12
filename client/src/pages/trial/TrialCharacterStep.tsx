@@ -323,7 +323,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
     try {
       const body: any = { imageData: base64 };
-      if (selectedFaceId && cachedFaces) {
+      if (selectedFaceId != null && cachedFaces) {
         body.selectedFaceId = selectedFaceId;
         body.cachedFaces = cachedFaces;
       }
