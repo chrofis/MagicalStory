@@ -1248,6 +1248,11 @@ export default function StoryWizard() {
   useEffect(() => {
     const loadCharacterData = async () => {
       try {
+        // Skip reload if user is mid-edit (prevents refreshUser/claim wiping local state)
+        if (initialCharacterLoadDone && currentCharacterRef.current) {
+          log.debug('Skipping character reload — user is mid-edit');
+          return;
+        }
         setIsLoading(true);
         // Load character data - use loadAllAvatars flag for dev mode
         // When true: loads all avatar variants (30MB+), useful for debugging
@@ -2799,9 +2804,13 @@ export default function StoryWizard() {
 
     setIsLoading(true);
     try {
-      // Use refs for reliable access to latest state values (avoids stale closures)
-      const latestCurrentChar = currentCharacterRef.current;
-      const latestCharacters = charactersRef.current;
+      // Use functional-update reads to get truly latest state (refs can lag one render in React 18)
+      const latestCurrentChar = await new Promise<Character | null>(resolve => {
+        setCurrentCharacter(prev => { resolve(prev); return prev; });
+      });
+      const latestCharacters = await new Promise<Character[]>(resolve => {
+        setCharacters(prev => { resolve(prev); return prev; });
+      });
 
       if (!latestCurrentChar) {
         log.warn('No current character to save');
@@ -2840,8 +2849,11 @@ export default function StoryWizard() {
         setCharacters(updatedCharacters);
       }
 
-      // Auto-select main characters after save
-      autoSelectMainCharacters(updatedCharacters);
+      // Auto-select main characters after save (only if no manually stored roles exist)
+      const hasStoredRoles = updatedCharacters.some((c: Character) => c.storyRole);
+      if (!hasStoredRoles) {
+        autoSelectMainCharacters(updatedCharacters);
+      }
 
       // Generate clothing avatars in the background (non-blocking)
       // Only if character has a photo and doesn't already have avatars
@@ -3919,15 +3931,18 @@ export default function StoryWizard() {
 
               setIsLoading(true);
               try {
+                // Read latest state to avoid stale closures
+                const latestChars = charactersRef.current;
+                const latestCurrent = currentCharacterRef.current || currentCharacter;
                 // Check if this is an edit (existing character) or new character
-                const isEdit = currentCharacter.id && characters.find(c => c.id === currentCharacter.id);
-                const updatedCharacters = isEdit
-                  ? characters.map(c => c.id === currentCharacter.id ? currentCharacter : c)
-                  : [...characters, currentCharacter];
+                const isEdit = latestCurrent.id && latestChars.find(c => c.id === latestCurrent.id);
+                let updatedCharacters = isEdit
+                  ? latestChars.map(c => c.id === latestCurrent.id ? latestCurrent : c)
+                  : [...latestChars, latestCurrent];
 
                 // Save characters along with relationships
                 // Include photos for new characters (server preserves existing photos from DB)
-                const hasNewCharWithPhotos = !isEdit && !!currentCharacter.photos?.original;
+                const hasNewCharWithPhotos = !isEdit && !!latestCurrent.photos?.original;
                 await characterService.saveCharacterData({
                   characters: updatedCharacters,
                   relationships,
@@ -3938,8 +3953,16 @@ export default function StoryWizard() {
                   customFears: [],
                 }, { includePhotos: hasNewCharWithPhotos });
 
-                setCharacters(updatedCharacters);
-                autoSelectMainCharacters(updatedCharacters);
+                // Reload from server to get true merged state
+                try {
+                  const freshData = await characterService.getCharacterData(false);
+                  setCharacters(freshData.characters);
+                  updatedCharacters = freshData.characters;
+                } catch {
+                  setCharacters(updatedCharacters);
+                }
+                const hasRoles = updatedCharacters.some((c: Character) => c.storyRole);
+                if (!hasRoles) autoSelectMainCharacters(updatedCharacters);
 
                 // Keep current character selected and go to photo step
                 log.info(`📸 Setting characterStep to 'photo', currentCharacter still: ${currentCharacter?.name}`);
