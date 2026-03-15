@@ -2257,64 +2257,22 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       tokenUsage: { byModel: {} }  // Track token usage for cost metrics
     };
 
-    // Log photo info to understand what's being sent
+    // Log photo info
     const photoSizeKB = Math.round(facePhoto.length / 1024);
-    const isPNG = facePhoto.startsWith('data:image/png');
-    log.info(`[AVATAR JOB ${jobId}] 📸 Input photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
+    log.info(`[AVATAR JOB ${jobId}] 📸 Input face photo: ${photoSizeKB}KB`);
 
-    // LOCALHOST FIX: If photo is large JPEG (likely unprocessed original), try to remove background
-    // Production processes photos during upload (creates bodyNoBg), but localhost may not have MediaPipe
-    // This ensures avatar generation works even with unprocessed photos
-    let processedFacePhoto = facePhoto;
-    if (!isPNG && photoSizeKB > 50) {
-      log.info(`[AVATAR JOB ${jobId}] 🔄 Photo appears unprocessed (JPEG ${photoSizeKB}KB), attempting background removal...`);
-      try {
-        const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
-        const analyzeResponse = await fetch(`${photoAnalyzerUrl}/analyze`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            image: facePhoto,
-            extract_face: true,
-            extract_body: false,
-            remove_background: true
-          })
-        });
-
-        if (analyzeResponse.ok) {
-          const analyzeData = await analyzeResponse.json();
-          // Prefer face thumbnail (processed, background on peach), then body with no bg
-          const processedPhoto = analyzeData.faceThumbnail || analyzeData.face_thumbnail ||
-                                 analyzeData.bodyNoBg || analyzeData.body_no_bg;
-          if (processedPhoto) {
-            const processedSize = Math.round(processedPhoto.length / 1024);
-            log.info(`[AVATAR JOB ${jobId}] ✅ Got processed photo from analyzer: ${processedSize}KB`);
-            processedFacePhoto = processedPhoto;
-          } else {
-            log.warn(`[AVATAR JOB ${jobId}] ⚠️ Analyzer returned no processed photo, using original`);
-          }
-        } else {
-          log.warn(`[AVATAR JOB ${jobId}] ⚠️ Photo analyzer returned ${analyzeResponse.status}, using original`);
-        }
-      } catch (analyzerErr) {
-        log.warn(`[AVATAR JOB ${jobId}] ⚠️ Photo analyzer error: ${analyzerErr.message}, using original`);
-      }
-    }
-
-    // Prepare base64 data - ALWAYS resize photos for Gemini to avoid IMAGE_OTHER errors
-    // Gemini works better with smaller images (tested: 13KB works, 90KB fails)
-    log.info(`[AVATAR JOB ${jobId}] Resizing photo (${processedFacePhoto.length} chars) for Gemini...`);
-
-    // Force resize to 512px max dimension - this bypasses the 100KB skip threshold in compressImageToJPEG
+    // Resize face photo to 512px for Gemini (avoids IMAGE_OTHER errors with large inputs)
+    // Face photo is already a tight HQ crop from client (768x768) — no bg removal needed,
+    // Gemini only uses it as identity reference for facial features
     const sharp = require('sharp');
-    const base64Input = processedFacePhoto.replace(/^data:image\/\w+;base64,/, '');
+    const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
       .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 85 })
       .toBuffer();
     const finalPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.info(`[AVATAR JOB ${jobId}] Resized to ${finalPhoto.length} chars (was ${processedFacePhoto.length})`);
+    log.info(`[AVATAR JOB ${jobId}] Resized to ${Math.round(finalPhoto.length / 1024)}KB for Gemini`);
     const base64Data = finalPhoto.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = finalPhoto.match(/^data:(image\/\w+);base64,/) ?
       finalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
