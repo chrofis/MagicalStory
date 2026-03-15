@@ -1218,9 +1218,9 @@ app.post('/api/gelato/webhook', express.json(), async (req, res) => {
   }
 });
 
-// Default body limit is 2MB for most routes. Image/story endpoints override with higher limits.
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ limit: '2mb', extended: true }));
+// Global body limit — character data includes base64 photos, so needs to be generous
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Protection against malformed URL attacks (e.g. /%c0 path traversal probes)
 app.use((req, res, next) => {
