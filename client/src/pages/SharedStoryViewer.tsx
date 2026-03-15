@@ -337,8 +337,9 @@ export default function SharedStoryViewer() {
         <header className="bg-black text-white px-3 py-3 sticky top-0 z-10">
           <div className="flex items-center justify-between">
             {/* Left: Title */}
-            <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80">
-              ✨ {t.title}
+            <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
+              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+              {t.title}
             </button>
 
             {/* Right: Story actions + Menu */}

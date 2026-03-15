@@ -461,8 +461,9 @@ export default function TrialGenerationPage() {
       {/* Navigation bar matching the trial wizard */}
       <nav className="bg-black text-white px-3 py-3">
         <div className="flex justify-between items-center">
-          <span className="text-sm md:text-base font-bold whitespace-nowrap">
-            ✨ {t.brand}
+          <span className="text-sm md:text-base font-bold whitespace-nowrap flex items-center gap-1.5">
+            <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+            {t.brand}
           </span>
         </div>
       </nav>
