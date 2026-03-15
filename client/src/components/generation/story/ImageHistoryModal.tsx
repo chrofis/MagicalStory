@@ -81,10 +81,11 @@ export function ImageHistoryModal({
             {versions.map((version, idx) => (
               <div
                 key={idx}
+                onClick={() => !version.isActive && handleSelect(idx)}
                 className={`relative rounded-lg overflow-hidden border-2 transition-all ${
                   version.isActive
                     ? 'border-green-500 ring-2 ring-green-200'
-                    : 'border-gray-200 hover:border-indigo-400 hover:shadow-md'
+                    : 'border-gray-200 hover:border-indigo-400 hover:shadow-md cursor-pointer active:scale-[0.98]'
                 }`}
               >
                 {/* Image */}
@@ -95,7 +96,7 @@ export function ImageHistoryModal({
                 />
 
                 {/* Overlay bar */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-black/0 pt-6 pb-2 px-3">
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-black/0 pt-8 pb-3 px-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <span className="text-white text-sm font-semibold">{versionLabel(idx)}</span>
@@ -115,8 +116,8 @@ export function ImageHistoryModal({
                       </span>
                     ) : (
                       <button
-                        onClick={() => handleSelect(idx)}
-                        className="bg-white/90 hover:bg-white text-gray-800 text-xs font-medium px-3 py-1 rounded transition-colors"
+                        onClick={(e) => { e.stopPropagation(); handleSelect(idx); }}
+                        className="bg-white/90 hover:bg-white text-gray-800 text-sm font-medium px-4 py-2 min-h-[44px] min-w-[44px] rounded transition-colors"
                       >
                         {language === 'de' ? 'Auswählen' : language === 'fr' ? 'Sélectionner' : 'Select'}
                       </button>
@@ -133,7 +134,7 @@ export function ImageHistoryModal({
                 {/* Dev mode: info button */}
                 {developerMode && (
                   <button
-                    onClick={() => setDetailIndex(detailIndex === idx ? null : idx)}
+                    onClick={(e) => { e.stopPropagation(); setDetailIndex(detailIndex === idx ? null : idx); }}
                     className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
                       detailIndex === idx
                         ? 'bg-indigo-600 text-white'
