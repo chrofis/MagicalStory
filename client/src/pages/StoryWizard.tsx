@@ -245,6 +245,7 @@ export default function StoryWizard() {
   const [showFaceSelectionModal, setShowFaceSelectionModal] = useState(false);
   const [detectedFaces, setDetectedFaces] = useState<DetectedFace[]>([]);
   const [pendingPhotoData, setPendingPhotoData] = useState<string | null>(null);
+  const [pendingOriginalPhoto, setPendingOriginalPhoto] = useState<string | null>(null); // Original uncompressed photo for HQ face crop
   const [pendingClothingToKeep, setPendingClothingToKeep] = useState<Character['clothing'] | null>(null);
 
   // Relationships state (step 2) - loaded from API with characters
@@ -1877,6 +1878,69 @@ export default function StoryWizard() {
     setShowCharacterCreated(false);
   };
 
+  // Crop face from original uncompressed photo using faceBox coordinates (percentages 0-100)
+  // This avoids compression artifacts on faces by cropping from the full-resolution source
+  const cropFaceFromOriginal = (originalDataUrl: string, faceBox: { x: number; y: number; width: number; height: number }, outputSize: number = 768): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const { naturalWidth: w, naturalHeight: h } = img;
+
+        // Convert percentage coordinates to pixels
+        const fx = (faceBox.x / 100) * w;
+        const fy = (faceBox.y / 100) * h;
+        const fw = (faceBox.width / 100) * w;
+        const fh = (faceBox.height / 100) * h;
+
+        // Asymmetric padding: 50% top (hair), 15% bottom (chin), 25% sides — matches Python
+        const padTop = fh * 0.50;
+        const padBottom = fh * 0.15;
+        const padLeft = fw * 0.25;
+        const padRight = fw * 0.25;
+
+        let cropX = Math.max(0, Math.round(fx - padLeft));
+        let cropY = Math.max(0, Math.round(fy - padTop));
+        let cropW = Math.round(fw + padLeft + padRight);
+        let cropH = Math.round(fh + padTop + padBottom);
+
+        // Clamp to image bounds
+        if (cropX + cropW > w) cropW = w - cropX;
+        if (cropY + cropH > h) cropH = h - cropY;
+
+        // Make it square (take the larger dimension, center the smaller)
+        const side = Math.max(cropW, cropH);
+        if (cropW < side) {
+          const diff = side - cropW;
+          cropX = Math.max(0, cropX - Math.round(diff / 2));
+          cropW = side;
+          if (cropX + cropW > w) cropX = w - cropW;
+        }
+        if (cropH < side) {
+          const diff = side - cropH;
+          cropY = Math.max(0, cropY - Math.round(diff / 2));
+          cropH = side;
+          if (cropY + cropH > h) cropY = h - cropH;
+        }
+
+        // Ensure positive dimensions
+        cropW = Math.max(1, Math.min(cropW, w - cropX));
+        cropH = Math.max(1, Math.min(cropH, h - cropY));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = outputSize;
+        canvas.height = outputSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No canvas context')); return; }
+
+        // Draw cropped region scaled to output size
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outputSize, outputSize);
+        resolve(canvas.toDataURL('image/jpeg', 0.95)); // 95% quality — matches Python face output
+      };
+      img.onerror = () => reject(new Error('Failed to load image for face crop'));
+      img.src = originalDataUrl;
+    });
+  };
+
   // Resize image to reduce upload size (max 1500px on longest side)
   const resizeImage = (dataUrl: string, maxSize: number = 1500): Promise<string> => {
     return new Promise((resolve) => {
@@ -1978,6 +2042,7 @@ export default function StoryWizard() {
           if (analysis.multipleFacesDetected && analysis.faces && analysis.faces.length > 1) {
             log.info(`Multiple faces detected (${analysis.faces.length}), showing selection modal`);
             setPendingPhotoData(resizedPhoto);
+            setPendingOriginalPhoto(originalPhotoUrl);
             setPendingClothingToKeep(clothingToKeep ? { structured: clothingToKeep } : null);
             setDetectedFaces(analysis.faces);
             setShowFaceSelectionModal(true);
@@ -2007,10 +2072,23 @@ export default function StoryWizard() {
           // Photo analysis now only returns face/body crops
           // Physical traits and clothing are extracted during avatar evaluation
 
+          // Re-crop face from original uncompressed photo for maximum quality
+          let highQualityFace = analysis.photos?.face;
+          if (analysis.photos?.faceBox && originalPhotoUrl) {
+            try {
+              highQualityFace = await cropFaceFromOriginal(originalPhotoUrl, analysis.photos.faceBox);
+              const hqSize = Math.round(highQualityFace.length / 1024);
+              const pySize = analysis.photos?.face ? Math.round(analysis.photos.face.length / 1024) : 0;
+              log.info(`📸 [HQ FACE] Cropped from original: ${hqSize}KB (was ${pySize}KB from Python)`);
+            } catch (err) {
+              log.warn('📸 [HQ FACE] Failed to crop from original, using Python crop:', err);
+            }
+          }
+
           // Build the updated photos object ONCE so we can use it for both state and avatar generation
           const updatedPhotos = {
-            original: analysis.photos?.face || originalPhotoUrl,
-            face: analysis.photos?.face,
+            original: highQualityFace || originalPhotoUrl,
+            face: highQualityFace,
             body: analysis.photos?.body || originalPhotoUrl,
             bodyNoBg: analysis.photos?.bodyNoBg,
             faceBox: analysis.photos?.faceBox,
@@ -2261,10 +2339,23 @@ export default function StoryWizard() {
         // Handle clothing based on user's choice
         const clothingToKeep = pendingClothingToKeep?.structured;
 
+        // Re-crop face from original uncompressed photo for maximum quality
+        let highQualityFace = analysis.photos?.face;
+        if (analysis.photos?.faceBox && pendingOriginalPhoto) {
+          try {
+            highQualityFace = await cropFaceFromOriginal(pendingOriginalPhoto, analysis.photos.faceBox);
+            const hqSize = Math.round(highQualityFace.length / 1024);
+            const pySize = analysis.photos?.face ? Math.round(analysis.photos.face.length / 1024) : 0;
+            log.info(`📸 [HQ FACE] Cropped from original (face select): ${hqSize}KB (was ${pySize}KB from Python)`);
+          } catch (err) {
+            log.warn('📸 [HQ FACE] Failed to crop from original, using Python crop:', err);
+          }
+        }
+
         // Build the updated photos object ONCE so we can use it for both state and avatar generation
         const updatedPhotos = {
-          original: analysis.photos?.face || pendingPhotoData,
-          face: analysis.photos?.face,
+          original: highQualityFace || pendingPhotoData,
+          face: highQualityFace,
           body: analysis.photos?.body || pendingPhotoData,
           bodyNoBg: analysis.photos?.bodyNoBg,
           faceBox: analysis.photos?.faceBox,
@@ -2434,6 +2525,7 @@ export default function StoryWizard() {
       setIsAnalyzingPhoto(false);
       // Clear pending data
       setPendingPhotoData(null);
+      setPendingOriginalPhoto(null);
       setPendingClothingToKeep(null);
       setDetectedFaces([]);
     }
@@ -2443,6 +2535,7 @@ export default function StoryWizard() {
   const handleFaceSelectionUploadNew = () => {
     setShowFaceSelectionModal(false);
     setPendingPhotoData(null);
+    setPendingOriginalPhoto(null);
     setPendingClothingToKeep(null);
     setDetectedFaces([]);
     // Stay on photo step so user can upload a new photo
