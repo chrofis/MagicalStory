@@ -13,7 +13,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, GROK_MODELS } = require('./grok');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, GROK_MODELS } = require('./grok');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
@@ -2201,39 +2201,15 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend`);
 
     try {
-      // Collect reference images as data URIs (max 3 for Grok)
-      const refImages = [];
+      const refImages = await packReferences({
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+      });
 
-      // Add visual bible grid as first reference if available
-      if (visualBibleGrid) {
-        const gridDataUri = `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`;
-        refImages.push(gridDataUri);
-        log.debug(`🎨 [GROK] Added visual bible grid as reference`);
-      }
-
-      // Add character photos
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          if (refImages.length >= 3) break; // Grok max 3 images
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            refImages.push(photoUrl);
-          }
-        }
-      }
-
-      // Use edit endpoint if we have reference images, otherwise generation
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, {
-          model: GROK_MODELS.STANDARD,
-          aspectRatio: '1:1',
-        });
+        result = await editWithGrok(prompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
       } else {
-        result = await generateWithGrok(prompt, {
-          model: GROK_MODELS.STANDARD,
-          aspectRatio: '1:1',
-        });
+        result = await generateWithGrok(prompt, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
       }
 
       // Call onImageReady callback for progressive display
@@ -2553,20 +2529,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      const refImages = [];
-
-      if (visualBibleGrid) {
-        refImages.push(`data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`);
-      }
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          if (refImages.length >= 3) break;
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            refImages.push(photoUrl);
-          }
-        }
-      }
+      const refImages = await packReferences({
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+      });
 
       let result;
       if (refImages.length > 0) {
@@ -2884,33 +2849,15 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend`);
 
     try {
-      const refImages = [];
-
-      if (visualBibleGrid) {
-        refImages.push(`data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`);
-      }
-
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          if (refImages.length >= 3) break;
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            refImages.push(photoUrl);
-          }
-        }
-      }
+      const refImages = await packReferences({
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+      });
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, {
-          model: GROK_MODELS.STANDARD,
-          aspectRatio: '1:1',
-        });
+        result = await editWithGrok(prompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
       } else {
-        result = await generateWithGrok(prompt, {
-          model: GROK_MODELS.STANDARD,
-          aspectRatio: '1:1',
-        });
+        result = await generateWithGrok(prompt, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
       }
 
       if (onImageReady && result.imageData) {
@@ -3119,20 +3066,9 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      const refImages = [];
-
-      if (visualBibleGrid) {
-        refImages.push(`data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`);
-      }
-      if (characterPhotos && characterPhotos.length > 0) {
-        for (const photoData of characterPhotos) {
-          if (refImages.length >= 3) break;
-          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-          if (photoUrl && photoUrl.startsWith('data:image')) {
-            refImages.push(photoUrl);
-          }
-        }
-      }
+      const refImages = await packReferences({
+        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+      });
 
       let result;
       if (refImages.length > 0) {
