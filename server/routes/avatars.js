@@ -3380,6 +3380,27 @@ These corrections OVERRIDE what is visible in the reference photo.
           }
         }
 
+        // Use Grok Imagine for grok models
+        const useGrok = modelConfig?.backend === 'grok' || selectedModel.startsWith('grok-imagine');
+        if (useGrok) {
+          const { generateWithGrok, editWithGrok, isGrokConfigured, GROK_MODELS } = require('../lib/grok');
+          if (isGrokConfigured()) {
+            try {
+              const grokModel = selectedModel === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+              // Use face photo as reference image
+              const refImages = [facePhoto];
+              const result = await editWithGrok(avatarPrompt, refImages, { model: grokModel, aspectRatio: '9:16' });
+              if (result.imageData) {
+                log.debug(`✅ [CLOTHING AVATARS] ${category} avatar generated via Grok Imagine`);
+                return { category, prompt: avatarPrompt, imageData: result.imageData, usage: result.usage };
+              }
+            } catch (grokError) {
+              log.error(`❌ [CLOTHING AVATARS] Grok generation failed for ${category}: ${grokError.message}`);
+              // Fall through to Gemini
+            }
+          }
+        }
+
         // Use Gemini for Gemini models
         const requestBody = {
           systemInstruction: {

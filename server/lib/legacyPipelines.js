@@ -486,8 +486,9 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    // Runware uses direct cost instead of tokens
+    // Runware and Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
+    grok: { direct_cost: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
       outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
@@ -530,10 +531,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
-      // Handle Runware (direct cost) vs token-based providers
-      if (provider === 'runware') {
-        tokenUsage.runware.direct_cost += usage.direct_cost || 0;
-        tokenUsage.runware.calls += 1;
+      // Handle direct-cost providers (Runware, Grok) vs token-based providers
+      if (provider === 'runware' || provider === 'grok') {
+        tokenUsage[provider].direct_cost += usage.direct_cost || usage.cost || 0;
+        tokenUsage[provider].calls += 1;
       } else {
         tokenUsage[provider].input_tokens += usage.input_tokens || 0;
         tokenUsage[provider].output_tokens += usage.output_tokens || 0;
@@ -752,9 +753,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
         // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
         const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
           if (imgUsage) {
-            // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+            // Detect provider from model name
             const isRunware = imgModel && imgModel.startsWith('runware:');
-            const provider = isRunware ? 'runware' : 'gemini_image';
+            const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
             const funcName = isInpaint ? 'inpaint' : 'page_images';
             addUsage(provider, imgUsage, funcName, imgModel);
           }
@@ -1436,9 +1438,10 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
           // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
           const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
             if (imgUsage) {
-              // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+              // Detect provider from model name
               const isRunware = imgModel && imgModel.startsWith('runware:');
-              const provider = isRunware ? 'runware' : 'gemini_image';
+              const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+              const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
               const funcName = isInpaint ? 'inpaint' : 'page_images';
               addUsage(provider, imgUsage, funcName, imgModel);
             }
@@ -2209,7 +2212,8 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
       totalCost: totalCost,
       totalInputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].input_tokens || 0), 0),
       totalOutputTokens: Object.keys(tokenUsage).filter(k => k !== 'byFunction').reduce((sum, k) => sum + (tokenUsage[k].output_tokens || 0), 0),
-      runwareCost: tokenUsage.runware?.direct_cost || 0
+      runwareCost: tokenUsage.runware?.direct_cost || 0,
+      grokCost: tokenUsage.grok?.direct_cost || 0
     });
 
     // Finalize and populate generationLog for storage
@@ -2412,6 +2416,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     runware: { direct_cost: 0, calls: 0 },
+    grok: { direct_cost: 0, calls: 0 },
     byFunction: {
       outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
       scene_descriptions: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
@@ -2444,9 +2449,9 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
 
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
-      if (provider === 'runware') {
-        tokenUsage.runware.direct_cost += usage.direct_cost || 0;
-        tokenUsage.runware.calls += 1;
+      if (provider === 'runware' || provider === 'grok') {
+        tokenUsage[provider].direct_cost += usage.direct_cost || usage.cost || 0;
+        tokenUsage[provider].calls += 1;
       } else {
         tokenUsage[provider].input_tokens += usage.input_tokens || 0;
         tokenUsage[provider].output_tokens += usage.output_tokens || 0;
@@ -4183,7 +4188,8 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
       totalCost: totalCost,
       totalInputTokens,
       totalOutputTokens,
-      runwareCost: tokenUsage.runware?.direct_cost || 0
+      runwareCost: tokenUsage.runware?.direct_cost || 0,
+      grokCost: tokenUsage.grok?.direct_cost || 0
     });
     genLog.finalize();
 

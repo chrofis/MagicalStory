@@ -123,6 +123,11 @@ export const AVATAR_MODELS = {
     description: 'ACE++ (Runware) - Cheap face-consistent avatars (~$0.005)',
     descriptionDe: 'ACE++ (Runware) - Günstige gesichtskonsistente Avatare (~$0.005)',
     descriptionFr: 'ACE++ (Runware) - Avatars économiques avec visage cohérent (~$0.005)'
+  },
+  'grok-imagine': {
+    description: 'Grok Imagine (xAI) - Avatar generation with ref images ($0.02)',
+    descriptionDe: 'Grok Imagine (xAI) - Avatar-Generierung mit Ref-Bildern ($0.02)',
+    descriptionFr: 'Grok Imagine (xAI) - Génération d\'avatars avec images ref ($0.02)'
   }
 } as const;
 

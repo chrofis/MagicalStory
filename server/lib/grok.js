@@ -150,6 +150,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
     model,
     prompt,
     response_format: 'b64_json',
+    aspect_ratio: aspectRatio,
   };
 
   // Single vs multiple image format

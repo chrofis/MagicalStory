@@ -359,6 +359,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
       runware: { direct_cost: 0, calls: 0 },
+      grok: { direct_cost: 0, calls: 0 },
       // Per-model tracking for avatars
       avatarByModel: avatarByModel,
       // Per-model tracking for story images (page_images, cover_images)
@@ -383,9 +384,9 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
           // Add to totals
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              if (provider === 'runware') {
-                totals.runware.direct_cost += tokenUsage[provider].direct_cost || 0;
-                totals.runware.calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware' || provider === 'grok') {
+                totals[provider].direct_cost += tokenUsage[provider].direct_cost || 0;
+                totals[provider].calls += tokenUsage[provider].calls || 0;
               } else {
                 totals[provider].input_tokens += tokenUsage[provider].input_tokens || 0;
                 totals[provider].output_tokens += tokenUsage[provider].output_tokens || 0;
@@ -433,16 +434,17 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               avatarByModel: {},  // Per-model avatar usage
-              runware: { direct_cost: 0, calls: 0 }
+              runware: { direct_cost: 0, calls: 0 },
+              grok: { direct_cost: 0, calls: 0 }
             };
           }
           byUser[userKey].storyCount++;
           byUser[userKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              if (provider === 'runware') {
-                byUser[userKey].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
-                byUser[userKey].runware.calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware' || provider === 'grok') {
+                byUser[userKey][provider].direct_cost += tokenUsage[provider].direct_cost || 0;
+                byUser[userKey][provider].calls += tokenUsage[provider].calls || 0;
               } else {
                 byUser[userKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
                 byUser[userKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
@@ -462,16 +464,17 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-              runware: { direct_cost: 0, calls: 0 }
+              runware: { direct_cost: 0, calls: 0 },
+              grok: { direct_cost: 0, calls: 0 }
             };
           }
           byStoryType[storyType].storyCount++;
           byStoryType[storyType].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              if (provider === 'runware') {
-                byStoryType[storyType].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
-                byStoryType[storyType].runware.calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware' || provider === 'grok') {
+                byStoryType[storyType][provider].direct_cost += tokenUsage[provider].direct_cost || 0;
+                byStoryType[storyType][provider].calls += tokenUsage[provider].calls || 0;
               } else {
                 byStoryType[storyType][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
                 byStoryType[storyType][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
@@ -491,16 +494,17 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-              runware: { direct_cost: 0, calls: 0 }
+              runware: { direct_cost: 0, calls: 0 },
+              grok: { direct_cost: 0, calls: 0 }
             };
           }
           byMonth[monthKey].storyCount++;
           byMonth[monthKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              if (provider === 'runware') {
-                byMonth[monthKey].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
-                byMonth[monthKey].runware.calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware' || provider === 'grok') {
+                byMonth[monthKey][provider].direct_cost += tokenUsage[provider].direct_cost || 0;
+                byMonth[monthKey][provider].calls += tokenUsage[provider].calls || 0;
               } else {
                 byMonth[monthKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
                 byMonth[monthKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
@@ -520,16 +524,17 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
               gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
               gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-              runware: { direct_cost: 0, calls: 0 }
+              runware: { direct_cost: 0, calls: 0 },
+              grok: { direct_cost: 0, calls: 0 }
             };
           }
           byDay[dayKey].storyCount++;
           byDay[dayKey].totalBookPages += bookPages;
           for (const provider of Object.keys(totals)) {
             if (tokenUsage[provider]) {
-              if (provider === 'runware') {
-                byDay[dayKey].runware.direct_cost += tokenUsage[provider].direct_cost || 0;
-                byDay[dayKey].runware.calls += tokenUsage[provider].calls || 0;
+              if (provider === 'runware' || provider === 'grok') {
+                byDay[dayKey][provider].direct_cost += tokenUsage[provider].direct_cost || 0;
+                byDay[dayKey][provider].calls += tokenUsage[provider].calls || 0;
               } else {
                 byDay[dayKey][provider].input_tokens += tokenUsage[provider].input_tokens || 0;
                 byDay[dayKey][provider].output_tokens += tokenUsage[provider].output_tokens || 0;
@@ -631,6 +636,9 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
       runware: {
         total: totals.runware.direct_cost // Runware charges directly, no token calculation
       },
+      grok: {
+        total: totals.grok.direct_cost // Grok charges directly per image
+      },
       // Per-model avatar costs
       avatarByModel: {}
     };
@@ -675,7 +683,7 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
     costs.gemini_image.total = costs.gemini_image.imageEstimate || (costs.gemini_image.input + costs.gemini_image.output + costs.gemini_image.thinking);
     costs.gemini_quality.total = costs.gemini_quality.input + costs.gemini_quality.output + costs.gemini_quality.thinking;
     costs.totalAvatarCost = totalAvatarCost;
-    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total + totalAvatarCost + costs.runware.total;
+    costs.grandTotal = costs.anthropic.total + costs.gemini_text.total + costs.gemini_image.total + costs.gemini_quality.total + totalAvatarCost + costs.runware.total + costs.grok.total;
 
     const totalBookPages = Object.values(byUser).reduce((sum, u) => sum + u.totalBookPages, 0);
 
@@ -696,7 +704,8 @@ router.get('/token-usage', authenticateToken, requireAdmin, async (req, res) => 
                                ((entry.gemini_quality?.output_tokens || 0) / 1000000) * 0.40 +
                                ((entry.gemini_quality?.thinking_tokens || 0) / 1000000) * 0.40;
       const runwareCost = entry.runware?.direct_cost || 0;
-      return anthropicCost + geminiTextCost + geminiImageCost + geminiQualityCost + runwareCost;
+      const grokCost = entry.grok?.direct_cost || 0;
+      return anthropicCost + geminiTextCost + geminiImageCost + geminiQualityCost + runwareCost + grokCost;
     };
 
     // Add cost to each day entry
