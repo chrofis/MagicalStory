@@ -2198,7 +2198,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
-    log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend`);
+    const grokModel = evaluationType === 'cover' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+    log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType})`);
 
     try {
       const refImages = await packReferences({
@@ -2207,9 +2208,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
+        result = await editWithGrok(prompt, refImages, { model: grokModel, aspectRatio: '1:1' });
       } else {
-        result = await generateWithGrok(prompt, { model: GROK_MODELS.STANDARD, aspectRatio: '1:1' });
+        result = await generateWithGrok(prompt, { model: grokModel, aspectRatio: '1:1' });
       }
 
       // Call onImageReady callback for progressive display
@@ -2846,7 +2847,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
-    log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend`);
+    // generateImageOnly is only used for page regeneration, so always STANDARD
+    log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend (model: ${GROK_MODELS.STANDARD})`);
 
     try {
       const refImages = await packReferences({
