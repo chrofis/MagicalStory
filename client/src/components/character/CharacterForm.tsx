@@ -675,7 +675,7 @@ export function CharacterForm({
                     draggable={false}
                     src={displayPhoto}
                     alt="Character"
-                    className="w-24 h-24 rounded-full object-cover border-4 border-indigo-400 shadow-lg cursor-pointer hover:opacity-80 transition-opacity"
+                    className="w-24 h-24 rounded-full object-cover object-top border-4 border-indigo-400 shadow-lg cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setLightboxImage(displayPhoto)}
                     title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                   />
@@ -817,7 +817,7 @@ export function CharacterForm({
                     draggable={false}
               src={displayPhoto}
               alt={character.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
+              className="w-16 h-16 rounded-full object-cover object-top border-2 border-indigo-400"
             />
           )}
           <div>
@@ -903,7 +903,7 @@ export function CharacterForm({
                     draggable={false}
               src={displayPhoto}
               alt={character.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
+              className="w-16 h-16 rounded-full object-cover object-top border-2 border-indigo-400"
             />
           )}
           <div>
@@ -970,7 +970,7 @@ export function CharacterForm({
                     draggable={false}
               src={displayPhoto}
               alt={character.name}
-              className="w-16 h-16 rounded-full object-cover border-2 border-indigo-400"
+              className="w-16 h-16 rounded-full object-cover object-top border-2 border-indigo-400"
             />
           )}
           <div>
@@ -1211,7 +1211,7 @@ export function CharacterForm({
                       draggable={false}
                     src={displayPhoto}
                     alt={character.name}
-                    className="w-14 h-14 rounded-full object-cover border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
+                    className="w-14 h-14 rounded-full object-cover object-top border-2 border-indigo-400 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => setLightboxImage(character.avatars?.standard || displayPhoto)}
                     title={language === 'de' ? 'Klicken zum Vergrössern' : 'Click to enlarge'}
                   />

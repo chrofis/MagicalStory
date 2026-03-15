@@ -2199,7 +2199,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
   // Check if we should use Grok Imagine backend
   if (imageBackend === 'grok' && isGrokConfigured()) {
     const grokModel = evaluationType === 'cover' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-    log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType})`);
+    const grokAspect = evaluationType === 'avatar' ? '9:16' : '1:1';
+    log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend (model: ${grokModel}, type: ${evaluationType}, aspect: ${grokAspect})`);
 
     try {
       const refImages = await packReferences({
@@ -2208,9 +2209,9 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
       let result;
       if (refImages.length > 0) {
-        result = await editWithGrok(prompt, refImages, { model: grokModel, aspectRatio: '1:1' });
+        result = await editWithGrok(prompt, refImages, { model: grokModel, aspectRatio: grokAspect });
       } else {
-        result = await generateWithGrok(prompt, { model: grokModel, aspectRatio: '1:1' });
+        result = await generateWithGrok(prompt, { model: grokModel, aspectRatio: grokAspect });
       }
 
       // Call onImageReady callback for progressive display
@@ -2220,6 +2221,21 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         } catch (callbackError) {
           log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
         }
+      }
+
+      // Skip quality evaluation for avatar conversions (just style transfer)
+      if (evaluationType === 'avatar') {
+        log.debug(`⏭️ [QUALITY] Skipping quality evaluation for Grok avatar conversion`);
+        const finalResult = {
+          imageData: result.imageData,
+          modelId: result.modelId,
+          score: null,
+          reasoning: null,
+          imageUsage: result.usage,
+          usage: result.usage
+        };
+        imageCache.set(cacheKey, finalResult);
+        return finalResult;
       }
 
       // Evaluate quality using Gemini

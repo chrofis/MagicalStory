@@ -401,7 +401,7 @@ export function GenerationProgress({
     <div className="flex flex-col items-center gap-1">
       <div className={`w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border-2 ${isReady ? 'border-green-400' : 'border-gray-200'} bg-gray-100 flex items-center justify-center`}>
         {isReady && imageData ? (
-          <img src={imageData} alt={label} className="w-full h-full object-cover" />
+          <img src={imageData} alt={label} className="w-full h-full object-cover object-top" />
         ) : (
           <Loader2 size={20} className="animate-spin text-gray-400" />
         )}

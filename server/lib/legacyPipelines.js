@@ -960,7 +960,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Usage tracker for streaming cover images
         const streamCoverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (imgUsage) {
+            const isRunware = imgModel && imgModel.startsWith('runware:');
+            const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+            addUsage(provider, imgUsage, 'cover_images', imgModel);
+          }
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
@@ -1085,7 +1090,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             characterNames: [char.name]
           }));
         });
-        await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, streamingClothingRequirements, addUsage);
+        await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, streamingClothingRequirements, addUsage, modelOverrides.imageBackend || null);
         log.debug(`✅ [STORYBOOK] Pre-streaming styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
         // Bug #14 fix: Include stack trace for better debugging
@@ -1346,7 +1351,7 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
             streamingClothingRequirements // Pass per-character clothing requirements
           );
           // Convert avatars in parallel (pass clothingRequirements for signature lookup)
-          await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements, streamingClothingRequirements, addUsage);
+          await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements, streamingClothingRequirements, addUsage, modelOverrides.imageBackend || null);
           log.debug(`✅ [STORYBOOK] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.error(`⚠️ [STORYBOOK] Failed to prepare styled avatars, using original photos:`, error.message);
@@ -1653,7 +1658,12 @@ async function processStorybookJob(jobId, inputData, characterPhotos, skipImages
 
         // Usage tracker for cover images
         const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (imgUsage) {
+            const isRunware = imgModel && imgModel.startsWith('runware:');
+            const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+            addUsage(provider, imgUsage, 'cover_images', imgModel);
+          }
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
@@ -2655,7 +2665,7 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
         }
 
         // Convert avatars in parallel (pass clothingRequirements for signature lookup)
-        await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements, clothingRequirements, addUsage);
+        await prepareStyledAvatars(inputData.characters || [], artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.imageBackend || null);
         log.debug(`✅ [PIPELINE] Styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
       } catch (error) {
         log.error(`⚠️ [PIPELINE] Failed to prepare styled avatars, using original photos:`, error.message);
@@ -2811,7 +2821,12 @@ async function processOutlineAndTextJob(jobId, inputData, characterPhotos, skipI
 
       // Usage tracker for cover images
       const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-        if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+        if (imgUsage) {
+          const isRunware = imgModel && imgModel.startsWith('runware:');
+          const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+          const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+          addUsage(provider, imgUsage, 'cover_images', imgModel);
+        }
         if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
       };
 
@@ -3163,9 +3178,10 @@ Output Format:
             // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
             const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
               if (imgUsage) {
-                // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+                // Detect provider from model name
                 const isRunware = imgModel && imgModel.startsWith('runware:');
-                const provider = isRunware ? 'runware' : 'gemini_image';
+                const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
                 const funcName = isInpaint ? 'inpaint' : 'page_images';
                 addUsage(provider, imgUsage, funcName, imgModel);
               }
@@ -3716,9 +3732,10 @@ Now write ONLY page ${missingPageNum}. Use EXACTLY this format:
             // Usage tracker for page images (5th param isInpaint distinguishes inpaint from generation)
             const pageUsageTracker = (imgUsage, qualUsage, imgModel, qualModel, isInpaint = false) => {
               if (imgUsage) {
-                // Detect provider from model name (Runware uses direct_cost, Gemini uses tokens)
+                // Detect provider from model name
                 const isRunware = imgModel && imgModel.startsWith('runware:');
-                const provider = isRunware ? 'runware' : 'gemini_image';
+                const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+                const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
                 const funcName = isInpaint ? 'inpaint' : 'page_images';
                 addUsage(provider, imgUsage, funcName, imgModel);
               }

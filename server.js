@@ -2348,7 +2348,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       log.info(`🎨 [TRIAL] Starting immediate avatar styling (${trialAvatarRequirements.length} variants)...`);
       streamingAvatarStylingPromise = (async () => {
         try {
-          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage);
+          await prepareStyledAvatars(inputData.characters || [], artStyle, trialAvatarRequirements, trialClothingRequirements, addUsage, modelOverrides.imageBackend || null);
           earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
           log.info(`✅ [TRIAL] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
@@ -2871,7 +2871,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
                   characterNames: [char.name]
                 }));
               });
-              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage);
+              await prepareStyledAvatars(inputData.characters || [], artStyle, basicRequirements, requirements, addUsage, modelOverrides.imageBackend || null);
               earlyAvatarStylingSucceeded = getStyledAvatarCacheStats().size > 0;
               log.debug(`✅ [STREAM] Early avatar styling complete: ${getStyledAvatarCacheStats().size} cached`);
             } catch (error) {
@@ -3146,7 +3146,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterNames: [char.name]
             }));
           });
-          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage);
+          await prepareStyledAvatars(inputData.characters || [], artStyle, basicCoverRequirements, clothingRequirements, addUsage, modelOverrides.imageBackend || null);
           log.debug(`✅ [UNIFIED] Pre-cover styled avatars ready: ${getStyledAvatarCacheStats().size} cached`);
         } catch (error) {
           log.warn(`⚠️ [UNIFIED] Pre-cover styled avatar prep failed: ${error.message}`);
@@ -3201,7 +3201,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       }
 
       log.debug(`🎨 [UNIFIED] Preparing ${avatarRequirements.length} styled avatars for ${artStyle} (early styling did not run)`);
-      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage);
+      await prepareStyledAvatars(inputData.characters, artStyle, avatarRequirements, clothingRequirements, addUsage, modelOverrides.imageBackend || null);
     } else if (earlyAvatarStylingSucceeded) {
       log.debug(`⏭️ [UNIFIED] Skipping PHASE 2 avatar styling - early styling already completed (${getStyledAvatarCacheStats().size} cached)`);
     }
