@@ -1151,6 +1151,76 @@ def process_photo(image_data, is_base64=True, selected_face_id=None, cached_face
         }
 
 
+@app.route('/remove-bg', methods=['POST'])
+def remove_bg_endpoint():
+    """
+    Remove background from an already-cropped image using rembg.
+    No face detection, no resizing — just bg removal.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,...",
+        "max_size": 1024  // Optional: max dimension to resize to (default: no resize)
+    }
+
+    Returns:
+    {
+        "success": true,
+        "image": "data:image/png;base64,..."  // PNG with transparent background
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "No image provided"}), 400
+
+        image_data = data['image']
+        max_size = data.get('max_size', None)
+
+        # Decode base64 image
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+        img_bytes = base64.b64decode(image_data)
+        img_array = np.frombuffer(img_bytes, np.uint8)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+
+        if img is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        h, w = img.shape[:2]
+        print(f"[REMOVE-BG] Input: {w}x{h}")
+
+        # Optional resize
+        if max_size and (w > max_size or h > max_size):
+            scale = max_size / max(w, h)
+            img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+            h, w = img.shape[:2]
+            print(f"[REMOVE-BG] Resized to: {w}x{h}")
+
+        # Remove background
+        result_rgba, mask = remove_background(img)
+        if result_rgba is None:
+            return jsonify({"success": False, "error": "Background removal failed"}), 500
+
+        # Encode as PNG (preserves transparency)
+        _, buffer = cv2.imencode('.png', result_rgba, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+        result_base64 = f"data:image/png;base64,{base64.b64encode(buffer).decode('utf-8')}"
+        print(f"[REMOVE-BG] Output: {len(buffer)//1024}KB PNG")
+
+        return jsonify({
+            "success": True,
+            "image": result_base64
+        })
+
+    except Exception as e:
+        print(f"[REMOVE-BG] Error: {e}")
+        traceback.print_exc()
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

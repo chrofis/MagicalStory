@@ -1941,6 +1941,76 @@ export default function StoryWizard() {
     });
   };
 
+  // Crop body from original uncompressed photo using bodyBox coordinates (percentages 0-100)
+  // Then send to server for background removal via Python rembg
+  const cropBodyHQ = async (originalDataUrl: string, bodyBox: { x: number; y: number; width: number; height: number }): Promise<{ body: string; bodyNoBg: string | null }> => {
+    // Step 1: Crop body from original at high quality
+    const bodyCrop = await new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const { naturalWidth: w, naturalHeight: h } = img;
+
+        // Convert percentage coordinates to pixels
+        let cropX = Math.round((bodyBox.x / 100) * w);
+        let cropY = Math.round((bodyBox.y / 100) * h);
+        let cropW = Math.round((bodyBox.width / 100) * w);
+        let cropH = Math.round((bodyBox.height / 100) * h);
+
+        // Clamp to image bounds
+        cropX = Math.max(0, cropX);
+        cropY = Math.max(0, cropY);
+        if (cropX + cropW > w) cropW = w - cropX;
+        if (cropY + cropH > h) cropH = h - cropY;
+        cropW = Math.max(1, cropW);
+        cropH = Math.max(1, cropH);
+
+        // Cap output at 1024px on longest side (enough quality for avatar gen)
+        const maxDim = 1024;
+        let outW = cropW;
+        let outH = cropH;
+        if (outW > maxDim || outH > maxDim) {
+          const scale = maxDim / Math.max(outW, outH);
+          outW = Math.round(outW * scale);
+          outH = Math.round(outH * scale);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = outW;
+        canvas.height = outH;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No canvas context')); return; }
+
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
+        resolve(canvas.toDataURL('image/jpeg', 0.95));
+      };
+      img.onerror = () => reject(new Error('Failed to load image for body crop'));
+      img.src = originalDataUrl;
+    });
+
+    const cropSize = Math.round(bodyCrop.length / 1024);
+    log.info(`📸 [HQ BODY] Cropped from original: ${cropSize}KB`);
+
+    // Step 2: Send to server for bg removal
+    let bodyNoBg: string | null = null;
+    try {
+      const { api } = await import('@/services/api');
+      const response = await api.post<{ success: boolean; image: string; error?: string }>(
+        '/api/photos/remove-bg',
+        { image: bodyCrop }
+      );
+      if (response.success && response.image) {
+        bodyNoBg = response.image;
+        log.info(`📸 [HQ BODY] Background removed: ${Math.round(response.image.length / 1024)}KB`);
+      } else {
+        log.warn(`📸 [HQ BODY] BG removal failed: ${response.error}`);
+      }
+    } catch (err) {
+      log.warn('📸 [HQ BODY] BG removal service unavailable, using body with background:', err);
+    }
+
+    return { body: bodyCrop, bodyNoBg };
+  };
+
   // Resize image to reduce upload size (max 1500px on longest side)
   const resizeImage = (dataUrl: string, maxSize: number = 1500): Promise<string> => {
     return new Promise((resolve) => {
@@ -2085,12 +2155,25 @@ export default function StoryWizard() {
             }
           }
 
+          // Re-crop body from original + bg removal for maximum quality
+          let hqBody = analysis.photos?.body || originalPhotoUrl;
+          let hqBodyNoBg = analysis.photos?.bodyNoBg;
+          if (analysis.photos?.bodyBox && originalPhotoUrl) {
+            try {
+              const bodyResult = await cropBodyHQ(originalPhotoUrl, analysis.photos.bodyBox);
+              hqBody = bodyResult.body;
+              if (bodyResult.bodyNoBg) hqBodyNoBg = bodyResult.bodyNoBg;
+            } catch (err) {
+              log.warn('📸 [HQ BODY] Failed to crop from original, using Python crop:', err);
+            }
+          }
+
           // Build the updated photos object ONCE so we can use it for both state and avatar generation
           const updatedPhotos = {
             original: highQualityFace || originalPhotoUrl,
             face: highQualityFace,
-            body: analysis.photos?.body || originalPhotoUrl,
-            bodyNoBg: analysis.photos?.bodyNoBg,
+            body: hqBody,
+            bodyNoBg: hqBodyNoBg,
             faceBox: analysis.photos?.faceBox,
             bodyBox: analysis.photos?.bodyBox,
           };
@@ -2352,12 +2435,25 @@ export default function StoryWizard() {
           }
         }
 
+        // Re-crop body from original + bg removal for maximum quality
+        let hqBody = analysis.photos?.body || pendingPhotoData;
+        let hqBodyNoBg = analysis.photos?.bodyNoBg;
+        if (analysis.photos?.bodyBox && pendingOriginalPhoto) {
+          try {
+            const bodyResult = await cropBodyHQ(pendingOriginalPhoto, analysis.photos.bodyBox);
+            hqBody = bodyResult.body;
+            if (bodyResult.bodyNoBg) hqBodyNoBg = bodyResult.bodyNoBg;
+          } catch (err) {
+            log.warn('📸 [HQ BODY] Failed to crop from original (face select), using Python crop:', err);
+          }
+        }
+
         // Build the updated photos object ONCE so we can use it for both state and avatar generation
         const updatedPhotos = {
           original: highQualityFace || pendingPhotoData,
           face: highQualityFace,
-          body: analysis.photos?.body || pendingPhotoData,
-          bodyNoBg: analysis.photos?.bodyNoBg,
+          body: hqBody,
+          bodyNoBg: hqBodyNoBg,
           faceBox: analysis.photos?.faceBox,
           bodyBox: analysis.photos?.bodyBox,
         };
