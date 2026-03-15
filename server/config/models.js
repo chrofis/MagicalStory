@@ -132,6 +132,11 @@ const IMAGE_BACKENDS = {
     name: 'Runware FLUX Schnell',
     description: 'FLUX Schnell via Runware - Ultra cheap ($0.0006/image), good for testing',
     costPerImage: 0.0006
+  },
+  'grok': {
+    name: 'Grok Imagine (xAI Aurora)',
+    description: 'xAI Grok Imagine - Good quality, cheap ($0.02/image), supports reference images',
+    costPerImage: 0.02
   }
 };
 
@@ -171,6 +176,18 @@ const IMAGE_MODELS = {
     description: 'ACE++ via Runware - Face-consistent avatar generation (~$0.005/image)',
     backend: 'runware',
     maxPromptLength: 2900
+  },
+  'grok-imagine': {
+    modelId: 'grok-imagine-image',
+    description: 'Grok Imagine Standard - Good quality ($0.02/image), ref image support',
+    backend: 'grok',
+    maxPromptLength: 8000
+  },
+  'grok-imagine-pro': {
+    modelId: 'grok-imagine-image-pro',
+    description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
+    backend: 'grok',
+    maxPromptLength: 8000
   }
 };
 

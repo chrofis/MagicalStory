@@ -13,6 +13,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
+const { generateWithGrok, editWithGrok, isGrokConfigured, GROK_MODELS } = require('./grok');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
@@ -2195,6 +2196,95 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     }
   }
 
+  // Check if we should use Grok Imagine backend
+  if (imageBackend === 'grok' && isGrokConfigured()) {
+    log.info(`🎨 [IMAGE GEN] Using Grok Imagine backend`);
+
+    try {
+      // Collect reference images as data URIs (max 3 for Grok)
+      const refImages = [];
+
+      // Add visual bible grid as first reference if available
+      if (visualBibleGrid) {
+        const gridDataUri = `data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`;
+        refImages.push(gridDataUri);
+        log.debug(`🎨 [GROK] Added visual bible grid as reference`);
+      }
+
+      // Add character photos
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          if (refImages.length >= 3) break; // Grok max 3 images
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            refImages.push(photoUrl);
+          }
+        }
+      }
+
+      // Use edit endpoint if we have reference images, otherwise generation
+      let result;
+      if (refImages.length > 0) {
+        result = await editWithGrok(prompt, refImages, {
+          model: GROK_MODELS.STANDARD,
+          aspectRatio: '1:1',
+        });
+      } else {
+        result = await generateWithGrok(prompt, {
+          model: GROK_MODELS.STANDARD,
+          aspectRatio: '1:1',
+        });
+      }
+
+      // Call onImageReady callback for progressive display
+      if (onImageReady && result.imageData) {
+        try {
+          await onImageReady(result.imageData, result.modelId);
+        } catch (callbackError) {
+          log.error('⚠️ [IMAGE GEN] onImageReady callback error:', callbackError.message);
+        }
+      }
+
+      // Evaluate quality using Gemini
+      const qualityResult = await evaluateImageQuality(
+        result.imageData,
+        prompt,
+        characterPhotos,
+        evaluationType,
+        qualityModelOverride,
+        pageContext,
+        storyText,
+        sceneHint
+      );
+
+      const finalResult = {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        score: qualityResult.score,
+        reasoning: qualityResult.reasoning,
+        detectedProblems: qualityResult.detectedProblems || [],
+        figures: qualityResult.figures || [],
+        matches: qualityResult.matches || [],
+        objectMatches: qualityResult.object_matches || [],
+        fixTargets: qualityResult.fixTargets || [],
+        fixableIssues: qualityResult.fixableIssues || [],
+        semanticResult: qualityResult?.semanticResult || null,
+        semanticScore: qualityResult?.semanticScore ?? null,
+        issuesSummary: qualityResult?.issuesSummary || null,
+        verdict: qualityResult?.verdict || null,
+        usage: result.usage
+      };
+
+      imageCache.set(cacheKey, finalResult);
+      log.debug(`💾 [IMAGE CACHE] Stored (${imageCache.size}/${IMAGE_CACHE_MAX_SIZE})`);
+
+      return finalResult;
+    } catch (grokError) {
+      log.error(`❌ [GROK] Generation failed, falling back to Gemini: ${grokError.message}`);
+      // Fall through to Gemini
+    }
+  }
+
   // Call Gemini API for image generation with optional character reference images
   const apiKey = process.env.GEMINI_API_KEY;
 
@@ -2454,6 +2544,65 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
     } catch (runwareError) {
       log.error('❌ [IMAGE GEN] Runware generation failed:', runwareError.message);
       throw runwareError;
+    }
+  }
+
+  // Route to Grok if model config says so
+  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
+    log.info(`🎨 [IMAGE GEN] Model ${modelId} uses Grok backend - routing to Grok`);
+
+    try {
+      const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+      const refImages = [];
+
+      if (visualBibleGrid) {
+        refImages.push(`data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`);
+      }
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          if (refImages.length >= 3) break;
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            refImages.push(photoUrl);
+          }
+        }
+      }
+
+      let result;
+      if (refImages.length > 0) {
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: '1:1' });
+      } else {
+        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: '1:1' });
+      }
+
+      if (onImageReady && result.imageData) {
+        try { await onImageReady(result.imageData, result.modelId); } catch (e) { /* ignore */ }
+      }
+
+      const qualityResult = await evaluateImageQuality(
+        result.imageData, prompt, characterPhotos, evaluationType,
+        qualityModelOverride, pageContext, storyText, sceneHint
+      );
+
+      return {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        score: qualityResult.score,
+        numericScore: qualityResult.numericScore,
+        reasoning: qualityResult.reasoning,
+        verdict: qualityResult.verdict,
+        fixTargets: qualityResult.fixTargets,
+        fixableIssues: qualityResult.fixableIssues || [],
+        semanticResult: qualityResult?.semanticResult || null,
+        semanticScore: qualityResult?.semanticScore ?? null,
+        issuesSummary: qualityResult?.issuesSummary || null,
+        qualityModelId: qualityResult.qualityModelId,
+        imageUsage: result.usage,
+        qualityUsage: qualityResult.usage
+      };
+    } catch (grokError) {
+      log.error('❌ [IMAGE GEN] Grok generation failed:', grokError.message);
+      throw grokError;
     }
   }
 
@@ -2730,6 +2879,61 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     }
   }
 
+  // Check if we should use Grok Imagine backend
+  if (imageBackend === 'grok' && isGrokConfigured()) {
+    log.info(`🎨 [IMAGE GEN-ONLY] Using Grok Imagine backend`);
+
+    try {
+      const refImages = [];
+
+      if (visualBibleGrid) {
+        refImages.push(`data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`);
+      }
+
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          if (refImages.length >= 3) break;
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            refImages.push(photoUrl);
+          }
+        }
+      }
+
+      let result;
+      if (refImages.length > 0) {
+        result = await editWithGrok(prompt, refImages, {
+          model: GROK_MODELS.STANDARD,
+          aspectRatio: '1:1',
+        });
+      } else {
+        result = await generateWithGrok(prompt, {
+          model: GROK_MODELS.STANDARD,
+          aspectRatio: '1:1',
+        });
+      }
+
+      if (onImageReady && result.imageData) {
+        try {
+          await onImageReady(result.imageData, result.modelId);
+        } catch (callbackError) {
+          log.error('⚠️ [IMAGE GEN-ONLY] onImageReady callback error:', callbackError.message);
+        }
+      }
+
+      const finalResult = {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        usage: result.usage
+      };
+
+      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
+      return finalResult;
+    } catch (grokError) {
+      log.error(`❌ [IMAGE GEN-ONLY] Grok failed, falling back to Gemini: ${grokError.message}`);
+    }
+  }
+
   // Gemini path
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -2906,6 +3110,52 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
     } catch (runwareError) {
       log.error('❌ [IMAGE GEN-ONLY] Runware generation failed:', runwareError.message);
       throw runwareError;
+    }
+  }
+
+  // Route to Grok if model config says so
+  if (modelConfig?.backend === 'grok' && isGrokConfigured()) {
+    log.info(`🎨 [IMAGE GEN-ONLY] Model ${modelId} uses Grok backend`);
+
+    try {
+      const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
+      const refImages = [];
+
+      if (visualBibleGrid) {
+        refImages.push(`data:image/jpeg;base64,${visualBibleGrid.toString('base64')}`);
+      }
+      if (characterPhotos && characterPhotos.length > 0) {
+        for (const photoData of characterPhotos) {
+          if (refImages.length >= 3) break;
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            refImages.push(photoUrl);
+          }
+        }
+      }
+
+      let result;
+      if (refImages.length > 0) {
+        result = await editWithGrok(effectivePrompt, refImages, { model: grokModel, aspectRatio: '1:1' });
+      } else {
+        result = await generateWithGrok(effectivePrompt, { model: grokModel, aspectRatio: '1:1' });
+      }
+
+      if (onImageReady && result.imageData) {
+        try { await onImageReady(result.imageData, result.modelId); } catch (e) { /* ignore */ }
+      }
+
+      const finalResult = {
+        imageData: result.imageData,
+        modelId: result.modelId,
+        usage: result.usage
+      };
+
+      if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);
+      return finalResult;
+    } catch (grokError) {
+      log.error('❌ [IMAGE GEN-ONLY] Grok generation failed:', grokError.message);
+      throw grokError;
     }
   }
 

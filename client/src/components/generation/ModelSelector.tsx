@@ -84,6 +84,11 @@ export const IMAGE_BACKENDS = {
     description: 'FLUX Schnell - Ultra cheap for testing ($0.0006/image)',
     descriptionDe: 'FLUX Schnell - Ultra günstig zum Testen ($0.0006/Bild)',
     descriptionFr: 'FLUX Schnell - Ultra économique pour tests ($0.0006/image)'
+  },
+  'grok': {
+    description: 'Grok Imagine (xAI) - Good quality, ref images ($0.02/image)',
+    descriptionDe: 'Grok Imagine (xAI) - Gute Qualität, Ref-Bilder ($0.02/Bild)',
+    descriptionFr: 'Grok Imagine (xAI) - Bonne qualité, images ref ($0.02/image)'
   }
 } as const;
 
