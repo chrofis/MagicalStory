@@ -790,26 +790,21 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
         artStyle: story.visualBible.artStyle,
         createdAt: story.visualBible.createdAt,
         updatedAt: story.visualBible.updatedAt,
-        locations: (story.visualBible.locations || []).map(loc => ({
-          id: loc.id,
-          name: loc.name,
-          description: loc.description,
-          extractedDescription: loc.extractedDescription,
-          attributes: loc.attributes,
-          source: loc.source,
-          isRealLandmark: loc.isRealLandmark,
-          appearsInPages: loc.appearsInPages,
-          hasReferenceImage: !!loc.referenceImageData
+        mainCharacters: (story.visualBible.mainCharacters || []).map(char => ({
+          id: char.id,
+          name: char.name,
+          physical: char.physical,
+          generatedOutfits: char.generatedOutfits,
         })),
-        objects: (story.visualBible.objects || []).map(obj => ({
-          id: obj.id,
-          name: obj.name,
-          description: obj.description,
-          extractedDescription: obj.extractedDescription,
-          attributes: obj.attributes,
-          source: obj.source,
-          appearsInPages: obj.appearsInPages,
-          hasReferenceImage: !!obj.referenceImageData
+        secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
+          id: char.id,
+          name: char.name,
+          description: char.description,
+          extractedDescription: char.extractedDescription,
+          attributes: char.attributes,
+          source: char.source,
+          appearsInPages: char.appearsInPages,
+          hasReferenceImage: !!char.referenceImageData
         })),
         animals: (story.visualBible.animals || []).map(animal => ({
           id: animal.id,
@@ -831,16 +826,47 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           appearsInPages: artifact.appearsInPages,
           hasReferenceImage: !!artifact.referenceImageData
         })),
-        secondaryCharacters: (story.visualBible.secondaryCharacters || []).map(char => ({
-          id: char.id,
-          name: char.name,
-          description: char.description,
-          extractedDescription: char.extractedDescription,
-          attributes: char.attributes,
-          source: char.source,
-          appearsInPages: char.appearsInPages,
-          hasReferenceImage: !!char.referenceImageData
-        }))
+        locations: (story.visualBible.locations || []).map(loc => ({
+          id: loc.id,
+          name: loc.name,
+          description: loc.description,
+          extractedDescription: loc.extractedDescription,
+          attributes: loc.attributes,
+          source: loc.source,
+          isRealLandmark: loc.isRealLandmark,
+          appearsInPages: loc.appearsInPages,
+          hasReferenceImage: !!loc.referenceImageData
+        })),
+        vehicles: (story.visualBible.vehicles || []).map(v => ({
+          id: v.id,
+          name: v.name,
+          description: v.description,
+          extractedDescription: v.extractedDescription,
+          attributes: v.attributes,
+          source: v.source,
+          appearsInPages: v.appearsInPages,
+          hasReferenceImage: !!v.referenceImageData
+        })),
+        clothing: (story.visualBible.clothing || []).map(c => ({
+          id: c.id,
+          name: c.name,
+          description: c.description,
+          extractedDescription: c.extractedDescription,
+          attributes: c.attributes,
+          source: c.source,
+          appearsInPages: c.appearsInPages,
+        })),
+        objects: (story.visualBible.objects || []).map(obj => ({
+          id: obj.id,
+          name: obj.name,
+          description: obj.description,
+          extractedDescription: obj.extractedDescription,
+          attributes: obj.attributes,
+          source: obj.source,
+          appearsInPages: obj.appearsInPages,
+          hasReferenceImage: !!obj.referenceImageData
+        })),
+        changeLog: story.visualBible.changeLog || [],
       } : null,
       // Generation log (avatar lookups, stage transitions, etc.)
       generationLog: story.generationLog || [],

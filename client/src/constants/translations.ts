@@ -181,7 +181,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
   en: {
     title: 'Magical Story',
     subtitle: 'Personalize your story to create magic',
-    heroTitle: 'A book where your child is the main character',
+    heroTitle: 'Your child as the hero of their own story',
     heroSubtitle: '',
     heroDescription: 'Upload a photo, choose an adventure, and get a beautifully illustrated story featuring your child.',
     bookText: 'Also available as a printed book. A personal gift they will want to read again and again.',
@@ -359,7 +359,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
   de: {
     title: 'Magical Story',
     subtitle: 'Personalisiere deine Geschichte für Magie',
-    heroTitle: 'Ein Buch, in dem dein Kind die Hauptrolle spielt',
+    heroTitle: 'Dein Kind als Held seiner eigenen Geschichte',
     heroSubtitle: '',
     heroDescription: 'Lade ein Foto hoch, wähle ein Abenteuer und erhalte eine illustrierte Geschichte mit deinem Kind.',
     bookText: 'Auch als gedrucktes Buch bestellbar. Ein persönliches Geschenk, das immer wieder gelesen wird.',
@@ -537,7 +537,7 @@ export const translations: Record<'en' | 'de' | 'fr', TranslationStrings> = {
   fr: {
     title: 'Magical Story',
     subtitle: 'Personnalisez votre histoire pour créer la magie',
-    heroTitle: 'Un livre où votre enfant est le personnage principal',
+    heroTitle: 'Votre enfant, héros de sa propre histoire',
     heroSubtitle: '',
     heroDescription: 'Téléchargez une photo, choisissez une aventure et recevez une histoire illustrée avec votre enfant.',
     bookText: 'Aussi disponible en livre imprimé. Un cadeau personnalisé à relire encore et encore.',

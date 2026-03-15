@@ -88,8 +88,9 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
       <div className="flex justify-between items-center">
         {/* Left: Title */}
         <div className="flex-shrink-0">
-          <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80">
-            ✨ {t.title}
+          <button onClick={() => navigate('/')} className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
+            <img src="/images/logo-book.png" alt="" className="h-6 md:h-7 w-auto" />
+            {t.title}
           </button>
         </div>
 
