@@ -56,6 +56,16 @@ export const IMAGE_MODELS = {
     description: 'FLUX Dev (Runware) - Better quality ($0.004/image)',
     descriptionDe: 'FLUX Dev (Runware) - Bessere Qualität ($0.004/Bild)',
     descriptionFr: 'FLUX Dev (Runware) - Meilleure qualité ($0.004/image)'
+  },
+  'grok-imagine': {
+    description: 'Grok Imagine (xAI) - Good quality, ref images ($0.02/image)',
+    descriptionDe: 'Grok Imagine (xAI) - Gute Qualität, Ref-Bilder ($0.02/Bild)',
+    descriptionFr: 'Grok Imagine (xAI) - Bonne qualité, images ref ($0.02/image)'
+  },
+  'grok-imagine-pro': {
+    description: 'Grok Imagine Pro (xAI) - Higher quality ($0.07/image)',
+    descriptionDe: 'Grok Imagine Pro (xAI) - Höhere Qualität ($0.07/Bild)',
+    descriptionFr: 'Grok Imagine Pro (xAI) - Qualité supérieure ($0.07/image)'
   }
 } as const;
 
