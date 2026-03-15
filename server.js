@@ -1295,7 +1295,7 @@ app.use('/api/photos', photosRoutes);
 app.use('/api', express.json({ limit: '50mb' }), avatarsRoutes);  // /api/analyze-photo, /api/avatar-prompt, /api/generate-clothing-avatars
 app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
-app.use('/api/jobs', jobRoutes);  // Job creation, status, cancellation, checkpoints
+app.use('/api/jobs', express.json({ limit: '50mb' }), jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', express.json({ limit: '50mb' }), storyIdeasRoutes);  // Story idea generation
 app.use('/api/trial', express.json({ limit: '50mb' }), trialRoutes);  // Anonymous trial story flow
 app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
