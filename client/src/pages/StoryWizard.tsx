@@ -3685,6 +3685,7 @@ export default function StoryWizard() {
           imageModel: modelSelections.imageModel,
           coverImageModel: modelSelections.coverImageModel,
           qualityModel: modelSelections.qualityModel,
+          imageBackend: modelSelections.imageBackend,
         } : undefined,
         // User location for landmark discovery
         userLocation: userLocation || undefined,

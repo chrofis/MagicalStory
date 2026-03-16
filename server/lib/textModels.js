@@ -664,6 +664,7 @@ async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options 
           model: modelId,
           max_tokens: maxTokens,
           stream: true,
+          stream_options: { include_usage: true },
           messages
         }),
         signal: controller.signal

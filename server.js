@@ -4531,6 +4531,7 @@ async function _processStoryJobImpl(jobId) {
       imageModel: MODEL_DEFAULTS.pageImage,
       coverImageModel: MODEL_DEFAULTS.coverImage,
       qualityModel: MODEL_DEFAULTS.qualityEval,
+      imageBackend: MODEL_DEFAULTS.imageBackend,
       ...filteredUserOverrides  // Only non-null user overrides
     };
     // Trial mode: use Haiku for faster, cheaper story generation
