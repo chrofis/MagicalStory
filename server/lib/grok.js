@@ -233,13 +233,26 @@ async function packReferences(refs = {}) {
     previousImage = null,
   } = refs;
 
-  // Extract character photo buffers
+  // Extract character photo buffers (handle same formats as Gemini path)
   const charBuffers = [];
   for (const photoData of characterPhotos) {
-    const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
-    if (photoUrl && photoUrl.startsWith('data:image')) {
+    let photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+    const charName = typeof photoData === 'object' ? photoData?.name : null;
+    // Handle nested object formats: {data: "..."}, {imageData: "..."}, or arrays
+    if (photoUrl && typeof photoUrl === 'object') {
+      if (Array.isArray(photoUrl)) {
+        photoUrl = photoUrl[0];
+      } else if (photoUrl.data) {
+        photoUrl = photoUrl.data;
+      } else if (photoUrl.imageData) {
+        photoUrl = photoUrl.imageData;
+      }
+    }
+    if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
       const base64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
       charBuffers.push(Buffer.from(base64, 'base64'));
+    } else if (charName) {
+      log.warn(`⚠️ [GROK] Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);
     }
   }
 
