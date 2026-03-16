@@ -199,13 +199,13 @@ const IMAGE_MODELS = {
     modelId: 'grok-imagine-image',
     description: 'Grok Imagine Standard - Good quality ($0.02/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 8000
+    maxPromptLength: 7500
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
     description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 8000
+    maxPromptLength: 7500
   }
 };
 
