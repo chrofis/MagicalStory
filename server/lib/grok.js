@@ -277,8 +277,32 @@ async function packReferences(refs = {}) {
     log.info(`🎨 [GROK] Slot 3: Previous scene image`);
   }
 
-  log.info(`🎨 [GROK] Packed ${slots.length}/3 reference slots`);
-  return slots;
+  // Grok edit with single image: output matches input aspect ratio (ignores aspect_ratio param).
+  // Pad all reference images to square so output is always 1:1.
+  const squareSlots = [];
+  for (const slot of slots) {
+    try {
+      const base64 = slot.replace(/^data:image\/\w+;base64,/, '');
+      const buf = Buffer.from(base64, 'base64');
+      const meta = await sharp(buf).metadata();
+      if (meta.width !== meta.height) {
+        const size = Math.max(meta.width, meta.height);
+        const padded = await sharp(buf)
+          .resize(size, size, { fit: 'contain', background: { r: 255, g: 255, b: 255, alpha: 1 } })
+          .jpeg({ quality: 90 })
+          .toBuffer();
+        squareSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
+        log.debug(`🎨 [GROK] Padded ref image ${meta.width}x${meta.height} → ${size}x${size}`);
+      } else {
+        squareSlots.push(slot);
+      }
+    } catch {
+      squareSlots.push(slot); // fallback: use as-is
+    }
+  }
+
+  log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots`);
+  return squareSlots;
 }
 
 /**
