@@ -145,6 +145,7 @@ const {
 } = require('./server/lib/textModels');
 const {
   MODEL_PRICING,
+  IMAGE_MODELS,
   REPAIR_DEFAULTS,
   calculateTextCost,
   calculateImageCost,
@@ -3547,8 +3548,11 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         if (elementReferences.length > 0 || secondaryLandmarks.length > 0) {
           vbGrid = await buildVisualBibleGrid(elementReferences, secondaryLandmarks);
         }
+        // Skip Visual Bible text when using Grok (8000 char limit; VB grid sent as reference image)
+        const imageModelConfig = IMAGE_MODELS[modelOverrides.imageModel];
+        const isGrokImage = imageModelConfig?.backend === 'grok';
         const imagePrompt = buildImagePrompt(
-          scene.sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, true, pagePhotos
+          scene.sceneDescription, inputData, sceneCharacters, false, visualBible, pageNum, true, pagePhotos, { skipVisualBible: isGrokImage }
         );
         return {
           pageNumber: pageNum,

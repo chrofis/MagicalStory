@@ -2785,7 +2785,7 @@ Focus on essential characters only (1-2 maximum unless the story specifically re
 /**
  * Build image generation prompt
  */
-function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null, isStorybook = false, referencePhotos = null) {
+function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, isSequential = false, visualBible = null, pageNumber = null, isStorybook = false, referencePhotos = null, options = {}) {
   // Build image generation prompt (matches step-by-step format)
   // For storybook mode: visualBible entries are added here since there's no separate scene description step
   // For parallel/sequential modes: Visual Bible is also in scene description, but adding here ensures consistency
@@ -3030,14 +3030,18 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
   }
 
   // FALLBACK: Only add full Visual Bible if scene description didn't specify required objects
+  // AND the image backend is not Grok (Grok has 8000 char limit, VB grid is sent as reference image)
   // This handles storybook mode where there's no separate scene description step
   let visualBibleSection = '';
-  if (!hasRequiredObjects && visualBible && pageNumber !== null) {
+  const skipVisualBible = options?.skipVisualBible === true;
+  if (!hasRequiredObjects && !skipVisualBible && visualBible && pageNumber !== null) {
     const sceneCharacterNames = sceneCharacters ? sceneCharacters.map(c => c.name) : null;
     visualBibleSection = buildVisualBiblePrompt(visualBible, pageNumber, sceneCharacterNames, language);
     if (visualBibleSection) {
       log.debug(`[IMAGE PROMPT] Added full Visual Bible section for page ${pageNumber} (no metadata.objects)`);
     }
+  } else if (!hasRequiredObjects && skipVisualBible) {
+    log.debug(`[IMAGE PROMPT] Skipping Visual Bible text for page ${pageNumber} (visual reference sent as image)`);
   }
 
   // Select the correct template based on mode and language
