@@ -1,7 +1,23 @@
 // Per-theme unique descriptions in 3 languages (EN, DE, FR)
 // Used by ThemePage.tsx for SEO-friendly, non-repetitive descriptions
+// Rich SEO content (longDescription, skills, FAQ) in themeContent.ts
 
-type LocalizedDesc = { en: string; de: string; fr: string };
+export type LocalizedDesc = { en: string; de: string; fr: string };
+
+export interface ThemeFAQ {
+  q: { en: string; de: string; fr: string };
+  a: { en: string; de: string; fr: string };
+}
+
+export interface ThemeContent {
+  description: LocalizedDesc;
+  longDescription: LocalizedDesc;
+  skills: LocalizedDesc;
+  ageRecommendation: string;
+  faq: ThemeFAQ[];
+}
+
+export { themeContent } from './themeContent';
 
 export const themeDescriptions: Record<string, LocalizedDesc> = {
   // =========================================================================

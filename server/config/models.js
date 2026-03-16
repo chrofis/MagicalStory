@@ -244,6 +244,10 @@ const MODEL_PRICING = {
   'grok-3': { input: 3.00, output: 15.00 },
   'grok-4-1-fast-non-reasoning': { input: 0.20, output: 0.50 },
 
+  // Grok Imagine models (fixed cost per image)
+  'grok-imagine-image': { perImage: 0.02 },
+  'grok-imagine-image-pro': { perImage: 0.07 },
+
   // Image generation models (fixed cost per image, not per token)
   'gemini-2.5-flash-image': { perImage: 0.04 },
   'gemini-3-pro-image-preview': { perImage: 0.15 },

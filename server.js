@@ -2160,8 +2160,9 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    // Runware uses direct cost instead of tokens
+    // Runware/Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
+    grok: { direct_cost: 0, calls: 0 },
     byFunction: {
       unified_story: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
       scene_expansion: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: null, models: new Set() },
@@ -2742,7 +2743,12 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Usage tracker for cover images
         const coverUsageTracker = (imgUsage, qualUsage, imgModel, qualModel) => {
-          if (imgUsage) addUsage('gemini_image', imgUsage, 'cover_images', imgModel);
+          if (imgUsage) {
+            const isRunware = imgModel && imgModel.startsWith('runware:');
+            const isGrok = imgModel && imgModel.startsWith('grok-imagine');
+            const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
+            addUsage(provider, imgUsage, 'cover_images', imgModel);
+          }
           if (qualUsage) addUsage('gemini_quality', qualUsage, 'cover_quality', qualModel);
         };
 
@@ -3593,7 +3599,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
             // Track usage
             if (genResult.usage) {
               const isRunware = genResult.modelId && genResult.modelId.startsWith('runware:');
-              const provider = isRunware ? 'runware' : 'gemini_image';
+              const isGrok = genResult.modelId && genResult.modelId.startsWith('grok-imagine');
+              const provider = isRunware ? 'runware' : isGrok ? 'grok' : 'gemini_image';
               addUsage(provider, genResult.usage, 'page_images', genResult.modelId);
             }
 
@@ -4299,8 +4306,9 @@ async function _processStoryJobImpl(jobId) {
     gemini_text: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_image: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
     gemini_quality: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0 },
-    // Runware uses direct cost instead of tokens
+    // Runware/Grok use direct cost instead of tokens
     runware: { direct_cost: 0, calls: 0 },
+    grok: { direct_cost: 0, calls: 0 },
     // By function (for detailed breakdown)
     byFunction: {
       outline: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, calls: 0, provider: 'anthropic', models: new Set() },
@@ -4343,10 +4351,10 @@ async function _processStoryJobImpl(jobId) {
   // Helper to add usage - now supports function-level tracking with model names, thinking tokens, and direct costs
   const addUsage = (provider, usage, functionName = null, modelName = null) => {
     if (usage && tokenUsage[provider]) {
-      // Handle Runware (direct cost) vs token-based providers
-      if (provider === 'runware') {
-        tokenUsage.runware.direct_cost += usage.direct_cost || 0;
-        tokenUsage.runware.calls += 1;
+      // Handle Runware/Grok (direct cost) vs token-based providers
+      if (provider === 'runware' || provider === 'grok') {
+        tokenUsage[provider].direct_cost += usage.direct_cost || usage.cost || 0;
+        tokenUsage[provider].calls += 1;
       } else {
         tokenUsage[provider].input_tokens += usage.input_tokens || 0;
         tokenUsage[provider].output_tokens += usage.output_tokens || 0;
