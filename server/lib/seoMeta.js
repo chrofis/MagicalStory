@@ -643,7 +643,7 @@ function escapeAttr(str) {
  * @returns {string} XML sitemap
  */
 function generateSitemap() {
-  const urls = [];
+  const paths = [];
   const today = new Date().toISOString().split('T')[0];
 
   // Priority mappings
@@ -663,8 +663,8 @@ function generateSitemap() {
 
   // Static public pages
   for (const [route, priority] of Object.entries(staticPriorities)) {
-    urls.push({
-      loc: `${BASE_URL}${route === '/' ? '' : route}`,
+    paths.push({
+      path: route,
       lastmod: today,
       changefreq: route === '/' ? 'weekly' : 'monthly',
       priority,
@@ -673,8 +673,8 @@ function generateSitemap() {
 
   // Theme category pages
   for (const categoryId of Object.keys(THEME_CATEGORIES)) {
-    urls.push({
-      loc: `${BASE_URL}/themes/${categoryId}`,
+    paths.push({
+      path: `/themes/${categoryId}`,
       lastmod: today,
       changefreq: 'monthly',
       priority: '0.7',
@@ -684,8 +684,8 @@ function generateSitemap() {
   // Individual theme pages
   for (const [categoryId, themes] of Object.entries(THEMES)) {
     for (const themeId of Object.keys(themes)) {
-      urls.push({
-        loc: `${BASE_URL}/themes/${categoryId}/${themeId}`,
+      paths.push({
+        path: `/themes/${categoryId}/${themeId}`,
         lastmod: today,
         changefreq: 'monthly',
         priority: '0.6',
@@ -693,26 +693,42 @@ function generateSitemap() {
     }
   }
 
-  // Build XML
-  const urlEntries = urls.map(u => {
-    let entry = `  <url>\n    <loc>${escapeXml(u.loc)}</loc>\n    <lastmod>${u.lastmod}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>`;
+  // Build XML — each path gets 3 <url> entries (de, en, fr) with xhtml:link alternates
+  const LANGS = ['de', 'en', 'fr'];
+  const urlEntries = [];
 
-    // Add video entry for homepage
-    if (u.loc === BASE_URL) {
-      entry += `\n    <video:video>` +
-        `\n      <video:thumbnail_loc>${BASE_URL}/images/video-poster.jpg</video:thumbnail_loc>` +
-        `\n      <video:title>MagicalStory – Personalized Children's Books with AI</video:title>` +
-        `\n      <video:description>See how MagicalStory transforms your child's photo into a personalized illustrated storybook. Upload a photo, choose a theme, and watch the magic happen.</video:description>` +
-        `\n      <video:content_loc>${BASE_URL}/images/Boy%20to%20pirat%20to%20book.mp4</video:content_loc>` +
-        `\n      <video:family_friendly>yes</video:family_friendly>` +
-        `\n    </video:video>`;
+  for (const p of paths) {
+    for (const lang of LANGS) {
+      const loc = lang === 'de'
+        ? `${BASE_URL}${p.path === '/' ? '' : p.path}`
+        : `${BASE_URL}${p.path === '/' ? '' : p.path}?lang=${lang}`;
+
+      let entry = `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${p.lastmod}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>`;
+
+      // xhtml:link alternates for all 3 languages + x-default
+      const basePath = p.path === '/' ? '' : p.path;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="de" href="${escapeXml(`${BASE_URL}${basePath}`)}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="en" href="${escapeXml(`${BASE_URL}${basePath}?lang=en`)}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="fr" href="${escapeXml(`${BASE_URL}${basePath}?lang=fr`)}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(`${BASE_URL}${basePath}`)}" />`;
+
+      // Add video entry for homepage (German only)
+      if (p.path === '/' && lang === 'de') {
+        entry += `\n    <video:video>` +
+          `\n      <video:thumbnail_loc>${BASE_URL}/images/video-poster.jpg</video:thumbnail_loc>` +
+          `\n      <video:title>MagicalStory – Personalisierte Kinderbücher mit KI</video:title>` +
+          `\n      <video:description>So wird das Foto deines Kindes zum personalisierten, illustrierten Bilderbuch. Foto hochladen, Thema wählen und staunen.</video:description>` +
+          `\n      <video:content_loc>${BASE_URL}/images/Boy%20to%20pirat%20to%20book.mp4</video:content_loc>` +
+          `\n      <video:family_friendly>yes</video:family_friendly>` +
+          `\n    </video:video>`;
+      }
+
+      entry += `\n  </url>`;
+      urlEntries.push(entry);
     }
+  }
 
-    entry += `\n  </url>`;
-    return entry;
-  }).join('\n');
-
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${urlEntries}\n</urlset>`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${urlEntries.join('\n')}\n</urlset>`;
 }
 
 function escapeXml(str) {
