@@ -331,6 +331,42 @@ const STATIC_ROUTES = {
       fr: 'Parcourez tous les thèmes: aventure, défis de vie, éducatif et historique. Créez un livre personnalisé pour votre enfant.',
     },
   },
+  '/geschichten-aus': {
+    title: {
+      de: 'Kindergeschichten aus der Schweiz | MagicalStory',
+      en: 'Children\'s Stories from Switzerland | MagicalStory',
+      fr: 'Histoires pour enfants de Suisse | MagicalStory',
+    },
+    description: {
+      de: 'Personalisierte Kindergeschichten aus 50 Schweizer Städten. Dein Kind erlebt Abenteuer in Zürich, Bern, Basel und mehr.',
+      en: 'Personalized children\'s stories from 50 Swiss cities. Your child goes on adventures in Zurich, Bern, Basel and more.',
+      fr: 'Histoires personnalisées pour enfants de 50 villes suisses. Votre enfant vit des aventures à Zurich, Berne, Bâle et plus.',
+    },
+  },
+  '/vergleich': {
+    title: {
+      de: 'MagicalStory im Vergleich | Personalisierte Kinderbücher',
+      en: 'MagicalStory Compared | Personalized Children\'s Books',
+      fr: 'MagicalStory en comparaison | Livres personnalisés pour enfants',
+    },
+    description: {
+      de: 'Ehrlicher Vergleich von MagicalStory mit Wonderbly, Hooray Heroes, Librio und anderen personalisierten Kinderbuch-Anbietern.',
+      en: 'Honest comparison of MagicalStory with Wonderbly, Hooray Heroes, Librio, and other personalized children\'s book providers.',
+      fr: 'Comparaison honnête de MagicalStory avec Wonderbly, Hooray Heroes, Librio et d\'autres fournisseurs de livres personnalisés.',
+    },
+  },
+  '/anlass': {
+    title: {
+      de: 'Das perfekte Geschenk für jeden Anlass | MagicalStory',
+      en: 'The Perfect Gift for Every Occasion | MagicalStory',
+      fr: 'Le cadeau parfait pour chaque occasion | MagicalStory',
+    },
+    description: {
+      de: 'Personalisierte Kinderbücher als Geschenk: Geburtstag, Weihnachten, Taufe, Einschulung und mehr. Erste Geschichte gratis.',
+      en: 'Personalized children\'s books as gifts: birthdays, Christmas, baptism, first day of school and more. First story free.',
+      fr: 'Livres personnalisés comme cadeau: anniversaire, Noël, baptême, rentrée et plus. Première histoire gratuite.',
+    },
+  },
 };
 
 // Routes that should have noindex
@@ -339,7 +375,126 @@ const NOINDEX_ROUTES = [
   '/welcome', '/trial-generation', '/claim', '/reset-password', '/email-verified',
 ];
 
-// ─── FAQ JSON-LD ──────────────────────────────────────────────────────────────
+// ─── Town Data (for meta tags) ────────────────────────────────────────────────
+
+const TOWNS = {
+  zuerich: { name: 'Zürich', de: 'Kindergeschichten aus Zürich', en: 'Children\'s Stories from Zurich', fr: 'Histoires pour enfants de Zurich' },
+  basel: { name: 'Basel', de: 'Kindergeschichten aus Basel', en: 'Children\'s Stories from Basel', fr: 'Histoires pour enfants de Bâle' },
+  bern: { name: 'Bern', de: 'Kindergeschichten aus Bern', en: 'Children\'s Stories from Bern', fr: 'Histoires pour enfants de Berne' },
+  luzern: { name: 'Luzern', de: 'Kindergeschichten aus Luzern', en: 'Children\'s Stories from Lucerne', fr: 'Histoires pour enfants de Lucerne' },
+  'st-gallen': { name: 'St. Gallen', de: 'Kindergeschichten aus St. Gallen', en: 'Children\'s Stories from St. Gallen', fr: 'Histoires pour enfants de Saint-Gall' },
+  winterthur: { name: 'Winterthur', de: 'Kindergeschichten aus Winterthur', en: 'Children\'s Stories from Winterthur', fr: 'Histoires pour enfants de Winterthour' },
+  zug: { name: 'Zug', de: 'Kindergeschichten aus Zug', en: 'Children\'s Stories from Zug', fr: 'Histoires pour enfants de Zoug' },
+  thun: { name: 'Thun', de: 'Kindergeschichten aus Thun', en: 'Children\'s Stories from Thun', fr: 'Histoires pour enfants de Thoune' },
+  aarau: { name: 'Aarau', de: 'Kindergeschichten aus Aarau', en: 'Children\'s Stories from Aarau', fr: 'Histoires pour enfants d\'Aarau' },
+  baden: { name: 'Baden', de: 'Kindergeschichten aus Baden', en: 'Children\'s Stories from Baden', fr: 'Histoires pour enfants de Baden' },
+  schaffhausen: { name: 'Schaffhausen', de: 'Kindergeschichten aus Schaffhausen', en: 'Children\'s Stories from Schaffhausen', fr: 'Histoires pour enfants de Schaffhouse' },
+  olten: { name: 'Olten', de: 'Kindergeschichten aus Olten', en: 'Children\'s Stories from Olten', fr: 'Histoires pour enfants d\'Olten' },
+  chur: { name: 'Chur', de: 'Kindergeschichten aus Chur', en: 'Children\'s Stories from Chur', fr: 'Histoires pour enfants de Coire' },
+  solothurn: { name: 'Solothurn', de: 'Kindergeschichten aus Solothurn', en: 'Children\'s Stories from Solothurn', fr: 'Histoires pour enfants de Soleure' },
+  'rapperswil-jona': { name: 'Rapperswil-Jona', de: 'Kindergeschichten aus Rapperswil-Jona', en: 'Children\'s Stories from Rapperswil-Jona', fr: 'Histoires pour enfants de Rapperswil-Jona' },
+  uster: { name: 'Uster', de: 'Kindergeschichten aus Uster', en: 'Children\'s Stories from Uster', fr: 'Histoires pour enfants d\'Uster' },
+  davos: { name: 'Davos', de: 'Kindergeschichten aus Davos', en: 'Children\'s Stories from Davos', fr: 'Histoires pour enfants de Davos' },
+  interlaken: { name: 'Interlaken', de: 'Kindergeschichten aus Interlaken', en: 'Children\'s Stories from Interlaken', fr: 'Histoires pour enfants d\'Interlaken' },
+  koeniz: { name: 'Köniz', de: 'Kindergeschichten aus Köniz', en: 'Children\'s Stories from Köniz', fr: 'Histoires pour enfants de Köniz' },
+  emmen: { name: 'Emmen', de: 'Kindergeschichten aus Emmen', en: 'Children\'s Stories from Emmen', fr: 'Histoires pour enfants d\'Emmen' },
+  kriens: { name: 'Kriens', de: 'Kindergeschichten aus Kriens', en: 'Children\'s Stories from Kriens', fr: 'Histoires pour enfants de Kriens' },
+  horgen: { name: 'Horgen', de: 'Kindergeschichten aus Horgen', en: 'Children\'s Stories from Horgen', fr: 'Histoires pour enfants de Horgen' },
+  waedenswil: { name: 'Wädenswil', de: 'Kindergeschichten aus Wädenswil', en: 'Children\'s Stories from Wädenswil', fr: 'Histoires pour enfants de Wädenswil' },
+  dietikon: { name: 'Dietikon', de: 'Kindergeschichten aus Dietikon', en: 'Children\'s Stories from Dietikon', fr: 'Histoires pour enfants de Dietikon' },
+  duebendorf: { name: 'Dübendorf', de: 'Kindergeschichten aus Dübendorf', en: 'Children\'s Stories from Dübendorf', fr: 'Histoires pour enfants de Dübendorf' },
+  kloten: { name: 'Kloten', de: 'Kindergeschichten aus Kloten', en: 'Children\'s Stories from Kloten', fr: 'Histoires pour enfants de Kloten' },
+  wetzikon: { name: 'Wetzikon', de: 'Kindergeschichten aus Wetzikon', en: 'Children\'s Stories from Wetzikon', fr: 'Histoires pour enfants de Wetzikon' },
+  frauenfeld: { name: 'Frauenfeld', de: 'Kindergeschichten aus Frauenfeld', en: 'Children\'s Stories from Frauenfeld', fr: 'Histoires pour enfants de Frauenfeld' },
+  kreuzlingen: { name: 'Kreuzlingen', de: 'Kindergeschichten aus Kreuzlingen', en: 'Children\'s Stories from Kreuzlingen', fr: 'Histoires pour enfants de Kreuzlingen' },
+  rheinfelden: { name: 'Rheinfelden', de: 'Kindergeschichten aus Rheinfelden', en: 'Children\'s Stories from Rheinfelden', fr: 'Histoires pour enfants de Rheinfelden' },
+  lausanne: { name: 'Lausanne', de: 'Kindergeschichten aus Lausanne', en: 'Children\'s Stories from Lausanne', fr: 'Histoires pour enfants de Lausanne' },
+  geneve: { name: 'Genève', de: 'Kindergeschichten aus Genf', en: 'Children\'s Stories from Geneva', fr: 'Histoires pour enfants de Genève' },
+  'biel-bienne': { name: 'Biel/Bienne', de: 'Kindergeschichten aus Biel', en: 'Children\'s Stories from Biel', fr: 'Histoires pour enfants de Bienne' },
+  fribourg: { name: 'Fribourg', de: 'Kindergeschichten aus Freiburg', en: 'Children\'s Stories from Fribourg', fr: 'Histoires pour enfants de Fribourg' },
+  neuchatel: { name: 'Neuchâtel', de: 'Kindergeschichten aus Neuenburg', en: 'Children\'s Stories from Neuchâtel', fr: 'Histoires pour enfants de Neuchâtel' },
+  montreux: { name: 'Montreux', de: 'Kindergeschichten aus Montreux', en: 'Children\'s Stories from Montreux', fr: 'Histoires pour enfants de Montreux' },
+  nyon: { name: 'Nyon', de: 'Kindergeschichten aus Nyon', en: 'Children\'s Stories from Nyon', fr: 'Histoires pour enfants de Nyon' },
+  vevey: { name: 'Vevey', de: 'Kindergeschichten aus Vevey', en: 'Children\'s Stories from Vevey', fr: 'Histoires pour enfants de Vevey' },
+  morges: { name: 'Morges', de: 'Kindergeschichten aus Morges', en: 'Children\'s Stories from Morges', fr: 'Histoires pour enfants de Morges' },
+  yverdon: { name: 'Yverdon-les-Bains', de: 'Kindergeschichten aus Yverdon', en: 'Children\'s Stories from Yverdon', fr: 'Histoires pour enfants d\'Yverdon' },
+  'la-chaux-de-fonds': { name: 'La Chaux-de-Fonds', de: 'Kindergeschichten aus La Chaux-de-Fonds', en: 'Children\'s Stories from La Chaux-de-Fonds', fr: 'Histoires pour enfants de La Chaux-de-Fonds' },
+  sion: { name: 'Sion', de: 'Kindergeschichten aus Sitten', en: 'Children\'s Stories from Sion', fr: 'Histoires pour enfants de Sion' },
+  sierre: { name: 'Sierre', de: 'Kindergeschichten aus Siders', en: 'Children\'s Stories from Sierre', fr: 'Histoires pour enfants de Sierre' },
+  delemont: { name: 'Delémont', de: 'Kindergeschichten aus Delsberg', en: 'Children\'s Stories from Delémont', fr: 'Histoires pour enfants de Delémont' },
+  martigny: { name: 'Martigny', de: 'Kindergeschichten aus Martigny', en: 'Children\'s Stories from Martigny', fr: 'Histoires pour enfants de Martigny' },
+  lugano: { name: 'Lugano', de: 'Kindergeschichten aus Lugano', en: 'Children\'s Stories from Lugano', fr: 'Histoires pour enfants de Lugano' },
+  locarno: { name: 'Locarno', de: 'Kindergeschichten aus Locarno', en: 'Children\'s Stories from Locarno', fr: 'Histoires pour enfants de Locarno' },
+  bellinzona: { name: 'Bellinzona', de: 'Kindergeschichten aus Bellinzona', en: 'Children\'s Stories from Bellinzona', fr: 'Histoires pour enfants de Bellinzone' },
+  mendrisio: { name: 'Mendrisio', de: 'Kindergeschichten aus Mendrisio', en: 'Children\'s Stories from Mendrisio', fr: 'Histoires pour enfants de Mendrisio' },
+  chiasso: { name: 'Chiasso', de: 'Kindergeschichten aus Chiasso', en: 'Children\'s Stories from Chiasso', fr: 'Histoires pour enfants de Chiasso' },
+};
+
+// ─── Comparison Data (for meta tags) ──────────────────────────────────────────
+
+const COMPARISONS = {
+  wonderbly: { name: 'Wonderbly', de: 'MagicalStory vs Wonderbly', en: 'MagicalStory vs Wonderbly', fr: 'MagicalStory vs Wonderbly' },
+  'hooray-heroes': { name: 'Hooray Heroes', de: 'MagicalStory vs Hooray Heroes', en: 'MagicalStory vs Hooray Heroes', fr: 'MagicalStory vs Hooray Heroes' },
+  librio: { name: 'Librio', de: 'MagicalStory vs Librio', en: 'MagicalStory vs Librio', fr: 'MagicalStory vs Librio' },
+  framily: { name: 'Framily', de: 'MagicalStory vs Framily', en: 'MagicalStory vs Framily', fr: 'MagicalStory vs Framily' },
+  'lullaby-ink': { name: 'Lullaby.ink', de: 'MagicalStory vs Lullaby.ink', en: 'MagicalStory vs Lullaby.ink', fr: 'MagicalStory vs Lullaby.ink' },
+  lovetoread: { name: 'LoveToRead', de: 'MagicalStory vs LoveToRead', en: 'MagicalStory vs LoveToRead', fr: 'MagicalStory vs LoveToRead' },
+  'beste-personalisierte-kinderbuecher': { name: 'Beste Kinderbücher', de: 'Beste personalisierte Kinderbücher Schweiz 2026', en: 'Best Personalized Children\'s Books Switzerland 2026', fr: 'Meilleurs livres personnalisés pour enfants Suisse 2026' },
+  'beste-ki-kinderbuch-generatoren': { name: 'Beste KI-Generatoren', de: 'Beste KI-Kinderbuch-Generatoren 2026', en: 'Best AI Children\'s Book Generators 2026', fr: 'Meilleurs générateurs de livres IA pour enfants 2026' },
+};
+
+// ─── Occasion Data (for meta tags) ────────────────────────────────────────────
+
+const OCCASIONS = {
+  geburtstag: { de: 'Personalisiertes Kinderbuch zum Geburtstag', en: 'Personalized Birthday Book for Kids', fr: 'Livre personnalisé pour anniversaire' },
+  weihnachten: { de: 'Personalisiertes Kinderbuch zu Weihnachten', en: 'Personalized Christmas Book for Kids', fr: 'Livre personnalisé pour Noël' },
+  ostern: { de: 'Personalisiertes Kinderbuch zu Ostern', en: 'Personalized Easter Book for Kids', fr: 'Livre personnalisé pour Pâques' },
+  taufe: { de: 'Personalisiertes Kinderbuch zur Taufe', en: 'Personalized Baptism Book for Kids', fr: 'Livre personnalisé pour le baptême' },
+  einschulung: { de: 'Personalisiertes Kinderbuch zur Einschulung', en: 'Personalized First Day of School Book', fr: 'Livre personnalisé pour la rentrée' },
+  geschwisterchen: { de: 'Personalisiertes Kinderbuch zum Geschwisterchen', en: 'Personalized New Sibling Book', fr: 'Livre personnalisé nouveau bébé' },
+  muttertag: { de: 'Personalisiertes Kinderbuch zum Muttertag', en: 'Personalized Mother\'s Day Book', fr: 'Livre personnalisé fête des mères' },
+  vatertag: { de: 'Personalisiertes Kinderbuch zum Vatertag', en: 'Personalized Father\'s Day Book', fr: 'Livre personnalisé fête des pères' },
+  nikolaus: { de: 'Personalisiertes Kinderbuch zum Nikolaus', en: 'Personalized St. Nicholas Day Book', fr: 'Livre personnalisé pour la Saint-Nicolas' },
+  advent: { de: 'Personalisiertes Kinderbuch zum Advent', en: 'Personalized Advent Book for Kids', fr: 'Livre personnalisé pour l\'Avent' },
+  umzug: { de: 'Personalisiertes Kinderbuch zum Umzug', en: 'Personalized Moving House Book', fr: 'Livre personnalisé pour le déménagement' },
+  kindergartenstart: { de: 'Personalisiertes Kinderbuch zum Kindergartenstart', en: 'Personalized Starting Kindergarten Book', fr: 'Livre personnalisé pour l\'entrée en maternelle' },
+};
+
+// ─── JSON-LD Schema Templates ─────────────────────────────────────────────────
+
+const ORGANIZATION_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: 'MagicalStory',
+  url: BASE_URL,
+  logo: `${BASE_URL}/images/logo.png`,
+  description: 'AI-powered personalized children\'s storybooks made in Switzerland. 170+ themes, 8 art styles, 3 languages.',
+  foundingLocation: { '@type': 'Place', name: 'Switzerland' },
+  sameAs: [],
+  contactPoint: {
+    '@type': 'ContactPoint',
+    contactType: 'customer service',
+    url: `${BASE_URL}/contact`,
+    availableLanguage: ['German', 'English', 'French'],
+  },
+};
+
+const PRODUCT_JSON_LD = {
+  '@context': 'https://schema.org',
+  '@type': 'Product',
+  name: 'Personalisiertes Kinderbuch',
+  description: 'KI-illustriertes Kinderbuch mit deinem Kind als Held. 170+ Themen, 8 Kunststile, 3 Sprachen.',
+  brand: { '@type': 'Brand', name: 'MagicalStory' },
+  offers: {
+    '@type': 'AggregateOffer',
+    lowPrice: '0',
+    highPrice: '96',
+    priceCurrency: 'CHF',
+    availability: 'https://schema.org/InStock',
+    offerCount: '170',
+  },
+  category: 'Personalized Children\'s Books',
+};
 
 const FAQ_JSON_LD = {
   '@context': 'https://schema.org',
@@ -347,54 +502,121 @@ const FAQ_JSON_LD = {
   mainEntity: [
     {
       '@type': 'Question',
-      name: 'How does it work?',
+      name: 'Wie funktioniert MagicalStory?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Upload a photo of your child, choose a story theme, and get a fully illustrated personalized story in minutes. Your child appears as the main character on every page.',
+        text: 'Lade ein Foto deines Kindes hoch, wähle ein Story-Thema, und erhalte in wenigen Minuten eine vollständig illustrierte, personalisierte Geschichte. Dein Kind erscheint als Hauptfigur auf jeder Seite.',
       },
     },
     {
       '@type': 'Question',
-      name: 'How long does it take?',
+      name: 'Wie lange dauert es?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your first free story is ready in under 3 minutes. Story text and all illustrations are generated automatically.',
+        text: 'Deine erste kostenlose Geschichte ist in unter 3 Minuten fertig. Text und alle Illustrationen werden automatisch generiert.',
       },
     },
     {
       '@type': 'Question',
-      name: 'What ages is this for?',
+      name: 'Für welches Alter ist MagicalStory geeignet?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Stories can be created for children of all ages. The story content and complexity are adapted to the age you specify when creating the story.',
+        text: 'Geschichten können für Kinder jeden Alters erstellt werden. Inhalt und Komplexität werden an das angegebene Alter angepasst.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Can I add multiple characters?',
+      name: 'Kann ich mehrere Charaktere hinzufügen?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes! You can add your whole family, friends, or pets as characters in the story. Each character gets their own personalized illustrations.',
+        text: 'Ja! Du kannst die ganze Familie, Freunde oder Haustiere als Figuren in der Geschichte hinzufügen. Jeder Charakter bekommt eigene personalisierte Illustrationen.',
       },
     },
     {
       '@type': 'Question',
-      name: 'How much does it cost?',
+      name: 'Was kostet MagicalStory?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Your first story is completely free. After that, stories are created with credits. Printed books start at CHF 38 for a high-quality hardcover.',
+        text: 'Deine erste Geschichte ist komplett gratis. Danach werden Geschichten mit Credits erstellt. Gedruckte Bücher gibt es ab CHF 38 als hochwertiges Hardcover.',
       },
     },
     {
       '@type': 'Question',
-      name: 'Is my data safe?',
+      name: 'Sind meine Daten sicher?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Yes. Your photos are used only to create your story illustrations and are never shared with third parties. We take data protection seriously and comply with Swiss privacy laws.',
+        text: 'Ja. Deine Fotos werden ausschliesslich zur Erstellung der Illustrationen verwendet und niemals an Dritte weitergegeben. Wir nehmen Datenschutz ernst und halten uns an die Schweizer Datenschutzgesetze.',
       },
     },
   ],
 };
+
+function buildBreadcrumbJsonLd(items) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: items.map((item, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: item.name,
+      item: item.url ? `${BASE_URL}${item.url}` : undefined,
+    })),
+  };
+}
+
+function buildProductJsonLdForTheme(themeName, category, themeId) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: `Personalisiertes Kinderbuch: ${themeName}`,
+    description: `KI-illustriertes ${themeName}-Kinderbuch mit deinem Kind als Held.`,
+    brand: { '@type': 'Brand', name: 'MagicalStory' },
+    url: `${BASE_URL}/themes/${category}/${themeId}`,
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'CHF',
+      availability: 'https://schema.org/InStock',
+      description: 'Erste Geschichte kostenlos. Hardcover ab CHF 38.',
+    },
+    category: 'Personalized Children\'s Books',
+  };
+}
+
+function buildHowToJsonLd(lang) {
+  const steps = {
+    de: [
+      { name: 'Foto hochladen', text: 'Lade ein Foto deines Kindes hoch. Es wird zum illustrierten Helden der Geschichte.' },
+      { name: 'Thema wählen', text: 'Wähle aus über 170 Themen: Abenteuer, Lebensherausforderungen, Lehrreiches oder Historisches.' },
+      { name: 'Geschichte erhalten', text: 'Deine personalisierte illustrierte Geschichte ist in Minuten fertig. Online lesen oder als Buch bestellen.' },
+    ],
+    en: [
+      { name: 'Upload a photo', text: 'Upload a photo of your child. They become the illustrated hero of the story.' },
+      { name: 'Choose a theme', text: 'Pick from 170+ themes: adventure, life challenges, educational, or historical.' },
+      { name: 'Get your story', text: 'Your personalized illustrated story is ready in minutes. Read online or order a printed book.' },
+    ],
+    fr: [
+      { name: 'Télécharger une photo', text: 'Téléchargez une photo de votre enfant. Il devient le héros illustré de l\'histoire.' },
+      { name: 'Choisir un thème', text: 'Choisissez parmi 170+ thèmes: aventure, défis de vie, éducatif ou historique.' },
+      { name: 'Recevoir votre histoire', text: 'Votre histoire personnalisée illustrée est prête en quelques minutes. Lisez en ligne ou commandez un livre.' },
+    ],
+  };
+  const s = steps[lang] || steps.de;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: lang === 'de' ? 'Personalisiertes Kinderbuch erstellen' : lang === 'fr' ? 'Créer un livre personnalisé' : 'Create a Personalized Children\'s Book',
+    description: lang === 'de' ? 'In 3 einfachen Schritten zum personalisierten Kinderbuch' : lang === 'fr' ? 'En 3 étapes simples vers votre livre personnalisé' : 'Create your personalized book in 3 simple steps',
+    totalTime: 'PT3M',
+    tool: { '@type': 'HowToTool', name: lang === 'de' ? 'Ein Foto deines Kindes' : 'A photo of your child' },
+    step: s.map((step, i) => ({
+      '@type': 'HowToStep',
+      position: i + 1,
+      name: step.name,
+      text: step.text,
+    })),
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -441,11 +663,50 @@ function getMetaForRoute(routePath, lang) {
       path: cleanPath,
       noindex: isNoindex,
       hreflang: buildHreflang(cleanPath),
+      jsonLd: [],
     };
-    // Add FAQ JSON-LD for /faq
-    if (cleanPath === '/faq') {
-      meta.jsonLd = FAQ_JSON_LD;
+
+    // Page-specific schemas
+    if (cleanPath === '/') {
+      meta.jsonLd = [
+        ORGANIZATION_JSON_LD,
+        PRODUCT_JSON_LD,
+        buildBreadcrumbJsonLd([{ name: 'Home' }]),
+      ];
+    } else if (cleanPath === '/faq') {
+      meta.jsonLd = [
+        FAQ_JSON_LD,
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: 'FAQ' }]),
+      ];
+    } else if (cleanPath === '/about') {
+      meta.jsonLd = [
+        ORGANIZATION_JSON_LD,
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Über uns' : lang === 'fr' ? 'À propos' : 'About' }]),
+      ];
+    } else if (cleanPath === '/pricing') {
+      meta.jsonLd = [
+        PRODUCT_JSON_LD,
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Preise' : lang === 'fr' ? 'Tarifs' : 'Pricing' }]),
+      ];
+    } else if (cleanPath === '/try') {
+      meta.jsonLd = [
+        buildHowToJsonLd(lang),
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Gratis Geschichte erstellen' : lang === 'fr' ? 'Créer une histoire' : 'Create Your Story' }]),
+      ];
+    } else if (cleanPath === '/themes') {
+      meta.jsonLd = [
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Themen' : lang === 'fr' ? 'Thèmes' : 'Themes' }]),
+      ];
+    } else if (cleanPath === '/science') {
+      meta.jsonLd = [
+        buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: lang === 'de' ? 'Forschung' : lang === 'fr' ? 'Science' : 'Science' }]),
+      ];
+    } else {
+      // Other static pages get breadcrumb only
+      const pageName = staticMeta.title[lang] || staticMeta.title.de;
+      meta.jsonLd = [buildBreadcrumbJsonLd([{ name: 'Home', url: '/' }, { name: pageName.replace(/ – Magical Story$/, '') }])];
     }
+
     return meta;
   }
 
@@ -463,6 +724,13 @@ function getMetaForRoute(routePath, lang) {
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Themen' : lang === 'fr' ? 'Thèmes' : 'Themes', url: '/themes' },
+            { name: catName },
+          ]),
+        ],
       };
     }
   }
@@ -474,18 +742,109 @@ function getMetaForRoute(routePath, lang) {
     const found = findTheme(categoryId, themeId);
     if (found) {
       const themeName = found.theme[lang] || found.theme.de;
+      const catName = (THEME_CATEGORIES[categoryId] || {})[lang] || (THEME_CATEGORIES[categoryId] || {}).de || categoryId;
+      const titleTemplate = lang === 'de'
+        ? `Personalisiertes ${themeName}-Kinderbuch | MagicalStory`
+        : lang === 'fr'
+          ? `Livre personnalisé ${themeName} | MagicalStory`
+          : `Personalized ${themeName} Story | MagicalStory`;
       return {
-        title: `${themeName} – Personalized Story | Magical Story`,
+        title: titleTemplate,
         description: buildThemeDescription(themeName, lang),
         canonical: `${BASE_URL}${cleanPath}`,
         path: cleanPath,
         noindex: false,
         hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          buildProductJsonLdForTheme(themeName, categoryId, themeId),
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Themen' : lang === 'fr' ? 'Thèmes' : 'Themes', url: '/themes' },
+            { name: catName, url: `/themes/${categoryId}` },
+            { name: themeName },
+          ]),
+        ],
       };
     }
   }
 
-  // 4. Noindex route (auth/app pages)
+  // 4. Town page: /geschichten-aus/:townSlug
+  const townMatch = cleanPath.match(/^\/geschichten-aus\/([^/]+)$/);
+  if (townMatch) {
+    const townSlug = townMatch[1];
+    const town = TOWNS[townSlug];
+    if (town) {
+      const title = town[lang] || town.de;
+      return {
+        title: `${title} | MagicalStory`,
+        description: buildTownDescription(town.name, lang),
+        canonical: `${BASE_URL}${cleanPath}`,
+        path: cleanPath,
+        noindex: false,
+        hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Geschichten aus der Schweiz' : lang === 'fr' ? 'Histoires de Suisse' : 'Stories from Switzerland', url: '/geschichten-aus' },
+            { name: town.name },
+          ]),
+        ],
+      };
+    }
+  }
+
+  // 5. Comparison page: /vergleich/:competitorSlug
+  const compMatch = cleanPath.match(/^\/vergleich\/([^/]+)$/);
+  if (compMatch) {
+    const compSlug = compMatch[1];
+    const comp = COMPARISONS[compSlug];
+    if (comp) {
+      const title = comp[lang] || comp.de;
+      return {
+        title: `${title} — Ehrlicher Vergleich | MagicalStory`,
+        description: buildComparisonDescription(comp.name, lang),
+        canonical: `${BASE_URL}${cleanPath}`,
+        path: cleanPath,
+        noindex: false,
+        hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Vergleich' : lang === 'fr' ? 'Comparaison' : 'Compare', url: '/vergleich' },
+            { name: title },
+          ]),
+        ],
+      };
+    }
+  }
+
+  // 6. Occasion page: /anlass/:occasionSlug
+  const occasionMatch = cleanPath.match(/^\/anlass\/([^/]+)$/);
+  if (occasionMatch) {
+    const occasionSlug = occasionMatch[1];
+    const occasion = OCCASIONS[occasionSlug];
+    if (occasion) {
+      const title = occasion[lang] || occasion.de;
+      return {
+        title: `${title} | MagicalStory`,
+        description: buildOccasionDescription(occasionSlug, lang),
+        canonical: `${BASE_URL}${cleanPath}`,
+        path: cleanPath,
+        noindex: false,
+        hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          PRODUCT_JSON_LD,
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Anlässe' : lang === 'fr' ? 'Occasions' : 'Occasions', url: '/anlass' },
+            { name: title },
+          ]),
+        ],
+      };
+    }
+  }
+
+  // 7. Noindex route (auth/app pages)
   if (isNoindex) {
     return {
       title: 'Magical Story',
@@ -497,10 +856,10 @@ function getMetaForRoute(routePath, lang) {
     };
   }
 
-  // 5. Fallback — unknown route
+  // 8. Fallback — unknown route
   return {
-    title: 'Magical Story – Your Child as the Hero of Their Own Book',
-    description: 'Your child becomes the hero of a beautifully illustrated story. Upload a photo, pick a theme, and hold a finished book in your hands.',
+    title: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
+    description: 'Dein Kind wird zum Helden einer wunderschön illustrierten Geschichte. Foto hochladen, Thema wählen und ein fertiges Buch in den Händen halten.',
     canonical: `${BASE_URL}${cleanPath === '/' ? '' : cleanPath}`,
     path: cleanPath,
     noindex: false,
@@ -511,9 +870,13 @@ function getMetaForRoute(routePath, lang) {
 function buildHreflang(routePath) {
   const p = routePath === '/' ? '' : routePath;
   return [
+    { lang: 'de-CH', href: `${BASE_URL}${p}` },
+    { lang: 'de-DE', href: `${BASE_URL}${p}` },
+    { lang: 'de-AT', href: `${BASE_URL}${p}` },
     { lang: 'de', href: `${BASE_URL}${p}` },
-    { lang: 'en', href: `${BASE_URL}${p}?lang=en` },
+    { lang: 'fr-CH', href: `${BASE_URL}${p}?lang=fr` },
     { lang: 'fr', href: `${BASE_URL}${p}?lang=fr` },
+    { lang: 'en', href: `${BASE_URL}${p}?lang=en` },
     { lang: 'x-default', href: `${BASE_URL}${p}` },
   ];
 }
@@ -529,9 +892,51 @@ function buildCategoryDescription(catName, lang) {
 
 function buildThemeDescription(themeName, lang) {
   const templates = {
-    en: `Create a personalized ${themeName} story for your child. Upload a photo and get an illustrated book in minutes.`,
-    de: `Erstelle eine personalisierte ${themeName}-Geschichte für dein Kind. Foto hochladen und in Minuten ein illustriertes Buch erhalten.`,
-    fr: `Créez une histoire personnalisée ${themeName} pour votre enfant. Téléchargez une photo et obtenez un livre illustré en minutes.`,
+    de: `Erstelle ein personalisiertes ${themeName}-Kinderbuch mit dem Foto deines Kindes. KI-illustriert, einzigartig, ab CHF 38. Erste Geschichte gratis.`,
+    en: `Create a personalized ${themeName} children's book with your child's photo. AI-illustrated, unique, from CHF 38. First story free.`,
+    fr: `Créez un livre personnalisé ${themeName} avec la photo de votre enfant. Illustré par IA, unique, dès CHF 38. Première histoire gratuite.`,
+  };
+  return templates[lang] || templates.de;
+}
+
+function buildTownDescription(townName, lang) {
+  const templates = {
+    de: `Dein Kind erlebt ein personalisiertes Abenteuer in ${townName} — als Held eines illustrierten Kinderbuchs. Lokale Wahrzeichen, echte Schauplätze. Kostenlos testen.`,
+    en: `Your child goes on a personalized adventure in ${townName} — as the hero of an illustrated children's book. Local landmarks, real settings. Try free.`,
+    fr: `Votre enfant vit une aventure personnalisée à ${townName} — en héros d'un livre illustré. Monuments locaux, lieux réels. Essai gratuit.`,
+  };
+  return templates[lang] || templates.de;
+}
+
+function buildComparisonDescription(competitorName, lang) {
+  const templates = {
+    de: `Ehrlicher Vergleich: MagicalStory vs ${competitorName}. Features, Preise, Vor- und Nachteile. Finde das beste personalisierte Kinderbuch.`,
+    en: `Honest comparison: MagicalStory vs ${competitorName}. Features, pricing, pros and cons. Find the best personalized children's book.`,
+    fr: `Comparaison honnête: MagicalStory vs ${competitorName}. Fonctionnalités, prix, avantages et inconvénients. Trouvez le meilleur livre personnalisé.`,
+  };
+  return templates[lang] || templates.de;
+}
+
+function buildOccasionDescription(occasionSlug, lang) {
+  const occasionGifts = {
+    geburtstag: { de: 'Geburtstag', en: 'birthday', fr: 'anniversaire' },
+    weihnachten: { de: 'Weihnachten', en: 'Christmas', fr: 'Noël' },
+    ostern: { de: 'Ostern', en: 'Easter', fr: 'Pâques' },
+    taufe: { de: 'Taufe', en: 'baptism', fr: 'baptême' },
+    einschulung: { de: 'Einschulung', en: 'first day of school', fr: 'rentrée scolaire' },
+    geschwisterchen: { de: 'Geschwisterchen', en: 'new sibling', fr: 'nouveau bébé' },
+    muttertag: { de: 'Muttertag', en: 'Mother\'s Day', fr: 'fête des mères' },
+    vatertag: { de: 'Vatertag', en: 'Father\'s Day', fr: 'fête des pères' },
+    nikolaus: { de: 'Nikolaus', en: 'St. Nicholas Day', fr: 'Saint-Nicolas' },
+    advent: { de: 'Advent', en: 'Advent', fr: 'Avent' },
+    umzug: { de: 'Umzug', en: 'moving house', fr: 'déménagement' },
+    kindergartenstart: { de: 'Kindergartenstart', en: 'starting kindergarten', fr: 'entrée en maternelle' },
+  };
+  const occ = occasionGifts[occasionSlug] || { de: 'Anlass', en: 'occasion', fr: 'occasion' };
+  const templates = {
+    de: `Das perfekte Geschenk zum ${occ.de}: Ein personalisiertes Kinderbuch mit deinem Kind als Held. 170+ Themen, Hardcover ab CHF 38. Erste Geschichte gratis.`,
+    en: `The perfect gift for ${occ.en}: A personalized children's book with your child as the hero. 170+ themes, hardcover from CHF 38. First story free.`,
+    fr: `Le cadeau parfait pour ${occ.fr}: Un livre personnalisé avec votre enfant en héros. 170+ thèmes, couverture rigide dès CHF 38. Première histoire gratuite.`,
   };
   return templates[lang] || templates.de;
 }
@@ -608,9 +1013,12 @@ function injectMeta(html, meta) {
     }
   }
 
-  // Add JSON-LD
+  // Add JSON-LD (supports single object or array of objects)
   if (meta.jsonLd) {
-    injectTags.push(`<script type="application/ld+json">${JSON.stringify(meta.jsonLd)}</script>`);
+    const jsonLdItems = Array.isArray(meta.jsonLd) ? meta.jsonLd : [meta.jsonLd];
+    for (const item of jsonLdItems) {
+      if (item) injectTags.push(`<script type="application/ld+json">${JSON.stringify(item)}</script>`);
+    }
   }
 
   // Inject before </head>
@@ -652,6 +1060,9 @@ function generateSitemap() {
     '/try': '0.9',
     '/pricing': '0.9',
     '/themes': '0.8',
+    '/geschichten-aus': '0.7',
+    '/anlass': '0.7',
+    '/vergleich': '0.6',
     '/science': '0.7',
     '/faq': '0.5',
     '/about': '0.5',
@@ -693,6 +1104,36 @@ function generateSitemap() {
     }
   }
 
+  // Town pages
+  for (const townSlug of Object.keys(TOWNS)) {
+    paths.push({
+      path: `/geschichten-aus/${townSlug}`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.7',
+    });
+  }
+
+  // Comparison pages
+  for (const compSlug of Object.keys(COMPARISONS)) {
+    paths.push({
+      path: `/vergleich/${compSlug}`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.6',
+    });
+  }
+
+  // Occasion pages
+  for (const occasionSlug of Object.keys(OCCASIONS)) {
+    paths.push({
+      path: `/anlass/${occasionSlug}`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.6',
+    });
+  }
+
   // Build XML — each path gets 3 <url> entries (de, en, fr) with xhtml:link alternates
   const LANGS = ['de', 'en', 'fr'];
   const urlEntries = [];
@@ -705,12 +1146,19 @@ function generateSitemap() {
 
       let entry = `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${p.lastmod}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>`;
 
-      // xhtml:link alternates for all 3 languages + x-default
+      // xhtml:link alternates for regional + language variants
       const basePath = p.path === '/' ? '' : p.path;
-      entry += `\n    <xhtml:link rel="alternate" hreflang="de" href="${escapeXml(`${BASE_URL}${basePath}`)}" />`;
-      entry += `\n    <xhtml:link rel="alternate" hreflang="en" href="${escapeXml(`${BASE_URL}${basePath}?lang=en`)}" />`;
-      entry += `\n    <xhtml:link rel="alternate" hreflang="fr" href="${escapeXml(`${BASE_URL}${basePath}?lang=fr`)}" />`;
-      entry += `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${escapeXml(`${BASE_URL}${basePath}`)}" />`;
+      const deUrl = escapeXml(`${BASE_URL}${basePath}`);
+      const enUrl = escapeXml(`${BASE_URL}${basePath}?lang=en`);
+      const frUrl = escapeXml(`${BASE_URL}${basePath}?lang=fr`);
+      entry += `\n    <xhtml:link rel="alternate" hreflang="de-CH" href="${deUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="de-DE" href="${deUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="de-AT" href="${deUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="de" href="${deUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="fr-CH" href="${frUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="fr" href="${frUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="en" href="${enUrl}" />`;
+      entry += `\n    <xhtml:link rel="alternate" hreflang="x-default" href="${deUrl}" />`;
 
       // Add video entry for homepage (German only)
       if (p.path === '/' && lang === 'de') {
