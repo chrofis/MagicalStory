@@ -696,37 +696,33 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   }
 
   for (const { charName, char, clothingCategory, cacheKey, costumeType, costumeConfig } of pendingCostumedGenerations) {
-    allPromises.push((async () => {
-      log.debug(`🎭 [STYLED AVATARS] ${charName}: generating costumed:${costumeType} on-demand...`);
-      try {
-        const result = await generateStyledCostumedAvatar(char, {
-          costume: costumeConfig.costume || costumeType,
-          description: costumeConfig.description
-        }, artStyle);
+    // Use the same convertAvatarToStyle path as standard avatars — routes through
+    // callGeminiAPIForImage which respects imageModelOverride (Grok, Gemini, etc.)
+    const avatars = char.avatars || char.clothingAvatars;
+    const originalAvatar = avatars?.standard || getPrimaryPhoto(char);
+    const facePhoto = getFacePhoto(char);
+    const costumeDescription = costumeConfig.description || `${costumeType} costume`;
 
-        if (result.success && result.imageData) {
-          setStyledAvatar(charName, clothingCategory, artStyle, result.imageData);
-          if (!char.avatars) char.avatars = {};
-          if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-          if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-          char.avatars.styledAvatars[artStyle].costumed[costumeType] = result.imageData;
-          if (result.clothing) {
-            if (!char.avatars.clothing) char.avatars.clothing = {};
-            if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-            char.avatars.clothing.costumed[costumeType] = result.clothing;
-          }
-          log.debug(`✅ [STYLED AVATARS] ${charName}: costumed:${costumeType}@${artStyle} generated successfully`);
-          return { type: 'costumed', charName, costumeType, success: true };
-        } else {
-          log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation failed: ${result.error || 'unknown'}`);
-          return { type: 'costumed', charName, char, costumeType, success: false };
-        }
-      } catch (err) {
-        log.error(`❌ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation error: ${err.message}`);
-        return { type: 'costumed', charName, char, costumeType, success: false };
-      }
-    })());
+    if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
+      allPromises.push(
+        getOrCreateStyledAvatar(charName, clothingCategory, artStyle, originalAvatar, facePhoto, costumeDescription, addUsage, char, imageModelOverride)
+          .then(styledAvatar => {
+            // Store on character object
+            if (!char.avatars) char.avatars = {};
+            if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+            if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+            if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+            char.avatars.styledAvatars[artStyle].costumed[costumeType] = styledAvatar;
+            return { type: 'costumed', cacheKey, characterName: charName, clothingCategory, character: char, styledAvatar, success: true };
+          })
+          .catch(error => {
+            log.error(`❌ [STYLED AVATARS] Failed costumed ${charName}:${costumeType}: ${error.message}`);
+            return { type: 'costumed', charName, char, costumeType, success: false };
+          })
+      );
+    } else {
+      log.warn(`⚠️ [STYLED AVATARS] ${charName}: no base avatar for costumed:${costumeType}, skipping`);
+    }
   }
 
   // Standard style conversion promises (run simultaneously with costumed)
