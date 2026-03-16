@@ -6581,16 +6581,24 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       };
     }
 
-    // Log why we're retrying
-    if (hasTextError) {
-      log.debug(`⚠️  [QUALITY RETRY] Retrying due to text error: ${result.textIssue}`);
+    // Log retry status
+    if (attempts >= MAX_ATTEMPTS) {
+      // No more attempts — just report the final score
+      const reason = hasTextError ? `text error: ${result.textIssue}` : `score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%`;
+      if (MAX_ATTEMPTS === 1) {
+        log.debug(`📊 [QUALITY] ${pageLabel}${reason} (quality retry disabled, accepting result)`);
+      } else {
+        log.debug(`⚠️  [QUALITY RETRY] ${pageLabel}${reason}, no attempts remaining`);
+      }
+    } else if (hasTextError) {
+      log.debug(`⚠️  [QUALITY RETRY] ${pageLabel}Retrying due to text error: ${result.textIssue}`);
     } else {
-      log.debug(`⚠️  [QUALITY RETRY] Score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%, retrying with new generation...`);
+      log.debug(`⚠️  [QUALITY RETRY] ${pageLabel}Score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%, retrying with new generation...`);
     }
   }
 
   // All attempts exhausted, return best result
-  console.log(`⚠️  [QUALITY RETRY] Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore === -1 ? 'unknown' : bestScore + '%'}`);
+  console.log(`⚠️  [QUALITY RETRY] ${pageLabel}Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore === -1 ? 'unknown' : bestScore + '%'}`);
   // Extract rewrite usage from retryHistory if a scene was rewritten
   const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
   return {

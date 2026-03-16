@@ -2565,18 +2565,22 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           log.debug(`📕 [COVER] ${coverType}: Using fallback scene description (hint was empty)`);
         }
 
-        let coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
-
-        // Fallback: if scene description doesn't contain character names, use characters from hint.characterClothing
-        // This handles cases like "Two brothers stand..." where names aren't in the description but ARE in the character list
-        if (coverCharacters.length === 0 && hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
+        // Primary: use hint.characterClothing (authoritative — explicitly lists who should appear)
+        // Fallback: match character names in scene text
+        let coverCharacters = [];
+        if (hint.characterClothing && Object.keys(hint.characterClothing).length > 0) {
           const clothingCharNames = Object.keys(hint.characterClothing);
           coverCharacters = inputData.characters.filter(c =>
             clothingCharNames.some(name => name.toLowerCase() === c.name.toLowerCase())
           );
           if (coverCharacters.length > 0) {
-            log.debug(`📕 [COVER] ${coverType}: Using ${coverCharacters.length} characters from hint.characterClothing (scene didn't contain names)`);
+            log.debug(`📕 [COVER] ${coverType}: Using ${coverCharacters.length} characters from hint.characterClothing: ${coverCharacters.map(c => c.name).join(', ')}`);
           }
+        }
+
+        // Fallback: if characterClothing didn't yield results, try scene text matching
+        if (coverCharacters.length === 0) {
+          coverCharacters = getCharactersInScene(sceneDescription, inputData.characters);
         }
 
         // Final fallback for title page: use main characters or all characters
