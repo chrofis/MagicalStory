@@ -2478,30 +2478,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const generationPromises = Object.keys(clothingCategories).map(cat => generateSingleAvatarForJob(cat));
     const generatedAvatars = await Promise.all(generationPromises);
 
-    // Store images in results immediately
+    // Store images in results
     for (const { category, imageData } of generatedAvatars) {
       if (imageData) results[category] = imageData;
     }
 
-    // Return images to client IMMEDIATELY — evaluation + DB save continue in background
-    // Client shows avatars right away (~5s), traits/clothing arrive via DB on next character load
-    if (results.standard) {
-      results.status = 'complete';
-      results.generatedAt = new Date().toISOString();
-      job.status = 'complete';
-      job.progress = 100;
-      job.message = 'Avatars ready';
-      job.result = results;
-      log.info(`⚡ [AVATAR JOB ${jobId}] Images ready in ${Date.now() - generationStart}ms — returning to client, continuing evaluation in background`);
-    }
-
     job.progress = 70;
-    job.message = 'Evaluating generated avatars...';
+    job.message = 'Processing avatars...';
 
-    // Store results and aggregate token usage
+    // Aggregate token usage
     for (const { category, prompt, inputTokens, outputTokens } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
-
       if (inputTokens > 0 || outputTokens > 0) {
         if (!results.tokenUsage.byModel[geminiModelId]) {
           results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
@@ -2532,7 +2519,23 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         log.warn(`[AVATAR JOB ${jobId}] Face thumbnail extraction failed for ${category}: ${err.message}`);
       }
     });
-    // Run grid splits AND evaluation in parallel (grid splits use Python, evals use Gemini — no conflict)
+
+    // Wait for grid splits (needed for thumbnails the client displays)
+    await Promise.all(splitPromises);
+
+    // Return thumbnails to client NOW — evaluation + DB save continue in background
+    // User sees avatars after Gemini (~5s) + grid splits (~1s parallel) = ~6s
+    if (results.standard) {
+      results.status = 'complete';
+      results.generatedAt = new Date().toISOString();
+      job.status = 'complete';
+      job.progress = 100;
+      job.message = 'Avatars ready';
+      job.result = results;
+      log.info(`⚡ [AVATAR JOB ${jobId}] Thumbnails ready in ${Date.now() - generationStart}ms — returning to client, evaluation continues in background`);
+    }
+
+    // Evaluation + DB save run in background (client already has images)
     if (ENABLE_AVATAR_EVALUATION) {
     const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
     log.debug(`🔍 [AVATAR JOB ${jobId}] Checking evaluation: avatarsToEvaluate=${avatarsToEvaluate.length}, geminiApiKey=${!!geminiApiKey}`);
@@ -2551,9 +2554,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           return { category, faceMatchResult };
         });
 
-        // Wait for grid splits + photo analysis + avatar evaluations ALL in parallel
-        const [, photoTraitsResult, ...evalResults] = await Promise.all([
-          Promise.all(splitPromises),  // grid splits (Python) — overlapped with Gemini evals
+        // Wait for photo analysis + avatar evaluations in parallel
+        const [photoTraitsResult, ...evalResults] = await Promise.all([
           photoTraitsPromise,
           ...evalPromises
         ]);
@@ -2751,8 +2753,6 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     }
     } else {
       log.debug(`⏭️ [AVATAR JOB ${jobId}] Skipping face evaluation (ENABLE_AVATAR_EVALUATION=false)`);
-      // Still need to wait for grid splits if evaluation was skipped
-      await Promise.all(splitPromises);
     }
 
     // Directly update character in database with extracted traits and clothing
