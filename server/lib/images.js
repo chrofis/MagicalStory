@@ -622,7 +622,7 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
             cacheHits++;
           } else {
             // Compress and cache
-            const compressed = await compressImageToJPEG(photoUrl, 80, 512); // 80% quality, max 512px
+            const compressed = await compressImageToJPEG(photoUrl, 85, 768); // 85% quality, max 768px
             compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
             compressedRefCache.set(imageHash, compressedBase64);
           }
@@ -8160,7 +8160,7 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
         let compressedBase64 = compressedRefCache.get(imageHash);
 
         if (!compressedBase64) {
-          const compressed = await compressImageToJPEG(refPhoto, 80, 512);
+          const compressed = await compressImageToJPEG(refPhoto, 85, 768);
           compressedBase64 = compressed.replace(/^data:image\/\w+;base64,/, '');
           compressedRefCache.set(imageHash, compressedBase64);
         }

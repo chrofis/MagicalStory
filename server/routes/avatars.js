@@ -1017,7 +1017,7 @@ async function generateDynamicAvatar(character, category, config) {
       'CLOTHING_STYLE': clothingPrompt
     });
 
-    // Prepare image data - resize to avoid Gemini IMAGE_OTHER errors
+    // Prepare image data - keep 768px for quality, only convert format
     const photoSizeKB = Math.round(facePhoto.length / 1024);
     log.debug(`🎭 [DYNAMIC AVATAR] Input photo: ${photoSizeKB}KB`);
 
@@ -1025,11 +1025,11 @@ async function generateDynamicAvatar(character, category, config) {
     const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
-      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 92 })
       .toBuffer();
     const resizedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.debug(`🎭 [DYNAMIC AVATAR] Resized to ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
+    log.debug(`🎭 [DYNAMIC AVATAR] Prepared: ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
 
     const base64Data = resizedPhoto.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = 'image/jpeg'; // Always JPEG after resize
@@ -2261,18 +2261,17 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const photoSizeKB = Math.round(facePhoto.length / 1024);
     log.info(`[AVATAR JOB ${jobId}] 📸 Input face photo: ${photoSizeKB}KB`);
 
-    // Resize face photo to 512px for Gemini (avoids IMAGE_OTHER errors with large inputs)
-    // Face photo is already a tight HQ crop from client (768x768) — no bg removal needed,
-    // Gemini only uses it as identity reference for facial features
+    // Keep face photo at 768px for quality — Gemini 2.5 Flash handles this fine
+    // Face photo is already a tight HQ crop from Python service (768x768 JPEG q95)
     const sharp = require('sharp');
     const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
-      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 92 })
       .toBuffer();
     const finalPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.info(`[AVATAR JOB ${jobId}] Resized to ${Math.round(finalPhoto.length / 1024)}KB for Gemini`);
+    log.info(`[AVATAR JOB ${jobId}] Prepared face photo: ${Math.round(finalPhoto.length / 1024)}KB for Gemini (was ${photoSizeKB}KB)`);
     const base64Data = finalPhoto.replace(/^data:image\/\w+;base64,/, '');
     const mimeType = finalPhoto.match(/^data:(image\/\w+);base64,/) ?
       finalPhoto.match(/^data:(image\/\w+);base64,/)[1] : 'image/jpeg';
@@ -3156,16 +3155,16 @@ router.post('/generate-clothing-avatars', authenticateToken, async (req, res) =>
     const isPNG = facePhoto.startsWith('data:image/png');
     log.info(`👔 [CLOTHING AVATARS] 📸 Input photo: ${photoSizeKB}KB, format: ${isPNG ? 'PNG' : 'JPEG'}`);
 
-    // Force resize to 512px max dimension for Gemini
+    // Keep face photo at 768px for quality — Gemini 2.5 Flash handles this fine
     const sharp = require('sharp');
     const base64Input = facePhoto.replace(/^data:image\/\w+;base64,/, '');
     const inputBuffer = Buffer.from(base64Input, 'base64');
     const resizedBuffer = await sharp(inputBuffer)
-      .resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 85 })
+      .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 92 })
       .toBuffer();
     const resizedPhoto = `data:image/jpeg;base64,${resizedBuffer.toString('base64')}`;
-    log.info(`👔 [CLOTHING AVATARS] Resized to ${resizedPhoto.length} chars (was ${facePhoto.length})`);
+    log.info(`👔 [CLOTHING AVATARS] Prepared: ${Math.round(resizedPhoto.length / 1024)}KB (was ${photoSizeKB}KB)`);
 
     // Prepare base64 data once for all requests
     const base64Data = resizedPhoto.replace(/^data:image\/\w+;base64,/, '');
