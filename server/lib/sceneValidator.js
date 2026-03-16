@@ -739,7 +739,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     return null;
   }
 
-  log.debug('[SEMANTIC] Evaluating semantic fidelity against story text...');
+  log.verbose('[SEMANTIC] Evaluating semantic fidelity against story text...');
 
   const model = genAI.getGenerativeModel({ model: VISION_MODEL });
   const startTime = Date.now();
@@ -813,7 +813,7 @@ async function evaluateSemanticFidelity(imageData, storyText, imagePrompt, scene
     if (semanticIssues.length > 0) {
       log.info(`🔍 [SEMANTIC] Found ${semanticIssues.length} semantic issues: ${semanticIssues.map(i => i.problem).join('; ')}`);
     } else {
-      log.debug(`[SEMANTIC] No semantic issues found (score: ${score}/10)`);
+      log.verbose(`[SEMANTIC] No semantic issues found (score: ${score}/10)`);
     }
 
     return {

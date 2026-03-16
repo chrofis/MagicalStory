@@ -686,7 +686,7 @@ async function evaluateAvatarFaceMatch(originalPhoto, generatedAvatar, geminiApi
       console.log(`📊 [AVATAR EVAL] model: gemini-2.5-flash, input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
     }
 
-    log.debug(`🔍 [AVATAR EVAL] Raw response: ${responseText.replace(/\n\s*/g, ' ').substring(0, 200)}...`);
+    log.verbose(`🔍 [AVATAR EVAL] Raw response: ${responseText.replace(/\n\s*/g, ' ').substring(0, 200)}...`);
 
     // Parse JSON response (new combined format)
     try {

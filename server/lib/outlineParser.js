@@ -55,7 +55,7 @@ function parseCharacterClothingBlock(content) {
     // Log the FULL Characters section to diagnose truncation
     const endIdx = content.indexOf('\n\n', idx);
     const fullSection = endIdx > idx ? content.substring(idx, endIdx) : content.substring(idx);
-    log.debug(`[PARSE-CLOTHING] Characters section (full): "${fullSection.replace(/\n/g, '\\n')}"`);
+    log.verbose(`[PARSE-CLOTHING] Characters section (full): "${fullSection.replace(/\n/g, '\\n')}"`);
   }
 
   // Try new per-character format first:
@@ -84,7 +84,7 @@ function parseCharacterClothingBlock(content) {
       const baseName = rawName.replace(/\s*\([^)]*\)\s*$/, '').trim();
       characters.push(rawName);
       characterClothing[baseName] = clothing;
-      log.debug(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
+      log.verbose(`[PARSE-CLOTHING] Parsed: "${baseName}" -> "${clothing}"`);
     }
     // Debug: log if Characters block found but no per-character clothing parsed
     if (characters.length === 0 && block.trim()) {
@@ -974,15 +974,15 @@ function extractCharacterNamesFromScene(sceneDescription) {
     'i'
   );
   const sectionMatch = sceneDescription.match(sectionPattern);
-  log.debug(`[SCENE-PARSER] Looking for Characters section in scene (${sceneDescription.length} chars)`);
-  log.debug(`[SCENE-PARSER] Section pattern match: ${sectionMatch ? 'FOUND' : 'NOT FOUND'}`);
+  log.verbose(`[SCENE-PARSER] Looking for Characters section in scene (${sceneDescription.length} chars)`);
+  log.verbose(`[SCENE-PARSER] Section pattern match: ${sectionMatch ? 'FOUND' : 'NOT FOUND'}`);
 
   if (sectionMatch && sectionMatch[1]) {
     const charactersSection = sectionMatch[1];
 
     // DEBUG: Log the captured section
-    log.debug(`[SCENE-PARSER] Characters section captured (${charactersSection.length} chars):`);
-    log.debug(`[SCENE-PARSER] Section content: "${charactersSection.substring(0, 500)}"`);
+    log.verbose(`[SCENE-PARSER] Characters section captured (${charactersSection.length} chars):`);
+    log.verbose(`[SCENE-PARSER] Section content: "${charactersSection.substring(0, 500)}"`);
 
     // Step 2: Extract names from the section
     // Pattern handles multiple formats:
@@ -1003,27 +1003,27 @@ function extractCharacterNamesFromScene(sceneDescription) {
 
     for (const pattern of namePatterns) {
       let match;
-      log.debug(`[SCENE-PARSER] Trying pattern: ${pattern.toString().substring(0, 80)}...`);
+      log.verbose(`[SCENE-PARSER] Trying pattern: ${pattern.toString().substring(0, 80)}...`);
       while ((match = pattern.exec(charactersSection)) !== null) {
         const name = match[1].trim();
-        log.debug(`[SCENE-PARSER]   Raw match: "${name}" at index ${match.index}`);
+        log.verbose(`[SCENE-PARSER]   Raw match: "${name}" at index ${match.index}`);
         // Skip if it looks like a section header or is too short
         if (name.length >= 2 && !name.match(/^(?:Characters|Charaktere|Personnages|Physical|Description)$/i)) {
           const nameLower = name.toLowerCase();
           if (!characterNames.includes(nameLower)) {
             characterNames.push(nameLower);
-            log.debug(`[SCENE-PARSER]   -> Added: "${nameLower}"`);
+            log.verbose(`[SCENE-PARSER]   -> Added: "${nameLower}"`);
           } else {
-            log.debug(`[SCENE-PARSER]   -> Duplicate, skipped`);
+            log.verbose(`[SCENE-PARSER]   -> Duplicate, skipped`);
           }
         } else {
-          log.debug(`[SCENE-PARSER]   -> Filtered out (header or too short)`);
+          log.verbose(`[SCENE-PARSER]   -> Filtered out (header or too short)`);
         }
       }
     }
 
     if (characterNames.length > 0) {
-      log.debug(`[SCENE-PARSER] Found ${characterNames.length} characters in section: ${characterNames.join(', ')}`);
+      log.verbose(`[SCENE-PARSER] Found ${characterNames.length} characters in section: ${characterNames.join(', ')}`);
       return characterNames;
     }
   }
@@ -1039,7 +1039,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
       }
     }
     if (characterNames.length > 0) {
-      log.debug(`[SCENE-PARSER] Found ${characterNames.length} characters from "Main characters:": ${characterNames.join(', ')}`);
+      log.verbose(`[SCENE-PARSER] Found ${characterNames.length} characters from "Main characters:": ${characterNames.join(', ')}`);
       return characterNames;
     }
   }
@@ -1056,13 +1056,13 @@ function extractCharacterNamesFromScene(sceneDescription) {
     }
   }
   if (characterNames.length > 0) {
-    log.debug(`[SCENE-PARSER] Found ${characterNames.length} characters from Composition section: ${characterNames.join(', ')}`);
+    log.verbose(`[SCENE-PARSER] Found ${characterNames.length} characters from Composition section: ${characterNames.join(', ')}`);
     return characterNames;
   }
 
   // Step 5: Fallback - look for character headers anywhere in the scene (bold format)
   // This handles scenes without a dedicated Characters section
-  log.debug(`[SCENE-PARSER] No Characters section found, using text matching`);
+  log.verbose(`[SCENE-PARSER] No Characters section found, using text matching`);
 
   // Look for patterns like "* **Name:**" followed by action/position keywords
   const fallbackPattern = /[\s\-\*\u2022]+\*\*([^*:]+?)\*\*\s*:[\s\S]*?(?:ACTION|POSITION|EXPRESSION|action|position|expression)/gi;
@@ -1075,7 +1075,7 @@ function extractCharacterNamesFromScene(sceneDescription) {
   }
 
   if (characterNames.length > 0) {
-    log.debug(`[SCENE-PARSER] Text matching found ${characterNames.length} characters: ${characterNames.join(', ')}`);
+    log.verbose(`[SCENE-PARSER] Text matching found ${characterNames.length} characters: ${characterNames.join(', ')}`);
   }
 
   return characterNames;

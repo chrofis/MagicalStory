@@ -1826,7 +1826,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   for (const figure of allDetections.figures) {
     if (figure.name && figure.name !== 'UNKNOWN') {
       charToDetectionFigure[figure.name.toLowerCase()] = figure;
-      log.debug(`📦 [BBOX-ENRICH] Character identified: "${figure.name}" (${figure.confidence}) → "${figure.label}"`);
+      log.verbose(`📦 [BBOX-ENRICH] Character identified: "${figure.name}" (${figure.confidence}) → "${figure.label}"`);
     } else {
       unknownFigures.push(figure);
     }
@@ -1961,7 +1961,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
           if (figure) {
             bestMatch = { ...figure, elementType: 'figure' };
             matchedCharacter = charName;
-            log.debug(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → direct match to "${figure.label}"`);
+            log.verbose(`📦 [BBOX-ENRICH] Issue mentions "${charName}" → direct match to "${figure.label}"`);
             break;
           }
         }
@@ -2030,7 +2030,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
         matchMethod: matchedCharacter ? 'character' : 'fallback',
         matchedCharacter: matchedCharacter || (bestMatch.name !== 'UNKNOWN' ? bestMatch.name : null)
       });
-      log.debug(`📦 [BBOX-ENRICH] Matched: "${issue.description.substring(0, 30)}..." → "${bestMatch.label}" (${matchedCharacter ? 'character' : 'fallback'})`);
+      log.verbose(`📦 [BBOX-ENRICH] Matched: "${issue.description.substring(0, 30)}..." → "${bestMatch.label}" (${matchedCharacter ? 'character' : 'fallback'})`);
     } else {
       log.warn(`⚠️ [BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
     }
