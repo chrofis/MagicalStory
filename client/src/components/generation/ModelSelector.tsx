@@ -151,6 +151,27 @@ export const AVATAR_MODELS = {
 
 export type AvatarModelKey = keyof typeof AVATAR_MODELS;
 
+// Available story avatar models (styled avatar conversion during story generation)
+export const STORY_AVATAR_MODELS = {
+  'gemini-2.5-flash-image': {
+    description: 'Gemini 2.5 Flash Image - Fast styled avatars (~$0.04)',
+    descriptionDe: 'Gemini 2.5 Flash Image - Schnelle Style-Avatare (~$0.04)',
+    descriptionFr: 'Gemini 2.5 Flash Image - Avatars stylisés rapides (~$0.04)'
+  },
+  'gemini-3-pro-image-preview': {
+    description: 'Gemini 3 Pro Image - Higher quality (preview)',
+    descriptionDe: 'Gemini 3 Pro Image - Höhere Qualität (Vorschau)',
+    descriptionFr: 'Gemini 3 Pro Image - Qualité supérieure (aperçu)'
+  },
+  'grok-imagine': {
+    description: 'Grok Imagine (xAI) - Styled avatars with ref images ($0.02)',
+    descriptionDe: 'Grok Imagine (xAI) - Style-Avatare mit Ref-Bildern ($0.02)',
+    descriptionFr: 'Grok Imagine (xAI) - Avatars stylisés avec images ref ($0.02)'
+  }
+} as const;
+
+export type StoryAvatarModelKey = keyof typeof STORY_AVATAR_MODELS;
+
 export interface ModelSelections {
   ideaModel: TextModelKey | null;  // null = use server default
   outlineModel: TextModelKey | null;
@@ -160,8 +181,9 @@ export interface ModelSelections {
   imageModel: ImageModelKey | null;
   coverImageModel: ImageModelKey | null;
   qualityModel: QualityModelKey | null;
-  imageBackend: ImageBackendKey | null;  // gemini or runware
-  avatarModel: AvatarModelKey | null;  // Avatar generation model
+  imageBackend: ImageBackendKey | null;  // gemini or runware (for repair)
+  avatarModel: AvatarModelKey | null;  // Character creation avatar model
+  storyAvatarModel: StoryAvatarModelKey | null;  // Styled avatar model during story generation
 }
 
 interface ModelSelectorProps {
@@ -317,13 +339,23 @@ export function ModelSelector({ selections, onChange }: ModelSelectorProps) {
           language={language}
         />
 
-        {/* Avatar Generation Model */}
+        {/* Character Avatar Model (used during character creation) */}
         <ModelDropdown
-          label={language === 'de' ? 'Avatar-Modell' : language === 'fr' ? 'Modèle d\'avatar' : 'Avatar Model'}
+          label={language === 'de' ? 'Charakter-Avatare' : language === 'fr' ? 'Avatars personnage' : 'Character Avatars'}
           icon={<Image size={12} />}
           value={selections.avatarModel}
           options={AVATAR_MODELS}
           onChange={(v) => updateSelection('avatarModel', v)}
+          language={language}
+        />
+
+        {/* Story Avatar Model (styled avatar conversion during story generation) */}
+        <ModelDropdown
+          label={language === 'de' ? 'Story-Avatare' : language === 'fr' ? 'Avatars histoire' : 'Story Avatars'}
+          icon={<Sparkles size={12} />}
+          value={selections.storyAvatarModel}
+          options={STORY_AVATAR_MODELS}
+          onChange={(v) => updateSelection('storyAvatarModel', v)}
           language={language}
         />
       </div>

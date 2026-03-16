@@ -48,6 +48,7 @@ const MODEL_DEFAULTS: ModelSelections = {
   qualityModel: null,
   imageBackend: null,
   avatarModel: null,
+  storyAvatarModel: null,
 };
 
 /**

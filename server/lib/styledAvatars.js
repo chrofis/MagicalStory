@@ -209,7 +209,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageBackendOverride = null) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null) {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   const hasClothing = !!clothingDescription;
@@ -297,7 +297,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     for (let attempt = 1; attempt <= MAX_STYLED_AVATAR_RETRIES; attempt++) {
       // Call image API to convert the avatar
       // Use 'avatar' evaluation type (lightweight, no quality retry)
-      const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar', null, null, null, '', imageBackendOverride);
+      const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar', null, imageModelOverride, null, '');
 
       if (!result || !result.imageData || typeof result.imageData !== 'string') {
         log.warn(`⚠️ [STYLED AVATAR] No valid image returned (attempt ${attempt}/${MAX_STYLED_AVATAR_RETRIES})`);
@@ -437,7 +437,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageBackendOverride = null) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -457,7 +457,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageBackendOverride);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride);
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -481,7 +481,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
  * @param {Array<{pageNumber, clothingCategory, characterNames}>} pageRequirements - What's needed for each page
  * @returns {Promise<Map>} Map of cacheKey -> styledAvatar
  */
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageBackendOverride = null) {
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // Skip for realistic style (no conversion needed)
@@ -725,7 +725,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   const conversionPromises = [];
   for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, character }] of neededAvatars) {
     conversionPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageBackendOverride)
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride)
         .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
         .catch(error => {
           // Bug #14 fix: Include stack trace for better debugging
