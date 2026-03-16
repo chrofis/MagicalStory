@@ -2481,11 +2481,10 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     job.progress = 70;
     job.message = 'Evaluating generated avatars...';
 
-    // Store results, extract faceThumbnails, and aggregate token usage
-    for (const { category, imageData, prompt, inputTokens, outputTokens } of generatedAvatars) {
+    // Store results and aggregate token usage
+    for (const { category, prompt, inputTokens, outputTokens } of generatedAvatars) {
       if (prompt) results.prompts[category] = prompt;
 
-      // Aggregate token usage by model
       if (inputTokens > 0 || outputTokens > 0) {
         if (!results.tokenUsage.byModel[geminiModelId]) {
           results.tokenUsage.byModel[geminiModelId] = { input_tokens: 0, output_tokens: 0 };
@@ -2493,36 +2492,40 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         results.tokenUsage.byModel[geminiModelId].input_tokens += inputTokens;
         results.tokenUsage.byModel[geminiModelId].output_tokens += outputTokens;
       }
-
-      if (imageData) {
-        results[category] = imageData;
-        // Extract face thumbnail from 2x2 grid (same as sync endpoint)
-        try {
-          const splitResult = await splitGridAndExtractFace(imageData);
-          if (splitResult.success) {
-            if (splitResult.faceThumbnail) {
-              if (!results.faceThumbnails) results.faceThumbnails = {};
-              results.faceThumbnails[category] = splitResult.faceThumbnail;
-              log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
-            }
-            if (splitResult.quadrants?.bodyFront) {
-              if (!results.bodyThumbnails) results.bodyThumbnails = {};
-              results.bodyThumbnails[category] = splitResult.quadrants.bodyFront;
-              log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} body thumbnail`);
-            }
-          }
-        } catch (err) {
-          log.warn(`[AVATAR JOB ${jobId}] Face thumbnail extraction failed for ${category}: ${err.message}`);
-        }
-      }
     }
 
-    // Run evaluation on ALL avatars in parallel to extract clothing for each (optional)
+    // Store image data
+    for (const { category, imageData } of generatedAvatars) {
+      if (imageData) results[category] = imageData;
+    }
+
+    // Extract face/body thumbnails from 2x2 grids — ALL in parallel
+    const avatarsWithImages = generatedAvatars.filter(a => a.imageData);
+    const splitPromises = avatarsWithImages.map(async ({ category, imageData }) => {
+      try {
+        const splitResult = await splitGridAndExtractFace(imageData);
+        if (splitResult.success) {
+          if (splitResult.faceThumbnail) {
+            if (!results.faceThumbnails) results.faceThumbnails = {};
+            results.faceThumbnails[category] = splitResult.faceThumbnail;
+            log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} face thumbnail`);
+          }
+          if (splitResult.quadrants?.bodyFront) {
+            if (!results.bodyThumbnails) results.bodyThumbnails = {};
+            results.bodyThumbnails[category] = splitResult.quadrants.bodyFront;
+            log.debug(`✅ [AVATAR JOB ${jobId}] Extracted ${category} body thumbnail`);
+          }
+        }
+      } catch (err) {
+        log.warn(`[AVATAR JOB ${jobId}] Face thumbnail extraction failed for ${category}: ${err.message}`);
+      }
+    });
+    // Run grid splits AND evaluation in parallel (grid splits use Python, evals use Gemini — no conflict)
     if (ENABLE_AVATAR_EVALUATION) {
     const avatarsToEvaluate = generatedAvatars.filter(a => a.imageData);
     log.debug(`🔍 [AVATAR JOB ${jobId}] Checking evaluation: avatarsToEvaluate=${avatarsToEvaluate.length}, geminiApiKey=${!!geminiApiKey}`);
     if (avatarsToEvaluate.length > 0 && geminiApiKey) {
-      log.debug(`🔍 [AVATAR JOB ${jobId}] Starting PARALLEL evaluation of ${avatarsToEvaluate.length} avatars...`);
+      log.debug(`🔍 [AVATAR JOB ${jobId}] Starting PARALLEL grid splits + evaluation of ${avatarsToEvaluate.length} avatars...`);
       job.progress = 80;
       job.message = 'Extracting traits and clothing...';
 
@@ -2536,8 +2539,9 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
           return { category, faceMatchResult };
         });
 
-        // Wait for both photo analysis and avatar evaluations (zero added latency)
-        const [photoTraitsResult, ...evalResults] = await Promise.all([
+        // Wait for grid splits + photo analysis + avatar evaluations ALL in parallel
+        const [, photoTraitsResult, ...evalResults] = await Promise.all([
+          Promise.all(splitPromises),  // grid splits (Python) — overlapped with Gemini evals
           photoTraitsPromise,
           ...evalPromises
         ]);
@@ -2735,6 +2739,8 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     }
     } else {
       log.debug(`⏭️ [AVATAR JOB ${jobId}] Skipping face evaluation (ENABLE_AVATAR_EVALUATION=false)`);
+      // Still need to wait for grid splits if evaluation was skipped
+      await Promise.all(splitPromises);
     }
 
     // Directly update character in database with extracted traits and clothing
