@@ -2478,6 +2478,23 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
     const generationPromises = Object.keys(clothingCategories).map(cat => generateSingleAvatarForJob(cat));
     const generatedAvatars = await Promise.all(generationPromises);
 
+    // Store images in results immediately
+    for (const { category, imageData } of generatedAvatars) {
+      if (imageData) results[category] = imageData;
+    }
+
+    // Return images to client IMMEDIATELY — evaluation + DB save continue in background
+    // Client shows avatars right away (~5s), traits/clothing arrive via DB on next character load
+    if (results.standard) {
+      results.status = 'complete';
+      results.generatedAt = new Date().toISOString();
+      job.status = 'complete';
+      job.progress = 100;
+      job.message = 'Avatars ready';
+      job.result = results;
+      log.info(`⚡ [AVATAR JOB ${jobId}] Images ready in ${Date.now() - generationStart}ms — returning to client, continuing evaluation in background`);
+    }
+
     job.progress = 70;
     job.message = 'Evaluating generated avatars...';
 
@@ -2492,11 +2509,6 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
         results.tokenUsage.byModel[geminiModelId].input_tokens += inputTokens;
         results.tokenUsage.byModel[geminiModelId].output_tokens += outputTokens;
       }
-    }
-
-    // Store image data
-    for (const { category, imageData } of generatedAvatars) {
-      if (imageData) results[category] = imageData;
     }
 
     // Extract face/body thumbnails from 2x2 grids — ALL in parallel
@@ -3004,21 +3016,16 @@ async function processAvatarJobInBackground(jobId, bodyParams, user, geminiApiKe
       }
     }
 
+    // Finalize results (images were already returned to client via early completion)
     results.status = 'complete';
-    results.generatedAt = new Date().toISOString();
-    // Ensure dbSaveSuccessful is set (true if we got here without error)
+    if (!results.generatedAt) results.generatedAt = new Date().toISOString();
     if (results.dbSaveSuccessful === undefined) results.dbSaveSuccessful = true;
 
     if (!results.standard) {
       throw new Error('Failed to generate standard avatar');
     }
 
-    job.status = 'complete';
-    job.progress = 100;
-    job.message = 'Avatar generation complete';
-    job.result = results;
-
-    log.debug(`✅ [AVATAR JOB ${jobId}] Completed in ${Date.now() - generationStart}ms`);
+    log.debug(`✅ [AVATAR JOB ${jobId}] Fully completed (eval + DB) in ${Date.now() - generationStart}ms`);
 
     // Log activity
     try {
@@ -4070,8 +4077,10 @@ router.get('/avatar-jobs/:jobId', authenticateToken, async (req, res) => {
   }
 
   if (job.status === 'complete') {
-    // Return the result and delete the job
+    // Return the result — keep job alive briefly so background processing can update it
     const result = job.result;
+    // Delete job after first read (client stops polling on complete)
+    // Background processing already has a reference to job.result and updates it in-place
     avatarJobs.delete(jobId);
     return res.json({
       jobId,
