@@ -233,29 +233,7 @@ async function packReferences(refs = {}) {
     previousImage = null,
   } = refs;
 
-  const slots = [];
-
-  // ── Slot 1: Visual Bible grid + landmark photos ──
-  const contextImages = [];
-
-  if (visualBibleGrid) {
-    contextImages.push(visualBibleGrid); // Buffer
-  }
-
-  for (const lm of landmarkPhotos) {
-    if (lm.photoData && lm.photoData.startsWith('data:image')) {
-      const base64 = lm.photoData.replace(/^data:image\/\w+;base64,/, '');
-      contextImages.push(Buffer.from(base64, 'base64'));
-    }
-  }
-
-  if (contextImages.length > 0) {
-    const stitched = await stitchImagesHorizontally(contextImages, 768);
-    slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-    log.info(`🎨 [GROK] Slot 1: VB grid + ${landmarkPhotos.length} landmark(s) stitched`);
-  }
-
-  // ── Slot 2: All character photos stitched into one grid ──
+  // Extract character photo buffers
   const charBuffers = [];
   for (const photoData of characterPhotos) {
     const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
@@ -265,16 +243,80 @@ async function packReferences(refs = {}) {
     }
   }
 
-  if (charBuffers.length > 0) {
-    const stitched = await stitchImagesHorizontally(charBuffers, 768);
-    slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
-    log.info(`🎨 [GROK] Slot 2: ${charBuffers.length} character photo(s) stitched`);
+  // Extract landmark photo buffers
+  const landmarkBuffers = [];
+  for (const lm of landmarkPhotos) {
+    if (lm.photoData && lm.photoData.startsWith('data:image')) {
+      const base64 = lm.photoData.replace(/^data:image\/\w+;base64,/, '');
+      landmarkBuffers.push(Buffer.from(base64, 'base64'));
+    }
   }
 
-  // ── Slot 3: Previous scene image ──
-  if (previousImage && previousImage.startsWith('data:image') && slots.length < 3) {
-    slots.push(previousImage);
-    log.info(`🎨 [GROK] Slot 3: Previous scene image`);
+  // Count how many character slots we need (max 2, since 1 slot reserved for VB/landmarks)
+  const charCount = charBuffers.length;
+  const slots = [];
+
+  // Strategy: maximize character image quality by giving them separate slots
+  //   1 char:  Slot 1 = VB grid, Slot 2 = landmark(s), Slot 3 = character
+  //   2 chars: Slot 1 = VB + landmarks stitched, Slot 2 = char 1, Slot 3 = char 2
+  //   3+ chars: Slot 1 = VB + landmarks stitched, Slot 2 = chars first half, Slot 3 = chars second half
+
+  if (charCount <= 1) {
+    // ── 0-1 characters: spread VB and landmarks across separate slots ──
+    if (visualBibleGrid) {
+      const resized = await sharp(visualBibleGrid).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: VB grid`);
+    }
+
+    if (landmarkBuffers.length > 0 && slots.length < 3) {
+      const stitched = await stitchImagesHorizontally(landmarkBuffers, 768);
+      slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: ${landmarkBuffers.length} landmark(s)`);
+    }
+
+    if (charCount === 1 && slots.length < 3) {
+      const resized = await sharp(charBuffers[0]).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: 1 character photo`);
+    }
+  } else {
+    // ── 2+ characters: VB + landmarks share one slot, characters get 2 slots ──
+    const contextImages = [];
+    if (visualBibleGrid) contextImages.push(visualBibleGrid);
+    contextImages.push(...landmarkBuffers);
+
+    if (contextImages.length > 0) {
+      const stitched = await stitchImagesHorizontally(contextImages, 768);
+      slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+      log.info(`🎨 [GROK] Slot ${slots.length}: VB grid + ${landmarkBuffers.length} landmark(s) stitched`);
+    }
+
+    if (charCount === 2) {
+      // 2 characters: one per slot
+      for (const buf of charBuffers) {
+        if (slots.length >= 3) break;
+        const resized = await sharp(buf).resize({ height: 768, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+        slots.push(`data:image/jpeg;base64,${resized.toString('base64')}`);
+      }
+      log.info(`🎨 [GROK] Slot ${slots.length - 1}-${slots.length}: 2 character photos (separate)`);
+    } else {
+      // 3+ characters: split into two groups, stitch each
+      const mid = Math.ceil(charCount / 2);
+      const group1 = charBuffers.slice(0, mid);
+      const group2 = charBuffers.slice(mid);
+
+      if (group1.length > 0 && slots.length < 3) {
+        const stitched = await stitchImagesHorizontally(group1, 768);
+        slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: ${group1.length} characters stitched`);
+      }
+      if (group2.length > 0 && slots.length < 3) {
+        const stitched = await stitchImagesHorizontally(group2, 768);
+        slots.push(`data:image/jpeg;base64,${stitched.toString('base64')}`);
+        log.info(`🎨 [GROK] Slot ${slots.length}: ${group2.length} characters stitched`);
+      }
+    }
   }
 
   // Grok edit with single image: output matches input aspect ratio (ignores aspect_ratio param).
@@ -292,16 +334,16 @@ async function packReferences(refs = {}) {
           .jpeg({ quality: 90 })
           .toBuffer();
         squareSlots.push(`data:image/jpeg;base64,${padded.toString('base64')}`);
-        log.debug(`🎨 [GROK] Padded ref image ${meta.width}x${meta.height} → ${size}x${size}`);
+        log.debug(`🎨 [GROK] Padded ref ${meta.width}x${meta.height} → ${size}x${size}`);
       } else {
         squareSlots.push(slot);
       }
     } catch {
-      squareSlots.push(slot); // fallback: use as-is
+      squareSlots.push(slot);
     }
   }
 
-  log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots`);
+  log.info(`🎨 [GROK] Packed ${squareSlots.length}/3 reference slots (${charCount} chars, ${landmarkBuffers.length} landmarks, VB: ${visualBibleGrid ? 'yes' : 'no'})`);
   return squareSlots;
 }
 
