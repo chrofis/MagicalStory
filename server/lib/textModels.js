@@ -562,6 +562,202 @@ async function callGeminiTextAPI(prompt, maxTokens, modelId) {
 }
 
 /**
+ * Call xAI Grok API (OpenAI-compatible)
+ */
+async function callXaiAPI(prompt, maxTokens, modelId, options = {}) {
+  const apiKey = process.env.XAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('xAI API key not configured (XAI_API_KEY)');
+  }
+
+  const timeoutMs = Math.max(300000, 180000 + Math.ceil(maxTokens / 1000) * 3000);
+
+  const messages = [{ role: 'user', content: prompt }];
+  if (options.prefill) {
+    // xAI supports assistant prefill like OpenAI
+    messages.push({ role: 'assistant', content: options.prefill });
+  }
+
+  const data = await withRetry(async () => {
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: maxTokens,
+        messages
+      }),
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      const error = new Error(`xAI API error (${res.status}): ${errorText}`);
+      error.status = res.status;
+      throw error;
+    }
+
+    return res.json();
+  }, { maxRetries: 2, baseDelay: 2000 });
+
+  const inputTokens = data.usage?.prompt_tokens || 0;
+  const outputTokens = data.usage?.completion_tokens || 0;
+
+  if (inputTokens > 0 || outputTokens > 0) {
+    log.debug(`📊 [XAI] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+  }
+
+  const responseText = data.choices?.[0]?.message?.content || '';
+  // Prepend prefill if we used it (xAI continues after prefill)
+  const fullText = options.prefill ? options.prefill + responseText : responseText;
+
+  return {
+    text: fullText,
+    usage: {
+      input_tokens: inputTokens,
+      output_tokens: outputTokens
+    }
+  };
+}
+
+/**
+ * Call xAI Grok API with streaming (OpenAI-compatible SSE)
+ */
+async function callXaiAPIStreaming(prompt, maxTokens, modelId, onChunk, options = {}) {
+  const apiKey = process.env.XAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('xAI API key not configured (XAI_API_KEY)');
+  }
+
+  const messages = [{ role: 'user', content: prompt }];
+  if (options.prefill) {
+    messages.push({ role: 'assistant', content: options.prefill });
+  }
+
+  return await withRetry(async () => {
+    console.log(`🌊 [STREAM] Starting streaming request to xAI (${maxTokens} max tokens)...`);
+    const startTime = Date.now();
+
+    const timeoutMs = Math.max(1500000, 900000 + Math.ceil(maxTokens / 1000) * 15000);
+    const INACTIVITY_TIMEOUT_MS = 120000;
+    const controller = new AbortController();
+    const maxTimer = setTimeout(() => controller.abort(new Error(`streaming timeout after ${Math.round(timeoutMs / 1000)}s`)), timeoutMs);
+    let inactivityTimer;
+    const resetInactivity = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => controller.abort(new Error('stream inactivity timeout (120s)')), INACTIVITY_TIMEOUT_MS);
+    };
+
+    try {
+      const res = await fetch('https://api.x.ai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelId,
+          max_tokens: maxTokens,
+          stream: true,
+          messages
+        }),
+        signal: controller.signal
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        const error = new Error(`xAI streaming API error (${res.status}): ${errorText}`);
+        error.status = res.status;
+        throw error;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      let buffer = '';
+      let inputTokens = 0;
+      let outputTokens = 0;
+      let firstChunkTime = null;
+      resetInactivity();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (done) {
+            log.debug('🌊 [XAI STREAM] Stream complete');
+            break;
+          }
+
+          resetInactivity();
+
+          if (!firstChunkTime && value) {
+            firstChunkTime = Date.now();
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+
+            const data = line.slice(6);
+            if (data === '[DONE]') continue;
+
+            try {
+              const event = JSON.parse(data);
+
+              // OpenAI-compatible streaming format
+              if (event.choices?.[0]?.delta?.content) {
+                const chunk = event.choices[0].delta.content;
+                fullText += chunk;
+                if (onChunk) {
+                  onChunk(chunk, fullText);
+                }
+              }
+
+              // Usage info (may come in the final chunk)
+              if (event.usage) {
+                inputTokens = event.usage.prompt_tokens || inputTokens;
+                outputTokens = event.usage.completion_tokens || outputTokens;
+              }
+            } catch {
+              // Skip malformed JSON
+            }
+          }
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      log.debug(`📊 [XAI STREAM] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}`);
+
+      const responseText = options.prefill ? options.prefill + fullText : fullText;
+
+      return {
+        text: responseText,
+        usage: {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens
+        },
+        modelId,
+        ttft: firstChunkTime ? firstChunkTime - startTime : null
+      };
+    } finally {
+      clearTimeout(maxTimer);
+      clearTimeout(inactivityTimer);
+    }
+  }, { maxRetries: 2, baseDelay: 2000 });
+}
+
+/**
  * Main text model caller - routes to appropriate provider
  * @param {string} prompt - The prompt to send
  * @param {number} maxTokens - Maximum tokens to generate (capped to model limit)
@@ -590,6 +786,9 @@ async function callTextModel(prompt, maxTokens = 4096, modelOverride = null, opt
       break;
     case 'google':
       result = await callGeminiTextAPI(prompt, effectiveMaxTokens, model.modelId);
+      break;
+    case 'xai':
+      result = await callXaiAPI(prompt, effectiveMaxTokens, model.modelId, options);
       break;
     default:
       throw new Error(`Unknown provider: ${model.provider}`);
@@ -627,6 +826,9 @@ async function callTextModelStreaming(prompt, maxTokens = 4096, onChunk = null, 
       break;
     case 'google':
       result = await callGeminiTextAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk);
+      break;
+    case 'xai':
+      result = await callXaiAPIStreaming(prompt, effectiveMaxTokens, model.modelId, onChunk, options);
       break;
     default:
       // Fall back to non-streaming for unknown providers
@@ -786,6 +988,8 @@ module.exports = {
   callAnthropicAPIStreaming,
   callGeminiTextAPI,
   callGeminiTextAPIStreaming,
+  callXaiAPI,
+  callXaiAPIStreaming,
   callClaudeAPI,
 
   // Text consistency check

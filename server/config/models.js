@@ -42,6 +42,24 @@ const TEXT_MODELS = {
     modelId: 'gemini-pro-latest',
     maxOutputTokens: 65536,
     description: 'Gemini Pro Latest (2.5 Pro) - High quality'
+  },
+  'grok-3-mini': {
+    provider: 'xai',
+    modelId: 'grok-3-mini',
+    maxOutputTokens: 32768,
+    description: 'Grok 3 Mini - Fast and cheap ($0.30/$0.50 per 1M tokens)'
+  },
+  'grok-3': {
+    provider: 'xai',
+    modelId: 'grok-3',
+    maxOutputTokens: 32768,
+    description: 'Grok 3 - Good quality ($3.00/$15.00 per 1M tokens)'
+  },
+  'grok-4-fast': {
+    provider: 'xai',
+    modelId: 'grok-4-1-fast-non-reasoning',
+    maxOutputTokens: 65536,
+    description: 'Grok 4 Fast - Very cheap, 2M context ($0.20/$0.50 per 1M tokens)'
   }
 };
 
@@ -219,6 +237,12 @@ const MODEL_PRICING = {
   'gemini-2.5-flash': { input: 0.30, output: 2.50, thinking: 2.50 },
   'gemini-2.0-flash': { input: 0.10, output: 0.40, thinking: 0.40 },
   'gemini-pro-latest': { input: 1.25, output: 10.00, thinking: 10.00 },
+
+  // xAI Grok models (Mar 2026)
+  // Source: https://docs.x.ai/docs/models
+  'grok-3-mini': { input: 0.30, output: 0.50 },
+  'grok-3': { input: 3.00, output: 15.00 },
+  'grok-4-1-fast-non-reasoning': { input: 0.20, output: 0.50 },
 
   // Image generation models (fixed cost per image, not per token)
   'gemini-2.5-flash-image': { perImage: 0.04 },

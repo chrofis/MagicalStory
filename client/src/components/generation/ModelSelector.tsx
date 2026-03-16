@@ -32,6 +32,24 @@ export const TEXT_MODELS = {
     description: 'Gemini 2.0 Flash - Very fast',
     descriptionDe: 'Gemini 2.0 Flash - Sehr schnell',
     descriptionFr: 'Gemini 2.0 Flash - Très rapide'
+  },
+  'grok-3-mini': {
+    provider: 'xai',
+    description: 'Grok 3 Mini (xAI) - Fast & cheap ($0.30/$0.50 per 1M)',
+    descriptionDe: 'Grok 3 Mini (xAI) - Schnell & günstig ($0.30/$0.50 pro 1M)',
+    descriptionFr: 'Grok 3 Mini (xAI) - Rapide & économique ($0.30/$0.50 par 1M)'
+  },
+  'grok-3': {
+    provider: 'xai',
+    description: 'Grok 3 (xAI) - Good quality ($3.00/$15.00 per 1M)',
+    descriptionDe: 'Grok 3 (xAI) - Gute Qualität ($3.00/$15.00 pro 1M)',
+    descriptionFr: 'Grok 3 (xAI) - Bonne qualité ($3.00/$15.00 par 1M)'
+  },
+  'grok-4-fast': {
+    provider: 'xai',
+    description: 'Grok 4 Fast (xAI) - Very cheap, 2M context ($0.20/$0.50 per 1M)',
+    descriptionDe: 'Grok 4 Fast (xAI) - Sehr günstig, 2M Kontext ($0.20/$0.50 pro 1M)',
+    descriptionFr: 'Grok 4 Fast (xAI) - Très économique, 2M contexte ($0.20/$0.50 par 1M)'
   }
 } as const;
 
