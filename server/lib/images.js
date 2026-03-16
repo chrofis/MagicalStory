@@ -2546,9 +2546,24 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
 
     try {
       const grokModel = modelId === 'grok-imagine-pro' ? GROK_MODELS.PRO : GROK_MODELS.STANDARD;
-      const refImages = await packReferences({
-        visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
-      });
+
+      // For avatars: each reference image (face, body, style sample) gets its own slot
+      // For scenes: use normal packing (VB grid + landmarks + characters)
+      let refImages;
+      if (evaluationType === 'avatar' && characterPhotos?.length > 0) {
+        refImages = [];
+        for (const photoData of characterPhotos.slice(0, 3)) {
+          const photoUrl = typeof photoData === 'string' ? photoData : photoData?.photoUrl;
+          if (photoUrl && photoUrl.startsWith('data:image')) {
+            refImages.push(photoUrl);
+          }
+        }
+        log.info(`🎨 [GROK] Avatar mode: ${refImages.length} reference images as separate slots`);
+      } else {
+        refImages = await packReferences({
+          visualBibleGrid, landmarkPhotos, characterPhotos, previousImage,
+        });
+      }
 
       let result;
       if (refImages.length > 0) {

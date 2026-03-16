@@ -1264,6 +1264,8 @@ function buildPhysicalTraitsForAvatar(character) {
  * @returns {Promise<Object>} - { success, imageData, clothing, costumeType, artStyle, error? }
  */
 async function generateStyledCostumedAvatar(character, config, artStyle) {
+  // NOTE: Costumed avatars always use Gemini — they require 2x2 grid generation
+  // with system instructions and grid splitting, which Grok's edit endpoint can't do.
   const startTime = Date.now();
   const geminiApiKey = process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
