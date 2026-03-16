@@ -4,6 +4,8 @@ import { useLanguage } from '@/context/LanguageContext';
 const footerTexts = {
   en: {
     themes: 'Themes',
+    occasions: 'Gift Ideas',
+    compare: 'Compare',
     science: 'Science',
     terms: 'Terms of Service',
     privacy: 'Privacy Policy',
@@ -14,6 +16,8 @@ const footerTexts = {
   },
   de: {
     themes: 'Themen',
+    occasions: 'Geschenkideen',
+    compare: 'Vergleich',
     science: 'Forschung',
     terms: 'Nutzungsbedingungen',
     privacy: 'Datenschutz',
@@ -24,6 +28,8 @@ const footerTexts = {
   },
   fr: {
     themes: 'Thèmes',
+    occasions: 'Idées cadeaux',
+    compare: 'Comparaison',
     science: 'Science',
     terms: 'Conditions d\'Utilisation',
     privacy: 'Confidentialité',
@@ -45,6 +51,14 @@ export function Footer() {
         <div className="flex items-center gap-4 flex-wrap">
           <Link to="/themes" className="hover:text-indigo-600 hover:underline">
             {texts.themes}
+          </Link>
+          <span className="text-stone-300">|</span>
+          <Link to="/anlass" className="hover:text-indigo-600 hover:underline">
+            {texts.occasions}
+          </Link>
+          <span className="text-stone-300">|</span>
+          <Link to="/vergleich" className="hover:text-indigo-600 hover:underline">
+            {texts.compare}
           </Link>
           <span className="text-stone-300">|</span>
           <Link to="/science" className="hover:text-indigo-600 hover:underline">
