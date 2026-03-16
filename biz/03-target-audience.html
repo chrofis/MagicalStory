@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Target Audience & Personas — MagicalStory.ch</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            surface: { 50: '#fafaf9', 100: '#1a1e2e', 200: '#1e2538', 300: '#252d42', 400: '#2e3750', 500: '#3a4460' },
+            amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e' },
+            slate: { 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+    .nav-link { transition: color 0.2s; }
+    .nav-link:hover { color: #fbbf24; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1a1e2e; }
+    ::-webkit-scrollbar-thumb { background: #2e3750; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a4460; }
+
+    /* Persona cards */
+    .persona-card { transition: all 0.3s ease; cursor: pointer; }
+    .persona-card:hover { border-color: rgba(245, 158, 11, 0.4); }
+    .persona-content { max-height: 0; overflow: hidden; transition: max-height 0.4s ease, opacity 0.3s ease; opacity: 0; }
+    .persona-card.open .persona-content { max-height: 2000px; opacity: 1; }
+    .persona-card.open { border-color: rgba(245, 158, 11, 0.5); }
+    .chevron-icon { transition: transform 0.3s ease; }
+    .persona-card.open .chevron-icon { transform: rotate(180deg); }
+
+    /* Map tooltip */
+    .map-tooltip {
+      position: absolute;
+      background: #1e2538;
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 0.75rem;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 50;
+      white-space: nowrap;
+    }
+    .map-tooltip.visible { opacity: 1; }
+
+    /* City dot */
+    .city-dot { cursor: pointer; transition: r 0.15s ease; }
+    .city-dot:hover { r: 7; }
+
+    /* Heatmap cell */
+    .heatmap-cell { transition: transform 0.15s ease, box-shadow 0.15s ease; cursor: default; }
+    .heatmap-cell:hover { transform: scale(1.05); box-shadow: 0 0 12px rgba(245, 158, 11, 0.3); }
+
+    /* Audience card */
+    .audience-card { transition: border-color 0.2s ease, transform 0.15s ease; }
+    .audience-card:hover { border-color: rgba(245, 158, 11, 0.4); transform: translateY(-2px); }
+
+    /* Budget input */
+    .budget-input:focus { outline: none; border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2); }
+
+    /* Stat bar animation */
+    .stat-bar-fill { transition: width 0.6s ease; }
+
+    /* Segment bar */
+    .segment-bar { height: 8px; border-radius: 4px; transition: width 0.5s ease; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fade-in { animation: fadeInUp 0.4s ease-out both; }
+  </style>
+</head>
+<body class="min-h-screen pt-8">
+
+  <!-- Cross-document navigation -->
+  <nav class="fixed top-0 left-0 right-0 z-[9999] bg-[#1e293b] border-b border-slate-700 overflow-x-auto whitespace-nowrap">
+    <div class="flex items-center gap-4 px-4 py-2 text-xs">
+      <a href="01-gtm-strategy.html" class="nav-link text-slate-400 hover:text-amber-400">GTM Strategy</a>
+      <a href="02-competitive-analysis.html" class="nav-link text-slate-400 hover:text-amber-400">Competition</a>
+      <a href="03-target-audience.html" class="nav-link text-amber-500 font-semibold">Audience</a>
+      <a href="05-meta-ads-strategy.html" class="nav-link text-slate-400 hover:text-amber-400">Meta Ads</a>
+      <a href="06-seo-geo-strategy.html" class="nav-link text-slate-400 hover:text-amber-400">SEO & GEO</a>
+      <a href="09-glocal-strategy.html" class="nav-link text-slate-400 hover:text-amber-400">Glocal</a>
+    </div>
+  </nav>
+
+  <!-- Navigation -->
+  <nav class="sticky top-8 z-50 bg-[#0f172a]/90 backdrop-blur-md border-b border-surface-300/30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-amber-400 font-bold text-lg tracking-tight">MagicalStory</span>
+        <span class="text-slate-500 text-sm hidden sm:inline">Target Audience & Personas</span>
+      </div>
+      <div class="hidden md:flex items-center gap-6 text-sm text-slate-400">
+        <a href="#market" class="nav-link">Market</a>
+        <a href="#map" class="nav-link">Swiss Map</a>
+        <a href="#personas" class="nav-link">Personas</a>
+        <a href="#calendar" class="nav-link">Calendar</a>
+        <a href="#audiences" class="nav-link">Audiences</a>
+        <a href="#budget" class="nav-link">Budget</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero / Header -->
+  <header class="max-w-7xl mx-auto px-4 pt-16 pb-12">
+    <p class="text-amber-500 text-sm font-semibold tracking-wider uppercase mb-3">Audience Intelligence</p>
+    <h1 class="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-4">
+      Target Audience & Personas
+    </h1>
+    <p class="text-slate-400 text-lg max-w-2xl leading-relaxed">
+      <span class="text-white font-semibold">~380K Swiss households</span> with children aged 2-8.
+      Five distinct personas across <span class="text-white font-semibold">three language regions</span>,
+      mapped to seasonal buying patterns and Meta ad targeting.
+    </p>
+
+    <!-- Quick stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-10">
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-4">
+        <div class="text-2xl font-bold text-white">380K</div>
+        <div class="text-slate-500 text-sm">Target households</div>
+      </div>
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-4">
+        <div class="text-2xl font-bold text-white">20</div>
+        <div class="text-slate-500 text-sm">Target cities</div>
+      </div>
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-4">
+        <div class="text-2xl font-bold text-white">5</div>
+        <div class="text-slate-500 text-sm">Core personas</div>
+      </div>
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-4">
+        <div class="text-2xl font-bold text-white">3-5x</div>
+        <div class="text-slate-500 text-sm">Target ROAS</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 pb-24 space-y-24">
+
+    <!-- Section 1: Market Segmentation -->
+    <section id="market">
+      <h2 class="text-2xl font-bold text-white mb-2">Market Segmentation</h2>
+      <p class="text-slate-400 mb-8">Demographic and psychographic breakdown of the Swiss family market.</p>
+
+      <div class="grid md:grid-cols-2 gap-8">
+        <!-- Language regions -->
+        <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-5">Language Regions</h3>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-slate-300">German-speaking</span>
+                <span class="text-amber-400 font-semibold">65% — 247K households</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="h-3 rounded-full bg-amber-500 stat-bar-fill" style="width: 65%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-slate-300">French-speaking</span>
+                <span class="text-blue-400 font-semibold">23% — 87K households</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="h-3 rounded-full bg-blue-500 stat-bar-fill" style="width: 23%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-slate-300">Italian-speaking</span>
+                <span class="text-emerald-400 font-semibold">8% — 30K households</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="h-3 rounded-full bg-emerald-500 stat-bar-fill" style="width: 8%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Psychographic segments -->
+        <div class="bg-surface-100 border border-surface-300 rounded-xl p-6">
+          <h3 class="text-lg font-semibold text-white mb-5">Psychographic Segments</h3>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-amber-500 flex-shrink-0"></div>
+              <span class="text-slate-300 text-sm flex-1">Quality-Conscious Parents</span>
+              <span class="text-white font-semibold text-sm">35%</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-amber-400 flex-shrink-0"></div>
+              <span class="text-slate-300 text-sm flex-1">Experience Seekers</span>
+              <span class="text-white font-semibold text-sm">25%</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-amber-300 flex-shrink-0"></div>
+              <span class="text-slate-300 text-sm flex-1">Budget-Smart Gifters</span>
+              <span class="text-white font-semibold text-sm">20%</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-amber-200 flex-shrink-0"></div>
+              <span class="text-slate-300 text-sm flex-1">Tech-Forward Parents</span>
+              <span class="text-white font-semibold text-sm">12%</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="w-3 h-3 rounded-full bg-amber-100 flex-shrink-0"></div>
+              <span class="text-slate-300 text-sm flex-1">Traditional Families</span>
+              <span class="text-white font-semibold text-sm">8%</span>
+            </div>
+          </div>
+          <!-- Visual bar representation -->
+          <div class="flex mt-5 rounded-full overflow-hidden h-4">
+            <div class="bg-amber-500" style="width:35%" title="Quality-Conscious 35%"></div>
+            <div class="bg-amber-400" style="width:25%" title="Experience Seekers 25%"></div>
+            <div class="bg-amber-300" style="width:20%" title="Budget-Smart 20%"></div>
+            <div class="bg-amber-200" style="width:12%" title="Tech-Forward 12%"></div>
+            <div class="bg-amber-100" style="width:8%" title="Traditional 8%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Demographic sweet spot -->
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6 mt-8">
+        <h3 class="text-lg font-semibold text-white mb-4">Demographic Sweet Spot</h3>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="text-center">
+            <div class="text-amber-400 font-bold text-lg">2-8</div>
+            <div class="text-slate-500 text-xs">Child age</div>
+            <div class="text-slate-400 text-xs mt-1">Peak: 3-6</div>
+          </div>
+          <div class="text-center">
+            <div class="text-amber-400 font-bold text-lg">28-42</div>
+            <div class="text-slate-500 text-xs">Parent age</div>
+            <div class="text-slate-400 text-xs mt-1">Decision makers</div>
+          </div>
+          <div class="text-center">
+            <div class="text-amber-400 font-bold text-lg">100-250K</div>
+            <div class="text-slate-500 text-xs">HH income (CHF)</div>
+            <div class="text-slate-400 text-xs mt-1">Mid-upper class</div>
+          </div>
+          <div class="text-center">
+            <div class="text-amber-400 font-bold text-lg">Above avg</div>
+            <div class="text-slate-500 text-xs">Education</div>
+            <div class="text-slate-400 text-xs mt-1">Values content</div>
+          </div>
+          <div class="text-center">
+            <div class="text-amber-400 font-bold text-lg">1-3</div>
+            <div class="text-slate-500 text-xs">Children</div>
+            <div class="text-slate-400 text-xs mt-1">All family models</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Swiss Map -->
+    <section id="map">
+      <h2 class="text-2xl font-bold text-white mb-2">Swiss Target Cities</h2>
+      <p class="text-slate-400 mb-4">Top 20 cities by family density. Hover over dots for details.</p>
+
+      <!-- Legend -->
+      <div class="flex flex-wrap gap-4 mb-6 text-sm">
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-amber-500"></div>
+          <span class="text-slate-400">German-speaking</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+          <span class="text-slate-400">French-speaking</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-emerald-500"></div>
+          <span class="text-slate-400">Italian-speaking</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="w-3 h-3 rounded-full bg-cyan-400"></div>
+          <span class="text-slate-400">Bilingual</span>
+        </div>
+      </div>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-4 md:p-8 relative overflow-hidden">
+        <div id="mapTooltip" class="map-tooltip"></div>
+        <div class="w-full max-w-3xl mx-auto">
+          <svg id="swissMap" viewBox="0 0 600 400" class="w-full h-auto" xmlns="http://www.w3.org/2000/svg">
+            <!-- Simplified Switzerland outline -->
+            <path d="M 90,180 L 105,155 L 130,140 L 145,130 L 170,115 L 190,105 L 215,100
+                     L 240,95 L 260,90 L 285,85 L 310,82 L 335,80 L 355,82 L 375,88
+                     L 395,95 L 410,105 L 430,115 L 450,120 L 470,130 L 485,140
+                     L 500,155 L 510,170 L 515,185 L 518,200 L 520,218
+                     L 515,235 L 505,250 L 490,262 L 475,270 L 460,278
+                     L 445,285 L 425,290 L 405,292 L 385,290 L 365,285
+                     L 345,282 L 325,278 L 305,275 L 280,272 L 260,268
+                     L 240,265 L 220,262 L 200,258 L 180,252 L 160,245
+                     L 140,238 L 120,228 L 105,218 L 95,205 L 90,192 Z"
+                  fill="none" stroke="#2e3750" stroke-width="2" opacity="0.6"/>
+
+            <!-- Lake shapes (decorative) -->
+            <ellipse cx="265" cy="170" rx="18" ry="6" fill="#1e3a5f" opacity="0.3"/>
+            <ellipse cx="170" cy="195" rx="12" ry="5" fill="#1e3a5f" opacity="0.3"/>
+            <ellipse cx="380" cy="225" rx="10" ry="4" fill="#1e3a5f" opacity="0.3"/>
+
+            <!-- City dots will be added by JavaScript -->
+          </svg>
+        </div>
+
+        <!-- City list (compact) -->
+        <div id="cityList" class="mt-6 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs"></div>
+      </div>
+    </section>
+
+    <!-- Section 3: Persona Cards -->
+    <section id="personas">
+      <h2 class="text-2xl font-bold text-white mb-2">Core Personas</h2>
+      <p class="text-slate-400 mb-8">Five buyer personas driving acquisition. Click to expand details.</p>
+
+      <div class="space-y-4" id="personaContainer"></div>
+    </section>
+
+    <!-- Section 4: Seasonal Calendar Heatmap -->
+    <section id="calendar">
+      <h2 class="text-2xl font-bold text-white mb-2">Seasonal Targeting Calendar</h2>
+      <p class="text-slate-400 mb-8">Monthly budget multipliers aligned to gift-buying occasions.</p>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6 overflow-x-auto">
+        <div class="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-3 min-w-[600px]" id="heatmapGrid"></div>
+      </div>
+
+      <!-- Peak windows -->
+      <div class="mt-8 grid md:grid-cols-2 gap-4">
+        <div class="bg-surface-100 border border-amber-700/30 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+            <span class="text-amber-400 font-semibold text-sm">Peak Window 1</span>
+          </div>
+          <div class="text-white font-bold">Nov 15 - Dec 15</div>
+          <div class="text-slate-400 text-sm">Christmas gift buying peak (4 weeks)</div>
+        </div>
+        <div class="bg-surface-100 border border-amber-700/30 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+            <span class="text-amber-400 font-semibold text-sm">Peak Window 2</span>
+          </div>
+          <div class="text-white font-bold">Aug 15 - Sep 15</div>
+          <div class="text-slate-400 text-sm">Back to school season</div>
+        </div>
+        <div class="bg-surface-100 border border-amber-700/30 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-2 h-2 rounded-full bg-amber-400"></div>
+            <span class="text-amber-400 font-semibold text-sm">Peak Window 3</span>
+          </div>
+          <div class="text-white font-bold">Apr 1 - May 15</div>
+          <div class="text-slate-400 text-sm">Easter + Mother's Day cluster</div>
+        </div>
+        <div class="bg-surface-100 border border-amber-700/30 rounded-xl p-5">
+          <div class="flex items-center gap-2 mb-3">
+            <div class="w-2 h-2 rounded-full bg-amber-400"></div>
+            <span class="text-amber-400 font-semibold text-sm">Peak Window 4</span>
+          </div>
+          <div class="text-white font-bold">Jun 1 - Jun 20</div>
+          <div class="text-slate-400 text-sm">Father's Day + school year end</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5: Meta Audiences -->
+    <section id="audiences">
+      <h2 class="text-2xl font-bold text-white mb-2">Meta Ads Audiences</h2>
+      <p class="text-slate-400 mb-8">Five audience segments with targeting parameters and budget allocation.</p>
+
+      <!-- Budget allocation bar -->
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6 mb-8">
+        <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Budget Allocation</h3>
+        <div class="flex rounded-full overflow-hidden h-8 text-xs font-semibold">
+          <div class="bg-amber-500 flex items-center justify-center text-slate-900" style="width:30%">30%</div>
+          <div class="bg-amber-400 flex items-center justify-center text-slate-900" style="width:25%">25%</div>
+          <div class="bg-amber-300 flex items-center justify-center text-slate-900" style="width:20%">20%</div>
+          <div class="bg-amber-200 flex items-center justify-center text-slate-900" style="width:15%">15%</div>
+          <div class="bg-amber-100 flex items-center justify-center text-slate-900" style="width:10%">10%</div>
+        </div>
+        <div class="flex text-xs mt-2 text-slate-500">
+          <div style="width:30%" class="text-center">Broad</div>
+          <div style="width:25%" class="text-center">Engaged</div>
+          <div style="width:20%" class="text-center">Gift</div>
+          <div style="width:15%" class="text-center">Local</div>
+          <div style="width:10%" class="text-center">Retarget</div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4" id="audienceCards"></div>
+    </section>
+
+    <!-- Section 6: Budget Calculator -->
+    <section id="budget">
+      <h2 class="text-2xl font-bold text-white mb-2">Budget Calculator</h2>
+      <p class="text-slate-400 mb-8">Estimate reach and conversions based on your monthly ad spend.</p>
+
+      <div class="bg-surface-100 border border-surface-300 rounded-xl p-6 md:p-8">
+        <div class="max-w-lg">
+          <label class="block text-sm font-semibold text-slate-300 mb-2">Monthly Ad Budget (CHF)</label>
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 text-lg">CHF</span>
+            <input
+              type="number"
+              id="budgetInput"
+              value="3000"
+              min="500"
+              max="50000"
+              step="100"
+              class="budget-input bg-surface-200 border border-surface-400 text-white text-2xl font-bold rounded-lg px-4 py-3 w-full"
+              oninput="updateBudgetCalc()"
+            >
+          </div>
+          <input
+            type="range"
+            id="budgetSlider"
+            min="500"
+            max="15000"
+            step="100"
+            value="3000"
+            class="w-full h-2 bg-surface-300 rounded-lg appearance-none cursor-pointer accent-amber-500 mt-2"
+            oninput="syncSlider()"
+          >
+          <div class="flex justify-between text-xs text-slate-500 mt-1">
+            <span>CHF 500</span>
+            <span>CHF 15,000</span>
+          </div>
+        </div>
+
+        <!-- Results grid -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+          <div class="bg-surface-200 border border-surface-400 rounded-xl p-4 text-center">
+            <div class="text-3xl font-bold text-white" id="calcImpressions">375K</div>
+            <div class="text-slate-500 text-sm mt-1">Impressions</div>
+            <div class="text-slate-600 text-xs mt-1">CPM ~CHF 8</div>
+          </div>
+          <div class="bg-surface-200 border border-surface-400 rounded-xl p-4 text-center">
+            <div class="text-3xl font-bold text-white" id="calcClicks">3,750</div>
+            <div class="text-slate-500 text-sm mt-1">Clicks</div>
+            <div class="text-slate-600 text-xs mt-1">1.0% CTR</div>
+          </div>
+          <div class="bg-surface-200 border border-surface-400 rounded-xl p-4 text-center">
+            <div class="text-3xl font-bold text-amber-400" id="calcStories">375</div>
+            <div class="text-slate-500 text-sm mt-1">Story starts</div>
+            <div class="text-slate-600 text-xs mt-1">10% conv rate</div>
+          </div>
+          <div class="bg-surface-200 border border-surface-400 rounded-xl p-4 text-center">
+            <div class="text-3xl font-bold text-amber-400" id="calcOrders">75</div>
+            <div class="text-slate-500 text-sm mt-1">Print orders</div>
+            <div class="text-slate-600 text-xs mt-1">20% purchase rate</div>
+          </div>
+        </div>
+
+        <!-- Revenue projection -->
+        <div class="mt-6 bg-surface-200 border border-amber-700/30 rounded-xl p-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="text-sm text-slate-400">Estimated Monthly Revenue</div>
+              <div class="text-3xl font-bold text-amber-400" id="calcRevenue">CHF 4,350</div>
+              <div class="text-sm text-slate-500" id="calcROAS">ROAS: 1.45x</div>
+            </div>
+            <div class="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div class="text-white font-semibold" id="calcCpaStory">CHF 8.00</div>
+                <div class="text-slate-500 text-xs">CPA Story</div>
+              </div>
+              <div>
+                <div class="text-white font-semibold" id="calcCpaOrder">CHF 40.00</div>
+                <div class="text-slate-500 text-xs">CPA Order</div>
+              </div>
+              <div>
+                <div class="text-white font-semibold" id="calcAov">CHF 58</div>
+                <div class="text-slate-500 text-xs">Avg Order</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Target benchmarks -->
+        <div class="mt-6 text-xs text-slate-500">
+          <div class="font-semibold text-slate-400 mb-2">Target Benchmarks (Phase 1)</div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <div>CPA story creation: CHF 3-8</div>
+            <div>CPA print purchase: CHF 15-30</div>
+            <div>Visit-to-story: 5-10%</div>
+            <div>Story-to-purchase: 15-25%</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Messaging Framework -->
+    <section id="messaging">
+      <h2 class="text-2xl font-bold text-white mb-2">Messaging Framework</h2>
+      <p class="text-slate-400 mb-8">Emotional and rational hooks mapped to each persona.</p>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse min-w-[700px]">
+          <thead>
+            <tr class="border-b border-surface-300">
+              <th class="text-left py-3 px-4 text-slate-400 font-semibold">Persona</th>
+              <th class="text-left py-3 px-4 text-slate-400 font-semibold">Emotional Hook</th>
+              <th class="text-left py-3 px-4 text-slate-400 font-semibold">Rational Hook</th>
+              <th class="text-left py-3 px-4 text-slate-400 font-semibold">Social Proof</th>
+            </tr>
+          </thead>
+          <tbody class="text-slate-300">
+            <tr class="border-b border-surface-300/50">
+              <td class="py-3 px-4 font-medium text-white">Engaged Mom</td>
+              <td class="py-3 px-4">"See your child's eyes light up"</td>
+              <td class="py-3 px-4">"Screen-free, educational"</td>
+              <td class="py-3 px-4 text-amber-400">"4,500+ Swiss families"</td>
+            </tr>
+            <tr class="border-b border-surface-300/50">
+              <td class="py-3 px-4 font-medium text-white">Gift Seeker</td>
+              <td class="py-3 px-4">"Be the one who gives THE gift"</td>
+              <td class="py-3 px-4">"Unique, never duplicate"</td>
+              <td class="py-3 px-4 text-amber-400">"5-star reviews"</td>
+            </tr>
+            <tr class="border-b border-surface-300/50">
+              <td class="py-3 px-4 font-medium text-white">Education Dad</td>
+              <td class="py-3 px-4">"Learning disguised as adventure"</td>
+              <td class="py-3 px-4">"AI-powered, Swiss quality"</td>
+              <td class="py-3 px-4 text-amber-400">"Recommended by educators"</td>
+            </tr>
+            <tr class="border-b border-surface-300/50">
+              <td class="py-3 px-4 font-medium text-white">Expat Parent</td>
+              <td class="py-3 px-4">"Your child's Swiss adventure"</td>
+              <td class="py-3 px-4">"Bilingual, culturally rich"</td>
+              <td class="py-3 px-4 text-amber-400">"Loved by expat families"</td>
+            </tr>
+            <tr>
+              <td class="py-3 px-4 font-medium text-white">Grandmother</td>
+              <td class="py-3 px-4">"The most special gift"</td>
+              <td class="py-3 px-4">"Easy to order, beautiful quality"</td>
+              <td class="py-3 px-4 text-amber-400">"Trusted by grandparents"</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-surface-300 py-8 text-center text-slate-600 text-sm">
+    MagicalStory.ch — Target Audience & Persona Document
+  </footer>
+
+  <script>
+    // ==============================
+    // DATA
+    // ==============================
+
+    const cities = [
+      { name: 'Zurich', pop: '435K', lang: 'de', x: 310, y: 155, rank: 1 },
+      { name: 'Geneva', pop: '203K', lang: 'fr', x: 115, y: 255, rank: 2 },
+      { name: 'Basel', pop: '175K', lang: 'de', x: 245, y: 100, rank: 3 },
+      { name: 'Lausanne', pop: '140K', lang: 'fr', x: 145, y: 232, rank: 4 },
+      { name: 'Bern', pop: '134K', lang: 'de', x: 240, y: 185, rank: 5 },
+      { name: 'Winterthur', pop: '115K', lang: 'de', x: 340, y: 140, rank: 6 },
+      { name: 'Luzern', pop: '82K', lang: 'de', x: 305, y: 190, rank: 7 },
+      { name: 'St. Gallen', pop: '76K', lang: 'de', x: 390, y: 140, rank: 8 },
+      { name: 'Biel/Bienne', pop: '55K', lang: 'bi', x: 215, y: 178, rank: 9 },
+      { name: 'Fribourg', pop: '42K', lang: 'bi', x: 200, y: 210, rank: 10 },
+      { name: 'Thun', pop: '44K', lang: 'de', x: 260, y: 210, rank: 11 },
+      { name: 'Chur', pop: '38K', lang: 'de', x: 420, y: 185, rank: 12 },
+      { name: 'Schaffhausen', pop: '37K', lang: 'de', x: 320, y: 100, rank: 13 },
+      { name: 'Uster', pop: '36K', lang: 'de', x: 330, y: 155, rank: 14 },
+      { name: 'Zug', pop: '31K', lang: 'de', x: 315, y: 175, rank: 15 },
+      { name: 'Rapperswil-Jona', pop: '27K', lang: 'de', x: 350, y: 170, rank: 16 },
+      { name: 'Aarau', pop: '22K', lang: 'de', x: 280, y: 155, rank: 17 },
+      { name: 'Olten', pop: '19K', lang: 'de', x: 262, y: 158, rank: 18 },
+      { name: 'Baden', pop: '19K', lang: 'de', x: 290, y: 145, rank: 19 },
+      { name: 'Solothurn', pop: '17K', lang: 'de', x: 248, y: 165, rank: 20 },
+    ];
+
+    const langColors = {
+      de: { fill: '#f59e0b', stroke: '#d97706', label: 'German' },
+      fr: { fill: '#3b82f6', stroke: '#2563eb', label: 'French' },
+      it: { fill: '#10b981', stroke: '#059669', label: 'Italian' },
+      bi: { fill: '#22d3ee', stroke: '#06b6d4', label: 'Bilingual' },
+    };
+
+    const personas = [
+      {
+        id: 'mama',
+        title: 'Die engagierte Mama',
+        subtitle: 'The Engaged Mom',
+        emoji: '',
+        age: '30-38',
+        location: 'Suburban (Winterthur, Uster, Rapperswil-Jona)',
+        income: 'CHF 120-180K',
+        channels: ['Instagram', 'Facebook Groups', 'WhatsApp', 'Pinterest'],
+        color: 'amber',
+        triggers: [
+          "Child's birthday approaching (2-4 weeks before)",
+          "New sibling arriving — older child feels special",
+          "Starting kindergarten — milestone celebration",
+          "Saw another parent's personalized book on Instagram",
+        ],
+        painPoints: [
+          "Finding meaningful, non-plastic gifts",
+          "Bedtime routine struggles",
+          "Too many generic children's books",
+          "Guilt about screen time",
+        ],
+        objection: "Is my child's photo safe? Who has access to it?",
+        cta: "Erstelle jetzt die Geschichte deines Kindes — kostenlos",
+        reach: 'Instagram Stories with real parent testimonials, Facebook parent groups, school/Kita WhatsApp groups',
+      },
+      {
+        id: 'gift',
+        title: 'Die Geschenk-Sucherin',
+        subtitle: 'The Gift Seeker',
+        age: '28-45',
+        location: 'Any Swiss city',
+        income: 'CHF 40-80 gift budget',
+        channels: ['Google Search', 'Instagram', 'Gift Blogs', 'Online Reviews'],
+        color: 'blue',
+        triggers: [
+          "Birthday (4 weeks out: thinking, 2 weeks: searching, 1 week: panic)",
+          "Christmas / Weihnachten",
+          "Baptism (Taufe)",
+          "First day of school (Einschulung)",
+        ],
+        painPoints: [
+          "Never knowing what to get kids these days",
+          "Avoiding duplicate gifts",
+          "Finding something personal without being creepy",
+          "Delivery timing anxiety",
+        ],
+        objection: "Will this actually look good, or will it be cheesy?",
+        cta: "Ein Buch, das kein anderes Kind auf der Welt hat",
+        reach: 'Google Ads (gift terms), Instagram occasion-based ads, gift guide partnerships with Swiss lifestyle bloggers',
+      },
+      {
+        id: 'papa',
+        title: 'Der bildungsbewusste Papa',
+        subtitle: 'The Education-Conscious Dad',
+        age: '32-42',
+        location: 'Urban (Zurich, Basel, Bern)',
+        income: 'CHF 150-250K',
+        channels: ['NZZ/Tages-Anzeiger', 'Podcasts', 'LinkedIn', 'Tech Blogs'],
+        color: 'emerald',
+        triggers: [
+          "Making learning fun without it feeling like school",
+          "Balancing screen time with meaningful content",
+          "Finding age-appropriate educational content in German",
+          "Wanting to be more involved in bedtime reading",
+        ],
+        painPoints: [
+          "Skepticism about 'personalized' products",
+          "Finding quality educational content",
+          "Balancing screen time meaningfully",
+          "Lack of good bedtime reading material",
+        ],
+        objection: "Is the AI-generated content actually good quality, or is it generic?",
+        cta: "Dein Kind lernt das Alphabet — als Held seiner eigenen Geschichte",
+        reach: 'Facebook groups (lurker), SEO educational keywords, word of mouth, tech content marketing, LinkedIn',
+      },
+      {
+        id: 'expat',
+        title: 'The Expat Parent',
+        subtitle: 'International families in Switzerland',
+        age: '30-40',
+        location: 'Zurich, Geneva, Basel, Zug (expat hubs)',
+        income: 'CHF 180-300K (expat packages)',
+        channels: ['Instagram', 'Facebook Expat Groups', 'Reddit', 'WhatsApp'],
+        color: 'cyan',
+        triggers: [
+          "Child doesn't feel 'Swiss' — wants to build connection",
+          "Homesickness — bridging cultures through stories",
+          "Missing family — send meaningful gifts abroad",
+          "Looking for English-language content set in Switzerland",
+        ],
+        painPoints: [
+          "Limited German/French skills for local shopping",
+          "Finding English content that isn't US/UK-centric",
+          "Building child's connection to their Swiss home",
+          "Missing extended family far away",
+        ],
+        objection: "Will the Swiss setting feel authentic, or just generic European?",
+        cta: "A personalized story set in YOUR Swiss town",
+        reach: 'English-language expat Facebook groups, Instagram ads in English (geo: Swiss cities), international school networks',
+      },
+      {
+        id: 'grossmutter',
+        title: 'Die Grossmutter',
+        subtitle: 'The Grandmother',
+        age: '55-70',
+        location: 'Any Swiss town',
+        income: 'Retired, CHF 50-100 per gift',
+        channels: ['Facebook', 'WhatsApp', 'Print Media', 'Phone'],
+        color: 'rose',
+        triggers: [
+          "Birthday (primary occasion)",
+          "Christmas / Weihnachten",
+          "Easter (small gift)",
+          "Visits — grandparent prerogative surprise",
+        ],
+        painPoints: [
+          "Not tech-savvy — complex ordering is a dealbreaker",
+          "Doesn't know what kids want these days",
+          "Overwhelmed by too many online options",
+          "Worried about online payment security",
+        ],
+        objection: "I don't understand how this works. Can someone help me?",
+        cta: "Das schonste Geschenk fur Ihr Enkelkind",
+        reach: 'Facebook ads (age 55-70 + grandparent interests), print media, word of mouth from children, local newspapers',
+      },
+    ];
+
+    const calendarData = [
+      { month: 'Jan', multiplier: 0.8, occasions: ['New Year', 'Dreikonigstag'], msg: 'Starte das Jahr mit einer besonderen Geschichte' },
+      { month: 'Feb', multiplier: 0.8, occasions: ["Valentine's", 'Fasnacht'], msg: 'Zeig deinem Kind, wie besonders es ist' },
+      { month: 'Mar', multiplier: 1.0, occasions: ['Spring break'], msg: 'Ferienzeit ist Lesezeit' },
+      { month: 'Apr', multiplier: 1.2, occasions: ['Easter', 'Sechselauten'], msg: 'Das Ostergeschenk, das bleibt' },
+      { month: 'May', multiplier: 1.3, occasions: ["Mother's Day"], msg: 'Ein Geschenk von Mama fur ihr Kind' },
+      { month: 'Jun', multiplier: 1.3, occasions: ["Father's Day", 'School year end'], msg: 'Feiere das Schuljahr mit einer Geschichte' },
+      { month: 'Jul', multiplier: 0.9, occasions: ['Summer holidays'], msg: 'Die perfekte Feriengeschichte' },
+      { month: 'Aug', multiplier: 1.2, occasions: ['Back to school'], msg: 'Bereit fur den Kindergarten' },
+      { month: 'Sep', multiplier: 1.5, occasions: ['Einschulung', 'Knabenschiessen'], msg: 'Dein Kind als Held der Einschulung' },
+      { month: 'Oct', multiplier: 1.0, occasions: ['Halloween', 'Autumn break'], msg: 'Eine schaurig-schone Geschichte' },
+      { month: 'Nov', multiplier: 2.0, occasions: ['Pre-Christmas', 'Black Friday'], msg: 'Jetzt bestellen, rechtzeitig unter dem Baum' },
+      { month: 'Dec', multiplier: 2.5, occasions: ['Christmas', 'Advent', 'Samichlaus'], msg: 'Das personlichste Weihnachtsgeschenk' },
+    ];
+
+    const audiences = [
+      {
+        name: 'Swiss Parents (Broad)',
+        budget: '30%',
+        color: 'amber-500',
+        params: {
+          Location: 'Switzerland',
+          Age: '25-45',
+          Interests: 'Parenting, children\'s books, family activities',
+          Language: 'German, French',
+          Placement: 'Instagram Feed/Stories, Facebook Feed',
+          Optimization: 'Conversions (story creation)',
+        },
+      },
+      {
+        name: 'Swiss Parents (Engaged)',
+        budget: '25%',
+        color: 'amber-400',
+        params: {
+          Location: 'Switzerland',
+          Age: '28-40',
+          Interests: 'Personalisierte Geschenke, Kinderbucher, Vorlesen',
+          Behaviors: 'Parents of children (0-8 years)',
+          Language: 'German',
+          Optimization: 'Conversions (story creation)',
+        },
+      },
+      {
+        name: 'Gift Givers (Seasonal)',
+        budget: '20%',
+        color: 'amber-300',
+        params: {
+          Location: 'Switzerland',
+          Age: '25-65',
+          Interests: 'Geschenke, Kindergeburtstag, Taufe, Weihnachtsgeschenke',
+          Timing: 'Activate 4 weeks before major occasions',
+          Placement: 'Instagram Feed, Facebook Feed + Marketplace',
+          Optimization: 'Conversions (purchase)',
+        },
+      },
+      {
+        name: 'Town-Specific (Hyper-Local)',
+        budget: '15%',
+        color: 'amber-200',
+        params: {
+          Location: '15km radius around specific city',
+          Age: '28-42',
+          Creative: '"Eine Geschichte aus [Stadtname]"',
+          Rotation: 'Top 10 cities, one per ad set',
+          Placement: 'Instagram Feed/Stories',
+          Optimization: 'Conversions (story creation)',
+        },
+      },
+      {
+        name: 'Retargeting',
+        budget: '10%',
+        color: 'amber-100',
+        params: {
+          'Audience A': 'Visited site (30d), no story',
+          'Audience B': 'Started story, didn\'t complete',
+          'Audience C': 'Completed story, no print purchase',
+          Lookalike: '1% lookalike of story completers',
+          Placement: 'All placements',
+          Optimization: 'Conversions (next funnel step)',
+        },
+      },
+    ];
+
+    // ==============================
+    // SWISS MAP
+    // ==============================
+
+    function renderMap() {
+      const svg = document.getElementById('swissMap');
+      const tooltip = document.getElementById('mapTooltip');
+      const cityList = document.getElementById('cityList');
+
+      cities.forEach((city, i) => {
+        const colors = langColors[city.lang];
+        const popNum = parseInt(city.pop);
+        const radius = Math.max(4, Math.min(8, popNum / 60));
+
+        // Glow circle
+        const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        glow.setAttribute('cx', city.x);
+        glow.setAttribute('cy', city.y);
+        glow.setAttribute('r', radius + 4);
+        glow.setAttribute('fill', colors.fill);
+        glow.setAttribute('opacity', '0.15');
+        svg.appendChild(glow);
+
+        // Main dot
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', city.x);
+        circle.setAttribute('cy', city.y);
+        circle.setAttribute('r', radius);
+        circle.setAttribute('fill', colors.fill);
+        circle.setAttribute('stroke', colors.stroke);
+        circle.setAttribute('stroke-width', '1.5');
+        circle.setAttribute('class', 'city-dot');
+        circle.setAttribute('data-city', i);
+
+        circle.addEventListener('mouseenter', (e) => {
+          const rect = svg.getBoundingClientRect();
+          const svgWidth = rect.width;
+          const svgHeight = rect.height;
+          const scaleX = svgWidth / 600;
+          const scaleY = svgHeight / 400;
+
+          tooltip.innerHTML = `
+            <div class="font-semibold text-white">${city.rank}. ${city.name}</div>
+            <div class="text-slate-400">Pop: ${city.pop}</div>
+            <div style="color: ${colors.fill}">${colors.label}</div>
+          `;
+          tooltip.classList.add('visible');
+
+          const tooltipX = rect.left + city.x * scaleX + 12;
+          const tooltipY = rect.top + city.y * scaleY - 10;
+          tooltip.style.left = (city.x * scaleX + 16) + 'px';
+          tooltip.style.top = (city.y * scaleY - 8) + 'px';
+        });
+
+        circle.addEventListener('mouseleave', () => {
+          tooltip.classList.remove('visible');
+        });
+
+        svg.appendChild(circle);
+
+        // City label for top 10
+        if (city.rank <= 8) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', city.x + radius + 4);
+          text.setAttribute('y', city.y + 3);
+          text.setAttribute('fill', '#94a3b8');
+          text.setAttribute('font-size', '9');
+          text.setAttribute('font-family', 'Inter, sans-serif');
+          text.textContent = city.name;
+          svg.appendChild(text);
+        }
+      });
+
+      // Compact city list below map
+      cities.forEach((city) => {
+        const colors = langColors[city.lang];
+        const el = document.createElement('div');
+        el.className = 'flex items-center gap-2 py-1 px-2 rounded bg-surface-200/50';
+        el.innerHTML = `
+          <span class="text-slate-500 w-4 text-right font-mono">${city.rank}</span>
+          <span class="w-2 h-2 rounded-full flex-shrink-0" style="background:${colors.fill}"></span>
+          <span class="text-slate-300 truncate">${city.name}</span>
+          <span class="text-slate-500 ml-auto">${city.pop}</span>
+        `;
+        cityList.appendChild(el);
+      });
+    }
+
+    // ==============================
+    // PERSONA CARDS
+    // ==============================
+
+    function renderPersonas() {
+      const container = document.getElementById('personaContainer');
+      const colorMap = {
+        amber: { border: 'border-amber-700/30', bg: 'bg-amber-500/10', text: 'text-amber-400', badge: 'bg-amber-500/20 text-amber-300', dot: 'bg-amber-500' },
+        blue: { border: 'border-blue-700/30', bg: 'bg-blue-500/10', text: 'text-blue-400', badge: 'bg-blue-500/20 text-blue-300', dot: 'bg-blue-500' },
+        emerald: { border: 'border-emerald-700/30', bg: 'bg-emerald-500/10', text: 'text-emerald-400', badge: 'bg-emerald-500/20 text-emerald-300', dot: 'bg-emerald-500' },
+        cyan: { border: 'border-cyan-700/30', bg: 'bg-cyan-500/10', text: 'text-cyan-400', badge: 'bg-cyan-500/20 text-cyan-300', dot: 'bg-cyan-500' },
+        rose: { border: 'border-rose-700/30', bg: 'bg-rose-500/10', text: 'text-rose-400', badge: 'bg-rose-500/20 text-rose-300', dot: 'bg-rose-500' },
+      };
+
+      personas.forEach((p) => {
+        const c = colorMap[p.color];
+        const card = document.createElement('div');
+        card.className = `persona-card bg-surface-100 border ${c.border} rounded-xl overflow-hidden`;
+        card.onclick = () => card.classList.toggle('open');
+
+        card.innerHTML = `
+          <!-- Header (always visible) -->
+          <div class="p-5 md:p-6 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              <div class="w-10 h-10 rounded-full ${c.bg} flex items-center justify-center flex-shrink-0">
+                <div class="w-3 h-3 rounded-full ${c.dot}"></div>
+              </div>
+              <div class="min-w-0">
+                <h3 class="text-white font-bold text-lg truncate">${p.title}</h3>
+                <p class="text-slate-500 text-sm">${p.subtitle}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0">
+              <div class="hidden sm:flex items-center gap-2">
+                <span class="text-xs px-2 py-1 rounded-full ${c.badge} font-medium">${p.age}</span>
+                <span class="text-xs px-2 py-1 rounded-full bg-surface-300 text-slate-400 font-medium">${p.income}</span>
+              </div>
+              <svg class="chevron-icon w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Expandable content -->
+          <div class="persona-content">
+            <div class="px-5 md:px-6 pb-6 border-t border-surface-300/50 pt-5">
+              <!-- Quick info grid -->
+              <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <div class="text-xs text-slate-500 mb-1">Age Range</div>
+                  <div class="text-white text-sm font-semibold">${p.age}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-500 mb-1">Location</div>
+                  <div class="text-white text-sm font-semibold">${p.location}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-500 mb-1">Income</div>
+                  <div class="text-white text-sm font-semibold">${p.income}</div>
+                </div>
+                <div>
+                  <div class="text-xs text-slate-500 mb-1">Channels</div>
+                  <div class="flex flex-wrap gap-1">
+                    ${p.channels.map(ch => `<span class="text-xs px-1.5 py-0.5 rounded bg-surface-300 text-slate-400">${ch}</span>`).join('')}
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-6">
+                <!-- Trigger moments -->
+                <div>
+                  <h4 class="text-sm font-semibold ${c.text} mb-3">Trigger Moments</h4>
+                  <ul class="space-y-2">
+                    ${p.triggers.map(t => `
+                      <li class="flex items-start gap-2 text-sm text-slate-300">
+                        <span class="w-1.5 h-1.5 rounded-full ${c.dot} mt-1.5 flex-shrink-0"></span>
+                        ${t}
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+                <!-- Pain points -->
+                <div>
+                  <h4 class="text-sm font-semibold ${c.text} mb-3">Pain Points</h4>
+                  <ul class="space-y-2">
+                    ${p.painPoints.map(pp => `
+                      <li class="flex items-start gap-2 text-sm text-slate-300">
+                        <span class="w-1.5 h-1.5 rounded-full bg-slate-500 mt-1.5 flex-shrink-0"></span>
+                        ${pp}
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Objection + CTA -->
+              <div class="mt-6 grid md:grid-cols-2 gap-4">
+                <div class="bg-surface-200 rounded-lg p-4">
+                  <div class="text-xs text-slate-500 mb-2">Primary Objection</div>
+                  <div class="text-sm text-slate-300 italic">"${p.objection}"</div>
+                </div>
+                <div class="${c.bg} rounded-lg p-4 border ${c.border}">
+                  <div class="text-xs ${c.text} mb-2">Best CTA</div>
+                  <div class="text-sm text-white font-medium">"${p.cta}"</div>
+                </div>
+              </div>
+
+              <!-- How to reach -->
+              <div class="mt-4 bg-surface-200 rounded-lg p-4">
+                <div class="text-xs text-slate-500 mb-2">How to Reach</div>
+                <div class="text-sm text-slate-300">${p.reach}</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    // ==============================
+    // SEASONAL CALENDAR HEATMAP
+    // ==============================
+
+    function renderCalendar() {
+      const grid = document.getElementById('heatmapGrid');
+      const maxMult = 2.5;
+
+      calendarData.forEach((m) => {
+        const intensity = m.multiplier / maxMult;
+        // Map intensity to opacity/color
+        const alpha = 0.15 + intensity * 0.75;
+        const bgColor = `rgba(245, 158, 11, ${alpha})`;
+        const textColor = intensity > 0.5 ? '#1a1e2e' : '#fcd34d';
+
+        const cell = document.createElement('div');
+        cell.className = 'heatmap-cell rounded-xl p-3 flex flex-col items-center justify-between min-h-[140px] border border-amber-800/20';
+        cell.style.background = bgColor;
+
+        cell.innerHTML = `
+          <div class="text-xs font-bold tracking-wider" style="color: ${textColor}">${m.month}</div>
+          <div class="text-2xl font-black my-1" style="color: ${textColor}">${m.multiplier}x</div>
+          <div class="text-center">
+            ${m.occasions.map(o => `<div class="text-[10px] leading-tight font-medium" style="color: ${intensity > 0.5 ? '#44340e' : '#d4a44e'}">${o}</div>`).join('')}
+          </div>
+        `;
+
+        // Tooltip on hover
+        cell.title = `${m.msg}\nBudget: ${m.multiplier}x base`;
+
+        grid.appendChild(cell);
+      });
+    }
+
+    // ==============================
+    // META AUDIENCE CARDS
+    // ==============================
+
+    function renderAudiences() {
+      const container = document.getElementById('audienceCards');
+
+      audiences.forEach((aud) => {
+        const card = document.createElement('div');
+        card.className = `audience-card bg-surface-100 border border-surface-300 rounded-xl p-5`;
+
+        const paramRows = Object.entries(aud.params).map(([key, val]) => `
+          <tr class="border-b border-surface-300/30">
+            <td class="py-1.5 pr-3 text-slate-500 text-xs font-medium align-top whitespace-nowrap">${key}</td>
+            <td class="py-1.5 text-slate-300 text-xs">${val}</td>
+          </tr>
+        `).join('');
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-white font-bold text-sm">${aud.name}</h3>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-${aud.color}/20 text-${aud.color} font-bold">${aud.budget}</span>
+          </div>
+          <table class="w-full">
+            <tbody>${paramRows}</tbody>
+          </table>
+        `;
+
+        container.appendChild(card);
+      });
+    }
+
+    // ==============================
+    // BUDGET CALCULATOR
+    // ==============================
+
+    function formatNum(n) {
+      if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+      if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'K';
+      return n.toFixed(0);
+    }
+
+    function formatCHF(n) {
+      return 'CHF ' + n.toLocaleString('de-CH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    }
+
+    function updateBudgetCalc() {
+      const budget = parseFloat(document.getElementById('budgetInput').value) || 0;
+      document.getElementById('budgetSlider').value = Math.min(15000, Math.max(500, budget));
+
+      // Assumptions
+      const cpm = 8; // CHF per 1000 impressions
+      const ctr = 0.01; // 1% click-through rate
+      const visitToStory = 0.10; // 10% visit-to-story-start
+      const storyToPurchase = 0.20; // 20% story-to-purchase
+      const aov = 58; // Average order value CHF
+
+      const impressions = (budget / cpm) * 1000;
+      const clicks = impressions * ctr;
+      const storyStarts = clicks * visitToStory;
+      const printOrders = storyStarts * storyToPurchase;
+      const revenue = printOrders * aov;
+      const roas = budget > 0 ? revenue / budget : 0;
+      const cpaStory = storyStarts > 0 ? budget / storyStarts : 0;
+      const cpaOrder = printOrders > 0 ? budget / printOrders : 0;
+
+      document.getElementById('calcImpressions').textContent = formatNum(impressions);
+      document.getElementById('calcClicks').textContent = formatNum(clicks);
+      document.getElementById('calcStories').textContent = formatNum(storyStarts);
+      document.getElementById('calcOrders').textContent = formatNum(printOrders);
+      document.getElementById('calcRevenue').textContent = formatCHF(revenue);
+      document.getElementById('calcROAS').textContent = `ROAS: ${roas.toFixed(2)}x`;
+      document.getElementById('calcCpaStory').textContent = formatCHF(cpaStory);
+      document.getElementById('calcCpaOrder').textContent = formatCHF(cpaOrder);
+      document.getElementById('calcAov').textContent = formatCHF(aov);
+    }
+
+    function syncSlider() {
+      const val = document.getElementById('budgetSlider').value;
+      document.getElementById('budgetInput').value = val;
+      updateBudgetCalc();
+    }
+
+    // ==============================
+    // INIT
+    // ==============================
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMap();
+      renderPersonas();
+      renderCalendar();
+      renderAudiences();
+      updateBudgetCalc();
+    });
+  </script>
+</body>
+</html>

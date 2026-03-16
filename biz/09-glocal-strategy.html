@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Glocal Strategy — MagicalStory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            surface: { 50: '#fafaf9', 100: '#1e293b', 200: '#1a2332', 300: '#162031', 400: '#334155', 500: '#475569' },
+            amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309' },
+            slate: { 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    /* Nav */
+    .nav-link { transition: color 0.2s; }
+    .nav-link:hover { color: #fbbf24; }
+
+    /* Cards */
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      border-color: rgba(245, 158, 11, 0.3);
+      box-shadow: 0 0 24px rgba(245, 158, 11, 0.06);
+    }
+
+    /* Phase cards */
+    .phase-card { cursor: pointer; transition: all 0.3s ease; }
+    .phase-card .phase-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.5s ease;
+    }
+    .phase-card.expanded .phase-content { max-height: 1200px; }
+    .phase-card .chevron { transition: transform 0.3s ease; }
+    .phase-card.expanded .chevron { transform: rotate(180deg); }
+
+    /* Filter chips */
+    .filter-chip {
+      transition: all 0.2s ease;
+      cursor: pointer;
+      user-select: none;
+      border: 1px solid #334155;
+      background: transparent;
+      color: #64748b;
+    }
+    .filter-chip:hover:not(.active) { border-color: #475569; color: #94a3b8; }
+    .filter-chip.active {
+      border-color: #f59e0b;
+      background: rgba(245, 158, 11, 0.1);
+      color: #fbbf24;
+    }
+
+    /* Map */
+    .city-dot { cursor: pointer; transition: all 0.2s ease; }
+    .city-dot:hover { filter: brightness(1.4); }
+
+    /* Tooltip */
+    .map-tooltip {
+      position: absolute;
+      background: #1e293b;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 16px;
+      width: 280px;
+      z-index: 30;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s, transform 0.2s;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+    .map-tooltip.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+
+    /* Flywheel */
+    .flywheel-step {
+      transition: all 0.4s ease;
+      opacity: 0.4;
+    }
+    .flywheel-step.active {
+      opacity: 1;
+      transform: scale(1.08);
+    }
+    .flywheel-step.active .step-ring {
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+      border-color: #f59e0b;
+    }
+    .step-ring {
+      transition: all 0.4s ease;
+      border: 2px solid #334155;
+    }
+
+    /* Budget bars */
+    .budget-bar {
+      transition: width 0.8s ease;
+      border-radius: 0 4px 4px 0;
+    }
+
+    /* Moat fortress */
+    .moat-brick {
+      transition: all 0.3s ease;
+    }
+    .moat-brick:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);
+    }
+
+    /* Status badges */
+    .badge-planned { background: rgba(100, 116, 139, 0.2); color: #94a3b8; border: 1px solid #475569; }
+    .badge-content { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-live { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+
+    /* Priority dots */
+    .priority-high { background: #f59e0b; }
+    .priority-medium { background: #fbbf24; }
+    .priority-low { background: #fde68a; }
+
+    /* Connector line animation */
+    @keyframes flowPulse {
+      0%, 100% { opacity: 0.2; }
+      50% { opacity: 0.8; }
+    }
+
+    /* Fortress wall gradient */
+    .fortress-wall {
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 100%);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Cross-document Navigation -->
+  <div style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:1px solid #334155;" class="overflow-x-auto whitespace-nowrap">
+    <div style="display:flex;align-items:center;gap:0.25rem;padding:0.4rem 1rem;" class="text-xs">
+      <a href="01-gtm-strategy.html" style="color:#94a3b8;text-decoration:none;padding:0.25rem 0.6rem;border-radius:0.25rem;transition:color 0.2s;" onmouseover="this.style.color='#fbbf24'" onmouseout="this.style.color='#94a3b8'">GTM Strategy</a>
+      <a href="02-competitive-analysis.html" style="color:#94a3b8;text-decoration:none;padding:0.25rem 0.6rem;border-radius:0.25rem;transition:color 0.2s;" onmouseover="this.style.color='#fbbf24'" onmouseout="this.style.color='#94a3b8'">Competition</a>
+      <a href="03-target-audience.html" style="color:#94a3b8;text-decoration:none;padding:0.25rem 0.6rem;border-radius:0.25rem;transition:color 0.2s;" onmouseover="this.style.color='#fbbf24'" onmouseout="this.style.color='#94a3b8'">Audience</a>
+      <a href="05-meta-ads-strategy.html" style="color:#94a3b8;text-decoration:none;padding:0.25rem 0.6rem;border-radius:0.25rem;transition:color 0.2s;" onmouseover="this.style.color='#fbbf24'" onmouseout="this.style.color='#94a3b8'">Meta Ads</a>
+      <a href="06-seo-geo-strategy.html" style="color:#94a3b8;text-decoration:none;padding:0.25rem 0.6rem;border-radius:0.25rem;transition:color 0.2s;" onmouseover="this.style.color='#fbbf24'" onmouseout="this.style.color='#94a3b8'">SEO &amp; GEO</a>
+      <a href="09-glocal-strategy.html" style="color:#f59e0b;font-weight:600;text-decoration:none;padding:0.25rem 0.6rem;border-radius:0.25rem;">Glocal</a>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sticky top-0 z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/40" style="margin-top:32px;">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-amber-400 font-bold text-lg tracking-tight">MagicalStory</span>
+        <span class="text-slate-500 text-sm hidden sm:inline">Glocal Strategy</span>
+      </div>
+      <div class="hidden md:flex items-center gap-6 text-sm text-slate-400">
+        <a href="#map" class="nav-link">Swiss Map</a>
+        <a href="#phases" class="nav-link">Phases</a>
+        <a href="#flywheel" class="nav-link">Flywheel</a>
+        <a href="#tracker" class="nav-link">Tracker</a>
+        <a href="#budget" class="nav-link">Budget</a>
+        <a href="#moat" class="nav-link">Moat</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Header -->
+  <header class="max-w-7xl mx-auto px-4 pt-16 pb-12">
+    <p class="text-amber-500 text-sm font-semibold tracking-wider uppercase mb-3">Expansion Strategy</p>
+    <h1 class="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-4">
+      Glocal Strategy: Think Global,<br>Target Local
+    </h1>
+    <p class="text-slate-400 text-lg max-w-2xl leading-relaxed">
+      <span class="text-white font-medium">MagicalStory.ch</span> &mdash; From Swiss Towns to Global Reach.
+      A globally scalable product marketed with hyper-local precision: <span class="text-amber-400">50 Swiss towns</span>,
+      <span class="text-amber-400">3 languages</span>, then DACH and beyond.
+    </p>
+    <div class="flex flex-wrap gap-4 mt-8">
+      <div class="card rounded-lg px-5 py-3">
+        <div class="text-2xl font-bold text-amber-400">50</div>
+        <div class="text-xs text-slate-400">Swiss Towns</div>
+      </div>
+      <div class="card rounded-lg px-5 py-3">
+        <div class="text-2xl font-bold text-amber-400">3</div>
+        <div class="text-xs text-slate-400">Languages</div>
+      </div>
+      <div class="card rounded-lg px-5 py-3">
+        <div class="text-2xl font-bold text-amber-400">12</div>
+        <div class="text-xs text-slate-400">Month Rollout</div>
+      </div>
+      <div class="card rounded-lg px-5 py-3">
+        <div class="text-2xl font-bold text-amber-400">CHF 90K</div>
+        <div class="text-xs text-slate-400">Total Budget</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 pb-24 space-y-24">
+
+    <!-- ============================================ -->
+    <!-- SECTION: SWISS MAP                           -->
+    <!-- ============================================ -->
+    <section id="map">
+      <h2 class="text-2xl font-bold text-white mb-2">Switzerland: 50 Target Cities</h2>
+      <p class="text-slate-400 mb-6 text-sm">Click a city to see local details. Dot size indicates priority. Color indicates language region.</p>
+
+      <!-- Legend -->
+      <div class="flex flex-wrap gap-6 mb-4 text-sm">
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span><span class="text-slate-300">German (30)</span></div>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-sky-400 inline-block"></span><span class="text-slate-300">French (15)</span></div>
+        <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span><span class="text-slate-300">Italian (5)</span></div>
+      </div>
+
+      <div class="card rounded-xl p-4 md:p-8 relative overflow-hidden" id="mapContainer">
+        <svg id="swissMap" viewBox="0 0 600 400" class="w-full max-w-4xl mx-auto" style="max-height: 520px;">
+          <!-- Switzerland outline (simplified) -->
+          <path d="M 60,220 L 30,200 25,180 40,160 60,150 75,120 100,100 120,90 145,80
+                   170,75 200,72 220,70 240,68 260,72 280,68 300,65 320,70 340,72
+                   360,68 380,72 400,80 420,85 440,95 460,100 480,110 500,120
+                   520,140 535,155 550,175 555,195 548,215 535,230 520,250
+                   505,265 490,275 475,290 460,305 445,315 425,325 410,335
+                   395,345 380,355 365,360 345,365 325,365 310,360 295,355
+                   280,350 265,345 250,340 235,338 220,335 200,330 180,328
+                   160,325 140,320 120,310 105,300 90,290 78,275 68,260
+                   60,245 55,230 60,220 Z"
+                fill="none"
+                stroke="#334155"
+                stroke-width="2"
+                opacity="0.6"/>
+
+          <!-- Cantonal boundary hints (very subtle) -->
+          <line x1="200" y1="72" x2="200" y2="330" stroke="#1e293b" stroke-width="0.5" opacity="0.4"/>
+          <line x1="320" y1="65" x2="320" y2="365" stroke="#1e293b" stroke-width="0.5" opacity="0.4"/>
+
+          <!-- City dots will be rendered by JS -->
+        </svg>
+
+        <!-- Tooltip -->
+        <div class="map-tooltip" id="mapTooltip"></div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION: PHASE TIMELINE                      -->
+    <!-- ============================================ -->
+    <section id="phases">
+      <h2 class="text-2xl font-bold text-white mb-2">Expansion Phases</h2>
+      <p class="text-slate-400 mb-6 text-sm">Three phases over 12 months. Click to expand details.</p>
+
+      <!-- Timeline line -->
+      <div class="space-y-4">
+        <!-- Phase 1 -->
+        <div class="phase-card card rounded-xl overflow-hidden expanded" onclick="togglePhase(this)">
+          <div class="p-6 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg">1</div>
+              <div>
+                <h3 class="text-white font-semibold text-lg">Switzerland</h3>
+                <p class="text-slate-400 text-sm">Months 1&ndash;3 &middot; CHF 15,000 &middot; 33 towns</p>
+              </div>
+            </div>
+            <svg class="chevron w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div class="phase-content px-6 pb-6">
+            <div class="grid md:grid-cols-3 gap-4">
+              <!-- 1a -->
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                  <span class="text-amber-400 font-semibold text-sm">Phase 1a: German Core</span>
+                </div>
+                <p class="text-slate-400 text-xs mb-2">Weeks 1&ndash;6 &middot; 20 towns</p>
+                <ul class="text-slate-300 text-xs space-y-1">
+                  <li>ZH, BE, BS, BL, LU, SG, AG, TG, SH, ZG cantons</li>
+                  <li>20 ad sets (1/town, 15km radius)</li>
+                  <li>3 creatives per town</li>
+                  <li>CHF 5&ndash;15/day per town</li>
+                  <li>Kill CPA >CHF 15 after 3 days</li>
+                </ul>
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <div class="text-xs text-slate-500">KPI Targets</div>
+                  <div class="text-xs text-slate-300 mt-1">CTR >2.5% &middot; CPA &lt;CHF 12 &middot; 200 stories/month</div>
+                </div>
+              </div>
+              <!-- 1b -->
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                  <span class="text-sky-400 font-semibold text-sm">Phase 1b: French Expansion</span>
+                </div>
+                <p class="text-slate-400 text-xs mb-2">Weeks 7&ndash;10 &middot; 10 towns</p>
+                <ul class="text-slate-300 text-xs space-y-1">
+                  <li>VD, GE, NE, FR, VS cantons</li>
+                  <li>Lausanne, Geneve, Montreux, Neuchatel...</li>
+                  <li>Translate winning DE creatives</li>
+                  <li>Use "votre enfant" (formal)</li>
+                  <li>Instagram focus (FR preference)</li>
+                </ul>
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <div class="text-xs text-slate-500">KPI Targets</div>
+                  <div class="text-xs text-slate-300 mt-1">CTR >2.0% &middot; CPA &lt;CHF 15 &middot; 100 stories/month</div>
+                </div>
+              </div>
+              <!-- 1c -->
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <div class="flex items-center gap-2 mb-3">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                  <span class="text-emerald-400 font-semibold text-sm">Phase 1c: Italian Seed</span>
+                </div>
+                <p class="text-slate-400 text-xs mb-2">Weeks 11&ndash;12 &middot; 3 towns</p>
+                <ul class="text-slate-300 text-xs space-y-1">
+                  <li>Ticino only</li>
+                  <li>Lugano, Locarno, Bellinzona</li>
+                  <li>CHF 500 total test budget</li>
+                  <li>Evaluate demand before deeper invest</li>
+                  <li>3 town pages in Italian</li>
+                </ul>
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <div class="text-xs text-slate-500">KPI Targets</div>
+                  <div class="text-xs text-slate-300 mt-1">CTR >1.5% &middot; CPA &lt;CHF 18 &middot; 30 stories total</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 2 -->
+        <div class="phase-card card rounded-xl overflow-hidden" onclick="togglePhase(this)">
+          <div class="p-6 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 font-bold text-lg">2</div>
+              <div>
+                <h3 class="text-white font-semibold text-lg">DACH Expansion</h3>
+                <p class="text-slate-400 text-sm">Months 4&ndash;6 &middot; EUR 25,000 &middot; Germany + Austria</p>
+              </div>
+            </div>
+            <svg class="chevron w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div class="phase-content px-6 pb-6">
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <h4 class="text-white font-semibold text-sm mb-3">Germany</h4>
+                <div class="mb-3">
+                  <span class="text-xs text-amber-400 font-medium">Wave 1 (Month 4): Southern</span>
+                  <p class="text-slate-300 text-xs mt-1">Munchen, Stuttgart, Freiburg, Konstanz, Augsburg, Nurnberg, Heidelberg, Karlsruhe</p>
+                </div>
+                <div class="mb-3">
+                  <span class="text-xs text-amber-400 font-medium">Wave 2 (Months 5&ndash;6): National</span>
+                  <p class="text-slate-300 text-xs mt-1">Hamburg, Berlin, Koln, Frankfurt, Dusseldorf, Dortmund, Essen, Leipzig, Dresden, Hannover</p>
+                </div>
+                <ul class="text-slate-400 text-xs space-y-1 border-t border-slate-700/50 pt-3 mt-3">
+                  <li>Pricing in EUR</li>
+                  <li>Standard Hochdeutsch (no Swiss-isms)</li>
+                  <li>German print fulfillment via Gelato</li>
+                </ul>
+              </div>
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <h4 class="text-white font-semibold text-sm mb-3">Austria</h4>
+                <p class="text-slate-300 text-xs mb-3">Wien, Salzburg, Innsbruck, Graz, Linz</p>
+                <ul class="text-slate-400 text-xs space-y-1">
+                  <li>Austrian German variant (Janner, Paradeiser...)</li>
+                  <li>Habsburg/Sissi themes</li>
+                  <li>Austrian landmarks in stories</li>
+                  <li>Pricing in EUR</li>
+                </ul>
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <div class="text-xs text-slate-500">Phase 2 KPI Targets</div>
+                  <div class="text-xs text-slate-300 mt-1">CPA &lt;EUR 10 &middot; 500 stories/month &middot; 5% print conversion</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phase 3 -->
+        <div class="phase-card card rounded-xl overflow-hidden" onclick="togglePhase(this)">
+          <div class="p-6 flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-bold text-lg">3</div>
+              <div>
+                <h3 class="text-white font-semibold text-lg">Global English</h3>
+                <p class="text-slate-400 text-sm">Months 7&ndash;12 &middot; USD 50,000 &middot; UK, US, AU, CA</p>
+              </div>
+            </div>
+            <svg class="chevron w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div class="phase-content px-6 pb-6">
+            <div class="grid md:grid-cols-3 gap-4">
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <span class="text-xs font-semibold text-amber-400">Months 7&ndash;8</span>
+                <h4 class="text-white font-semibold text-sm mt-1 mb-2">United Kingdom</h4>
+                <p class="text-slate-300 text-xs mb-2">London, Manchester, Birmingham, Edinburgh, Bristol, Leeds, Glasgow, Cardiff, Liverpool, Oxford</p>
+                <ul class="text-slate-400 text-xs space-y-1">
+                  <li>British English (colour, mum)</li>
+                  <li>Pricing in GBP</li>
+                  <li>UK landmarks and traditions</li>
+                </ul>
+              </div>
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <span class="text-xs font-semibold text-amber-400">Months 9&ndash;12</span>
+                <h4 class="text-white font-semibold text-sm mt-1 mb-2">United States</h4>
+                <p class="text-slate-300 text-xs mb-2">New York, Los Angeles, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, San Jose</p>
+                <ul class="text-slate-400 text-xs space-y-1">
+                  <li>American English (color, mom)</li>
+                  <li>Pricing in USD</li>
+                  <li>Much larger market, higher spend</li>
+                </ul>
+              </div>
+              <div class="bg-slate-900/50 rounded-lg p-4 border border-slate-700/50">
+                <span class="text-xs font-semibold text-amber-400">Months 11&ndash;12</span>
+                <h4 class="text-white font-semibold text-sm mt-1 mb-2">Australia & Canada</h4>
+                <p class="text-slate-300 text-xs mb-2">Sydney, Melbourne, Brisbane, Toronto, Vancouver, Montreal</p>
+                <ul class="text-slate-400 text-xs space-y-1">
+                  <li>Test markets</li>
+                  <li>AUD / CAD pricing</li>
+                  <li>Gelato local fulfillment</li>
+                </ul>
+                <div class="mt-3 pt-3 border-t border-slate-700/50">
+                  <div class="text-xs text-slate-500">Phase 3 KPI Targets</div>
+                  <div class="text-xs text-slate-300 mt-1">CPA &lt;$8 &middot; 2,000 stories/month &middot; 8% print conversion</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION: LOCAL FLYWHEEL                      -->
+    <!-- ============================================ -->
+    <section id="flywheel">
+      <h2 class="text-2xl font-bold text-white mb-2">The Local Flywheel</h2>
+      <p class="text-slate-400 mb-8 text-sm">Each town builds its own self-reinforcing loop. Smaller towns spin faster.</p>
+
+      <div class="card rounded-xl p-6 md:p-10">
+        <div class="relative w-full max-w-xl mx-auto" style="aspect-ratio: 1/1;">
+          <!-- Center label -->
+          <div class="absolute inset-0 flex items-center justify-center z-10">
+            <div class="text-center">
+              <div class="text-amber-400 font-bold text-sm md:text-base">LOCAL</div>
+              <div class="text-amber-400 font-bold text-sm md:text-base">VIRALITY</div>
+              <div class="text-slate-500 text-xs mt-1">Self-reinforcing</div>
+            </div>
+          </div>
+
+          <!-- Circular connector (SVG) -->
+          <svg class="absolute inset-0 w-full h-full" viewBox="0 0 400 400">
+            <circle cx="200" cy="200" r="150" fill="none" stroke="#334155" stroke-width="1" stroke-dasharray="6 4" opacity="0.5"/>
+            <!-- Animated flow indicator -->
+            <circle cx="200" cy="200" r="150" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="20 440" stroke-dashoffset="0" opacity="0.4">
+              <animateTransform attributeName="transform" type="rotate" from="0 200 200" to="360 200 200" dur="8s" repeatCount="indefinite"/>
+            </circle>
+          </svg>
+
+          <!-- 8 Steps positioned in circle -->
+          <div id="flywheelSteps" class="absolute inset-0"></div>
+        </div>
+
+        <!-- Why it spins faster in small towns -->
+        <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-3 mt-10 pt-6 border-t border-slate-700/50">
+          <div class="text-center p-3">
+            <div class="text-amber-400 text-xl font-bold">Tighter</div>
+            <div class="text-slate-400 text-xs">Parent groups are more connected</div>
+          </div>
+          <div class="text-center p-3">
+            <div class="text-amber-400 text-xl font-bold">Known</div>
+            <div class="text-slate-400 text-xs">Everyone knows each other</div>
+          </div>
+          <div class="text-center p-3">
+            <div class="text-amber-400 text-xl font-bold">Proud</div>
+            <div class="text-slate-400 text-xs">Local pride amplifies sharing</div>
+          </div>
+          <div class="text-center p-3">
+            <div class="text-amber-400 text-xl font-bold">Viral</div>
+            <div class="text-slate-400 text-xs">"Set in OUR town!" spreads fast</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION: TOWN EXPANSION TRACKER              -->
+    <!-- ============================================ -->
+    <section id="tracker">
+      <h2 class="text-2xl font-bold text-white mb-2">Town Expansion Tracker</h2>
+      <p class="text-slate-400 mb-4 text-sm">All 50 Swiss target towns with status tracking.</p>
+
+      <!-- Filters -->
+      <div class="flex flex-wrap gap-2 mb-6" id="trackerFilters">
+        <button onclick="filterTracker('all')" class="filter-chip active px-4 py-2 rounded-full text-sm font-medium" data-filter="all">All (50)</button>
+        <button onclick="filterTracker('de')" class="filter-chip px-4 py-2 rounded-full text-sm font-medium" data-filter="de">German (30)</button>
+        <button onclick="filterTracker('fr')" class="filter-chip px-4 py-2 rounded-full text-sm font-medium" data-filter="fr">French (15)</button>
+        <button onclick="filterTracker('it')" class="filter-chip px-4 py-2 rounded-full text-sm font-medium" data-filter="it">Italian (5)</button>
+        <button onclick="filterTracker('high')" class="filter-chip px-4 py-2 rounded-full text-sm font-medium" data-filter="high">High Priority</button>
+      </div>
+
+      <div class="card rounded-xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700/60">
+                <th class="text-left text-slate-400 font-medium px-4 py-3 text-xs uppercase tracking-wider">Town</th>
+                <th class="text-left text-slate-400 font-medium px-4 py-3 text-xs uppercase tracking-wider">Canton</th>
+                <th class="text-left text-slate-400 font-medium px-4 py-3 text-xs uppercase tracking-wider">Language</th>
+                <th class="text-right text-slate-400 font-medium px-4 py-3 text-xs uppercase tracking-wider">Population</th>
+                <th class="text-center text-slate-400 font-medium px-4 py-3 text-xs uppercase tracking-wider">Priority</th>
+                <th class="text-center text-slate-400 font-medium px-4 py-3 text-xs uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody id="trackerBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION: BUDGET ALLOCATION                   -->
+    <!-- ============================================ -->
+    <section id="budget">
+      <h2 class="text-2xl font-bold text-white mb-2">Budget Allocation</h2>
+      <p class="text-slate-400 mb-6 text-sm">Three phases, total CHF 90K equivalent across 12 months.</p>
+
+      <div class="space-y-6">
+        <!-- Phase 1 Budget -->
+        <div class="card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-white font-semibold">Phase 1: Switzerland</h3>
+              <p class="text-slate-400 text-xs">3 months &middot; CHF 15,000 total</p>
+            </div>
+            <div class="text-amber-400 font-bold text-lg">CHF 15K</div>
+          </div>
+          <div class="space-y-3" id="budgetPhase1"></div>
+        </div>
+
+        <!-- Phase 2 Budget -->
+        <div class="card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-white font-semibold">Phase 2: DACH</h3>
+              <p class="text-slate-400 text-xs">3 months &middot; EUR 25,000 total</p>
+            </div>
+            <div class="text-sky-400 font-bold text-lg">EUR 25K</div>
+          </div>
+          <div class="space-y-3" id="budgetPhase2"></div>
+        </div>
+
+        <!-- Phase 3 Budget -->
+        <div class="card rounded-xl p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-white font-semibold">Phase 3: Global</h3>
+              <p class="text-slate-400 text-xs">6 months &middot; USD 50,000 total</p>
+            </div>
+            <div class="text-emerald-400 font-bold text-lg">USD 50K</div>
+          </div>
+          <div class="space-y-3" id="budgetPhase3"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================ -->
+    <!-- SECTION: COMPETITIVE MOAT                    -->
+    <!-- ============================================ -->
+    <section id="moat">
+      <h2 class="text-2xl font-bold text-white mb-2">Competitive Moat</h2>
+      <p class="text-slate-400 mb-8 text-sm">Six reinforcing layers that make town stories defensible.</p>
+
+      <!-- Fortress visualization -->
+      <div class="fortress-wall rounded-2xl p-6 md:p-10">
+        <!-- Fortress top - crenellations -->
+        <div class="flex justify-center gap-1 mb-6">
+          <div class="w-4 h-6 bg-amber-500/20 rounded-t"></div>
+          <div class="w-6 h-3 bg-transparent"></div>
+          <div class="w-4 h-6 bg-amber-500/20 rounded-t"></div>
+          <div class="w-6 h-3 bg-transparent"></div>
+          <div class="w-4 h-6 bg-amber-500/20 rounded-t"></div>
+          <div class="w-6 h-3 bg-transparent"></div>
+          <div class="w-4 h-6 bg-amber-500/20 rounded-t"></div>
+          <div class="w-6 h-3 bg-transparent"></div>
+          <div class="w-4 h-6 bg-amber-500/20 rounded-t"></div>
+          <div class="w-6 h-3 bg-transparent"></div>
+          <div class="w-4 h-6 bg-amber-500/20 rounded-t"></div>
+        </div>
+
+        <!-- 6 Moat blocks as stacked wall layers -->
+        <div class="grid md:grid-cols-3 gap-4">
+          <div class="moat-brick bg-slate-900/60 border border-amber-500/15 rounded-lg p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+              <h4 class="text-white font-semibold text-sm">Research Effort</h4>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">Each town requires local knowledge &mdash; landmarks, traditions, dialect. A competitor needs to research 50+ towns to match us.</p>
+          </div>
+
+          <div class="moat-brick bg-slate-900/60 border border-amber-500/15 rounded-lg p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"/></svg>
+              </div>
+              <h4 class="text-white font-semibold text-sm">Content Creation</h4>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">50 town pages x 5 story ideas = 250 unique concepts. Plus illustrations of each town's landmarks. Months of work.</p>
+          </div>
+
+          <div class="moat-brick bg-slate-900/60 border border-amber-500/15 rounded-lg p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+              </div>
+              <h4 class="text-white font-semibold text-sm">SEO Compounding</h4>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">First to rank for "personalisiertes kinderbuch zurich" owns that keyword for years. SEO is a compounding advantage.</p>
+          </div>
+
+          <div class="moat-brick bg-slate-900/60 border border-amber-500/15 rounded-lg p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <h4 class="text-white font-semibold text-sm">Local Trust</h4>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">Parents who see their town in our product trust us more. This trust doesn't transfer to a competitor who arrives later.</p>
+          </div>
+
+          <div class="moat-brick bg-slate-900/60 border border-amber-500/15 rounded-lg p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+              </div>
+              <h4 class="text-white font-semibold text-sm">Network Effects</h4>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">More parents in a town = more UGC = more social proof = more parents. Each town builds its own local flywheel.</p>
+          </div>
+
+          <div class="moat-brick bg-slate-900/60 border border-amber-500/15 rounded-lg p-5">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/></svg>
+              </div>
+              <h4 class="text-white font-semibold text-sm">Data Advantage</h4>
+            </div>
+            <p class="text-slate-400 text-xs leading-relaxed">We learn which towns, themes, and stories perform best. This data informs where to invest next. Competitors start blind.</p>
+          </div>
+        </div>
+
+        <!-- Fortress base -->
+        <div class="mt-8 pt-6 border-t border-amber-500/10 text-center">
+          <blockquote class="text-amber-300/80 text-lg md:text-xl font-medium italic max-w-2xl mx-auto">
+            "Competitors can copy features. They can't copy local knowledge at scale."
+          </blockquote>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-800 py-8 text-center">
+    <p class="text-slate-600 text-xs">MagicalStory.ch &mdash; Glocal Strategy &middot; Confidential</p>
+  </footer>
+
+  <script>
+    // ==========================================
+    // DATA: 50 Swiss cities
+    // ==========================================
+    const cities = [
+      // German (30 cities)
+      { name: 'Zurich', canton: 'ZH', lang: 'de', pop: 435000, priority: 1, x: 370, y: 150, landmarks: 'Grossmunster, Zurichsee, Zoo Zurich', stories: 'Sechselaeuten/Boeoegg, Zoo adventure, Zurichsee sailing', status: 'live' },
+      { name: 'Basel', canton: 'BS', lang: 'de', pop: 175000, priority: 2, x: 220, y: 80, landmarks: 'Munster, Rhein, Fasnacht', stories: 'Basler Fasnacht, Rhine swimming, Zolli adventure', status: 'live' },
+      { name: 'Bern', canton: 'BE', lang: 'de', pop: 134000, priority: 3, x: 250, y: 200, landmarks: 'Baerengraben, Zytglogge, Aare', stories: 'Bear Park, Bundeshaus mystery, Aare float', status: 'live' },
+      { name: 'Luzern', canton: 'LU', lang: 'de', pop: 82000, priority: 4, x: 310, y: 190, landmarks: 'Kapellbrucke, Pilatus, See', stories: 'Lowendenkmal, Pilatus dragon, covered bridge', status: 'content' },
+      { name: 'Winterthur', canton: 'ZH', lang: 'de', pop: 115000, priority: 5, x: 390, y: 120, landmarks: 'Technorama, Altstadt', stories: 'Science adventure, family town tales', status: 'content' },
+      { name: 'St. Gallen', canton: 'SG', lang: 'de', pop: 76000, priority: 6, x: 450, y: 130, landmarks: 'Stiftsbibliothek, Altstadt', stories: 'Abbey library mystery, textile history', status: 'content' },
+      { name: 'Zug', canton: 'ZG', lang: 'de', pop: 31000, priority: 7, x: 340, y: 185, landmarks: 'Zugerberg, Altstadt, See', stories: 'Zugersee exploration, old town secrets', status: 'content' },
+      { name: 'Thun', canton: 'BE', lang: 'de', pop: 44000, priority: 8, x: 270, y: 230, landmarks: 'Schloss Thun, Aare, See', stories: 'Castle adventure, Berner Oberland tales', status: 'planned' },
+      { name: 'Aarau', canton: 'AG', lang: 'de', pop: 22000, priority: 9, x: 290, y: 130, landmarks: 'Altstadt, Jura-Park', stories: 'Canton capital quest, Jura nature walk', status: 'planned' },
+      { name: 'Baden', canton: 'AG', lang: 'de', pop: 19000, priority: 10, x: 310, y: 120, landmarks: 'Thermalquellen, Altstadt', stories: 'Hot springs mystery, Baederstadt legend', status: 'planned' },
+      { name: 'Schaffhausen', canton: 'SH', lang: 'de', pop: 37000, priority: 11, x: 350, y: 72, landmarks: 'Rheinfall, Munot', stories: 'Rheinfall adventure, Munot fortress', status: 'planned' },
+      { name: 'Rapperswil-Jona', canton: 'SG', lang: 'de', pop: 27000, priority: 12, x: 395, y: 175, landmarks: 'Schloss, Holzbrucke, Zoo', stories: 'Rose city, wooden bridge, castle tales', status: 'planned' },
+      { name: 'Uster', canton: 'ZH', lang: 'de', pop: 36000, priority: 13, x: 385, y: 145, landmarks: 'Greifensee, Schloss', stories: 'Zurcher Oberland nature, lake tales', status: 'planned' },
+      { name: 'Davos', canton: 'GR', lang: 'de', pop: 11000, priority: 14, x: 480, y: 215, landmarks: 'Berge, Ski, WEF-Stadt', stories: 'Mountain ski adventure, snow tales', status: 'planned' },
+      { name: 'Interlaken', canton: 'BE', lang: 'de', pop: 6000, priority: 15, x: 290, y: 245, landmarks: 'Eiger, Monch, Jungfrau', stories: 'Jungfrau region adventure, lake quest', status: 'planned' },
+      { name: 'Chur', canton: 'GR', lang: 'de', pop: 38000, priority: 16, x: 470, y: 190, landmarks: 'Altstadt, Calanda', stories: 'Oldest town in Switzerland, Calanda bear', status: 'planned' },
+      { name: 'Frauenfeld', canton: 'TG', lang: 'de', pop: 26000, priority: 17, x: 420, y: 105, landmarks: 'Schloss, Murg', stories: 'Thurgau apple harvest, castle tales', status: 'planned' },
+      { name: 'Olten', canton: 'SO', lang: 'de', pop: 19000, priority: 18, x: 270, y: 150, landmarks: 'Aare, Altstadt', stories: 'Center of Switzerland, Aare bridge', status: 'planned' },
+      { name: 'Solothurn', canton: 'SO', lang: 'de', pop: 17000, priority: 19, x: 240, y: 155, landmarks: 'Barockstadt, Aare', stories: 'Baroque beauty, number 11 mystery', status: 'planned' },
+      { name: 'Kreuzlingen', canton: 'TG', lang: 'de', pop: 23000, priority: 20, x: 435, y: 95, landmarks: 'Bodensee, Seeburgpark', stories: 'Lake Constance adventure, border town', status: 'planned' },
+      // Additional German cities (21-30)
+      { name: 'Biel/Bienne', canton: 'BE', lang: 'de', pop: 55000, priority: 21, x: 215, y: 180, landmarks: 'Bieler See, Altstadt', stories: 'Bilingual city, lake adventure', status: 'planned' },
+      { name: 'Wil', canton: 'SG', lang: 'de', pop: 24000, priority: 22, x: 430, y: 135, landmarks: 'Hof zu Wil, Altstadt', stories: 'Market town tales, Toggenburg gateway', status: 'planned' },
+      { name: 'Burgdorf', canton: 'BE', lang: 'de', pop: 17000, priority: 23, x: 260, y: 175, landmarks: 'Schloss Burgdorf, Emmental', stories: 'Emmental cheese, castle quest', status: 'planned' },
+      { name: 'Langenthal', canton: 'BE', lang: 'de', pop: 16000, priority: 24, x: 260, y: 160, landmarks: 'Altstadt, textile history', stories: 'Textile town tales', status: 'planned' },
+      { name: 'Wetzikon', canton: 'ZH', lang: 'de', pop: 25000, priority: 25, x: 395, y: 155, landmarks: 'Pfaeffikersee', stories: 'Zurcher Oberland nature', status: 'planned' },
+      { name: 'Arbon', canton: 'TG', lang: 'de', pop: 15000, priority: 26, x: 455, y: 110, landmarks: 'Bodensee, Schloss', stories: 'Lake Constance, Roman history', status: 'planned' },
+      { name: 'Herisau', canton: 'AR', lang: 'de', pop: 16000, priority: 27, x: 455, y: 145, landmarks: 'Appenzeller Hinterland', stories: 'Appenzell traditions, hiking', status: 'planned' },
+      { name: 'Appenzell', canton: 'AI', lang: 'de', pop: 6000, priority: 28, x: 465, y: 155, landmarks: 'Landsgemeindeplatz, Alpstein', stories: 'Alpstein adventure, Landsgemeinde', status: 'planned' },
+      { name: 'Liestal', canton: 'BL', lang: 'de', pop: 14000, priority: 29, x: 235, y: 95, landmarks: 'Altstadt, Chienbaesefeuer', stories: 'Fire festival, Baselbiet tales', status: 'planned' },
+      { name: 'Schwyz', canton: 'SZ', lang: 'de', pop: 15000, priority: 30, x: 355, y: 210, landmarks: 'Bundesbriefmuseum, Mythen', stories: 'Origin of Switzerland, Mythen hike', status: 'planned' },
+      // French (15 cities)
+      { name: 'Lausanne', canton: 'VD', lang: 'fr', pop: 140000, priority: 1, x: 120, y: 280, landmarks: 'Cathedrale, Lac Leman, Ouchy', stories: 'Olympic capital, cathedral mystery, lake tales', status: 'content' },
+      { name: 'Geneve', canton: 'GE', lang: 'fr', pop: 203000, priority: 2, x: 80, y: 320, landmarks: 'Jet d\'eau, Lac Leman, ONU', stories: 'Jet d\'eau legend, UN adventure, lake quest', status: 'content' },
+      { name: 'Montreux', canton: 'VD', lang: 'fr', pop: 27000, priority: 3, x: 140, y: 295, landmarks: 'Chateau de Chillon, Jazz Festival', stories: 'Castle Chillon mystery, jazz adventure', status: 'planned' },
+      { name: 'Neuchatel', canton: 'NE', lang: 'fr', pop: 34000, priority: 4, x: 170, y: 190, landmarks: 'Chateau, Lac', stories: 'Clockmaking heritage, lake adventure', status: 'planned' },
+      { name: 'Fribourg', canton: 'FR', lang: 'fr', pop: 42000, priority: 5, x: 195, y: 225, landmarks: 'Pont de Berne, Vieille Ville', stories: 'Medieval bridges, old town secrets', status: 'planned' },
+      { name: 'Nyon', canton: 'VD', lang: 'fr', pop: 21000, priority: 6, x: 95, y: 305, landmarks: 'Chateau, Lac, Paleo Festival', stories: 'Roman ruins, Paleo music fest', status: 'planned' },
+      { name: 'Vevey', canton: 'VD', lang: 'fr', pop: 20000, priority: 7, x: 135, y: 288, landmarks: 'Fork sculpture, Nestle, Lac', stories: 'Chaplin heritage, giant fork, Nestle story', status: 'planned' },
+      { name: 'Morges', canton: 'VD', lang: 'fr', pop: 16000, priority: 8, x: 110, y: 285, landmarks: 'Chateau, tulipes', stories: 'Tulip festival, castle by the lake', status: 'planned' },
+      { name: 'Yverdon', canton: 'VD', lang: 'fr', pop: 30000, priority: 9, x: 140, y: 240, landmarks: 'Thermes, Chateau', stories: 'Thermal baths, historic castle', status: 'planned' },
+      { name: 'Sion', canton: 'VS', lang: 'fr', pop: 35000, priority: 10, x: 195, y: 300, landmarks: 'Valere, Tourbillon', stories: 'Twin castles, Valais wine country', status: 'planned' },
+      { name: 'Martigny', canton: 'VS', lang: 'fr', pop: 18000, priority: 11, x: 160, y: 315, landmarks: 'Amphitheatre romain, Fondation Gianadda', stories: 'Roman ruins, Bernard dogs', status: 'planned' },
+      { name: 'Monthey', canton: 'VS', lang: 'fr', pop: 18000, priority: 12, x: 145, y: 310, landmarks: 'Chateau, Dents du Midi', stories: 'Mountain views, Chablais tales', status: 'planned' },
+      { name: 'Delemont', canton: 'JU', lang: 'fr', pop: 12000, priority: 13, x: 205, y: 110, landmarks: 'Vieille Ville, Jura', stories: 'Jura horseback, old town quest', status: 'planned' },
+      { name: 'La Chaux-de-Fonds', canton: 'NE', lang: 'fr', pop: 37000, priority: 14, x: 155, y: 170, landmarks: 'Watchmaking, UNESCO', stories: 'Watchmaker apprentice, UNESCO city', status: 'planned' },
+      { name: 'Bulle', canton: 'FR', lang: 'fr', pop: 24000, priority: 15, x: 175, y: 255, landmarks: 'Chateau, Gruyere nearby', stories: 'Gruyere cheese quest, castle tales', status: 'planned' },
+      // Italian (5 cities)
+      { name: 'Lugano', canton: 'TI', lang: 'it', pop: 63000, priority: 1, x: 350, y: 360, landmarks: 'Lago, Monte Bre, Parco Ciani', stories: 'Lake adventure, Monte Bre hike, park tales', status: 'content' },
+      { name: 'Locarno', canton: 'TI', lang: 'it', pop: 16000, priority: 2, x: 330, y: 340, landmarks: 'Piazza Grande, Film Festival', stories: 'Film festival magic, piazza adventure', status: 'planned' },
+      { name: 'Bellinzona', canton: 'TI', lang: 'it', pop: 18000, priority: 3, x: 345, y: 325, landmarks: 'Tre Castelli (UNESCO)', stories: 'Three castles quest, UNESCO heritage', status: 'planned' },
+      { name: 'Mendrisio', canton: 'TI', lang: 'it', pop: 15000, priority: 4, x: 355, y: 375, landmarks: 'Processioni storiche, vineyards', stories: 'Wine country, historical procession', status: 'planned' },
+      { name: 'Chiasso', canton: 'TI', lang: 'it', pop: 8000, priority: 5, x: 358, y: 382, landmarks: 'Border town, Max Museo', stories: 'Border adventure, art museum', status: 'planned' },
+    ];
+
+    // ==========================================
+    // SWISS MAP
+    // ==========================================
+    function renderMap() {
+      const svg = document.getElementById('swissMap');
+      const tooltip = document.getElementById('mapTooltip');
+      const container = document.getElementById('mapContainer');
+
+      const langColors = { de: '#fbbf24', fr: '#38bdf8', it: '#34d399' };
+      const langNames = { de: 'German', fr: 'French', it: 'Italian' };
+
+      cities.forEach((city, i) => {
+        const maxPriority = city.lang === 'de' ? 30 : city.lang === 'fr' ? 15 : 5;
+        const normalizedPriority = city.priority / maxPriority;
+        const radius = 3 + (1 - normalizedPriority) * 5;
+
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.classList.add('city-dot');
+
+        // Outer glow
+        const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        glow.setAttribute('cx', city.x);
+        glow.setAttribute('cy', city.y);
+        glow.setAttribute('r', radius + 3);
+        glow.setAttribute('fill', langColors[city.lang]);
+        glow.setAttribute('opacity', '0.15');
+        group.appendChild(glow);
+
+        // Main dot
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', city.x);
+        dot.setAttribute('cy', city.y);
+        dot.setAttribute('r', radius);
+        dot.setAttribute('fill', langColors[city.lang]);
+        dot.setAttribute('opacity', '0.85');
+        group.appendChild(dot);
+
+        // Label for top-priority cities
+        if (city.priority <= 5) {
+          const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          text.setAttribute('x', city.x);
+          text.setAttribute('y', city.y - radius - 5);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('fill', '#cbd5e1');
+          text.setAttribute('font-size', '9');
+          text.setAttribute('font-family', 'Inter, sans-serif');
+          text.textContent = city.name;
+          group.appendChild(text);
+        }
+
+        // Click handler
+        group.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const containerRect = container.getBoundingClientRect();
+          const svgRect = svg.getBoundingClientRect();
+
+          // Calculate position in container coords
+          const scaleX = svgRect.width / 600;
+          const scaleY = svgRect.height / 400;
+          let left = (city.x * scaleX) + (svgRect.left - containerRect.left) + 15;
+          let top = (city.y * scaleY) + (svgRect.top - containerRect.top) - 20;
+
+          // Keep within container
+          if (left + 290 > containerRect.width) left = left - 310;
+          if (top + 200 > containerRect.height) top = containerRect.height - 210;
+          if (top < 10) top = 10;
+
+          const statusLabel = city.status === 'live' ? '<span class="badge-live px-2 py-0.5 rounded text-xs">Live</span>' :
+                              city.status === 'content' ? '<span class="badge-content px-2 py-0.5 rounded text-xs">Content Created</span>' :
+                              '<span class="badge-planned px-2 py-0.5 rounded text-xs">Planned</span>';
+
+          tooltip.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-white font-semibold">${city.name}</span>
+              ${statusLabel}
+            </div>
+            <div class="text-xs space-y-1.5">
+              <div class="flex justify-between">
+                <span class="text-slate-400">Canton</span>
+                <span class="text-slate-200">${city.canton}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Language</span>
+                <span style="color:${langColors[city.lang]}">${langNames[city.lang]}</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-slate-400">Population</span>
+                <span class="text-slate-200">${city.pop.toLocaleString()}</span>
+              </div>
+              <div class="mt-2 pt-2 border-t border-slate-700/50">
+                <div class="text-slate-400 mb-1">Landmarks</div>
+                <div class="text-slate-200">${city.landmarks}</div>
+              </div>
+              <div class="mt-1">
+                <div class="text-slate-400 mb-1">Story Ideas</div>
+                <div class="text-slate-200">${city.stories}</div>
+              </div>
+            </div>
+          `;
+          tooltip.style.left = left + 'px';
+          tooltip.style.top = top + 'px';
+          tooltip.classList.add('visible');
+        });
+
+        svg.appendChild(group);
+      });
+
+      // Close tooltip on click outside
+      container.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+      });
+    }
+
+    // ==========================================
+    // PHASE TIMELINE
+    // ==========================================
+    function togglePhase(el) {
+      el.classList.toggle('expanded');
+    }
+
+    // ==========================================
+    // LOCAL FLYWHEEL
+    // ==========================================
+    function renderFlywheel() {
+      const container = document.getElementById('flywheelSteps');
+      const steps = [
+        { label: 'Local Ad', sub: '15km radius targeting' },
+        { label: 'Parent Creates', sub: 'Free story in their town' },
+        { label: 'Shares on WhatsApp', sub: 'Parent group sharing' },
+        { label: 'Friends See', sub: 'Story set in THEIR town' },
+        { label: 'Create Own', sub: 'New stories generated' },
+        { label: 'Share Again', sub: 'Viral loop continues' },
+        { label: 'Local Virality', sub: 'Town-wide awareness' },
+        { label: 'Better Ads', sub: 'UGC + lower CPA' },
+      ];
+
+      const totalSteps = steps.length;
+      const radius = 42; // % of container
+
+      steps.forEach((step, i) => {
+        const angle = (i / totalSteps) * 2 * Math.PI - Math.PI / 2;
+        const x = 50 + radius * Math.cos(angle);
+        const y = 50 + radius * Math.sin(angle);
+
+        const div = document.createElement('div');
+        div.className = 'flywheel-step absolute text-center';
+        div.style.left = `${x}%`;
+        div.style.top = `${y}%`;
+        div.style.transform = 'translate(-50%, -50%)';
+        div.style.width = '90px';
+        div.setAttribute('data-step', i);
+
+        div.innerHTML = `
+          <div class="step-ring w-12 h-12 md:w-14 md:h-14 rounded-full bg-slate-800 flex items-center justify-center mx-auto mb-1">
+            <span class="text-amber-400 font-bold text-xs">${i + 1}</span>
+          </div>
+          <div class="text-white text-xs font-medium leading-tight">${step.label}</div>
+          <div class="text-slate-500 text-[10px] leading-tight mt-0.5 hidden md:block">${step.sub}</div>
+        `;
+
+        container.appendChild(div);
+      });
+
+      // Animate active step
+      let activeStep = 0;
+      function animateStep() {
+        document.querySelectorAll('.flywheel-step').forEach((el, i) => {
+          el.classList.toggle('active', i === activeStep);
+        });
+        activeStep = (activeStep + 1) % totalSteps;
+      }
+      animateStep();
+      setInterval(animateStep, 1500);
+    }
+
+    // ==========================================
+    // TOWN TRACKER
+    // ==========================================
+    let currentFilter = 'all';
+
+    function filterTracker(filter) {
+      currentFilter = filter;
+      // Update chips
+      document.querySelectorAll('#trackerFilters .filter-chip').forEach(chip => {
+        chip.classList.toggle('active', chip.dataset.filter === filter);
+      });
+      renderTracker();
+    }
+
+    function renderTracker() {
+      const tbody = document.getElementById('trackerBody');
+      const langLabels = { de: 'German', fr: 'French', it: 'Italian' };
+      const langColors = { de: 'text-amber-400', fr: 'text-sky-400', it: 'text-emerald-400' };
+
+      let filtered = [...cities];
+      if (currentFilter === 'de') filtered = cities.filter(c => c.lang === 'de');
+      else if (currentFilter === 'fr') filtered = cities.filter(c => c.lang === 'fr');
+      else if (currentFilter === 'it') filtered = cities.filter(c => c.lang === 'it');
+      else if (currentFilter === 'high') filtered = cities.filter(c => c.priority <= 5);
+
+      // Sort by language then priority
+      filtered.sort((a, b) => {
+        const langOrder = { de: 0, fr: 1, it: 2 };
+        if (langOrder[a.lang] !== langOrder[b.lang]) return langOrder[a.lang] - langOrder[b.lang];
+        return a.priority - b.priority;
+      });
+
+      tbody.innerHTML = filtered.map(city => {
+        const statusBadge = city.status === 'live' ? '<span class="badge-live px-2 py-0.5 rounded text-xs">Live</span>' :
+                            city.status === 'content' ? '<span class="badge-content px-2 py-0.5 rounded text-xs">Content Created</span>' :
+                            '<span class="badge-planned px-2 py-0.5 rounded text-xs">Planned</span>';
+
+        const priorityClass = city.priority <= 5 ? 'priority-high' : city.priority <= 15 ? 'priority-medium' : 'priority-low';
+
+        return `
+          <tr class="border-b border-slate-700/30 hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-3 text-white font-medium">${city.name}</td>
+            <td class="px-4 py-3 text-slate-300">${city.canton}</td>
+            <td class="px-4 py-3"><span class="${langColors[city.lang]} text-xs font-medium">${langLabels[city.lang]}</span></td>
+            <td class="px-4 py-3 text-right text-slate-300 tabular-nums">${city.pop.toLocaleString()}</td>
+            <td class="px-4 py-3 text-center"><span class="${priorityClass} inline-block w-2.5 h-2.5 rounded-full"></span> <span class="text-slate-400 text-xs ml-1">${city.priority}</span></td>
+            <td class="px-4 py-3 text-center">${statusBadge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // BUDGET CHARTS
+    // ==========================================
+    function renderBudgets() {
+      const budgetData = {
+        phase1: {
+          container: 'budgetPhase1',
+          total: 15000,
+          currency: 'CHF',
+          color: 'amber',
+          items: [
+            { label: 'Meta Ads', amount: 9000, pct: 60, color: '#f59e0b' },
+            { label: 'Content Creation', amount: 1500, pct: 10, color: '#fbbf24' },
+            { label: 'Micro-Influencers', amount: 1500, pct: 10, color: '#fcd34d' },
+            { label: 'SEO / Technical', amount: 1500, pct: 10, color: '#fde68a' },
+            { label: 'Tools & Software', amount: 1500, pct: 10, color: '#fef3c7' },
+          ]
+        },
+        phase2: {
+          container: 'budgetPhase2',
+          total: 25000,
+          currency: 'EUR',
+          color: 'sky',
+          items: [
+            { label: 'Meta Ads', amount: 15000, pct: 60, color: '#38bdf8' },
+            { label: 'Content (Town Pages)', amount: 4500, pct: 18, color: '#7dd3fc' },
+            { label: 'Influencers', amount: 3000, pct: 12, color: '#bae6fd' },
+            { label: 'SEO / Localization', amount: 2500, pct: 10, color: '#e0f2fe' },
+          ]
+        },
+        phase3: {
+          container: 'budgetPhase3',
+          total: 50000,
+          currency: 'USD',
+          color: 'emerald',
+          items: [
+            { label: 'Meta Ads', amount: 30000, pct: 60, color: '#34d399' },
+            { label: 'Content', amount: 9000, pct: 18, color: '#6ee7b7' },
+            { label: 'Influencers', amount: 6000, pct: 12, color: '#a7f3d0' },
+            { label: 'SEO / Technical', amount: 5000, pct: 10, color: '#d1fae5' },
+          ]
+        }
+      };
+
+      Object.values(budgetData).forEach(phase => {
+        const container = document.getElementById(phase.container);
+        container.innerHTML = phase.items.map(item => `
+          <div class="flex items-center gap-3">
+            <div class="w-28 md:w-36 text-xs text-slate-400 text-right shrink-0">${item.label}</div>
+            <div class="flex-1 bg-slate-900/50 rounded h-7 relative overflow-hidden">
+              <div class="budget-bar h-full flex items-center px-3" style="width: ${item.pct}%; background: ${item.color}20; border-left: 3px solid ${item.color};">
+                <span class="text-xs font-medium" style="color: ${item.color}">${item.pct}%</span>
+              </div>
+            </div>
+            <div class="w-20 text-xs text-slate-300 text-right tabular-nums shrink-0">${phase.currency} ${item.amount.toLocaleString()}</div>
+          </div>
+        `).join('');
+      });
+    }
+
+    // ==========================================
+    // INIT
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', () => {
+      renderMap();
+      renderFlywheel();
+      renderTracker();
+      renderBudgets();
+
+      // Animate budget bars on scroll
+      const budgetSection = document.getElementById('budget');
+      let budgetAnimated = false;
+      const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && !budgetAnimated) {
+          budgetAnimated = true;
+          document.querySelectorAll('.budget-bar').forEach(bar => {
+            const w = bar.style.width;
+            bar.style.width = '0%';
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                bar.style.width = w;
+              });
+            });
+          });
+        }
+      }, { threshold: 0.2 });
+      observer.observe(budgetSection);
+    });
+  </script>
+</body>
+</html>

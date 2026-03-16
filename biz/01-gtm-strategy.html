@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MagicalStory.ch — Go-To-Market Strategy</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            surface: {
+              50: '#fafaf9',
+              100: '#1a1a1a',
+              200: '#222222',
+              300: '#2a2a2a',
+              400: '#333333',
+              500: '#444444',
+            },
+            accent: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              200: '#fde68a',
+              300: '#fcd34d',
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+            },
+            warm: {
+              50: '#fdf2f8',
+              100: '#fce7f3',
+              200: '#fbcfe8',
+              300: '#f9a8d4',
+              400: '#f472b6',
+              500: '#ec4899',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    body { background: #111111; color: #e5e5e5; }
+
+    .nav-link {
+      transition: all 0.2s ease;
+      border-left: 2px solid transparent;
+    }
+    .nav-link:hover, .nav-link.active {
+      border-left-color: #f59e0b;
+      color: #fbbf24;
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      border-color: #f59e0b33;
+      box-shadow: 0 0 20px rgba(245, 158, 11, 0.05);
+    }
+
+    .phase-card {
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .phase-card .phase-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.5s ease, padding 0.3s ease;
+    }
+    .phase-card.expanded .phase-content {
+      max-height: 800px;
+      padding-top: 1rem;
+    }
+    .phase-card .chevron {
+      transition: transform 0.3s ease;
+    }
+    .phase-card.expanded .chevron {
+      transform: rotate(180deg);
+    }
+
+    .progress-step {
+      position: relative;
+    }
+    .progress-step::before {
+      content: '';
+      position: absolute;
+      left: 15px;
+      top: 32px;
+      bottom: -8px;
+      width: 2px;
+      background: #2a2a2a;
+    }
+    .progress-step:last-child::before {
+      display: none;
+    }
+    .progress-step.completed::before {
+      background: #f59e0b;
+    }
+
+    .bar-chart-bar {
+      transition: width 1s ease;
+    }
+
+    .metric-card {
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #f59e0b, #d97706);
+    }
+
+    .status-badge {
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+    }
+
+    .table-row:hover {
+      background: rgba(245, 158, 11, 0.03);
+    }
+
+    @media (max-width: 1024px) {
+      .sidebar { display: none; }
+      .main-content { margin-left: 0 !important; }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-divider {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #f59e0b33, transparent);
+    }
+  </style>
+</head>
+<body class="antialiased">
+
+  <!-- Floating Top Navigation -->
+  <nav style="position:fixed;top:0;left:0;right:0;z-index:60;background:#1e293b;border-bottom:1px solid #334155;" class="flex items-center gap-1 px-4 py-2 overflow-x-auto whitespace-nowrap text-xs">
+    <a href="01-gtm-strategy.html" class="px-3 py-1 rounded font-semibold" style="background:#f59e0b;color:#1e293b;">GTM Strategy</a>
+    <a href="02-competitive-analysis.html" class="px-3 py-1 rounded text-neutral-300 hover:text-white hover:bg-white/10 transition-colors">Competition</a>
+    <a href="03-target-audience.html" class="px-3 py-1 rounded text-neutral-300 hover:text-white hover:bg-white/10 transition-colors">Audience</a>
+    <a href="05-meta-ads-strategy.html" class="px-3 py-1 rounded text-neutral-300 hover:text-white hover:bg-white/10 transition-colors">Meta Ads</a>
+    <a href="06-seo-geo-strategy.html" class="px-3 py-1 rounded text-neutral-300 hover:text-white hover:bg-white/10 transition-colors">SEO &amp; GEO</a>
+    <a href="09-glocal-strategy.html" class="px-3 py-1 rounded text-neutral-300 hover:text-white hover:bg-white/10 transition-colors">Glocal</a>
+  </nav>
+
+  <!-- Sidebar Navigation -->
+  <aside class="sidebar fixed left-0 top-10 bottom-0 w-64 bg-surface-100 border-r border-surface-300 z-50 overflow-y-auto">
+    <div class="p-6 border-b border-surface-300">
+      <div class="text-accent-400 font-bold text-lg tracking-tight">MagicalStory.ch</div>
+      <div class="text-xs text-neutral-500 mt-1 uppercase tracking-wider">GTM Strategy v1.0</div>
+    </div>
+    <nav class="py-4">
+      <a href="#executive-summary" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Executive Summary</a>
+      <a href="#market-opportunity" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Market Opportunity</a>
+      <a href="#positioning" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Strategic Positioning</a>
+      <a href="#glocal-strategy" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Glocal Strategy</a>
+      <a href="#channels" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Channel Strategy</a>
+      <a href="#revenue" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Revenue Model</a>
+      <a href="#metrics" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Key Metrics</a>
+      <a href="#90-day-plan" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">90-Day Plan</a>
+      <a href="#phase-status" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Phase Status</a>
+      <a href="#risks" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">Risk Mitigation</a>
+      <a href="#references" class="nav-link block px-6 py-2.5 text-sm text-neutral-400">References</a>
+    </nav>
+    <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-surface-300">
+      <div class="text-xs text-neutral-600">March 2026</div>
+      <div class="text-xs text-neutral-600">Draft for Executive Review</div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content ml-64">
+
+    <!-- Hero Header -->
+    <header class="relative px-8 lg:px-16 pt-24 pb-12 border-b border-surface-300">
+      <div class="max-w-4xl">
+        <div class="inline-block px-3 py-1 bg-accent-500/10 border border-accent-500/20 rounded text-accent-400 text-xs font-medium uppercase tracking-wider mb-6">
+          Go-To-Market Strategy
+        </div>
+        <h1 class="text-4xl lg:text-5xl font-800 text-white tracking-tight leading-tight">
+          MagicalStory.ch
+        </h1>
+        <p class="text-xl text-neutral-400 mt-4 max-w-2xl leading-relaxed">
+          AI-powered personalized children's storybooks. Swiss-made, globally scalable.
+        </p>
+        <div class="flex gap-6 mt-8 text-sm">
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-accent-400"></div>
+            <span class="text-neutral-400">170+ Themes</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-accent-400"></div>
+            <span class="text-neutral-400">3 Languages + Swiss German</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="w-2 h-2 rounded-full bg-accent-400"></div>
+            <span class="text-neutral-400">Freemium Model</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="px-8 lg:px-16 py-12 space-y-16">
+
+      <!-- Executive Summary -->
+      <section id="executive-summary" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">1</span>
+          Executive Summary
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="card rounded-lg p-6">
+            <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-3">What We Do</h3>
+            <p class="text-neutral-300 text-sm leading-relaxed">
+              Parents upload photos, choose from 170+ themes, and our AI generates fully illustrated storybooks where their child is the hero. Every illustration features the child's actual face with consistent appearance across all pages.
+            </p>
+          </div>
+          <div class="card rounded-lg p-6">
+            <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-3">Why It Matters</h3>
+            <p class="text-neutral-300 text-sm leading-relaxed">
+              Wonderbly sold for EUR 99M using templates. We use AI for true personalization: real faces, local stories, Swiss German dialects. Better product, better unit economics, defensible technology moat.
+            </p>
+          </div>
+          <div class="card rounded-lg p-6">
+            <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-3">Business Model</h3>
+            <p class="text-neutral-300 text-sm leading-relaxed">
+              Freemium. First story free (digital). Printed books CHF 38-96 via Gelato. Additional digital stories CHF 9.90. Gift cards CHF 39/59/79. Future: subscription for families.
+            </p>
+          </div>
+          <div class="card rounded-lg p-6">
+            <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-3">Target Market</h3>
+            <p class="text-neutral-300 text-sm leading-relaxed">
+              Swiss parents of children aged 2-8. Start canton-by-canton in German-speaking Switzerland, expand to DACH (months 4-6), then global English markets (months 7-12).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Market Opportunity -->
+      <section id="market-opportunity" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">2</span>
+          Market Opportunity
+        </h2>
+
+        <!-- Market Size Visualization -->
+        <div class="card rounded-lg p-6 mb-6">
+          <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-6">Global Personalized Children's Book Market</h3>
+          <div class="space-y-4">
+            <div class="flex items-center gap-4">
+              <div class="w-16 text-xs text-neutral-500 text-right shrink-0">2024</div>
+              <div class="flex-1 relative h-8">
+                <div class="bar-chart-bar absolute left-0 top-0 bottom-0 bg-accent-600/60 rounded-r" style="width: 54%"></div>
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-600 text-white z-10">$569M</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="w-16 text-xs text-neutral-500 text-right shrink-0">2026</div>
+              <div class="flex-1 relative h-8">
+                <div class="bar-chart-bar absolute left-0 top-0 bottom-0 bg-accent-500/60 rounded-r" style="width: 65%"></div>
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-600 text-white z-10">$680M (est.)</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="w-16 text-xs text-neutral-500 text-right shrink-0">2028</div>
+              <div class="flex-1 relative h-8">
+                <div class="bar-chart-bar absolute left-0 top-0 bottom-0 bg-accent-400/60 rounded-r" style="width: 80%"></div>
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-600 text-white z-10">$810M (est.)</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="w-16 text-xs text-neutral-500 text-right shrink-0">2031</div>
+              <div class="flex-1 relative h-8">
+                <div class="bar-chart-bar absolute left-0 top-0 bottom-0 bg-accent-400 rounded-r" style="width: 100%"></div>
+                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-700 text-surface-100 z-10">$1.05B</span>
+              </div>
+            </div>
+          </div>
+          <div class="mt-4 text-xs text-neutral-500">9.2% CAGR &middot; Source: Industry reports, 2024</div>
+        </div>
+
+        <!-- Wonderbly Acquisition Callout -->
+        <div class="card rounded-lg p-6 mb-6 border-accent-500/30">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-lg bg-accent-500/10 flex items-center justify-center shrink-0">
+              <svg class="w-5 h-5 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-white font-600 text-sm">Market Validation: Wonderbly Acquired for EUR 99M</h3>
+              <p class="text-neutral-400 text-sm mt-1">
+                Penguin Random House acquired Wonderbly in June 2025 at ~2.5x revenue. Wonderbly was template-based. An AI-native platform with real face personalization has fundamentally better unit economics and deeper personalization.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Competitive Landscape -->
+        <div class="card rounded-lg overflow-hidden">
+          <div class="p-4 border-b border-surface-300">
+            <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider">Competitive Landscape</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-surface-300">
+                  <th class="text-left px-4 py-3 text-neutral-500 font-500 text-xs uppercase tracking-wider">Competitor</th>
+                  <th class="text-left px-4 py-3 text-neutral-500 font-500 text-xs uppercase tracking-wider">HQ</th>
+                  <th class="text-left px-4 py-3 text-neutral-500 font-500 text-xs uppercase tracking-wider">Approach</th>
+                  <th class="text-left px-4 py-3 text-neutral-500 font-500 text-xs uppercase tracking-wider">Key Gap</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr class="table-row border-b border-surface-300/50">
+                  <td class="px-4 py-3 text-white font-500">Librio</td>
+                  <td class="px-4 py-3 text-neutral-400">Switzerland</td>
+                  <td class="px-4 py-3 text-neutral-400">Template-based</td>
+                  <td class="px-4 py-3 text-neutral-400">No AI, few themes, no face personalization</td>
+                </tr>
+                <tr class="table-row border-b border-surface-300/50">
+                  <td class="px-4 py-3 text-white font-500">Wonderbly</td>
+                  <td class="px-4 py-3 text-neutral-400">UK (Penguin)</td>
+                  <td class="px-4 py-3 text-neutral-400">Template, name insertion</td>
+                  <td class="px-4 py-3 text-neutral-400">No face, no Swiss focus, acquired</td>
+                </tr>
+                <tr class="table-row border-b border-surface-300/50">
+                  <td class="px-4 py-3 text-white font-500">Hooray Heroes</td>
+                  <td class="px-4 py-3 text-neutral-400">Slovenia</td>
+                  <td class="px-4 py-3 text-neutral-400">UGC-driven social</td>
+                  <td class="px-4 py-3 text-neutral-400">Cartoon-only, no local stories</td>
+                </tr>
+                <tr class="table-row">
+                  <td class="px-4 py-3 text-white font-500">Framily</td>
+                  <td class="px-4 py-3 text-neutral-400">Germany</td>
+                  <td class="px-4 py-3 text-neutral-400">Licensed IP</td>
+                  <td class="px-4 py-3 text-neutral-400">IP-dependent, no personalization depth</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Strategic Positioning -->
+      <section id="positioning" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">3</span>
+          Strategic Positioning
+        </h2>
+
+        <!-- Brand Promise -->
+        <div class="card rounded-lg p-8 mb-6 text-center border-accent-500/20">
+          <div class="text-xs text-accent-400 uppercase tracking-wider mb-3 font-500">Brand Position</div>
+          <h3 class="text-2xl lg:text-3xl font-700 text-white">"The story that knows your child AND your town."</h3>
+        </div>
+
+        <!-- Five Differentiators -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="card rounded-lg p-5">
+            <div class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold mb-3">1</div>
+            <h4 class="text-white font-600 text-sm mb-2">Real Face AI</h4>
+            <p class="text-neutral-400 text-xs leading-relaxed">Child's actual face in every illustration. Not a filter, not a cartoon overlay. AI-generated artwork featuring their real appearance.</p>
+          </div>
+          <div class="card rounded-lg p-5">
+            <div class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold mb-3">2</div>
+            <h4 class="text-white font-600 text-sm mb-2">Character Consistency Engine</h4>
+            <p class="text-neutral-400 text-xs leading-relaxed">Multi-pass entity repair workflow ensures the child looks the same on every page. Automatic quality scoring and regeneration.</p>
+          </div>
+          <div class="card rounded-lg p-5">
+            <div class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold mb-3">3</div>
+            <h4 class="text-white font-600 text-sm mb-2">Swiss Town Stories</h4>
+            <p class="text-neutral-400 text-xs leading-relaxed">Adventures set in Zurich, Basel, Bern, Luzern, and dozens more. Real landmarks, local traditions, regional character.</p>
+          </div>
+          <div class="card rounded-lg p-5">
+            <div class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold mb-3">4</div>
+            <h4 class="text-white font-600 text-sm mb-2">Swiss German Dialects</h4>
+            <p class="text-neutral-400 text-xs leading-relaxed">Stories in Zuridutsch, Baseldytsch, Barndutsch. No other children's book platform in the world offers this.</p>
+          </div>
+          <div class="card rounded-lg p-5">
+            <div class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold mb-3">5</div>
+            <h4 class="text-white font-600 text-sm mb-2">170+ Themes</h4>
+            <p class="text-neutral-400 text-xs leading-relaxed">Swiss history, seasonal, educational, fantasy, everyday milestones, cultural events. More themes = more repeat purchases.</p>
+          </div>
+          <div class="card rounded-lg p-5">
+            <div class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold mb-3">+</div>
+            <h4 class="text-white font-600 text-sm mb-2">8 Art Styles</h4>
+            <p class="text-neutral-400 text-xs leading-relaxed">Watercolor, Pixar-style 3D, anime, classic storybook, and more. Parents choose the visual style that fits their child.</p>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Glocal Strategy -->
+      <section id="glocal-strategy" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">4</span>
+          Glocal Strategy
+        </h2>
+        <p class="text-neutral-400 text-sm mb-6">Think global, target local. Every ad references the parent's specific town. Click each phase to expand.</p>
+
+        <div class="space-y-3" id="phases-container">
+          <!-- Phase 1 -->
+          <div class="phase-card card rounded-lg" onclick="togglePhase(this)">
+            <div class="p-5 flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-accent-500/20 flex items-center justify-center">
+                  <span class="text-accent-400 font-700 text-sm">P1</span>
+                </div>
+                <div>
+                  <h3 class="text-white font-600 text-sm">Phase 1: Switzerland</h3>
+                  <p class="text-neutral-500 text-xs mt-0.5">Months 1-3 &middot; Canton by Canton</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="status-badge px-2 py-1 rounded bg-accent-500/10 text-accent-400 uppercase font-600">Active</span>
+                <svg class="chevron w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
+            </div>
+            <div class="phase-content px-5 pb-5">
+              <div class="border-t border-surface-300 pt-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 class="text-xs font-600 text-accent-400 uppercase tracking-wider mb-2">Priority Regions</h4>
+                    <ul class="space-y-1.5 text-sm text-neutral-300">
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-400"></span>Zurich (DE + Zuridutsch)</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-400"></span>Bern (DE + Barndutsch)</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-500"></span>Basel (DE + Baseldytsch)</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-600"></span>Luzern (DE)</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-700"></span>Lausanne/Geneva (FR)</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-600 text-accent-400 uppercase tracking-wider mb-2">Key Milestones</h4>
+                    <ul class="space-y-1.5 text-sm text-neutral-300">
+                      <li>500 free stories created</li>
+                      <li>50 printed book orders</li>
+                      <li>3 organic press mentions</li>
+                      <li>&lt; CHF 30 CAC</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 2 -->
+          <div class="phase-card card rounded-lg" onclick="togglePhase(this)">
+            <div class="p-5 flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-neutral-700/30 flex items-center justify-center">
+                  <span class="text-neutral-400 font-700 text-sm">P2</span>
+                </div>
+                <div>
+                  <h3 class="text-white font-600 text-sm">Phase 2: DACH Expansion</h3>
+                  <p class="text-neutral-500 text-xs mt-0.5">Months 4-6 &middot; Austria + Germany</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Planned</span>
+                <svg class="chevron w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
+            </div>
+            <div class="phase-content px-5 pb-5">
+              <div class="border-t border-surface-300 pt-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 class="text-xs font-600 text-accent-400 uppercase tracking-wider mb-2">Target Markets</h4>
+                    <ul class="space-y-1.5 text-sm text-neutral-300">
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-400"></span>Austria: Vienna, Salzburg, Graz</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-500"></span>Germany: Munich, Stuttgart, Freiburg</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-600 text-accent-400 uppercase tracking-wider mb-2">Key Milestones</h4>
+                    <ul class="space-y-1.5 text-sm text-neutral-300">
+                      <li>2,000 stories (cumulative)</li>
+                      <li>200 print orders/month</li>
+                      <li>LTV &gt; 3x CAC</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 3 -->
+          <div class="phase-card card rounded-lg" onclick="togglePhase(this)">
+            <div class="p-5 flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <div class="w-10 h-10 rounded-lg bg-neutral-700/30 flex items-center justify-center">
+                  <span class="text-neutral-400 font-700 text-sm">P3</span>
+                </div>
+                <div>
+                  <h3 class="text-white font-600 text-sm">Phase 3: Global English</h3>
+                  <p class="text-neutral-500 text-xs mt-0.5">Months 7-12 &middot; UK, US, Australia</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Future</span>
+                <svg class="chevron w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
+            </div>
+            <div class="phase-content px-5 pb-5">
+              <div class="border-t border-surface-300 pt-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 class="text-xs font-600 text-accent-400 uppercase tracking-wider mb-2">Target Markets</h4>
+                    <ul class="space-y-1.5 text-sm text-neutral-300">
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-400"></span>UK: London, Manchester, Edinburgh</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-500"></span>US: New York, LA, Chicago</li>
+                      <li class="flex items-center gap-2"><span class="w-1.5 h-1.5 rounded-full bg-accent-600"></span>Australia: Sydney, Melbourne</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="text-xs font-600 text-accent-400 uppercase tracking-wider mb-2">Key Milestones</h4>
+                    <ul class="space-y-1.5 text-sm text-neutral-300">
+                      <li>10,000 stories/month</li>
+                      <li>1,000 print orders/month</li>
+                      <li>Self-sustaining growth</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Channel Strategy -->
+      <section id="channels" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">5</span>
+          Channel Strategy
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <!-- Meta -->
+          <div class="card rounded-lg p-5 border-accent-500/30">
+            <div class="flex items-center justify-between mb-4">
+              <span class="status-badge px-2 py-1 rounded bg-accent-500/10 text-accent-400 uppercase font-600">Primary</span>
+              <span class="text-xs text-neutral-500">60-70% budget</span>
+            </div>
+            <h3 class="text-white font-600 mb-2">Meta (Instagram + Facebook)</h3>
+            <p class="text-neutral-400 text-xs leading-relaxed mb-4">
+              Wonderbly spent 60-70% on Meta. Hooray Heroes grew 90% through social. Parents 25-40 live on Instagram. Visual product = perfect format.
+            </p>
+            <div class="space-y-2 text-xs text-neutral-300">
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-accent-400"></span>Emotional hook ads (unboxing reactions)</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-accent-400"></span>Product demo carousels</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-accent-400"></span>UGC ads (Phase 2+)</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-accent-400"></span>Gift occasion seasonal pushes</div>
+            </div>
+          </div>
+
+          <!-- SEO -->
+          <div class="card rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+              <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Secondary</span>
+              <span class="text-xs text-neutral-500">20-25% budget</span>
+            </div>
+            <h3 class="text-white font-600 mb-2">SEO / GEO</h3>
+            <p class="text-neutral-400 text-xs leading-relaxed mb-4">
+              170+ themes x Swiss towns = thousands of indexable pages. Programmatic SEO with structured data and long-tail targeting.
+            </p>
+            <div class="space-y-2 text-xs text-neutral-300">
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Theme landing pages</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Town-specific pages</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Competitor comparison pages</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Gift guides and blog content</div>
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="card rounded-lg p-5">
+            <div class="flex items-center justify-between mb-4">
+              <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Tertiary</span>
+              <span class="text-xs text-neutral-500">10-15% budget</span>
+            </div>
+            <h3 class="text-white font-600 mb-2">Email Marketing</h3>
+            <p class="text-neutral-400 text-xs leading-relaxed mb-4">
+              Automated sequences for welcome, abandoned story recovery, post-purchase nurture, and seasonal campaigns.
+            </p>
+            <div class="space-y-2 text-xs text-neutral-300">
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Welcome sequence (4 emails)</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Abandoned story recovery</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Post-purchase nurture</div>
+              <div class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-neutral-500"></span>Gift card campaigns</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Revenue Model -->
+      <section id="revenue" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">6</span>
+          Revenue Model
+        </h2>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Pricing Table -->
+          <div class="card rounded-lg overflow-hidden">
+            <div class="p-4 border-b border-surface-300">
+              <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider">Pricing Structure</h3>
+            </div>
+            <div class="divide-y divide-surface-300/50">
+              <div class="table-row px-4 py-3 flex justify-between items-center">
+                <div>
+                  <div class="text-white text-sm font-500">First digital story</div>
+                  <div class="text-neutral-500 text-xs">Acquisition hook</div>
+                </div>
+                <span class="text-accent-400 font-700">Free</span>
+              </div>
+              <div class="table-row px-4 py-3 flex justify-between items-center">
+                <div>
+                  <div class="text-white text-sm font-500">Additional digital stories</div>
+                  <div class="text-neutral-500 text-xs">~85% margin</div>
+                </div>
+                <span class="text-white font-600">CHF 9.90</span>
+              </div>
+              <div class="table-row px-4 py-3 flex justify-between items-center">
+                <div>
+                  <div class="text-white text-sm font-500">Printed softcover</div>
+                  <div class="text-neutral-500 text-xs">20x20cm, ~50% margin</div>
+                </div>
+                <span class="text-white font-600">CHF 38</span>
+              </div>
+              <div class="table-row px-4 py-3 flex justify-between items-center">
+                <div>
+                  <div class="text-white text-sm font-500">Printed hardcover</div>
+                  <div class="text-neutral-500 text-xs">20x20cm, ~45% margin</div>
+                </div>
+                <span class="text-white font-600">CHF 48</span>
+              </div>
+              <div class="table-row px-4 py-3 flex justify-between items-center">
+                <div>
+                  <div class="text-white text-sm font-500">Premium printed book</div>
+                  <div class="text-neutral-500 text-xs">Larger/more pages, ~40% margin</div>
+                </div>
+                <span class="text-white font-600">CHF 68-96</span>
+              </div>
+              <div class="table-row px-4 py-3 flex justify-between items-center">
+                <div>
+                  <div class="text-white text-sm font-500">Gift cards</div>
+                  <div class="text-neutral-500 text-xs">3 tiers</div>
+                </div>
+                <span class="text-white font-600">CHF 39/59/79</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Unit Economics -->
+          <div class="card rounded-lg p-6">
+            <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-4">Unit Economics</h3>
+            <div class="space-y-4">
+              <div>
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-neutral-400">AI cost per story</span>
+                  <span class="text-white font-500">CHF 2.00-4.50</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-1.5">
+                  <div class="bg-accent-600 h-1.5 rounded-full" style="width: 15%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-neutral-400">Print COGS (Gelato + shipping)</span>
+                  <span class="text-white font-500">CHF 15-25</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-1.5">
+                  <div class="bg-accent-500 h-1.5 rounded-full" style="width: 45%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-neutral-400">Target CAC</span>
+                  <span class="text-white font-500">CHF 15-30</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-1.5">
+                  <div class="bg-accent-400 h-1.5 rounded-full" style="width: 35%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-neutral-400">First order AOV</span>
+                  <span class="text-white font-500">CHF 48</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-1.5">
+                  <div class="bg-green-500 h-1.5 rounded-full" style="width: 55%"></div>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-sm mb-1">
+                  <span class="text-neutral-400">12-month LTV</span>
+                  <span class="text-white font-500">CHF 80-90</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-1.5">
+                  <div class="bg-green-400 h-1.5 rounded-full" style="width: 85%"></div>
+                </div>
+              </div>
+              <div class="pt-3 border-t border-surface-300">
+                <div class="flex justify-between text-sm">
+                  <span class="text-accent-400 font-600">Target LTV:CAC Ratio</span>
+                  <span class="text-accent-400 font-700 text-lg">3:1+</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Key Metrics -->
+      <section id="metrics" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">7</span>
+          Key Metrics Dashboard
+        </h2>
+
+        <!-- North Star -->
+        <div class="card rounded-lg p-6 mb-6 border-accent-500/20 text-center">
+          <div class="text-xs text-accent-400 uppercase tracking-wider font-500 mb-1">North Star Metric</div>
+          <div class="text-3xl font-800 text-white">Stories Completed</div>
+          <div class="text-sm text-neutral-400 mt-1">Not started. Not signups. Completed stories where the parent experienced the emotional payoff.</div>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div class="metric-card card rounded-lg p-5">
+            <div class="text-xs text-neutral-500 uppercase tracking-wider font-500">Monthly Visitors</div>
+            <div class="text-2xl font-700 text-white mt-2">10K</div>
+            <div class="text-xs text-neutral-500 mt-1">Target Month 3</div>
+          </div>
+          <div class="metric-card card rounded-lg p-5">
+            <div class="text-xs text-neutral-500 uppercase tracking-wider font-500">Signup Rate</div>
+            <div class="text-2xl font-700 text-white mt-2">15%</div>
+            <div class="text-xs text-neutral-500 mt-1">Visitor &rarr; Account</div>
+          </div>
+          <div class="metric-card card rounded-lg p-5">
+            <div class="text-xs text-neutral-500 uppercase tracking-wider font-500">Print Conversion</div>
+            <div class="text-2xl font-700 text-white mt-2">15%</div>
+            <div class="text-xs text-neutral-500 mt-1">Story &rarr; Order</div>
+          </div>
+          <div class="metric-card card rounded-lg p-5">
+            <div class="text-xs text-neutral-500 uppercase tracking-wider font-500">Monthly Revenue</div>
+            <div class="text-2xl font-700 text-white mt-2">15K</div>
+            <div class="text-xs text-neutral-500 mt-1">CHF, Target Month 3</div>
+          </div>
+        </div>
+
+        <!-- Funnel -->
+        <div class="card rounded-lg p-6">
+          <h3 class="text-sm font-600 text-accent-400 uppercase tracking-wider mb-6">Activation Funnel (Month 3 Targets)</h3>
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-neutral-300">Signup &rarr; Photo uploaded</span>
+                <span class="text-white font-500">60%</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="bg-accent-400 h-3 rounded-full flex items-center justify-end pr-2" style="width: 60%">
+                  <span class="text-[10px] font-600 text-surface-100">60%</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-neutral-300">Photo &rarr; Theme selected</span>
+                <span class="text-white font-500">80%</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="bg-accent-500 h-3 rounded-full flex items-center justify-end pr-2" style="width: 80%">
+                  <span class="text-[10px] font-600 text-surface-100">80%</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-neutral-300">Theme &rarr; Generation started</span>
+                <span class="text-white font-500">90%</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="bg-accent-500 h-3 rounded-full flex items-center justify-end pr-2" style="width: 90%">
+                  <span class="text-[10px] font-600 text-surface-100">90%</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="text-neutral-300">Generation &rarr; Story completed</span>
+                <span class="text-white font-500">95%</span>
+              </div>
+              <div class="w-full bg-surface-300 rounded-full h-3">
+                <div class="bg-accent-600 h-3 rounded-full flex items-center justify-end pr-2" style="width: 95%">
+                  <span class="text-[10px] font-600 text-white">95%</span>
+                </div>
+              </div>
+            </div>
+            <div class="pt-3 border-t border-surface-300">
+              <div class="flex justify-between text-sm">
+                <span class="text-accent-400 font-600">End-to-end activation (Signup &rarr; Completed story)</span>
+                <span class="text-accent-400 font-700">~40%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- 90-Day Plan -->
+      <section id="90-day-plan" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">8</span>
+          90-Day Launch Plan
+        </h2>
+
+        <div class="space-y-0">
+          <!-- Week 1-2 -->
+          <div class="progress-step pl-12 pb-8 relative">
+            <div class="absolute left-0 top-0 w-8 h-8 rounded-full bg-surface-300 border-2 border-accent-400 flex items-center justify-center">
+              <span class="text-accent-400 text-xs font-700">1</span>
+            </div>
+            <div class="card rounded-lg p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-white font-600 text-sm">Week 1-2: Foundation</h3>
+                <span class="status-badge px-2 py-1 rounded bg-accent-500/10 text-accent-400 uppercase font-600">Up Next</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-neutral-300">
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Technical SEO audit and fixes</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Install Meta Pixel + Conversions API</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>5 competitor comparison pages</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Analytics setup (Plausible/PostHog)</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Email marketing platform setup</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Free story landing page optimization</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Conversion events + funnel tracking</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Prepare 10 ad creatives</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week 3-4 -->
+          <div class="progress-step pl-12 pb-8 relative">
+            <div class="absolute left-0 top-0 w-8 h-8 rounded-full bg-surface-300 border-2 border-neutral-600 flex items-center justify-center">
+              <span class="text-neutral-400 text-xs font-700">2</span>
+            </div>
+            <div class="card rounded-lg p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-white font-600 text-sm">Week 3-4: First Ads Live</h3>
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Planned</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-neutral-300">
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Launch Meta ads (Zurich, DE + dialect)</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Town pages for top 20 Swiss cities</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Welcome email sequence live</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Abandoned story recovery emails</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Daily ad performance monitoring</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>First 5 real testimonials collected</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>A/B test: emotional vs product demo</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week 5-8 -->
+          <div class="progress-step pl-12 pb-8 relative">
+            <div class="absolute left-0 top-0 w-8 h-8 rounded-full bg-surface-300 border-2 border-neutral-600 flex items-center justify-center">
+              <span class="text-neutral-400 text-xs font-700">3</span>
+            </div>
+            <div class="card rounded-lg p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-white font-600 text-sm">Week 5-8: Optimize & Scale</h3>
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Planned</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-neutral-300">
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Scale winning ads, kill losers</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Expand to Bern, Basel, Luzern</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>UGC collection program launch</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>10 more town pages (SEO)</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Post-purchase email sequence</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>A/B test landing page variations</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Gift card purchase flow</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>First NPS survey</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Week 9-12 -->
+          <div class="progress-step pl-12 pb-8 relative">
+            <div class="absolute left-0 top-0 w-8 h-8 rounded-full bg-surface-300 border-2 border-neutral-600 flex items-center justify-center">
+              <span class="text-neutral-400 text-xs font-700">4</span>
+            </div>
+            <div class="card rounded-lg p-5">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-white font-600 text-sm">Week 9-12: Scale & Expand</h3>
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Planned</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-neutral-300">
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Scale Meta to CHF 150-200/day</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Expand to French Switzerland</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Gift card campaigns launch</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Printed book reviews collection</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Google Ads pilot (brand terms)</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>3 SEO guide publications</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Month 3 performance review</div>
+                <div class="flex items-start gap-2"><span class="w-3 h-3 rounded border border-neutral-600 shrink-0 mt-0.5"></span>Plan Phase 2 (DACH)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Phase Status -->
+      <section id="phase-status" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">9</span>
+          Phase Status
+        </h2>
+        <p class="text-neutral-400 text-sm mb-6">Click each card to toggle details.</p>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4" id="status-cards">
+          <!-- Phase 1 Status -->
+          <div class="card rounded-lg cursor-pointer" onclick="toggleStatusCard(this)">
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-4">
+                <span class="status-badge px-2 py-1 rounded bg-accent-500/10 text-accent-400 uppercase font-600">In Progress</span>
+                <span class="text-xs text-neutral-500">Months 1-3</span>
+              </div>
+              <h3 class="text-white font-700 text-lg mb-1">Switzerland</h3>
+              <p class="text-neutral-400 text-xs mb-4">Canton-by-canton rollout with Swiss German dialect support</p>
+
+              <!-- Progress bar -->
+              <div class="mb-3">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-neutral-500">Progress</span>
+                  <span class="text-accent-400 font-600">15%</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-2">
+                  <div class="bg-accent-400 h-2 rounded-full transition-all duration-1000" style="width: 15%"></div>
+                </div>
+              </div>
+
+              <div class="status-details hidden border-t border-surface-300 pt-4 mt-4">
+                <div class="space-y-2 text-xs">
+                  <div class="flex items-center gap-2 text-green-400">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    Product built and functional
+                  </div>
+                  <div class="flex items-center gap-2 text-green-400">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    170+ themes live
+                  </div>
+                  <div class="flex items-center gap-2 text-green-400">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                    SEO sitemap (187 URLs)
+                  </div>
+                  <div class="flex items-center gap-2 text-accent-400">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Meta Pixel installation
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    First Meta ad campaign
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Town pages for 20 cities
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Email sequences active
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 2 Status -->
+          <div class="card rounded-lg cursor-pointer" onclick="toggleStatusCard(this)">
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-4">
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Not Started</span>
+                <span class="text-xs text-neutral-500">Months 4-6</span>
+              </div>
+              <h3 class="text-white font-700 text-lg mb-1">DACH Expansion</h3>
+              <p class="text-neutral-400 text-xs mb-4">Austria and Germany entry with localized content</p>
+
+              <div class="mb-3">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-neutral-500">Progress</span>
+                  <span class="text-neutral-500 font-600">0%</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-2">
+                  <div class="bg-neutral-600 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <div class="status-details hidden border-t border-surface-300 pt-4 mt-4">
+                <div class="space-y-2 text-xs">
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Austrian town stories created
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    German city landing pages
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Meta ads adapted for DE/AT
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Holiday/theme localization
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    200 orders/month target
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 3 Status -->
+          <div class="card rounded-lg cursor-pointer" onclick="toggleStatusCard(this)">
+            <div class="p-5">
+              <div class="flex items-center justify-between mb-4">
+                <span class="status-badge px-2 py-1 rounded bg-neutral-700/30 text-neutral-400 uppercase font-600">Not Started</span>
+                <span class="text-xs text-neutral-500">Months 7-12</span>
+              </div>
+              <h3 class="text-white font-700 text-lg mb-1">Global English</h3>
+              <p class="text-neutral-400 text-xs mb-4">UK, US, Australia with town-specific stories</p>
+
+              <div class="mb-3">
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-neutral-500">Progress</span>
+                  <span class="text-neutral-500 font-600">0%</span>
+                </div>
+                <div class="w-full bg-surface-300 rounded-full h-2">
+                  <div class="bg-neutral-600 h-2 rounded-full" style="width: 0%"></div>
+                </div>
+              </div>
+
+              <div class="status-details hidden border-t border-surface-300 pt-4 mt-4">
+                <div class="space-y-2 text-xs">
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    UK town stories (London, etc.)
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    US market entry (New York, LA)
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Pricing in GBP/USD/AUD
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Art style A/B testing
+                  </div>
+                  <div class="flex items-center gap-2 text-neutral-500">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    1,000 orders/month target
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- Risk Mitigation -->
+      <section id="risks" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">10</span>
+          Risk Mitigation
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="card rounded-lg p-5">
+            <h3 class="text-white font-600 text-sm mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+              </svg>
+              Abuse & Fraud
+            </h3>
+            <ul class="space-y-1.5 text-xs text-neutral-400">
+              <li>Cloudflare Turnstile on free story creation</li>
+              <li>One free story per verified email</li>
+              <li>Rate limiting per IP address</li>
+              <li>Stripe Radar for payment fraud</li>
+            </ul>
+          </div>
+
+          <div class="card rounded-lg p-5">
+            <h3 class="text-white font-600 text-sm mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+              </svg>
+              Privacy & Compliance
+            </h3>
+            <ul class="space-y-1.5 text-xs text-neutral-400">
+              <li>Photos encrypted, deleted after avatar generation</li>
+              <li>GDPR and Swiss nDSG compliant</li>
+              <li>Privacy-first analytics (Plausible)</li>
+              <li>72-hour deletion request response</li>
+            </ul>
+          </div>
+
+          <div class="card rounded-lg p-5">
+            <h3 class="text-white font-600 text-sm mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Quality Assurance
+            </h3>
+            <ul class="space-y-1.5 text-xs text-neutral-400">
+              <li>Entity repair workflow (multi-pass)</li>
+              <li>Automatic low-score image regeneration</li>
+              <li>Monthly Gelato print sample QA</li>
+              <li>Customer complaint tracking system</li>
+            </ul>
+          </div>
+
+          <div class="card rounded-lg p-5">
+            <h3 class="text-white font-600 text-sm mb-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              Cost Control
+            </h3>
+            <ul class="space-y-1.5 text-xs text-neutral-400">
+              <li>AI cost per story: CHF 2-4.50 (monitored)</li>
+              <li>Budget caps per user for free tier</li>
+              <li>Fallback to cheaper models when possible</li>
+              <li>Volume pricing negotiation at 500+ orders/month</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-divider"></div>
+
+      <!-- References -->
+      <section id="references" class="fade-in">
+        <h2 class="text-2xl font-700 text-white mb-6 flex items-center gap-3">
+          <span class="w-8 h-8 rounded bg-accent-500/10 flex items-center justify-center text-accent-400 text-sm font-bold">11</span>
+          Related Documents
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <a href="./02-meta-ads-playbook.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">02</div>
+            <div class="text-white text-sm font-500">Meta Ads Playbook</div>
+            <div class="text-neutral-500 text-xs mt-1">Campaign structures, targeting, creative frameworks</div>
+          </a>
+          <a href="./03-seo-geo-strategy.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">03</div>
+            <div class="text-white text-sm font-500">SEO / GEO Strategy</div>
+            <div class="text-neutral-500 text-xs mt-1">Programmatic pages, keywords, structured data</div>
+          </a>
+          <a href="./04-email-sequences.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">04</div>
+            <div class="text-white text-sm font-500">Email Sequences</div>
+            <div class="text-neutral-500 text-xs mt-1">Welcome, recovery, nurture, seasonal</div>
+          </a>
+          <a href="./05-pricing-analysis.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">05</div>
+            <div class="text-white text-sm font-500">Pricing Analysis</div>
+            <div class="text-neutral-500 text-xs mt-1">Competitor pricing, sensitivity, subscription</div>
+          </a>
+          <a href="./06-competitor-intel.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">06</div>
+            <div class="text-white text-sm font-500">Competitor Intel</div>
+            <div class="text-neutral-500 text-xs mt-1">Librio, Wonderbly, Hooray Heroes analysis</div>
+          </a>
+          <a href="./07-brand-guidelines.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">07</div>
+            <div class="text-white text-sm font-500">Brand Guidelines</div>
+            <div class="text-neutral-500 text-xs mt-1">Voice, visual identity, messaging</div>
+          </a>
+          <a href="./08-ugc-playbook.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">08</div>
+            <div class="text-white text-sm font-500">UGC Playbook</div>
+            <div class="text-neutral-500 text-xs mt-1">Collection, incentives, ad frameworks</div>
+          </a>
+          <a href="./09-analytics-dashboard.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">09</div>
+            <div class="text-white text-sm font-500">Analytics Dashboard</div>
+            <div class="text-neutral-500 text-xs mt-1">Events, funnels, dashboards, reporting</div>
+          </a>
+          <a href="./10-swiss-market-research.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">10</div>
+            <div class="text-white text-sm font-500">Swiss Market Research</div>
+            <div class="text-neutral-500 text-xs mt-1">Demographics, behavior, cultural nuances</div>
+          </a>
+          <a href="./11-expansion-playbook.md" class="card rounded-lg p-4 block hover:border-accent-500/30 transition-colors">
+            <div class="text-accent-400 text-xs font-600 mb-1">11</div>
+            <div class="text-white text-sm font-500">Expansion Playbook</div>
+            <div class="text-neutral-500 text-xs mt-1">DACH entry, English markets, localization</div>
+          </a>
+        </div>
+      </section>
+
+      <!-- Footer -->
+      <footer class="mt-16 pt-8 border-t border-surface-300 pb-12">
+        <div class="flex items-center justify-between text-xs text-neutral-600">
+          <div>MagicalStory.ch &middot; GTM Strategy v1.0 &middot; March 2026</div>
+          <div>Draft for Executive Review</div>
+        </div>
+      </footer>
+
+    </div>
+  </main>
+
+  <!-- Mobile nav toggle -->
+  <button onclick="document.querySelector('.sidebar').classList.toggle('!block')" class="lg:hidden fixed top-4 left-4 z-[60] w-10 h-10 rounded-lg bg-surface-200 border border-surface-300 flex items-center justify-center">
+    <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+    </svg>
+  </button>
+
+  <script>
+    // Phase card toggle
+    function togglePhase(el) {
+      el.classList.toggle('expanded');
+    }
+
+    // Status card toggle
+    function toggleStatusCard(el) {
+      const details = el.querySelector('.status-details');
+      if (details) {
+        details.classList.toggle('hidden');
+      }
+    }
+
+    // Active nav link highlighting on scroll
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    function updateActiveNav() {
+      let current = '';
+      sections.forEach(section => {
+        const rect = section.getBoundingClientRect();
+        if (rect.top <= 120) {
+          current = section.getAttribute('id');
+        }
+      });
+
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + current) {
+          link.classList.add('active');
+        }
+      });
+    }
+
+    window.addEventListener('scroll', updateActiveNav);
+    updateActiveNav();
+
+    // Animate bars on load
+    window.addEventListener('load', () => {
+      document.querySelectorAll('.bar-chart-bar').forEach((bar, i) => {
+        const targetWidth = bar.style.width;
+        bar.style.width = '0%';
+        setTimeout(() => {
+          bar.style.width = targetWidth;
+        }, 200 + i * 150);
+      });
+    });
+  </script>
+
+</body>
+</html>

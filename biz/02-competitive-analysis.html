@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Competitive Analysis — MagicalStory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            surface: { 50: '#fafaf9', 100: '#1a1a1e', 200: '#22222a', 300: '#2a2a34', 400: '#32323e', 500: '#3a3a48' },
+            amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309' },
+            slate: { 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f1117; color: #e2e8f0; }
+    .radar-container { position: relative; width: 280px; height: 280px; margin: 0 auto; }
+    .radar-bg { position: absolute; inset: 0; }
+    .radar-bg circle { fill: none; stroke: #2a2a34; stroke-width: 1; }
+    .radar-shape { position: absolute; inset: 0; }
+    .radar-shape polygon { fill-opacity: 0.15; stroke-width: 2; }
+    .radar-label { position: absolute; font-size: 0.65rem; color: #94a3b8; font-weight: 500; white-space: nowrap; }
+    .toggle-chip { transition: all 0.2s ease; cursor: pointer; user-select: none; }
+    .toggle-chip.active { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); color: #fbbf24; }
+    .toggle-chip:not(.active) { border-color: #32323e; background: transparent; color: #64748b; }
+    .toggle-chip:hover:not(.active) { border-color: #475569; color: #94a3b8; }
+    .card-enter { animation: cardIn 0.3s ease-out; }
+    @keyframes cardIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .comparison-row { transition: all 0.3s ease; }
+    .comparison-row.hidden-row { display: none; }
+    .price-bar { transition: width 0.5s ease; border-radius: 0 4px 4px 0; }
+    .score-fill { transition: width 0.6s ease; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1a1a1e; }
+    ::-webkit-scrollbar-thumb { background: #32323e; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3a48; }
+    .nav-link { transition: color 0.2s; }
+    .nav-link:hover { color: #fbbf24; }
+    .advantage-badge { background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.06)); border: 1px solid rgba(245, 158, 11, 0.25); }
+    .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    @media (max-width: 768px) {
+      .radar-container { width: 220px; height: 220px; }
+    }
+  </style>
+</head>
+<body class="min-h-screen pt-10">
+
+  <!-- Cross-document navigation -->
+  <div class="fixed top-0 left-0 right-0 z-[9999] bg-[#1e293b] border-b border-slate-700 overflow-x-auto whitespace-nowrap">
+    <div class="flex items-center gap-4 px-4 py-2 text-xs font-medium">
+      <a href="01-gtm-strategy.html" class="text-slate-300 hover:text-amber-400 transition-colors">GTM Strategy</a>
+      <a href="02-competitive-analysis.html" class="text-amber-500 font-semibold">Competition</a>
+      <a href="03-target-audience.html" class="text-slate-300 hover:text-amber-400 transition-colors">Audience</a>
+      <a href="05-meta-ads-strategy.html" class="text-slate-300 hover:text-amber-400 transition-colors">Meta Ads</a>
+      <a href="06-seo-geo-strategy.html" class="text-slate-300 hover:text-amber-400 transition-colors">SEO & GEO</a>
+      <a href="09-glocal-strategy.html" class="text-slate-300 hover:text-amber-400 transition-colors">Glocal</a>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sticky top-10 z-50 bg-[#0f1117]/90 backdrop-blur-md border-b border-surface-300/30">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-amber-400 font-bold text-lg tracking-tight">MagicalStory</span>
+        <span class="text-slate-500 text-sm">Competitive Analysis</span>
+      </div>
+      <div class="hidden md:flex items-center gap-6 text-sm text-slate-400">
+        <a href="#overview" class="nav-link">Overview</a>
+        <a href="#comparison" class="nav-link">Comparison</a>
+        <a href="#radar" class="nav-link">Radar</a>
+        <a href="#pricing" class="nav-link">Pricing</a>
+        <a href="#advantages" class="nav-link">Advantages</a>
+        <a href="#gaps" class="nav-link">Gaps</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="max-w-7xl mx-auto px-4 pt-16 pb-12">
+    <p class="text-amber-500 text-sm font-semibold tracking-wider uppercase mb-3">Market Intelligence</p>
+    <h1 class="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-4">
+      Personalized Children's Book<br>Competitive Landscape
+    </h1>
+    <p class="text-slate-400 text-lg max-w-2xl leading-relaxed">
+      Market valued at <span class="text-white font-semibold">$569M</span> in 2024, projected
+      <span class="text-white font-semibold">$1.05B</span> by 2031.
+      Analysis of 10 competitors across template-based and AI-native segments.
+    </p>
+
+    <!-- Category filter chips -->
+    <div class="flex flex-wrap gap-2 mt-8" id="categoryFilters">
+      <button onclick="filterCategory('all')" class="toggle-chip active px-4 py-2 rounded-full border text-sm font-medium" data-category="all">All Competitors</button>
+      <button onclick="filterCategory('traditional')" class="toggle-chip px-4 py-2 rounded-full border text-sm font-medium" data-category="traditional">Traditional</button>
+      <button onclick="filterCategory('ai')" class="toggle-chip px-4 py-2 rounded-full border text-sm font-medium" data-category="ai">AI-Native</button>
+      <button onclick="filterCategory('swiss')" class="toggle-chip px-4 py-2 rounded-full border text-sm font-medium" data-category="swiss">Swiss Market</button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 pb-24 space-y-20">
+
+    <!-- Section: Overview Cards -->
+    <section id="overview">
+      <h2 class="text-2xl font-bold text-white mb-6">Competitor Overview</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="competitorCards">
+        <!-- Cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- Section: Interactive Comparison Table -->
+    <section id="comparison">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <h2 class="text-2xl font-bold text-white">Feature Comparison</h2>
+        <div class="flex flex-wrap gap-2" id="toggles">
+          <!-- Toggle chips injected by JS -->
+        </div>
+      </div>
+
+      <div class="table-container bg-surface-100 rounded-xl border border-surface-300/50 overflow-hidden">
+        <table class="w-full text-sm" id="comparisonTable">
+          <thead>
+            <tr id="tableHeader" class="border-b border-surface-300/50">
+              <th class="text-left px-4 py-3 text-slate-400 font-medium sticky left-0 bg-surface-100 z-10 min-w-[160px]">Feature</th>
+              <!-- Headers injected by JS -->
+            </tr>
+          </thead>
+          <tbody id="tableBody">
+            <!-- Rows injected by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Section: Radar Charts -->
+    <section id="radar">
+      <h2 class="text-2xl font-bold text-white mb-2">Strength Profiles</h2>
+      <p class="text-slate-400 mb-8">Comparative radar analysis across six key dimensions. Outer ring = 10 (best).</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="radarGrid">
+        <!-- Radars injected by JS -->
+      </div>
+    </section>
+
+    <!-- Section: Pricing Comparison -->
+    <section id="pricing">
+      <h2 class="text-2xl font-bold text-white mb-2">Pricing Comparison</h2>
+      <p class="text-slate-400 mb-8">Print book pricing across competitors. MagicalStory offers a free first story — the most generous entry point in the market.</p>
+      <div class="bg-surface-100 rounded-xl border border-surface-300/50 p-6" id="pricingChart">
+        <!-- Pricing bars injected by JS -->
+      </div>
+    </section>
+
+    <!-- Section: MagicalStory Advantages -->
+    <section id="advantages">
+      <h2 class="text-2xl font-bold text-white mb-8">MagicalStory Competitive Advantages</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="advantageCards">
+        <!-- Advantage cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- Section: Competitive Gaps -->
+    <section id="gaps">
+      <h2 class="text-2xl font-bold text-white mb-2">Gaps to Exploit</h2>
+      <p class="text-slate-400 mb-8">Specific weaknesses in each competitor's offering that MagicalStory directly addresses.</p>
+      <div class="space-y-3" id="gapsList">
+        <!-- Gap items injected by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // ─── Data ───────────────────────────────────────────────────────────────────
+
+    const competitors = [
+      {
+        id: 'magicalstory', name: 'MagicalStory', type: 'ai', swiss: true, highlight: true,
+        tagline: 'AI-native, Swiss-focused, character-consistent',
+        founded: '2024', location: 'Switzerland',
+        reviews: 'Building', rating: '-',
+        pricing: { min: 0, max: 45, label: 'Free first, then $35-$45', printMin: 35, printMax: 45 },
+        features: {
+          personalization: 'AI (full story + illustrations + town + interests)',
+          languages: 'DE, EN, FR, CH-DE dialects',
+          swissPresence: 'Strong (.ch domain, Swiss focus)',
+          printQuality: 'Gelato premium POD',
+          consistency: 'High (entity repair workflow)',
+          townStories: 'Yes (170+ towns)',
+          artStyles: '8 styles',
+          themes: '170+',
+          ugc: 'Building',
+          trust: 'Swiss quality, free trial'
+        },
+        radar: { personalization: 10, quality: 9, languages: 7, swissRelevance: 10, innovation: 10, trust: 5 }
+      },
+      {
+        id: 'wonderbly', name: 'Wonderbly', type: 'traditional', swiss: false,
+        tagline: '11M+ books, PRH-backed, template personalization',
+        founded: '2013', location: 'London',
+        reviews: '82K Trustpilot', rating: '4.5',
+        pricing: { min: 35, max: 55, label: 'From ~$35', printMin: 35, printMax: 55 },
+        features: {
+          personalization: 'Template (name + basic appearance)',
+          languages: '10+ languages',
+          swissPresence: 'Low (ships to CH)',
+          printQuality: 'High (PRH standards)',
+          consistency: 'N/A (illustrated templates)',
+          townStories: 'No',
+          artStyles: 'Fixed per book',
+          themes: '~30 titles',
+          ugc: 'Strong (82K reviews)',
+          trust: 'PRH ownership, 11M sold'
+        },
+        radar: { personalization: 3, quality: 8, languages: 7, swissRelevance: 2, innovation: 2, trust: 10 }
+      },
+      {
+        id: 'hooray', name: 'Hooray Heroes', type: 'traditional', swiss: false,
+        tagline: 'UGC marketing masters, emotional reaction videos',
+        founded: '2013', location: 'Slovenia',
+        reviews: '6.6K Trustpilot', rating: '4.3',
+        pricing: { min: 39, max: 50, label: 'From ~$39', printMin: 39, printMax: 50 },
+        features: {
+          personalization: 'Template (name + basic appearance)',
+          languages: '10+ languages',
+          swissPresence: 'Low (ships to CH)',
+          printQuality: 'High',
+          consistency: 'N/A (illustrated templates)',
+          townStories: 'No',
+          artStyles: 'Fixed per book',
+          themes: '~20 titles',
+          ugc: 'Very strong (UGC-first)',
+          trust: '3M sold, 6.6K reviews'
+        },
+        radar: { personalization: 3, quality: 7, languages: 6, swissRelevance: 2, innovation: 2, trust: 8 }
+      },
+      {
+        id: 'framily', name: 'Framily', type: 'traditional', swiss: true,
+        tagline: 'Licensed IP (PAW Patrol, Peppa Pig, Disney)',
+        founded: '-', location: 'Germany',
+        reviews: 'Moderate', rating: '-',
+        pricing: { min: 30, max: 40, label: '~$30-$40', printMin: 30, printMax: 40 },
+        features: {
+          personalization: 'Template (name + licensed IP)',
+          languages: 'DE, FR, IT',
+          swissPresence: 'Yes (.ch domain)',
+          printQuality: 'High',
+          consistency: 'N/A (licensed art)',
+          townStories: 'No',
+          artStyles: 'Fixed per license',
+          themes: 'Licensed IP only',
+          ugc: 'Moderate',
+          trust: 'Licensed IP brands'
+        },
+        radar: { personalization: 2, quality: 7, languages: 4, swissRelevance: 6, innovation: 1, trust: 7 }
+      },
+      {
+        id: 'iseeme', name: 'I See Me!', type: 'traditional', swiss: false,
+        tagline: 'USA, 100+ titles, broad product ecosystem',
+        founded: '-', location: 'USA',
+        reviews: '1.9K Google', rating: '4.7',
+        pricing: { min: 30, max: 57, label: '$29.99-$56.98', printMin: 30, printMax: 57 },
+        features: {
+          personalization: 'Template (name)',
+          languages: 'EN only',
+          swissPresence: 'None',
+          printQuality: 'High',
+          consistency: 'N/A (templates)',
+          townStories: 'No',
+          artStyles: 'Fixed per book',
+          themes: '100+ titles',
+          ugc: 'Moderate',
+          trust: '4.7 Google, 100+ titles'
+        },
+        radar: { personalization: 2, quality: 7, languages: 1, swissRelevance: 0, innovation: 1, trust: 7 }
+      },
+      {
+        id: 'librio', name: 'Librio', type: 'traditional', swiss: true,
+        tagline: 'Swiss-based, 20+ languages, Globi license',
+        founded: '-', location: 'Switzerland',
+        reviews: 'Moderate', rating: '-',
+        pricing: { min: 35, max: 45, label: '$34.99-$44.99', printMin: 35, printMax: 45 },
+        features: {
+          personalization: 'Template (name + 8K combos)',
+          languages: '20+ incl. CH-DE dialects, Romansh',
+          swissPresence: 'Strong (Swiss company)',
+          printQuality: 'High (recycled paper)',
+          consistency: 'N/A (templates)',
+          townStories: 'No',
+          artStyles: 'Fixed per book',
+          themes: '~15 titles',
+          ugc: 'Moderate',
+          trust: 'Swiss made, Globi license'
+        },
+        radar: { personalization: 4, quality: 8, languages: 9, swissRelevance: 9, innovation: 2, trust: 7 }
+      },
+      {
+        id: 'lullaby', name: 'Lullaby.ink', type: 'ai', swiss: false,
+        tagline: '$5 digital / $25 print, photo-to-cartoon',
+        founded: '-', location: '-',
+        reviews: 'Low', rating: '-',
+        pricing: { min: 5, max: 25, label: '$5 digital, $25 print', printMin: 25, printMax: 25 },
+        features: {
+          personalization: 'AI (photo-to-cartoon, up to 3 chars)',
+          languages: 'EN, limited others',
+          swissPresence: 'None',
+          printQuality: 'Basic POD',
+          consistency: 'Low-Medium',
+          townStories: 'No',
+          artStyles: '7 styles',
+          themes: 'Varied',
+          ugc: 'Low',
+          trust: 'Early stage'
+        },
+        radar: { personalization: 7, quality: 5, languages: 2, swissRelevance: 0, innovation: 7, trust: 2 }
+      },
+      {
+        id: 'lovetoread', name: 'LoveToRead.ai', type: 'ai', swiss: false,
+        tagline: 'Credit-based, 30-second generation, K-5 levels',
+        founded: '-', location: '-',
+        reviews: 'Low', rating: '-',
+        pricing: { min: 10, max: 25, label: '$9.99-$24.99', printMin: 25, printMax: 25 },
+        features: {
+          personalization: 'AI (text + image)',
+          languages: 'EN only',
+          swissPresence: 'None',
+          printQuality: 'Basic POD',
+          consistency: 'Low',
+          townStories: 'No',
+          artStyles: 'Limited',
+          themes: 'Varied',
+          ugc: 'Low',
+          trust: 'Early stage'
+        },
+        radar: { personalization: 6, quality: 4, languages: 1, swissRelevance: 0, innovation: 6, trust: 2 }
+      },
+      {
+        id: 'childbook', name: 'Childbook.ai', type: 'ai', swiss: false,
+        tagline: 'Subscription, high-volume, creator-focused',
+        founded: '-', location: '-',
+        reviews: 'Low', rating: '-',
+        pricing: { min: 2.5, max: 99, label: '$19-$99/mo (sub)', printMin: 0, printMax: 0 },
+        features: {
+          personalization: 'AI (text + image)',
+          languages: 'EN, limited',
+          swissPresence: 'None',
+          printQuality: 'No print',
+          consistency: 'Low',
+          townStories: 'No',
+          artStyles: 'Varied',
+          themes: 'Unlimited',
+          ugc: 'Low',
+          trust: 'Early stage'
+        },
+        radar: { personalization: 6, quality: 3, languages: 1, swissRelevance: 0, innovation: 5, trust: 1 }
+      },
+      {
+        id: 'mystorybot', name: 'MyStoryBot', type: 'ai', swiss: false,
+        tagline: 'Interactive branching stories with audio',
+        founded: '-', location: '-',
+        reviews: 'Low', rating: '-',
+        pricing: { min: 6, max: 40, label: '$5.99-$39.99/mo', printMin: 25, printMax: 40 },
+        features: {
+          personalization: 'AI (branching narratives)',
+          languages: 'EN, limited',
+          swissPresence: 'None',
+          printQuality: 'Basic POD',
+          consistency: 'Low',
+          townStories: 'No',
+          artStyles: 'Limited',
+          themes: 'Interactive',
+          ugc: 'Low',
+          trust: 'Early stage'
+        },
+        radar: { personalization: 7, quality: 4, languages: 1, swissRelevance: 0, innovation: 8, trust: 2 }
+      },
+      {
+        id: 'magicstory', name: 'Magic Story', type: 'ai', swiss: false,
+        tagline: 'Photo-to-Pixar, strong privacy positioning',
+        founded: '-', location: '-',
+        reviews: 'Low', rating: '-',
+        pricing: { min: 25, max: 40, label: '~$25-$40 (est.)', printMin: 25, printMax: 40 },
+        features: {
+          personalization: 'AI (photo-to-illustration)',
+          languages: 'EN only',
+          swissPresence: 'None',
+          printQuality: 'US POD only',
+          consistency: 'Medium',
+          townStories: 'No',
+          artStyles: '1 ("Pixar")',
+          themes: 'Varied',
+          ugc: 'Low',
+          trust: 'Early stage'
+        },
+        radar: { personalization: 7, quality: 5, languages: 1, swissRelevance: 0, innovation: 7, trust: 2 }
+      }
+    ];
+
+    const featureLabels = {
+      personalization: 'Personalization Depth',
+      languages: 'Language Support',
+      swissPresence: 'Swiss Market Presence',
+      printQuality: 'Print Quality',
+      consistency: 'Character Consistency',
+      townStories: 'Local/Town Stories',
+      artStyles: 'Art Style Variety',
+      themes: 'Theme Catalog',
+      ugc: 'UGC / Social Proof',
+      trust: 'Trust Signals'
+    };
+
+    const radarLabels = {
+      personalization: 'Personalization',
+      quality: 'Quality',
+      languages: 'Languages',
+      swissRelevance: 'Swiss Relevance',
+      innovation: 'Innovation',
+      trust: 'Trust'
+    };
+
+    const advantages = [
+      { title: 'Swiss German Dialect Support', desc: 'The only AI platform offering Swiss German dialects (Zurich, Bern, Basel). Librio offers dialects but is template-based. We combine AI uniqueness with linguistic authenticity.', metric: 'Only AI+dialect platform' },
+      { title: 'Character Consistency', desc: 'Multi-pass entity repair workflow with quality evaluation and automated fixes. The #1 complaint about AI books is characters looking different on every page. We solve this.', metric: '#1 AI pain point solved' },
+      { title: 'Town-Specific Stories', desc: 'Stories set in the child\'s actual hometown with local landmarks. No competitor, template or AI, generates narratives tied to 170+ specific Swiss towns.', metric: '170+ towns supported' },
+      { title: '170+ Story Themes', desc: 'The largest theme catalog of any AI personalized book platform. From first day of school to space adventures, we cover every scenario parents request.', metric: 'Largest AI theme catalog' },
+      { title: '8 Art Styles', desc: 'More art style variety than any competitor. Parents choose the visual style that fits their child\'s preferences and the story\'s tone.', metric: 'Most art style options' },
+      { title: 'Swiss Quality Positioning', desc: 'Operating from .ch with Swiss-focused marketing and dialect support. We inherit Swiss quality perception while leveraging AI for scale.', metric: '.ch domain + Swiss focus' },
+      { title: 'Gelato EU Fulfillment', desc: 'Professional POD through Gelato with European fulfillment centers. Fast shipping to Switzerland and EU at professional print quality.', metric: 'EU print + shipping' },
+      { title: 'Free First Story', desc: 'The most generous free tier among AI competitors. Parents see full quality before paying. Trust through transparency, not marketing claims.', metric: 'Most generous free tier' },
+    ];
+
+    const gaps = [
+      { competitor: 'Wonderbly', gap: 'Template-based; cannot create truly personalized AI stories', counter: 'Every MagicalStory book is genuinely unique: different plot, scenes, and dialogue', type: 'traditional' },
+      { competitor: 'Hooray Heroes', gap: 'Template-based; no Swiss-specific content', counter: 'Town-specific stories + Swiss German dialects create local relevance they cannot match', type: 'traditional' },
+      { competitor: 'Librio', gap: 'Template-based; no AI; limited story themes', counter: '170+ AI-generated themes vs. their fixed catalog of ~15 titles', type: 'traditional' },
+      { competitor: 'Framily', gap: 'Dependent on licensed IP; no original stories', counter: 'We create original stories about the child — they are the hero, not a side character in PAW Patrol', type: 'traditional' },
+      { competitor: 'Lullaby.ink', gap: 'No Swiss German; no town stories; no CH print fulfillment', counter: 'Swiss dialect support + town stories + Gelato EU fulfillment = complete Swiss market solution', type: 'ai' },
+      { competitor: 'LoveToRead.ai', gap: 'English-only; confusing credit model for gift-givers', counter: 'Multilingual + simple pricing + gift-ready experience', type: 'ai' },
+      { competitor: 'All AI Competitors', gap: 'Weak character consistency across pages', counter: 'Entity repair workflow is the most sophisticated character consistency system in the market', type: 'ai' },
+    ];
+
+    // Active state
+    let activeCategory = 'all';
+    let activeCompetitors = new Set(competitors.map(c => c.id));
+
+    // ─── Rendering ──────────────────────────────────────────────────────────────
+
+    function getVisibleCompetitors() {
+      return competitors.filter(c => {
+        if (activeCategory === 'all') return true;
+        if (activeCategory === 'traditional') return c.type === 'traditional';
+        if (activeCategory === 'ai') return c.type === 'ai' || c.highlight;
+        if (activeCategory === 'swiss') return c.swiss;
+        return true;
+      });
+    }
+
+    function filterCategory(category) {
+      activeCategory = category;
+      document.querySelectorAll('#categoryFilters .toggle-chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.category === category);
+      });
+      const visible = getVisibleCompetitors();
+      activeCompetitors = new Set(visible.map(c => c.id));
+      renderAll();
+    }
+
+    function toggleCompetitor(id) {
+      if (activeCompetitors.has(id)) {
+        if (id === 'magicalstory') return; // always keep MagicalStory visible
+        activeCompetitors.delete(id);
+      } else {
+        activeCompetitors.add(id);
+      }
+      renderAll();
+    }
+
+    function renderAll() {
+      renderCards();
+      renderToggles();
+      renderTable();
+      renderRadars();
+      renderPricing();
+      renderGaps();
+    }
+
+    // ─── Cards ──────────────────────────────────────────────────────────────────
+
+    function renderCards() {
+      const container = document.getElementById('competitorCards');
+      const visible = competitors.filter(c => activeCompetitors.has(c.id));
+      container.innerHTML = visible.map(c => {
+        const borderColor = c.highlight ? 'border-amber-500/40' : 'border-surface-300/50';
+        const headerBg = c.highlight ? 'bg-amber-500/5' : '';
+        const typeLabel = c.type === 'traditional' ? 'Traditional' : 'AI-Native';
+        const typeColor = c.type === 'traditional' ? 'text-slate-400 bg-slate-800' : 'text-amber-400 bg-amber-900/30';
+        const swissBadge = c.swiss ? '<span class="text-xs px-2 py-0.5 rounded-full bg-red-900/30 text-red-400">Swiss</span>' : '';
+        return `
+          <div class="card-enter bg-surface-100 rounded-xl border ${borderColor} overflow-hidden">
+            <div class="px-5 py-4 ${headerBg} border-b border-surface-300/30 flex items-start justify-between">
+              <div>
+                <h3 class="font-bold text-white ${c.highlight ? 'text-amber-400' : ''}">${c.name}</h3>
+                <p class="text-xs text-slate-500 mt-0.5">${c.tagline}</p>
+              </div>
+              <div class="flex gap-1.5 flex-shrink-0 ml-2">
+                <span class="text-xs px-2 py-0.5 rounded-full ${typeColor}">${typeLabel}</span>
+                ${swissBadge}
+              </div>
+            </div>
+            <div class="px-5 py-4 space-y-2 text-sm">
+              <div class="flex justify-between"><span class="text-slate-500">Location</span><span class="text-slate-300">${c.location}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Founded</span><span class="text-slate-300">${c.founded}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Pricing</span><span class="text-slate-300">${c.pricing.label}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Reviews</span><span class="text-slate-300">${c.reviews}${c.rating !== '-' ? ' (' + c.rating + ')' : ''}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Art Styles</span><span class="text-slate-300">${c.features.artStyles}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">Consistency</span><span class="text-slate-300">${c.features.consistency}</span></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── Toggles ────────────────────────────────────────────────────────────────
+
+    function renderToggles() {
+      const container = document.getElementById('toggles');
+      const visible = getVisibleCompetitors();
+      container.innerHTML = visible.map(c => {
+        const isActive = activeCompetitors.has(c.id);
+        const locked = c.id === 'magicalstory';
+        return `<button onclick="${locked ? '' : `toggleCompetitor('${c.id}')`}"
+          class="toggle-chip ${isActive ? 'active' : ''} px-3 py-1.5 rounded-full border text-xs font-medium ${locked ? 'opacity-80 cursor-default' : ''}"
+        >${c.name}</button>`;
+      }).join('');
+    }
+
+    // ─── Table ──────────────────────────────────────────────────────────────────
+
+    function renderTable() {
+      const visible = competitors.filter(c => activeCompetitors.has(c.id));
+      // Header
+      const header = document.getElementById('tableHeader');
+      header.innerHTML = '<th class="text-left px-4 py-3 text-slate-400 font-medium sticky left-0 bg-surface-100 z-10 min-w-[160px]">Feature</th>' +
+        visible.map(c => {
+          const hlClass = c.highlight ? 'text-amber-400' : 'text-slate-300';
+          return `<th class="px-4 py-3 text-center font-medium ${hlClass} min-w-[130px]">${c.name}</th>`;
+        }).join('');
+
+      // Body
+      const tbody = document.getElementById('tableBody');
+      const featureKeys = Object.keys(featureLabels);
+      tbody.innerHTML = featureKeys.map((key, i) => {
+        const rowBg = i % 2 === 0 ? 'bg-surface-200/30' : '';
+        const cells = visible.map(c => {
+          const val = c.features[key];
+          let cellClass = 'text-slate-400';
+          // Highlight MagicalStory advantages
+          if (c.highlight) {
+            if (key === 'townStories' && val.startsWith('Yes')) cellClass = 'text-amber-400 font-semibold';
+            else if (key === 'consistency' && val.includes('High')) cellClass = 'text-amber-400 font-semibold';
+            else if (key === 'artStyles' && val === '8 styles') cellClass = 'text-amber-400 font-semibold';
+            else if (key === 'themes' && val === '170+') cellClass = 'text-amber-400 font-semibold';
+            else cellClass = 'text-slate-300';
+          }
+          // Mark "No" and "None" dimmer
+          if (val === 'No' || val === 'None') cellClass = 'text-slate-600';
+          return `<td class="px-4 py-3 text-center text-xs ${cellClass}">${val}</td>`;
+        }).join('');
+        return `<tr class="${rowBg} border-b border-surface-300/20">
+          <td class="px-4 py-3 text-slate-300 font-medium sticky left-0 bg-surface-100 z-10 text-sm">${featureLabels[key]}</td>
+          ${cells}
+        </tr>`;
+      }).join('');
+    }
+
+    // ─── Radar Charts (CSS/SVG) ─────────────────────────────────────────────────
+
+    function polarToXY(cx, cy, r, angleDeg) {
+      const rad = (angleDeg - 90) * Math.PI / 180;
+      return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+    }
+
+    function renderRadars() {
+      const container = document.getElementById('radarGrid');
+      const visible = competitors.filter(c => activeCompetitors.has(c.id));
+      const keys = Object.keys(radarLabels);
+      const n = keys.length;
+      const size = 280;
+      const cx = size / 2, cy = size / 2;
+      const maxR = 110;
+
+      container.innerHTML = visible.map(c => {
+        const borderColor = c.highlight ? 'border-amber-500/40' : 'border-surface-300/50';
+        const fillColor = c.highlight ? '#f59e0b' : '#64748b';
+        const strokeColor = c.highlight ? '#f59e0b' : '#94a3b8';
+
+        // Background grid
+        let gridLines = '';
+        for (let ring = 1; ring <= 5; ring++) {
+          const r = (ring / 5) * maxR;
+          const pts = keys.map((_, i) => {
+            const p = polarToXY(cx, cy, r, (360 / n) * i);
+            return `${p.x},${p.y}`;
+          }).join(' ');
+          gridLines += `<polygon points="${pts}" fill="none" stroke="#2a2a34" stroke-width="1"/>`;
+        }
+        // Axis lines
+        let axisLines = '';
+        keys.forEach((_, i) => {
+          const p = polarToXY(cx, cy, maxR, (360 / n) * i);
+          axisLines += `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="#2a2a34" stroke-width="1"/>`;
+        });
+
+        // Data polygon
+        const dataPts = keys.map((key, i) => {
+          const val = c.radar[key];
+          const r = (val / 10) * maxR;
+          const p = polarToXY(cx, cy, r, (360 / n) * i);
+          return `${p.x},${p.y}`;
+        }).join(' ');
+
+        // Data dots
+        let dots = '';
+        keys.forEach((key, i) => {
+          const val = c.radar[key];
+          const r = (val / 10) * maxR;
+          const p = polarToXY(cx, cy, r, (360 / n) * i);
+          dots += `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${fillColor}"/>`;
+        });
+
+        // Labels positioned around the radar
+        const labelPositions = [
+          'top-0 left-1/2 -translate-x-1/2 -translate-y-1',
+          'top-1/4 -right-2',
+          'bottom-1/4 -right-2',
+          'bottom-0 left-1/2 -translate-x-1/2 translate-y-1',
+          'bottom-1/4 -left-2',
+          'top-1/4 -left-2'
+        ];
+        const labelHtml = keys.map((key, i) => {
+          const p = polarToXY(cx, cy, maxR + 28, (360 / n) * i);
+          let anchor = 'text-anchor: middle;';
+          if (i === 1 || i === 2) anchor = 'text-anchor: start;';
+          if (i === 4 || i === 5) anchor = 'text-anchor: end;';
+          return `<text x="${p.x}" y="${p.y + 4}" style="${anchor}" fill="#94a3b8" font-size="10" font-family="Inter, sans-serif">${radarLabels[key]}</text>`;
+        }).join('');
+
+        // Score
+        const avgScore = Math.round(Object.values(c.radar).reduce((a, b) => a + b, 0) / n * 10) / 10;
+
+        return `
+          <div class="card-enter bg-surface-100 rounded-xl border ${borderColor} p-5">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="font-bold ${c.highlight ? 'text-amber-400' : 'text-white'}">${c.name}</h3>
+              <span class="text-xs text-slate-500">Avg: ${avgScore}/10</span>
+            </div>
+            <div class="flex justify-center">
+              <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" class="max-w-full">
+                ${gridLines}
+                ${axisLines}
+                <polygon points="${dataPts}" fill="${fillColor}" fill-opacity="0.15" stroke="${strokeColor}" stroke-width="2"/>
+                ${dots}
+                ${labelHtml}
+              </svg>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── Pricing ────────────────────────────────────────────────────────────────
+
+    function renderPricing() {
+      const container = document.getElementById('pricingChart');
+      const visible = competitors.filter(c => activeCompetitors.has(c.id) && c.pricing.printMin > 0);
+      const maxPrice = 60;
+
+      // Sort by printMin
+      const sorted = [...visible].sort((a, b) => a.pricing.printMin - b.pricing.printMin);
+
+      container.innerHTML = `
+        <div class="space-y-3">
+          ${sorted.map(c => {
+            const leftPct = (c.pricing.printMin / maxPrice) * 100;
+            const widthPct = Math.max(((c.pricing.printMax - c.pricing.printMin) / maxPrice) * 100, 2);
+            const barColor = c.highlight ? 'bg-amber-500' : 'bg-slate-600';
+            const textColor = c.highlight ? 'text-amber-400' : 'text-slate-300';
+            const nameWidth = 'w-28 md:w-36';
+            const freeLabel = c.highlight ? '<span class="text-xs text-amber-500/70 ml-1">(free first story)</span>' : '';
+            return `
+              <div class="flex items-center gap-3">
+                <span class="${nameWidth} text-sm font-medium ${textColor} flex-shrink-0 truncate">${c.name}</span>
+                <div class="flex-1 relative h-7 bg-surface-300/30 rounded overflow-hidden">
+                  <div class="price-bar absolute top-0 bottom-0 ${barColor}" style="left: ${leftPct}%; width: ${widthPct}%;"></div>
+                  <span class="absolute inset-0 flex items-center justify-center text-xs text-white font-medium z-10">
+                    $${c.pricing.printMin}${c.pricing.printMax !== c.pricing.printMin ? ' - $' + c.pricing.printMax : ''}
+                    ${freeLabel}
+                  </span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+        <div class="flex justify-between mt-4 text-xs text-slate-600">
+          <span>$0</span>
+          <span>$15</span>
+          <span>$30</span>
+          <span>$45</span>
+          <span>$60</span>
+        </div>
+      `;
+    }
+
+    // ─── Advantages ─────────────────────────────────────────────────────────────
+
+    function renderAdvantages() {
+      const container = document.getElementById('advantageCards');
+      container.innerHTML = advantages.map((a, i) => `
+        <div class="card-enter advantage-badge rounded-xl p-5">
+          <div class="flex items-start justify-between mb-2">
+            <h3 class="font-bold text-amber-300 text-sm">${a.title}</h3>
+            <span class="text-xs text-amber-500/80 bg-amber-900/20 px-2 py-0.5 rounded-full flex-shrink-0 ml-2">${a.metric}</span>
+          </div>
+          <p class="text-sm text-slate-400 leading-relaxed">${a.desc}</p>
+        </div>
+      `).join('');
+    }
+
+    // ─── Gaps ───────────────────────────────────────────────────────────────────
+
+    function renderGaps() {
+      const container = document.getElementById('gapsList');
+      const filteredGaps = gaps.filter(g => {
+        if (activeCategory === 'all') return true;
+        if (activeCategory === 'traditional') return g.type === 'traditional';
+        if (activeCategory === 'ai') return g.type === 'ai';
+        if (activeCategory === 'swiss') return ['Librio', 'Framily'].includes(g.competitor);
+        return true;
+      });
+
+      container.innerHTML = filteredGaps.map(g => `
+        <div class="card-enter bg-surface-100 rounded-xl border border-surface-300/50 p-4 flex flex-col md:flex-row md:items-start gap-4">
+          <div class="flex-shrink-0 w-32">
+            <span class="text-sm font-semibold text-white">${g.competitor}</span>
+          </div>
+          <div class="flex-1 space-y-1">
+            <p class="text-sm text-red-400/80">${g.gap}</p>
+            <p class="text-sm text-amber-400/90">${g.counter}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ─── Init ───────────────────────────────────────────────────────────────────
+
+    renderAll();
+    renderAdvantages();
+  </script>
+
+</body>
+</html>

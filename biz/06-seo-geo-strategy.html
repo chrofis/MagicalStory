@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEO &amp; GEO Strategy — MagicalStory.ch</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            surface: {
+              DEFAULT: '#0f172a',
+              50: '#1e293b',
+              100: '#1a2332',
+              200: '#15203a',
+              300: '#253350',
+              400: '#334155',
+              500: '#475569',
+            },
+            accent: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              200: '#fde68a',
+              300: '#fcd34d',
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    body { background: #0f172a; color: #e2e8f0; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 0.75rem;
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      border-color: rgba(245, 158, 11, 0.3);
+      box-shadow: 0 0 24px rgba(245, 158, 11, 0.06);
+    }
+
+    .section-title {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #f8fafc;
+      border-left: 4px solid #f59e0b;
+      padding-left: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* Keyword table */
+    .kw-table th {
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .kw-table th:hover { color: #fbbf24; }
+    .sort-arrow { opacity: 0.4; margin-left: 4px; font-size: 0.7rem; }
+    .sort-arrow.active { opacity: 1; color: #f59e0b; }
+
+    /* Expandable template cards */
+    .template-card { cursor: pointer; }
+    .template-card .expand-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.4s ease, padding 0.3s ease;
+    }
+    .template-card.open .expand-content {
+      max-height: 600px;
+      padding-top: 1rem;
+    }
+    .template-card .chevron {
+      transition: transform 0.3s ease;
+    }
+    .template-card.open .chevron {
+      transform: rotate(180deg);
+    }
+
+    /* Cluster diagram */
+    .hub-center {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #0f172a;
+    }
+    .spoke-line {
+      position: absolute;
+      background: #334155;
+      transform-origin: 0 0;
+    }
+
+    /* Checklist progress */
+    .progress-fill {
+      transition: width 0.4s ease;
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+
+    /* Calendar */
+    .cal-town { background: rgba(245, 158, 11, 0.15); border-left: 3px solid #f59e0b; }
+    .cal-comparison { background: rgba(56, 189, 248, 0.12); border-left: 3px solid #38bdf8; }
+    .cal-occasion { background: rgba(52, 211, 153, 0.12); border-left: 3px solid #34d399; }
+    .cal-blog { background: rgba(148, 163, 184, 0.12); border-left: 3px solid #94a3b8; }
+    .cal-tech { background: rgba(167, 139, 250, 0.1); border-left: 3px solid #a78bfa; }
+
+    /* Filter buttons */
+    .filter-btn {
+      transition: all 0.2s ease;
+    }
+    .filter-btn.active {
+      background: #f59e0b;
+      color: #0f172a;
+    }
+
+    /* Smooth scroll offset */
+    section { scroll-margin-top: 2rem; }
+
+    /* Tier badge colors */
+    .tier-1 { border-top: 3px solid #f59e0b; }
+    .tier-2 { border-top: 3px solid #38bdf8; }
+    .tier-3 { border-top: 3px solid #34d399; }
+    .tier-4 { border-top: 3px solid #94a3b8; }
+
+    /* KPI card */
+    .kpi-card { position: relative; overflow: hidden; }
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Cross-document navigation -->
+  <nav class="fixed top-0 left-0 right-0 bg-[#1e293b] border-b border-slate-700 z-[9999] overflow-x-auto whitespace-nowrap">
+    <div class="flex items-center gap-1 px-4 py-2 text-xs font-medium">
+      <a href="01-gtm-strategy.html" class="px-3 py-1 rounded text-slate-400 hover:text-white transition">GTM Strategy</a>
+      <a href="02-competitive-analysis.html" class="px-3 py-1 rounded text-slate-400 hover:text-white transition">Competition</a>
+      <a href="03-target-audience.html" class="px-3 py-1 rounded text-slate-400 hover:text-white transition">Audience</a>
+      <a href="05-meta-ads-strategy.html" class="px-3 py-1 rounded text-slate-400 hover:text-white transition">Meta Ads</a>
+      <a href="06-seo-geo-strategy.html" class="px-3 py-1 rounded text-amber-400 bg-amber-500/15 font-semibold">SEO &amp; GEO</a>
+      <a href="09-glocal-strategy.html" class="px-3 py-1 rounded text-slate-400 hover:text-white transition">Glocal</a>
+    </div>
+  </nav>
+
+  <!-- Header -->
+  <div class="h-10"></div>
+  <header class="border-b border-slate-700/50 sticky top-10 z-50" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-white">SEO &amp; GEO Strategy</h1>
+        <p class="text-sm text-slate-400 mt-0.5">MagicalStory.ch &mdash; Organic Growth Playbook</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="hidden sm:inline text-xs text-slate-500 mr-2">March 2026</span>
+        <span class="px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/20">Strategy Doc</span>
+      </div>
+    </div>
+    <!-- Nav -->
+    <nav class="max-w-7xl mx-auto px-4 sm:px-6 pb-3 flex gap-1 overflow-x-auto text-xs font-medium">
+      <a href="#audit" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Audit</a>
+      <a href="#keywords" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Keywords</a>
+      <a href="#templates" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Templates</a>
+      <a href="#clusters" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Clusters</a>
+      <a href="#checklist" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Checklist</a>
+      <a href="#calendar" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Calendar</a>
+      <a href="#links" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">Link Building</a>
+      <a href="#kpis" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 transition whitespace-nowrap">KPIs</a>
+    </nav>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-16">
+
+    <!-- ============================================================ -->
+    <!-- SECTION 1: CURRENT STATE AUDIT -->
+    <!-- ============================================================ -->
+    <section id="audit">
+      <h2 class="section-title">Current State Audit</h2>
+      <div class="grid md:grid-cols-2 gap-6">
+        <!-- Working -->
+        <div class="card p-6">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-emerald-400 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Working Well
+          </h3>
+          <ul class="space-y-3 text-sm">
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">187 URLs</strong> in sitemap &mdash; solid theme coverage</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">170+ theme pages</strong> &mdash; programmatic SEO foundation</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span>Proper <strong class="text-white">robots.txt</strong> (blocks /api/, /admin/)</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">OG tags</strong> and meta descriptions present</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">hreflang</strong> tags for de/en/fr</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">JSON-LD</strong> schema for WebApplication</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">Google Ads</strong> conversion tracking installed</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg></span><span><strong class="text-white">Cloudflare Turnstile</strong> for abuse prevention</span></li>
+          </ul>
+        </div>
+        <!-- Needs Improvement -->
+        <div class="card p-6">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-amber-400 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            Needs Improvement
+          </h3>
+          <ul class="space-y-3 text-sm">
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>No <strong class="text-white">blog/content hub</strong> for organic traffic</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>No <strong class="text-white">comparison pages</strong> (vs competitors)</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>No <strong class="text-white">Swiss town pages</strong> (massive local SEO gap)</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>Theme pages <strong class="text-white">lack depth</strong> (need 300+ words)</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>Missing <strong class="text-white">FAQ, Product, Breadcrumb</strong> schema</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>No <strong class="text-white">Google Business Profile</strong></span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>Missing <strong class="text-white">internal linking</strong> strategy</span></li>
+            <li class="flex items-start gap-3"><span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-amber-500/15 flex items-center justify-center"><svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01"/></svg></span><span>No <strong class="text-white">content clusters</strong> or topic hubs</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 2: KEYWORD RESEARCH TABLE -->
+    <!-- ============================================================ -->
+    <section id="keywords">
+      <h2 class="section-title">Keyword Research</h2>
+
+      <!-- Filter buttons -->
+      <div class="flex flex-wrap gap-2 mb-4">
+        <button class="filter-btn active px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-600 text-slate-300" data-filter="all" onclick="filterKeywords('all')">All</button>
+        <button class="filter-btn px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-600 text-slate-300" data-filter="DE" onclick="filterKeywords('DE')">German (DE)</button>
+        <button class="filter-btn px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-600 text-slate-300" data-filter="EN" onclick="filterKeywords('EN')">English (EN)</button>
+        <button class="filter-btn px-4 py-1.5 rounded-full text-xs font-semibold border border-slate-600 text-slate-300" data-filter="FR" onclick="filterKeywords('FR')">French (FR)</button>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="kw-table w-full text-sm text-left">
+            <thead>
+              <tr class="bg-slate-800/60 text-xs uppercase tracking-wider text-slate-400 border-b border-slate-700">
+                <th class="px-4 py-3" onclick="sortTable(0)">Keyword <span class="sort-arrow" id="arrow-0">&#9650;</span></th>
+                <th class="px-4 py-3" onclick="sortTable(1)">Lang <span class="sort-arrow" id="arrow-1">&#9650;</span></th>
+                <th class="px-4 py-3" onclick="sortTable(2)">Volume <span class="sort-arrow" id="arrow-2">&#9650;</span></th>
+                <th class="px-4 py-3" onclick="sortTable(3)">Difficulty <span class="sort-arrow" id="arrow-3">&#9650;</span></th>
+                <th class="px-4 py-3" onclick="sortTable(4)">Priority <span class="sort-arrow" id="arrow-4">&#9650;</span></th>
+                <th class="px-4 py-3" onclick="sortTable(5)">Target Page <span class="sort-arrow" id="arrow-5">&#9650;</span></th>
+              </tr>
+            </thead>
+            <tbody id="kw-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 3: PROGRAMMATIC SEO TEMPLATES -->
+    <!-- ============================================================ -->
+    <section id="templates">
+      <h2 class="section-title">Programmatic SEO Templates</h2>
+      <div class="space-y-4" id="template-cards">
+        <!-- Cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 4: CONTENT CLUSTER DIAGRAM -->
+    <!-- ============================================================ -->
+    <section id="clusters">
+      <h2 class="section-title">Content Cluster Diagram</h2>
+      <div class="card p-8 flex items-center justify-center" style="min-height: 420px;">
+        <div class="relative" id="cluster-diagram" style="width: 560px; height: 380px;">
+          <!-- Hub -->
+          <div class="hub-center absolute rounded-2xl shadow-lg flex items-center justify-center text-center font-bold text-sm px-4 py-3 z-10"
+               style="width: 200px; height: 70px; left: 180px; top: 155px;">
+            Personalisierte<br>Kinderbücher
+          </div>
+          <!-- Spokes rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 5: SEO CHECKLIST -->
+    <!-- ============================================================ -->
+    <section id="checklist">
+      <h2 class="section-title">Technical SEO Checklist</h2>
+      <!-- Progress bar -->
+      <div class="card p-4 mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-semibold text-slate-300">Progress</span>
+          <span id="checklist-count" class="text-sm font-bold text-amber-400">0 / 0</span>
+        </div>
+        <div class="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
+          <div class="progress-fill h-full rounded-full" id="checklist-bar" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <div class="grid md:grid-cols-2 gap-6" id="checklist-container">
+        <!-- Groups injected by JS -->
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 6: CONTENT CALENDAR -->
+    <!-- ============================================================ -->
+    <section id="calendar">
+      <h2 class="section-title">Content Calendar &mdash; First 3 Months</h2>
+      <!-- Legend -->
+      <div class="flex flex-wrap gap-4 mb-6 text-xs font-medium">
+        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-amber-500"></span> Town Pages</span>
+        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-sky-400"></span> Comparison Pages</span>
+        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-emerald-400"></span> Occasion Pages</span>
+        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-slate-400"></span> Blog Posts</span>
+        <span class="flex items-center gap-2"><span class="w-3 h-3 rounded-sm bg-violet-400"></span> Technical SEO</span>
+      </div>
+      <div class="space-y-4" id="calendar-container">
+        <!-- Weeks injected by JS -->
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 7: LINK BUILDING TIERS -->
+    <!-- ============================================================ -->
+    <section id="links">
+      <h2 class="section-title">Link Building Tiers</h2>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" id="link-tiers">
+        <!-- Tier cards injected by JS -->
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 8: KPI TARGETS -->
+    <!-- ============================================================ -->
+    <section id="kpis">
+      <h2 class="section-title">KPI Targets</h2>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6" id="kpi-cards">
+        <!-- KPI cards injected by JS -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-700/50 mt-16 py-8 text-center text-xs text-slate-500">
+    MagicalStory.ch &mdash; SEO &amp; GEO Strategy &mdash; March 2026
+  </footer>
+
+  <!-- ============================================================ -->
+  <!-- JAVASCRIPT -->
+  <!-- ============================================================ -->
+  <script>
+    // ========== KEYWORD DATA ==========
+    const keywords = [
+      { kw: 'personalisiertes kinderbuch', lang: 'DE', vol: 750, volLabel: '500-1K', diff: 'Medium', prio: 'HIGH', target: 'Homepage' },
+      { kw: 'personalisierte kindergeschichte', lang: 'DE', vol: 350, volLabel: '200-500', diff: 'Low', prio: 'HIGH', target: 'Homepage' },
+      { kw: 'kinderbuch mit eigenem foto', lang: 'DE', vol: 200, volLabel: '100-300', diff: 'Low', prio: 'HIGH', target: 'How It Works' },
+      { kw: 'kinderbuch personalisiert schweiz', lang: 'DE', vol: 75, volLabel: '50-100', diff: 'Low', prio: 'HIGH', target: 'Homepage (DE)' },
+      { kw: 'kinderbuch mit namen', lang: 'DE', vol: 350, volLabel: '200-500', diff: 'Medium', prio: 'HIGH', target: 'Homepage' },
+      { kw: 'personalisiertes geschenk kind', lang: 'DE', vol: 750, volLabel: '500-1K', diff: 'Medium', prio: 'MEDIUM', target: 'Gift page' },
+      { kw: 'kinderbuch selber gestalten', lang: 'DE', vol: 350, volLabel: '200-500', diff: 'Medium', prio: 'MEDIUM', target: 'How It Works' },
+      { kw: 'fotobuch kinder', lang: 'DE', vol: 200, volLabel: '100-300', diff: 'Medium', prio: 'LOW', target: 'Feature page' },
+      { kw: 'kinderbuch mit ki erstellen', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Very Low', prio: 'HIGH', target: 'Feature page' },
+      { kw: 'gutschein personalisiertes kinderbuch', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Very Low', prio: 'HIGH', target: 'Gift card page' },
+      { kw: 'personalisiertes kinderbuch zürich', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Low', prio: 'HIGH', target: 'Town page' },
+      { kw: 'personalisiertes kinderbuch basel', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Low', prio: 'HIGH', target: 'Town page' },
+      { kw: 'personalisiertes kinderbuch bern', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Low', prio: 'HIGH', target: 'Town page' },
+      { kw: 'kinderbuch zum einschlafen personalisiert', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Low', prio: 'MEDIUM', target: 'Theme page' },
+      { kw: 'geschenk kindergeburtstag personalisiert', lang: 'DE', vol: 75, volLabel: '50-100', diff: 'Low', prio: 'HIGH', target: 'Occasion page' },
+      { kw: 'kinderbuch taufe geschenk', lang: 'DE', vol: 75, volLabel: '50-100', diff: 'Low', prio: 'HIGH', target: 'Occasion page' },
+      { kw: 'kinderbuch einschulung geschenk', lang: 'DE', vol: 75, volLabel: '50-100', diff: 'Low', prio: 'HIGH', target: 'Occasion page' },
+      { kw: 'personalisiertes weihnachtsgeschenk kind', lang: 'DE', vol: 75, volLabel: '50-100', diff: 'Low', prio: 'HIGH', target: 'Occasion page' },
+      { kw: 'schweizer kindergeschichten', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Low', prio: 'MEDIUM', target: 'Swiss history themes' },
+      { kw: 'wilhelm tell kinderbuch', lang: 'DE', vol: 30, volLabel: '10-50', diff: 'Low', prio: 'MEDIUM', target: 'Historical theme' },
+      // English
+      { kw: "personalized children's book", lang: 'EN', vol: 7500, volLabel: '5K-10K', diff: 'High', prio: 'MEDIUM', target: 'Homepage (EN)' },
+      { kw: 'personalized storybook with photo', lang: 'EN', vol: 750, volLabel: '500-1K', diff: 'Medium', prio: 'HIGH', target: 'How It Works' },
+      { kw: 'AI children\'s book generator', lang: 'EN', vol: 350, volLabel: '200-500', diff: 'Medium', prio: 'HIGH', target: 'Feature page' },
+      { kw: 'personalized book for kids switzerland', lang: 'EN', vol: 30, volLabel: '10-50', diff: 'Very Low', prio: 'HIGH', target: 'Homepage (EN)' },
+      { kw: "custom children's story with photo", lang: 'EN', vol: 200, volLabel: '100-300', diff: 'Medium', prio: 'MEDIUM', target: 'How It Works' },
+      { kw: 'wonderbly alternative', lang: 'EN', vol: 750, volLabel: '500-1K', diff: 'Medium', prio: 'HIGH', target: 'Comparison page' },
+      { kw: 'hooray heroes alternative', lang: 'EN', vol: 350, volLabel: '200-500', diff: 'Medium', prio: 'HIGH', target: 'Comparison page' },
+      // French
+      { kw: 'livre personnalisé enfant', lang: 'FR', vol: 750, volLabel: '500-1K', diff: 'Medium', prio: 'MEDIUM', target: 'Homepage (FR)' },
+      { kw: 'livre enfant personnalisé suisse', lang: 'FR', vol: 30, volLabel: '10-50', diff: 'Very Low', prio: 'HIGH', target: 'Homepage (FR)' },
+      { kw: 'histoire personnalisée enfant', lang: 'FR', vol: 200, volLabel: '100-300', diff: 'Low', prio: 'HIGH', target: 'Homepage (FR)' },
+      { kw: 'cadeau personnalisé enfant', lang: 'FR', vol: 350, volLabel: '200-500', diff: 'Medium', prio: 'MEDIUM', target: 'Gift page (FR)' },
+      { kw: 'livre enfant avec photo', lang: 'FR', vol: 75, volLabel: '50-100', diff: 'Low', prio: 'HIGH', target: 'How It Works (FR)' },
+    ];
+
+    // Priority sort order
+    const prioOrder = { 'HIGH': 0, 'MEDIUM': 1, 'LOW': 2 };
+    const diffOrder = { 'Very Low': 0, 'Low': 1, 'Medium': 2, 'High': 3, 'Very High': 4 };
+
+    let currentFilter = 'all';
+    let sortCol = -1;
+    let sortAsc = true;
+
+    function filterKeywords(lang) {
+      currentFilter = lang;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === lang);
+      });
+      renderKeywords();
+    }
+
+    function sortTable(col) {
+      if (sortCol === col) {
+        sortAsc = !sortAsc;
+      } else {
+        sortCol = col;
+        sortAsc = true;
+      }
+      // Update arrows
+      document.querySelectorAll('.sort-arrow').forEach((a, i) => {
+        a.classList.toggle('active', i === col);
+        a.innerHTML = (i === col && !sortAsc) ? '&#9660;' : '&#9650;';
+      });
+      renderKeywords();
+    }
+
+    function renderKeywords() {
+      let data = currentFilter === 'all' ? [...keywords] : keywords.filter(k => k.lang === currentFilter);
+
+      if (sortCol >= 0) {
+        data.sort((a, b) => {
+          let va, vb;
+          switch (sortCol) {
+            case 0: va = a.kw; vb = b.kw; break;
+            case 1: va = a.lang; vb = b.lang; break;
+            case 2: va = a.vol; vb = b.vol; break;
+            case 3: va = diffOrder[a.diff] || 0; vb = diffOrder[b.diff] || 0; break;
+            case 4: va = prioOrder[a.prio] || 0; vb = prioOrder[b.prio] || 0; break;
+            case 5: va = a.target; vb = b.target; break;
+          }
+          if (typeof va === 'string') return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+          return sortAsc ? va - vb : vb - va;
+        });
+      }
+
+      const tbody = document.getElementById('kw-body');
+      tbody.innerHTML = data.map(k => {
+        const prioColor = k.prio === 'HIGH' ? 'text-amber-400 bg-amber-500/15' : k.prio === 'MEDIUM' ? 'text-sky-400 bg-sky-500/15' : 'text-slate-400 bg-slate-500/15';
+        const diffColor = k.diff === 'Very Low' ? 'text-emerald-400' : k.diff === 'Low' ? 'text-emerald-300' : k.diff === 'Medium' ? 'text-amber-400' : 'text-red-400';
+        const langColor = k.lang === 'DE' ? 'bg-amber-500/15 text-amber-300' : k.lang === 'EN' ? 'bg-sky-500/15 text-sky-300' : 'bg-emerald-500/15 text-emerald-300';
+        return `<tr class="border-b border-slate-700/50 hover:bg-slate-800/40 transition">
+          <td class="px-4 py-2.5 font-medium text-white">${k.kw}</td>
+          <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-semibold ${langColor}">${k.lang}</span></td>
+          <td class="px-4 py-2.5 text-slate-300">${k.volLabel}</td>
+          <td class="px-4 py-2.5 ${diffColor} font-medium">${k.diff}</td>
+          <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded text-xs font-semibold ${prioColor}">${k.prio}</span></td>
+          <td class="px-4 py-2.5 text-slate-400">${k.target}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ========== TEMPLATE CARDS ==========
+    const templates = [
+      {
+        title: 'Theme Pages',
+        count: '170+ existing',
+        action: 'Enhance',
+        color: '#f59e0b',
+        url: '/themes/[category]/[theme-slug]',
+        structure: [
+          'Detailed theme description (300+ words)',
+          'Sample story excerpt (2-3 paragraphs)',
+          'Art style previews (same scene in 3 styles)',
+          'Age recommendation badge',
+          'Skills/values the theme teaches',
+          'Related themes (3-5 internal links)',
+          'FAQ specific to this theme (2-3 Qs with schema)',
+        ],
+        seo: 'Title: "Personalisiertes [Theme] Kinderbuch | MagicalStory" &mdash; Product + FAQ schema markup'
+      },
+      {
+        title: 'Town Pages',
+        count: '50-100 new',
+        action: 'Create',
+        color: '#38bdf8',
+        url: '/geschichten-aus/[town-slug] (DE) | /stories-from/[town-slug] (EN)',
+        structure: [
+          'Hero: how stories are set in the town',
+          'Local landmarks section (3-5 landmarks)',
+          'Sample story ideas specific to the town',
+          'Art style preview with town landmark',
+          'Testimonial placeholder (replace with real over time)',
+          'CTA: "Erstelle eine Geschichte aus [Town]"',
+        ],
+        seo: 'LocalBusiness + Product + FAQ schema &mdash; Targets: 30 German, 15 French, 5 Italian towns'
+      },
+      {
+        title: 'Comparison Pages',
+        count: '8-10 new',
+        action: 'Create',
+        color: '#a78bfa',
+        url: '/vergleich/[competitor-slug] (DE) | /compare/[competitor-slug] (EN)',
+        structure: [
+          'Quick comparison table (features side by side)',
+          'Where competitor excels (honest, builds trust)',
+          'Where MagicalStory excels',
+          'Detailed feature breakdown (6-8 dimensions)',
+          'Pricing comparison',
+          'Who should choose which',
+          'FAQ (3-5 questions with schema)',
+        ],
+        seo: 'Targets: wonderbly/hooray heroes/librio/framily alternatives &mdash; 1,500-2,500 words each'
+      },
+      {
+        title: 'Occasion Pages',
+        count: '12-15 new',
+        action: 'Create',
+        color: '#34d399',
+        url: '/anlass/[occasion-slug]',
+        structure: [
+          'Why a personalized story is perfect for this occasion',
+          'Recommended themes (3-5 with links)',
+          'Gift card option highlighted',
+          'Sample story preview',
+          'Delivery timeline for the occasion',
+          'FAQ (2-3 questions)',
+        ],
+        seo: 'Occasions: Geburtstag, Weihnachten, Ostern, Taufe, Einschulung, Geschwisterchen, Muttertag, and more'
+      },
+      {
+        title: 'Blog / Content Hub',
+        count: '12+ articles',
+        action: 'Create',
+        color: '#94a3b8',
+        url: '/blog/[slug]',
+        structure: [
+          'Month 1: Reading motivation, gift ideas, behind-the-scenes AI, bedtime tips',
+          'Month 2: Swiss history, kindergarten start, comparison listicle, privacy/safety',
+          'Month 3: Art styles guide, Swiss town stories, child psychology, product updates',
+          'All posts internally linked to relevant themes, towns, occasions',
+        ],
+        seo: 'Top-of-funnel organic traffic &mdash; educational and gift-related content targeting parents'
+      }
+    ];
+
+    function renderTemplates() {
+      const container = document.getElementById('template-cards');
+      container.innerHTML = templates.map((t, i) => `
+        <div class="template-card card p-5" onclick="toggleTemplate(${i})" id="tpl-${i}">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold" style="background: ${t.color}20; color: ${t.color};">${i + 1}</div>
+              <div>
+                <h3 class="font-semibold text-white">${t.title}</h3>
+                <p class="text-xs text-slate-400 mt-0.5">${t.count} &mdash; ${t.action}</p>
+              </div>
+            </div>
+            <svg class="chevron w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+          </div>
+          <div class="expand-content text-sm border-t border-slate-700/50 mt-4">
+            <div class="grid md:grid-cols-3 gap-4 pt-3">
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">URL Pattern</p>
+                <code class="text-xs text-amber-300 bg-slate-800 px-2 py-1 rounded block">${t.url}</code>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Content Structure</p>
+                <ul class="space-y-1">
+                  ${t.structure.map(s => `<li class="flex items-start gap-2 text-slate-300"><span class="text-amber-500 mt-1 flex-shrink-0">&bull;</span>${s}</li>`).join('')}
+                </ul>
+              </div>
+              <div>
+                <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">SEO Elements</p>
+                <p class="text-slate-300">${t.seo}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function toggleTemplate(i) {
+      document.getElementById('tpl-' + i).classList.toggle('open');
+    }
+
+    // ========== CLUSTER DIAGRAM ==========
+    function renderCluster() {
+      const diagram = document.getElementById('cluster-diagram');
+      const spokes = [
+        { label: 'Themes', count: '170+', x: 30, y: 20, color: '#f59e0b' },
+        { label: 'Towns', count: '50+', x: 430, y: 20, color: '#38bdf8' },
+        { label: 'Occasions', count: '12+', x: 30, y: 310, color: '#34d399' },
+        { label: 'Comparisons', count: '8+', x: 430, y: 310, color: '#a78bfa' },
+        { label: 'Blog', count: '12+', x: 230, y: 340, color: '#94a3b8' },
+      ];
+
+      const hubCX = 280, hubCY = 190;
+
+      spokes.forEach(sp => {
+        // Connector line (SVG)
+        const spCX = sp.x + 50, spCY = sp.y + 25;
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        line.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+        line.innerHTML = `<line x1="${hubCX}" y1="${hubCY}" x2="${spCX}" y2="${spCY}" stroke="${sp.color}" stroke-width="2" stroke-dasharray="6 4" opacity="0.4"/>`;
+        diagram.appendChild(line);
+
+        // Spoke node
+        const node = document.createElement('div');
+        node.className = 'absolute rounded-xl border flex flex-col items-center justify-center text-center px-3 py-2 transition hover:scale-105';
+        node.style.cssText = `left:${sp.x}px;top:${sp.y}px;width:100px;height:50px;background:${sp.color}10;border-color:${sp.color}40;`;
+        node.innerHTML = `<span class="text-xs font-bold" style="color:${sp.color}">${sp.label}</span><span class="text-[10px] text-slate-400">${sp.count} pages</span>`;
+        diagram.appendChild(node);
+      });
+    }
+
+    // ========== SEO CHECKLIST ==========
+    const checklistGroups = [
+      {
+        title: 'Schema Markup',
+        items: [
+          'FAQ schema on theme, comparison, occasion, FAQ pages',
+          'Product schema on pricing and theme pages',
+          'Organization schema on about page',
+          'HowTo schema on "How It Works" section',
+          'BreadcrumbList schema on all pages',
+          'Review/AggregateRating schema (when reviews exist)',
+          'LocalBusiness schema for Swiss presence',
+        ]
+      },
+      {
+        title: 'Core Web Vitals',
+        items: [
+          'Audit LCP, INP, CLS via PageSpeed Insights',
+          'Lazy loading and WebP for all images',
+          'Minimize JS bundle for landing pages',
+          'Critical CSS inlining for above-the-fold',
+          'Preconnect to Google Fonts and CDN origins',
+          'Target: LCP <2.5s, INP <200ms, CLS <0.1',
+        ]
+      },
+      {
+        title: 'Sitemap & Indexing',
+        items: [
+          'Add 50 town pages (priority 0.7)',
+          'Add 8-10 comparison pages (priority 0.6)',
+          'Add 12 occasion pages (priority 0.6)',
+          'Add blog posts (priority 0.5)',
+          'Set update frequency: themes monthly, blog weekly',
+        ]
+      },
+      {
+        title: 'Internal Linking',
+        items: [
+          'Every theme page links to 3-5 related themes',
+          'Every town page links to 3-5 relevant themes',
+          'Comparison pages link to pricing + theme pages',
+          'Occasion pages link to themes + gift card page',
+          'Blog posts link to relevant themes, towns, occasions',
+          'Footer: top 10 themes, top 5 towns, comparison hub',
+          'Breadcrumbs on all pages (with schema)',
+        ]
+      },
+      {
+        title: 'Hreflang Expansion',
+        items: [
+          'Add de-CH (Swiss German, primary)',
+          'Add de-DE (Standard German, DACH expansion)',
+          'Add de-AT (Austrian German)',
+          'Add fr-CH (Swiss French)',
+          'Keep en (International English)',
+          'Add it-CH (Italian, when Ticino pages launch)',
+        ]
+      },
+    ];
+
+    function renderChecklist() {
+      const container = document.getElementById('checklist-container');
+      let globalIdx = 0;
+      container.innerHTML = checklistGroups.map(g => `
+        <div class="card p-5">
+          <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-3">${g.title}</h3>
+          <ul class="space-y-2">
+            ${g.items.map(item => {
+              const id = 'chk-' + (globalIdx++);
+              return `<li class="flex items-start gap-3">
+                <input type="checkbox" id="${id}" class="seo-check mt-1 accent-amber-500 cursor-pointer w-4 h-4 flex-shrink-0" onchange="updateProgress()">
+                <label for="${id}" class="text-sm text-slate-300 cursor-pointer hover:text-white transition">${item}</label>
+              </li>`;
+            }).join('')}
+          </ul>
+        </div>
+      `).join('');
+      updateProgress();
+    }
+
+    function updateProgress() {
+      const all = document.querySelectorAll('.seo-check');
+      const checked = document.querySelectorAll('.seo-check:checked');
+      const pct = all.length > 0 ? (checked.length / all.length * 100) : 0;
+      document.getElementById('checklist-bar').style.width = pct + '%';
+      document.getElementById('checklist-count').textContent = checked.length + ' / ' + all.length;
+    }
+
+    // ========== CONTENT CALENDAR ==========
+    const calendarData = [
+      { month: 'Month 1 — Foundation', weeks: [
+        { week: 'Week 1', items: [
+          { type: 'tech', label: 'Schema implementation, sitemap update, CWV audit' },
+        ]},
+        { week: 'Week 2', items: [
+          { type: 'town', label: '10 town pages: Zürich, Basel, Bern, Luzern, St. Gallen, Winterthur, Lausanne, Genève, Zug, Thun' },
+        ]},
+        { week: 'Week 3', items: [
+          { type: 'comparison', label: '4 comparison pages: vs Wonderbly, Hooray Heroes, Librio, Framily' },
+        ]},
+        { week: 'Week 4', items: [
+          { type: 'occasion', label: '3 occasion pages: Geburtstag, Weihnachten, Einschulung' },
+          { type: 'blog', label: '2 blog posts: reading motivation + gift ideas' },
+        ]},
+      ]},
+      { month: 'Month 2 — Growth', weeks: [
+        { week: 'Week 5', items: [
+          { type: 'town', label: '10 more town pages: second batch Swiss cities' },
+        ]},
+        { week: 'Week 6', items: [
+          { type: 'comparison', label: '4 comparison pages: vs AI competitors + listicles' },
+        ]},
+        { week: 'Week 7', items: [
+          { type: 'occasion', label: '5 occasion pages: Ostern, Taufe, Muttertag, Vatertag, Nikolaus' },
+        ]},
+        { week: 'Week 8', items: [
+          { type: 'blog', label: '4 blog posts: Swiss history, kindergarten, comparison, privacy' },
+        ]},
+      ]},
+      { month: 'Month 3 — Scale', weeks: [
+        { week: 'Week 9-10', items: [
+          { type: 'town', label: '20 more town pages (total: 40 Swiss towns)' },
+        ]},
+        { week: 'Week 11', items: [
+          { type: 'tech', label: 'Enhance all 170+ theme pages: +300 words, FAQ, related links' },
+        ]},
+        { week: 'Week 12', items: [
+          { type: 'blog', label: '4 blog posts: art styles, Swiss stories, psychology, product update' },
+          { type: 'tech', label: 'Start PR and backlink outreach campaign' },
+        ]},
+      ]},
+    ];
+
+    const typeClasses = {
+      town: 'cal-town',
+      comparison: 'cal-comparison',
+      occasion: 'cal-occasion',
+      blog: 'cal-blog',
+      tech: 'cal-tech',
+    };
+    const typeLabels = {
+      town: 'Town',
+      comparison: 'Comparison',
+      occasion: 'Occasion',
+      blog: 'Blog',
+      tech: 'Technical',
+    };
+
+    function renderCalendar() {
+      const container = document.getElementById('calendar-container');
+      container.innerHTML = calendarData.map(m => `
+        <div class="card p-5">
+          <h3 class="text-sm font-bold text-white mb-4">${m.month}</h3>
+          <div class="space-y-3">
+            ${m.weeks.map(w => `
+              <div>
+                <p class="text-xs font-semibold text-slate-500 mb-1.5">${w.week}</p>
+                <div class="space-y-1.5">
+                  ${w.items.map(it => `
+                    <div class="${typeClasses[it.type]} rounded-md px-3 py-2 text-sm text-slate-200">
+                      <span class="text-xs font-semibold uppercase tracking-wider mr-2" style="opacity:0.7">${typeLabels[it.type]}</span>${it.label}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ========== LINK BUILDING TIERS ==========
+    const linkTiers = [
+      {
+        tier: 1,
+        title: 'Editorial / PR',
+        priority: 'Highest Value',
+        className: 'tier-1',
+        targets: [
+          '20 Minuten (tech/startup angle)',
+          'Tages-Anzeiger',
+          'NZZ',
+          'startupticker.ch',
+          'startupvalley.news',
+        ],
+        approach: '"Swiss startup uses AI to create personalized children\'s books"'
+      },
+      {
+        tier: 2,
+        title: 'Parenting & Family',
+        priority: 'High Value',
+        className: 'tier-2',
+        targets: [
+          'swissmom.ch',
+          'familienleben.ch',
+          'Annabelle magazine',
+          'Schweizer Familie',
+          'Migros Magazin',
+          'Coop Zeitung',
+        ],
+        approach: 'Guest content, product features, gift guides'
+      },
+      {
+        tier: 3,
+        title: 'Partnerships',
+        priority: 'Medium Value',
+        className: 'tier-3',
+        targets: [
+          'Swiss libraries (Pestalozzi, etc.)',
+          'Kindergartens & schools',
+          'Kinderspital Zürich (donate books)',
+          'Book fairs (Salon du Livre, Buch Basel)',
+          'Gelato (print partner listing)',
+        ],
+        approach: 'Sponsorships, donations, co-marketing'
+      },
+      {
+        tier: 4,
+        title: 'Directories & Platforms',
+        priority: 'Foundation',
+        className: 'tier-4',
+        targets: [
+          'local.ch / search.ch',
+          'gelbeseiten.ch',
+          'toppreise.ch',
+          'geschenkidee.ch',
+          'Product Hunt',
+          'AlternativeTo.net',
+        ],
+        approach: 'Listings, profiles, comparison entries'
+      },
+    ];
+
+    function renderLinkTiers() {
+      const container = document.getElementById('link-tiers');
+      container.innerHTML = linkTiers.map(t => `
+        <div class="card ${t.className} p-5">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Tier ${t.tier}</span>
+            <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-400/70">${t.priority}</span>
+          </div>
+          <h3 class="font-semibold text-white mb-3">${t.title}</h3>
+          <ul class="space-y-1.5 text-xs text-slate-400 mb-4">
+            ${t.targets.map(tgt => `<li class="flex items-center gap-2"><span class="w-1 h-1 rounded-full bg-slate-500 flex-shrink-0"></span>${tgt}</li>`).join('')}
+          </ul>
+          <p class="text-xs text-slate-500 italic border-t border-slate-700 pt-3">${t.approach}</p>
+        </div>
+      `).join('');
+    }
+
+    // ========== KPI TARGETS ==========
+    const kpis = [
+      {
+        label: 'Indexed Pages',
+        icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>',
+        m1: '200', m3: '250', m6: '350',
+      },
+      {
+        label: 'Organic Sessions/mo',
+        icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>',
+        m1: '500', m3: '2,000', m6: '8,000',
+      },
+      {
+        label: 'Keywords in Top 10',
+        icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/></svg>',
+        m1: '20', m3: '80', m6: '200',
+      },
+      {
+        label: 'Backlinks (domains)',
+        icon: '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>',
+        m1: '10', m3: '30', m6: '80',
+      },
+    ];
+
+    function renderKPIs() {
+      const container = document.getElementById('kpi-cards');
+      container.innerHTML = kpis.map(k => `
+        <div class="kpi-card card p-5">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="text-amber-400">${k.icon}</div>
+            <h3 class="text-sm font-semibold text-white">${k.label}</h3>
+          </div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p class="text-xs text-slate-500 mb-1">Month 1</p>
+              <p class="text-lg font-bold text-slate-200">${k.m1}</p>
+            </div>
+            <div>
+              <p class="text-xs text-slate-500 mb-1">Month 3</p>
+              <p class="text-lg font-bold text-amber-400">${k.m3}</p>
+            </div>
+            <div>
+              <p class="text-xs text-slate-500 mb-1">Month 6</p>
+              <p class="text-lg font-bold text-amber-300">${k.m6}</p>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ========== INIT ==========
+    document.addEventListener('DOMContentLoaded', () => {
+      renderKeywords();
+      renderTemplates();
+      renderCluster();
+      renderChecklist();
+      renderCalendar();
+      renderLinkTiers();
+      renderKPIs();
+    });
+  </script>
+
+</body>
+</html>

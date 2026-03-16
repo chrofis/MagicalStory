@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Meta Ads Strategy — MagicalStory.ch</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          colors: {
+            surface: { 50: '#fafaf9', 100: '#1e293b', 200: '#1a2332', 300: '#243044', 400: '#2d3a50', 500: '#374760' },
+            amber: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
+            slate: { 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+
+    .nav-link { transition: color 0.2s; }
+    .nav-link:hover { color: #fbbf24; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      transition: all 0.3s ease;
+    }
+    .card:hover {
+      border-color: rgba(245, 158, 11, 0.3);
+      box-shadow: 0 0 24px rgba(245, 158, 11, 0.06);
+    }
+
+    .flow-connector {
+      position: relative;
+    }
+    .flow-connector::after {
+      content: '';
+      position: absolute;
+      background: #f59e0b;
+      opacity: 0.3;
+    }
+
+    .tab-btn { transition: all 0.2s ease; cursor: pointer; user-select: none; }
+    .tab-btn.active { border-color: #f59e0b; background: rgba(245, 158, 11, 0.1); color: #fbbf24; }
+    .tab-btn:not(.active) { border-color: #334155; background: transparent; color: #64748b; }
+    .tab-btn:hover:not(.active) { border-color: #475569; color: #94a3b8; }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .gantt-bar {
+      transition: width 0.6s ease;
+      border-radius: 4px;
+    }
+
+    .bar-fill {
+      transition: width 0.8s ease;
+      border-radius: 0 4px 4px 0;
+    }
+
+    .pixel-check {
+      transition: all 0.2s ease;
+    }
+    .pixel-check:hover {
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #1e293b; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fadeInUp 0.4s ease-out; }
+
+    .ig-frame {
+      background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
+      border: 1px solid #334155;
+      border-radius: 12px;
+    }
+
+    .budget-segment {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .budget-segment:hover {
+      filter: brightness(1.15);
+      transform: translateY(-2px);
+    }
+
+    .campaign-node {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    .campaign-node:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Floating doc nav -->
+  <nav style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e293b;border-bottom:1px solid #334155;" class="overflow-x-auto whitespace-nowrap">
+    <div class="flex items-center gap-4 px-4 py-1.5 text-xs">
+      <a href="01-gtm-strategy.html" class="text-slate-400 hover:text-amber-400 transition-colors">GTM Strategy</a>
+      <a href="02-competitive-analysis.html" class="text-slate-400 hover:text-amber-400 transition-colors">Competition</a>
+      <a href="03-target-audience.html" class="text-slate-400 hover:text-amber-400 transition-colors">Audience</a>
+      <a href="05-meta-ads-strategy.html" class="text-amber-400 font-semibold">Meta Ads</a>
+      <a href="06-seo-geo-strategy.html" class="text-slate-400 hover:text-amber-400 transition-colors">SEO &amp; GEO</a>
+      <a href="09-glocal-strategy.html" class="text-slate-400 hover:text-amber-400 transition-colors">Glocal</a>
+    </div>
+  </nav>
+  <div style="height:36px;"></div>
+
+  <!-- Navigation -->
+  <nav class="sticky top-[36px] z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-700/40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-amber-400 font-bold text-lg tracking-tight">MagicalStory</span>
+        <span class="text-slate-500 text-sm hidden sm:inline">Meta Ads Strategy</span>
+      </div>
+      <div class="hidden md:flex items-center gap-5 text-sm text-slate-400">
+        <a href="#campaigns" class="nav-link">Campaigns</a>
+        <a href="#budget" class="nav-link">Budget</a>
+        <a href="#creatives" class="nav-link">Creatives</a>
+        <a href="#adcopy" class="nav-link">Ad Copy</a>
+        <a href="#timeline" class="nav-link">Timeline</a>
+        <a href="#benchmarks" class="nav-link">Benchmarks</a>
+        <a href="#pixel" class="nav-link">Pixel Events</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Header -->
+  <header class="max-w-7xl mx-auto px-4 pt-16 pb-12">
+    <p class="text-amber-500 text-sm font-semibold tracking-wider uppercase mb-3">Paid Acquisition</p>
+    <h1 class="text-4xl md:text-5xl font-extrabold text-white leading-tight mb-4">
+      Meta Ads Strategy<br class="hidden sm:block"><span class="text-amber-400">MagicalStory.ch</span>
+    </h1>
+    <p class="text-slate-400 text-lg max-w-2xl leading-relaxed">
+      Facebook + Instagram as primary paid channel. Target: Swiss parents 25-45.
+      Monthly starting budget <span class="text-white font-semibold">CHF 3,000</span>,
+      Year 1 total <span class="text-white font-semibold">~CHF 39,750</span>,
+      target ROAS <span class="text-amber-400 font-semibold">3x</span>.
+    </p>
+    <div class="mt-6 p-4 rounded-lg bg-amber-500/5 border border-amber-500/20 max-w-2xl">
+      <p class="text-amber-200 text-sm leading-relaxed">
+        <span class="font-semibold text-amber-400">Core insight:</span>
+        We are not selling a book. We are selling the moment a child sees themselves as the hero of a story. Every ad must create or invoke that emotional moment.
+      </p>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 pb-24 space-y-24">
+
+    <!-- ===== SECTION 1: Campaign Structure Flowchart ===== -->
+    <section id="campaigns">
+      <h2 class="text-2xl font-bold text-white mb-2">Campaign Structure</h2>
+      <p class="text-slate-400 text-sm mb-8">6 campaigns flowing from awareness through conversion to scaling</p>
+
+      <!-- Flowchart -->
+      <div class="relative">
+        <!-- Top row: Awareness feeds into conversions -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+          <!-- Campaign 1: Awareness -->
+          <div class="campaign-node card rounded-xl p-6 border-l-4 border-l-amber-500">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-amber-500 tracking-wider uppercase">Campaign 1</span>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-500/10 text-amber-400">20%</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Awareness</h3>
+            <p class="text-amber-300 text-sm font-medium mb-3">"Meet Your Story"</p>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex justify-between"><span>Objective</span><span class="text-slate-300">Video Views / Reach</span></div>
+              <div class="flex justify-between"><span>Audience</span><span class="text-slate-300">Broad Swiss Parents</span></div>
+              <div class="flex justify-between"><span>Placement</span><span class="text-slate-300">Reels, Stories, Feed</span></div>
+              <div class="flex justify-between"><span>Optimization</span><span class="text-slate-300">ThruPlay (15s)</span></div>
+              <div class="flex justify-between"><span>Monthly</span><span class="text-amber-400 font-semibold">CHF 600</span></div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-700/50">
+              <p class="text-xs text-slate-500">Goal: Build pixel data, warm audience pool >10K</p>
+            </div>
+          </div>
+
+          <!-- Campaign 2: Conversion Emotional -->
+          <div class="campaign-node card rounded-xl p-6 border-l-4 border-l-amber-400">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-amber-400 tracking-wider uppercase">Campaign 2</span>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-400/10 text-amber-300">30%</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Conversion — Emotional</h3>
+            <p class="text-amber-300 text-sm font-medium mb-3">Primary Acquisition</p>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex justify-between"><span>Objective</span><span class="text-slate-300">Conversions (StoryCompleted)</span></div>
+              <div class="flex justify-between"><span>Audience</span><span class="text-slate-300">Engaged Parents</span></div>
+              <div class="flex justify-between"><span>Placement</span><span class="text-slate-300">IG Feed, Stories, FB Feed</span></div>
+              <div class="flex justify-between"><span>Cost Cap</span><span class="text-slate-300">CHF 15/completion</span></div>
+              <div class="flex justify-between"><span>Monthly</span><span class="text-amber-400 font-semibold">CHF 900</span></div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-700/50">
+              <p class="text-xs text-slate-500">Goal: CPA &lt; CHF 12, story-to-print &gt; 8%</p>
+            </div>
+          </div>
+
+          <!-- Campaign 3: Local/Town -->
+          <div class="campaign-node card rounded-xl p-6 border-l-4 border-l-amber-600">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-amber-600 tracking-wider uppercase">Campaign 3</span>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-600/10 text-amber-500">15%</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Conversion — Local</h3>
+            <p class="text-amber-300 text-sm font-medium mb-3">Hyper-Local Engagement</p>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex justify-between"><span>Objective</span><span class="text-slate-300">Conversions (StoryCompleted)</span></div>
+              <div class="flex justify-between"><span>Audience</span><span class="text-slate-300">Town-Specific (15km)</span></div>
+              <div class="flex justify-between"><span>Rotation</span><span class="text-slate-300">Top 20 cities, 1/week</span></div>
+              <div class="flex justify-between"><span>Bid</span><span class="text-slate-300">Lowest cost</span></div>
+              <div class="flex justify-between"><span>Monthly</span><span class="text-amber-400 font-semibold">CHF 450</span></div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-700/50">
+              <p class="text-xs text-slate-500">Goal: CPA &lt; CHF 10, engagement &gt; 3%</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Flow arrows (desktop only) -->
+        <div class="hidden lg:flex justify-center items-center gap-4 mb-6">
+          <svg width="24" height="24" viewBox="0 0 24 24" class="text-amber-500/50"><path d="M12 4 L12 20 M6 14 L12 20 L18 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="text-xs text-slate-500 font-medium">feeds warm audience into</span>
+          <svg width="24" height="24" viewBox="0 0 24 24" class="text-amber-500/50"><path d="M12 4 L12 20 M6 14 L12 20 L18 14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+
+        <!-- Bottom row -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <!-- Campaign 4: Gift -->
+          <div class="campaign-node card rounded-xl p-6 border-l-4 border-l-amber-700">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-amber-700 tracking-wider uppercase">Campaign 4</span>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-amber-700/10 text-amber-600">15%</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Conversion — Gift</h3>
+            <p class="text-amber-300 text-sm font-medium mb-3">Seasonal Gift Purchases</p>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex justify-between"><span>Objective</span><span class="text-slate-300">Conversions (Purchase)</span></div>
+              <div class="flex justify-between"><span>Audience</span><span class="text-slate-300">Gift Givers (CH + border)</span></div>
+              <div class="flex justify-between"><span>Cost Cap</span><span class="text-slate-300">CHF 25/purchase</span></div>
+              <div class="flex justify-between"><span>Activation</span><span class="text-slate-300">4 weeks pre-occasion</span></div>
+              <div class="flex justify-between"><span>Monthly</span><span class="text-amber-400 font-semibold">CHF 450</span></div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-700/50">
+              <p class="text-xs text-slate-500">Goal: ROAS &gt; 3x on gift cards</p>
+            </div>
+          </div>
+
+          <!-- Campaign 5: Retargeting -->
+          <div class="campaign-node card rounded-xl p-6 border-l-4 border-l-orange-500">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-orange-500 tracking-wider uppercase">Campaign 5</span>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-orange-500/10 text-orange-400">10%</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Retargeting</h3>
+            <p class="text-amber-300 text-sm font-medium mb-3">Re-engage Dropoffs</p>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex justify-between"><span>Objective</span><span class="text-slate-300">Conversions</span></div>
+              <div class="flex justify-between"><span>Audience</span><span class="text-slate-300">Website visitors (30d)</span></div>
+              <div class="flex justify-between"><span>Freq. Cap</span><span class="text-slate-300">3 imp/person/week</span></div>
+              <div class="flex justify-between"><span>Creative</span><span class="text-slate-300">Dynamic per segment</span></div>
+              <div class="flex justify-between"><span>Monthly</span><span class="text-amber-400 font-semibold">CHF 300</span></div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-700/50">
+              <p class="text-xs text-slate-500">Goal: CPA &lt; CHF 8, frequency &lt; 3/week</p>
+            </div>
+          </div>
+
+          <!-- Campaign 6: Lookalike -->
+          <div class="campaign-node card rounded-xl p-6 border-l-4 border-l-yellow-600">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-yellow-600 tracking-wider uppercase">Campaign 6</span>
+              <span class="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-600/10 text-yellow-500">10%</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mb-1">Lookalike Scaling</h3>
+            <p class="text-amber-300 text-sm font-medium mb-3">Scale Winners</p>
+            <div class="space-y-2 text-xs text-slate-400">
+              <div class="flex justify-between"><span>Objective</span><span class="text-slate-300">Conversions</span></div>
+              <div class="flex justify-between"><span>Audience</span><span class="text-slate-300">1-3% Lookalike</span></div>
+              <div class="flex justify-between"><span>Cost Cap</span><span class="text-slate-300">CHF 15/completion</span></div>
+              <div class="flex justify-between"><span>Activation</span><span class="text-slate-300">After 100+ conversions</span></div>
+              <div class="flex justify-between"><span>Monthly</span><span class="text-amber-400 font-semibold">CHF 300</span></div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-700/50">
+              <p class="text-xs text-slate-500">Goal: CPA within 20% of Campaign 2</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Retargeting segment detail -->
+        <div class="mt-8 card rounded-xl p-6">
+          <h3 class="text-sm font-bold text-white mb-4">Retargeting Segments (Campaign 5)</h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-800/50 rounded-lg p-4">
+              <p class="text-xs text-orange-400 font-semibold mb-1">Didn't Finish Wizard</p>
+              <p class="text-sm text-slate-300 mb-2">"Deine Geschichte wartet auf dich"</p>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">CTA: Jetzt weitermachen</span>
+            </div>
+            <div class="bg-slate-800/50 rounded-lg p-4">
+              <p class="text-xs text-orange-400 font-semibold mb-1">Free Story, No Purchase</p>
+              <p class="text-sm text-slate-300 mb-2">"Dein Buch ist druckbereit"</p>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">CTA: Jetzt drucken lassen</span>
+            </div>
+            <div class="bg-slate-800/50 rounded-lg p-4">
+              <p class="text-xs text-orange-400 font-semibold mb-1">Viewed Pricing</p>
+              <p class="text-sm text-slate-300 mb-2">"Ab CHF 38 — inkl. Versand"</p>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">CTA: Jetzt bestellen</span>
+            </div>
+            <div class="bg-slate-800/50 rounded-lg p-4">
+              <p class="text-xs text-orange-400 font-semibold mb-1">Abandoned Cart</p>
+              <p class="text-sm text-slate-300 mb-2">"Deine Bestellung ist noch offen"</p>
+              <span class="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-400">CTA: Jetzt abschliessen</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SECTION 2: Budget Allocation ===== -->
+    <section id="budget">
+      <h2 class="text-2xl font-bold text-white mb-2">Budget Allocation</h2>
+      <p class="text-slate-400 text-sm mb-8">Monthly base: CHF 3,000 | Year 1 total: ~CHF 39,750</p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- Horizontal bar chart -->
+        <div class="card rounded-xl p-6">
+          <h3 class="text-sm font-bold text-white mb-6">Monthly Budget Split</h3>
+          <div class="space-y-4" id="budgetBars">
+            <!-- Bars rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Donut chart (CSS) -->
+        <div class="card rounded-xl p-6">
+          <h3 class="text-sm font-bold text-white mb-6">Visual Breakdown</h3>
+          <div class="flex flex-col items-center">
+            <div class="relative w-56 h-56 mb-6" id="donutChart">
+              <svg viewBox="0 0 200 200" class="w-full h-full transform -rotate-90">
+                <!-- Donut segments rendered by JS -->
+              </svg>
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="text-center">
+                  <p class="text-2xl font-bold text-white" id="donutCenter">CHF 3K</p>
+                  <p class="text-xs text-slate-400">monthly</p>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-2 text-xs" id="donutLegend">
+              <!-- Legend rendered by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seasonal calendar -->
+      <div class="mt-8 card rounded-xl p-6">
+        <h3 class="text-sm font-bold text-white mb-4">Seasonal Budget Multipliers (Gift Campaign)</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-center">
+            <p class="text-xs text-slate-400 mb-1">Nov-Dec</p>
+            <p class="text-sm font-bold text-red-400">Christmas</p>
+            <p class="text-lg font-black text-white">3x</p>
+          </div>
+          <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-center">
+            <p class="text-xs text-slate-400 mb-1">Aug-Sep</p>
+            <p class="text-sm font-bold text-amber-400">Schulanfang</p>
+            <p class="text-lg font-black text-white">2x</p>
+          </div>
+          <div class="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 text-center">
+            <p class="text-xs text-slate-400 mb-1">Apr-May</p>
+            <p class="text-sm font-bold text-amber-400">Mother's Day</p>
+            <p class="text-lg font-black text-white">2x</p>
+          </div>
+          <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
+            <p class="text-xs text-slate-400 mb-1">Mar-Apr</p>
+            <p class="text-sm font-bold text-yellow-400">Easter</p>
+            <p class="text-lg font-black text-white">1.5x</p>
+          </div>
+          <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 text-center">
+            <p class="text-xs text-slate-400 mb-1">May-Jun</p>
+            <p class="text-sm font-bold text-yellow-400">Father's Day</p>
+            <p class="text-lg font-black text-white">1.5x</p>
+          </div>
+          <div class="bg-slate-500/10 border border-slate-500/20 rounded-lg p-3 text-center">
+            <p class="text-xs text-slate-400 mb-1">All year</p>
+            <p class="text-sm font-bold text-slate-400">Birthdays</p>
+            <p class="text-lg font-black text-white">1x</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Annual projection -->
+      <div class="mt-8 card rounded-xl p-6 overflow-x-auto">
+        <h3 class="text-sm font-bold text-white mb-4">Annual Budget Projection</h3>
+        <div class="flex items-end gap-2 min-w-[600px] h-48" id="annualBars">
+          <!-- Rendered by JS -->
+        </div>
+        <div class="flex gap-2 min-w-[600px] mt-2" id="annualLabels">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SECTION 3: Ad Creative Mockups ===== -->
+    <section id="creatives">
+      <h2 class="text-2xl font-bold text-white mb-2">Ad Creative Strategy</h2>
+      <p class="text-slate-400 text-sm mb-8">5 creative types designed for scroll-stopping engagement</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        <!-- Creative 1: Before/After -->
+        <div class="card rounded-xl overflow-hidden">
+          <div class="h-48 bg-gradient-to-br from-amber-900/30 to-slate-800 flex items-center justify-center relative">
+            <div class="flex gap-2 items-center">
+              <div class="w-20 h-24 bg-slate-700 rounded-lg flex items-center justify-center border border-slate-600">
+                <svg class="w-8 h-8 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" /></svg>
+              </div>
+              <svg class="w-6 h-6 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+              <div class="w-20 h-24 bg-amber-500/20 rounded-lg flex items-center justify-center border border-amber-500/30">
+                <svg class="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+              </div>
+            </div>
+            <span class="absolute top-3 left-3 text-[10px] font-bold tracking-wider uppercase text-amber-500 bg-amber-500/10 px-2 py-1 rounded">Type 1</span>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-white mb-1">Before/After Transformation</h3>
+            <div class="flex gap-2 flex-wrap mb-3">
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">1080x1080</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">IG Feed</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">FB Feed</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Split-screen: real child photo transforms into illustrated story character. The IKEA effect in visual form — parents see what they could own. Brain processes faces first, then reconciles photo vs. illustration.
+            </p>
+          </div>
+        </div>
+
+        <!-- Creative 2: Flip-Through -->
+        <div class="card rounded-xl overflow-hidden">
+          <div class="h-48 bg-gradient-to-br from-amber-800/20 to-slate-800 flex items-center justify-center relative">
+            <div class="flex gap-1">
+              <div class="w-12 h-16 bg-slate-700/80 rounded transform -rotate-6 border border-slate-600"></div>
+              <div class="w-12 h-16 bg-slate-600/80 rounded transform -rotate-2 border border-slate-500"></div>
+              <div class="w-12 h-16 bg-amber-500/20 rounded transform rotate-1 border border-amber-500/30"></div>
+              <div class="w-12 h-16 bg-amber-500/30 rounded transform rotate-4 border border-amber-500/40"></div>
+            </div>
+            <div class="absolute bottom-3 right-3 flex items-center gap-1">
+              <svg class="w-4 h-4 text-slate-500" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <span class="text-[10px] text-slate-500">15s</span>
+            </div>
+            <span class="absolute top-3 left-3 text-[10px] font-bold tracking-wider uppercase text-amber-500 bg-amber-500/10 px-2 py-1 rounded">Type 2</span>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-white mb-1">Story Flip-Through Video</h3>
+            <div class="flex gap-2 flex-wrap mb-3">
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">1080x1920</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">IG Reels</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">Stories</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              15-second overhead shot flipping through printed book. Peak-end rule: best pages create outsized impression. Feels like organic review/unboxing. Video drives cheaper CPMs.
+            </p>
+          </div>
+        </div>
+
+        <!-- Creative 3: Town Hook -->
+        <div class="card rounded-xl overflow-hidden">
+          <div class="h-48 bg-gradient-to-br from-amber-700/20 to-slate-800 flex items-center justify-center relative">
+            <div class="text-center">
+              <svg class="w-12 h-12 text-amber-500/60 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21" /></svg>
+              <span class="text-sm font-bold text-amber-400/80">Zuerich</span>
+            </div>
+            <span class="absolute top-3 left-3 text-[10px] font-bold tracking-wider uppercase text-amber-500 bg-amber-500/10 px-2 py-1 rounded">Type 3</span>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-white mb-1">Town Hook</h3>
+            <div class="flex gap-2 flex-wrap mb-3">
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">1080x1080</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">FB Feed</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">IG Feed</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Illustrated town landmark with child character. Local identity triggers strong emotional response. Pattern interrupt: "Why is my town in a children's book?" Shares well in local Facebook groups.
+            </p>
+          </div>
+        </div>
+
+        <!-- Creative 4: UGC -->
+        <div class="card rounded-xl overflow-hidden">
+          <div class="h-48 bg-gradient-to-br from-orange-800/20 to-slate-800 flex items-center justify-center relative">
+            <div class="bg-slate-700/50 rounded-lg p-4 max-w-[160px] border border-slate-600/50">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-6 h-6 rounded-full bg-slate-600"></div>
+                <div class="space-y-1">
+                  <div class="w-16 h-1.5 bg-slate-600 rounded"></div>
+                  <div class="w-10 h-1 bg-slate-700 rounded"></div>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <div class="w-full h-1 bg-slate-600 rounded"></div>
+                <div class="w-3/4 h-1 bg-slate-600 rounded"></div>
+                <div class="w-5/6 h-1 bg-slate-600 rounded"></div>
+              </div>
+            </div>
+            <span class="absolute top-3 left-3 text-[10px] font-bold tracking-wider uppercase text-amber-500 bg-amber-500/10 px-2 py-1 rounded">Type 4</span>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-white mb-1">Parent Quote / UGC Style</h3>
+            <div class="flex gap-2 flex-wrap mb-3">
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">1080x1920</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">Stories</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">Reels</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Real parent quotes or child reaction videos. UGC aesthetic bypasses ad blindness. Low-fi is better — polished UGC looks fake. Lowest production cost of all types.
+            </p>
+          </div>
+        </div>
+
+        <!-- Creative 5: Gift -->
+        <div class="card rounded-xl overflow-hidden">
+          <div class="h-48 bg-gradient-to-br from-yellow-800/20 to-slate-800 flex items-center justify-center relative">
+            <div class="relative">
+              <div class="w-20 h-24 bg-amber-500/15 rounded-lg border border-amber-500/25 flex items-center justify-center">
+                <svg class="w-10 h-10 text-amber-500/50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 11.25v8.25a1.5 1.5 0 01-1.5 1.5H5.25a1.5 1.5 0 01-1.5-1.5v-8.25M12 4.875A2.625 2.625 0 109.375 7.5H12m0-2.625V7.5m0-2.625A2.625 2.625 0 1114.625 7.5H12m0 0V21m-8.625-9.75h18c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125h-18c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg>
+              </div>
+            </div>
+            <span class="absolute top-3 left-3 text-[10px] font-bold tracking-wider uppercase text-amber-500 bg-amber-500/10 px-2 py-1 rounded">Type 5</span>
+          </div>
+          <div class="p-5">
+            <h3 class="text-base font-bold text-white mb-1">Gift Occasion</h3>
+            <div class="flex gap-2 flex-wrap mb-3">
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">Carousel</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">FB Feed</span>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-400">IG Feed</span>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Gift-wrapped book with seasonal context. Activates "gift budget" mental accounting. Solves gift anxiety: "What do I get a kid who has everything?" Shows both book + gift card option.
+            </p>
+          </div>
+        </div>
+
+        <!-- Policy note -->
+        <div class="card rounded-xl p-5 border-orange-500/20 bg-orange-500/5">
+          <div class="flex gap-3">
+            <svg class="w-5 h-5 text-orange-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+            <div>
+              <p class="text-sm font-semibold text-orange-400 mb-1">Policy Note</p>
+              <p class="text-xs text-slate-400 leading-relaxed">
+                Meta restricts children's images in ads. All creatives must use illustrated characters, not real photographs. The "Before/After" creative should use artistic style for both sides, or show the parent's phone screen displaying the photo (indirect depiction).
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SECTION 4: Ad Copy Preview ===== -->
+    <section id="adcopy">
+      <h2 class="text-2xl font-bold text-white mb-2">Ad Copy Preview</h2>
+      <p class="text-slate-400 text-sm mb-6">Tap a tab to preview ad copy in Instagram-style frame</p>
+
+      <!-- Tabs -->
+      <div class="flex flex-wrap gap-2 mb-6" id="adCopyTabs">
+        <button class="tab-btn active px-4 py-2 rounded-full border text-sm font-medium" data-tab="emotional" onclick="switchTab('emotional')">Emotional (DE)</button>
+        <button class="tab-btn px-4 py-2 rounded-full border text-sm font-medium" data-tab="local" onclick="switchTab('local')">Local (DE)</button>
+        <button class="tab-btn px-4 py-2 rounded-full border text-sm font-medium" data-tab="gift" onclick="switchTab('gift')">Gift (DE)</button>
+        <button class="tab-btn px-4 py-2 rounded-full border text-sm font-medium" data-tab="english" onclick="switchTab('english')">English</button>
+        <button class="tab-btn px-4 py-2 rounded-full border text-sm font-medium" data-tab="retarget" onclick="switchTab('retarget')">Retargeting</button>
+      </div>
+
+      <!-- Tab content -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        <!-- Instagram mockup frame -->
+        <div class="flex justify-center">
+          <div class="ig-frame w-full max-w-[380px] overflow-hidden">
+            <!-- IG Header -->
+            <div class="flex items-center gap-3 px-4 py-3 border-b border-slate-700/50">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center">
+                <span class="text-xs font-bold text-white">M</span>
+              </div>
+              <div>
+                <p class="text-xs font-semibold text-white">magicalstory.ch</p>
+                <p class="text-[10px] text-slate-500">Sponsored</p>
+              </div>
+              <div class="ml-auto text-slate-500">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+              </div>
+            </div>
+
+            <!-- IG Image area -->
+            <div class="aspect-square bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+              <div class="text-center px-6">
+                <svg class="w-16 h-16 text-amber-500/30 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" /></svg>
+                <p class="text-sm text-slate-500" id="mockupImageLabel">Creative placement area</p>
+              </div>
+            </div>
+
+            <!-- IG Action bar -->
+            <div class="flex items-center gap-4 px-4 py-2.5">
+              <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" /></svg>
+              <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 20.25c4.97 0 9-3.694 9-8.25s-4.03-8.25-9-8.25S3 7.444 3 12c0 2.104.859 4.023 2.273 5.48.432.447.74 1.04.586 1.641a4.483 4.483 0 01-.923 1.785A5.969 5.969 0 006 21c1.282 0 2.47-.402 3.445-1.087.81.22 1.668.337 2.555.337z" /></svg>
+              <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" /></svg>
+              <svg class="w-6 h-6 text-white ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" /></svg>
+            </div>
+
+            <!-- IG Caption -->
+            <div class="px-4 pb-4">
+              <p class="text-sm text-white leading-relaxed" id="mockupCaption">
+                <span class="font-semibold">magicalstory.ch</span> <span id="captionText">Dein Kind als Held seiner eigenen Geschichte. Lade ein Foto hoch, waehle ein Abenteuer — und halte ein Buch in den Haenden, das es nur einmal auf der Welt gibt.</span>
+              </p>
+              <p class="text-xs text-slate-500 mt-2" id="mockupCTA">Die erste Geschichte ist kostenlos.</p>
+              <a class="block mt-3 text-center py-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold" id="mockupButton">Jetzt gratis ausprobieren</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Copy variants list -->
+        <div id="adCopyContent">
+          <!-- Emotional tab -->
+          <div class="tab-content active space-y-4" data-tab="emotional">
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('emotional', 0)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version A — Discovery</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Dein Kind als Held seiner eigenen Geschichte.</p>
+              <p class="text-sm text-slate-400 mt-1">Lade ein Foto hoch, waehle ein Abenteuer — und halte ein Buch in den Haenden, das es nur einmal auf der Welt gibt.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Die erste Geschichte ist kostenlos. magicalstory.ch</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('emotional', 1)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version B — Imagination</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Was waere, wenn dein Kind durch einen verzauberten Wald wandert, ein Raetsel loest und am Ende die ganze Stadt rettet?</p>
+              <p class="text-sm text-slate-400 mt-1">Bei MagicalStory wird daraus ein richtiges Buch — mit deinem Kind auf jeder Seite.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Jetzt gratis ausprobieren. magicalstory.ch</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('emotional', 2)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version C — Quality</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Nicht irgendein KI-Bilderbuch.</p>
+              <p class="text-sm text-slate-400 mt-1">Jede Illustration individuell generiert. Jede Geschichte einzigartig geschrieben. Dein Kind auf jeder Seite wiedererkennbar. Professionell gedruckt. In die Schweiz geliefert.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Erste Geschichte kostenlos. magicalstory.ch</p>
+            </div>
+          </div>
+
+          <!-- Local tab -->
+          <div class="tab-content space-y-4" data-tab="local">
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('local', 0)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version A — Town Pride</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Eine Geschichte aus [Stadtname] — und dein Kind mittendrin.</p>
+              <p class="text-sm text-slate-400 mt-1">[Kindername] erkundet [lokale Sehenswuerdigkeit], trifft [lokale Figur] und erlebt ein Abenteuer in der eigenen Stadt.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Jetzt kostenlos ausprobieren. magicalstory.ch</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('local', 1)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version B — Neighborhood</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Stell dir vor: Ein Bilderbuch, das in [Stadtname] spielt. Und dein Kind ist die Hauptfigur.</p>
+              <p class="text-sm text-slate-400 mt-1">Abenteuer direkt vor der Haustuer — mit echten Orten, die dein Kind kennt.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Gratis testen. magicalstory.ch</p>
+            </div>
+            <div class="p-4 rounded-lg bg-amber-500/5 border border-amber-500/15">
+              <p class="text-xs text-amber-400 font-semibold mb-2">City Rotation (Priority)</p>
+              <div class="flex flex-wrap gap-1.5">
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Zuerich</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Bern</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Basel</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Luzern</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">St. Gallen</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Winterthur</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-amber-800/50 text-amber-300">Lausanne (FR)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-amber-800/50 text-amber-300">Geneve (FR)</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Biel</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Thun</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">Aarau</span>
+                <span class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300">+9 more</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gift tab -->
+          <div class="tab-content space-y-4" data-tab="gift">
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('gift', 0)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version A — Personal</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Das persoenlichste Geschenk, das du je machen wirst.</p>
+              <p class="text-sm text-slate-400 mt-1">Ein illustriertes Buch, in dem [Kindername] die Hauptrolle spielt. Jede Seite individuell gestaltet. Jede Geschichte einzigartig.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Geschenkkarte ab CHF 39. magicalstory.ch/gift</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('gift', 1)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version B — Problem-Solving</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Schon wieder ein Spielzeug, das nach zwei Wochen in der Ecke liegt?</p>
+              <p class="text-sm text-slate-400 mt-1">Schenk stattdessen eine Geschichte. Ein Buch, in dem das Kind die Hauptfigur ist. Etwas, das bleibt.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Geschenkkarte ab CHF 39. magicalstory.ch/gift</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('gift', 2)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version C — Grandparent</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Oma- und Opa-Tipp: Ein Buch, in dem euer Enkelkind der Star ist.</p>
+              <p class="text-sm text-slate-400 mt-1">Ihr kauft die Geschenkkarte. Die Eltern laden ein Foto hoch. Und euer Enkelkind bekommt eine Geschichte, die es nur einmal auf der Welt gibt.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Ab CHF 39. magicalstory.ch/gift</p>
+            </div>
+          </div>
+
+          <!-- English tab -->
+          <div class="tab-content space-y-4" data-tab="english">
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('english', 0)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version A — Hero</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Your child. The hero of their own story.</p>
+              <p class="text-sm text-slate-400 mt-1">Upload a photo, pick an adventure, and hold a one-of-a-kind illustrated book in your hands.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Your first story is free. magicalstory.ch</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('english', 1)">
+              <p class="text-xs text-amber-400 font-semibold mb-2">Version B — Picture Book</p>
+              <p class="text-sm text-slate-300 leading-relaxed">What if your child could star in their very own picture book?</p>
+              <p class="text-sm text-slate-400 mt-1">Every page illustrated just for them. Every story written around their adventure. Professionally printed and delivered to your door.</p>
+              <p class="text-xs text-amber-400/70 mt-2">Try it free. magicalstory.ch</p>
+            </div>
+            <div class="p-4 rounded-lg bg-slate-800/50 border border-slate-700/50">
+              <p class="text-xs text-slate-500">Target: Expat community in Switzerland. English-language creatives for international families.</p>
+            </div>
+          </div>
+
+          <!-- Retargeting tab -->
+          <div class="tab-content space-y-4" data-tab="retarget">
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('retarget', 0)">
+              <p class="text-xs text-orange-400 font-semibold mb-2">Didn't Finish Wizard</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Du hast angefangen, eine Geschichte zu erstellen — aber noch nicht fertig.</p>
+              <p class="text-sm text-slate-400 mt-1">Dein Abenteuer wartet. In wenigen Minuten haeltst du eine einzigartige Geschichte in den Haenden.</p>
+              <p class="text-xs text-orange-400/70 mt-2">Jetzt weitermachen.</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('retarget', 1)">
+              <p class="text-xs text-orange-400 font-semibold mb-2">Free Story Complete</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Deine Geschichte ist bereit zum Drucken.</p>
+              <p class="text-sm text-slate-400 mt-1">Ab CHF 38 — professionell gedruckt, kostenloser Versand in der Schweiz. Inklusive digitale Version.</p>
+              <p class="text-xs text-orange-400/70 mt-2">Jetzt drucken lassen.</p>
+            </div>
+            <div class="card rounded-lg p-4 cursor-pointer hover:border-amber-500/30" onclick="setCaption('retarget', 2)">
+              <p class="text-xs text-orange-400 font-semibold mb-2">Cart Abandoner</p>
+              <p class="text-sm text-slate-300 leading-relaxed">Deine Bestellung wartet noch auf dich.</p>
+              <p class="text-sm text-slate-400 mt-1">[Anzahl] Seiten voller Abenteuer, mit deinem Kind als Held.</p>
+              <p class="text-xs text-orange-400/70 mt-2">Jetzt abschliessen.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SECTION 5: Testing Timeline (Gantt) ===== -->
+    <section id="timeline">
+      <h2 class="text-2xl font-bold text-white mb-2">Testing Timeline</h2>
+      <p class="text-slate-400 text-sm mb-8">8-week phased approach: test, validate, scale. Total test budget: ~CHF 6,800</p>
+
+      <div class="card rounded-xl p-6 overflow-x-auto">
+        <div class="min-w-[640px]">
+          <!-- Week headers -->
+          <div class="grid grid-cols-[180px_repeat(8,1fr)] gap-0 mb-4">
+            <div class="text-xs text-slate-500 font-medium">Phase</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W1</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W2</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W3</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W4</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W5</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W6</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W7</div>
+            <div class="text-xs text-slate-500 text-center font-medium">W8</div>
+          </div>
+
+          <!-- Phase 1: Creative Testing -->
+          <div class="grid grid-cols-[180px_repeat(8,1fr)] gap-0 mb-3 items-center">
+            <div>
+              <p class="text-sm font-semibold text-white">Creative Testing</p>
+              <p class="text-[10px] text-slate-500">CHF 700 | 10 variants</p>
+            </div>
+            <div class="col-span-2 px-1">
+              <div class="gantt-bar h-8 bg-gradient-to-r from-amber-500 to-amber-600 flex items-center justify-center">
+                <span class="text-[10px] font-bold text-slate-900">Phase 1</span>
+              </div>
+            </div>
+            <div class="col-span-6"></div>
+          </div>
+
+          <!-- Phase 2: Audience Testing -->
+          <div class="grid grid-cols-[180px_repeat(8,1fr)] gap-0 mb-3 items-center">
+            <div>
+              <p class="text-sm font-semibold text-white">Audience Testing</p>
+              <p class="text-[10px] text-slate-500">CHF 1,050 | 15 ad sets</p>
+            </div>
+            <div class="col-span-2"></div>
+            <div class="col-span-2 px-1">
+              <div class="gantt-bar h-8 bg-gradient-to-r from-amber-600 to-amber-700 flex items-center justify-center">
+                <span class="text-[10px] font-bold text-white">Phase 2</span>
+              </div>
+            </div>
+            <div class="col-span-4"></div>
+          </div>
+
+          <!-- Phase 3: Scaling -->
+          <div class="grid grid-cols-[180px_repeat(8,1fr)] gap-0 mb-3 items-center">
+            <div>
+              <p class="text-sm font-semibold text-white">Scaling</p>
+              <p class="text-[10px] text-slate-500">CHF 5,050 | +20%/3 days</p>
+            </div>
+            <div class="col-span-4"></div>
+            <div class="col-span-4 px-1">
+              <div class="gantt-bar h-8 bg-gradient-to-r from-amber-700 to-amber-900 flex items-center justify-center">
+                <span class="text-[10px] font-bold text-white">Phase 3</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Lookalike activation -->
+          <div class="grid grid-cols-[180px_repeat(8,1fr)] gap-0 mb-3 items-center">
+            <div>
+              <p class="text-sm font-semibold text-slate-400">Lookalike Activation</p>
+              <p class="text-[10px] text-slate-500">After 100+ conversions</p>
+            </div>
+            <div class="col-span-5"></div>
+            <div class="col-span-3 px-1">
+              <div class="gantt-bar h-8 bg-gradient-to-r from-yellow-600/40 to-yellow-700/40 border border-yellow-600/40 border-dashed flex items-center justify-center">
+                <span class="text-[10px] font-medium text-yellow-500">If data threshold met</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Always-be-testing -->
+          <div class="grid grid-cols-[180px_repeat(8,1fr)] gap-0 items-center mt-6 pt-4 border-t border-slate-700/50">
+            <div>
+              <p class="text-sm font-semibold text-slate-400">Ongoing Testing</p>
+              <p class="text-[10px] text-slate-500">2-3 new creatives/week</p>
+            </div>
+            <div class="col-span-8 px-1">
+              <div class="gantt-bar h-6 bg-slate-700/50 border border-slate-600/50 border-dashed flex items-center justify-center">
+                <span class="text-[10px] text-slate-500">Continuous: Week 9+</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Decision rules -->
+        <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-slate-800/50 rounded-lg p-4">
+            <p class="text-xs text-amber-400 font-semibold mb-2">Kill Rules (Phase 1)</p>
+            <ul class="text-xs text-slate-400 space-y-1">
+              <li>500 imp: Kill if CTR &lt; 0.5%</li>
+              <li>1K imp: Kill if CPC &gt; CHF 2.00</li>
+              <li>2K imp: Kill if CPA &gt; CHF 20</li>
+              <li>Top 3 advance</li>
+            </ul>
+          </div>
+          <div class="bg-slate-800/50 rounded-lg p-4">
+            <p class="text-xs text-amber-400 font-semibold mb-2">Kill Rules (Phase 2)</p>
+            <ul class="text-xs text-slate-400 space-y-1">
+              <li>1K imp: Kill if CPC &gt; CHF 1.50</li>
+              <li>2K imp: Identify top 5 combos</li>
+              <li>Calculate blended CPA + ROAS</li>
+              <li>Top 5 advance</li>
+            </ul>
+          </div>
+          <div class="bg-slate-800/50 rounded-lg p-4">
+            <p class="text-xs text-amber-400 font-semibold mb-2">Scaling Discipline</p>
+            <ul class="text-xs text-slate-400 space-y-1">
+              <li>Max +20% budget per 3 days</li>
+              <li>Pause if CPA &gt;20% above target for 3d</li>
+              <li>Refresh creative at frequency &gt; 3.0</li>
+              <li>Monitor auction overlap</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Budget ramp table -->
+      <div class="mt-6 card rounded-xl p-6">
+        <h3 class="text-sm font-bold text-white mb-4">Budget Ramp (Scaling Phase)</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700">
+                <th class="text-left py-2 text-xs text-slate-500 font-medium">Week</th>
+                <th class="text-right py-2 text-xs text-slate-500 font-medium">Daily Budget</th>
+                <th class="text-right py-2 text-xs text-slate-500 font-medium">Monthly Run Rate</th>
+                <th class="text-right py-2 text-xs text-slate-500 font-medium">Cumulative</th>
+                <th class="text-right py-2 text-xs text-slate-500 font-medium">Ramp</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="border-b border-slate-700/50">
+                <td class="py-2 text-slate-300">Week 5</td>
+                <td class="py-2 text-right text-slate-300">CHF 100</td>
+                <td class="py-2 text-right text-slate-400">CHF 3,000</td>
+                <td class="py-2 text-right text-amber-400 font-medium">CHF 2,450</td>
+                <td class="py-2 text-right"><div class="w-16 h-2 bg-slate-700 rounded-full overflow-hidden ml-auto"><div class="h-full bg-amber-500 rounded-full" style="width:36%"></div></div></td>
+              </tr>
+              <tr class="border-b border-slate-700/50">
+                <td class="py-2 text-slate-300">Week 6</td>
+                <td class="py-2 text-right text-slate-300">CHF 140</td>
+                <td class="py-2 text-right text-slate-400">CHF 4,200</td>
+                <td class="py-2 text-right text-amber-400 font-medium">CHF 3,430</td>
+                <td class="py-2 text-right"><div class="w-16 h-2 bg-slate-700 rounded-full overflow-hidden ml-auto"><div class="h-full bg-amber-500 rounded-full" style="width:50%"></div></div></td>
+              </tr>
+              <tr class="border-b border-slate-700/50">
+                <td class="py-2 text-slate-300">Week 7</td>
+                <td class="py-2 text-right text-slate-300">CHF 200</td>
+                <td class="py-2 text-right text-slate-400">CHF 6,000</td>
+                <td class="py-2 text-right text-amber-400 font-medium">CHF 4,830</td>
+                <td class="py-2 text-right"><div class="w-16 h-2 bg-slate-700 rounded-full overflow-hidden ml-auto"><div class="h-full bg-amber-500 rounded-full" style="width:71%"></div></div></td>
+              </tr>
+              <tr>
+                <td class="py-2 text-slate-300">Week 8</td>
+                <td class="py-2 text-right text-slate-300">CHF 280</td>
+                <td class="py-2 text-right text-slate-400">CHF 8,400</td>
+                <td class="py-2 text-right text-amber-400 font-medium">CHF 6,790</td>
+                <td class="py-2 text-right"><div class="w-16 h-2 bg-slate-700 rounded-full overflow-hidden ml-auto"><div class="h-full bg-amber-500 rounded-full" style="width:100%"></div></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SECTION 6: Performance Benchmarks ===== -->
+    <section id="benchmarks">
+      <h2 class="text-2xl font-bold text-white mb-2">Performance Benchmarks</h2>
+      <p class="text-slate-400 text-sm mb-8">Our targets vs. Swiss market and industry averages</p>
+
+      <div class="card rounded-xl p-6">
+        <div class="space-y-6" id="benchmarkBars">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <div class="mt-6 p-4 rounded-lg bg-amber-500/5 border border-amber-500/20">
+        <p class="text-xs text-amber-200 leading-relaxed">
+          <span class="font-semibold text-amber-400">Why our targets exceed averages:</span>
+          Personalized children's content is inherently scroll-stopping. A parent seeing a child in a story illustration will stop scrolling. Our product IS the creative — we are not selling a commodity.
+        </p>
+      </div>
+    </section>
+
+    <!-- ===== SECTION 7: Pixel Events ===== -->
+    <section id="pixel">
+      <h2 class="text-2xl font-bold text-white mb-2">Meta Pixel Events</h2>
+      <p class="text-slate-400 text-sm mb-8">All events to track for attribution and optimization</p>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Standard Events -->
+        <div class="card rounded-xl p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-amber-500"></div>
+            <h3 class="text-sm font-bold text-white">Standard Events</h3>
+          </div>
+          <div class="space-y-1" id="standardEvents">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
+        <!-- Custom Events -->
+        <div class="card rounded-xl p-6">
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-2 h-2 rounded-full bg-orange-500"></div>
+            <h3 class="text-sm font-bold text-white">Custom Events</h3>
+          </div>
+          <div class="space-y-1" id="customEvents">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Implementation Notes -->
+      <div class="mt-6 card rounded-xl p-6">
+        <h3 class="text-sm font-bold text-white mb-4">Implementation Checklist</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3" id="implChecklist">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-700/40 py-8">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <p class="text-xs text-slate-500">MagicalStory.ch -- Meta Ads Strategy Document</p>
+      <p class="text-xs text-slate-600">Year 1 Target: CHF 39,750 spend / CHF 119,000 attributed revenue</p>
+    </div>
+  </footer>
+
+  <script>
+    // ===== BUDGET ALLOCATION =====
+    const campaigns = [
+      { name: 'Awareness', pct: 20, amount: 600, color: '#f59e0b' },
+      { name: 'Conversion — Emotional', pct: 30, amount: 900, color: '#fbbf24' },
+      { name: 'Conversion — Local', pct: 15, amount: 450, color: '#d97706' },
+      { name: 'Conversion — Gift', pct: 15, amount: 450, color: '#b45309' },
+      { name: 'Retargeting', pct: 10, amount: 300, color: '#ea580c' },
+      { name: 'Lookalike', pct: 10, amount: 300, color: '#ca8a04' },
+    ];
+
+    // Budget bars
+    const budgetBarsEl = document.getElementById('budgetBars');
+    campaigns.forEach(c => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-4';
+      row.innerHTML = `
+        <div class="w-40 flex-shrink-0">
+          <p class="text-xs text-slate-300 font-medium">${c.name}</p>
+          <p class="text-[10px] text-slate-500">CHF ${c.amount}/mo</p>
+        </div>
+        <div class="flex-1 h-7 bg-slate-800 rounded overflow-hidden">
+          <div class="h-full bar-fill flex items-center pl-3" style="width:${c.pct * 3.33}%;background:${c.color}">
+            <span class="text-[10px] font-bold text-slate-900">${c.pct}%</span>
+          </div>
+        </div>
+      `;
+      budgetBarsEl.appendChild(row);
+    });
+
+    // Donut chart
+    const donutSvg = document.querySelector('#donutChart svg');
+    const donutLegend = document.getElementById('donutLegend');
+    const radius = 70;
+    const circumference = 2 * Math.PI * radius;
+    let offset = 0;
+
+    campaigns.forEach(c => {
+      const segmentLength = (c.pct / 100) * circumference;
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', '100');
+      circle.setAttribute('cy', '100');
+      circle.setAttribute('r', String(radius));
+      circle.setAttribute('fill', 'none');
+      circle.setAttribute('stroke', c.color);
+      circle.setAttribute('stroke-width', '28');
+      circle.setAttribute('stroke-dasharray', `${segmentLength} ${circumference - segmentLength}`);
+      circle.setAttribute('stroke-dashoffset', String(-offset));
+      circle.classList.add('budget-segment');
+      donutSvg.appendChild(circle);
+      offset += segmentLength;
+
+      // Legend
+      const legendItem = document.createElement('div');
+      legendItem.className = 'flex items-center gap-2';
+      legendItem.innerHTML = `
+        <div class="w-2.5 h-2.5 rounded-sm flex-shrink-0" style="background:${c.color}"></div>
+        <span class="text-slate-400">${c.name} <span class="text-slate-500">${c.pct}%</span></span>
+      `;
+      donutLegend.appendChild(legendItem);
+    });
+
+    // Annual bars
+    const annualData = [
+      { label: 'M1', value: 1750 },
+      { label: 'M2', value: 3000 },
+      { label: 'M3', value: 3000 },
+      { label: 'M4', value: 3000 },
+      { label: 'M5', value: 3000 },
+      { label: 'M6', value: 2000, note: 'Summer' },
+      { label: 'M7', value: 2500 },
+      { label: 'M8', value: 2500 },
+      { label: 'M9', value: 4000, note: 'Schulanfang' },
+      { label: 'M10', value: 3000 },
+      { label: 'M11', value: 6000, note: 'Christmas' },
+      { label: 'M12', value: 6000, note: 'Christmas' },
+    ];
+    const maxAnnual = Math.max(...annualData.map(d => d.value));
+    const annualBarsEl = document.getElementById('annualBars');
+    const annualLabelsEl = document.getElementById('annualLabels');
+
+    annualData.forEach(d => {
+      const barWrapper = document.createElement('div');
+      barWrapper.className = 'flex-1 flex flex-col items-center justify-end h-full';
+      const heightPct = (d.value / maxAnnual) * 100;
+      const isHigh = d.value >= 4000;
+      barWrapper.innerHTML = `
+        <span class="text-[9px] text-slate-500 mb-1">CHF ${(d.value/1000).toFixed(1)}K</span>
+        <div class="w-full rounded-t" style="height:${heightPct}%;background:${isHigh ? '#f59e0b' : d.value <= 2000 ? '#475569' : '#d97706'}; min-height:8px; transition: height 0.5s ease"></div>
+      `;
+      annualBarsEl.appendChild(barWrapper);
+
+      const labelEl = document.createElement('div');
+      labelEl.className = 'flex-1 text-center';
+      labelEl.innerHTML = `
+        <span class="text-[10px] text-slate-500">${d.label}</span>
+        ${d.note ? `<br><span class="text-[8px] text-amber-500/60">${d.note}</span>` : ''}
+      `;
+      annualLabelsEl.appendChild(labelEl);
+    });
+
+    // ===== AD COPY TABS =====
+    const adCopyData = {
+      emotional: [
+        { text: 'Dein Kind als Held seiner eigenen Geschichte. Lade ein Foto hoch, waehle ein Abenteuer — und halte ein Buch in den Haenden, das es nur einmal auf der Welt gibt.', cta: 'Die erste Geschichte ist kostenlos.', btn: 'Jetzt gratis ausprobieren', img: 'Before/After Transformation' },
+        { text: 'Was waere, wenn dein Kind durch einen verzauberten Wald wandert, ein Raetsel loest und am Ende die ganze Stadt rettet? Bei MagicalStory wird daraus ein richtiges Buch — mit deinem Kind auf jeder Seite.', cta: 'Jetzt gratis ausprobieren.', btn: 'Geschichte erstellen', img: 'Story Flip-Through Video' },
+        { text: 'Nicht irgendein KI-Bilderbuch. Jede Illustration individuell generiert. Jede Geschichte einzigartig geschrieben. Dein Kind auf jeder Seite wiedererkennbar. Professionell gedruckt. In die Schweiz geliefert.', cta: 'Erste Geschichte kostenlos.', btn: 'Jetzt testen', img: 'Quality Showcase' },
+      ],
+      local: [
+        { text: 'Eine Geschichte aus Zuerich — und dein Kind mittendrin. Erkundet das Grossmuenster, trifft den Sechselaeuten-Boeoegg und erlebt ein Abenteuer in der eigenen Stadt.', cta: 'Jetzt kostenlos ausprobieren.', btn: 'Geschichte erstellen', img: 'Town Hook — Zuerich' },
+        { text: 'Stell dir vor: Ein Bilderbuch, das in Bern spielt. Und dein Kind ist die Hauptfigur. Abenteuer direkt vor der Haustuer — mit echten Orten, die dein Kind kennt.', cta: 'Gratis testen.', btn: 'Jetzt ausprobieren', img: 'Town Hook — Bern' },
+      ],
+      gift: [
+        { text: 'Das persoenlichste Geschenk, das du je machen wirst. Ein illustriertes Buch, in dem dein Kind die Hauptrolle spielt. Jede Seite individuell gestaltet. Jede Geschichte einzigartig.', cta: 'Geschenkkarte ab CHF 39.', btn: 'Geschenkkarte kaufen', img: 'Gift Card Visual' },
+        { text: 'Schon wieder ein Spielzeug, das nach zwei Wochen in der Ecke liegt? Schenk stattdessen eine Geschichte. Ein Buch, in dem das Kind die Hauptfigur ist. Etwas, das bleibt.', cta: 'Geschenkkarte ab CHF 39.', btn: 'Geschenkkarte kaufen', img: 'Gift Occasion' },
+        { text: 'Oma- und Opa-Tipp: Ein Buch, in dem euer Enkelkind der Star ist. Ihr kauft die Geschenkkarte. Die Eltern laden ein Foto hoch. Und euer Enkelkind bekommt eine Geschichte, die es nur einmal auf der Welt gibt.', cta: 'Ab CHF 39.', btn: 'Geschenkkarte kaufen', img: 'Grandparent Gift' },
+      ],
+      english: [
+        { text: 'Your child. The hero of their own story. Upload a photo, pick an adventure, and hold a one-of-a-kind illustrated book in your hands.', cta: 'Your first story is free.', btn: 'Try it free', img: 'Before/After Transformation' },
+        { text: 'What if your child could star in their very own picture book? Every page illustrated just for them. Every story written around their adventure. Professionally printed and delivered to your door.', cta: 'Try it free.', btn: 'Create a story', img: 'Story Flip-Through' },
+      ],
+      retarget: [
+        { text: 'Du hast angefangen, eine Geschichte zu erstellen — aber noch nicht fertig. Dein Abenteuer wartet. In wenigen Minuten haeltst du eine einzigartige Geschichte in den Haenden.', cta: '', btn: 'Jetzt weitermachen', img: 'Retargeting — Wizard' },
+        { text: 'Deine Geschichte ist bereit zum Drucken. Ab CHF 38 — professionell gedruckt, kostenloser Versand in der Schweiz. Inklusive digitale Version.', cta: '', btn: 'Jetzt drucken lassen', img: 'Retargeting — Print' },
+        { text: 'Deine Bestellung wartet noch auf dich. Seiten voller Abenteuer, mit deinem Kind als Held.', cta: '', btn: 'Jetzt abschliessen', img: 'Retargeting — Cart' },
+      ],
+    };
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabName);
+      });
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.toggle('active', content.dataset.tab === tabName);
+      });
+      // Set first caption of the new tab
+      setCaption(tabName, 0);
+    }
+
+    function setCaption(tab, index) {
+      const data = adCopyData[tab][index];
+      if (!data) return;
+      document.getElementById('captionText').textContent = data.text;
+      document.getElementById('mockupCTA').textContent = data.cta;
+      document.getElementById('mockupButton').textContent = data.btn;
+      document.getElementById('mockupImageLabel').textContent = data.img;
+    }
+
+    // ===== BENCHMARKS =====
+    const benchmarks = [
+      { metric: 'CTR (Feed)', target: '1.5-3.0%', targetVal: 3.0, swiss: '1.0-1.5%', swissVal: 1.5, industry: '0.9%', industryVal: 0.9, max: 3.5 },
+      { metric: 'CTR (Stories)', target: '0.8-1.5%', targetVal: 1.5, swiss: '0.5-0.8%', swissVal: 0.8, industry: '0.5%', industryVal: 0.5, max: 2.0 },
+      { metric: 'CPC', target: 'CHF 0.30-0.80', targetVal: 0.80, swiss: 'CHF 0.50-1.50', swissVal: 1.50, industry: 'CHF 0.50-1.50', industryVal: 1.50, max: 2.0, invert: true },
+      { metric: 'Cost / Story Complete', target: 'CHF 8-15', targetVal: 15, swiss: 'N/A', swissVal: 0, industry: 'N/A', industryVal: 0, max: 30 },
+      { metric: 'Cost / Print Purchase', target: 'CHF 15-30', targetVal: 30, swiss: 'N/A', swissVal: 0, industry: 'N/A', industryVal: 0, max: 50 },
+      { metric: 'ROAS (Print)', target: '3-5x', targetVal: 5, swiss: '2-4x', swissVal: 4, industry: '2-4x', industryVal: 4, max: 6 },
+    ];
+
+    const benchmarkBarsEl = document.getElementById('benchmarkBars');
+    benchmarks.forEach(b => {
+      const targetPct = (b.targetVal / b.max) * 100;
+      const swissPct = b.swissVal > 0 ? (b.swissVal / b.max) * 100 : 0;
+      const industryPct = b.industryVal > 0 ? (b.industryVal / b.max) * 100 : 0;
+
+      const row = document.createElement('div');
+      row.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-white">${b.metric}</span>
+          <span class="text-xs text-amber-400 font-semibold">${b.target}</span>
+        </div>
+        <div class="space-y-1.5">
+          <div class="flex items-center gap-3">
+            <span class="text-[10px] text-slate-500 w-20 text-right flex-shrink-0">Our Target</span>
+            <div class="flex-1 h-4 bg-slate-800 rounded overflow-hidden">
+              <div class="h-full bar-fill bg-amber-500" style="width:${targetPct}%"></div>
+            </div>
+            <span class="text-[10px] text-amber-400 w-24 flex-shrink-0">${b.target}</span>
+          </div>
+          ${b.swissVal > 0 ? `
+          <div class="flex items-center gap-3">
+            <span class="text-[10px] text-slate-500 w-20 text-right flex-shrink-0">Swiss Avg</span>
+            <div class="flex-1 h-4 bg-slate-800 rounded overflow-hidden">
+              <div class="h-full bar-fill bg-slate-600" style="width:${swissPct}%"></div>
+            </div>
+            <span class="text-[10px] text-slate-500 w-24 flex-shrink-0">${b.swiss}</span>
+          </div>` : ''}
+          ${b.industryVal > 0 ? `
+          <div class="flex items-center gap-3">
+            <span class="text-[10px] text-slate-500 w-20 text-right flex-shrink-0">Industry</span>
+            <div class="flex-1 h-4 bg-slate-800 rounded overflow-hidden">
+              <div class="h-full bar-fill bg-slate-700" style="width:${industryPct}%"></div>
+            </div>
+            <span class="text-[10px] text-slate-500 w-24 flex-shrink-0">${b.industry}</span>
+          </div>` : ''}
+        </div>
+      `;
+      benchmarkBarsEl.appendChild(row);
+    });
+
+    // ===== PIXEL EVENTS =====
+    const standardEvents = [
+      { event: 'PageView', trigger: 'All pages', params: 'page_path, referrer' },
+      { event: 'ViewContent', trigger: 'Theme selected in wizard', params: 'content_name, content_type' },
+      { event: 'AddToCart', trigger: 'Story generation started', params: 'content_name, value' },
+      { event: 'InitiateCheckout', trigger: 'Print order started', params: 'value, currency, content_ids' },
+      { event: 'Purchase', trigger: 'Print order completed', params: 'value, currency, content_ids' },
+      { event: 'CompleteRegistration', trigger: 'Account created', params: 'method' },
+      { event: 'Lead', trigger: 'Free story completed', params: 'content_name' },
+    ];
+
+    const customEvents = [
+      { event: 'PhotoUploaded', trigger: 'Photo successfully processed', params: 'character_count' },
+      { event: 'WizardStep', trigger: 'Each wizard step completed', params: 'step_number, step_name' },
+      { event: 'StoryStarted', trigger: 'Story generation begins', params: 'theme, page_count, language' },
+      { event: 'StoryCompleted', trigger: 'Story generation finishes', params: 'theme, page_count, duration' },
+      { event: 'StoryViewed', trigger: 'User views completed story', params: 'story_id, view_duration' },
+      { event: 'PrintSelected', trigger: 'User clicks "Print this story"', params: 'format, page_count' },
+      { event: 'GiftCardViewed', trigger: 'User views gift card options', params: '—' },
+      { event: 'GiftCardPurchased', trigger: 'Gift card bought', params: 'value, type' },
+      { event: 'BundlePurchased', trigger: 'Digital bundle bought', params: 'bundle_size, value' },
+    ];
+
+    function renderEvents(container, events, color) {
+      const el = document.getElementById(container);
+      events.forEach(ev => {
+        const row = document.createElement('div');
+        row.className = 'pixel-check flex items-start gap-3 p-2.5 rounded-lg';
+        row.innerHTML = `
+          <div class="w-4 h-4 rounded border border-slate-600 flex items-center justify-center flex-shrink-0 mt-0.5 cursor-pointer event-checkbox" onclick="toggleCheck(this)">
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <code class="text-xs font-mono font-semibold" style="color:${color}">${ev.event}</code>
+              <span class="text-[10px] text-slate-500 truncate">${ev.trigger}</span>
+            </div>
+            <p class="text-[10px] text-slate-600 mt-0.5">${ev.params}</p>
+          </div>
+        `;
+        el.appendChild(row);
+      });
+    }
+
+    renderEvents('standardEvents', standardEvents, '#f59e0b');
+    renderEvents('customEvents', customEvents, '#ea580c');
+
+    function toggleCheck(el) {
+      const isChecked = el.dataset.checked === 'true';
+      if (isChecked) {
+        el.dataset.checked = 'false';
+        el.innerHTML = '';
+        el.style.background = '';
+        el.style.borderColor = '';
+      } else {
+        el.dataset.checked = 'true';
+        el.innerHTML = '<svg class="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>';
+        el.style.background = 'rgba(245, 158, 11, 0.1)';
+        el.style.borderColor = '#f59e0b';
+      }
+    }
+
+    // Implementation checklist
+    const implChecks = [
+      'Install Meta Pixel via Google Tag Manager',
+      'Server-side Conversions API for Purchase + Lead',
+      'Deduplicate browser + server events (event_id)',
+      'Set value + currency on ALL conversion events',
+      'Enable Advanced Matching (hash email + phone)',
+      'Test all events in Meta Events Manager',
+    ];
+
+    const implEl = document.getElementById('implChecklist');
+    implChecks.forEach(text => {
+      const item = document.createElement('div');
+      item.className = 'flex items-center gap-3 p-3 rounded-lg bg-slate-800/50 cursor-pointer';
+      item.innerHTML = `
+        <div class="w-4 h-4 rounded border border-slate-600 flex items-center justify-center flex-shrink-0 event-checkbox" onclick="toggleCheck(this)">
+        </div>
+        <span class="text-xs text-slate-400">${text}</span>
+      `;
+      implEl.appendChild(item);
+    });
+
+    // ===== ANIMATE BARS ON SCROLL =====
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.querySelectorAll('.bar-fill').forEach(bar => {
+            const width = bar.style.width;
+            bar.style.width = '0%';
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                bar.style.width = width;
+              });
+            });
+          });
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.2 });
+
+    document.querySelectorAll('#budgetBars, #benchmarkBars, #annualBars').forEach(el => {
+      observer.observe(el);
+    });
+
+    // ===== SMOOTH SCROLL =====
+    document.querySelectorAll('a[href^="#"]').forEach(link => {
+      link.addEventListener('click', e => {
+        e.preventDefault();
+        const target = document.querySelector(link.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
