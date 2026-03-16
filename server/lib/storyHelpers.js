@@ -999,16 +999,19 @@ const LANGUAGE_LEVELS = {
     description: 'Simple words and very short sentences for early readers',
     wordsPerPageMin: 20,
     wordsPerPageMax: 35,
+    sentencesPerPage: '2-3',
   },
   'standard': {
     description: 'Age-appropriate vocabulary for elementary school children',
     wordsPerPageMin: 120,
     wordsPerPageMax: 150,
+    sentencesPerPage: '8-12',
   },
   'advanced': {
     description: 'More complex vocabulary and varied sentence structure for advanced readers',
     wordsPerPageMin: 250,
     wordsPerPageMax: 300,
+    sentencesPerPage: '15-20',
   }
 };
 
@@ -1021,9 +1024,7 @@ const LANGUAGE_LEVELS = {
  */
 function getReadingLevel(languageLevel) {
   const levelInfo = LANGUAGE_LEVELS[languageLevel] || LANGUAGE_LEVELS['standard'];
-  const pageLength = languageLevel === '1st-grade'
-    ? `2-3 sentences per page (approximately ${levelInfo.wordsPerPageMin}-${levelInfo.wordsPerPageMax} words)`
-    : `approximately ${levelInfo.wordsPerPageMin}-${levelInfo.wordsPerPageMax} words per page`;
+  const pageLength = `${levelInfo.sentencesPerPage} sentences per page (approximately ${levelInfo.wordsPerPageMin}-${levelInfo.wordsPerPageMax} words)`;
   return `${levelInfo.description}. ${pageLength}`;
 }
 

@@ -69,7 +69,7 @@ Minor characters you create to serve the story (shopkeepers, teachers, passersby
 # TEXT LENGTH RULES
 
 **{READING_LEVEL}**
-- Stay within the word count. Count your words. Aim for the middle of the range, not the maximum.
+- Stay within the word and sentence count. Count your words AND sentences. Aim for the middle of the range, not the maximum.
 - Write in flowing paragraphs with 2-4 sentences each
 - Maximum 3-4 paragraphs per page
 - **IMPORTANT: Separate paragraphs with a blank line** (not just a newline, a BLANK LINE)
