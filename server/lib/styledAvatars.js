@@ -498,6 +498,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
   // Collect all unique character + clothing combinations needed
   const neededAvatars = new Map(); // key -> { characterName, clothingCategory, originalAvatar, facePhoto }
+  // Collect costumed avatars that need on-demand generation (to run in parallel)
+  const pendingCostumedGenerations = []; // { charName, char, clothingCategory, cacheKey, costumeType, costumeConfig }
 
   for (const requirement of pageRequirements) {
     let { clothingCategory, characterNames } = requirement;
@@ -515,6 +517,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
       // Skip if already in our list to convert
       if (neededAvatars.has(cacheKey)) continue;
+
+      // Skip if already pending costumed generation
+      if (pendingCostumedGenerations.some(p => p.cacheKey === cacheKey)) continue;
 
       // For costumed avatars, check if styled version already exists in character data
       // (generateStyledCostumedAvatar creates styled versions directly)
@@ -567,11 +572,9 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           continue;
         }
         if (!originalAvatar) {
-          // Costumed avatar doesn't exist - GENERATE it on-demand
-          // Look up costume config from clothingRequirements
+          // Costumed avatar doesn't exist - collect for PARALLEL generation
           let charReqs = clothingRequirements?.[charName] || clothingRequirements?.[charName.trim()];
           if (!charReqs && clothingRequirements) {
-            // Fallback: case-insensitive + trimmed lookup
             const charNameLower = charName.trim().toLowerCase();
             const matchingKey = Object.keys(clothingRequirements).find(k => k.trim().toLowerCase() === charNameLower);
             if (matchingKey) charReqs = clothingRequirements[matchingKey];
@@ -579,43 +582,8 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
           const costumeConfig = charReqs?.costumed;
 
           if (costumeConfig?.used && costumeConfig?.description) {
-            log.debug(`🎭 [STYLED AVATARS] ${charName}: generating costumed:${costumeType} on-demand...`);
-            let generationSucceeded = false;
-            try {
-              const result = await generateStyledCostumedAvatar(char, {
-                costume: costumeConfig.costume || costumeType,
-                description: costumeConfig.description
-              }, artStyle);
-
-              if (result.success && result.imageData) {
-                // Store in cache
-                setStyledAvatar(charName, clothingCategory, artStyle, result.imageData);
-                // Store on character object for persistence
-                if (!char.avatars) char.avatars = {};
-                if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
-                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
-                if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
-                char.avatars.styledAvatars[artStyle].costumed[costumeType] = result.imageData;
-                // Store clothing description if available
-                if (result.clothing) {
-                  if (!char.avatars.clothing) char.avatars.clothing = {};
-                  if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
-                  char.avatars.clothing.costumed[costumeType] = result.clothing;
-                }
-                log.debug(`✅ [STYLED AVATARS] ${charName}: costumed:${costumeType}@${artStyle} generated successfully`);
-                generationSucceeded = true;
-              } else {
-                log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation failed: ${result.error || 'unknown'}, falling back to standard`);
-              }
-            } catch (err) {
-              log.error(`❌ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation error: ${err.message}, falling back to standard`);
-            }
-
-            if (generationSucceeded) {
-              continue; // Skip adding to neededAvatars - we already have the styled costumed avatar
-            }
-            // Fall through to add standard avatar to neededAvatars
-            clothingCategory = 'standard';
+            pendingCostumedGenerations.push({ charName, char, clothingCategory, cacheKey, costumeType, costumeConfig });
+            continue; // Will be generated in parallel below
           } else {
             log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} not found and no costume config, falling back to standard`);
             clothingCategory = 'standard';
@@ -713,65 +681,139 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
     }
   }
 
-  if (neededAvatars.size === 0) {
+  // Run ALL avatar generation in parallel: costumed + standard style conversions together
+  const allPromises = [];
+  const startTime = Date.now();
+
+  // Costumed avatar promises (previously sequential — was the main pipeline bottleneck)
+  if (pendingCostumedGenerations.length > 0) {
+    log.info(`🎭 [STYLED AVATARS] Generating ${pendingCostumedGenerations.length} costumed + ${neededAvatars.size} standard avatars in PARALLEL...`);
+  } else if (neededAvatars.size > 0) {
+    log.debug(`🔄 [STYLED AVATARS] Converting ${neededAvatars.size} avatars in parallel...`);
+  } else {
     log.debug(`✅ [STYLED AVATARS] All needed avatars already cached`);
     return styledAvatarCache;
   }
 
-  log.debug(`🔄 [STYLED AVATARS] Converting ${neededAvatars.size} avatars in parallel...`);
-  const startTime = Date.now();
+  for (const { charName, char, clothingCategory, cacheKey, costumeType, costumeConfig } of pendingCostumedGenerations) {
+    allPromises.push((async () => {
+      log.debug(`🎭 [STYLED AVATARS] ${charName}: generating costumed:${costumeType} on-demand...`);
+      try {
+        const result = await generateStyledCostumedAvatar(char, {
+          costume: costumeConfig.costume || costumeType,
+          description: costumeConfig.description
+        }, artStyle);
 
-  // Convert all needed avatars in parallel
-  const conversionPromises = [];
+        if (result.success && result.imageData) {
+          setStyledAvatar(charName, clothingCategory, artStyle, result.imageData);
+          if (!char.avatars) char.avatars = {};
+          if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+          if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+          if (!char.avatars.styledAvatars[artStyle].costumed) char.avatars.styledAvatars[artStyle].costumed = {};
+          char.avatars.styledAvatars[artStyle].costumed[costumeType] = result.imageData;
+          if (result.clothing) {
+            if (!char.avatars.clothing) char.avatars.clothing = {};
+            if (!char.avatars.clothing.costumed) char.avatars.clothing.costumed = {};
+            char.avatars.clothing.costumed[costumeType] = result.clothing;
+          }
+          log.debug(`✅ [STYLED AVATARS] ${charName}: costumed:${costumeType}@${artStyle} generated successfully`);
+          return { type: 'costumed', charName, costumeType, success: true };
+        } else {
+          log.warn(`⚠️ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation failed: ${result.error || 'unknown'}`);
+          return { type: 'costumed', charName, char, costumeType, success: false };
+        }
+      } catch (err) {
+        log.error(`❌ [STYLED AVATARS] ${charName}: costumed:${costumeType} generation error: ${err.message}`);
+        return { type: 'costumed', charName, char, costumeType, success: false };
+      }
+    })());
+  }
+
+  // Standard style conversion promises (run simultaneously with costumed)
   for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, character }] of neededAvatars) {
-    conversionPromises.push(
+    allPromises.push(
       getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride)
-        .then(styledAvatar => ({ cacheKey, styledAvatar, success: true }))
+        .then(styledAvatar => ({ type: 'standard', cacheKey, characterName, clothingCategory, character, styledAvatar, success: true }))
         .catch(error => {
-          // Bug #14 fix: Include stack trace for better debugging
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);
           log.debug(`   Stack: ${error.stack?.split('\n').slice(0, 3).join(' -> ')}`);
-          return { cacheKey, success: false };
+          return { type: 'standard', cacheKey, success: false };
         })
     );
   }
 
-  const results = await Promise.all(conversionPromises);
-  const successCount = results.filter(r => r.success).length;
+  const allResults = await Promise.all(allPromises);
   const duration = Date.now() - startTime;
 
-  log.debug(`✅ [STYLED AVATARS] Converted ${successCount}/${neededAvatars.size} avatars in ${duration}ms`);
+  // Process results
+  let costumeSuccess = 0, costumeTotal = 0, standardSuccess = 0, standardTotal = 0;
 
-  // Store styled avatars on character objects immediately (not just in cache)
-  // This ensures consistency checks can find them later in the pipeline
-  for (const result of results) {
-    if (!result.success || !result.styledAvatar) continue;
-
-    // Parse the cache key to get character and clothing info
-    const { cacheKey } = result;
-    const info = neededAvatars.get(cacheKey);
-    if (!info?.character) continue;
-
-    const { character, clothingCategory } = info;
-
-    // Initialize styledAvatars structure if not exists
-    if (!character.avatars) character.avatars = {};
-    if (!character.avatars.styledAvatars) character.avatars.styledAvatars = {};
-    if (!character.avatars.styledAvatars[artStyle]) character.avatars.styledAvatars[artStyle] = {};
-
-    // Store the styled avatar
-    if (clothingCategory.startsWith('costumed:')) {
-      const costumeType = clothingCategory.split(':')[1];
-      if (!character.avatars.styledAvatars[artStyle].costumed) {
-        character.avatars.styledAvatars[artStyle].costumed = {};
-      }
-      character.avatars.styledAvatars[artStyle].costumed[costumeType] = result.styledAvatar;
+  for (const result of allResults) {
+    if (result.type === 'costumed') {
+      costumeTotal++;
+      if (result.success) costumeSuccess++;
+      // Failed costumed: generate standard fallback (rare — handled after this loop)
     } else {
-      character.avatars.styledAvatars[artStyle][clothingCategory] = result.styledAvatar;
+      standardTotal++;
+      if (result.success && result.styledAvatar) {
+        standardSuccess++;
+        // Store on character object
+        const { character, clothingCategory } = result;
+        if (character) {
+          if (!character.avatars) character.avatars = {};
+          if (!character.avatars.styledAvatars) character.avatars.styledAvatars = {};
+          if (!character.avatars.styledAvatars[artStyle]) character.avatars.styledAvatars[artStyle] = {};
+          if (clothingCategory.startsWith('costumed:')) {
+            const costumeType = clothingCategory.split(':')[1];
+            if (!character.avatars.styledAvatars[artStyle].costumed) character.avatars.styledAvatars[artStyle].costumed = {};
+            character.avatars.styledAvatars[artStyle].costumed[costumeType] = result.styledAvatar;
+          } else {
+            character.avatars.styledAvatars[artStyle][clothingCategory] = result.styledAvatar;
+          }
+        }
+      }
     }
   }
 
-  log.debug(`💾 [STYLED AVATARS] Stored ${successCount} styled avatars on character objects for ${artStyle}`);
+  // Handle failed costumed avatars: generate standard fallback
+  const failedCostumed = allResults.filter(r => r.type === 'costumed' && !r.success);
+  if (failedCostumed.length > 0) {
+    log.warn(`⚠️ [STYLED AVATARS] ${failedCostumed.length} costumed avatars failed, generating standard fallbacks...`);
+    const fallbackPromises = [];
+    for (const { charName, char } of failedCostumed) {
+      if (!char) continue;
+      const fallbackKey = getAvatarCacheKey(charName, 'standard', artStyle);
+      if (styledAvatarCache.has(fallbackKey)) continue;
+      const avatars = char.avatars || char.clothingAvatars;
+      const originalAvatar = avatars?.standard || getPrimaryPhoto(char);
+      const facePhoto = getFacePhoto(char);
+      if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
+        fallbackPromises.push(
+          getOrCreateStyledAvatar(charName, 'standard', artStyle, originalAvatar, facePhoto, null, addUsage, char, imageModelOverride)
+            .then(styledAvatar => {
+              if (char) {
+                if (!char.avatars) char.avatars = {};
+                if (!char.avatars.styledAvatars) char.avatars.styledAvatars = {};
+                if (!char.avatars.styledAvatars[artStyle]) char.avatars.styledAvatars[artStyle] = {};
+                char.avatars.styledAvatars[artStyle].standard = styledAvatar;
+              }
+              return { success: true };
+            })
+            .catch(err => {
+              log.error(`❌ [STYLED AVATARS] Fallback failed for ${charName}: ${err.message}`);
+              return { success: false };
+            })
+        );
+      }
+    }
+    if (fallbackPromises.length > 0) {
+      await Promise.all(fallbackPromises);
+    }
+  }
+
+  const totalSuccess = costumeSuccess + standardSuccess;
+  const totalCount = costumeTotal + standardTotal;
+  log.debug(`💾 [STYLED AVATARS] Stored ${totalSuccess}/${totalCount} styled avatars in ${duration}ms (${costumeSuccess} costumed, ${standardSuccess} standard) for ${artStyle}`);
 
   return styledAvatarCache;
 }
