@@ -337,6 +337,8 @@ export function RepairWorkflowPanel({
   const [isExpanded, setIsExpanded] = useState(true);
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
   const [gridLightbox, setGridLightbox] = useState<string | null>(null);
+  const [overrideImageModel, setOverrideImageModel] = useState<string | null>(null);
+  const effectiveImageModel = overrideImageModel || imageModel;
 
   const {
     workflowState,
@@ -364,7 +366,7 @@ export function RepairWorkflowPanel({
     sceneImages,
     characters,
     finalChecksReport,
-    imageModel,
+    imageModel: effectiveImageModel,
     onImageUpdate,
   });
 
@@ -1206,6 +1208,26 @@ export function RepairWorkflowPanel({
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Image model selector for page redo - only in developer mode */}
+                {developerMode && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <label className="text-sm font-medium text-yellow-800 mb-2 block">Image Model (page redo):</label>
+                    <select
+                      value={overrideImageModel || imageModel || ''}
+                      onChange={(e) => setOverrideImageModel(e.target.value || null)}
+                      className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      disabled={isRunning}
+                    >
+                      <option value="">Server Default</option>
+                      <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                      <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                      <option value="grok-imagine">Grok Imagine ($0.02/image)</option>
+                      <option value="grok-imagine-pro">Grok Imagine Pro ($0.07/image)</option>
+                      <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
+                    </select>
                   </div>
                 )}
 
