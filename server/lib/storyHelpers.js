@@ -27,6 +27,7 @@ const { OutlineParser, UnifiedStoryParser, extractCharacterNamesFromScene } = re
 const { getLanguageNote, getLanguageInstruction, getLanguageNameEnglish } = require('./languages');
 const { getEventById } = require('./historicalEvents');
 const { loadLandmarkPhotoVariant } = require('./landmarkPhotos');
+const { getSwissStoryResearch, getSwissCityById } = require('./swissStories');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -2249,6 +2250,35 @@ ${historicalGuide}${locationsSection}
 - Make history accessible and engaging for children
 - Balance education with entertainment`;
     }
+  } else if (storyCategory === 'swiss-stories') {
+    const cityId = storyTopic.replace(/-\d+$/, '');
+    const cityData = getSwissStoryResearch(cityId);
+    const cityMeta = getSwissCityById(cityId);
+
+    if (cityData) {
+      const ideaNum = parseInt(storyTopic.split('-').pop());
+      const idea = cityData.ideas[ideaNum - 1];
+      const ideaTitle = idea?.title || storyTopic;
+      const cityName = cityMeta?.name?.en || cityId;
+
+      categoryGuidelines = `This is a SWISS LOCAL STORY set in ${cityName}, a real Swiss city.
+
+**STORY IDEA:** "${ideaTitle}"
+${idea?.description ? `**CONCEPT:** ${idea.description}` : ''}
+
+**HISTORICAL & CULTURAL CONTEXT (verified research — use for accuracy):**
+${cityData.research}
+
+**GUIDELINES:**
+- Set the story in this specific Swiss city with real local landmarks
+- Use historically accurate details from the research above
+- Include local cultural elements, traditions, and geography
+- Characters should interact with real places described in the context
+- Make the local history and culture come alive for children
+- The story should feel authentic to this specific Swiss place`;
+    } else {
+      categoryGuidelines = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city with local landmarks and cultural elements.`;
+    }
   } else if (storyCategory === 'custom') {
     const customText = inputData.customThemeText || '';
     categoryGuidelines = `This is a CUSTOM story. The user provided their own story concept:
@@ -3256,6 +3286,35 @@ ${historicalGuide}${locationsSection}
 - Characters should wear period-appropriate clothing
 - Make history accessible and engaging for children
 - Balance education with entertainment`;
+    }
+  } else if (storyCategory === 'swiss-stories') {
+    const cityId = storyTopic.replace(/-\d+$/, '');
+    const cityData = getSwissStoryResearch(cityId);
+    const cityMeta = getSwissCityById(cityId);
+
+    if (cityData) {
+      const ideaNum = parseInt(storyTopic.split('-').pop());
+      const idea = cityData.ideas[ideaNum - 1];
+      const ideaTitle = idea?.title || storyTopic;
+      const cityName = cityMeta?.name?.en || cityId;
+
+      categoryGuidelines = `This is a SWISS LOCAL STORY set in ${cityName}, a real Swiss city.
+
+**STORY IDEA:** "${ideaTitle}"
+${idea?.description ? `**CONCEPT:** ${idea.description}` : ''}
+
+**HISTORICAL & CULTURAL CONTEXT (verified research — use for accuracy):**
+${cityData.research}
+
+**GUIDELINES:**
+- Set the story in this specific Swiss city with real local landmarks
+- Use historically accurate details from the research above
+- Include local cultural elements, traditions, and geography
+- Characters should interact with real places described in the context
+- Make the local history and culture come alive for children
+- The story should feel authentic to this specific Swiss place`;
+    } else {
+      categoryGuidelines = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city with local landmarks and cultural elements.`;
     }
   } else if (storyCategory === 'custom') {
     const customText = inputData.customThemeText || '';

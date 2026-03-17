@@ -5,7 +5,7 @@ import type {
   RelationshipTextMap,
   VisualBible
 } from '@/types/character';
-import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport } from '@/types/story';
+import type { SavedStory, StoryLanguageCode, LanguageLevel, SceneDescription, SceneImage, CoverImages, CoverImageData, RetryAttempt, RepairAttempt, ImageVersion, ReferencePhoto, LandmarkPhoto, GenerationLogEntry, FinalChecksReport, SwissStoriesData } from '@/types/story';
 
 /**
  * Normalize a cover value from the API to always be CoverImageData | null.
@@ -89,7 +89,7 @@ interface StoryDetailsServer {
   title: string;
   storyType: string;
   storyTypeName?: string;  // Display name for story type
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom';  // Story category
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom';  // Story category
   storyTopic?: string;  // Life challenge or educational topic
   storyTheme?: string;  // Adventure theme
   storyDetails?: string;  // User's custom story idea
@@ -148,6 +148,11 @@ export const storyService = {
 
   async deleteDraft(): Promise<void> {
     await api.delete('/api/story-draft');
+  },
+
+  // Swiss Stories
+  async getSwissStories(): Promise<SwissStoriesData> {
+    return api.get<SwissStoriesData>('/api/swiss-stories');
   },
 
   // Story CRUD
@@ -1258,7 +1263,7 @@ export const storyService = {
   async generateStoryIdeas(data: {
     storyType: string;
     storyTypeName: string;
-    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;
@@ -1292,7 +1297,7 @@ export const storyService = {
     data: {
       storyType: string;
       storyTypeName: string;
-      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+      storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
       storyTopic?: string;
       storyTheme?: string;
       customThemeText?: string;
@@ -1440,7 +1445,7 @@ export const storyService = {
   async createStoryJob(data: {
     storyType: string;
     storyTypeName: string;
-    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+    storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
     storyTopic?: string;
     storyTheme?: string;
     customThemeText?: string;

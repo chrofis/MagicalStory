@@ -1352,6 +1352,12 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
       categoryContext = `This is a life skills story about "${storyTopic}". The story should help children understand and cope with this topic.${storyTheme && storyTheme !== 'realistic' ? ` Set in a ${storyTheme} adventure context.` : ''}`;
     } else if (storyCategory === 'historical') {
       categoryContext = `This is a historical story about "${storyTopic}". Keep it age-appropriate and educational.`;
+    } else if (storyCategory === 'swiss-stories') {
+      const { getSwissStoryResearch, getSwissCityById } = require('../lib/swissStories');
+      const cityId = (storyTopic || '').replace(/-\d+$/, '');
+      const cityMeta = getSwissCityById(cityId);
+      const cityName = cityMeta?.name?.en || cityId;
+      categoryContext = `This is a Swiss local story set in ${cityName}. Use real local landmarks and cultural elements from this city. Keep it age-appropriate and engaging.`;
     } else {
       categoryContext = `This is a ${storyTheme || 'adventure'} story${storyTopic ? ` about "${storyTopic}"` : ''}. Make it exciting and appropriate for children.`;
     }

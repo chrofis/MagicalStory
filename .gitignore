@@ -43,7 +43,8 @@ API key.txt
 /data/
 /data/uploads/
 /data/files.json
-server/data/
+server/data/*
+!server/data/swiss-cities.json
 
 # User content and uploads
 # Images/ - now included in git for Railway deployment

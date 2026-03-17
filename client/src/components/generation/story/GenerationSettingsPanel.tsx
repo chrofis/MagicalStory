@@ -4,7 +4,7 @@ import type { RelationshipMap, RelationshipTextMap } from '@/types/character';
 import type { StoryLanguageCode, LanguageLevel } from '@/types/story';
 
 export interface GenerationSettings {
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
   storyTopic?: string;
   storyTheme?: string;
   storyTypeName?: string;

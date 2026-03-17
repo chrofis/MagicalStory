@@ -118,6 +118,24 @@ ${historicalGuide}`;
     } else {
       categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
     }
+  } else if (effectiveCategory === 'swiss-stories') {
+    const { getSwissStoryResearch, getSwissCityById } = require('../lib/swissStories');
+    const cityId = storyTopic.replace(/-\d+$/, '');
+    const cityData = getSwissStoryResearch(cityId);
+    const cityMeta = getSwissCityById(cityId);
+    const cityName = cityMeta?.name?.en || cityId;
+
+    if (cityData) {
+      const ideaNum = parseInt(storyTopic.split('-').pop());
+      const idea = cityData.ideas[ideaNum - 1];
+      categoryInstructions = `IMPORTANT: This is a SWISS LOCAL STORY set in ${cityName}.
+Story idea: "${idea?.title || storyTopic}" — ${idea?.description || ''}
+
+Use the city's real landmarks, history, and cultural elements.
+${cityData.research.slice(0, 2000)}`;
+    } else {
+      categoryInstructions = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city.`;
+    }
   } else if (effectiveCategory === 'custom') {
     categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:
 "${customThemeText || ''}"

@@ -1,12 +1,14 @@
 import { StoryCategorySelector, ArtStyleSelector } from '@/components/story';
 
+type StoryCategoryId = 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
+
 interface WizardStep1Props {
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+  storyCategory: StoryCategoryId;
   storyTopic: string;
   storyTheme: string;
   customThemeText: string;
   artStyle: string;
-  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => void;
+  onCategoryChange: (cat: StoryCategoryId) => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange: (text: string) => void;
@@ -34,7 +36,7 @@ export function WizardStep1Configuration({
   // Determine if story selection is complete (ready to show art style)
   const isStorySelectionComplete =
     (storyCategory === 'adventure' && storyTheme) ||
-    ((storyCategory === 'life-challenge' || storyCategory === 'educational' || storyCategory === 'historical') && storyTopic);
+    ((storyCategory === 'life-challenge' || storyCategory === 'educational' || storyCategory === 'historical' || storyCategory === 'swiss-stories') && storyTopic);
 
   return (
     <div className="space-y-6">

@@ -32,10 +32,32 @@ export interface AdventureThemeGroup {
 
 // Story category (Adventure, Life Challenge, Educational, Historical, Custom)
 export interface StoryCategory {
-  id: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom';
+  id: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom';
   name: LocalizedString;
   description: LocalizedString;
   emoji: string;
+}
+
+// Swiss Stories types
+export interface SwissStoryIdea {
+  id: string;      // 'bern-1'
+  title: string;   // Bold title from MD
+  description: string;  // Description after dash
+}
+
+export interface SwissCity {
+  id: string;
+  name: { en: string; de: string; fr: string };
+  canton: string;
+  lat: number;
+  lon: number;
+  lang: string;
+  ideas: SwissStoryIdea[];
+}
+
+export interface SwissStoriesData {
+  cantons: Record<string, { en: string; de: string; fr: string }>;
+  cities: SwissCity[];
 }
 
 // Historical event topic
@@ -771,7 +793,7 @@ export interface SavedStory {
   storyType: string;  // Legacy: adventure theme (pirate, knight, etc.)
   storyTypeName?: string;  // Display name for story type
   // New story structure
-  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom';  // What kind of story
+  storyCategory?: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom';  // What kind of story
   storyTopic?: string;  // Life challenge or educational topic ID
   storyTheme?: string;  // Adventure theme wrapper (or 'realistic' for no wrapper)
   storyDetails?: string;  // User's custom story idea/description

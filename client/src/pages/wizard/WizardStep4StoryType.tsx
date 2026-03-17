@@ -1,11 +1,14 @@
 import { StoryCategorySelector } from '@/components/story/StoryCategorySelector';
 
+type StoryCategoryId = 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
+
 interface WizardStep4Props {
-  storyCategory: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+  storyCategory: StoryCategoryId;
   storyTopic: string;
   storyTheme: string;
   customThemeText: string;
-  onCategoryChange: (cat: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => void;
+  userLocation?: { city: string | null; region: string | null; country: string | null } | null;
+  onCategoryChange: (cat: StoryCategoryId) => void;
   onTopicChange: (topic: string) => void;
   onThemeChange: (theme: string) => void;
   onCustomThemeTextChange: (text: string) => void;
@@ -21,6 +24,7 @@ export function WizardStep4StoryType({
   storyTopic,
   storyTheme,
   customThemeText,
+  userLocation,
   onCategoryChange,
   onTopicChange,
   onThemeChange,
@@ -34,6 +38,7 @@ export function WizardStep4StoryType({
         storyTopic={storyTopic}
         storyTheme={storyTheme}
         customThemeText={customThemeText}
+        userLocation={userLocation}
         onCategoryChange={onCategoryChange}
         onTopicChange={onTopicChange}
         onThemeChange={onThemeChange}

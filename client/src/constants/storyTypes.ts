@@ -45,6 +45,16 @@ export const storyCategories: StoryCategory[] = [
     emoji: '🏛️'
   },
   {
+    id: 'swiss-stories',
+    name: { en: 'Swiss Stories', de: 'Schweizer Geschichten', fr: 'Histoires Suisses' },
+    description: {
+      en: 'Discover stories from Swiss cities and their history',
+      de: 'Entdecke Geschichten aus Schweizer Städten und ihrer Geschichte',
+      fr: 'Découvrez des histoires des villes suisses et leur histoire'
+    },
+    emoji: '🇨🇭'
+  },
+  {
     id: 'custom',
     name: { en: 'Create Your Own', de: 'Eigenes Thema', fr: 'Créer le vôtre' },
     description: {
