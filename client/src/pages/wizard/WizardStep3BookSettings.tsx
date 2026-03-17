@@ -476,14 +476,14 @@ export function WizardStep3BookSettings({
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Range Slider */}
+              {/* Range Slider — shows full range, clamps to affordable max */}
               <input
                 type="range"
                 min={minPages}
-                max={effectiveMaxPages}
+                max={absoluteMaxPages}
                 step={pageStep}
                 value={Math.min(pages, effectiveMaxPages)}
-                onChange={(e) => onPagesChange(parseInt(e.target.value))}
+                onChange={(e) => onPagesChange(Math.min(parseInt(e.target.value), effectiveMaxPages))}
                 className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-600 touch-none
                            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6
                            [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer
@@ -498,10 +498,7 @@ export function WizardStep3BookSettings({
                 <span className="text-xl font-bold text-indigo-600">
                   {pages} {language === 'de' ? 'Seiten' : language === 'fr' ? 'pages' : 'pages'}
                 </span>
-                <span className={`text-sm ${isLimitedByCredits ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                  {effectiveMaxPages}
-                  {isLimitedByCredits && ' ⚠️'}
-                </span>
+                <span className="text-sm text-gray-400">{absoluteMaxPages}</span>
               </div>
 
               {/* Credit limit warning */}
