@@ -837,7 +837,7 @@ function getStyledAvatar(characterName, clothingCategory, artStyle) {
     }
   }
   if (!styledAvatar) {
-    log.info(`📍 [STYLED AVATARS] Cache miss: ${cacheKey}`);
+    log.info(`🔄 [FALLBACK] Styled avatar cache miss: ${cacheKey}`);
   }
   return styledAvatar || null;
 }
@@ -1029,7 +1029,7 @@ function applyStyledAvatars(characterPhotos, artStyle) {
     log.debug(`🎨 [STYLED AVATARS] Applied ${appliedCount}/${characterPhotos.length} styled avatars for ${artStyle}`);
   }
   if (missed.length > 0) {
-    log.warn(`⚠️ [STYLED AVATARS] Cache miss for ${artStyle}: ${missed.join(', ')} - using fallback avatars`);
+    log.warn(`🔄 [FALLBACK] Cache miss for ${artStyle}: ${missed.join(', ')} - using fallback avatars`);
   }
 
   return result;

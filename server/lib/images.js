@@ -488,15 +488,15 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
     }
 
     const thinkingInfo = thinkingTokens > 0 ? `, thinking: ${thinkingTokens.toLocaleString()}` : '';
-    log.verbose(`📊 [QUALITY P1] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
+    log.verbose(`📊 [EVAL P1] Token usage - input: ${inputTokens.toLocaleString()}, output: ${outputTokens.toLocaleString()}${thinkingInfo}`);
 
     const figures = inventoryJson.figures || [];
     const matches = inventoryJson.matches || [];
     if (figures.length > 0) {
-      log.info(`⭐ [QUALITY P1] Figures: ${figures.map(f => `#${f.id} ${f.apparent_age} ${f.hair} (${f.position})`).join('; ')}`);
+      log.info(`📊 [EVAL P1] Figures: ${figures.map(f => `#${f.id} ${f.apparent_age} ${f.hair} (${f.position})`).join('; ')}`);
     }
     if (matches.length > 0) {
-      log.info(`⭐ [QUALITY P1] Matches: ${matches.map(m => `Fig ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%${m.age_match === false ? ', AGE MISMATCH' : ''})`).join('; ')}`);
+      log.info(`📊 [EVAL P1] Matches: ${matches.map(m => `Fig ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%${m.age_match === false ? ', AGE MISMATCH' : ''})`).join('; ')}`);
     }
 
     return {
@@ -560,10 +560,10 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     let evaluationTemplate;
     if (evaluationType === 'cover' && PROMPT_TEMPLATES.coverImageEvaluation) {
       evaluationTemplate = PROMPT_TEMPLATES.coverImageEvaluation;
-      log.verbose('⭐ [QUALITY] Using COVER evaluation (text-focused)');
+      log.verbose('📊 [EVAL] Using COVER evaluation (text-focused)');
     } else if (PROMPT_TEMPLATES.imageEvaluation) {
       evaluationTemplate = PROMPT_TEMPLATES.imageEvaluation;
-      log.verbose('⭐ [QUALITY] Using SCENE evaluation (standard)');
+      log.verbose('📊 [EVAL] Using SCENE evaluation (standard)');
     } else {
       evaluationTemplate = null;
     }
@@ -640,13 +640,13 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
           addedCount++;
         }
       }
-      log.verbose(`⭐ [QUALITY] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
+      log.verbose(`📊 [EVAL] Added ${addedCount} reference images (${cacheHits} cached, ${addedCount - cacheHits} compressed)`);
     }
 
     // === LAUNCH P1 VISUAL INVENTORY IN PARALLEL (age/figure detection) ===
     let p1Promise = null;
     if (evaluationType === 'scene' && PROMPT_TEMPLATES.imageVisualInventory) {
-      log.debug(`⭐ [QUALITY P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
+      log.debug(`📊 [EVAL P1] Launching parallel figure/age detection for ${pageContext || 'scene'}`);
       p1Promise = runVisualInventory(parts, modelId, apiKey, pageContext);
     }
 
@@ -717,14 +717,14 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     const qualityThinkingTokens = data.usageMetadata?.thoughtsTokenCount || 0;
     if (qualityInputTokens > 0 || qualityOutputTokens > 0) {
       const thinkingInfo = qualityThinkingTokens > 0 ? `, thinking: ${qualityThinkingTokens.toLocaleString()}` : '';
-      log.verbose(`📊 [QUALITY] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
+      log.verbose(`📊 [EVAL] Token usage - input: ${qualityInputTokens.toLocaleString()}, output: ${qualityOutputTokens.toLocaleString()}${thinkingInfo}`);
     }
 
     // Fallback: If content was blocked and we're using 2.5, try sanitized prompt first
     if (isBlockedResponse(data) && modelId.includes('2.5')) {
       const blockReason = data.promptFeedback?.blockReason || data.candidates?.[0]?.finishReason || 'UNKNOWN';
       const pageLabel = pageContext ? `[${pageContext}] ` : '';
-      log.warn(`⚠️  [QUALITY] ${pageLabel}Content blocked by ${modelId} (${blockReason}), retrying with sanitized prompt...`);
+      log.warn(`🔄 [FALLBACK] ${pageLabel}Content blocked by ${modelId} (${blockReason}), retrying with sanitized prompt...`);
 
       // Create a SANITIZED prompt that removes potentially triggering content:
       // - No detailed physical descriptions (age, body type, etc.)
@@ -838,13 +838,13 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
                 });
               }
             } catch (e) {
-              log.debug(`⭐ [QUALITY] Could not parse FIX_TARGET: ${line}`);
+              log.debug(`📊 [EVAL] Could not parse FIX_TARGET: ${line}`);
             }
           }
         }
       }
       if (fixTargets.length > 0) {
-        log.info(`⭐ [QUALITY] Parsed ${fixTargets.length} fix targets with bounding boxes`);
+        log.info(`📊 [EVAL] Parsed ${fixTargets.length} fix targets with bounding boxes`);
       }
       return fixTargets;
     };
@@ -860,7 +860,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         parsedJson = JSON.parse(jsonMatch[0]);
       }
     } catch (e) {
-      log.debug(`⭐ [QUALITY] Response is not JSON, trying legacy format`);
+      log.debug(`📊 [EVAL] Response is not JSON, trying legacy format`);
     }
 
     if (parsedJson && typeof parsedJson.score === 'number') {
@@ -877,10 +877,10 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
         issuesSummary = String(issuesSummary);
       }
 
-      log.info(`⭐ [QUALITY] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
+      log.info(`📊 [EVAL] Score: ${rawScore}/10 (${score}/100), Verdict: ${verdict}`);
       const hasRealIssues = issuesSummary && issuesSummary !== 'none' && issuesSummary.toLowerCase() !== 'none';
       if (hasRealIssues) {
-        log.info(`⭐ [QUALITY] Issues: ${issuesSummary}`);
+        log.info(`📊 [EVAL] Issues: ${issuesSummary}`);
       }
 
       // Parse fixable_issues from JSON (new two-stage format - no bboxes)
@@ -896,7 +896,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
             fix: i.fix || `Fix: ${i.description}`
           }));
         if (fixableIssues.length > 0) {
-          log.info(`⭐ [QUALITY] Parsed ${fixableIssues.length} fixable issues (two-stage detection)`);
+          log.info(`📊 [EVAL] Parsed ${fixableIssues.length} fixable issues (two-stage detection)`);
         }
       }
 
@@ -911,7 +911,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
             fixPrompt: t.fix || 'fix the issue'
           }));
         if (jsonFixTargets.length > 0) {
-          log.info(`⭐ [QUALITY] Parsed ${jsonFixTargets.length} fix targets from JSON (legacy format)`);
+          log.info(`📊 [EVAL] Parsed ${jsonFixTargets.length} fix targets from JSON (legacy format)`);
         }
       }
 
@@ -934,7 +934,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
       let figures = parsedJson.figures || [];
       let matches = parsedJson.matches || [];
       if (matches.length > 0) {
-        log.info(`⭐ [QUALITY] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
+        log.info(`📊 [EVAL] Character matches: ${matches.map(m => `Figure ${m.figure} → ${m.reference} (${Math.round(m.confidence * 100)}%)`).join(', ')}`);
       }
 
       // Merge P1 figure data if available (better age detection — P1 doesn't see the prompt)
@@ -951,7 +951,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
             for (const m of matches) {
               if (m.age_match === false) {
                 const figureData = figures.find(f => f.id === m.figure);
-                log.warn(`⚠️ [QUALITY P1] Age mismatch: ${m.reference} — figure appears ${figureData?.apparent_age || 'unknown'}`);
+                log.info(`📊 [EVAL] Age mismatch: ${m.reference} — figure appears ${figureData?.apparent_age || 'unknown'}`);
               }
             }
           }
@@ -1087,7 +1087,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     if (score10Match) {
       const rawScore = parseInt(score10Match[1]);
       const qualityScore = rawScore * 10; // Convert 0-10 to 0-100 for compatibility
-      log.verbose(`⭐ [QUALITY] Image quality score: ${rawScore}/10 (${qualityScore}/100)`);
+      log.verbose(`📊 [EVAL] Image quality score: ${rawScore}/10 (${qualityScore}/100)`);
       return mergeSemanticResult(qualityScore, responseText);
     }
 
@@ -1095,14 +1095,14 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     const scoreMatch = responseText.match(/Score:\s*(\d+)\/100/i);
     if (scoreMatch) {
       const qualityScore = parseInt(scoreMatch[1]);
-      log.verbose(`⭐ [QUALITY] Image quality score: ${qualityScore}/100 (legacy format)`);
+      log.verbose(`📊 [EVAL] Image quality score: ${qualityScore}/100 (legacy format)`);
       return mergeSemanticResult(qualityScore, responseText);
     }
 
     // Fallback: Try parsing just a number (0-100)
     const numericScore = parseFloat(responseText);
     if (!isNaN(numericScore) && numericScore >= 0 && numericScore <= 100) {
-      log.verbose(`⭐ [QUALITY] Image quality score: ${numericScore}/100 (numeric format)`);
+      log.verbose(`📊 [EVAL] Image quality score: ${numericScore}/100 (numeric format)`);
       return mergeSemanticResult(numericScore, responseText);
     }
 
@@ -1264,7 +1264,7 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     }
 
     if (!data.candidates || !data.candidates[0]?.content?.parts?.[0]?.text) {
-      log.warn('⚠️  [BBOX-DETECT] No response from Gemini');
+      log.warn('🔄 [FALLBACK] No response from Gemini for bbox detection');
       return null;
     }
 
@@ -1814,7 +1814,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
   });
 
   if (!allDetections) {
-    log.warn(`⚠️  [BBOX-ENRICH] Detection failed, no bounding boxes available`);
+    log.warn(`🔄 [FALLBACK] Detection failed, no bounding boxes available`);
     return { targets: [], detectionHistory: null };
   }
 
@@ -2030,7 +2030,7 @@ async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches 
         matchMethod: matchedCharacter ? 'character' : 'fallback',
         matchedCharacter: matchedCharacter || (bestMatch.name !== 'UNKNOWN' ? bestMatch.name : null)
       });
-      log.verbose(`📦 [BBOX-ENRICH] Matched: "${issue.description.substring(0, 30)}..." → "${bestMatch.label}" (${matchedCharacter ? 'character' : 'fallback'})`);
+      log.verbose(`📊 [EVAL] Matched: "${issue.description.substring(0, 30)}..." → "${bestMatch.label}" (${matchedCharacter ? 'character' : 'fallback'})`);
     } else {
       log.warn(`⚠️ [BBOX-ENRICH] Could not match issue: ${issue.description.substring(0, 50)}...`);
     }
@@ -2708,7 +2708,7 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         }
 
         // Evaluate image quality with prompt and reference images
-        log.debug(`⭐ [QUALITY] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
+        log.debug(`📊 [EVAL] Evaluating image quality (${evaluationType})...${qualityModelOverride ? ` [model: ${qualityModelOverride}]` : ''}`);
         const qualityResult = await evaluateImageQuality(compressedImageData, prompt, characterPhotos, evaluationType, qualityModelOverride, pageContext, storyText, sceneHint);
 
         // Extract score, reasoning, and text error info from quality result
@@ -6601,7 +6601,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       // No more attempts — just report the final score
       const reason = hasTextError ? `text error: ${result.textIssue}` : `score ${score}% < ${IMAGE_QUALITY_THRESHOLD}%`;
       if (MAX_ATTEMPTS === 1) {
-        log.debug(`📊 [QUALITY] ${pageLabel}${reason} (quality retry disabled, accepting result)`);
+        log.debug(`📊 [EVAL] ${pageLabel}${reason} (quality retry disabled, accepting result)`);
       } else {
         log.debug(`⚠️  [QUALITY RETRY] ${pageLabel}${reason}, no attempts remaining`);
       }
@@ -6613,7 +6613,7 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
   }
 
   // All attempts exhausted, return best result
-  console.log(`⚠️  [QUALITY RETRY] ${pageLabel}Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore === -1 ? 'unknown' : bestScore + '%'}`);
+  log.info(`📊 [EVAL] ${pageLabel}Max attempts (${MAX_ATTEMPTS}) reached. Using best result with score ${bestScore === -1 ? 'unknown' : bestScore + '%'}`);
   // Extract rewrite usage from retryHistory if a scene was rewritten
   const rewriteEntry = retryHistory.find(h => h.type === 'safety_block_rewrite' && h.rewriteUsage);
   return {

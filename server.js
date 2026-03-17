@@ -402,7 +402,7 @@ async function detectBboxOnCovers(coverImages, characters) {
         log.debug(`📦 [COVER BBOX] ${coverType}: detected ${figCount} figures, ${identifiedCount} identified`);
 
         if (missingCharacters.length > 0) {
-          log.warn(`⚠️ [COVER BBOX] ${coverType}: MISSING CHARACTERS - ${missingCharacters.join(', ')}`);
+          log.warn(`🚨 [ISSUE] [COVER BBOX] ${coverType}: MISSING CHARACTERS - ${missingCharacters.join(', ')}`);
         }
 
         // Update cover with bbox data
