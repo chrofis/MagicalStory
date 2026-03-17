@@ -269,6 +269,7 @@ const { jobRoutes, initJobRoutes } = require('./server/routes/jobs');
 const storyIdeasRoutes = require('./server/routes/storyIdeas');
 const trialRoutes = require('./server/routes/trial');
 const { apiRouter: sharingApiRoutes, htmlRouter: sharingHtmlRoutes, initSharingRoutes } = require('./server/routes/sharing');
+const { initSwissStories, getSwissStoriesResponse } = require('./server/lib/swissStories');
 
 /**
  * Build scene image objects for cover images to include in consistency checks.
@@ -1261,6 +1262,9 @@ if (trialRoutes.initTrialRoutes) {
   trialRoutes.initTrialRoutes({ processStoryJob });
 }
 
+// Initialize Swiss stories cache (parses MD files at startup)
+initSwissStories();
+
 // Initialize auth routes with server.js-local dependencies (for trial job processing on email verify)
 if (authRoutes.initAuthRoutes) {
   authRoutes.initAuthRoutes({ processStoryJob });
@@ -1298,6 +1302,17 @@ app.use('/api', aiProxyRoutes);  // /api/claude, /api/gemini
 app.use('/api', printRoutes);  // Print provider, PDF generation, Stripe payments, pricing
 app.use('/api/jobs', express.json({ limit: '50mb' }), jobRoutes);  // Job creation, status, cancellation, checkpoints
 app.use('/api', express.json({ limit: '50mb' }), storyIdeasRoutes);  // Story idea generation
+
+// Swiss Stories API — serves city data with story ideas (parsed from docs/story-ideas/*.md)
+app.get('/api/swiss-stories', (req, res) => {
+  try {
+    const data = getSwissStoriesResponse();
+    res.json(data);
+  } catch (err) {
+    log.error('[SWISS] API error:', err.message);
+    res.status(500).json({ error: 'Failed to load Swiss stories data' });
+  }
+});
 app.use('/api/trial', express.json({ limit: '50mb' }), trialRoutes);  // Anonymous trial story flow
 app.use('/api', sharingApiRoutes);  // /api/shared/* (public story data, images, OG image)
 app.use('/', sharingHtmlRoutes);  // /s/:shareToken, /shared/:shareToken (HTML)
@@ -3697,7 +3712,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dbPool
         }, {
           maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
-          evalConcurrency: 10,
+          evalConcurrency: 50,
           qualityModelOverride: modelOverrides.qualityModel,
           useIteratePage: false  // Fresh generation by default during story creation
         });
