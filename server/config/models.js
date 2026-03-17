@@ -69,12 +69,12 @@ const MODEL_DEFAULTS = {
   idea: 'claude-sonnet',               // Story idea generation
   outline: 'claude-sonnet',            // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
-  sceneDescription: 'claude-haiku',    // Initial scene expansion (fast/cheap)
+  sceneDescription: 'grok-4-fast',     // Initial scene expansion (fast/cheap — 4x cheaper than Haiku, 2x faster)
   sceneIteration: 'claude-sonnet',     // Scene iteration/retry (thorough, with all checks)
 
   // Image models
-  pageImage: 'gemini-2.5-flash-image',       // Regular page images
-  coverImage: 'gemini-3-pro-image-preview',  // Cover images (higher quality)
+  pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
+  coverImage: 'grok-imagine',                // Cover images ($0.02/image)
 
   // Quality evaluation models
   qualityEval: 'gemini-2.5-flash',     // Image quality evaluation
