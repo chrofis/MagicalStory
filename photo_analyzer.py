@@ -1566,15 +1566,18 @@ def split_grid():
         height, width = image.shape[:2]
 
         # Split into 4 quadrants
+        # Body quadrants start 15% above midpoint to include the head
+        # (Gemini's 2x2 grids often have heads right at the grid boundary)
         mid_h = height // 2
         mid_w = width // 2
-        print(f"[SPLIT-GRID] {width}x{height}, quadrants: {mid_w}x{mid_h}")
+        body_top = max(0, mid_h - int(height * 0.15))  # 15% overlap to capture heads
+        print(f"[SPLIT-GRID] {width}x{height}, quadrants: {mid_w}x{mid_h}, body_top: {body_top}")
 
         quadrants = {
-            'faceFront': image[0:mid_h, 0:mid_w],           # Top-left
-            'faceProfile': image[0:mid_h, mid_w:width],     # Top-right
-            'bodyFront': image[mid_h:height, 0:mid_w],      # Bottom-left
-            'bodyProfile': image[mid_h:height, mid_w:width] # Bottom-right
+            'faceFront': image[0:mid_h, 0:mid_w],              # Top-left
+            'faceProfile': image[0:mid_h, mid_w:width],        # Top-right
+            'bodyFront': image[body_top:height, 0:mid_w],      # Bottom-left (with head overlap)
+            'bodyProfile': image[body_top:height, mid_w:width]  # Bottom-right (with head overlap)
         }
 
         # Encode each quadrant as base64 JPEG
