@@ -1565,20 +1565,59 @@ def split_grid():
 
         height, width = image.shape[:2]
 
-        # Split into 4 quadrants
-        # Body quadrants start 15% above midpoint to include the head
-        # (Gemini's 2x2 grids often have heads right at the grid boundary)
-        mid_h = height // 2
-        mid_w = width // 2
-        body_top = max(0, mid_h - int(height * 0.15))  # 15% overlap to capture heads
-        print(f"[SPLIT-GRID] {width}x{height}, quadrants: {mid_w}x{mid_h}, body_top: {body_top}")
+        # Detect the actual grid separator lines instead of assuming 50/50 split.
+        # The 2x2 grid typically has a visible gap/line between cells.
+        # Strategy: find the row/column with the most uniform color (= separator).
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
+        # Find horizontal separator: row with lowest variance in the middle 60% of image
+        search_h_start = int(height * 0.3)
+        search_h_end = int(height * 0.7)
+        row_variances = []
+        for y in range(search_h_start, search_h_end):
+            row_variances.append((np.var(gray[y, :].astype(float)), y))
+        row_variances.sort()
+        mid_h = row_variances[0][1] if row_variances else height // 2
+
+        # Find vertical separator: column with lowest variance in the middle 60%
+        search_w_start = int(width * 0.3)
+        search_w_end = int(width * 0.7)
+        col_variances = []
+        for x in range(search_w_start, search_w_end):
+            col_variances.append((np.var(gray[:, x].astype(float)), x))
+        col_variances.sort()
+        mid_w = col_variances[0][1] if col_variances else width // 2
+
+        print(f"[SPLIT-GRID] {width}x{height}, detected grid at x={mid_w} y={mid_h}")
+
+        # Split using detected grid lines
         quadrants = {
-            'faceFront': image[0:mid_h, 0:mid_w],              # Top-left
-            'faceProfile': image[0:mid_h, mid_w:width],        # Top-right
-            'bodyFront': image[body_top:height, 0:mid_w],      # Bottom-left (with head overlap)
-            'bodyProfile': image[body_top:height, mid_w:width]  # Bottom-right (with head overlap)
+            'faceFront': image[0:mid_h, 0:mid_w],
+            'faceProfile': image[0:mid_h, mid_w:width],
+            'bodyFront': image[mid_h:height, 0:mid_w],
+            'bodyProfile': image[mid_h:height, mid_w:width]
         }
+
+        # Verify body quadrants have heads: detect faces in each body quadrant.
+        # If head is cut off, expand upward to include it.
+        for body_key in ['bodyFront', 'bodyProfile']:
+            body_img = quadrants[body_key]
+            face = detect_face_mediapipe(body_img)
+            if face and face['y'] < 5:
+                # Face is at very top edge — likely cut off. Expand upward.
+                col_start = 0 if body_key == 'bodyFront' else mid_w
+                col_end = mid_w if body_key == 'bodyFront' else width
+                # Search above mid_h for the face in the original image
+                expanded_top = max(0, mid_h - int(height * 0.15))
+                quadrants[body_key] = image[expanded_top:height, col_start:col_end]
+                print(f"[SPLIT-GRID] {body_key}: face at top edge, expanded from y={expanded_top}")
+            elif not face:
+                # No face detected at all — expand upward as fallback
+                col_start = 0 if body_key == 'bodyFront' else mid_w
+                col_end = mid_w if body_key == 'bodyFront' else width
+                expanded_top = max(0, mid_h - int(height * 0.10))
+                quadrants[body_key] = image[expanded_top:height, col_start:col_end]
+                print(f"[SPLIT-GRID] {body_key}: no face detected, expanded from y={expanded_top}")
 
         # Encode each quadrant as base64 JPEG
         encoded_quadrants = {}
