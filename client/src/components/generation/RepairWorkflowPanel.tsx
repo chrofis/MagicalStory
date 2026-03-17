@@ -1211,57 +1211,38 @@ export function RepairWorkflowPanel({
                   </div>
                 )}
 
-                {/* Image model selector for page redo - only in developer mode */}
+                {/* Image & repair model selector - only in developer mode */}
                 {developerMode && (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <label className="text-sm font-medium text-yellow-800 mb-2 block">Image Model (page redo):</label>
+                    <label className="text-sm font-medium text-yellow-800 mb-2 block">Image Model:</label>
                     <select
-                      value={overrideImageModel || imageModel || ''}
-                      onChange={(e) => setOverrideImageModel(e.target.value || null)}
+                      value={useMagicApiRepair ? 'magicapi' : (overrideImageModel || imageModel || '')}
+                      onChange={(e) => {
+                        if (e.target.value === 'magicapi') {
+                          setUseMagicApiRepair?.(true);
+                          setOverrideImageModel(null);
+                        } else {
+                          setUseMagicApiRepair?.(false);
+                          setOverrideImageModel(e.target.value || null);
+                        }
+                      }}
                       className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
                       disabled={isRunning}
                     >
-                      <option value="">Server Default</option>
-                      <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
-                      <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
-                      <option value="grok-imagine">Grok Imagine ($0.02/image)</option>
-                      <option value="grok-imagine-pro">Grok Imagine Pro ($0.07/image)</option>
-                      <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
+                      <optgroup label="Image Generation">
+                        <option value="">Server Default</option>
+                        <option value="gemini-2.5-flash-image">Gemini 2.5 Flash Image</option>
+                        <option value="gemini-3-pro-image-preview">Gemini 3 Pro Image</option>
+                        <option value="grok-imagine">Grok Imagine ($0.02/image)</option>
+                        <option value="grok-imagine-pro">Grok Imagine Pro ($0.07/image)</option>
+                        <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
+                      </optgroup>
+                      <optgroup label="Face Repair">
+                        <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
+                      </optgroup>
                     </select>
-                  </div>
-                )}
-
-                {/* Repair method selector - only in developer mode */}
-                {developerMode && setUseMagicApiRepair && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                    <label className="text-sm font-medium text-blue-800 mb-2 block">Repair Method:</label>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="repairMethod"
-                          checked={!useMagicApiRepair}
-                          onChange={() => setUseMagicApiRepair(false)}
-                          className="text-blue-600"
-                          disabled={isRunning}
-                        />
-                        <span className="text-sm">Gemini (default)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="repairMethod"
-                          checked={useMagicApiRepair}
-                          onChange={() => setUseMagicApiRepair(true)}
-                          className="text-blue-600"
-                          disabled={isRunning}
-                        />
-                        <span className="text-sm">MagicAPI Face+Hair</span>
-                        <span className="text-xs text-blue-600">(~$0.006/repair)</span>
-                      </label>
-                    </div>
                     {useMagicApiRepair && (
-                      <p className="text-xs text-blue-600 mt-2">
+                      <p className="text-xs text-yellow-600 mt-2">
                         Uses face swap + hair fix pipeline with iterative crop checking
                       </p>
                     )}

@@ -207,8 +207,8 @@ export default function StoryWizard() {
     return localStorage.getItem('story_type') || '';
   });
   // New story category system
-  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | ''>(() => {
-    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '';
+  const [storyCategory, setStoryCategory] = useState<'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | ''>(() => {
+    return (localStorage.getItem('story_category') || '') as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
   });
   const [storyTopic, setStoryTopic] = useState(() => {
     return localStorage.getItem('story_topic') || '';
@@ -714,7 +714,7 @@ export default function StoryWizard() {
 
       // Reset story settings state
       setStoryType('');
-      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '');
+      setStoryCategory('' as 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '');
       setStoryTopic('');
       setStoryTheme('');
       setCustomThemeText('');
@@ -1738,7 +1738,7 @@ export default function StoryWizard() {
   }, [step]);
 
   // Handler for story category change - doesn't auto-advance, user must select theme/topic
-  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'custom' | '') => {
+  const handleCategoryChange = (category: 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '') => {
     setStoryCategory(category);
     // Don't auto-advance - user needs to select theme/topic next
   };
@@ -1765,8 +1765,8 @@ export default function StoryWizard() {
   // Handler for story topic change
   const handleTopicChange = (topic: string) => {
     setStoryTopic(topic);
-    // Historical: advance when topic is selected (no theme step for historical)
-    if (storyCategory === 'historical' && topic !== '') {
+    // Historical and Swiss Stories: advance when topic is selected (no theme step)
+    if ((storyCategory === 'historical' || storyCategory === 'swiss-stories') && topic !== '') {
       safeSetStep(4);
     }
     // Life-challenge/Educational: don't auto-advance, user still has optional theme step
@@ -3883,7 +3883,7 @@ export default function StoryWizard() {
 
           // Save generation settings for dev mode display (use current wizard state)
           setSavedGenerationSettings({
-            storyCategory: storyCategory || undefined,
+            storyCategory: (storyCategory || undefined) as any,
             storyTopic: storyTopic || undefined,
             storyTheme: storyTheme || undefined,
             storyTypeName: getStoryTypeName(),
@@ -4090,6 +4090,7 @@ export default function StoryWizard() {
             storyTopic={storyTopic}
             storyTheme={storyTheme}
             customThemeText={customThemeText}
+            userLocation={userLocation}
             onCategoryChange={handleCategoryChange}
             onTopicChange={handleTopicChange}
             onThemeChange={handleThemeChange}
@@ -4114,7 +4115,7 @@ export default function StoryWizard() {
             characters={characters}
             mainCharacters={mainCharacters}
             excludedCharacters={excludedCharacters}
-            storyCategory={storyCategory}
+            storyCategory={storyCategory as any}
             storyTopic={storyTopic}
             storyTheme={storyTheme}
             customThemeText={customThemeText}
@@ -5295,8 +5296,9 @@ export default function StoryWizard() {
       </div>
 
       {/* Generation Progress Modal - Full story generation */}
-      {/* Show until we have content to display (front cover, story data, or final story), or user minimizes */}
-      {isGenerating && !generatedStory && !progressiveStoryData && !coverImages.frontCover && !isProgressMinimized && (
+      {/* Show until we have an image to display (front cover or first page image), final story, or user minimizes */}
+      {/* Note: progressiveStoryData (text) alone does NOT dismiss — wait for at least one image */}
+      {isGenerating && !generatedStory && !coverImages.frontCover && Object.keys(completedPageImages).length === 0 && !isProgressMinimized && (
         <GenerationProgress
           current={generationProgress.current}
           total={generationProgress.total}
