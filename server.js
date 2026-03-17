@@ -3712,7 +3712,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           dbPool
         }, {
           maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
-          evalConcurrency: 50,
+          evalConcurrency: 500,
           qualityModelOverride: modelOverrides.qualityModel,
           useIteratePage: false  // Fresh generation by default during story creation
         });
@@ -4459,6 +4459,17 @@ async function _processStoryJobImpl(jobId) {
         }
       } catch (dbErr) {
         log.warn(`📸 [PROCESS] Failed to load character data from DB: ${dbErr.message}`);
+      }
+    }
+
+    // For swiss-stories, derive city from storyTopic if userLocation not set
+    if (inputData.storyCategory === 'swiss-stories' && inputData.storyTopic && !inputData.userLocation?.city) {
+      const { getSwissCityById } = require('./server/lib/swissStories');
+      const cityId = inputData.storyTopic.replace(/-\d+$/, '');
+      const cityMeta = getSwissCityById(cityId);
+      if (cityMeta) {
+        inputData.userLocation = { city: cityMeta.name.en, country: 'Switzerland' };
+        log.debug(`[SWISS] Auto-set userLocation to ${cityMeta.name.en} from storyTopic ${inputData.storyTopic}`);
       }
     }
 
