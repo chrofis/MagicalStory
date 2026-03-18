@@ -119,25 +119,51 @@ ${historicalGuide}`;
       categoryInstructions = `This is a HISTORICAL story about "${storyTopic}". Create an age-appropriate adventure set during this historical event.`;
     }
   } else if (effectiveCategory === 'swiss-stories') {
-    const { getSwissStoryResearch, getSwissCityById } = require('../lib/swissStories');
-    const cityId = storyTopic.replace(/-\d+$/, '');
-    const cityData = getSwissStoryResearch(cityId);
-    const cityMeta = getSwissCityById(cityId);
-    const cityName = cityMeta?.name?.en || cityId;
+    if (storyTopic.startsWith('sage-')) {
+      // Swiss fairy tale / legend (Sage)
+      const { getSageById } = require('../lib/swissStories');
+      const sage = getSageById(storyTopic);
+      if (sage) {
+        const sageTitle = typeof sage.title === 'object' ? sage.title.en : sage.title;
+        const sageDesc = typeof sage.description === 'object' ? sage.description.en : sage.description;
+        const sageContext = sage.context && typeof sage.context === 'object' ? sage.context.en : (sage.context || '');
+        categoryInstructions = `IMPORTANT: This is a SWISS FAIRY TALE / LEGEND (Sage).
+Story: "${sageTitle}" — ${sageDesc}
 
-    if (cityData) {
-      const ideaNum = parseInt(storyTopic.split('-').pop());
-      const idea = cityData.ideas[ideaNum - 1];
-      // Support both localized {en,de,fr} and plain string formats
-      const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
-      const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : (idea?.description || '');
-      categoryInstructions = `IMPORTANT: This is a SWISS LOCAL STORY set in ${cityName}.
+${sageContext}
+
+Themes: ${(sage.themes || []).join(', ')}
+
+INSTRUCTIONS:
+- Retell this classic Swiss legend with the child characters as participants in the story
+- Keep the core plot and moral but make it age-appropriate and magical
+- Use vivid Swiss Alpine imagery and real Swiss cultural elements
+- The child becomes part of the legend — they don't just observe it`;
+      } else {
+        categoryInstructions = `This is a SWISS FAIRY TALE. Create an engaging retelling of a Swiss legend.`;
+      }
+    } else {
+      // City-based Swiss story
+      const { getSwissStoryResearch, getSwissCityById } = require('../lib/swissStories');
+      const cityId = storyTopic.replace(/-\d+$/, '');
+      const cityData = getSwissStoryResearch(cityId);
+      const cityMeta = getSwissCityById(cityId);
+      const cityName = cityMeta?.name?.en || cityId;
+
+      if (cityData) {
+        const ideaNum = parseInt(storyTopic.split('-').pop());
+        const idea = cityData.ideas[ideaNum - 1];
+        // Support both localized {en,de,fr} and plain string formats
+        const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
+        const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : (idea?.description || '');
+        categoryInstructions = `IMPORTANT: This is a SWISS LOCAL STORY set in ${cityName}.
 Story idea: "${ideaTitle}" — ${ideaDesc}
 
 Use the city's real landmarks, history, and cultural elements.
 ${cityData.research.slice(0, 2000)}`;
-    } else {
-      categoryInstructions = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city.`;
+      } else {
+        categoryInstructions = `This is a SWISS LOCAL STORY. Create an engaging story set in a Swiss city.`;
+      }
     }
   } else if (effectiveCategory === 'custom') {
     categoryInstructions = `IMPORTANT: This is a CUSTOM story. The user provided their own concept:

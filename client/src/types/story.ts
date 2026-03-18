@@ -60,9 +60,20 @@ export interface SwissCity {
   ideas: SwissStoryIdea[];
 }
 
+export interface SwissSage {
+  id: string;
+  title: SwissLocalizedString;
+  description: SwissLocalizedString;
+  context?: SwissLocalizedString;
+  themes: string[];
+  age: string;
+  emoji: string;
+}
+
 export interface SwissStoriesData {
   cantons: Record<string, { en: string; de: string; fr: string }>;
   cities: SwissCity[];
+  sagen?: SwissSage[];
 }
 
 // Historical event topic

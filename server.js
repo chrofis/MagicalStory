@@ -4463,7 +4463,8 @@ async function _processStoryJobImpl(jobId) {
     }
 
     // For swiss-stories, derive city from storyTopic if userLocation not set
-    if (inputData.storyCategory === 'swiss-stories' && inputData.storyTopic && !inputData.userLocation?.city) {
+    // Skip for Sagen (fairy tales) — they're not city-bound
+    if (inputData.storyCategory === 'swiss-stories' && inputData.storyTopic && !inputData.storyTopic.startsWith('sage-') && !inputData.userLocation?.city) {
       const { getSwissCityById } = require('./server/lib/swissStories');
       const cityId = inputData.storyTopic.replace(/-\d+$/, '');
       const cityMeta = getSwissCityById(cityId);

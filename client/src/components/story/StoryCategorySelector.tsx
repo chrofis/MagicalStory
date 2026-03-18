@@ -129,7 +129,7 @@ export function StoryCategorySelector({
   const [swissLoading, setSwissLoading] = useState(false);
   const [expandedSwissCities, setExpandedSwissCities] = useState<string[]>([]);
   const [expandedSwissCantons, setExpandedSwissCantons] = useState<string[]>([]);
-  const [expandedSwissSection, setExpandedSwissSection] = useState<'nearby' | 'cantons' | null>(null);
+  const [expandedSwissSection, setExpandedSwissSection] = useState<'nearby' | 'cantons' | 'sagen' | null>(null);
 
   // Translations
   const translations = {
@@ -155,6 +155,7 @@ export function StoryCategorySelector({
       yourCity: 'Your City',
       nearby: 'Nearby',
       byCanton: 'By Canton',
+      sagen: 'Legends & Fairy Tales',
       ideas: 'ideas',
       km: 'km',
       loading: 'Loading...',
@@ -181,6 +182,7 @@ export function StoryCategorySelector({
       yourCity: 'Deine Stadt',
       nearby: 'In der Nähe',
       byCanton: 'Nach Kanton',
+      sagen: 'Sagen & Märchen',
       ideas: 'Ideen',
       km: 'km',
       loading: 'Laden...',
@@ -207,6 +209,7 @@ export function StoryCategorySelector({
       yourCity: 'Votre ville',
       nearby: 'À proximité',
       byCanton: 'Par canton',
+      sagen: 'Légendes & Contes',
       ideas: 'idées',
       km: 'km',
       loading: 'Chargement...',
@@ -902,6 +905,52 @@ export function StoryCategorySelector({
                 </div>
               )}
             </div>
+
+            {/* Swiss Legends (Sagen) */}
+            {swissData?.sagen && swissData.sagen.length > 0 && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setExpandedSwissSection(prev => prev === 'sagen' ? null : 'sagen')}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <span className="font-semibold text-gray-700 flex items-center gap-2">
+                    <span>📖</span> {t.sagen}
+                    <span className="text-xs text-gray-500 font-normal">({swissData.sagen.length})</span>
+                  </span>
+                  {expandedSwissSection === 'sagen' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </button>
+                {expandedSwissSection === 'sagen' && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
+                    {swissData.sagen.map((sage) => {
+                      const title = localizeField(sage.title, lang);
+                      const description = localizeField(sage.description, lang);
+                      const context = sage.context ? localizeField(sage.context, lang) : '';
+                      return (
+                        <button
+                          key={sage.id}
+                          onClick={() => {
+                            onTopicChange(sage.id);
+                            onLegacyStoryTypeChange(sage.id);
+                          }}
+                          className="p-3 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="text-xl flex-shrink-0">{sage.emoji}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-semibold text-gray-800 line-clamp-1">{title}</div>
+                              {context && (
+                                <div className="text-[11px] text-amber-700 bg-amber-50 rounded px-1.5 py-1 mt-1 line-clamp-2 border border-amber-100">{context}</div>
+                              )}
+                              <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">{description}</div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : null}
       </div>
