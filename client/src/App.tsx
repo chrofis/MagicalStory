@@ -34,6 +34,8 @@ const Occasions = lazy(() => import('./pages/Occasions'));
 const OccasionPage = lazy(() => import('./pages/OccasionPage'));
 const Comparisons = lazy(() => import('./pages/Comparisons'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
+const CityListing = lazy(() => import('./pages/CityListing'));
+const CityPage = lazy(() => import('./pages/CityPage'));
 
 function App() {
   return (
@@ -66,6 +68,8 @@ function App() {
           <Route path="/anlass/:occasionSlug" element={<OccasionPage />} />
           <Route path="/vergleich" element={<Comparisons />} />
           <Route path="/vergleich/:competitorSlug" element={<ComparisonPage />} />
+          <Route path="/stadt" element={<CityListing />} />
+          <Route path="/stadt/:cityId" element={<CityPage />} />
           <Route path="/shared/:shareToken" element={<SharedStoryViewer />} />
           <Route path="/s/:shareToken" element={<SharedStoryViewer />} />
           <Route path="/try" element={<TrialWizard />} />

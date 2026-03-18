@@ -1,7 +1,18 @@
 // server/lib/seoMeta.js — SEO meta tag injection, sitemap generation, and route metadata
 // CommonJS module for server-side use
 
+const fs = require('fs');
+const path = require('path');
+
 const BASE_URL = 'https://magicalstory.ch';
+
+// ─── Swiss City Data (loaded from JSON for /stadt routes) ────────────────────
+
+let SWISS_CITIES = [];
+try {
+  const raw = JSON.parse(fs.readFileSync(path.join(__dirname, '../data/swiss-cities.json'), 'utf-8'));
+  SWISS_CITIES = raw.cities || [];
+} catch (_) { /* data file optional */ }
 
 // ─── Theme Data (id → { en, de, fr }) ────────────────────────────────────────
 
@@ -341,6 +352,18 @@ const STATIC_ROUTES = {
       de: 'Personalisierte Kindergeschichten aus 50 Schweizer Städten. Dein Kind erlebt Abenteuer in Zürich, Bern, Basel und mehr.',
       en: 'Personalized children\'s stories from 50 Swiss cities. Your child goes on adventures in Zurich, Bern, Basel and more.',
       fr: 'Histoires personnalisées pour enfants de 50 villes suisses. Votre enfant vit des aventures à Zurich, Berne, Bâle et plus.',
+    },
+  },
+  '/stadt': {
+    title: {
+      de: 'Kindergeschichten aus der Schweiz — Alle Städte | MagicalStory',
+      en: 'Children\'s Stories from Switzerland — All Cities | MagicalStory',
+      fr: 'Histoires pour enfants de Suisse — Toutes les villes | MagicalStory',
+    },
+    description: {
+      de: 'Personalisierte Kindergeschichten aus 100 Schweizer Städten. Entdecke Geschichte und Sagen aus deiner Stadt — dein Kind wird zum Helden.',
+      en: 'Personalized children\'s stories from 100 Swiss cities. Discover history and legends from your city — your child becomes the hero.',
+      fr: 'Histoires personnalisées pour enfants de 100 villes suisses. Découvrez l\'histoire et les légendes de votre ville — votre enfant devient le héros.',
     },
   },
   '/vergleich': {
@@ -844,7 +867,38 @@ function getMetaForRoute(routePath, lang) {
     }
   }
 
-  // 7. Noindex route (auth/app pages)
+  // 7. City page: /stadt/:cityId
+  const cityMatch = cleanPath.match(/^\/stadt\/([^/]+)$/);
+  if (cityMatch) {
+    const cId = cityMatch[1];
+    const cityData = SWISS_CITIES.find(c => c.id === cId);
+    if (cityData) {
+      const cityName = cityData.name[lang] || cityData.name.de;
+      const canton = cityData.canton;
+      const titleTpl = lang === 'de'
+        ? `Personalisiertes Kinderbuch ${cityName} (${canton}) | MagicalStory`
+        : lang === 'fr'
+          ? `Livre personnalisé pour enfants ${cityName} (${canton}) | MagicalStory`
+          : `Personalized Children's Book ${cityName} (${canton}) | MagicalStory`;
+      return {
+        title: titleTpl,
+        description: buildCityDescription(cityName, lang),
+        canonical: `${BASE_URL}${cleanPath}`,
+        path: cleanPath,
+        noindex: false,
+        hreflang: buildHreflang(cleanPath),
+        jsonLd: [
+          buildBreadcrumbJsonLd([
+            { name: 'Home', url: '/' },
+            { name: lang === 'de' ? 'Schweizer Städte' : lang === 'fr' ? 'Villes suisses' : 'Swiss Cities', url: '/stadt' },
+            { name: cityName },
+          ]),
+        ],
+      };
+    }
+  }
+
+  // 8. Noindex route (auth/app pages)
   if (isNoindex) {
     return {
       title: 'Magical Story',
@@ -856,7 +910,7 @@ function getMetaForRoute(routePath, lang) {
     };
   }
 
-  // 8. Fallback — unknown route
+  // 9. Fallback — unknown route
   return {
     title: 'Magical Story – Dein Kind als Held seiner eigenen Geschichte',
     description: 'Dein Kind wird zum Helden einer wunderschön illustrierten Geschichte. Foto hochladen, Thema wählen und ein fertiges Buch in den Händen halten.',
@@ -904,6 +958,15 @@ function buildTownDescription(townName, lang) {
     de: `Dein Kind erlebt ein personalisiertes Abenteuer in ${townName} — als Held eines illustrierten Kinderbuchs. Lokale Wahrzeichen, echte Schauplätze. Kostenlos testen.`,
     en: `Your child goes on a personalized adventure in ${townName} — as the hero of an illustrated children's book. Local landmarks, real settings. Try free.`,
     fr: `Votre enfant vit une aventure personnalisée à ${townName} — en héros d'un livre illustré. Monuments locaux, lieux réels. Essai gratuit.`,
+  };
+  return templates[lang] || templates.de;
+}
+
+function buildCityDescription(cityName, lang) {
+  const templates = {
+    de: `Personalisierte Kindergeschichten aus ${cityName}: Dein Kind erlebt echte Geschichte und lokale Sagen als Held eines illustrierten Kinderbuchs. Kostenlos testen.`,
+    en: `Personalized children's stories from ${cityName}: Your child experiences real history and local legends as the hero of an illustrated book. Try free.`,
+    fr: `Histoires personnalisées pour enfants de ${cityName}: Votre enfant vit l'histoire locale en héros d'un livre illustré. Essai gratuit.`,
   };
   return templates[lang] || templates.de;
 }
@@ -1061,6 +1124,7 @@ function generateSitemap() {
     '/pricing': '0.9',
     '/themes': '0.8',
     '/geschichten-aus': '0.7',
+    '/stadt': '0.7',
     '/anlass': '0.7',
     '/vergleich': '0.6',
     '/science': '0.7',
@@ -1128,6 +1192,16 @@ function generateSitemap() {
   for (const occasionSlug of Object.keys(OCCASIONS)) {
     paths.push({
       path: `/anlass/${occasionSlug}`,
+      lastmod: today,
+      changefreq: 'monthly',
+      priority: '0.6',
+    });
+  }
+
+  // City pages (/stadt/:cityId)
+  for (const city of SWISS_CITIES) {
+    paths.push({
+      path: `/stadt/${city.id}`,
       lastmod: today,
       changefreq: 'monthly',
       priority: '0.6',
