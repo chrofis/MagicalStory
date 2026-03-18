@@ -3785,10 +3785,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         ]);
 
         // Run bbox detection on covers for entity consistency checks
-        try {
-          await detectBboxOnCovers(coverImages, inputData.characters);
-        } catch (bboxErr) {
-          log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
+        // Skip when quality evaluation is disabled (trial mode) — bbox data won't be used
+        if (!skipQualityEval) {
+          try {
+            await detectBboxOnCovers(coverImages, inputData.characters);
+          } catch (bboxErr) {
+            log.warn(`⚠️ [UNIFIED] Cover bbox detection failed: ${bboxErr.message}`);
+          }
         }
       } catch (coverErr) {
         log.error(`❌ [UNIFIED] Cover generation failed/timed out: ${coverErr.message}`);

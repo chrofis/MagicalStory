@@ -493,6 +493,8 @@ Characters (MAX 5, each listed BY NAME):
 - [Name] (position): [clothing]
 
 ---STORY PAGES---
+**CRITICAL: NO Visual Bible IDs in story text.** [LOC001], [ART001], [CHR001], [ANI001], [VEH001], [CLO001] etc. are for the Visual Bible JSON and scene hints ONLY. Story text must use natural names ("the old tower", "her amulet") — never bracket IDs.
+
 Rewrite the story applying ALL FIXES from CRITICAL ANALYSIS. No word counts - clean text only.
 
 For EACH of the {PAGES} pages:

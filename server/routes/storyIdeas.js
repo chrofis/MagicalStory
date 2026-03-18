@@ -192,9 +192,9 @@ ${adventureGuideContent}`
     : '';
 
   // Calculate story length category for output length limits
-  const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 4 sentences max per idea' :
-                              pages <= 20 ? 'MEDIUM (11-20 pages) - 6 sentences max per idea' :
-                                            'LONG (21+ pages) - 8 sentences max per idea';
+  const storyLengthCategory = pages <= 10 ? 'SHORT (1-10 pages) - 6 sentences max per idea' :
+                              pages <= 20 ? 'MEDIUM (11-20 pages) - 8 sentences max per idea' :
+                                            'LONG (21+ pages) - 10 sentences max per idea';
 
   // Load prompt templates
   const promptTemplate = await fs.readFile(path.join(__dirname, '../../prompts', 'generate-story-ideas.txt'), 'utf-8');

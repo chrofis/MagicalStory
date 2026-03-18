@@ -68,7 +68,7 @@ export const occasions: OccasionData[] = [
     faq: [
       {
         q: { en: 'How quickly can I get a printed book?', de: 'Wie schnell bekomme ich ein gedrucktes Buch?', fr: 'En combien de temps puis-je recevoir un livre imprimé ?' },
-        a: { en: 'The digital story is ready in minutes. Printed books are delivered within 3-5 business days to Swiss addresses.', de: 'Die digitale Geschichte ist in wenigen Minuten fertig. Gedruckte Bücher werden innerhalb von 3-5 Werktagen an Schweizer Adressen geliefert.', fr: 'L\'histoire numérique est prête en quelques minutes. Les livres imprimés sont livrés en 3 à 5 jours ouvrables en Suisse.' },
+        a: { en: 'The digital story is ready in minutes. Printed books are delivered within 5-7 business days to Swiss addresses.', de: 'Die digitale Geschichte ist in wenigen Minuten fertig. Gedruckte Bücher werden innerhalb von 5-7 Werktagen an Schweizer Adressen geliefert.', fr: 'L\'histoire numérique est prête en quelques minutes. Les livres imprimés sont livrés en 5 à 7 jours ouvrables en Suisse.' },
       },
       {
         q: { en: 'Can I add more than one child to the story?', de: 'Kann ich mehr als ein Kind zur Geschichte hinzufügen?', fr: 'Puis-je ajouter plus d\'un enfant à l\'histoire ?' },

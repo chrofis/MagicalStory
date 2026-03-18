@@ -1429,7 +1429,7 @@ class UnifiedStoryParser {
       // Extract TEXT section
       const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
       // Strip any trailing metadata like "*(Word count: 331)*" or similar
-      const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').trim() : '';
+      const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
 
       // Extract SCENE HINT section (stops at Characters: which is now multi-line)
       const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
@@ -1534,6 +1534,9 @@ class ProgressiveUnifiedParser {
       coverHints: false,
       pages: new Set()
     };
+
+    // Set to true during finalize() to relax last-page detection
+    this._finalized = false;
 
     // Section markers in order (must match actual output format from story-unified.txt)
     this.sectionMarkers = [
@@ -1853,22 +1856,33 @@ class ProgressiveUnifiedParser {
       const nextPageIndex = this.fullText.indexOf(`--- Page ${pageNum + 1} ---`);
       const isLastKnownPage = nextPageIndex === -1;
 
-      // Only emit if we're confident the page is complete
-      // Either there's a next page, or we have both TEXT and SCENE HINT plus at least one character with clothing
-      // Note: Characters section may be "Characters:" or "Characters (MAX N):"
-      // Note: [^\r\n] handles both Unix (\n) and Windows (\r\n) line endings
-      const hasCharacterClothing = /Characters(?:\s*\([^)]*\))?:\s*[\s\S]*?(?:^[-*]?\s*\w[^:\r\n]*:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))/mi.test(content);
+      // Page completeness detection:
+      // 1. Non-last page: If the next page marker exists, this page is COMPLETE by definition.
+      //    All content has been streamed. We just need TEXT + SCENE HINT to be useful.
+      // 2. Last page during streaming: Content may still be arriving, so require evidence
+      //    the page is fully received (clothing data or Setting: line present).
+      // 3. At finalize() time: this._finalized is true, so even the last page emits
+      //    with just TEXT + SCENE HINT (all content has been received).
 
-      // IMPORTANT: Check if Characters block is fully received
-      // Complete when: followed by Setting:, blank line, or end of content
-      const charactersBlockComplete = /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*\r?\n(?:Setting:|[^\S\r\n]*\r?\n)/mi.test(content) ||
-        /Characters(?:\s*\([^)]*\))?:\s*(?:[\s\S]*?\r?\n[-*]\s*[^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+))+\s*$/i.test(content);
+      // Detect any clothing-related content (handles all formats: bulleted, non-bulleted, inline)
+      // Matches "Name: standard/winter/summer/formal/costumed:xxx" anywhere in the Characters block
+      const hasCharacterClothing = /Characters(?:\s*\([^)]*\))?:[\s\S]*?\w[^:\r\n]*:\s*(?:standard|winter|summer|formal|costumed:[^\r\n]+)/i.test(content);
 
-      if ((nextPageIndex > match.index && charactersBlockComplete) || (isLastKnownPage && hasText && hasHint && hasCharacterClothing)) {
+      // For the last page during streaming, check if the page looks complete:
+      // Has Setting: line, OR has a blank line after Characters block, OR has clothing data at end of content
+      const hasSettingLine = /\bSetting:\s*\S/i.test(content);
+
+      // Emit conditions:
+      // - Non-last page: next page marker exists AND we have TEXT + HINT (page is definitively complete)
+      // - Last page: TEXT + HINT + (Setting line OR clothing data OR finalized)
+      const isNonLastComplete = nextPageIndex > match.index && hasText && hasHint;
+      const isLastComplete = isLastKnownPage && hasText && hasHint && (hasSettingLine || hasCharacterClothing || this._finalized);
+
+      if (isNonLastComplete || isLastComplete) {
         // Extract page data
         const textMatch = content.match(/TEXT:\s*([\s\S]*?)(?=SCENE HINT:|$)/i);
         // Strip any trailing metadata like "*(Word count: 331)*" or similar
-        const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').trim() : '';
+        const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
 
         const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters(?:\s*\([^)]*\))?:|---\s*Page|$)/i);
         const sceneHint = hintMatch ? hintMatch[1].trim() : '';
@@ -1942,6 +1956,10 @@ class ProgressiveUnifiedParser {
    * Finalize parsing - emit any remaining pages and warn about missing sections
    */
   finalize() {
+    // Mark as finalized so _checkPages() relaxes last-page detection
+    // (all content has been received, so TEXT + HINT is sufficient)
+    this._finalized = true;
+
     // Re-check pages one more time to catch the last page
     this._checkPages();
 

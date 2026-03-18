@@ -56,9 +56,9 @@ Generate a story idea that includes:
 STORY LENGTH: {STORY_LENGTH_CATEGORY}
 
 MAXIMUM LENGTH:
-- Short stories (1-10 pages): 4 sentences maximum
-- Medium stories (11-20 pages): 6 sentences maximum
-- Long stories (21+ pages): 8 sentences maximum
+- Short stories (1-10 pages): 6 sentences maximum
+- Medium stories (11-20 pages): 8 sentences maximum
+- Long stories (21+ pages): 10 sentences maximum
 
 Each sentence should describe ONE key event or plot point. Be concise.
 DO NOT exceed these limits - quality over quantity.

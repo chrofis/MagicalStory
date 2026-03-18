@@ -112,9 +112,9 @@ Each story idea must be PLAIN TEXT PARAGRAPHS:
 - Focus on actions: who goes where, what they do, what happens
 
 **LENGTH:** {STORY_LENGTH_CATEGORY}
-- Short (1-10 pages): 3-4 sentences
-- Medium (11-20 pages): 5-6 sentences
-- Long (21+ pages): 7-8 sentences
+- Short (1-10 pages): 5-6 sentences
+- Medium (11-20 pages): 7-8 sentences
+- Long (21+ pages): 9-10 sentences
 
 ## EXAMPLES (correct format):
 

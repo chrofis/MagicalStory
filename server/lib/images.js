@@ -9205,6 +9205,15 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     maxElements = null
   } = options;
 
+  // Reference sheet generation uses the Gemini API directly, so skip for non-Gemini backends.
+  // Grok has its own packReferences() system; Runware doesn't support this at all.
+  const resolvedModel = imageModel || MODEL_DEFAULTS.pageImage;
+  const modelConfig = IMAGE_MODELS[resolvedModel];
+  if (modelConfig?.backend && modelConfig.backend !== 'gemini') {
+    log.info(`[REF-SHEET] Skipping — ${modelConfig.backend} backend does not use Gemini reference sheets`);
+    return { generated: 0, failed: 0, elements: [] };
+  }
+
   // DEBUG: Log visual bible contents to diagnose reference image generation
   log.info(`[REF-SHEET] Visual Bible summary:`);
   log.info(`  - Secondary characters: ${visualBible?.secondaryCharacters?.length || 0}`);

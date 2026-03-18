@@ -295,9 +295,9 @@ async function sendStoryFailedEmail(userEmail, firstName, language = 'English') 
 function formatDeliveryEstimate(minDate, maxDate, language) {
   // Default fallbacks by language
   const defaults = {
-    'English': '5-10 business days',
-    'German': '5-10 Werktage',
-    'French': '5-10 jours ouvrables'
+    'English': '5-7 business days',
+    'German': '5-7 Werktage',
+    'French': '5-7 jours ouvrables'
   };
 
   if (!minDate && !maxDate) {
