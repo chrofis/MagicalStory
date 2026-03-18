@@ -468,8 +468,8 @@ export default function SharedStoryViewer() {
             return (
               <div className="flex flex-col md:grid md:grid-cols-2 h-[calc(100vh-180px)] md:h-[calc(100vh-160px)] min-h-[400px] max-h-[800px]">
                 {/* Text — left on desktop, bottom on mobile */}
-                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col bg-indigo-50/50 overflow-hidden order-2 md:order-1">
-                  <div ref={textScrollRef} className="flex-1 overflow-y-auto min-h-0" data-text-scroll>
+                <div className="h-1/2 md:h-full p-4 md:p-5 lg:p-6 flex flex-col md:justify-center bg-indigo-50/50 overflow-hidden order-2 md:order-1">
+                  <div ref={textScrollRef} className="overflow-y-auto min-h-0 md:max-h-full" data-text-scroll>
                     <p className="text-base md:text-base leading-relaxed text-gray-800 whitespace-pre-wrap">
                       {page.text}
                     </p>

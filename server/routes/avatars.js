@@ -4078,27 +4078,23 @@ router.get('/avatar-jobs/:jobId', authenticateToken, async (req, res) => {
   }
 
   if (job.status === 'complete') {
-    // Return the result — keep job alive briefly so background processing can update it
-    const result = job.result;
-    // Delete job after first read (client stops polling on complete)
-    // Background processing already has a reference to job.result and updates it in-place
-    avatarJobs.delete(jobId);
+    // Don't delete on read — let the expiry cleanup handle it.
+    // Deleting on first read causes "Job not found" errors when the client
+    // re-polls (React StrictMode, component re-mount, network retry).
     return res.json({
       jobId,
       status: 'complete',
       success: true,
-      clothingAvatars: result
+      clothingAvatars: job.result
     });
   }
 
   if (job.status === 'failed') {
-    const error = job.error;
-    avatarJobs.delete(jobId);
     return res.json({
       jobId,
       status: 'failed',
       success: false,
-      error
+      error: job.error
     });
   }
 

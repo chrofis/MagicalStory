@@ -762,9 +762,9 @@ export default function MyStories() {
               <Lock className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
                 <p className="font-semibold text-amber-800 text-sm mb-1">
-                  {language === 'de' ? 'Setze ein Passwort und erhalte 500 Credits für weitere Geschichten!'
-                    : language === 'fr' ? 'Définissez un mot de passe et recevez 500 crédits pour plus d\'histoires !'
-                    : 'Set a password and get 500 credits for more stories!'}
+                  {language === 'de' ? 'Setze ein Passwort und erhalte 300 Credits für weitere Geschichten!'
+                    : language === 'fr' ? 'Définissez un mot de passe et recevez 300 crédits pour plus d\'histoires !'
+                    : 'Set a password and get 300 credits for more stories!'}
                 </p>
                 <p className="text-amber-700 text-xs mb-2">
                   {language === 'de' ? 'Sichere deinen Zugang und schalte alle Funktionen frei.'
