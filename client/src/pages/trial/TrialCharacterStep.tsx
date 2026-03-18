@@ -205,7 +205,8 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
 
   // Track which face photo the current avatar was generated for
   const facePhotoKey = characterData.photos.face ? characterData.photos.face.slice(-40) : '';
-  const avatarPhotoKeyRef = useRef<string>('');
+  // Initialize with current facePhotoKey if avatar already exists (survives component remount)
+  const avatarPhotoKeyRef = useRef<string>(previewAvatar ? facePhotoKey : '');
 
   // Start avatar generation in the background as soon as photo is ready
   // Re-triggers when photo changes (different face photo = different key)
