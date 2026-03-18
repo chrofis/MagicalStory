@@ -39,10 +39,15 @@ export interface StoryCategory {
 }
 
 // Swiss Stories types
+// Multilingual string for story ideas (title, description, context)
+export type SwissLocalizedString = { en: string; de: string; fr: string };
+
 export interface SwissStoryIdea {
   id: string;      // 'bern-1'
-  title: string;   // Bold title from MD
-  description: string;  // Description after dash
+  // Multilingual (new JSON format) or plain string (legacy MD fallback)
+  title: string | SwissLocalizedString;
+  description: string | SwissLocalizedString;
+  context?: SwissLocalizedString;  // Historical context (only in JSON format)
 }
 
 export interface SwissCity {

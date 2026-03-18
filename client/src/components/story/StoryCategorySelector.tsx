@@ -18,9 +18,16 @@ import {
   getHistoricalEventsByGroup,
 } from '@/constants/storyTypes';
 import { storyService } from '@/services/storyService';
-import type { Language, SwissCity, SwissStoriesData } from '@/types/story';
+import type { Language, SwissCity, SwissStoriesData, SwissLocalizedString } from '@/types/story';
 
 type StoryCategoryId = 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
+
+// Helper to extract localized text from a string or SwissLocalizedString
+function localizeField(field: string | SwissLocalizedString | undefined, lang: Language): string {
+  if (!field) return '';
+  if (typeof field === 'string') return field;
+  return field[lang] || field.en || '';
+}
 
 // Swiss flag inline SVG — Windows renders 🇨🇭 as "CH" text
 const SwissFlag = ({ className = '' }: { className?: string }) => (
@@ -62,8 +69,11 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 // Auto-assign emoji based on story idea keywords
-function getIdeaEmoji(title: string, description: string): string {
-  const text = (title + ' ' + description).toLowerCase();
+function getIdeaEmoji(title: string | SwissLocalizedString, description: string | SwissLocalizedString): string {
+  // Combine all language variants for broader keyword matching
+  const titleStr = typeof title === 'string' ? title : Object.values(title).join(' ');
+  const descStr = typeof description === 'string' ? description : Object.values(description).join(' ');
+  const text = (titleStr + ' ' + descStr).toLowerCase();
   if (text.includes('bear') || text.includes('bär')) return '🐻';
   if (text.includes('clock') || text.includes('uhr') || text.includes('zyt') || text.includes('time')) return '🕰️';
   if (text.includes('fire') || text.includes('feuer') || text.includes('brand')) return '🔥';
@@ -346,7 +356,7 @@ export function StoryCategorySelector({
       const cityId = id.replace(/-\d+$/, '');
       const city = swissData.cities.find(c => c.id === cityId);
       const idea = city?.ideas.find(i => i.id === id);
-      if (idea) return idea.title;
+      if (idea) return localizeField(idea.title, lang);
     }
     return id;
   };
@@ -720,24 +730,32 @@ export function StoryCategorySelector({
     // Render a city's story ideas as cards
     const renderCityIdeas = (city: SwissCity) => (
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
-        {city.ideas.map((idea) => (
-          <button
-            key={idea.id}
-            onClick={() => {
-              onTopicChange(idea.id);
-              onLegacyStoryTypeChange(idea.id);
-            }}
-            className="p-3 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
-          >
-            <div className="flex items-start gap-2">
-              <span className="text-xl flex-shrink-0">{getIdeaEmoji(idea.title, idea.description)}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-semibold text-gray-800 line-clamp-1">{idea.title}</div>
-                <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">{idea.description}</div>
+        {city.ideas.map((idea) => {
+          const title = localizeField(idea.title, lang);
+          const description = localizeField(idea.description, lang);
+          const context = idea.context ? localizeField(idea.context, lang) : '';
+          return (
+            <button
+              key={idea.id}
+              onClick={() => {
+                onTopicChange(idea.id);
+                onLegacyStoryTypeChange(idea.id);
+              }}
+              className="p-3 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+            >
+              <div className="flex items-start gap-2">
+                <span className="text-xl flex-shrink-0">{getIdeaEmoji(idea.title, idea.description)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-gray-800 line-clamp-1">{title}</div>
+                  {context && (
+                    <div className="text-[11px] text-amber-700 bg-amber-50 rounded px-1.5 py-1 mt-1 line-clamp-2 border border-amber-100">{context}</div>
+                  )}
+                  <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">{description}</div>
+                </div>
               </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     );
 

@@ -45,6 +45,7 @@ API key.txt
 /data/files.json
 server/data/*
 !server/data/swiss-cities.json
+!server/data/swiss-story-ideas.json
 
 # User content and uploads
 # Images/ - now included in git for Railway deployment

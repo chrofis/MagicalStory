@@ -1,15 +1,17 @@
 /**
- * Swiss Stories — Parses docs/story-ideas/*.md files at startup
- * and serves city/story data via API.
+ * Swiss Stories — Loads multilingual story ideas from JSON and
+ * research content from docs/story-ideas/*.md files at startup.
  */
 
 const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
 
-// In-memory cache: Map<cityId, { ideas: [{id, title, description}], research: string }>
+// In-memory cache: Map<cityId, { ideas: [{id, title, description, context}], research: string }>
 let swissStoriesCache = null;
 let swissCitiesData = null;
+// Multilingual ideas from JSON: Map<cityId, [{id, title:{en,de,fr}, context:{en,de,fr}, description:{en,de,fr}}]>
+let swissIdeasJson = null;
 
 /**
  * Extract story ideas from the "## Story Ideas" section of an MD file.
@@ -101,15 +103,41 @@ function loadCitiesData() {
 }
 
 /**
+ * Load multilingual story ideas from swiss-story-ideas.json.
+ * Returns Map<cityId, ideas[]> or null if file missing.
+ */
+function loadSwissStoryIdeas() {
+  const filePath = path.join(__dirname, '../data/swiss-story-ideas.json');
+  if (!fs.existsSync(filePath)) {
+    log.warn('[SWISS] swiss-story-ideas.json not found, falling back to MD parsing');
+    return null;
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    const map = new Map();
+    for (const [cityId, ideas] of Object.entries(data)) {
+      map.set(cityId, ideas);
+    }
+    log.info(`[SWISS] Loaded multilingual ideas for ${map.size} cities from JSON`);
+    return map;
+  } catch (err) {
+    log.error(`[SWISS] Failed to parse swiss-story-ideas.json: ${err.message}`);
+    return null;
+  }
+}
+
+/**
  * Initialize the swiss stories cache. Call once at startup.
  */
 function initSwissStories() {
   swissStoriesCache = parseAllSwissStories();
   swissCitiesData = loadCitiesData();
+  swissIdeasJson = loadSwissStoryIdeas();
 }
 
 /**
  * Get the combined API response: cities with their story ideas.
+ * Uses multilingual JSON ideas if available, falls back to MD-parsed ideas.
  */
 function getSwissStoriesResponse() {
   if (!swissStoriesCache || !swissCitiesData) {
@@ -117,10 +145,12 @@ function getSwissStoriesResponse() {
   }
 
   const cities = swissCitiesData.cities.map(city => {
-    const storyData = swissStoriesCache.get(city.id);
+    // Prefer multilingual JSON ideas, fall back to MD-parsed
+    const jsonIdeas = swissIdeasJson?.get(city.id);
+    const mdData = swissStoriesCache.get(city.id);
     return {
       ...city,
-      ideas: storyData?.ideas || []
+      ideas: jsonIdeas || mdData?.ideas || []
     };
   });
 

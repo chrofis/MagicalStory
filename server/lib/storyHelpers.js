@@ -2258,13 +2258,15 @@ ${historicalGuide}${locationsSection}
     if (cityData) {
       const ideaNum = parseInt(storyTopic.split('-').pop());
       const idea = cityData.ideas[ideaNum - 1];
-      const ideaTitle = idea?.title || storyTopic;
+      // Support both localized {en,de,fr} and plain string formats
+      const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
+      const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : idea?.description;
       const cityName = cityMeta?.name?.en || cityId;
 
       categoryGuidelines = `This is a SWISS LOCAL STORY set in ${cityName}, a real Swiss city.
 
 **STORY IDEA:** "${ideaTitle}"
-${idea?.description ? `**CONCEPT:** ${idea.description}` : ''}
+${ideaDesc ? `**CONCEPT:** ${ideaDesc}` : ''}
 
 **HISTORICAL & CULTURAL CONTEXT (verified research — use for accuracy):**
 ${cityData.research}
@@ -3295,13 +3297,15 @@ ${historicalGuide}${locationsSection}
     if (cityData) {
       const ideaNum = parseInt(storyTopic.split('-').pop());
       const idea = cityData.ideas[ideaNum - 1];
-      const ideaTitle = idea?.title || storyTopic;
+      // Support both localized {en,de,fr} and plain string formats
+      const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
+      const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : idea?.description;
       const cityName = cityMeta?.name?.en || cityId;
 
       categoryGuidelines = `This is a SWISS LOCAL STORY set in ${cityName}, a real Swiss city.
 
 **STORY IDEA:** "${ideaTitle}"
-${idea?.description ? `**CONCEPT:** ${idea.description}` : ''}
+${ideaDesc ? `**CONCEPT:** ${ideaDesc}` : ''}
 
 **HISTORICAL & CULTURAL CONTEXT (verified research — use for accuracy):**
 ${cityData.research}

@@ -128,8 +128,11 @@ ${historicalGuide}`;
     if (cityData) {
       const ideaNum = parseInt(storyTopic.split('-').pop());
       const idea = cityData.ideas[ideaNum - 1];
+      // Support both localized {en,de,fr} and plain string formats
+      const ideaTitle = (idea?.title && typeof idea.title === 'object' ? idea.title.en : idea?.title) || storyTopic;
+      const ideaDesc = idea?.description && typeof idea.description === 'object' ? idea.description.en : (idea?.description || '');
       categoryInstructions = `IMPORTANT: This is a SWISS LOCAL STORY set in ${cityName}.
-Story idea: "${idea?.title || storyTopic}" — ${idea?.description || ''}
+Story idea: "${ideaTitle}" — ${ideaDesc}
 
 Use the city's real landmarks, history, and cultural elements.
 ${cityData.research.slice(0, 2000)}`;
