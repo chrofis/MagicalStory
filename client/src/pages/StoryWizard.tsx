@@ -1735,6 +1735,11 @@ export default function StoryWizard() {
     if (step >= 1 && step <= 5) {
       localStorage.setItem('wizard_step', step.toString());
     }
+    // Prefetch next wizard step chunk to avoid flash on navigation
+    if (step === 1) { import('./wizard/WizardStep2Characters'); import('./wizard/WizardStep3BookSettings'); }
+    if (step === 2) import('./wizard/WizardStep4StoryType');
+    if (step === 3) import('./wizard/WizardStep5ArtStyle');
+    if (step === 4) import('./wizard/WizardStep6Summary');
   }, [step]);
 
   // Handler for story category change - doesn't auto-advance, user must select theme/topic
