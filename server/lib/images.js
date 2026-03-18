@@ -13,7 +13,7 @@ const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { MODEL_DEFAULTS, withRetry } = require('./textModels');
 const { generateWithRunware, isRunwareConfigured, RUNWARE_MODELS } = require('./runware');
-const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, GROK_MODELS } = require('./grok');
+const { generateWithGrok, editWithGrok, isGrokConfigured, packReferences, cropToFrontColumn, GROK_MODELS } = require('./grok');
 const { MODEL_DEFAULTS: CONFIG_DEFAULTS, IMAGE_MODELS, REPAIR_DEFAULTS } = require('../config/models');
 const { createDiffImage } = require('./repairVerification');
 const { findBadPages, selectCharRepairTasks } = require('./repairLogic');
@@ -5286,13 +5286,19 @@ OUTPUT: A single image matching the reference style.`;
  * @returns {Promise<Object>} { imageData, character, method: 'character_replacement' }
  */
 async function repairCharacterMismatch(imageData, characterPhoto, bbox, charName, options = {}) {
+  if (!bbox || bbox.length !== 4) {
+    throw new Error('Valid bounding box required for character replacement');
+  }
+
+  // Route to Grok repair if requested
+  if (options.imageBackend === 'grok') {
+    return repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options);
+  }
+
+  // Default: Gemini repair
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('Gemini API key not configured');
-  }
-
-  if (!bbox || bbox.length !== 4) {
-    throw new Error('Valid bounding box required for character replacement');
   }
 
   const [ymin, xmin, ymax, xmax] = bbox;
@@ -5406,6 +5412,126 @@ Output a single corrected image.`;
 
   log.warn('⚠️ [CHAR REPAIR] No image in response');
   return { imageData: null, character: charName, method: 'character_replacement' };
+}
+
+/**
+ * Repair character mismatch using Grok Imagine edit endpoint.
+ *
+ * Two modes:
+ * - Cut-out (options.useCutout = true): Extract bbox region, send region + characterRef to Grok,
+ *   composite result back into original scene.
+ * - Full scene (default): Send full scene + characterRef to Grok with repair prompt.
+ *
+ * @param {string} imageData - Current scene image (base64 data URI)
+ * @param {string} characterPhoto - Character avatar photo (base64 data URI)
+ * @param {Array<number>} bbox - Bounding box [ymin, xmin, ymax, xmax] in 0-1 normalized coords
+ * @param {string} charName - Character name
+ * @param {Object} options
+ * @returns {Promise<Object>} { imageData, character, method, usage }
+ */
+async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, charName, options = {}) {
+  if (!isGrokConfigured()) {
+    throw new Error('XAI_API_KEY not configured for Grok repair');
+  }
+
+  const [ymin, xmin, ymax, xmax] = bbox;
+  const useCutout = options.useCutout || false;
+  const method = useCutout ? 'grok_cutout' : 'grok_blackout';
+
+  log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
+
+  // Crop character reference to front column (strips back-view from 2x2 avatar grids)
+  const avatarBase64 = characterPhoto.replace(/^data:image\/\w+;base64,/, '');
+  const avatarBuffer = Buffer.from(avatarBase64, 'base64');
+  const croppedAvatar = await cropToFrontColumn(avatarBuffer);
+  const croppedAvatarDataUri = `data:image/jpeg;base64,${croppedAvatar.toString('base64')}`;
+
+  const currentBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+  const sceneBuffer = Buffer.from(currentBase64, 'base64');
+
+  const issueDescription = options.issueDescription || '';
+  const issueContext = issueDescription ? ` Specific issue: ${issueDescription}` : '';
+
+  if (useCutout) {
+    // ── Cut-out mode: extract bbox region, repair it, composite back ──
+    const sharp = require('sharp');
+    const sceneMeta = await sharp(sceneBuffer).metadata();
+    const pixelLeft = Math.max(0, Math.floor(xmin * sceneMeta.width));
+    const pixelTop = Math.max(0, Math.floor(ymin * sceneMeta.height));
+    const pixelWidth = Math.min(sceneMeta.width - pixelLeft, Math.ceil((xmax - xmin) * sceneMeta.width));
+    const pixelHeight = Math.min(sceneMeta.height - pixelTop, Math.ceil((ymax - ymin) * sceneMeta.height));
+
+    // Add padding around bbox for context (20% each side)
+    const padX = Math.floor(pixelWidth * 0.2);
+    const padY = Math.floor(pixelHeight * 0.2);
+    const extractLeft = Math.max(0, pixelLeft - padX);
+    const extractTop = Math.max(0, pixelTop - padY);
+    const extractWidth = Math.min(sceneMeta.width - extractLeft, pixelWidth + 2 * padX);
+    const extractHeight = Math.min(sceneMeta.height - extractTop, pixelHeight + 2 * padY);
+
+    const regionBuffer = await sharp(sceneBuffer)
+      .extract({ left: extractLeft, top: extractTop, width: extractWidth, height: extractHeight })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+    const regionDataUri = `data:image/jpeg;base64,${regionBuffer.toString('base64')}`;
+
+    log.info(`👤 [CHAR REPAIR GROK] Cut-out region: ${extractWidth}x${extractHeight} at (${extractLeft}, ${extractTop})`);
+
+    const prompt = `Fix this character's appearance to match the reference photo of ${charName}. Replace the face, hair, and skin tone to match the reference exactly. Keep the pose, clothing style, and background unchanged.${issueContext}`;
+
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, regionDataUri]);
+
+    if (!grokResult.imageData) {
+      log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
+      return { imageData: null, character: charName, method };
+    }
+
+    // Composite repaired region back into original scene
+    const repairedRegionBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+    const repairedRegionBuffer = Buffer.from(repairedRegionBase64, 'base64');
+
+    // Resize repaired region to match original extraction dimensions
+    const resizedRegion = await sharp(repairedRegionBuffer)
+      .resize(extractWidth, extractHeight, { fit: 'fill' })
+      .toBuffer();
+
+    const composited = await sharp(sceneBuffer)
+      .composite([{ input: resizedRegion, left: extractLeft, top: extractTop }])
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
+    log.info(`✅ [CHAR REPAIR GROK] Cut-out repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
+
+    return {
+      imageData: finalImageData,
+      character: charName,
+      usage: grokResult.usage,
+      method
+    };
+  } else {
+    // ── Full-scene mode (blackout): send full scene + reference to Grok ──
+    const regionWidth = Math.round((xmax - xmin) * 100);
+    const regionHeight = Math.round((ymax - ymin) * 100);
+    const centerX = Math.round(((xmin + xmax) / 2) * 100);
+    const centerY = Math.round(((ymin + ymax) / 2) * 100);
+    const horizontalPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
+    const verticalPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
+    const regionDesc = `${verticalPos} ${horizontalPos}`;
+
+    const prompt = `Fix the character at the ${regionDesc} of this illustration. Their face does not match the reference photo of ${charName}. Change their face, hair, and skin tone to match the reference exactly. The character is at approximately ${centerX}% from left, ${centerY}% from top, ${regionWidth}% wide, ${regionHeight}% tall. Keep the pose, background, art style, and all other characters unchanged.${issueContext}`;
+
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, imageData]);
+
+    log.info(`✅ [CHAR REPAIR GROK] Full-scene repair for ${charName} completed. Cost: $${grokResult.usage?.cost || 0.02}`);
+
+    return {
+      imageData: grokResult.imageData,
+      character: charName,
+      usage: grokResult.usage,
+      method
+    };
+  }
 }
 
 /**

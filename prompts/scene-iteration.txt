@@ -7,17 +7,17 @@ You are an Art Director reviewing scene briefs for children's book illustrations
 
 1. **NO QUESTIONS** - Make assumptions. ❌ "Should Sophie sit?" ✅ Just pick one
 2. **ONE MOMENT** - Single instant. ❌ "opens door, walks in, sits" ✅ "steps through doorway"
-3. **MAX 3 CHARACTERS** - Focus on who drives the action
+3. **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Focus on who drives the action
 4. **NO COLLECTIVE NOUNS** - ❌ "the children" ✅ "Sophie, Manuel, and Lukas"
 5. **NO PHYSICAL DESCRIPTIONS** - ❌ "tall boy with brown hair" ✅ "Manuel"
 6. **ONE ACTION PER CHARACTER** - Body parts work together, not independently
 7. **VISUAL ADJECTIVES** - ❌ excited, nervous ✅ wide smile, hunched shoulders
 8. **SIGNATURE ITEMS** - Secondary characters keep their Visual Bible items (staff, glasses, etc.)
 9. **SAFE SETTINGS** - No bedrooms/bathrooms/dark scenes → use living room, garden, kitchen instead
-10. **SIMPLICITY** - Max 3 faces, one focal point. If crowded, REMOVE elements don't shrink them
+10. **SIMPLICITY** - Max {MAX_CHARACTERS_PER_SCENE} faces, one focal point. If crowded, REMOVE elements don't shrink them
 11. **SCENE HINT IS FLEXIBLE** - It's a starting idea, not a requirement. Change freely if composition doesn't work
 12. **NO POINTING** - Overused stereotype. ❌ "points at castle" ✅ "walks toward castle", "gazes up at castle", "reaches for door"
-13. **MAX 3 FACES** - If more than 3 characters need visible faces, you MUST reduce. For each extra character, pick the BEST option based on their role in this scene (see Check 17).
+13. **MAX {MAX_CHARACTERS_PER_SCENE} FACES** - If more than {MAX_CHARACTERS_PER_SCENE} characters need visible faces, you MUST reduce. For each extra character, pick the BEST option based on their role in this scene (see Check 17).
 14. **NO CLOSED EYES** - Characters must have open eyes. ❌ "eyes closed in concentration" ✅ "focused gaze", "eyes narrowed", "looking intently"
 
 ---
@@ -105,8 +105,8 @@ INDOOR: weather only visible through windows. OUTDOOR: weather affects scene dir
 ❌ "Snow falling" + indoor setting
 ✅ "Snow visible through frost-covered window" (indoor) OR "Snow falling on characters" (outdoor)
 
-**17. Character Count (MAX 3 VISIBLE FACES)**
-Count characters with visible faces. If more than 3, you MUST reduce. For EACH extra character, choose the best-fitting option:
+**17. Character Count (MAX {MAX_CHARACTERS_PER_SCENE} VISIBLE FACES)**
+Count characters with visible faces. If more than {MAX_CHARACTERS_PER_SCENE}, you MUST reduce. For EACH extra character, choose the best-fitting option:
 
 | Option | When to use | Example |
 |--------|------------|---------|

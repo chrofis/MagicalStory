@@ -209,6 +209,42 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
 }
 
 /**
+ * Detect portrait 2x2 avatar grids (aspect ~1:1.75) and crop to left half (front-facing column).
+ *
+ * Avatar grids are arranged:
+ *   Front-Left  |  Front-Right
+ *   Back-Left   |  Back-Right
+ *
+ * For Grok reference images, only the front-facing column is useful.
+ * Non-grid images (aspect ratio far from 1:1.75) are returned unchanged.
+ *
+ * @param {Buffer} buffer - Image buffer
+ * @returns {Promise<Buffer>} Cropped (or original) JPEG buffer
+ */
+async function cropToFrontColumn(buffer) {
+  try {
+    const meta = await sharp(buffer).metadata();
+    if (!meta.width || !meta.height) return buffer;
+
+    const aspect = meta.height / meta.width;
+    // Portrait 2x2 grids have aspect ratio ~1.6–1.9 (4 images in 2x2, each roughly square)
+    if (aspect < 1.5 || aspect > 2.0) return buffer;
+
+    const halfWidth = Math.floor(meta.width / 2);
+    const cropped = await sharp(buffer)
+      .extract({ left: 0, top: 0, width: halfWidth, height: meta.height })
+      .jpeg({ quality: 90 })
+      .toBuffer();
+
+    log.info(`🎨 [GROK] Cropped to front column: ${meta.width}x${meta.height} → ${halfWidth}x${meta.height}`);
+    return cropped;
+  } catch (err) {
+    log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
+    return buffer;
+  }
+}
+
+/**
  * Pack reference images into max 3 slots for Grok's edit endpoint.
  *
  * Strategy:
@@ -250,7 +286,9 @@ async function packReferences(refs = {}) {
     }
     if (photoUrl && typeof photoUrl === 'string' && photoUrl.startsWith('data:image')) {
       const base64 = photoUrl.replace(/^data:image\/\w+;base64,/, '');
-      charBuffers.push(Buffer.from(base64, 'base64'));
+      const rawBuffer = Buffer.from(base64, 'base64');
+      const croppedBuffer = await cropToFrontColumn(rawBuffer);
+      charBuffers.push(croppedBuffer);
     } else if (charName) {
       log.warn(`⚠️ [GROK] Skipped character "${charName}": photoUrl is ${photoUrl ? typeof photoUrl : 'null/undefined'} (not base64)`);
     }
@@ -414,5 +452,6 @@ module.exports = {
   editWithGrok,
   isGrokConfigured,
   packReferences,
+  cropToFrontColumn,
   GROK_MODELS,
 };

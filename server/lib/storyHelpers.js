@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const { log } = require('../utils/logger');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
+const { IMAGE_MODELS, MODEL_DEFAULTS } = require('../config/models');
 const { buildVisualBiblePrompt } = require('./visualBible');
 const { getPrimaryPhoto, getFacePhoto } = require('./characterPhotos');
 const { getPhysical } = require('./characterPhysical');
@@ -2414,7 +2415,7 @@ function buildAvailableAvatarsForPrompt(characters, clothingRequirements = null)
  * @param {string} availableAvatars - Pre-built string of available avatars per character
  * @param {Object} rawOutlineContext - Raw outline blocks {previousPages: string, currentPage: string}
  */
-function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language = 'en', visualBible = null, availableAvatars = '', rawOutlineContext = null) {
+function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language = 'en', visualBible = null, availableAvatars = '', rawOutlineContext = null, options = {}) {
   // Build character names list ONLY
   const characterDetails = characters.map(c => `* **${c.name}**`).join('\n');
 
@@ -2525,7 +2526,8 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
     LANGUAGE_NAME: languageName,
     LANGUAGE_INSTRUCTION: languageInstruction,
     LANGUAGE_NOTE: getLanguageNote(language),
-    CORRECTION_NOTES: ''
+    CORRECTION_NOTES: '',
+    MAX_CHARACTERS_PER_SCENE: options.maxCharactersPerScene || 3
   });
 }
 
@@ -2765,6 +2767,10 @@ Compare this against the scene hint above. Your job is to:
       previewFeedbackText = '(No preview available - create scene from hint, run all 17 checks)';
     }
 
+    // Look up maxCharactersPerScene from the current image model config
+    const iterImageModelKey = MODEL_DEFAULTS.pageImage;
+    const iterImageModelConfig = IMAGE_MODELS[iterImageModelKey];
+
     return fillTemplate(PROMPT_TEMPLATES.sceneDescriptions, {
       DRAFT_SCENE_DESCRIPTION: draftSceneDescription,
       PREVIOUS_SCENES: previousScenesText,
@@ -2779,7 +2785,8 @@ Compare this against the scene hint above. Your job is to:
       LANGUAGE_NAME: languageName,
       LANGUAGE_INSTRUCTION: languageInstruction,
       LANGUAGE_NOTE: getLanguageNote(language),
-      CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : ''
+      CORRECTION_NOTES: correctionNotes ? `\n**CORRECTION NOTES (from previous attempt - MUST be addressed):**\n${correctionNotes}\n` : '',
+      MAX_CHARACTERS_PER_SCENE: iterImageModelConfig?.maxCharactersPerScene || 3
     });
   }
 
@@ -3358,6 +3365,11 @@ ${adventureGuide}` : ''}`;
   }
 
   // Use template if available
+  // Look up maxCharactersPerScene from image model config
+  const imageModelKey = inputData.modelOverrides?.imageModel || MODEL_DEFAULTS.pageImage;
+  const imageModelConfig = IMAGE_MODELS[imageModelKey];
+  const maxCharsPerScene = imageModelConfig?.maxCharactersPerScene || 3;
+
   if (PROMPT_TEMPLATES.storyUnified) {
     const prompt = fillTemplate(PROMPT_TEMPLATES.storyUnified, {
       LANGUAGE_INSTRUCTION: getLanguageInstruction(language),
@@ -3374,7 +3386,8 @@ ${adventureGuide}` : ''}`;
       MAIN_CHARACTER_NAMES: mainCharacterNames,
       PRIMARY_CHARACTER_NAMES: primaryCharacterNames,
       CATEGORY_GUIDELINES: categoryGuidelines,
-      AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection
+      AVAILABLE_LANDMARKS_SECTION: availableLandmarksSection,
+      MAX_CHARACTERS_PER_SCENE: maxCharsPerScene
     });
     log.debug(`[PROMPT] Unified story prompt length: ${prompt.length} chars`);
     return prompt;

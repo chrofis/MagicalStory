@@ -160,6 +160,7 @@ const IMAGE_BACKENDS = {
 
 // Image model configurations
 // maxPromptLength: Maximum characters for the prompt (API limit)
+// maxCharactersPerScene: Max characters in scene hints (Grok handles more faces via ref images)
 const IMAGE_MODELS = {
   'gemini-2.5-flash-image': {
     modelId: 'gemini-2.5-flash-image',
@@ -167,7 +168,8 @@ const IMAGE_MODELS = {
     backend: 'gemini',
     supportsThinking: false,
     temperature: 0.5,  // Lower temp for more consistent character reproduction
-    maxPromptLength: 30000  // Gemini supports very long prompts
+    maxPromptLength: 30000,  // Gemini supports very long prompts
+    maxCharactersPerScene: 3
   },
   'gemini-3-pro-image-preview': {
     modelId: 'gemini-3-pro-image-preview',
@@ -175,37 +177,43 @@ const IMAGE_MODELS = {
     backend: 'gemini',
     supportsThinking: true,  // Thinks by default; thinkingConfig.includeThoughts returns thought text
     temperature: 0.5,  // Lower temp for more consistent character reproduction
-    maxPromptLength: 30000
+    maxPromptLength: 30000,
+    maxCharactersPerScene: 3
   },
   'flux-schnell': {
     modelId: 'runware:5@1',
     description: 'FLUX Schnell via Runware - Ultra fast, cheap ($0.0006/image)',
     backend: 'runware',
-    maxPromptLength: 2900  // Runware limit is 3000, leave margin
+    maxPromptLength: 2900,  // Runware limit is 3000, leave margin
+    maxCharactersPerScene: 3
   },
   'flux-dev': {
     modelId: 'runware:6@1',
     description: 'FLUX Dev via Runware - Better quality ($0.004/image)',
     backend: 'runware',
-    maxPromptLength: 2900
+    maxPromptLength: 2900,
+    maxCharactersPerScene: 3
   },
   'ace-plus-plus': {
     modelId: 'ace-plus-plus',
     description: 'ACE++ via Runware - Face-consistent avatar generation (~$0.005/image)',
     backend: 'runware',
-    maxPromptLength: 2900
+    maxPromptLength: 2900,
+    maxCharactersPerScene: 3
   },
   'grok-imagine': {
     modelId: 'grok-imagine-image',
     description: 'Grok Imagine Standard - Good quality ($0.02/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 7500
+    maxPromptLength: 7500,
+    maxCharactersPerScene: 5
   },
   'grok-imagine-pro': {
     modelId: 'grok-imagine-image-pro',
     description: 'Grok Imagine Pro - Higher quality ($0.07/image), ref image support',
     backend: 'grok',
-    maxPromptLength: 7500
+    maxPromptLength: 7500,
+    maxCharactersPerScene: 5
   }
 };
 

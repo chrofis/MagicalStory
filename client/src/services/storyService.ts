@@ -2222,7 +2222,7 @@ export const storyService = {
   async repairCharacters(
     storyId: string,
     repairs: Array<{ character: string; pages: number[] }>,
-    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean }
+    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean; grokRepairMode?: 'cutout' | 'blackout' }
   ): Promise<{
     results: Array<{
       character: string;
@@ -2258,7 +2258,8 @@ export const storyService = {
       }>;
     }>(`/api/stories/${storyId}/repair-workflow/character-repair`, {
       ...(options?.autoSelect ? { autoSelect: true } : { repairs }),
-      ...(options?.useMagicApiRepair !== undefined && { useMagicApiRepair: options.useMagicApiRepair })
+      ...(options?.useMagicApiRepair !== undefined && { useMagicApiRepair: options.useMagicApiRepair }),
+      ...(options?.grokRepairMode && { grokRepairMode: options.grokRepairMode })
     });
     return response;
   },

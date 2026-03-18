@@ -96,14 +96,14 @@ Every page needs a scene hint for illustration. Use this EXACT format:
 ```
 SCENE HINT:
 [1-2 sentences - the KEY VISUAL MOMENT with character positions]
-Characters (MAX 3):
+Characters (MAX {MAX_CHARACTERS_PER_SCENE}):
 - [Name] (left/right/center): [standard | winter | summer | costumed:type]
 - [Name] (position): [clothing category]
 Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
 ```
 
 **Rules:**
-- **MAX 3 CHARACTERS** - Pick the most important for this visual moment. Others can be in the story text but NOT in the scene hint.
+- **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Pick the most important for this visual moment. Others can be in the story text but NOT in the scene hint.
   - The scene hint description must ONLY mention characters from the Characters list. Do NOT name anyone else in the hint — not in the background, not "nearby", not "standing together". If they're not in the Characters list, they don't exist in this illustration.
   - BAD: "Werner (left) gestures. Franziska and Roger stand together smiling. Lukas sits with Manuel and Sophie nearby." (7 characters named!)
   - GOOD: "Werner (left) gestures appreciatively at the clean room. Verena (center) sets down pirate decorations." (only listed characters)
@@ -281,8 +281,8 @@ For EACH character ({CHARACTER_NAMES}), answer these questions BY NAME:
 14. **Passive voice** - Too much "was done" instead of "did"? Make it active.
 
 **D. SCENE HINTS REVIEW:**
-15. **MAX 3 CHARACTERS** - Check EACH page: more than 3 in scene hint? Pick the 3 most important.
-    - Background characters can be in text but scene hint focuses on max 3
+15. **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Check EACH page: more than {MAX_CHARACTERS_PER_SCENE} in scene hint? Pick the {MAX_CHARACTERS_PER_SCENE} most important.
+    - Background characters can be in text but scene hint focuses on max {MAX_CHARACTERS_PER_SCENE}
 16. **Positions** - Does EACH scene hint specify left/right/center for all characters?
 17. **Clothing** - Categories match scene (winter for cold outdoor, costumed for costume scenes)?
 18. **Setting/Weather** - Is weather consistent across outdoor scenes? Time progresses logically?

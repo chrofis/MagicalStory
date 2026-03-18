@@ -64,7 +64,7 @@ function parseCharacterClothingBlock(content) {
   // - Name2 (alias): costumed:type
   // Also handles single-line comma-separated format:
   // Characters: Name1: standard, Name2: costumed:wizard, Name3: winter
-  // Match "Characters:" with optional suffix like "(MAX 3)", "(max 2-3)", etc.
+  // Match "Characters:" with optional suffix like "(MAX 3)", "(MAX 5)", "(max 2-3)", etc.
   const charactersBlockMatch = content.match(/Characters(?:\s*\([^)]*\))?:\s*([\s\S]*?)(?=---\s*Page|$)/i);
   if (charactersBlockMatch) {
     const block = charactersBlockMatch[1];

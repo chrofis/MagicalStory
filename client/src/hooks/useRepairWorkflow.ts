@@ -151,7 +151,7 @@ export interface UseRepairWorkflowReturn {
   runConsistencyCheck: () => Promise<void>;
 
   // Step 6: Character repair
-  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean }) => Promise<void>;
+  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'cutout' | 'blackout' }) => Promise<void>;
 
   // Step 7: Artifact repair
   repairArtifacts: (pageNumbers: number[]) => Promise<void>;
@@ -708,7 +708,7 @@ export function useRepairWorkflow({
   }, [storyId, startStep, completeStep, failStep]);
 
   // Step 6: Repair character on specific pages
-  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean }) => {
+  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'cutout' | 'blackout' }) => {
     if (!storyId || pages.length === 0) return;
 
     startStep('character-repair');

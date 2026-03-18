@@ -2436,6 +2436,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const availableAvatars = buildAvailableAvatarsForPrompt(inputData.characters, streamingClothingRequirements);
 
         // Initial expansion: simplified prompt, no preview feedback (fast/cheap)
+        const imgModelConfig = IMAGE_MODELS[modelOverrides.imageModel];
         const expansionPrompt = buildSceneExpansionPrompt(
           page.pageNumber,
           page.text,
@@ -2443,7 +2444,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           lang,
           streamingVisualBible,
           availableAvatars,
-          rawOutlineContext // pass raw outline blocks directly
+          rawOutlineContext, // pass raw outline blocks directly
+          { maxCharactersPerScene: imgModelConfig?.maxCharactersPerScene || 3 }
         );
 
         const expansionResult = await callTextModelStreaming(expansionPrompt, 10000, null, modelOverrides.sceneDescriptionModel, { prefill: '{"scene":{' });

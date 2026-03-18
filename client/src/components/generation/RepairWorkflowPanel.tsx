@@ -338,6 +338,7 @@ export function RepairWorkflowPanel({
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
   const [gridLightbox, setGridLightbox] = useState<string | null>(null);
   const [overrideImageModel, setOverrideImageModel] = useState<string | null>(null);
+  const [grokRepairMode, setGrokRepairMode] = useState<'cutout' | 'blackout' | null>(null);
   const effectiveImageModel = overrideImageModel || imageModel;
 
   const {
@@ -1216,14 +1217,30 @@ export function RepairWorkflowPanel({
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <label className="text-sm font-medium text-yellow-800 mb-2 block">Image Model:</label>
                     <select
-                      value={useMagicApiRepair ? 'magicapi' : (overrideImageModel || imageModel || '')}
+                      value={
+                        grokRepairMode === 'cutout' ? 'grok-cutout' :
+                        grokRepairMode === 'blackout' ? 'grok-blackout' :
+                        useMagicApiRepair ? 'magicapi' :
+                        (overrideImageModel || imageModel || '')
+                      }
                       onChange={(e) => {
-                        if (e.target.value === 'magicapi') {
+                        const val = e.target.value;
+                        if (val === 'grok-cutout') {
+                          setGrokRepairMode('cutout');
+                          setUseMagicApiRepair?.(false);
+                          setOverrideImageModel(null);
+                        } else if (val === 'grok-blackout') {
+                          setGrokRepairMode('blackout');
+                          setUseMagicApiRepair?.(false);
+                          setOverrideImageModel(null);
+                        } else if (val === 'magicapi') {
+                          setGrokRepairMode(null);
                           setUseMagicApiRepair?.(true);
                           setOverrideImageModel(null);
                         } else {
+                          setGrokRepairMode(null);
                           setUseMagicApiRepair?.(false);
-                          setOverrideImageModel(e.target.value || null);
+                          setOverrideImageModel(val || null);
                         }
                       }}
                       className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
@@ -1237,8 +1254,10 @@ export function RepairWorkflowPanel({
                         <option value="grok-imagine-pro">Grok Imagine Pro ($0.07/image)</option>
                         <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
                       </optgroup>
-                      <optgroup label="Face Repair">
+                      <optgroup label="Character Repair">
                         <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
+                        <option value="grok-cutout">Grok Cut-Out ($0.02/repair)</option>
+                        <option value="grok-blackout">Grok Blackout ($0.02/repair)</option>
                       </optgroup>
                     </select>
                     {useMagicApiRepair && (
@@ -1246,12 +1265,25 @@ export function RepairWorkflowPanel({
                         Uses face swap + hair fix pipeline with iterative crop checking
                       </p>
                     )}
+                    {grokRepairMode === 'cutout' && (
+                      <p className="text-xs text-yellow-600 mt-2">
+                        Extracts character region, sends to Grok with reference, composites back
+                      </p>
+                    )}
+                    {grokRepairMode === 'blackout' && (
+                      <p className="text-xs text-yellow-600 mt-2">
+                        Sends full scene + reference to Grok for character face replacement
+                      </p>
+                    )}
                   </div>
                 )}
 
                 <button
                   onClick={async () => {
-                    await repairCharacter(selectedCharacter, selectedCharacterPages, { useMagicApiRepair });
+                    await repairCharacter(selectedCharacter, selectedCharacterPages, {
+                      useMagicApiRepair,
+                      ...(grokRepairMode && { grokRepairMode })
+                    });
                     if (onRefreshStory) {
                       await onRefreshStory();
                     }
@@ -1262,6 +1294,7 @@ export function RepairWorkflowPanel({
                   <Wrench className="w-4 h-4" />
                   Repair {selectedCharacter || 'Character'} on {selectedCharacterPages.length} pages
                   {useMagicApiRepair && <span className="text-xs opacity-75">(MagicAPI)</span>}
+                  {grokRepairMode && <span className="text-xs opacity-75">(Grok {grokRepairMode})</span>}
                 </button>
 
                 {/* Repaired pages with debug images */}
@@ -1277,9 +1310,13 @@ export function RepairWorkflowPanel({
                               <span className="text-sm font-medium text-green-800">Page {page.pageNumber}</span>
                               {page.method && (
                                 <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${
-                                  page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'
+                                  page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' :
+                                  page.method === 'grok_cutout' || page.method === 'grok_blackout' ? 'bg-orange-100 text-orange-700' :
+                                  'bg-indigo-100 text-indigo-700'
                                 }`}>
-                                  {page.method === 'magicapi' ? 'MagicAPI' : 'Gemini'}
+                                  {page.method === 'magicapi' ? 'MagicAPI' :
+                                   page.method === 'grok_cutout' ? 'Grok Cut-Out' :
+                                   page.method === 'grok_blackout' ? 'Grok Blackout' : 'Gemini'}
                                 </span>
                               )}
                               {page.verification && (

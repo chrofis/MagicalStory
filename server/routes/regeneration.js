@@ -2898,11 +2898,11 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
   }
 });
 
-// Step 7: Repair characters using repairSinglePage or MagicAPI
+// Step 7: Repair characters using repairSinglePage, MagicAPI, or Grok
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs: manualRepairs, useMagicApiRepair, autoSelect } = req.body;
+    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode } = req.body;
 
     let repairs;
 
@@ -2960,7 +2960,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
-    const repairMethod = useMagicApiRepair ? 'MagicAPI' : 'Gemini';
+    const repairMethod = grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
     const { repairSinglePage } = require('../lib/entityConsistency');
@@ -3132,6 +3132,63 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               }
             }
           }
+        } else if (grokRepairMode) {
+          // Grok repair mode: cutout or blackout
+          const { repairCharacterMismatch } = require('../lib/images');
+          const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
+
+          const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+          if (!sceneImage || !sceneImage.imageData) {
+            return { task, error: true, failReason: 'No scene image data for this page' };
+          }
+
+          const sceneDescriptions = storyData.sceneDescriptions || [];
+          const entityAppearances = await collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
+          const appearances = entityAppearances.get(characterName);
+          const appearance = appearances?.find(a => a.pageNumber === pageNumber);
+
+          if (!appearance?.faceBox && !appearance?.bodyBox) {
+            return { task, error: true, failReason: `No bounding box for ${characterName} on page ${pageNumber}` };
+          }
+
+          const clothingCategory = appearance.clothing || 'standard';
+          const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+          const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
+
+          if (!avatarData) {
+            return { task, error: true, failReason: `No avatar for ${characterName}` };
+          }
+
+          const faceBox = appearance.faceBox || appearance.bodyBox;
+          // Convert {x, y, width, height} to [ymin, xmin, ymax, xmax]
+          const bbox = [faceBox.y, faceBox.x, faceBox.y + faceBox.height, faceBox.x + faceBox.width];
+
+          const issueDesc = charIssues.length > 0
+            ? charIssues.map(i => i.issue || i.description || '').filter(Boolean).join('; ')
+            : '';
+
+          const grokResult = await repairCharacterMismatch(
+            sceneImage.imageData,
+            avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
+            bbox,
+            characterName,
+            {
+              imageBackend: 'grok',
+              useCutout: grokRepairMode === 'cutout',
+              issueDescription: issueDesc
+            }
+          );
+
+          if (grokResult.imageData) {
+            repairResult = {
+              success: true,
+              updatedImages: [{ pageNumber, imageData: grokResult.imageData }],
+              method: grokResult.method,
+              usage: grokResult.usage
+            };
+          } else {
+            return { task, error: true, failReason: 'Grok repair returned no image' };
+          }
         } else {
           repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
         }
@@ -3175,6 +3232,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       // Track repair cost
       if (repairResult.method === 'magicapi') {
         totalMagicApiRepairs++;
+      } else if (repairResult.method === 'grok_cutout' || repairResult.method === 'grok_blackout') {
+        // Grok repairs are $0.02 each, tracked via usage
       } else {
         totalGeminiRepairs++;
       }
