@@ -3786,7 +3786,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
         // Run bbox detection on covers for entity consistency checks
         // Skip when quality evaluation is disabled (trial mode) — bbox data won't be used
-        if (!skipQualityEval) {
+        if (!inputData.skipQualityEval) {
           try {
             await detectBboxOnCovers(coverImages, inputData.characters);
           } catch (bboxErr) {
