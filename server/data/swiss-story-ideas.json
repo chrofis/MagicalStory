@@ -1661,24 +1661,6 @@
       }
     },
     {
-      "id": "baden-4",
-      "title": {
-        "en": "The Devil's Bridge trick",
-        "de": "Die List an der Teufelsbrücke",
-        "fr": "La ruse du Pont du Diable"
-      },
-      "context": {
-        "en": "Local legend tells of the devil offering to build a bridge over the wild Limmat at Baden. In exchange, he demanded the soul of the first person to cross. The townspeople outwitted him by sending a goat across first. The furious devil, bound by his own bargain, had to accept the goat's soul. This is the Baden version of the famous Swiss Teufelsbruecke legend.",
-        "de": "Eine lokale Legende erzählt vom Teufel, der anbot, eine Brücke über die wilde Limmat in Baden zu bauen. Als Gegenleistung verlangte er die Seele des Ersten, der sie überquert. Die Badener überlisteten ihn, indem sie eine Ziege als Erste hinüberschickten. Der wütende Teufel musste die Seele der Ziege akzeptieren.",
-        "fr": "Une legende locale raconte que le diable proposa de construire un pont sur la Limmat tumultueuse a Baden. En echange, il exigea l'ame de la premiere personne a le traverser. Les habitants le duperent en envoyant une chevre la premiere. Le diable furieux dut accepter l'ame de la chevre."
-      },
-      "description": {
-        "en": "A lighthearted retelling of Baden's own Teufelsbruecke legend. A child teams up with a clever goat to outsmart the devil at the Limmat crossing. Through quick thinking and teamwork, they trick the devil into building the finest bridge in the land -- and all he gets in return is one very stubborn goat.",
-        "de": "Eine fröhliche Neuerzählung von Badens Teufelsbrücken-Legende. Ein Kind verbündet sich mit einer schlauen Ziege, um den Teufel an der Limmatquerung zu überlisten. Durch schnelles Denken bringen sie den Teufel dazu, die schönste Brücke zu bauen -- und alles, was er bekommt, ist eine störische Ziege.",
-        "fr": "Une version joyeuse de la legende du Pont du Diable de Baden. Un enfant s'allie a une chevre maligne pour duper le diable au passage de la Limmat. Grace a leur ingeniosite, ils amenent le diable a construire le plus beau pont du pays -- et tout ce qu'il recoit est une chevre tres tetue."
-      }
-    },
-    {
       "id": "baden-5",
       "title": {
         "en": "The inventor's notebook",

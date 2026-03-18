@@ -131,7 +131,8 @@ export function StoryCategorySelector({
   const [expandedSwissCantons, setExpandedSwissCantons] = useState<string[]>([]);
   const [expandedSwissSection, setExpandedSwissSection] = useState<'nearby' | 'cantons' | 'sagen' | null>(null);
   const [previewSageId, setPreviewSageId] = useState<string | null>(null);
-  const [sageInfoMode, setSageInfoMode] = useState<'description' | 'context'>('description');
+  const [previewIdeaId, setPreviewIdeaId] = useState<string | null>(null);
+  const [infoMode, setInfoMode] = useState<'description' | 'context'>('description');
 
   // Translations
   const translations = {
@@ -726,27 +727,76 @@ export function StoryCategorySelector({
       }
     }
 
-    // Render a city's story ideas as cards
+    // Render a city's story ideas as cards with tap-to-preview
     const renderCityIdeas = (city: SwissCity) => (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3">
-        {city.ideas.map((idea) => {
+      <div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3">
+          {city.ideas.map((idea) => {
+            const title = localizeField(idea.title, lang);
+            const isSelected = previewIdeaId === idea.id;
+            return (
+              <button
+                key={idea.id}
+                onClick={() => { setPreviewIdeaId(isSelected ? null : idea.id); setInfoMode('description'); }}
+                className={`p-2 rounded-lg border transition-all text-center ${
+                  isSelected
+                    ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-200'
+                    : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+                }`}
+              >
+                <div className="text-2xl mb-1">{getIdeaEmoji(idea.title, idea.description)}</div>
+                <div className="font-semibold text-xs line-clamp-2">{title}</div>
+              </button>
+            );
+          })}
+        </div>
+        {/* Detail preview panel */}
+        {previewIdeaId && (() => {
+          const idea = city.ideas.find(i => i.id === previewIdeaId);
+          if (!idea) return null;
           const title = localizeField(idea.title, lang);
           const description = localizeField(idea.description, lang);
+          const context = idea.context ? localizeField(idea.context, lang) : '';
           return (
-            <button
-              key={idea.id}
-              onClick={() => {
-                onTopicChange(idea.id);
-                onLegacyStoryTypeChange(idea.id);
-              }}
-              className="p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
-              title={description}
-            >
-              <div className="text-2xl mb-1">{getIdeaEmoji(idea.title, idea.description)}</div>
-              <div className="font-semibold text-xs line-clamp-2">{title}</div>
-            </button>
+            <div className="mx-3 mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-sm text-gray-800">{getIdeaEmoji(idea.title, idea.description)} {title}</span>
+                {context && (
+                  <div className="flex gap-1 bg-white rounded-md border border-gray-200 p-0.5">
+                    <button
+                      onClick={() => setInfoMode('description')}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                        infoMode === 'description' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {t.sageStoryIdea}
+                    </button>
+                    <button
+                      onClick={() => setInfoMode('context')}
+                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                        infoMode === 'context' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {t.sageBackground}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                {infoMode === 'context' && context ? context : description}
+              </p>
+              <button
+                onClick={() => {
+                  onTopicChange(idea.id);
+                  onLegacyStoryTypeChange(idea.id);
+                }}
+                className="mt-2 w-full py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                {t.sageChoose}
+              </button>
+            </div>
           );
-        })}
+        })()}
       </div>
     );
 
@@ -943,17 +993,17 @@ export function StoryCategorySelector({
                             {context && (
                               <div className="flex gap-1 bg-white rounded-md border border-gray-200 p-0.5">
                                 <button
-                                  onClick={() => setSageInfoMode('description')}
+                                  onClick={() => setInfoMode('description')}
                                   className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                                    sageInfoMode === 'description' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                                    infoMode === 'description' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                                   }`}
                                 >
                                   {t.sageStoryIdea}
                                 </button>
                                 <button
-                                  onClick={() => setSageInfoMode('context')}
+                                  onClick={() => setInfoMode('context')}
                                   className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                                    sageInfoMode === 'context' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                                    infoMode === 'context' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                                   }`}
                                 >
                                   {t.sageBackground}
@@ -962,7 +1012,7 @@ export function StoryCategorySelector({
                             )}
                           </div>
                           <p className="text-xs text-gray-600 leading-relaxed">
-                            {sageInfoMode === 'context' && context ? context : description}
+                            {infoMode === 'context' && context ? context : description}
                           </p>
                           <button
                             onClick={() => {
