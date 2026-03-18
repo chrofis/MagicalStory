@@ -12,6 +12,8 @@ let swissStoriesCache = null;
 let swissCitiesData = null;
 // Multilingual ideas from JSON: Map<cityId, [{id, title:{en,de,fr}, context:{en,de,fr}, description:{en,de,fr}}]>
 let swissIdeasJson = null;
+// Swiss fairy tales / legends (Sagen)
+let swissSagenData = null;
 
 /**
  * Extract story ideas from the "## Story Ideas" section of an MD file.
@@ -127,12 +129,32 @@ function loadSwissStoryIdeas() {
 }
 
 /**
+ * Load Swiss fairy tales / legends (Sagen) from swiss-sagen.json.
+ */
+function loadSwissSagen() {
+  const filePath = path.join(__dirname, '../data/swiss-sagen.json');
+  if (!fs.existsSync(filePath)) {
+    log.warn('[SWISS] swiss-sagen.json not found');
+    return [];
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+    log.info(`[SWISS] Loaded ${data.length} Sagen (fairy tales)`);
+    return data;
+  } catch (err) {
+    log.error(`[SWISS] Failed to parse swiss-sagen.json: ${err.message}`);
+    return [];
+  }
+}
+
+/**
  * Initialize the swiss stories cache. Call once at startup.
  */
 function initSwissStories() {
   swissStoriesCache = parseAllSwissStories();
   swissCitiesData = loadCitiesData();
   swissIdeasJson = loadSwissStoryIdeas();
+  swissSagenData = loadSwissSagen();
 }
 
 /**
@@ -156,7 +178,8 @@ function getSwissStoriesResponse() {
 
   return {
     cantons: swissCitiesData.cantons,
-    cities
+    cities,
+    sagen: swissSagenData || []
   };
 }
 
@@ -176,9 +199,18 @@ function getSwissCityById(cityId) {
   return swissCitiesData.cities.find(c => c.id === cityId) || null;
 }
 
+/**
+ * Get a single Sage (fairy tale) by its ID.
+ */
+function getSageById(sageId) {
+  if (!swissSagenData) initSwissStories();
+  return swissSagenData?.find(s => s.id === sageId) || null;
+}
+
 module.exports = {
   initSwissStories,
   getSwissStoriesResponse,
   getSwissStoryResearch,
-  getSwissCityById
+  getSwissCityById,
+  getSageById
 };

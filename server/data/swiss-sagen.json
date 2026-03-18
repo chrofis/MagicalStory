@@ -1,0 +1,296 @@
+[
+  {
+    "id": "sage-heidi",
+    "title": {
+      "en": "Heidi",
+      "de": "Heidi",
+      "fr": "Heidi"
+    },
+    "description": {
+      "en": "An orphan girl is sent to live with her gruff grandfather in the Swiss Alps. She befriends goatherd Peter and discovers the joy of mountain life. Later she helps heal a disabled girl named Klara who visits from Frankfurt.",
+      "de": "Ein Waisenmädchen wird zu ihrem mürrischen Grossvater in die Schweizer Alpen geschickt. Sie freundet sich mit dem Geissenpeter an und entdeckt die Freude am Leben in den Bergen. Später hilft sie der gehbehinderten Klara aus Frankfurt, wieder gesund zu werden.",
+      "fr": "Une orpheline est envoyée vivre chez son grand-père bourru dans les Alpes suisses. Elle se lie d'amitié avec Peter, le chevrier, et découvre les joies de la vie en montagne. Plus tard, elle aide Klara, une jeune fille handicapée venue de Francfort, à guérir."
+    },
+    "context": {
+      "en": "Based on Johanna Spyri's 1881 novel. Set in the Alpine meadows above Maienfeld (GR), with the Heididorf museum and the Alp above Maienfeld as real locations.",
+      "de": "Basierend auf dem Roman von Johanna Spyri aus dem Jahr 1881. Spielt auf den Alpweiden oberhalb von Maienfeld (GR), mit dem Heididorf-Museum und der Alp oberhalb von Maienfeld als reale Schauplätze.",
+      "fr": "Basé sur le roman de Johanna Spyri de 1881. Se déroule dans les alpages au-dessus de Maienfeld (GR), avec le musée Heididorf et l'alpage au-dessus de Maienfeld comme lieux réels."
+    },
+    "themes": ["nature heals", "kindness transforms hearts", "home is where you belong"],
+    "age": "3+",
+    "emoji": "🏔️"
+  },
+  {
+    "id": "sage-devils-bridge",
+    "title": {
+      "en": "The Devil's Bridge",
+      "de": "Die Teufelsbrücke",
+      "fr": "Le Pont du Diable"
+    },
+    "description": {
+      "en": "Villagers desperately need a bridge across a dangerous gorge. The Devil offers to build it but demands the soul of the first to cross. The clever villagers trick him by sending a goat across first. The furious Devil throws a boulder but misses.",
+      "de": "Dorfbewohner brauchen dringend eine Brücke über eine gefährliche Schlucht. Der Teufel bietet an, sie zu bauen, verlangt aber die Seele des Ersten, der sie überquert. Die schlauen Dorfbewohner überlisten ihn, indem sie eine Geiss vorausschicken. Der wütende Teufel wirft einen Felsen, verfehlt aber sein Ziel.",
+      "fr": "Des villageois ont désespérément besoin d'un pont au-dessus d'une gorge dangereuse. Le Diable propose de le construire mais exige l'âme du premier à le traverser. Les villageois rusés le dupent en envoyant une chèvre en premier. Le Diable furieux lance un rocher mais rate sa cible."
+    },
+    "context": {
+      "en": "Swiss folk legend from the Schöllenen Gorge, Canton Uri. Real locations include the Teufelsbrücke, the Devil's Stone (Teufelsstein), and the town of Andermatt.",
+      "de": "Schweizer Volkssage aus der Schöllenenschlucht, Kanton Uri. Zu den realen Schauplätzen gehören die Teufelsbrücke, der Teufelsstein und die Ortschaft Andermatt.",
+      "fr": "Légende populaire suisse des gorges de Schöllenen, canton d'Uri. Les lieux réels comprennent le Teufelsbrücke, la Pierre du Diable (Teufelsstein) et la ville d'Andermatt."
+    },
+    "themes": ["cleverness outwits power", "community problem-solving"],
+    "age": "5+",
+    "emoji": "🌉"
+  },
+  {
+    "id": "sage-dragons-pilatus",
+    "title": {
+      "en": "The Dragons of Mount Pilatus",
+      "de": "Die Drachen vom Pilatus",
+      "fr": "Les Dragons du Mont Pilate"
+    },
+    "description": {
+      "en": "Friendly dragons with magical healing powers live in caves on Mount Pilatus. A farmer witnesses a great dragon fly into the mountain and discovers the legendary Dragon Stone, said to have the power to heal the sick.",
+      "de": "Freundliche Drachen mit magischen Heilkräften leben in Höhlen am Pilatus. Ein Bauer beobachtet, wie ein grosser Drache in den Berg fliegt, und entdeckt den legendären Drachenstein, dem heilende Kräfte zugeschrieben werden.",
+      "fr": "Des dragons amicaux dotés de pouvoirs magiques de guérison vivent dans les grottes du Mont Pilate. Un fermier voit un grand dragon voler dans la montagne et découvre la légendaire Pierre du Dragon, réputée pour guérir les malades."
+    },
+    "context": {
+      "en": "Swiss folk legend from the Lucerne region. Real locations include Mount Pilatus, Lake Lucerne, and Pilatus Kulm.",
+      "de": "Schweizer Volkssage aus der Region Luzern. Zu den realen Schauplätzen gehören der Pilatus, der Vierwaldstättersee und Pilatus Kulm.",
+      "fr": "Légende populaire suisse de la région de Lucerne. Les lieux réels comprennent le Mont Pilate, le lac des Quatre-Cantons et Pilatus Kulm."
+    },
+    "themes": ["don't judge by appearances", "nature holds hidden wonders"],
+    "age": "3+",
+    "emoji": "🐉"
+  },
+  {
+    "id": "sage-st-gall-bear",
+    "title": {
+      "en": "St. Gall and the Bear",
+      "de": "Sankt Gallus und der Bär",
+      "fr": "Saint Gall et l'Ours"
+    },
+    "description": {
+      "en": "Irish monk Gallus travels to the Swiss wilderness. He encounters a large bear but instead of fighting, shares his bread. The grateful bear helps carry logs and build a shelter. The town of St. Gallen grew around the monastery built on that spot.",
+      "de": "Der irische Mönch Gallus reist in die Schweizer Wildnis. Er begegnet einem grossen Bären, doch anstatt zu kämpfen, teilt er sein Brot mit ihm. Der dankbare Bär hilft beim Tragen von Holzstämmen und beim Bau einer Unterkunft. Die Stadt St. Gallen entstand rund um das an dieser Stelle errichtete Kloster.",
+      "fr": "Le moine irlandais Gallus voyage dans la nature sauvage suisse. Il rencontre un grand ours mais au lieu de se battre, il partage son pain. L'ours reconnaissant l'aide à porter des bûches et à construire un abri. La ville de Saint-Gall s'est développée autour du monastère construit à cet endroit."
+    },
+    "context": {
+      "en": "Swiss legend from the 7th century, Canton St. Gallen. Real locations include the Abbey of St. Gall (UNESCO World Heritage) and the St. Gallen old town.",
+      "de": "Schweizer Legende aus dem 7. Jahrhundert, Kanton St. Gallen. Zu den realen Schauplätzen gehören die Stiftsbibliothek St. Gallen (UNESCO-Weltkulturerbe) und die Altstadt von St. Gallen.",
+      "fr": "Légende suisse du 7e siècle, canton de Saint-Gall. Les lieux réels comprennent l'Abbaye de Saint-Gall (patrimoine mondial de l'UNESCO) et la vieille ville de Saint-Gall."
+    },
+    "themes": ["kindness tames wild creatures", "sharing creates friendship"],
+    "age": "3+",
+    "emoji": "🐻"
+  },
+  {
+    "id": "sage-vogel-gryff",
+    "title": {
+      "en": "Vogel Gryff of Basel",
+      "de": "Der Vogel Gryff von Basel",
+      "fr": "Le Vogel Gryff de Bâle"
+    },
+    "description": {
+      "en": "Three magical creatures — the Vogel Gryff (griffin), the Wild Man, and the Lion — represent the guilds of Basel. Once a year they dance on the bridge over the Rhine, celebrating the spirit of the city.",
+      "de": "Drei magische Wesen — der Vogel Gryff (Greif), der Wild Maa (Wilde Mann) und der Leu (Löwe) — vertreten die Zünfte von Basel. Einmal im Jahr tanzen sie auf der Brücke über den Rhein und feiern den Geist der Stadt.",
+      "fr": "Trois créatures magiques — le Vogel Gryff (griffon), l'Homme Sauvage et le Lion — représentent les corporations de Bâle. Une fois par an, ils dansent sur le pont au-dessus du Rhin, célébrant l'esprit de la ville."
+    },
+    "context": {
+      "en": "Basel folk tradition, centuries old, still celebrated annually in January. Real locations include the Mittlere Brücke (Middle Bridge), Kleinbasel, and the Rhine.",
+      "de": "Basler Volkstradition, jahrhundertealt, wird jedes Jahr im Januar noch gefeiert. Zu den realen Schauplätzen gehören die Mittlere Brücke, Kleinbasel und der Rhein.",
+      "fr": "Tradition populaire bâloise, vieille de plusieurs siècles, encore célébrée chaque année en janvier. Les lieux réels comprennent le Mittlere Brücke (Pont du Milieu), le Petit-Bâle et le Rhin."
+    },
+    "themes": ["community celebration", "tradition brings people together"],
+    "age": "3+",
+    "emoji": "🦅"
+  },
+  {
+    "id": "sage-white-chamois",
+    "title": {
+      "en": "The White Chamois",
+      "de": "Die weisse Gämse",
+      "fr": "Le Chamois Blanc"
+    },
+    "description": {
+      "en": "A legendary white chamois lives on the highest peaks. Hunters who chase it selfishly are led to danger, but those with pure hearts are guided to safety by the magical creature.",
+      "de": "Eine legendäre weisse Gämse lebt auf den höchsten Gipfeln. Jäger, die sie aus Gier verfolgen, werden in Gefahr geführt, doch Menschen mit reinem Herzen werden von dem magischen Tier in Sicherheit geleitet.",
+      "fr": "Un chamois blanc légendaire vit sur les plus hauts sommets. Les chasseurs qui le poursuivent par cupidité sont menés vers le danger, mais ceux au cœur pur sont guidés vers la sécurité par la créature magique."
+    },
+    "context": {
+      "en": "Swiss Alpine folk legend. Set in various Swiss Alpine peaks, including the Bernese Oberland and Valais regions.",
+      "de": "Schweizer Alpen-Volkssage. Spielt auf verschiedenen Schweizer Alpengipfeln, unter anderem im Berner Oberland und im Wallis.",
+      "fr": "Légende populaire des Alpes suisses. Se déroule sur divers sommets alpins suisses, notamment dans l'Oberland bernois et le Valais."
+    },
+    "themes": ["respect nature", "greed leads to danger", "pure hearts find their way"],
+    "age": "4+",
+    "emoji": "🏔️"
+  },
+  {
+    "id": "sage-frost-giants",
+    "title": {
+      "en": "Frost Giants and Sunbeam Fairies",
+      "de": "Die Frostriesen und die Sonnenelfen",
+      "fr": "Les Géants de Givre et les Fées du Soleil"
+    },
+    "description": {
+      "en": "Switzerland was a frozen wasteland ruled by cruel Frost Giants. The Fairy Queen and the Sun send an army of Sunbeam Fairies to battle the giants, melting the ice and transforming the land into a green paradise with flowers and meadows.",
+      "de": "Die Schweiz war eine gefrorene Einöde, beherrscht von grausamen Frostriesen. Die Feenkönigin und die Sonne senden eine Armee von Sonnenelfen, um gegen die Riesen zu kämpfen, das Eis zu schmelzen und das Land in ein grünes Paradies mit Blumen und Wiesen zu verwandeln.",
+      "fr": "La Suisse était un désert gelé gouverné par de cruels Géants de Givre. La Reine des Fées et le Soleil envoient une armée de Fées du Soleil combattre les géants, faisant fondre la glace et transformant le pays en un paradis verdoyant de fleurs et de prairies."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set in frozen Swiss mountains, with glaciers turning into meadows and Alpine flower fields.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in den gefrorenen Schweizer Bergen, wo Gletscher sich in Wiesen und alpine Blumenfelder verwandeln.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les montagnes suisses gelées, où les glaciers se transforment en prairies et champs de fleurs alpines."
+    },
+    "themes": ["light triumphs over cold", "beauty grows from harsh beginnings"],
+    "age": "3+",
+    "emoji": "❄️"
+  },
+  {
+    "id": "sage-cuckoo-clock-fairy",
+    "title": {
+      "en": "The Fairy in the Cuckoo Clock",
+      "de": "Die Fee in der Kuckucksuhr",
+      "fr": "La Fée dans le Coucou"
+    },
+    "description": {
+      "en": "A mischievous fairy discovers Swiss woodworkers' clever clock mechanisms. She enchants a wooden bird to pop out and call \"cuckoo\" at every hour, delighting the villagers. This is how the first cuckoo clock was born.",
+      "de": "Eine schelmische Fee entdeckt die raffinierten Uhrmechanismen der Schweizer Holzschnitzer. Sie verzaubert einen Holzvogel, sodass er jede Stunde herausspringt und «Kuckuck» ruft, zur Freude der Dorfbewohner. So entstand die erste Kuckucksuhr.",
+      "fr": "Une fée espiègle découvre les ingénieux mécanismes d'horlogerie des artisans suisses. Elle enchante un oiseau en bois pour qu'il sorte et crie « coucou » à chaque heure, ravissant les villageois. C'est ainsi que naquit le premier coucou."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set in a Swiss woodworker's workshop in a mountain village.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in der Werkstatt eines Schweizer Holzschnitzers in einem Bergdorf.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans l'atelier d'un artisan du bois suisse dans un village de montagne."
+    },
+    "themes": ["magic and craftsmanship create wonder"],
+    "age": "3+",
+    "emoji": "🕰️"
+  },
+  {
+    "id": "sage-edelweiss-fairy",
+    "title": {
+      "en": "The Fairy of the Edelweiss",
+      "de": "Die Edelweissfee",
+      "fr": "La Fée de l'Edelweiss"
+    },
+    "description": {
+      "en": "A brave fairy is transformed by the Fairy Queen into the first Edelweiss flower to stand guard against the Frost King on the highest mountain peaks. The small fuzzy white flower grows where almost nothing else can, symbolizing courage and love.",
+      "de": "Eine mutige Fee wird von der Feenkönigin in die erste Edelweissblume verwandelt, um auf den höchsten Berggipfeln gegen den Frostkönig Wache zu halten. Die kleine, weiss-pelzige Blume wächst dort, wo fast nichts anderes gedeihen kann — ein Symbol für Mut und Liebe.",
+      "fr": "Une fée courageuse est transformée par la Reine des Fées en la première fleur d'edelweiss pour monter la garde contre le Roi du Givre sur les plus hauts sommets. La petite fleur blanche et duveteuse pousse là où presque rien d'autre ne peut survivre, symbolisant le courage et l'amour."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set on high Alpine peaks, rocky mountain ledges, and snow-covered cliffs.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf hohen Alpengipfeln, felsigen Bergsimsen und schneebedeckten Klippen.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule sur les hauts sommets alpins, les corniches rocheuses et les falaises enneigées."
+    },
+    "themes": ["bravery means standing firm in hard places", "small things hold great courage"],
+    "age": "3+",
+    "emoji": "🌸"
+  },
+  {
+    "id": "sage-alpine-horn",
+    "title": {
+      "en": "The Wonderful Alpine Horn",
+      "de": "Das wunderbare Alphorn",
+      "fr": "Le Merveilleux Cor des Alpes"
+    },
+    "description": {
+      "en": "A young shepherd boy named Perrod receives a magical Alpine horn from mysterious mountain visitors. When he plays it, the sound echoes through the valleys, bringing joy to everyone and calling the cows safely home.",
+      "de": "Ein junger Hirtenbub namens Perrod erhält ein magisches Alphorn von geheimnisvollen Bergbesuchern. Wenn er darauf spielt, hallt der Klang durch die Täler, bringt allen Freude und ruft die Kühe sicher nach Hause.",
+      "fr": "Un jeune berger nommé Perrod reçoit un cor des Alpes magique de mystérieux visiteurs de la montagne. Quand il en joue, le son résonne dans les vallées, apportant la joie à tous et ramenant les vaches saines et sauves."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set in Alpine pastures, mountain valleys, and a Swiss village.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf Alpweiden, in Bergtälern und in einem Schweizer Dorf.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les alpages, les vallées montagneuses et un village suisse."
+    },
+    "themes": ["music brings people together", "gifts should help others"],
+    "age": "3+",
+    "emoji": "🎶"
+  },
+  {
+    "id": "sage-dwarf-chocolate",
+    "title": {
+      "en": "The Dwarf and His Confectionery",
+      "de": "Der Zwerg und sein Süsswarenladen",
+      "fr": "Le Nain et sa Confiserie"
+    },
+    "description": {
+      "en": "A dairy farmer discovers that the Dwarf King has a secret underground workshop making wonderful candy and chocolate. The farmer tries to steal the recipe but is caught and learns about honesty and respect.",
+      "de": "Ein Milchbauer entdeckt, dass der Zwergenkönig eine geheime unterirdische Werkstatt hat, in der wunderbare Süssigkeiten und Schokolade hergestellt werden. Der Bauer versucht das Rezept zu stehlen, wird aber erwischt und lernt etwas über Ehrlichkeit und Respekt.",
+      "fr": "Un fermier laitier découvre que le Roi des Nains possède un atelier souterrain secret fabriquant de merveilleux bonbons et chocolats. Le fermier tente de voler la recette mais est pris et apprend l'honnêteté et le respect."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set in Swiss mountain pastures and a hidden underground confectionery cavern. Connects to Switzerland's chocolate tradition.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt auf Schweizer Bergweiden und in einer verborgenen unterirdischen Süsswarenhöhle. Verbunden mit der Schweizer Schokoladentradition.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans les pâturages de montagne suisses et une caverne souterraine cachée de confiserie. Lié à la tradition chocolatière suisse."
+    },
+    "themes": ["respect others' work", "greed leads to trouble"],
+    "age": "4+",
+    "emoji": "🍫"
+  },
+  {
+    "id": "sage-palace-under-waves",
+    "title": {
+      "en": "The Palace Under the Waves",
+      "de": "Der Palast unter den Wellen",
+      "fr": "Le Palais sous les Vagues"
+    },
+    "description": {
+      "en": "The king of the water spirits invites a human princess into his crystal palace beneath a Swiss lake. She discovers an enchanted world of shimmering halls and water gardens, and must choose between the magical underwater world and her life above.",
+      "de": "Der König der Wassergeister lädt eine menschliche Prinzessin in seinen Kristallpalast unter einem Schweizer See ein. Sie entdeckt eine verzauberte Welt aus schimmernden Hallen und Wassergärten und muss sich zwischen der magischen Unterwasserwelt und ihrem Leben an der Oberfläche entscheiden.",
+      "fr": "Le roi des esprits de l'eau invite une princesse humaine dans son palais de cristal sous un lac suisse. Elle découvre un monde enchanté de salles scintillantes et de jardins aquatiques, et doit choisir entre le monde magique sous-marin et sa vie à la surface."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set at a Swiss lake shore, with a crystal palace underwater and water gardens.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt am Ufer eines Schweizer Sees, mit einem Kristallpalast unter Wasser und Wassergärten.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule au bord d'un lac suisse, avec un palais de cristal sous l'eau et des jardins aquatiques."
+    },
+    "themes": ["every world has its own beauty", "be grateful for where you belong"],
+    "age": "4+",
+    "emoji": "🏰"
+  },
+  {
+    "id": "sage-friendly-dragons",
+    "title": {
+      "en": "Two Good-Natured Dragons",
+      "de": "Zwei gutmütige Drachen",
+      "fr": "Deux Dragons Bienveillants"
+    },
+    "description": {
+      "en": "A man lost in a mountain storm stumbles into a cave and discovers two friendly dragons. Instead of being frightening, they keep him warm through the winter and share their food.",
+      "de": "Ein Mann, der sich in einem Bergsturm verirrt hat, stolpert in eine Höhle und entdeckt zwei freundliche Drachen. Anstatt furchteinflössend zu sein, halten sie ihn den ganzen Winter über warm und teilen ihr Essen mit ihm.",
+      "fr": "Un homme perdu dans une tempête de montagne trébuche dans une grotte et découvre deux dragons amicaux. Au lieu d'être effrayants, ils le gardent au chaud tout l'hiver et partagent leur nourriture."
+    },
+    "context": {
+      "en": "From the William Elliot Griffis collection (1920). Set in a Swiss mountain cave during a stormy Alpine landscape.",
+      "de": "Aus der Sammlung von William Elliot Griffis (1920). Spielt in einer Schweizer Berghöhle während eines stürmischen Alpenwetters.",
+      "fr": "Tiré de la collection de William Elliot Griffis (1920). Se déroule dans une grotte de montagne suisse lors d'une tempête alpine."
+    },
+    "themes": ["don't judge by appearances", "kindness in unexpected places"],
+    "age": "3+",
+    "emoji": "🐲"
+  },
+  {
+    "id": "sage-gargantua-matterhorn",
+    "title": {
+      "en": "Gargantua of the Matterhorn",
+      "de": "Gargantua vom Matterhorn",
+      "fr": "Gargantua du Cervin"
+    },
+    "description": {
+      "en": "A legendary giant named Gargantua shaped the Swiss landscape as he walked. His footprints became lakes, and when he lay down to rest, his body became the Matterhorn.",
+      "de": "Ein legendärer Riese namens Gargantua formte die Schweizer Landschaft, während er umherwanderte. Seine Fussstapfen wurden zu Seen, und als er sich zur Ruhe legte, wurde sein Körper zum Matterhorn.",
+      "fr": "Un géant légendaire nommé Gargantua a façonné le paysage suisse en marchant. Ses empreintes de pas sont devenues des lacs, et lorsqu'il s'est couché pour se reposer, son corps est devenu le Cervin."
+    },
+    "context": {
+      "en": "Swiss Alpine legend. Set around the Matterhorn, Swiss valleys and lakes.",
+      "de": "Schweizer Alpensage. Spielt rund um das Matterhorn, Schweizer Täler und Seen.",
+      "fr": "Légende alpine suisse. Se déroule autour du Cervin, des vallées et des lacs suisses."
+    },
+    "themes": ["even the mightiest things have a story behind them"],
+    "age": "3+",
+    "emoji": "⛰️"
+  }
+]
