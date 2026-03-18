@@ -4,7 +4,6 @@ import { LoadingSpinner } from './components/common/LoadingSpinner';
 import { ImpersonationBanner } from './components/common/ImpersonationBanner';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { GenerationProvider } from './context/GenerationContext';
-import { GlobalGenerationProgress } from './components/GlobalGenerationProgress';
 
 // Lazy load pages for code splitting
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -41,7 +40,6 @@ function App() {
     <GenerationProvider>
       <ScrollToTop />
       <ImpersonationBanner />
-      <GlobalGenerationProgress />
       <Suspense fallback={<LoadingSpinner fullScreen />}>
         <Routes>
           <Route path="/" element={<LandingPage />} />
