@@ -22,6 +22,18 @@ import type { Language, SwissCity, SwissStoriesData } from '@/types/story';
 
 type StoryCategoryId = 'adventure' | 'life-challenge' | 'educational' | 'historical' | 'swiss-stories' | 'custom' | '';
 
+// Swiss flag inline SVG — Windows renders 🇨🇭 as "CH" text
+const SwissFlag = ({ className = '' }: { className?: string }) => (
+  <svg viewBox="0 0 32 32" className={`inline-block ${className}`} style={{ width: '1em', height: '1em' }}>
+    <rect width="32" height="32" rx="4" fill="#FF0000"/>
+    <rect x="13" y="6" width="6" height="20" fill="white"/>
+    <rect x="6" y="13" width="20" height="6" fill="white"/>
+  </svg>
+);
+
+// Render emoji, replacing 🇨🇭 with proper SVG flag
+const renderEmoji = (emoji: string) => emoji === '🇨🇭' ? <SwissFlag /> : emoji;
+
 interface StoryCategorySelectorProps {
   // Current values
   storyCategory: StoryCategoryId;
@@ -361,14 +373,14 @@ export function StoryCategorySelector({
             >
               {/* Mobile: horizontal layout with emoji left, title centered */}
               <div className="flex md:hidden items-center gap-3">
-                <div className="text-3xl flex-shrink-0">{category.emoji}</div>
+                <div className="text-3xl flex-shrink-0">{renderEmoji(category.emoji)}</div>
                 <div className={`flex-1 text-center font-bold text-lg ${category.id === 'custom' ? 'text-indigo-700' : 'text-gray-800'}`}>
                   {category.name[lang] || category.name.en}
                 </div>
               </div>
               {/* Desktop: vertical layout with emoji, title, description */}
               <div className="hidden md:block text-left">
-                <div className="text-4xl mb-3">{category.emoji}</div>
+                <div className="text-4xl mb-3">{renderEmoji(category.emoji)}</div>
                 <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-indigo-700' : 'text-gray-800'}`}>
                   {category.name[lang] || category.name.en}
                 </div>
@@ -391,7 +403,7 @@ export function StoryCategorySelector({
         {/* Selected category chip */}
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{catData?.emoji}</span>
+            <span className="text-2xl">{catData?.emoji && renderEmoji(catData.emoji)}</span>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
@@ -459,7 +471,7 @@ export function StoryCategorySelector({
         {/* Selected category chip */}
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{catData?.emoji}</span>
+            <span className="text-2xl">{catData?.emoji && renderEmoji(catData.emoji)}</span>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
@@ -529,7 +541,7 @@ export function StoryCategorySelector({
         {/* Selected category chip */}
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{catData?.emoji}</span>
+            <span className="text-2xl">{catData?.emoji && renderEmoji(catData.emoji)}</span>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
@@ -599,7 +611,7 @@ export function StoryCategorySelector({
         {/* Selected category chip */}
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{catData?.emoji}</span>
+            <span className="text-2xl">{catData?.emoji && renderEmoji(catData.emoji)}</span>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
@@ -734,7 +746,7 @@ export function StoryCategorySelector({
         {/* Selected category chip */}
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{catData?.emoji}</span>
+            <span className="text-2xl">{catData?.emoji && renderEmoji(catData.emoji)}</span>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm">{getCategoryName('swiss-stories')}</div>
@@ -891,7 +903,7 @@ export function StoryCategorySelector({
         {/* Selected category and topic chips */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="inline-flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{catData?.emoji}</span>
+            <span className="text-2xl">{catData?.emoji && renderEmoji(catData.emoji)}</span>
             <div>
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm">{getCategoryName(storyCategory)}</div>
@@ -1038,7 +1050,7 @@ export function StoryCategorySelector({
         <div className={`grid gap-4 ${chipCount === 1 ? 'grid-cols-1 max-w-xs' : chipCount === 2 ? 'grid-cols-2' : 'grid-cols-3'}`}>
           {/* Category chip */}
           <div className="relative flex items-center gap-3 bg-white px-4 py-3 rounded-xl border-2 border-indigo-200 shadow-sm">
-            <span className="text-2xl">{categoryData?.emoji}</span>
+            <span className="text-2xl">{categoryData?.emoji && renderEmoji(categoryData.emoji)}</span>
             <div className="flex-1 min-w-0">
               <div className="text-[10px] text-gray-400 uppercase">{t.category}</div>
               <div className="font-semibold text-sm truncate">{getCategoryName(storyCategory)}</div>
@@ -1131,7 +1143,7 @@ export function StoryCategorySelector({
             >
               {/* Horizontal layout: large emoji left, title + description right */}
               <div className="flex items-center gap-3 text-left">
-                <div className="text-4xl flex-shrink-0">{category.emoji}</div>
+                <div className="text-4xl flex-shrink-0">{renderEmoji(category.emoji)}</div>
                 <div>
                   <div className={`font-bold text-lg ${category.id === 'custom' ? 'text-indigo-700' : 'text-gray-800'}`}>
                     {category.name[lang] || category.name.en}
