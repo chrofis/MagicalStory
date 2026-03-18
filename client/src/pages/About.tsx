@@ -68,7 +68,7 @@ const aboutContent: Record<string, {
       'Jedes Kind hat eine Geschichte, die es verdient, erzählt zu werden — und dein Kind sollte der Held darin sein. Magical Story verwandelt deine Familienfotos in personalisierte Kinderbücher, in denen dein Kind auf jeder Seite die Hauptrolle spielt.',
       'Kein Buch von der Stange. Ein Buch über dein Kind. Eines, das einfängt, wer es wirklich ist, und das gemeinsame Lesen in etwas verwandelt, auf das ihr euch beide freut.',
     ],
-    scienceTitle: 'Weniger erklären. Mehr erzählen.',
+    scienceTitle: 'Schimpfen bringt oft nichts. Eine gute Geschichte schon.',
     scienceTagline: 'Kleine Geschichten, grosse Momente.',
     scienceText: [
       'Jeder Elternteil kennt den Moment: Man hat etwas zehnmal erklärt, zweimal die Stimme erhoben, und nichts hat sich geändert. Dann liest man eines Abends eine Geschichte über einen kleinen Bären, der teilen lernt — und plötzlich reicht das Kind sein Spielzeug dem Geschwisterchen. Geschichten erreichen Kinder dort, wo Worte allein es nicht können.',

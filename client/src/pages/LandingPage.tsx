@@ -74,7 +74,7 @@ const sectionTranslations = {
     printOptions: 'Hardcover oder Softcover Druck - 20x20cm, professionelle Qualität',
     shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
     // Why It Works
-    whyTitle: 'Warum erklären, wenn du eine Geschichte erzählen kannst?',
+    whyTitle: 'Eine Geschichte bewirkt mehr als tausend Ermahnungen.',
     whyDesc: 'Kinder lernen nicht durch Schimpfen — sie lernen durch Geschichten, die sie lieben. Eine Geschichte übers Zähneputzen bewirkt mehr als jede Diskussion. Und wenn sie selbst der Held sind? Können sie es kaum erwarten, es nachzumachen.',
     whyLink: 'Erfahre warum es wirkt',
     // CTA
