@@ -15,8 +15,9 @@ Create a front cover illustration for a children's book.
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact title text: "{STORY_TITLE}"
-- Make the title PROMINENT and highly visible at the top
-- Use an attractive, readable font style that fits the art style
+- Position the title in the upper third of the image
+- The letters have significant three-dimensional volume — they are physical objects in the scene, not flat text. They catch the scene's lighting and cast shadows like any other object would. Their color is not uniform but shaped by the light sources in the scene
+- Use an artistic hand-crafted lettering style that fits the story's world — never standard computer fonts
 - The title is the ONLY text that should appear in the image
 
 {VISUAL_BIBLE}

@@ -18,8 +18,9 @@ Create an introduction page illustration for a children's book.
 
 **TEXT REQUIREMENT - CRITICAL:**
 The image MUST include this exact dedication text: "<user_input>{DEDICATION}</user_input>"
-- Make the dedication text elegant and readable
-- Position it prominently in the image (typically top or bottom)
+- Position the text in the lower third of the image
+- Use elegant, hand-crafted lettering that fits the story's art style — not standard computer fonts. The text should feel like part of the illustration, painted or drawn by the same artist
+- Keep the lettering flat and graceful (not three-dimensional) — this is a dedication, not a title
 - Do NOT add any other text - ONLY the dedication text above
 
 {VISUAL_BIBLE}
