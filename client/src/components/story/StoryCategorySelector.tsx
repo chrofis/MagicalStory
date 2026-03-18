@@ -130,6 +130,8 @@ export function StoryCategorySelector({
   const [expandedSwissCities, setExpandedSwissCities] = useState<string[]>([]);
   const [expandedSwissCantons, setExpandedSwissCantons] = useState<string[]>([]);
   const [expandedSwissSection, setExpandedSwissSection] = useState<'nearby' | 'cantons' | 'sagen' | null>(null);
+  const [previewSageId, setPreviewSageId] = useState<string | null>(null);
+  const [sageInfoMode, setSageInfoMode] = useState<'description' | 'context'>('description');
 
   // Translations
   const translations = {
@@ -154,6 +156,9 @@ export function StoryCategorySelector({
       nearby: 'Nearby',
       byCanton: 'By Canton',
       sagen: 'Legends & Fairy Tales',
+      sageStoryIdea: 'Story Idea',
+      sageBackground: 'Background',
+      sageChoose: 'Choose This Story',
       ideas: 'ideas',
       km: 'km',
       loading: 'Loading...',
@@ -179,6 +184,9 @@ export function StoryCategorySelector({
       nearby: 'In der Nähe',
       byCanton: 'Nach Kanton',
       sagen: 'Sagen & Märchen',
+      sageStoryIdea: 'Geschichte',
+      sageBackground: 'Hintergrund',
+      sageChoose: 'Diese Geschichte wählen',
       ideas: 'Ideen',
       km: 'km',
       loading: 'Laden...',
@@ -204,6 +212,9 @@ export function StoryCategorySelector({
       nearby: 'À proximité',
       byCanton: 'Par canton',
       sagen: 'Légendes & Contes',
+      sageStoryIdea: 'Idée d\'histoire',
+      sageBackground: 'Contexte',
+      sageChoose: 'Choisir cette histoire',
       ideas: 'idées',
       km: 'km',
       loading: 'Chargement...',
@@ -717,11 +728,10 @@ export function StoryCategorySelector({
 
     // Render a city's story ideas as cards
     const renderCityIdeas = (city: SwissCity) => (
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3">
         {city.ideas.map((idea) => {
           const title = localizeField(idea.title, lang);
           const description = localizeField(idea.description, lang);
-          const context = idea.context ? localizeField(idea.context, lang) : '';
           return (
             <button
               key={idea.id}
@@ -729,18 +739,11 @@ export function StoryCategorySelector({
                 onTopicChange(idea.id);
                 onLegacyStoryTypeChange(idea.id);
               }}
-              className="p-3 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-left"
+              className="p-2 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center"
+              title={description}
             >
-              <div className="flex items-start gap-2">
-                <span className="text-xl flex-shrink-0">{getIdeaEmoji(idea.title, idea.description)}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-gray-800 line-clamp-1">{title}</div>
-                  {context && (
-                    <div className="text-[11px] text-amber-700 bg-amber-50 rounded px-1.5 py-1 mt-1 line-clamp-2 border border-amber-100">{context}</div>
-                  )}
-                  <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">{description}</div>
-                </div>
-              </div>
+              <div className="text-2xl mb-1">{getIdeaEmoji(idea.title, idea.description)}</div>
+              <div className="font-semibold text-xs line-clamp-2">{title}</div>
             </button>
           );
         })}
@@ -778,13 +781,13 @@ export function StoryCategorySelector({
           <div className="space-y-3">
             {/* User's city (auto-expanded) */}
             {userCity && (
-              <div className="border-2 border-indigo-200 rounded-lg overflow-hidden bg-indigo-50/30">
-                <div className="flex items-center gap-2 p-3 bg-indigo-50">
-                  <MapPin size={18} className="text-indigo-600" />
-                  <span className="font-semibold text-indigo-700">
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="flex items-center gap-2 p-3 bg-gray-50">
+                  <MapPin size={18} className="text-gray-600" />
+                  <span className="font-semibold text-gray-700">
                     {t.yourCity}: {userCity.name[lang] || userCity.name.en}
                   </span>
-                  <span className="text-xs text-indigo-500 ml-auto">{userCity.ideas.length} {t.ideas}</span>
+                  <span className="text-xs text-gray-500 ml-auto">{userCity.ideas.length} {t.ideas}</span>
                 </div>
                 {renderCityIdeas(userCity)}
               </div>
@@ -895,7 +898,7 @@ export function StoryCategorySelector({
             {swissData?.sagen && swissData.sagen.length > 0 && (
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <button
-                  onClick={() => setExpandedSwissSection(prev => prev === 'sagen' ? null : 'sagen')}
+                  onClick={() => { setExpandedSwissSection(prev => prev === 'sagen' ? null : 'sagen'); setPreviewSageId(null); }}
                   className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <span className="font-semibold text-gray-700 flex items-center gap-2">
@@ -905,26 +908,74 @@ export function StoryCategorySelector({
                   {expandedSwissSection === 'sagen' ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </button>
                 {expandedSwissSection === 'sagen' && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3">
-                    {swissData.sagen.map((sage) => {
+                  <div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3">
+                      {swissData.sagen.map((sage) => {
+                        const title = localizeField(sage.title, lang);
+                        const isSelected = previewSageId === sage.id;
+                        return (
+                          <button
+                            key={sage.id}
+                            onClick={() => setPreviewSageId(isSelected ? null : sage.id)}
+                            className={`p-2 rounded-lg border transition-all text-center ${
+                              isSelected
+                                ? 'border-indigo-400 bg-indigo-50 ring-2 ring-indigo-200'
+                                : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50'
+                            }`}
+                          >
+                            <div className="text-2xl mb-1">{sage.emoji}</div>
+                            <div className="font-semibold text-xs">{title}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {/* Detail preview panel */}
+                    {previewSageId && (() => {
+                      const sage = swissData.sagen!.find(s => s.id === previewSageId);
+                      if (!sage) return null;
                       const title = localizeField(sage.title, lang);
                       const description = localizeField(sage.description, lang);
+                      const context = sage.context ? localizeField(sage.context, lang) : '';
                       return (
-                        <button
-                          key={sage.id}
-                          onClick={() => {
-                            onTopicChange(sage.id);
-                            onLegacyStoryTypeChange(sage.id);
-                          }}
-                          className="p-3 rounded-lg border border-gray-200 hover:border-indigo-400 hover:bg-indigo-50 transition-all text-center group relative"
-                          title={description}
-                        >
-                          <div className="text-2xl mb-1">{sage.emoji}</div>
-                          <div className="font-semibold text-xs">{title}</div>
-                          <div className="text-[10px] text-gray-400 mt-0.5">{sage.age}</div>
-                        </button>
+                        <div className="mx-3 mb-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="font-semibold text-sm text-gray-800">{sage.emoji} {title}</span>
+                            {context && (
+                              <div className="flex gap-1 bg-white rounded-md border border-gray-200 p-0.5">
+                                <button
+                                  onClick={() => setSageInfoMode('description')}
+                                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                    sageInfoMode === 'description' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                                  }`}
+                                >
+                                  {t.sageStoryIdea}
+                                </button>
+                                <button
+                                  onClick={() => setSageInfoMode('context')}
+                                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                    sageInfoMode === 'context' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                                  }`}
+                                >
+                                  {t.sageBackground}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600 leading-relaxed">
+                            {sageInfoMode === 'context' && context ? context : description}
+                          </p>
+                          <button
+                            onClick={() => {
+                              onTopicChange(sage.id);
+                              onLegacyStoryTypeChange(sage.id);
+                            }}
+                            className="mt-2 w-full py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-md hover:bg-indigo-700 transition-colors"
+                          >
+                            {t.sageChoose}
+                          </button>
+                        </div>
                       );
-                    })}
+                    })()}
                   </div>
                 )}
               </div>
