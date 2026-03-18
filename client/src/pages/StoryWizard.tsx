@@ -5000,9 +5000,11 @@ export default function StoryWizard() {
                 {language === 'de' ? '🎁 Du erhältst 300 Gratis-Credits!' : language === 'fr' ? '🎁 Vous recevrez 300 crédits gratuits !' : '🎁 You\'ll receive 300 free credits!'}
               </p>
               <ul className="text-amber-700 text-xs mt-1 space-y-0.5">
-                <li>{language === 'de' ? '• Erstelle weitere personalisierte Geschichten' : language === 'fr' ? '• Créez plus d\'histoires personnalisées' : '• Create more personalized stories'}</li>
-                <li>{language === 'de' ? '• Alle deine Geschichten sind sicher gespeichert' : language === 'fr' ? '• Toutes vos histoires sont sauvegardées' : '• All your stories are safely stored'}</li>
-                <li>{language === 'de' ? '• Jederzeit erneut anmelden' : language === 'fr' ? '• Reconnectez-vous à tout moment' : '• Log back in anytime'}</li>
+                <li>{language === 'de' ? '• Längere Geschichten mit mehr Seiten' : language === 'fr' ? '• Des histoires plus longues avec plus de pages' : '• Longer stories with more pages'}</li>
+                <li>{language === 'de' ? '• Mehrere Figuren in einer Geschichte' : language === 'fr' ? '• Plusieurs personnages dans une histoire' : '• Multiple characters in one story'}</li>
+                <li>{language === 'de' ? '• Verschiedene Zeichenstile und höhere Bildqualität' : language === 'fr' ? '• Différents styles de dessin et meilleure qualité' : '• Different art styles and higher image quality'}</li>
+                <li>{language === 'de' ? '• Als gedrucktes Buch bestellen' : language === 'fr' ? '• Commander en livre imprimé' : '• Order as a printed book'}</li>
+                <li>{language === 'de' ? '• Alle Geschichten sicher gespeichert' : language === 'fr' ? '• Toutes vos histoires sauvegardées' : '• All stories safely stored'}</li>
               </ul>
             </div>
             <form onSubmit={handleClaimAccount} className="space-y-3">
