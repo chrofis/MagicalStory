@@ -765,7 +765,7 @@ export function StoryCategorySelector({
                   <div className="flex gap-1 bg-white rounded-md border border-gray-200 p-0.5">
                     <button
                       onClick={() => setInfoMode('description')}
-                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                         infoMode === 'description' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
@@ -773,7 +773,7 @@ export function StoryCategorySelector({
                     </button>
                     <button
                       onClick={() => setInfoMode('context')}
-                      className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                         infoMode === 'context' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                       }`}
                     >
@@ -782,7 +782,7 @@ export function StoryCategorySelector({
                   </div>
                 )}
               </div>
-              <p className="text-xs text-gray-600 leading-relaxed">
+              <p className="text-sm text-gray-600 leading-relaxed">
                 {infoMode === 'context' && context ? context : description}
               </p>
               <button
@@ -994,7 +994,7 @@ export function StoryCategorySelector({
                               <div className="flex gap-1 bg-white rounded-md border border-gray-200 p-0.5">
                                 <button
                                   onClick={() => setInfoMode('description')}
-                                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                                     infoMode === 'description' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                                   }`}
                                 >
@@ -1002,7 +1002,7 @@ export function StoryCategorySelector({
                                 </button>
                                 <button
                                   onClick={() => setInfoMode('context')}
-                                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                  className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
                                     infoMode === 'context' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:text-gray-700'
                                   }`}
                                 >
@@ -1011,7 +1011,7 @@ export function StoryCategorySelector({
                               </div>
                             )}
                           </div>
-                          <p className="text-xs text-gray-600 leading-relaxed">
+                          <p className="text-sm text-gray-600 leading-relaxed">
                             {infoMode === 'context' && context ? context : description}
                           </p>
                           <button
