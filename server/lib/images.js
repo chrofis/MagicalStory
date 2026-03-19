@@ -5435,8 +5435,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   }
 
   const [ymin, xmin, ymax, xmax] = bbox;
-  const useCutout = options.useCutout || false;
-  const method = useCutout ? 'grok_cutout' : 'grok_blackout';
+  const useBlended = options.useBlended !== undefined ? options.useBlended : true; // default ON
+  const useCutout = !useBlended && (options.useCutout || false);
+  const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : 'grok_blackout';
 
   log.info(`👤 [CHAR REPAIR GROK] Starting ${method} repair for ${charName} at bbox [${bbox.map(v => Math.round(v * 100) + '%').join(', ')}]`);
 
@@ -5452,7 +5453,95 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const issueDescription = options.issueDescription || '';
   const issueContext = issueDescription ? ` Specific issue: ${issueDescription}` : '';
 
-  if (useCutout) {
+  if (useBlended) {
+    // ── Blended mode: blackout → Grok → blend repaired region onto original ──
+    // Preserves background quality: only the character region changes.
+    const sharp = require('sharp');
+    const sceneMeta = await sharp(sceneBuffer).metadata();
+
+    // A. Create magenta blackout over character bbox
+    const bboxLeft = Math.floor(xmin * sceneMeta.width);
+    const bboxTop = Math.floor(ymin * sceneMeta.height);
+    const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
+    const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
+
+    const magentaOverlay = await sharp({
+      create: { width: bboxWidth, height: bboxHeight, channels: 4, background: { r: 200, g: 0, b: 100, alpha: 0.6 } }
+    }).png().toBuffer();
+
+    const blackoutBuffer = await sharp(sceneBuffer)
+      .composite([{ input: magentaOverlay, left: bboxLeft, top: bboxTop }])
+      .jpeg({ quality: 90 }).toBuffer();
+    const blackoutDataUri = `data:image/jpeg;base64,${blackoutBuffer.toString('base64')}`;
+
+    // B. Send blackout scene + avatar reference to Grok
+    const centerX = Math.round(((xmin + xmax) / 2) * 100);
+    const centerY = Math.round(((ymin + ymax) / 2) * 100);
+    const hPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
+    const vPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
+
+    const prompt = `Fix the character at the ${vPos} ${hPos} of this illustration (marked with magenta overlay). Replace their face, hair, and skin tone to match the reference photo of ${charName} exactly. Keep pose, background, art style, and all other characters unchanged.${issueContext}`;
+
+    log.info(`👤 [CHAR REPAIR GROK] Blended: blackout ${bboxWidth}x${bboxHeight} at (${bboxLeft},${bboxTop}), sending to Grok...`);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, blackoutDataUri]);
+
+    if (!grokResult.imageData) {
+      log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
+      return { imageData: null, character: charName, method };
+    }
+
+    // C. Resize Grok result to match original dimensions
+    const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
+    let grokBuffer = Buffer.from(grokBase64, 'base64');
+    const grokMeta = await sharp(grokBuffer).metadata();
+    if (grokMeta.width !== sceneMeta.width || grokMeta.height !== sceneMeta.height) {
+      grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
+    }
+
+    // D. Calculate blend region: bbox + 50% padding
+    const BLEND_PADDING = 0.5;
+    const FEATHER_PX = 30;
+    const padX = (xmax - xmin) * BLEND_PADDING;
+    const padY = (ymax - ymin) * BLEND_PADDING;
+    const blendXmin = Math.max(0, xmin - padX);
+    const blendYmin = Math.max(0, ymin - padY);
+    const blendXmax = Math.min(1, xmax + padX);
+    const blendYmax = Math.min(1, ymax + padY);
+
+    const blendLeft = Math.floor(blendXmin * sceneMeta.width);
+    const blendTop = Math.floor(blendYmin * sceneMeta.height);
+    const blendWidth = Math.min(sceneMeta.width - blendLeft, Math.ceil((blendXmax - blendXmin) * sceneMeta.width));
+    const blendHeight = Math.min(sceneMeta.height - blendTop, Math.ceil((blendYmax - blendYmin) * sceneMeta.height));
+
+    // E. Extract blend regions from both images
+    const grokRegion = await sharp(grokBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
+    const origRegion = await sharp(sceneBuffer).extract({ left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight }).raw().toBuffer();
+
+    // F. Feathered blend: original outside, Grok inside, gradient at edges
+    const blended = Buffer.alloc(blendWidth * blendHeight * 3);
+    for (let i = 0; i < blendWidth * blendHeight; i++) {
+      const y = Math.floor(i / blendWidth);
+      const x = i % blendWidth;
+      const dMin = Math.min(x, blendWidth - 1 - x, y, blendHeight - 1 - y);
+      const alpha = (dMin >= FEATHER_PX ? 255 : Math.round((dMin / FEATHER_PX) * 255)) / 255;
+      const idx = i * 3;
+      blended[idx]     = Math.round(origRegion[idx]     * (1 - alpha) + grokRegion[idx]     * alpha);
+      blended[idx + 1] = Math.round(origRegion[idx + 1] * (1 - alpha) + grokRegion[idx + 1] * alpha);
+      blended[idx + 2] = Math.round(origRegion[idx + 2] * (1 - alpha) + grokRegion[idx + 2] * alpha);
+    }
+
+    const blendedRegion = await sharp(blended, { raw: { width: blendWidth, height: blendHeight, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+
+    // G. Composite blended region onto original scene
+    const composited = await sharp(sceneBuffer)
+      .composite([{ input: blendedRegion, left: blendLeft, top: blendTop }])
+      .jpeg({ quality: 92 }).toBuffer();
+
+    const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
+    log.info(`✅ [CHAR REPAIR GROK] Blended repair for ${charName} completed. Blend region: ${blendWidth}x${blendHeight}. Cost: $${grokResult.usage?.cost || 0.02}`);
+
+    return { imageData: finalImageData, character: charName, usage: grokResult.usage, method };
+  } else if (useCutout) {
     // ── Cut-out mode: extract bbox region, repair it, composite back ──
     const sharp = require('sharp');
     const sceneMeta = await sharp(sceneBuffer).metadata();

@@ -68,6 +68,7 @@ const { applyStyledAvatars } = require('../lib/styledAvatars');
 const { runEntityConsistencyChecks } = require('../lib/entityConsistency');
 const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManager');
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
+const { isGrokConfigured } = require('../lib/grok');
 
 function getDbPool() { return getPool(); }
 
@@ -3132,8 +3133,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               }
             }
           }
-        } else if (grokRepairMode) {
-          // Grok repair mode: cutout or blackout
+        } else if (grokRepairMode || isGrokConfigured()) {
+          // Grok repair: blended (default), cutout, or blackout
+          const effectiveMode = grokRepairMode || 'blended';
           const { repairCharacterMismatch } = require('../lib/images');
           const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 
@@ -3174,7 +3176,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             characterName,
             {
               imageBackend: 'grok',
-              useCutout: grokRepairMode === 'cutout',
+              useBlended: effectiveMode === 'blended',
+              useCutout: effectiveMode === 'cutout',
               issueDescription: issueDesc
             }
           );
@@ -3190,6 +3193,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: 'Grok repair returned no image' };
           }
         } else {
+          // Fallback to Gemini when Grok not configured
           repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
         }
 
