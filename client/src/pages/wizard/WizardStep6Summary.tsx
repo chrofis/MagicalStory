@@ -558,7 +558,7 @@ export function WizardStep6Summary({
           placeholder={t.dedicationPlaceholder}
           className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none text-base"
           rows={2}
-          maxLength={200}
+          maxLength={500}
         />
         <p className="text-sm text-gray-500 mt-1">{t.dedicationHelp}</p>
       </div>

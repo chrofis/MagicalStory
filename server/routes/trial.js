@@ -1210,8 +1210,7 @@ router.post('/analyze-photo', trialPhotoLimiter, async (req, res) => {
         log.error('[TRIAL] [PHOTO] Python analysis failed:', analyzerData.error, analyzerData.traceback);
         return res.status(500).json({
           error: 'Photo analysis failed',
-          details: analyzerData.error || 'Unknown error',
-          traceback: analyzerData.traceback
+          details: analyzerData.error || 'Unknown error'
         });
       }
 

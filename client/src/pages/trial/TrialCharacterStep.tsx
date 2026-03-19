@@ -41,6 +41,7 @@ const strings: Record<string, {
   noFaceDetected: string;
   multipleFaces: string;
   photoError: string;
+  photoUploaded: string;
 }> = {
   en: {
     title: 'Create Your Hero',
@@ -72,6 +73,7 @@ const strings: Record<string, {
     noFaceDetected: 'No face detected. Please try a different photo.',
     multipleFaces: 'Multiple faces detected. Please select the correct one.',
     photoError: 'Failed to analyze photo. Please try again.',
+    photoUploaded: 'Photo uploaded',
   },
   de: {
     title: 'Erstelle deinen Helden',
@@ -103,6 +105,7 @@ const strings: Record<string, {
     noFaceDetected: 'Kein Gesicht erkannt. Bitte versuche ein anderes Foto.',
     multipleFaces: 'Mehrere Gesichter erkannt. Bitte wähle das richtige aus.',
     photoError: 'Foto konnte nicht analysiert werden. Bitte versuche es erneut.',
+    photoUploaded: 'Foto hochgeladen',
   },
   fr: {
     title: 'Créez votre héros',
@@ -134,6 +137,7 @@ const strings: Record<string, {
     noFaceDetected: 'Aucun visage détecté. Veuillez essayer une autre photo.',
     multipleFaces: 'Plusieurs visages détectés. Veuillez sélectionner le bon.',
     photoError: "Échec de l'analyse de la photo. Veuillez réessayer.",
+    photoUploaded: 'Photo téléchargée',
   },
 };
 
@@ -607,7 +611,7 @@ export default function TrialCharacterStep({ characterData, onChange, onNext, pr
                 className="w-20 h-20 rounded-full object-cover border-2 border-indigo-200"
               />
               <div className="flex-1">
-                <p className="text-sm font-medium text-green-700">Photo uploaded</p>
+                <p className="text-sm font-medium text-green-700">{t.photoUploaded}</p>
                 <button
                   onClick={handleRemovePhoto}
                   className="text-xs text-gray-500 hover:text-red-600 mt-1 flex items-center gap-1 transition-colors"

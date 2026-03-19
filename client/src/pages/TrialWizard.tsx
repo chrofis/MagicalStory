@@ -194,7 +194,7 @@ export default function TrialWizard() {
   }, []);
 
   const handleCreate = useCallback(() => {
-    if (selectedIdeaIndex === null || !sessionToken) return;
+    if (selectedIdeaIndex === null || !sessionToken || !characterId) return;
     const selectedIdea = generatedIdeas[selectedIdeaIndex];
     const finalStoryInput = {
       ...storyInput,

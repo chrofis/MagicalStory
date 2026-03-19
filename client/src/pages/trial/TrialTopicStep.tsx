@@ -340,7 +340,12 @@ export default function TrialTopicStep({ storyInput, onChange, onBack, onNext, p
         {hasTopicSelected && (
           <button
             onClick={handleNext}
-            className="w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200 mb-4"
+            disabled={!isComplete}
+            className={`w-full py-3 rounded-xl text-base font-semibold flex items-center justify-center gap-2 transition-all mb-4 ${
+              isComplete
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg shadow-indigo-200'
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           >
             {t.next}
             <ArrowRight className="w-4 h-4" />

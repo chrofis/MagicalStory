@@ -326,6 +326,7 @@ export default function StoryWizard() {
     season?: string;
   } | null>(null);
   const streamAbortRef = useRef<{ abort: () => void } | null>(null);
+  const pollCancelledRef = useRef(false);
   // User's location from IP (for story setting personalization)
   const [userLocation, setUserLocation] = useState<{ city: string | null; region: string | null; country: string | null } | null>(null);
   // Season for story setting (auto-calculated from current date, user can override)
@@ -1679,6 +1680,10 @@ export default function StoryWizard() {
     const SAFETY_TIMEOUT_MS = 150000; // 2.5 minutes (slightly longer than stream timeout)
     const timeoutId = setTimeout(() => {
       log.warn('[StoryWizard] Safety timeout - resetting isGeneratingIdeas after 2.5 minutes');
+      if (streamAbortRef.current) {
+        streamAbortRef.current.abort();
+        streamAbortRef.current = null;
+      }
       setIsGeneratingIdeas(false);
       setIsGeneratingIdea1(false);
       setIsGeneratingIdea2(false);
@@ -3493,8 +3498,13 @@ export default function StoryWizard() {
   };
 
   const generateStory = async (overrides?: { skipImages?: boolean; skipEmailCheck?: boolean }) => {
+    // Guard against double-click
+    if (isGenerating) return;
+
     console.log('[generateStory] Called with overrides:', overrides);
     console.log('[generateStory] user:', user?.email, 'emailVerified:', user?.emailVerified, 'isImpersonating:', isImpersonating);
+
+    pollCancelledRef.current = false;
 
     // Ensure any pending saves complete before generating
     if (pendingSavePromise.current) {
@@ -3724,12 +3734,28 @@ export default function StoryWizard() {
       let completed = false;
       let lastProgress = 0;
       let lastProgressTime = Date.now();
+      let networkErrors = 0;
       const STALL_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes without progress change
       setIsProgressStalled(false); // Reset stalled state
       while (!completed) {
         await new Promise(resolve => setTimeout(resolve, 2000)); // Poll every 2 seconds
 
-        const status = await storyService.getJobStatus(newJobId);
+        // Break if cancelled by user
+        if (pollCancelledRef.current) {
+          log.info('Polling stopped: job cancelled by user');
+          break;
+        }
+
+        let status;
+        try {
+          status = await storyService.getJobStatus(newJobId);
+          networkErrors = 0; // Reset on success
+        } catch (networkErr) {
+          networkErrors++;
+          log.warn(`Network error polling job status (attempt ${networkErrors}/5):`, networkErr);
+          if (networkErrors >= 5) throw networkErr;
+          continue; // Retry after 2s
+        }
 
         if (status.progress) {
           // Only log when progress changes
@@ -5320,6 +5346,7 @@ export default function StoryWizard() {
           onMinimize={() => setShowMinimizeDialog(true)}
           onCancel={jobId ? async () => {
             try {
+              pollCancelledRef.current = true;
               await storyService.cancelJob(jobId);
               log.info('Job cancelled by user');
               setIsGenerating(false);

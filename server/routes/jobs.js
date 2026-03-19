@@ -17,8 +17,10 @@ const { validateBody, schemas, sanitizeString, sanitizeInteger } = require('../m
 const { CREDIT_CONFIG } = require('../config/credits');
 
 // Services
+const crypto = require('crypto');
 const { log } = require('../utils/logger');
 const { getPool } = require('../services/database');
+const email = require('../../email');
 
 function getDbPool() { return getPool(); }
 
@@ -189,9 +191,9 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
 
         // Two failure modes:
         // 1. Total timeout: Job running for more than 60 minutes total
-        // 2. Heartbeat timeout: No progress update for 15 minutes (something is stuck)
+        // 2. Heartbeat timeout: No progress update for 5 minutes (something is stuck)
         const TOTAL_TIMEOUT_MINUTES = 60;
-        const HEARTBEAT_TIMEOUT_MINUTES = 15;
+        const HEARTBEAT_TIMEOUT_MINUTES = 5;
 
         const isStale = jobAgeMinutes > TOTAL_TIMEOUT_MINUTES ||
           minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES;
@@ -201,42 +203,43 @@ router.post('/create-story', authenticateToken, storyGenerationLimiter, validate
             minutesSinceUpdate > HEARTBEAT_TIMEOUT_MINUTES ? 'no progress' : 'timeout';
           log.info(`🧹 Auto-cancelling stale job ${activeJob.id} (${reason}, age: ${Math.round(jobAgeMinutes)}min, last update: ${Math.round(minutesSinceUpdate)}min ago)`);
 
-          // Refund reserved credits for stale job
+          // Refund reserved credits for stale job (atomic to prevent double-refund)
           try {
-            const staleJobResult = await getDbPool().query(
-              'SELECT credits_reserved, progress FROM story_jobs WHERE id = $1',
-              [activeJob.id]
-            );
-            if (staleJobResult.rows.length > 0 && staleJobResult.rows[0].credits_reserved > 0) {
-              const creditsToRefund = staleJobResult.rows[0].credits_reserved;
-              const progressPercent = staleJobResult.rows[0].progress || 0;
-
-              // Get current user balance
-              const userBalanceResult = await getDbPool().query(
-                'SELECT credits FROM users WHERE id = $1',
-                [userId]
+            const pool = getDbPool();
+            const client = await pool.connect();
+            try {
+              await client.query('BEGIN');
+              // Atomically claim the credits_reserved (prevents double-refund if cancel runs concurrently)
+              const claimResult = await client.query(
+                `UPDATE story_jobs SET credits_reserved = 0
+                 WHERE id = $1 AND credits_reserved > 0
+                 RETURNING credits_reserved AS refund_amount, progress`,
+                [activeJob.id]
               );
-
-              if (userBalanceResult.rows.length > 0 && userBalanceResult.rows[0].credits !== -1) {
-                const currentBalance = userBalanceResult.rows[0].credits;
-                const newBalance = currentBalance + creditsToRefund;
-
-                // Refund credits
-                await getDbPool().query('UPDATE users SET credits = $1 WHERE id = $2', [newBalance, userId]);
-
-                // Log refund transaction
-                await getDbPool().query(
-                  `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-                   VALUES ($1, $2, $3, $4, $5, $6)`,
-                  [userId, creditsToRefund, newBalance, 'story_refund', activeJob.id,
-                   `Auto-refund: stale job timed out after ${Math.round(jobAgeMinutes)} min (progress: ${progressPercent}%)`]
+              if (claimResult.rows.length > 0) {
+                const creditsToRefund = claimResult.rows[0].refund_amount;
+                const progressPercent = claimResult.rows[0].progress || 0;
+                // Atomic credit add
+                const refundResult = await client.query(
+                  `UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits != -1 RETURNING credits`,
+                  [creditsToRefund, userId]
                 );
-
-                log.info(`💳 Auto-refunded ${creditsToRefund} credits for stale job ${activeJob.id}`);
+                if (refundResult.rows.length > 0) {
+                  await client.query(
+                    `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [userId, creditsToRefund, refundResult.rows[0].credits, 'story_refund', activeJob.id,
+                     `Auto-refund: stale job timed out after ${Math.round(jobAgeMinutes)} min (progress: ${progressPercent}%)`]
+                  );
+                  log.info(`💳 Auto-refunded ${creditsToRefund} credits for stale job ${activeJob.id}`);
+                }
               }
-
-              // Reset credits_reserved to prevent double refunds
-              await getDbPool().query('UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1', [activeJob.id]);
+              await client.query('COMMIT');
+            } catch (txErr) {
+              await client.query('ROLLBACK');
+              throw txErr;
+            } finally {
+              client.release();
             }
           } catch (refundErr) {
             log.error(`❌ Failed to refund credits for stale job ${activeJob.id}:`, refundErr.message);
@@ -420,9 +423,9 @@ router.get('/:jobId/status', jobStatusLimiter, authenticateToken, async (req, re
 
         // Two failure modes:
         // 1. Total timeout: Job running for more than 60 minutes total
-        // 2. Heartbeat timeout: No progress update for 15 minutes (something is stuck)
+        // 2. Heartbeat timeout: No progress update for 5 minutes (something is stuck)
         const TOTAL_TIMEOUT_MINUTES = 60;
-        const HEARTBEAT_TIMEOUT_MINUTES = 15;
+        const HEARTBEAT_TIMEOUT_MINUTES = 5;
 
         let errorMessage = null;
 
@@ -562,44 +565,45 @@ router.post('/:jobId/cancel', authenticateToken, async (req, res) => {
       });
     }
 
-    // Refund reserved credits before cancelling
+    // Refund reserved credits before cancelling (atomic to prevent double-refund)
     let creditsRefunded = 0;
     try {
-      const jobCreditsResult = await getDbPool().query(
-        'SELECT credits_reserved, progress FROM story_jobs WHERE id = $1',
-        [jobId]
-      );
-      if (jobCreditsResult.rows.length > 0 && jobCreditsResult.rows[0].credits_reserved > 0) {
-        const creditsToRefund = jobCreditsResult.rows[0].credits_reserved;
-        const progressPercent = jobCreditsResult.rows[0].progress || 0;
-
-        // Get current user balance
-        const userBalanceResult = await getDbPool().query(
-          'SELECT credits FROM users WHERE id = $1',
-          [userId]
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        // Atomically claim the credits_reserved (prevents double-refund if stale cleanup runs concurrently)
+        const claimResult = await client.query(
+          `UPDATE story_jobs SET credits_reserved = 0
+           WHERE id = $1 AND credits_reserved > 0
+           RETURNING credits_reserved AS refund_amount, progress`,
+          [jobId]
         );
-
-        if (userBalanceResult.rows.length > 0 && userBalanceResult.rows[0].credits !== -1) {
-          const currentBalance = userBalanceResult.rows[0].credits;
-          const newBalance = currentBalance + creditsToRefund;
-
-          // Refund credits
-          await getDbPool().query('UPDATE users SET credits = $1 WHERE id = $2', [newBalance, userId]);
-
-          // Log refund transaction
-          await getDbPool().query(
-            `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [userId, creditsToRefund, newBalance, 'story_refund', jobId,
-             `Refund: job cancelled by user (progress: ${progressPercent}%)`]
+        if (claimResult.rows.length > 0) {
+          const creditsToRefund = claimResult.rows[0].refund_amount;
+          const progressPercent = claimResult.rows[0].progress || 0;
+          // Atomic credit add
+          const refundResult = await client.query(
+            `UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits != -1 RETURNING credits`,
+            [creditsToRefund, userId]
           );
-
-          creditsRefunded = creditsToRefund;
-          log.info(`💳 Refunded ${creditsToRefund} credits for cancelled job ${jobId}`);
+          if (refundResult.rows.length > 0) {
+            await client.query(
+              `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [userId, creditsToRefund, refundResult.rows[0].credits, 'story_refund', jobId,
+               `Refund: job cancelled by user (progress: ${progressPercent}%)`]
+            );
+            creditsRefunded = creditsToRefund;
+            log.info(`💳 Refunded ${creditsToRefund} credits for cancelled job ${jobId}`);
+          }
         }
-
-        // Reset credits_reserved to prevent double refunds
-        await getDbPool().query('UPDATE story_jobs SET credits_reserved = 0 WHERE id = $1', [jobId]);
+        await client.query('COMMIT');
+      } catch (txErr) {
+        await client.query('ROLLBACK');
+        throw txErr;
+      } finally {
+        client.release();
       }
     } catch (refundErr) {
       log.error(`❌ Failed to refund credits for cancelled job ${jobId}:`, refundErr.message);
@@ -633,7 +637,7 @@ router.post('/:jobId/cancel', authenticateToken, async (req, res) => {
 router.get('/my-jobs', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const limit = parseInt(req.query.limit) || 10;
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 10, 1), 100);
 
     if (STORAGE_MODE === 'database') {
       const result = await getDbPool().query(
@@ -669,7 +673,7 @@ router.get('/:jobId/checkpoints', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    if (jobResult.rows[0].user_id !== req.user.id && !req.user.isAdmin) {
+    if (jobResult.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -708,7 +712,7 @@ router.get('/:jobId/checkpoints/:stepName', authenticateToken, async (req, res) 
       return res.status(404).json({ error: 'Job not found' });
     }
 
-    if (jobResult.rows[0].user_id !== req.user.id && !req.user.isAdmin) {
+    if (jobResult.rows[0].user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied' });
     }
 
