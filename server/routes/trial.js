@@ -1317,7 +1317,7 @@ router.post('/generate-ideas-stream', trialIdeasLimiter, async (req, res) => {
 
     const { callTextModelStreaming } = require('../lib/textModels');
     const { getLanguageInstruction } = require('../lib/languages');
-    const modelToUse = 'claude-haiku';
+    const modelToUse = 'claude-sonnet';
 
     log.debug(`  Using model: ${modelToUse}`);
 

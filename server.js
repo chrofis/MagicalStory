@@ -4579,10 +4579,10 @@ async function _processStoryJobImpl(jobId) {
       storyAvatarModel: null,  // null = use default (gemini-2.5-flash-image)
       ...filteredUserOverrides  // Only non-null user overrides
     };
-    // Trial mode: use Grok 4 Fast for story generation (faster + cheaper than Haiku)
+    // Trial mode: use Sonnet for story generation (best narrative quality)
     if (inputData.trialMode) {
-      modelOverrides.outlineModel = 'grok-4-fast';
-      log.info(`⚡ [TRIAL] Using Grok 4 Fast for story generation (faster + cheaper)`);
+      modelOverrides.outlineModel = 'claude-sonnet';
+      log.info(`⚡ [TRIAL] Using Claude Sonnet for story generation (best quality)`);
     }
     // Always log model defaults being used
     log.debug(`🔧 [PIPELINE] Models: outline=${modelOverrides.outlineModel}, text=${modelOverrides.textModel}, scene=${modelOverrides.sceneDescriptionModel}, sceneIter=${modelOverrides.sceneIterationModel}, quality=${modelOverrides.qualityModel}`);

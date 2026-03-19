@@ -5,6 +5,7 @@ const footerTexts = {
   en: {
     themes: 'Themes',
     occasions: 'Gift Ideas',
+    swissCities: 'Swiss Stories',
     compare: 'Compare',
     science: 'Science',
     terms: 'Terms of Service',
@@ -17,6 +18,7 @@ const footerTexts = {
   de: {
     themes: 'Themen',
     occasions: 'Geschenkideen',
+    swissCities: 'Schweizer Geschichten',
     compare: 'Vergleich',
     science: 'Forschung',
     terms: 'Nutzungsbedingungen',
@@ -29,6 +31,7 @@ const footerTexts = {
   fr: {
     themes: 'Thèmes',
     occasions: 'Idées cadeaux',
+    swissCities: 'Histoires suisses',
     compare: 'Comparaison',
     science: 'Science',
     terms: 'Conditions d\'Utilisation',
@@ -55,6 +58,10 @@ export function Footer() {
           <span className="text-stone-300">|</span>
           <Link to="/anlass" className="hover:text-indigo-600 hover:underline">
             {texts.occasions}
+          </Link>
+          <span className="text-stone-300">|</span>
+          <Link to="/stadt" className="hover:text-indigo-600 hover:underline">
+            {texts.swissCities}
           </Link>
           <span className="text-stone-300">|</span>
           <Link to="/vergleich" className="hover:text-indigo-600 hover:underline">
