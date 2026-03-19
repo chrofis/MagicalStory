@@ -1558,6 +1558,7 @@ export default function StoryWizard() {
       localStorage.setItem('story_topic', storyTopic);
     } else {
       localStorage.removeItem('story_topic');
+      localStorage.removeItem('story_topic_name');
     }
   }, [storyTopic]);
 

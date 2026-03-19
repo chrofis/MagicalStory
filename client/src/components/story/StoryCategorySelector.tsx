@@ -789,6 +789,8 @@ export function StoryCategorySelector({
                 onClick={() => {
                   onTopicChange(idea.id);
                   onLegacyStoryTypeChange(idea.id);
+                  // Store topic name for display in summary (Step 6)
+                  localStorage.setItem('story_topic_name', title);
                 }}
                 className="mt-2 w-full py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-md hover:bg-indigo-700 transition-colors"
               >
@@ -1018,6 +1020,8 @@ export function StoryCategorySelector({
                             onClick={() => {
                               onTopicChange(sage.id);
                               onLegacyStoryTypeChange(sage.id);
+                              // Store topic name for display in summary (Step 6)
+                              localStorage.setItem('story_topic_name', title);
                             }}
                             className="mt-2 w-full py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-md hover:bg-indigo-700 transition-colors"
                           >

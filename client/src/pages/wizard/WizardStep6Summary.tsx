@@ -190,6 +190,9 @@ export function WizardStep6Summary({
       // Show mainPerson if available (e.g., "Mondlandung Neil Armstrong")
       return event.mainPerson ? `${eventName} ${event.mainPerson}` : eventName;
     }
+    // Swiss stories: topic name stored in localStorage by StoryCategorySelector
+    const storedName = localStorage.getItem('story_topic_name');
+    if (storedName) return storedName;
     return '';
   };
 
