@@ -4826,14 +4826,12 @@ export default function StoryWizard() {
                   log.info('Selecting image version:', { pageNumber, versionIndex });
                   const result = await storyService.setActiveImage(storyId, pageNumber, versionIndex);
                   // Update local state with the active version's image data
+                  // versionIndex is now a DB version_index (sent by modal via version.versionIndex)
+                  // Find the matching version by its versionIndex field, or fall back to array index
                   setSceneImages(prev => prev.map(img => {
                     if (img.pageNumber === pageNumber && img.imageVersions) {
-                      // Validate version index is in bounds
-                      if (versionIndex < 0 || versionIndex >= img.imageVersions.length) {
-                        log.error(`Invalid versionIndex ${versionIndex} for page ${pageNumber} (max: ${img.imageVersions.length - 1})`);
-                        return img;
-                      }
-                      const activeVersion = img.imageVersions[versionIndex];
+                      const activeVersion = img.imageVersions.find(v => v.versionIndex === versionIndex)
+                        ?? img.imageVersions[versionIndex];
                       if (!activeVersion?.imageData) {
                         log.error(`Version ${versionIndex} has no imageData for page ${pageNumber}`);
                         return img;
@@ -4849,9 +4847,9 @@ export default function StoryWizard() {
                         ...(activeVersion.description !== undefined && { description: activeVersion.description }),
                         ...(activeVersion.totalAttempts !== undefined && { totalAttempts: activeVersion.totalAttempts }),
                         ...(activeVersion.modelId !== undefined && { modelId: activeVersion.modelId }),
-                        imageVersions: img.imageVersions.map((v, i) => ({
+                        imageVersions: img.imageVersions.map(v => ({
                           ...v,
-                          isActive: i === versionIndex
+                          isActive: v.versionIndex === versionIndex
                         }))
                       };
                     }

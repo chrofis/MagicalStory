@@ -44,10 +44,14 @@ export function ImageHistoryModal({
   };
 
   const handleSelect = (idx: number) => {
+    // Use the DB versionIndex if available (from fast-path story_images),
+    // otherwise fall back to array index (blob path)
+    const version = versions[idx];
+    const effectiveIndex = version?.versionIndex ?? idx;
     if (coverType) {
-      onSelectVersion(coverType, idx);
+      onSelectVersion(coverType, effectiveIndex);
     } else if (pageNumber !== undefined) {
-      onSelectVersion(pageNumber, idx);
+      onSelectVersion(pageNumber, effectiveIndex);
     }
   };
 

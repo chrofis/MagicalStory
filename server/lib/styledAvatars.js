@@ -209,7 +209,7 @@ function getAvatarCacheKey(characterName, clothingCategory, artStyle) {
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL (downsized)
  */
-async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null) {
+async function convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto = null, clothingDescription = null, clothingCategory = 'standard', addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
   const startTime = Date.now();
   const hasMultipleRefs = facePhoto && facePhoto !== originalAvatar;
   const hasClothing = !!clothingDescription;
@@ -294,7 +294,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
     let clothingMatchReason = null;
     let successAttempt = 1;
 
-    for (let attempt = 1; attempt <= MAX_STYLED_AVATAR_RETRIES; attempt++) {
+    const maxRetries = skipQualityEval ? 1 : MAX_STYLED_AVATAR_RETRIES;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
       // Call image API to convert the avatar
       // Use 'avatar' evaluation type (lightweight, no quality retry)
       const result = await callGeminiAPIForImage(fullPrompt, referencePhotos, null, 'avatar', null, imageModelOverride, null, '');
@@ -315,7 +316,8 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       downsized = await compressImageToJPEG(result.imageData, 85, 512);
 
       // Evaluate face/clothing match if we have a face photo to compare against
-      if (hasMultipleRefs && facePhoto) {
+      // Skip in trial/fast mode — speed over quality
+      if (hasMultipleRefs && facePhoto && !skipQualityEval) {
         const evalResult = await evaluateAvatarFaceMatch(facePhoto, downsized, process.env.GEMINI_API_KEY, clothingDescription);
         if (evalResult) {
           faceMatchScore = evalResult.score || null;
@@ -437,7 +439,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
  * @param {Object} character - Character object with physical traits (optional)
  * @returns {Promise<string>} Styled avatar as base64 data URL
  */
-async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null) {
+async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto = null, clothingDescription = null, addUsage = null, character = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
   const cacheKey = getAvatarCacheKey(characterName, clothingCategory, artStyle);
 
   // Check cache first
@@ -457,7 +459,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
 
   const conversionPromise = (async () => {
     try {
-      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride);
+      const styledAvatar = await convertAvatarToStyle(originalAvatar, artStyle, characterName, facePhoto, clothingDescription, clothingCategory, addUsage, character, imageModelOverride, { skipQualityEval });
       styledAvatarCache.set(cacheKey, styledAvatar);
       return styledAvatar;
     } finally {
@@ -481,7 +483,7 @@ async function getOrCreateStyledAvatar(characterName, clothingCategory, artStyle
  * @param {Array<{pageNumber, clothingCategory, characterNames}>} pageRequirements - What's needed for each page
  * @returns {Promise<Map>} Map of cacheKey -> styledAvatar
  */
-async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null) {
+async function prepareStyledAvatars(characters, artStyle, pageRequirements, clothingRequirements = null, addUsage = null, imageModelOverride = null, { skipQualityEval = false } = {}) {
   log.debug(`🎨 [STYLED AVATARS] Preparing styled avatars for ${characters.length} characters in ${artStyle} style`);
 
   // Skip for realistic style (no conversion needed)
@@ -705,7 +707,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
 
     if (originalAvatar && typeof originalAvatar === 'string' && originalAvatar.startsWith('data:image')) {
       allPromises.push(
-        getOrCreateStyledAvatar(charName, clothingCategory, artStyle, originalAvatar, facePhoto, costumeDescription, addUsage, char, imageModelOverride)
+        getOrCreateStyledAvatar(charName, clothingCategory, artStyle, originalAvatar, facePhoto, costumeDescription, addUsage, char, imageModelOverride, { skipQualityEval })
           .then(styledAvatar => {
             // Store on character object
             if (!char.avatars) char.avatars = {};
@@ -728,7 +730,7 @@ async function prepareStyledAvatars(characters, artStyle, pageRequirements, clot
   // Standard style conversion promises (run simultaneously with costumed)
   for (const [cacheKey, { characterName, clothingCategory, originalAvatar, facePhoto, clothingDescription, character }] of neededAvatars) {
     allPromises.push(
-      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride)
+      getOrCreateStyledAvatar(characterName, clothingCategory, artStyle, originalAvatar, facePhoto, clothingDescription, addUsage, character, imageModelOverride, { skipQualityEval })
         .then(styledAvatar => ({ type: 'standard', cacheKey, characterName, clothingCategory, character, styledAvatar, success: true }))
         .catch(error => {
           log.error(`❌ [STYLED AVATARS] Failed ${cacheKey}: ${error.message}`);

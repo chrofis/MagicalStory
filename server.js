@@ -2253,6 +2253,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
   try {
     // PHASE 1: Generate complete story with unified prompt
+    await checkCancellation();
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
       [5, 'Starting story generation...', jobId]
@@ -3185,6 +3186,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // NOTE: Avatar generation removed. Avatars should already exist from character creation.
 
     // PHASE 2: Prepare styled avatars
+    await checkCancellation();
     genLog.setStage('avatars');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -3471,6 +3473,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
     // PHASE 5: Generate page images
     // Sequential mode when incremental consistency is enabled, parallel otherwise
+    await checkCancellation();
     genLog.setStage('images');
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -3598,6 +3601,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
 
       const rawImages = await Promise.all(
         pageDataArray.map(pageData => genLimit(async () => {
+          await checkCancellation();
           const progressPercent = 50 + Math.floor((pageData.index / expandedScenes.length) * 30);
           await dbPool.query(
             'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -3876,6 +3880,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     log.debug(`   TOTAL: ${totalInputTokens.toLocaleString()} input, ${totalOutputTokens.toLocaleString()} output${thinkingTotal} tokens`);
     log.debug(`   💰 TOTAL COST: $${totalCost.toFixed(4)}`);
 
+    await checkCancellation();
     log.debug(`📝 [UNIFIED] Updating job status to 95% (finalizing)...`);
     await dbPool.query(
       'UPDATE story_jobs SET progress = $1, progress_message = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3',
@@ -4270,6 +4275,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     return resultData;
 
   } catch (error) {
+    // If the job was cancelled by the user, don't treat it as a pipeline error
+    if (error.name === 'JobCancelledError') {
+      log.info(`🛑 [UNIFIED] Pipeline aborted for cancelled job ${jobId}`);
+      // Credits already refunded by the cancel endpoint — just stop
+      return null;
+    }
+
     log.error(`❌ [UNIFIED] Error generating story:`, error.message);
     genLog.error('pipeline_error', error.message, null, { stage: genLog.currentStage, stack: error.stack?.split('\n').slice(0, 3).join(' | ') });
 
@@ -4314,6 +4326,19 @@ async function processStoryJob(jobId) {
 
 async function _processStoryJobImpl(jobId) {
   log.info(`🎬 Starting processing for job ${jobId}`);
+
+  // Cancellation check — query DB status before each major phase
+  // Throws a special error that the outer catch can distinguish from real failures
+  class JobCancelledError extends Error {
+    constructor(jobId) { super(`Job ${jobId} was cancelled`); this.name = 'JobCancelledError'; }
+  }
+  async function checkCancellation() {
+    const result = await dbPool.query('SELECT status FROM story_jobs WHERE id = $1', [jobId]);
+    if (result.rows.length === 0 || result.rows[0].status === 'failed') {
+      log.info(`🛑 [PIPELINE] Job ${jobId} cancelled — aborting pipeline`);
+      throw new JobCancelledError(jobId);
+    }
+  }
 
   // Generation logger for tracking API usage and debugging
   const genLog = new GenerationLogger();
@@ -5021,6 +5046,53 @@ async function initialize() {
   if (STORAGE_MODE === 'database' && dbPool) {
     try {
       await initializeDatabase();
+
+      // Clean up zombie jobs from previous container lifecycle
+      // If the server restarts (deploy, crash), any "processing"/"pending" jobs are dead
+      try {
+        // First, find zombie jobs that need cleanup
+        const zombieResult = await dbPool.query(
+          `SELECT id, user_id, credits_reserved FROM story_jobs
+           WHERE status IN ('pending', 'processing')`
+        );
+        if (zombieResult.rows.length > 0) {
+          // Mark all zombie jobs as failed
+          await dbPool.query(
+            `UPDATE story_jobs
+             SET status = 'failed',
+                 error_message = 'Server restarted during generation',
+                 credits_reserved = 0,
+                 updated_at = NOW()
+             WHERE status IN ('pending', 'processing')`
+          );
+          log.info(`🧹 Cleaned up ${zombieResult.rows.length} zombie job(s) from previous server lifecycle: ${zombieResult.rows.map(r => r.id).join(', ')}`);
+          // Refund credits for each zombie job
+          for (const zombie of zombieResult.rows) {
+            if (zombie.credits_reserved > 0) {
+              try {
+                const refundResult = await dbPool.query(
+                  'UPDATE users SET credits = credits + $1 WHERE id = $2 AND credits != -1 RETURNING credits',
+                  [zombie.credits_reserved, zombie.user_id]
+                );
+                if (refundResult.rows.length > 0) {
+                  await dbPool.query(
+                    `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, reference_id, description)
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [zombie.user_id, zombie.credits_reserved, refundResult.rows[0].credits, 'story_refund', zombie.id,
+                     'Auto-refund: server restarted during generation']
+                  );
+                  log.info(`💳 Auto-refunded ${zombie.credits_reserved} credits for zombie job ${zombie.id}`);
+                }
+              } catch (refundErr) {
+                log.error(`❌ Failed to refund credits for zombie job ${zombie.id}:`, refundErr.message);
+              }
+            }
+          }
+        }
+      } catch (cleanupErr) {
+        log.error('⚠️ Failed to clean up zombie jobs:', cleanupErr.message);
+      }
+
       // Preload historical locations from DB into memory cache
       await preloadHistoricalLocations();
       // Load trial counters from DB so they survive deploys

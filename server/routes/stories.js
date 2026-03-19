@@ -1732,7 +1732,8 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         imageVersions: img.imageVersions?.map((v, i) => ({
           imageData: normalizeImageData(v.imageData),
           qualityScore: v.qualityScore,
-          isActive: activeIdx === (i + 1)
+          isActive: activeIdx === (i + 1),
+          versionIndex: (i === 0 && v.type === 'original') ? 0 : i + 1
         }))
       };
     });
@@ -2093,8 +2094,14 @@ router.get('/:id', authenticateToken, async (req, res) => {
               // Convert DB version_index to array index (scenes: dbIndex - 1)
               // DB index 0 = original (not in imageVersions array), so activeArrayIdx = -1 means "original"
               const activeArrayIdx = activeDbIndex === 0 ? -1 : dbToArrayIndex(activeDbIndex, 'scene');
+              const { arrayToDbIndex: toDbIdx } = require('../lib/versionManager');
               scene.imageVersions.forEach((v, idx) => {
                 v.isActive = idx === activeArrayIdx;
+                // Attach DB version_index so the frontend can send it directly
+                // For blob-path scenes: imageVersions[0] with type='original' → DB 0, others → idx+1
+                if (v.versionIndex === undefined) {
+                  v.versionIndex = (idx === 0 && v.type === 'original') ? 0 : toDbIdx(idx, 'scene');
+                }
               });
               // Track active version as array index for frontend
               scene.activeVersionIndex = activeArrayIdx;
@@ -2512,14 +2519,14 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
     }
 
     const pool = getPool();
-    const { arrayToDbIndex } = require('../lib/versionManager');
 
-    // Convert frontend array index to DB version_index
-    // Array index 0 = original (DB version_index 0)
-    // Array index 1+ = regenerations (DB version_index = arrayToDbIndex(i, 'scene'))
-    const dbVersionIndex = versionIndex === 0 ? 0 : arrayToDbIndex(versionIndex, 'scene');
+    // The frontend sends versionIndex which may be either:
+    // - A direct DB version_index (from fast-path story_images response, which includes versionIndex field)
+    // - An array index from the blob path (legacy: 0=original, 1+=regens mapped via arrayToDbIndex)
+    // Strategy: try versionIndex as a direct DB index first, fall back to array-to-DB mapping
+    let dbVersionIndex = versionIndex;
 
-    console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - array idx ${versionIndex} → DB idx ${dbVersionIndex}`);
+    console.log(`🖼️ PUT /api/stories/${id}/pages/${pageNum}/active-image - versionIndex ${versionIndex}`);
 
     // Verify story ownership (fast query, no data loading)
     const ownerCheck = await pool.query(
@@ -2531,31 +2538,50 @@ router.put('/:id/pages/:pageNumber/active-image', authenticateToken, async (req,
       return res.status(404).json({ error: 'Story not found' });
     }
 
-    // Validate version exists in story_images table
-    const versionCheck = await pool.query(
+    // Validate version exists in story_images table (try direct DB index first)
+    let versionCheck = await pool.query(
       `SELECT 1 FROM story_images
        WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
       [id, pageNum, dbVersionIndex]
     );
 
     if (versionCheck.rows.length === 0) {
-      // Fallback: check data blob for legacy stories without story_images entries
-      const dataCheck = await pool.query(
-        `SELECT jsonb_array_length(
-           (SELECT scene->'imageVersions'
-            FROM jsonb_array_elements(data->'sceneImages') AS scene
-            WHERE (scene->>'pageNumber')::int = $2
-            LIMIT 1)
-         ) as version_count
-         FROM stories WHERE id = $1`,
-        [id, pageNum]
-      );
+      // Direct index not found — try legacy blob array-to-DB mapping
+      const { arrayToDbIndex } = require('../lib/versionManager');
+      const legacyDbIndex = versionIndex === 0 ? 0 : arrayToDbIndex(versionIndex, 'scene');
+      if (legacyDbIndex !== dbVersionIndex) {
+        const legacyCheck = await pool.query(
+          `SELECT 1 FROM story_images
+           WHERE story_id = $1 AND page_number = $2 AND version_index = $3`,
+          [id, pageNum, legacyDbIndex]
+        );
+        if (legacyCheck.rows.length > 0) {
+          dbVersionIndex = legacyDbIndex;
+          console.log(`🖼️ Using legacy mapping: array idx ${versionIndex} → DB idx ${dbVersionIndex}`);
+        }
+      }
 
-      const versionCount = dataCheck.rows[0]?.version_count || 0;
-      if (versionIndex >= versionCount) {
-        return res.status(400).json({ error: 'Invalid version index' });
+      // Still not found — check data blob as last resort
+      if (dbVersionIndex === versionIndex && versionCheck.rows.length === 0) {
+        const dataCheck = await pool.query(
+          `SELECT jsonb_array_length(
+             (SELECT scene->'imageVersions'
+              FROM jsonb_array_elements(data->'sceneImages') AS scene
+              WHERE (scene->>'pageNumber')::int = $2
+              LIMIT 1)
+           ) as version_count
+           FROM stories WHERE id = $1`,
+          [id, pageNum]
+        );
+
+        const versionCount = dataCheck.rows[0]?.version_count || 0;
+        if (versionIndex >= versionCount) {
+          return res.status(400).json({ error: 'Invalid version index' });
+        }
       }
     }
+
+    console.log(`🖼️ Setting active version: DB idx ${dbVersionIndex} for page ${pageNum}`);
 
     // Single targeted update using image_version_meta column (~1ms vs 6+ seconds)
     await setActiveVersion(id, pageNum, dbVersionIndex);
