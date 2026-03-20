@@ -5501,7 +5501,7 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
-    const prompt = `This children's book illustration has a white rectangular gap at the ${vPos} ${hPos} where a character was removed. Paint ${charName} into that gap, replacing the white area completely. Use the reference photo to match ${charName}'s face, hair, and skin tone exactly. Draw ${charName} in the same art style as the surrounding illustration.${clothingContext}${actionContext}${issueContext}\n\nThe white rectangle must be completely filled with ${charName} — no white space should remain. Keep background, art style, and all other characters unchanged.`;
+    const prompt = `Redraw the character at the ${vPos} ${hPos} of this children's book illustration. The character there needs to be replaced with ${charName}. Use the reference photo to match ${charName}'s face, hair color, and skin tone exactly. Draw ${charName} in the same art style as the rest of the illustration so they blend in naturally.${clothingContext}${actionContext}${issueContext}\n\nKeep the background, art style, and all other characters completely unchanged.`;
 
     log.info(`👤 [CHAR REPAIR GROK] Blended: whiteout ${bboxWidth}x${bboxHeight} at (${bboxLeft},${bboxTop}), sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, blackoutDataUri]);
