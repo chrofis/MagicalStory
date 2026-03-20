@@ -2965,6 +2965,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       for (const scene of (storyData.sceneImages || [])) {
         if (scene.pageNumber != null) pageScores[scene.pageNumber] = scene.qualityScore ?? 100;
       }
+      // Include covers in repair candidate scoring
+      if (storyData.coverImages) {
+        const coverPageMap = { frontCover: -1, initialPage: -2, backCover: -3 };
+        for (const [coverType, cover] of Object.entries(storyData.coverImages)) {
+          if (cover && coverPageMap[coverType] != null) {
+            pageScores[coverPageMap[coverType]] = cover.qualityScore ?? 100;
+          }
+        }
+      }
       const { repairs: autoRepairs, dropped } = selectCharRepairTasks(entityReport, { pageScores });
       if (autoRepairs.length === 0) {
         return res.json({ results: [], message: 'No major/critical issues found' });
@@ -3018,6 +3027,16 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     let storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
     storyData = await rehydrateStoryImages(id, storyData);
     const artStyle = storyData.artStyle || 'pixar';
+
+    // Helper: look up a scene image or cover image by page number
+    const COVER_TYPES_BY_PAGE = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+    function findSceneOrCover(sData, pageNum) {
+      if (pageNum < 0) {
+        const coverType = COVER_TYPES_BY_PAGE[String(pageNum)];
+        return coverType ? sData.coverImages?.[coverType] || null : null;
+      }
+      return sData.sceneImages?.find(s => s.pageNumber === pageNum) || null;
+    }
 
     // Flatten all (character, page) pairs into parallel repair tasks
     const repairTasks = [];
@@ -3086,7 +3105,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             log.warn(`[REPAIR-WORKFLOW] MagicAPI not configured, falling back to Gemini`);
             repairResult = await repairSinglePage(storyData, character, pageNumber, { issues: charIssues });
           } else {
-            const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+            const sceneImage = findSceneOrCover(storyData, pageNumber);
             if (!sceneImage || !sceneImage.imageData) {
               log.warn(`[REPAIR-WORKFLOW] No scene image for page ${pageNumber}`);
               return { task, error: true, failReason: 'No scene image data for this page' };
@@ -3176,13 +3195,15 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const { repairCharacterMismatch } = require('../lib/images');
           const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
 
-          const sceneImage = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+          const sceneImage = findSceneOrCover(storyData, pageNumber);
           if (!sceneImage || !sceneImage.imageData) {
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
+          // For covers, inject pageNumber so collectEntityAppearances can use it
+          const sceneForEntity = pageNumber < 0 ? { ...sceneImage, pageNumber } : sceneImage;
           const sceneDescriptions = storyData.sceneDescriptions || [];
-          const entityAppearances = await collectEntityAppearances([sceneImage], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
+          const entityAppearances = await collectEntityAppearances([sceneForEntity], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
           const appearances = entityAppearances.get(characterName);
           const appearance = appearances?.find(a => a.pageNumber === pageNumber);
 
@@ -3298,9 +3319,20 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       // Apply updated image to story (sequential DB writes)
       const sceneImages = storyData.sceneImages || [];
       for (const update of repairResult.updatedImages || []) {
+        // Look up the existing image — in sceneImages for regular pages, in coverImages for covers
+        let existingImage;
+        let isCover = false;
+        let coverType = null;
         const sceneIndex = sceneImages.findIndex(img => img.pageNumber === update.pageNumber);
         if (sceneIndex >= 0) {
-          const existingImage = sceneImages[sceneIndex];
+          existingImage = sceneImages[sceneIndex];
+        } else if (update.pageNumber < 0) {
+          coverType = COVER_TYPES_BY_PAGE[String(update.pageNumber)];
+          existingImage = coverType ? storyData.coverImages?.[coverType] : null;
+          isCover = !!existingImage;
+        }
+
+        if (!existingImage) continue;
 
           if (!existingImage.imageVersions) {
             existingImage.imageVersions = [{
@@ -3335,12 +3367,17 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           existingImage.entityRepairedAt = new Date().toISOString();
           existingImage.entityRepairedFor = characterName;
 
-          const newDbVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, 'scene');
+          const imageType = isCover ? 'cover' : 'scene';
+          const newDbVersionIndex = getActiveIndexAfterPush(existingImage.imageVersions, imageType);
 
-          storyData.sceneImages = sceneImages;
+          if (!isCover) {
+            storyData.sceneImages = sceneImages;
+          }
           await saveStoryData(id, storyData);
           // Note: saveStoryData already saves images from imageVersions to story_images table
-          await setActiveVersion(id, update.pageNumber, newDbVersionIndex);
+          // For covers, use coverType string as the version identifier
+          const versionId = isCover ? coverType : update.pageNumber;
+          await setActiveVersion(id, versionId, newDbVersionIndex);
 
           charResult.pagesRepaired.push({
             pageNumber: update.pageNumber,
@@ -3351,7 +3388,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             method: repairResult.method || 'gemini',
             cropHistory: repairResult.cropHistory || null,
           });
-        }
       }
     }
 

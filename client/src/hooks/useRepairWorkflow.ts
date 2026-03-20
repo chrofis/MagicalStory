@@ -1004,12 +1004,23 @@ export function useRepairWorkflow({
 
         await Promise.all(pagesToRedo.map((pageNumber) => redoLimit(async () => {
           checkAborted();
-          onProgress?.('redo-pages', `Pass ${pass}: Page ${pageNumber} (${redoCompleted + 1}/${pagesToRedo.length})`);
+          onProgress?.('redo-pages', `Pass ${pass}: ${pageNumber < 0 ? 'Cover' : 'Page ' + pageNumber} (${redoCompleted + 1}/${pagesToRedo.length})`);
           setRedoProgress({ current: redoCompleted, total: pagesToRedo.length, currentPage: pageNumber });
 
           try {
-            const result = await storyService.iteratePage(storyId, pageNumber, imageModel);
-            if (result.success) {
+            let result: any;
+            if (pageNumber < 0) {
+              // Cover redo — map negative page number to cover type
+              const coverTypeMap: Record<number, 'front' | 'back' | 'initial'> = { [-1]: 'front', [-2]: 'initial', [-3]: 'back' };
+              const coverType = coverTypeMap[pageNumber];
+              if (coverType) {
+                const coverResult = await storyService.regenerateCover(storyId, coverType);
+                result = { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
+              }
+            } else {
+              result = await storyService.iteratePage(storyId, pageNumber, imageModel);
+            }
+            if (result?.success) {
               allRedonePagesAcrossPasses.add(pageNumber);
               const scene = sceneImages.find(s => s.pageNumber === pageNumber);
               const newVersionIndex = (scene?.imageVersions?.length ?? 0);
@@ -1024,7 +1035,7 @@ export function useRepairWorkflow({
               });
             }
           } catch (err) {
-            console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo page ${pageNumber}:`, err);
+            console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo ${pageNumber < 0 ? 'cover' : 'page'} ${pageNumber}:`, err);
           }
 
           redoCompleted++;

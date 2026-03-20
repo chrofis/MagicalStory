@@ -208,14 +208,40 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     const sceneImages = storyData.sceneImages || [];
     const sceneDescriptions = storyData.sceneDescriptions || [];
 
-    if (sceneImages.length < 2) {
+    // Include covers in entity checks (covers often show multiple characters)
+    const coverEntries = [];
+    const COVER_PAGE_MAP = { frontCover: -1, initialPage: -2, backCover: -3 };
+    if (storyData.coverImages) {
+      for (const [coverType, cover] of Object.entries(storyData.coverImages)) {
+        if (cover && (cover.imageData || cover.hasImage)) {
+          // Get active version image if available
+          let imageData = cover.imageData;
+          if (cover.imageVersions?.length > 0) {
+            const activeVersion = cover.imageVersions.find(v => v.isActive);
+            if (activeVersion?.imageData) imageData = activeVersion.imageData;
+          }
+          if (imageData) {
+            coverEntries.push({
+              pageNumber: COVER_PAGE_MAP[coverType],
+              imageData,
+              description: cover.description || cover.translatedDescription || '',
+              text: '',
+              _coverType: coverType,
+            });
+          }
+        }
+      }
+    }
+    const allImages = [...sceneImages, ...coverEntries];
+
+    if (allImages.length < 2) {
       report.summary = 'Not enough images for entity consistency check';
       return report;
     }
 
     // Collect entity appearances from bbox detection data
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
-    const entityAppearances = await collectEntityAppearances(sceneImages, characters, sceneDescriptions, {
+    const entityAppearances = await collectEntityAppearances(allImages, characters, sceneDescriptions, {
       storyCharacters: characters
     });
 
