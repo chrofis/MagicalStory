@@ -20,10 +20,10 @@ REQUIREMENTS:
 - FACE MUST BE VISIBLE in all quadrants
 - Background: Light grey studio
 
-BODY PROPORTIONS (CRITICAL - match age from physical traits):
-- Use the head-to-body ratio specified in physical traits below
+BODY PROPORTIONS (CRITICAL):
+- Use the age and head-to-body ratio from PHYSICAL TRAITS below
+- A 7-year-old child must look like a child, an adult must look like an adult
 - Do NOT make adult bodies look like children or vice versa
-- Maintain consistent body size relative to head size from reference avatar
 
 PHYSICAL TRAITS TO PRESERVE (must match reference exactly):
 {PHYSICAL_TRAITS}
