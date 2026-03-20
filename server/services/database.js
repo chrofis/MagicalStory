@@ -100,6 +100,7 @@ async function initializeDatabase() {
       { table: 'users', column: 'photo_consent_at', type: 'TIMESTAMP' },
       { table: 'users', column: 'has_set_password', type: 'BOOLEAN DEFAULT TRUE' },
       { table: 'users', column: 'anonymous', type: 'BOOLEAN DEFAULT FALSE' },
+      { table: 'users', column: 'firebase_uid', type: 'VARCHAR(255)' },
     ];
 
     for (const { table, column, type } of columnsToAdd) {
