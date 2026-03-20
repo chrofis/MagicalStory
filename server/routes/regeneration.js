@@ -3201,7 +3201,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           // Look up bbox from stored entity report (saved during consistency check)
-          const charReport = storyEntityReport?.characters?.[characterName];
+          const storedEntityReport = storyData.finalChecksReport?.entity;
+          const charReport = storedEntityReport?.characters?.[characterName];
           let storedAppearance = null;
           if (charReport?.byClothing) {
             for (const [, clothingData] of Object.entries(charReport.byClothing)) {
