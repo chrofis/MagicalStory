@@ -5459,18 +5459,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const sharp = require('sharp');
     const sceneMeta = await sharp(sceneBuffer).metadata();
 
-    // A. Create magenta blackout over character bbox
+    // A. Solid white blackout over character bbox (clear signal to Grok)
     const bboxLeft = Math.floor(xmin * sceneMeta.width);
     const bboxTop = Math.floor(ymin * sceneMeta.height);
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    const magentaOverlay = await sharp({
-      create: { width: bboxWidth, height: bboxHeight, channels: 4, background: { r: 200, g: 0, b: 100, alpha: 0.6 } }
-    }).png().toBuffer();
+    const whiteBlock = await sharp({
+      create: { width: bboxWidth, height: bboxHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
+    }).jpeg().toBuffer();
 
     const blackoutBuffer = await sharp(sceneBuffer)
-      .composite([{ input: magentaOverlay, left: bboxLeft, top: bboxTop }])
+      .composite([{ input: whiteBlock, left: bboxLeft, top: bboxTop }])
       .jpeg({ quality: 90 }).toBuffer();
     const blackoutDataUri = `data:image/jpeg;base64,${blackoutBuffer.toString('base64')}`;
 
@@ -5480,9 +5480,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const hPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
     const vPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
 
-    const prompt = `Fix the character at the ${vPos} ${hPos} of this illustration (marked with magenta overlay). Replace their face, hair, and skin tone to match the reference photo of ${charName} exactly. Keep pose, background, art style, and all other characters unchanged.${issueContext}`;
+    const prompt = `Fix the character at the ${vPos} ${hPos} of this illustration (the white rectangle marks where they should be). Replace the white area with ${charName} matching the reference photo exactly — same face, hair, and skin tone. Keep pose, background, art style, and all other characters unchanged.${issueContext}`;
 
-    log.info(`👤 [CHAR REPAIR GROK] Blended: blackout ${bboxWidth}x${bboxHeight} at (${bboxLeft},${bboxTop}), sending to Grok...`);
+    log.info(`👤 [CHAR REPAIR GROK] Blended: whiteout ${bboxWidth}x${bboxHeight} at (${bboxLeft},${bboxTop}), sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, blackoutDataUri]);
 
     if (!grokResult.imageData) {
@@ -5490,11 +5490,12 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       return { imageData: null, character: charName, method };
     }
 
-    // C. Resize Grok result to match original dimensions
+    // C. Decode Grok result — resize only if dimensions differ (shouldn't happen normally)
     const grokBase64 = grokResult.imageData.replace(/^data:image\/\w+;base64,/, '');
     let grokBuffer = Buffer.from(grokBase64, 'base64');
     const grokMeta = await sharp(grokBuffer).metadata();
     if (grokMeta.width !== sceneMeta.width || grokMeta.height !== sceneMeta.height) {
+      log.warn(`⚠️ [CHAR REPAIR GROK] Grok returned ${grokMeta.width}x${grokMeta.height}, expected ${sceneMeta.width}x${sceneMeta.height} — resizing`);
       grokBuffer = await sharp(grokBuffer).resize(sceneMeta.width, sceneMeta.height, { fit: 'fill' }).jpeg({ quality: 95 }).toBuffer();
     }
 
