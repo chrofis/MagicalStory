@@ -340,6 +340,7 @@ export function RepairWorkflowPanel({
   const [expandedSteps, setExpandedSteps] = useState<Set<RepairWorkflowStep>>(new Set(['collect-feedback']));
   const [gridLightbox, setGridLightbox] = useState<string | null>(null);
   const [overrideImageModel, setOverrideImageModel] = useState<string | null>(null);
+  const [overrideQualityModel, setOverrideQualityModel] = useState<string | null>(null);
   const [grokRepairMode, setGrokRepairMode] = useState<'cutout' | 'blackout' | null>(null);
   const effectiveImageModel = overrideImageModel || imageModel;
 
@@ -371,6 +372,7 @@ export function RepairWorkflowPanel({
     characters,
     finalChecksReport,
     imageModel: effectiveImageModel,
+    qualityModel: overrideQualityModel,
     onImageUpdate,
   });
 
@@ -1212,6 +1214,23 @@ export function RepairWorkflowPanel({
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Quality eval model selector - only in developer mode */}
+                {developerMode && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <label className="text-sm font-medium text-yellow-800 mb-2 block">Evaluation Model:</label>
+                    <select
+                      value={overrideQualityModel || ''}
+                      onChange={(e) => setOverrideQualityModel(e.target.value || null)}
+                      className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                      disabled={isRunning}
+                    >
+                      <option value="">Server Default (gemini-2.0-flash)</option>
+                      <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast ($0.005/eval)</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash — thorough ($0.026/eval)</option>
+                    </select>
                   </div>
                 )}
 

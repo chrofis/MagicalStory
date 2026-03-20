@@ -2029,7 +2029,7 @@ export const storyService = {
   // =============================================================================
 
   // Step 4: Re-evaluate pages
-  async reEvaluatePages(storyId: string, pageNumbers: number[]): Promise<{
+  async reEvaluatePages(storyId: string, pageNumbers: number[], qualityModelOverride?: string | null): Promise<{
     pages: Record<number, {
       score?: number;
       qualityScore: number;
@@ -2058,7 +2058,7 @@ export const storyService = {
         semanticResult?: unknown;
       }>;
       badPages?: number[];
-    }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers });
+    }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers, ...(qualityModelOverride ? { qualityModelOverride } : {}) });
     return response;
   },
 

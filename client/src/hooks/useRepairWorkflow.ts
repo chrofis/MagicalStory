@@ -113,6 +113,7 @@ export interface UseRepairWorkflowProps {
     imageChecks?: FinalChecksImageCheck[];
   } | null;
   imageModel?: string;
+  qualityModel?: string | null;
   onImageUpdate?: (pageNumber: number, imageData: string, versionIndex: number, metadata?: {
     description?: string;
     prompt?: string;
@@ -188,6 +189,7 @@ export function useRepairWorkflow({
   characters: _characters,
   finalChecksReport: _finalChecksReport,
   imageModel,
+  qualityModel,
   onImageUpdate,
 }: UseRepairWorkflowProps): UseRepairWorkflowReturn {
   const [workflowState, setWorkflowState] = useState<RepairWorkflowState>(createInitialState);
@@ -670,7 +672,7 @@ export function useRepairWorkflow({
     }
 
     try {
-      const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate);
+      const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate, qualityModel);
 
       const evalResults: Record<number, EvalPageResult> = {};
 
@@ -696,7 +698,7 @@ export function useRepairWorkflow({
       failStep('re-evaluate', error instanceof Error ? error.message : 'Unknown error');
       return undefined;
     }
-  }, [storyId, workflowState.redoResults.pagesCompleted, startStep, completeStep, failStep, skipStep]);
+  }, [storyId, qualityModel, workflowState.redoResults.pagesCompleted, startStep, completeStep, failStep, skipStep]);
 
   // Step 5: Run consistency check
   const runConsistencyCheck = useCallback(async () => {
