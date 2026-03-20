@@ -3503,20 +3503,17 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           ...(sceneMetadataForClothing?.characterClothing || {}),
           ...(scene.characterClothing || {})
         };
-        // Trial mode: override main character clothing to use costumed variant on all pages
-        if (inputData.trialMode && inputData._trialCostumeType) {
+        // Trial mode fallback: if parser didn't extract clothing from JSON scene hint,
+        // use the trial costume type for main characters
+        if (inputData.trialMode && inputData._trialCostumeType && Object.keys(perCharClothing).length === 0) {
           const mainCharIds = inputData.mainCharacters || [];
           for (const char of (inputData.characters || [])) {
             const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);
             if (isMain) {
               perCharClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
-              log.debug(`🎭 [TRIAL COSTUME] Page ${pageNum}: Overriding ${char.name} clothing to costumed:${inputData._trialCostumeType}`);
-            } else {
-              log.debug(`⚠️ [TRIAL COSTUME] Page ${pageNum}: ${char.name} isMainCharacter=${char.isMainCharacter} (id=${char.id}, mainCharIds=${JSON.stringify(mainCharIds)}), skipping override`);
+              log.debug(`🎭 [TRIAL COSTUME] Page ${pageNum}: Fallback — no clothing parsed, using costumed:${inputData._trialCostumeType} for ${char.name}`);
             }
           }
-        } else if (inputData.trialMode) {
-          log.debug(`⚠️ [TRIAL COSTUME] Page ${pageNum}: No _trialCostumeType set (trialMode=${inputData.trialMode}, costumeType=${inputData._trialCostumeType})`);
         }
         const defaultClothing = 'standard';
         const sceneClothingRequirements = { ...clothingRequirements };

@@ -1435,11 +1435,33 @@ class UnifiedStoryParser {
       const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
       const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
-      // Extract per-character clothing from new format:
+      // Extract per-character clothing from text-based format:
       // Characters:
       // - Name1: standard
       // - Name2: costumed:superhero
-      const { characterClothing, characters } = parseCharacterClothingBlock(content);
+      let { characterClothing, characters } = parseCharacterClothingBlock(content);
+
+      // Fallback: extract clothing from JSON scene hint (trial prompt format)
+      // JSON hints have characters[].clothing inside the scene object
+      if (Object.keys(characterClothing).length === 0 && sceneHint) {
+        try {
+          // Strip markdown code fences if present
+          const jsonStr = sceneHint.replace(/```json\s*/gi, '').replace(/```\s*/gi, '').trim();
+          const parsed = JSON.parse(jsonStr);
+          const sceneData = parsed?.scene || parsed;
+          if (sceneData?.characters && Array.isArray(sceneData.characters)) {
+            for (const char of sceneData.characters) {
+              if (char.name && char.clothing) {
+                const baseName = char.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                characterClothing[baseName] = char.clothing.toLowerCase();
+                characters.push(char.name);
+              }
+            }
+          }
+        } catch {
+          // Not valid JSON — that's fine, text-based hints don't need this fallback
+        }
+      }
 
       pages.push({
         pageNumber,
