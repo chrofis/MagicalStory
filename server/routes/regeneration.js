@@ -3193,38 +3193,42 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Grok repair: blended (default), cutout, or blackout
           const effectiveMode = grokRepairMode || 'blended';
           const { repairCharacterMismatch } = require('../lib/images');
-          const { getStyledAvatarForClothing, collectEntityAppearances } = require('../lib/entityConsistency');
+          const { getStyledAvatarForClothing } = require('../lib/entityConsistency');
 
           const sceneImage = findSceneOrCover(storyData, pageNumber);
           if (!sceneImage || !sceneImage.imageData) {
             return { task, error: true, failReason: 'No scene image data for this page' };
           }
 
-          // For covers, inject pageNumber so collectEntityAppearances can use it
-          const sceneForEntity = pageNumber < 0 ? { ...sceneImage, pageNumber } : sceneImage;
-          const sceneDescriptions = storyData.sceneDescriptions || [];
-          const entityAppearances = await collectEntityAppearances([sceneForEntity], [character], sceneDescriptions, { skipMinAppearancesFilter: true });
-          const appearances = entityAppearances.get(characterName);
-          const appearance = appearances?.find(a => a.pageNumber === pageNumber);
+          // Look up bbox from stored entity report (saved during consistency check)
+          const charReport = entityReport?.characters?.[characterName];
+          let storedAppearance = null;
+          if (charReport?.byClothing) {
+            for (const [, clothingData] of Object.entries(charReport.byClothing)) {
+              const app = (clothingData as any).appearances?.find((a: any) => a.pageNumber === pageNumber);
+              if (app?.faceBox || app?.bodyBox) {
+                storedAppearance = app;
+                break;
+              }
+            }
+          }
 
-          if (!appearance?.faceBox && !appearance?.bodyBox) {
-            // Entity consistency found the character but no bbox — try direct detection
-            log.info(`🔍 [CHAR REPAIR] No bbox from entity data for ${characterName} on page ${pageNumber}, running fresh detection...`);
+          // Fallback: re-detect if entity report doesn't have bbox for this page
+          if (!storedAppearance?.faceBox && !storedAppearance?.bodyBox) {
+            log.info(`🔍 [CHAR REPAIR] No stored bbox for ${characterName} on page ${pageNumber}, running fresh detection...`);
             const { detectAllBoundingBoxes } = require('../lib/images');
             const detection = await detectAllBoundingBoxes(sceneImage.imageData, [characterName]);
             const charFigure = detection?.figures?.find(f => f.label?.toLowerCase().includes(characterName.toLowerCase()));
             if (charFigure?.boundingBox) {
               const [ymin, xmin, ymax, xmax] = charFigure.boundingBox;
-              if (appearance) {
-                appearance.faceBox = { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
-              }
+              storedAppearance = { faceBox: { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin }, clothing: 'standard' };
               log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: [${charFigure.boundingBox.map(v => Math.round(v*100)+'%').join(', ')}]`);
             } else {
               return { task, error: true, failReason: `Could not locate ${characterName} on page ${pageNumber}` };
             }
           }
 
-          const clothingCategory = appearance.clothing || 'standard';
+          const clothingCategory = storedAppearance.clothing || 'standard';
           const styledAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
           const avatarData = styledAvatar || character.avatars?.standard || character.avatarUrl;
 
@@ -3232,11 +3236,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: `No avatar for ${characterName}` };
           }
 
-          const faceBox = appearance.faceBox || appearance.bodyBox;
-          if (!faceBox || faceBox.x == null || faceBox.y == null || faceBox.width == null || faceBox.height == null) {
-            log.warn(`⚠️ [CHAR REPAIR] No bounding box for ${characterName} on page ${pageNum} — skipping`);
-            return { task, error: true, failReason: `No bounding box for ${characterName} on page ${pageNum}` };
-          }
+          const faceBox = storedAppearance.faceBox || storedAppearance.bodyBox;
           // Convert {x, y, width, height} to [ymin, xmin, ymax, xmax]
           const bbox = [faceBox.y, faceBox.x, faceBox.y + faceBox.height, faceBox.x + faceBox.width];
 

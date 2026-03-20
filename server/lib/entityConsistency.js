@@ -344,7 +344,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               }
             );
 
-            // Store per-clothing result
+            // Store per-clothing result + per-page bboxes for character repair
             report.characters[charName].byClothing[clothingCategory] = {
               gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
               consistent: evalResult.consistent,
@@ -352,6 +352,13 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
               issues: evalResult.issues || [],
               summary: evalResult.summary,
               cellCount: crops.length,
+              // Store per-page appearance data (bbox) so character repair doesn't need to re-detect
+              appearances: groupAppearances.map(a => ({
+                pageNumber: a.pageNumber,
+                faceBox: a.faceBox || null,
+                bodyBox: a.bodyBox || null,
+                clothing: a.clothing || clothingCategory,
+              })),
               ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
             };
 
