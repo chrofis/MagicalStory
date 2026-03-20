@@ -2318,6 +2318,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       // Store for later use (skip outline-generated clothing)
       inputData._trialClothingRequirements = trialClothingRequirements;
       inputData._trialCostumeType = costume?.costumeType || null;
+      log.debug(`🎭 [TRIAL] _trialCostumeType set to: ${inputData._trialCostumeType} (costume: ${costume ? costume.costumeType : 'null'}, mainChar gender: ${mainChar?.gender})`);
+      log.debug(`🎭 [TRIAL] Characters isMainCharacter: ${(inputData.characters || []).map(c => `${c.name}=${c.isMainCharacter}`).join(', ')}`);
 
       // Look up pre-defined title for trial (uses same lookupTopic/lookupCategory as costume)
       const { getTrialTitle } = require('./server/config/trialTitles');
@@ -3503,11 +3505,18 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         };
         // Trial mode: override main character clothing to use costumed variant on all pages
         if (inputData.trialMode && inputData._trialCostumeType) {
+          const mainCharIds = inputData.mainCharacters || [];
           for (const char of (inputData.characters || [])) {
-            if (char.isMainCharacter) {
+            const isMain = char.isMainCharacter === true || mainCharIds.includes(char.id);
+            if (isMain) {
               perCharClothing[char.name] = `costumed:${inputData._trialCostumeType}`;
+              log.debug(`🎭 [TRIAL COSTUME] Page ${pageNum}: Overriding ${char.name} clothing to costumed:${inputData._trialCostumeType}`);
+            } else {
+              log.debug(`⚠️ [TRIAL COSTUME] Page ${pageNum}: ${char.name} isMainCharacter=${char.isMainCharacter} (id=${char.id}, mainCharIds=${JSON.stringify(mainCharIds)}), skipping override`);
             }
           }
+        } else if (inputData.trialMode) {
+          log.debug(`⚠️ [TRIAL COSTUME] Page ${pageNum}: No _trialCostumeType set (trialMode=${inputData.trialMode}, costumeType=${inputData._trialCostumeType})`);
         }
         const defaultClothing = 'standard';
         const sceneClothingRequirements = { ...clothingRequirements };
