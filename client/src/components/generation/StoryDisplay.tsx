@@ -3501,7 +3501,7 @@ export function StoryDisplay({
             </div>
             {/* Regenerate Cover and History - visible to all users */}
             {_onRegenerateCover && (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={() => openCoverEditModal('front')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
@@ -3522,7 +3522,7 @@ export function StoryDisplay({
                 {getCoverVersions('frontCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                    className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                   >
                     <Images size={14} />
                     {getCoverVersions('frontCover').length}
@@ -3709,7 +3709,7 @@ export function StoryDisplay({
             </div>
             {/* Regenerate Cover and History - visible to all users */}
             {_onRegenerateCover && (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={() => openCoverEditModal('initial')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
@@ -3730,7 +3730,7 @@ export function StoryDisplay({
                 {getCoverVersions('initialPage').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                    className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                   >
                     <Images size={14} />
                     {getCoverVersions('initialPage').length}
@@ -3983,7 +3983,7 @@ export function StoryDisplay({
                         {onRegenerateImage && (
                           <div className="mt-3 space-y-2">
                             {/* Regenerate Image and Edit Text buttons */}
-                            <div className="flex gap-2 items-center">
+                            <div className="flex flex-wrap gap-2 items-center">
                               <button
                                 onClick={() => openSceneEditModal(pageNumber)}
                                 disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
@@ -4017,7 +4017,7 @@ export function StoryDisplay({
                               {getImageVersions(pageNumber).length > 1 && (
                                 <button
                                   onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                                  className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                                 >
                                   <Images size={14} />
                                   {getImageVersions(pageNumber).length}
@@ -4512,7 +4512,7 @@ export function StoryDisplay({
                         {onRegenerateImage && (
                           <div className="mt-3 space-y-2">
                             {/* Regenerate Image and Edit Text buttons */}
-                            <div className="flex gap-2 items-center">
+                            <div className="flex flex-wrap gap-2 items-center">
                               <button
                                 onClick={() => openSceneEditModal(pageNumber)}
                                 disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
@@ -4546,7 +4546,7 @@ export function StoryDisplay({
                               {getImageVersions(pageNumber).length > 1 && (
                                 <button
                                   onClick={() => setImageHistoryModal({ pageNumber, versions: getImageVersions(pageNumber) })}
-                                  className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                                  className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                                 >
                                   <Images size={14} />
                                   {getImageVersions(pageNumber).length}
@@ -4971,7 +4971,7 @@ export function StoryDisplay({
             </div>
             {/* Regenerate Cover and History - visible to all users */}
             {_onRegenerateCover && (
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={() => openCoverEditModal('back')}
                   disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
@@ -4992,7 +4992,7 @@ export function StoryDisplay({
                 {getCoverVersions('backCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}
-                    className="px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
+                    className="shrink-0 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm text-gray-600 flex items-center gap-1"
                   >
                     <Images size={14} />
                     {getCoverVersions('backCover').length}
