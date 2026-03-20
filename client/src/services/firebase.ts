@@ -32,23 +32,25 @@ googleProvider.setCustomParameters({
 
 export async function signInWithGoogle(): Promise<FirebaseUser> {
   try {
-    // Try popup first - works on most browsers
+    // Try popup first - works on most desktop browsers
     const result = await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
     return result.user;
   } catch (error: unknown) {
     const firebaseError = error as { code?: string; message?: string };
     console.error('Popup sign-in failed:', firebaseError.code, firebaseError.message);
 
-    // If popup was blocked or failed, try redirect
-    if (firebaseError.code === 'auth/popup-blocked' ||
-        firebaseError.code === 'auth/popup-closed-by-user' ||
-        firebaseError.code === 'auth/cancelled-popup-request') {
-      console.log('Popup failed, trying redirect...');
-      await signInWithRedirect(auth, googleProvider);
-      throw new Error('Redirecting to Google...');
+    // Fall back to redirect for ANY popup failure (iOS Safari blocks popups entirely,
+    // and may return various error codes beyond just popup-blocked)
+    if (firebaseError.code === 'auth/popup-closed-by-user') {
+      // User explicitly closed the popup — don't redirect, they cancelled
+      throw error;
     }
 
-    throw error;
+    // All other popup failures → try redirect (covers popup-blocked, cancelled-popup-request,
+    // operation-not-supported-in-this-environment, internal-error, etc.)
+    console.log('Popup failed, trying redirect...');
+    await signInWithRedirect(auth, googleProvider);
+    throw new Error('Redirecting to Google...');
   }
 }
 
