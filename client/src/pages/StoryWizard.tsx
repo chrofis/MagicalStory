@@ -4236,6 +4236,7 @@ export default function StoryWizard() {
                 <RepairWorkflowPanel
                   storyId={storyId}
                   sceneImages={displaySceneImages}
+                  coverImages={coverImages}
                   characters={characters.filter(c => !excludedCharacters.includes(c.id))}
                   finalChecksReport={finalChecksReport}
                   imageModel={modelSelections.imageModel || undefined}

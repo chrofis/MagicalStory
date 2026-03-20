@@ -22,12 +22,13 @@ import {
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
-import type { SceneImage, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult } from '@/types/story';
+import type { SceneImage, CoverImages, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult } from '@/types/story';
 import type { Character } from '@/types/character';
 
 interface RepairWorkflowPanelProps {
   storyId: string | null;
   sceneImages: SceneImage[];
+  coverImages?: CoverImages | null;
   characters: Character[];
   finalChecksReport?: FinalChecksReport | null;
   imageModel?: string;
@@ -325,6 +326,7 @@ function PageFeedbackCard({
 export function RepairWorkflowPanel({
   storyId,
   sceneImages,
+  coverImages,
   characters,
   finalChecksReport,
   imageModel,
@@ -365,6 +367,7 @@ export function RepairWorkflowPanel({
   } = useRepairWorkflow({
     storyId,
     sceneImages,
+    coverImages,
     characters,
     finalChecksReport,
     imageModel: effectiveImageModel,

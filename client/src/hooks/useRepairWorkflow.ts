@@ -4,6 +4,7 @@ import type {
   RepairWorkflowState,
   PageFeedback,
   SceneImage,
+  CoverImages,
   EntityConsistencyReport,
   EvaluationData,
   FinalChecksImageCheck,
@@ -11,6 +12,9 @@ import type {
 import type { Character } from '../types/character';
 import { storyService } from '../services/storyService';
 import { REPAIR_DEFAULTS } from '../config/repairDefaults';
+
+// Cover type ↔ virtual page number mapping
+const COVER_PAGES: Record<string, number> = { frontCover: -1, initialPage: -2, backCover: -3 };
 
 // Concurrency limit for parallel image operations (redo, character repair)
 const IMAGE_CONCURRENCY = 50;
@@ -102,6 +106,7 @@ const STEP_ORDER: RepairWorkflowStep[] = [
 export interface UseRepairWorkflowProps {
   storyId: string | null;
   sceneImages: SceneImage[];
+  coverImages?: CoverImages | null;
   characters: Character[];
   finalChecksReport?: {
     entity?: EntityConsistencyReport;
@@ -179,6 +184,7 @@ export interface UseRepairWorkflowReturn {
 export function useRepairWorkflow({
   storyId,
   sceneImages,
+  coverImages,
   characters: _characters,
   finalChecksReport: _finalChecksReport,
   imageModel,
@@ -932,6 +938,15 @@ export function useRepairWorkflow({
 
     const allPageNumbers = sceneImages.map(s => s.pageNumber);
 
+    // Add cover pages if covers exist
+    const coverPageNumbers: number[] = [];
+    if (coverImages) {
+      if (coverImages.frontCover) coverPageNumbers.push(COVER_PAGES.frontCover);
+      if (coverImages.initialPage) coverPageNumbers.push(COVER_PAGES.initialPage);
+      if (coverImages.backCover) coverPageNumbers.push(COVER_PAGES.backCover);
+    }
+    const allEvalNumbers = [...allPageNumbers, ...coverPageNumbers];
+
     try {
       // Step 1: Collect feedback (populates UI state; pass logic uses fresh API data)
       checkAborted();
@@ -960,7 +975,7 @@ export function useRepairWorkflow({
         // Pass 1: entity data from generation. Pass 2+: freshly updated entity data.
         checkAborted();
         onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
-        const evalResult = await reEvaluatePages(allPageNumbers);
+        const evalResult = await reEvaluatePages(allEvalNumbers);
 
         // 3. Identify bad pages (server computes these using shared findBadPages)
         checkAborted();
@@ -1043,7 +1058,7 @@ export function useRepairWorkflow({
       // Final re-evaluate ALL (with fresh entity data)
       checkAborted();
       onProgress?.('re-evaluate', 'Final evaluation of all pages...');
-      await reEvaluatePages(allPageNumbers);
+      await reEvaluatePages(allEvalNumbers);
 
       // Character repair (before pick-best so repair versions are also considered)
       // Server handles task selection via autoSelect (shared selectCharRepairTasks logic)
@@ -1121,14 +1136,16 @@ export function useRepairWorkflow({
       }
 
       // Pick best versions last (considers all versions including character repairs)
+      // Include cover pages that have multiple versions so they are also considered
       const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
-      if (redonePagesArray.length > 0) {
+      const pickBestPages = [...redonePagesArray, ...coverPageNumbers];
+      if (pickBestPages.length > 0) {
         checkAborted();
         onProgress?.('redo-pages', 'Picking best versions...');
         try {
-          const pickResult = await storyService.pickBestVersions(storyId, redonePagesArray);
+          const pickResult = await storyService.pickBestVersions(storyId, pickBestPages);
           const switched = Object.values(pickResult.results).filter(r => r.switched).length;
-          console.log(`[RepairWorkflow] Pick-best: ${switched}/${redonePagesArray.length} pages switched to better version`);
+          console.log(`[RepairWorkflow] Pick-best: ${switched}/${pickBestPages.length} pages switched to better version`);
         } catch (err) {
           console.error('[RepairWorkflow] Pick-best failed:', err);
         }
@@ -1147,7 +1164,7 @@ export function useRepairWorkflow({
       abortControllerRef.current = null;
     }
   }, [
-    storyId, sceneImages, imageModel, onImageUpdate,
+    storyId, sceneImages, coverImages, imageModel, onImageUpdate,
     collectFeedback, reEvaluatePages, startStep, setRedoProgress,
   ]);
 

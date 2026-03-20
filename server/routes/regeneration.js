@@ -70,6 +70,13 @@ const { getActiveIndexAfterPush, arrayToDbIndex } = require('../lib/versionManag
 const { hasPhotos: hasCharacterPhotos } = require('../lib/characterPhotos');
 const { isGrokConfigured } = require('../lib/grok');
 
+// Cover type ↔ virtual page number mapping
+const COVER_PAGE_MAP = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+const COVER_TYPE_TO_PAGE = { frontCover: -1, initialPage: -2, backCover: -3 };
+function isCoverPage(pageNumber) { return pageNumber < 0; }
+function getCoverType(pageNumber) { return COVER_PAGE_MAP[String(pageNumber)]; }
+function getCoverData(storyData, coverType) { return storyData.coverImages?.[coverType]; }
+
 function getDbPool() { return getPool(); }
 
 // Calculate token-based API cost for Gemini models
@@ -2577,7 +2584,17 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
 
     await Promise.all(pageNumbers.map(pageNumber => evalLimit(async () => {
-      const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      let scene;
+      let evaluationType = 'scene';
+      let pageLabel = `PAGE ${pageNumber}`;
+      if (isCoverPage(pageNumber)) {
+        const coverType = getCoverType(pageNumber);
+        scene = getCoverData(storyData, coverType);
+        evaluationType = 'cover';
+        pageLabel = coverType.toUpperCase();
+      } else {
+        scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      }
       if (!scene) return;
 
       try {
@@ -2591,7 +2608,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         }
 
         if (!imageData || !imageData.startsWith('data:image/')) {
-          log.warn(`[REPAIR-WORKFLOW] Page ${pageNumber} has no valid image data, skipping`);
+          log.warn(`[REPAIR-WORKFLOW] ${pageLabel} has no valid image data, skipping`);
           pages[pageNumber] = {
             qualityScore: null,
             fixableIssues: [],
@@ -2601,7 +2618,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         }
 
         // Get page text for semantic fidelity check
-        const pageText = getPageText(fullStoryText, pageNumber) || scene.text || null;
+        const pageText = isCoverPage(pageNumber) ? null : (getPageText(fullStoryText, pageNumber) || scene.text || null);
 
         // Get scene hint (most direct statement of what image should show)
         const sceneHint = scene.outlineExtract || scene.sceneHint || null;
@@ -2611,15 +2628,15 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           imageData,
           scene.description,       // originalPrompt
           characterPhotos,         // referenceImages
-          'scene',                 // evaluationType
+          evaluationType,          // evaluationType
           qualityModelOverride || null,
-          `PAGE ${pageNumber}`,    // pageContext
+          pageLabel,               // pageContext
           pageText,                // storyText for semantic fidelity
           sceneHint                // sceneHint for semantic evaluation
         );
 
         if (!evaluation) {
-          log.warn(`[REPAIR-WORKFLOW] Page ${pageNumber} evaluation returned null`);
+          log.warn(`[REPAIR-WORKFLOW] ${pageLabel} evaluation returned null`);
           pages[pageNumber] = {
             qualityScore: null,
             fixableIssues: [],
@@ -2630,15 +2647,15 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
 
         // Validate semantic evaluation ran when expected
         if (evaluation.semanticScore === null && sceneHint) {
-          log.warn(`⚠️ [RE-EVALUATE] Page ${pageNumber}: Semantic evaluation failed despite sceneHint being available`);
+          log.warn(`⚠️ [RE-EVALUATE] ${pageLabel}: Semantic evaluation failed despite sceneHint being available`);
         }
 
         // Log both scores for debugging
         const qualityPct = evaluation.qualityScore ?? evaluation.score;
         const semanticPct = evaluation.semanticScore ?? 100;
-        log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - Quality: ${qualityPct}, Semantic: ${semanticPct}, Final: ${evaluation.score}`);
+        log.info(`📊 [REPAIR-WORKFLOW] ${pageLabel} - Quality: ${qualityPct}, Semantic: ${semanticPct}, Final: ${evaluation.score}`);
         if (evaluation.issuesSummary) {
-          log.info(`📊 [REPAIR-WORKFLOW] Page ${pageNumber} - issues: ${evaluation.issuesSummary}`);
+          log.info(`📊 [REPAIR-WORKFLOW] ${pageLabel} - issues: ${evaluation.issuesSummary}`);
         }
 
         // Update scene with new evaluation
@@ -2663,7 +2680,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         }
         const adjustedScore = Math.max(0, evaluation.score - entityPenalty);
         if (entityPenalty > 0) {
-          log.info(`📊 [RE-EVALUATE] Page ${pageNumber}: entity penalty ${entityPenalty} (${evaluation.score} → ${adjustedScore})`);
+          log.info(`📊 [RE-EVALUATE] ${pageLabel}: entity penalty ${entityPenalty} (${evaluation.score} → ${adjustedScore})`);
         }
 
         // Run bbox enrichment if there are any issues
@@ -2685,7 +2702,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           );
           scene.fixTargets = enrichResult.targets || [];
           scene.bboxDetection = enrichResult.detectionHistory || null;
-          log.info(`🎯 [RE-EVALUATE] Page ${pageNumber} - bbox enrichment: ${scene.fixTargets.length} targets from ${allIssues.length} issues`);
+          log.info(`🎯 [RE-EVALUATE] ${pageLabel} - bbox enrichment: ${scene.fixTargets.length} targets from ${allIssues.length} issues`);
         }
 
         // Store combined issues + bbox results on scene and active version
@@ -2719,7 +2736,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           usage: evaluation.usage || null
         };
       } catch (evalErr) {
-        log.error(`❌ [RE-EVALUATE] Page ${pageNumber} evaluation failed:`, evalErr);
+        log.error(`❌ [RE-EVALUATE] ${pageLabel} evaluation failed:`, evalErr);
         pages[pageNumber] = {
           qualityScore: null,
           fixableIssues: [],
@@ -2853,7 +2870,15 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 
     const results = {};
     for (const pageNumber of pageNumbers) {
-      const scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      let scene;
+      let imageType = 'scene';
+      if (isCoverPage(pageNumber)) {
+        const coverType = getCoverType(pageNumber);
+        scene = getCoverData(storyData, coverType);
+        imageType = coverType;
+      } else {
+        scene = storyData.sceneImages?.find(s => s.pageNumber === pageNumber);
+      }
       if (!scene?.imageVersions || scene.imageVersions.length <= 1) {
         results[pageNumber] = { switched: false, reason: 'single version' };
         continue;
@@ -2890,9 +2915,10 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
         // So when picking the original as best, point activeVersion to 0, not arrayToDbIndex(0).
         const bestVersion = scene.imageVersions[bestIndex];
         const isOriginalPreservation = bestIndex === 0 && bestVersion.type === 'original';
-        const dbIndex = isOriginalPreservation ? 0 : arrayToDbIndex(bestIndex, 'scene');
+        const dbIndex = isOriginalPreservation ? 0 : arrayToDbIndex(bestIndex, imageType);
 
-        await setActiveVersion(id, pageNumber, dbIndex);
+        const versionId = isCoverPage(pageNumber) ? getCoverType(pageNumber) : pageNumber;
+        await setActiveVersion(id, versionId, dbIndex);
         log.info(`🏆 [REPAIR-WORKFLOW] Page ${pageNumber}: switched to version ${bestIndex} (db index ${dbIndex}${isOriginalPreservation ? ' [original]' : ''}, score ${bestScore}, was ${activeIndex})`);
         results[pageNumber] = { switched: true, toIndex: bestIndex, score: bestScore, fromIndex: activeIndex };
       } else {
