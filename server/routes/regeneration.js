@@ -1390,24 +1390,36 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     const visualBible = storyData.visualBible || null;
     const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
 
-    // Extract cover scenes with clothing info
-    const coverScenes = extractCoverScenes(storyData.outline || '');
     // Use edited title/dedication if provided, otherwise use story data
     const storyTitle = editedTitle !== undefined ? editedTitle : (storyData.title || 'My Story');
     const coverDedication = editedDedication !== undefined ? editedDedication : storyData.dedication;
 
     // Determine scene description and clothing for this cover type
+    // Primary: use the stored description from initial generation (already correctly parsed)
+    // Fallback: re-parse from outline (for legacy stories without stored descriptions)
+    const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
+    const storedDescription = storyData.coverImages?.[coverKey]?.description;
+
     let sceneDescription;
     let coverClothing;
-    if (normalizedCoverType === 'front') {
-      sceneDescription = coverScenes.titlePage?.scene || 'A beautiful, magical title page featuring the main characters.';
-      coverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
-    } else if (normalizedCoverType === 'initialPage') {
-      sceneDescription = coverScenes.initialPage?.scene || 'A warm, inviting dedication/introduction page.';
-      coverClothing = coverScenes.initialPage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+    if (storedDescription && storedDescription.length >= 20) {
+      // Use the stored description from initial generation — already correctly parsed
+      sceneDescription = storedDescription;
+      coverClothing = parseClothingCategory(storedDescription) || 'standard';
+      log.debug(`📕 [COVER REGEN] Using stored description for ${normalizedCoverType} (${storedDescription.length} chars)`);
     } else {
-      sceneDescription = coverScenes.backCover?.scene || 'A satisfying, conclusive ending scene.';
-      coverClothing = coverScenes.backCover?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+      // Fallback: parse from outline for legacy stories
+      const coverScenes = extractCoverScenes(storyData.outline || '');
+      if (normalizedCoverType === 'front') {
+        sceneDescription = coverScenes.titlePage?.scene || 'A beautiful, magical title page featuring the main characters.';
+        coverClothing = coverScenes.titlePage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+      } else if (normalizedCoverType === 'initialPage') {
+        sceneDescription = coverScenes.initialPage?.scene || 'A warm, inviting dedication/introduction page.';
+        coverClothing = coverScenes.initialPage?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+      } else {
+        sceneDescription = coverScenes.backCover?.scene || 'A satisfying, conclusive ending scene.';
+        coverClothing = coverScenes.backCover?.clothing || parseClothingCategory(sceneDescription) || 'standard';
+      }
     }
 
     // Override scene description with user-provided edit (like regular image regeneration)
@@ -1559,7 +1571,6 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     // Get the current cover image before regenerating (to store as previous version)
     storyData.coverImages = storyData.coverImages || {};
-    const coverKey = normalizedCoverType === 'front' ? 'frontCover' : normalizedCoverType === 'initialPage' ? 'initialPage' : 'backCover';
     const existingCover = storyData.coverImages[coverKey] || {};
 
     // Initialize imageVersions array if missing (lazy migration from legacy format)
