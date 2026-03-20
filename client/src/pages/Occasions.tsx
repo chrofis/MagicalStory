@@ -10,6 +10,9 @@ const texts: Record<string, {
   ctaTitle: string;
   ctaSubtitle: string;
   ctaButton: string;
+  giftBannerTitle: string;
+  giftBannerText: string;
+  giftBannerLink: string;
 }> = {
   en: {
     title: 'The Perfect Gift for Every Occasion',
@@ -17,6 +20,9 @@ const texts: Record<string, {
     ctaTitle: 'Create Your Free Story',
     ctaSubtitle: 'Choose any theme and create a personalized story in minutes. Your first story is completely free.',
     ctaButton: 'Start Creating',
+    giftBannerTitle: 'More Gift Ideas',
+    giftBannerText: 'Discover personalized children\'s gifts for every occasion, every age, and every recipient.',
+    giftBannerLink: 'Browse the Gift Guide',
   },
   de: {
     title: 'Das perfekte Geschenk für jeden Anlass',
@@ -24,6 +30,9 @@ const texts: Record<string, {
     ctaTitle: 'Erstelle deine Gratis-Geschichte',
     ctaSubtitle: 'Wähle ein Thema und erstelle eine personalisierte Geschichte in wenigen Minuten. Deine erste Geschichte ist komplett kostenlos.',
     ctaButton: 'Jetzt starten',
+    giftBannerTitle: 'Mehr Geschenkideen',
+    giftBannerText: 'Entdecke personalisierte Kindergeschenke für jeden Anlass, jedes Alter und jeden Empfänger.',
+    giftBannerLink: 'Zum Geschenkratgeber',
   },
   fr: {
     title: 'Le cadeau parfait pour chaque occasion',
@@ -31,6 +40,9 @@ const texts: Record<string, {
     ctaTitle: 'Créez votre histoire gratuite',
     ctaSubtitle: 'Choisissez un thème et créez une histoire personnalisée en quelques minutes. Votre première histoire est entièrement gratuite.',
     ctaButton: 'Commencer',
+    giftBannerTitle: 'Plus d\'idées cadeaux',
+    giftBannerText: 'Découvrez des cadeaux personnalisés pour enfants pour chaque occasion, chaque âge et chaque destinataire.',
+    giftBannerLink: 'Voir le guide cadeaux',
   },
 };
 
@@ -90,6 +102,18 @@ export default function Occasions() {
             className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
           >
             {t.ctaButton} <ArrowRight size={18} />
+          </Link>
+        </div>
+
+        {/* Gift Hub Cross-link Banner */}
+        <div className="mt-8 bg-amber-50 border border-amber-100 rounded-2xl p-6 text-center">
+          <h2 className="font-title text-xl font-bold text-stone-900 mb-2">{t.giftBannerTitle}</h2>
+          <p className="text-stone-500 mb-4 max-w-lg mx-auto">{t.giftBannerText}</p>
+          <Link
+            to="/geschenk"
+            className="inline-flex items-center gap-2 text-indigo-600 font-semibold hover:text-indigo-800 transition-colors"
+          >
+            {t.giftBannerLink} <ArrowRight size={16} />
           </Link>
         </div>
       </div>

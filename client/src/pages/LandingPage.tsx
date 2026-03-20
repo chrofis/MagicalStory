@@ -36,6 +36,7 @@ const sectionTranslations = {
     pdfDownload: 'Instant PDF download - perfect for reading on tablets or printing at home',
     printOptions: 'Hardcover or softcover printing - 20x20cm, professional quality',
     shipping: 'Ships within Switzerland - the perfect gift for any occasion',
+    giftGuideLink: 'Browse gift ideas by age & occasion',
     // Why It Works
     whyTitle: 'Why lecture when you can tell a story?',
     whyDesc: "Children don't learn from nagging — they learn from stories they love. A story about brushing teeth inspires more than any argument. And when they're the hero? They can't wait to do it themselves.",
@@ -73,6 +74,7 @@ const sectionTranslations = {
     pdfDownload: 'Sofortiger PDF-Download - perfekt zum Lesen auf Tablets oder zum Ausdrucken zu Hause',
     printOptions: 'Hardcover oder Softcover Druck - 20x20cm, professionelle Qualität',
     shipping: 'Versand innerhalb der Schweiz - das perfekte Geschenk für jeden Anlass',
+    giftGuideLink: 'Geschenkideen nach Alter & Anlass entdecken',
     // Why It Works
     whyTitle: 'Eine Geschichte bewirkt mehr als tausend Ermahnungen.',
     whyDesc: 'Kinder lernen nicht durch Schimpfen — sie lernen durch Geschichten, die sie lieben. Eine Geschichte übers Zähneputzen bewirkt mehr als jede Diskussion. Und wenn sie selbst der Held sind? Können sie es kaum erwarten, es nachzumachen.',
@@ -110,6 +112,7 @@ const sectionTranslations = {
     pdfDownload: "Téléchargement PDF instantané - parfait pour lire sur tablette ou imprimer à la maison",
     printOptions: 'Impression reliée ou brochée - 20x20cm, qualité professionnelle',
     shipping: 'Livraison en Suisse - le cadeau parfait pour toute occasion',
+    giftGuideLink: 'Idées cadeaux par âge et occasion',
     // Why It Works
     whyTitle: 'Pourquoi sermonner quand on peut raconter une histoire ?',
     whyDesc: "Les enfants n'apprennent pas par les sermons — ils apprennent par les histoires qu'ils aiment. Une histoire sur le brossage des dents inspire plus que n'importe quelle discussion. Et quand ils sont le héros ? Ils ont hâte de le faire eux-mêmes.",
@@ -537,6 +540,12 @@ export default function LandingPage() {
                   <span className="text-stone-600">{st.shipping}</span>
                 </li>
               </ul>
+              <Link
+                to="/geschenk"
+                className="inline-flex items-center gap-1 mt-4 text-indigo-600 hover:text-indigo-800 font-medium text-sm"
+              >
+                {st.giftGuideLink} <ArrowRight size={16} />
+              </Link>
             </div>
             {/* Image - Second on mobile, peeks from below */}
             <div className="w-full lg:w-1/2 order-2 lg:order-1 flex items-center">

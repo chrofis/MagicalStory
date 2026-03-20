@@ -5,6 +5,7 @@ const footerTexts = {
   en: {
     themes: 'Themes',
     occasions: 'Gift Ideas',
+    giftHub: 'Gift Guide',
     swissCities: 'Swiss Stories',
     compare: 'Compare',
     science: 'Science',
@@ -18,6 +19,7 @@ const footerTexts = {
   de: {
     themes: 'Themen',
     occasions: 'Geschenkideen',
+    giftHub: 'Geschenkratgeber',
     swissCities: 'Schweizer Geschichten',
     compare: 'Vergleich',
     science: 'Forschung',
@@ -31,6 +33,7 @@ const footerTexts = {
   fr: {
     themes: 'Thèmes',
     occasions: 'Idées cadeaux',
+    giftHub: 'Guide cadeaux',
     swissCities: 'Histoires suisses',
     compare: 'Comparaison',
     science: 'Science',
@@ -58,6 +61,10 @@ export function Footer() {
           <span className="text-stone-300">|</span>
           <Link to="/anlass" className="hover:text-indigo-600 hover:underline">
             {texts.occasions}
+          </Link>
+          <span className="text-stone-300">|</span>
+          <Link to="/geschenk" className="hover:text-indigo-600 hover:underline">
+            {texts.giftHub}
           </Link>
           <span className="text-stone-300">|</span>
           <Link to="/stadt" className="hover:text-indigo-600 hover:underline">
