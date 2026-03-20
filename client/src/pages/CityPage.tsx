@@ -60,7 +60,11 @@ const pageTexts: Record<string, {
   ctaTitle: string;
   ctaSubtitle: string;
   ctaButton: string;
+  ctaTrialButton: string;
+  ctaTrialNote: string;
   createButton: string;
+  createAccountButton: string;
+  createAccountNote: string;
 }> = {
   en: {
     breadcrumbRoot: 'Swiss Cities',
@@ -75,10 +79,14 @@ const pageTexts: Record<string, {
       { title: 'Get your book', desc: 'A personalized illustrated story ready in minutes.' },
     ],
     nearbyTitle: 'Nearby Cities',
-    ctaTitle: 'Create Your Free Story',
-    ctaSubtitle: 'Your child as the main character in a story set right here. Try it free — no account needed.',
-    ctaButton: 'Start Creating Now',
+    ctaTitle: 'Create Your Swiss Story',
+    ctaSubtitle: 'Your child as the main character in a story set right here.',
+    ctaButton: 'Create Account (Free)',
+    ctaTrialButton: 'Or try a free trial story first',
+    ctaTrialNote: 'Swiss Stories require a free account. Trial stories use other themes.',
     createButton: 'Create This Story',
+    createAccountButton: 'Create free account',
+    createAccountNote: 'Swiss Stories require a free account',
   },
   de: {
     breadcrumbRoot: 'Schweizer Städte',
@@ -93,10 +101,14 @@ const pageTexts: Record<string, {
       { title: 'Buch erhalten', desc: 'Eine personalisierte illustrierte Geschichte in wenigen Minuten.' },
     ],
     nearbyTitle: 'Städte in der Nähe',
-    ctaTitle: 'Erstelle deine Gratis-Geschichte',
-    ctaSubtitle: 'Dein Kind als Hauptfigur in einer Geschichte, die genau hier spielt. Jetzt kostenlos testen — kein Konto nötig.',
-    ctaButton: 'Jetzt starten',
+    ctaTitle: 'Erstelle deine Schweizer Geschichte',
+    ctaSubtitle: 'Dein Kind als Hauptfigur in einer Geschichte, die genau hier spielt.',
+    ctaButton: 'Konto erstellen (gratis)',
+    ctaTrialButton: 'Oder zuerst eine Gratis-Probegeschichte erstellen',
+    ctaTrialNote: 'Schweizer Geschichten benötigen ein kostenloses Konto. Probegeschichten nutzen andere Themen.',
     createButton: 'Diese Geschichte erstellen',
+    createAccountButton: 'Gratis-Konto erstellen',
+    createAccountNote: 'Schweizer Geschichten benötigen ein kostenloses Konto',
   },
   fr: {
     breadcrumbRoot: 'Villes suisses',
@@ -111,10 +123,14 @@ const pageTexts: Record<string, {
       { title: 'Recevoir votre livre', desc: 'Une histoire personnalisée illustrée prête en quelques minutes.' },
     ],
     nearbyTitle: 'Villes proches',
-    ctaTitle: 'Créez votre histoire gratuite',
-    ctaSubtitle: 'Votre enfant comme personnage principal dans une histoire qui se déroule ici. Essayez gratuitement — aucun compte requis.',
-    ctaButton: 'Commencer maintenant',
+    ctaTitle: 'Créez votre histoire suisse',
+    ctaSubtitle: 'Votre enfant comme personnage principal dans une histoire qui se déroule ici.',
+    ctaButton: 'Créer un compte (gratuit)',
+    ctaTrialButton: 'Ou essayez d\'abord une histoire gratuite',
+    ctaTrialNote: 'Les histoires suisses nécessitent un compte gratuit. Les histoires d\'essai utilisent d\'autres thèmes.',
     createButton: 'Créer cette histoire',
+    createAccountButton: 'Créer un compte gratuit',
+    createAccountNote: 'Les histoires suisses nécessitent un compte gratuit',
   },
 };
 
@@ -208,12 +224,20 @@ export default function CityPage() {
               </span>
             </p>
           )}
-          <Link
-            to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors text-lg"
-          >
-            {t.ctaButton} <ArrowRight size={20} />
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              to="/create"
+              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-colors text-lg"
+            >
+              {t.ctaButton} <ArrowRight size={20} />
+            </Link>
+            <Link
+              to="/try"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border-2 border-indigo-200 text-indigo-600 font-medium hover:bg-indigo-50 transition-colors text-sm"
+            >
+              {t.ctaTrialButton}
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -245,8 +269,9 @@ export default function CityPage() {
                           <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                         </button>
                         <Link
-                          to="/try"
+                          to="/create"
                           className="ml-auto inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                          title={t.createAccountNote}
                         >
                           {t.createButton} <ArrowRight size={14} />
                         </Link>
@@ -327,12 +352,21 @@ export default function CityPage() {
         <div className="bg-indigo-600 rounded-2xl p-8 md:p-12 text-center text-white">
           <h2 className="font-title text-2xl md:text-3xl font-bold mb-3">{t.ctaTitle}</h2>
           <p className="text-indigo-100 mb-6 max-w-lg mx-auto">{t.ctaSubtitle}</p>
-          <Link
-            to="/try"
-            className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
-          >
-            {t.ctaButton} <ArrowRight size={18} />
-          </Link>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link
+              to="/create"
+              className="inline-flex items-center gap-2 px-8 py-3 rounded-lg bg-white text-indigo-600 font-semibold hover:bg-indigo-50 transition-colors"
+            >
+              {t.ctaButton} <ArrowRight size={18} />
+            </Link>
+            <Link
+              to="/try"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-lg border-2 border-indigo-300 text-white font-medium hover:bg-indigo-500 transition-colors text-sm"
+            >
+              {t.ctaTrialButton}
+            </Link>
+          </div>
+          <p className="text-indigo-200 text-xs mt-4">{t.ctaTrialNote}</p>
         </div>
       </div>
 
