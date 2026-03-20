@@ -200,7 +200,7 @@ User clicks "Run Full Workflow"
 1. COLLECT FEEDBACK
    Reads existing evaluation data from DB (populates UI; pass logic uses fresh API data)
 
-═══ GLOBAL PASS LOOP (maxPasses = 2) ═══════════════════════════════════════════
+═══ GLOBAL PASS LOOP (maxPasses = 3) ═══════════════════════════════════════════
 
   PASS 1:
   ├─ EVALUATE ALL pages (quality + semantic + entity penalties from generation)
@@ -208,8 +208,8 @@ User clicks "Run Full Workflow"
   ├─ If no bad pages → skip to final steps
   └─ REDO all bad pages (once each, generates new image version)
 
-  PASS 2:
-  ├─ RUN ENTITY CONSISTENCY (fresh grid analysis against new images from Pass 1)
+  PASS 2+:
+  ├─ RUN ENTITY CONSISTENCY (fresh grid analysis against new images)
   ├─ EVALUATE ALL pages (quality + semantic + fresh entity penalties)
   ├─ IDENTIFY BAD PAGES (score < 60 OR issues >= 5)
   ├─ If no bad pages → skip to final steps
@@ -219,9 +219,32 @@ User clicks "Run Full Workflow"
 
   FINAL ENTITY CONSISTENCY (against latest images)
   FINAL EVALUATE ALL pages (with fresh entity data)
-  CHARACTER REPAIR (up to 3 pages, critical severity first)
+  CHARACTER REPAIR (up to 3 pages, critical severity first, Grok blended mode)
   PICK BEST VERSIONS (for each redone page, activate highest-scoring version)
 ```
+
+**Thresholds** (in `server/config/models.js` → `REPAIR_DEFAULTS`):
+- `scoreThreshold: 60` — pages scoring below 60/100 get redone
+- `issueThreshold: 5` — pages with 5+ fixable issues get redone
+- `maxPasses: 3` — max global passes through all pages
+- `maxCharRepairPages: 3` — max pages for character repair per run
+
+**Character repair methods** (in `server/lib/images.js` → `repairCharacterMismatchWithGrok()`):
+- **Grok Blended** (default): blackout character bbox → Grok regenerates → feathered blend
+  onto original scene (30px feather, bbox + 50% padding). Preserves background quality.
+- **Grok Cutout**: extract character region with 20% padding → Grok repairs → composite back
+- **Grok Blackout**: send full scene with blackout overlay → Grok regenerates entire scene
+
+**When images are REDONE (full regeneration):**
+- User clicks "Regenerate Image" button (manual)
+- Repair workflow identifies bad pages (score < 60 or issues >= 5)
+- Uses `POST /:id/iterate/:pageNum` — re-expands scene description, generates new image
+
+**When images are FIXED (character repair only):**
+- Character repair step in the workflow (final steps)
+- Entity consistency found character appearance mismatches
+- Uses Grok blended mode: only the character region changes, background preserved
+- Cost: ~$0.02/image (vs full regeneration cost)
 
 **Key design decisions:**
 - Entity data exists from generation — penalties apply from Pass 1.
@@ -230,13 +253,14 @@ User clicks "Run Full Workflow"
 - Character repair runs before pick-best so repair versions are also considered.
 - Pick-best runs last, comparing ALL versions (original + redos + repairs) per page.
 - Character repair budget: max 3 pages, critical > major priority.
+- Grok blended is default when Grok is configured; falls back to Gemini otherwise.
 - Abortable at every step via AbortController.
 
 **Endpoints** (in `server/routes/regeneration.js`):
 - `POST /:id/repair-workflow/re-evaluate` — quality + semantic eval, entity penalties
 - `POST /:id/repair-workflow/consistency-check` — entity grid analysis
 - `POST /:id/repair-workflow/pick-best-versions` — activate best version per page
-- `POST /:id/repair-workflow/character-repair` — fix character appearance issues
+- `POST /:id/repair-workflow/character-repair` — fix character appearance (Grok blended/cutout/blackout)
 - Page redo uses existing `POST /:id/iterate/:pageNum` endpoint
 
 **Key files:**
@@ -244,6 +268,7 @@ User clicks "Run Full Workflow"
 - `client/src/components/generation/RepairWorkflowPanel.tsx` — UI panel
 - `client/src/services/storyService.ts` — API client methods
 - `server/routes/regeneration.js` — backend endpoints
+- `server/lib/images.js` → `repairCharacterMismatchWithGrok()` — Grok character repair
 - `server/lib/images.js` → `collectAllIssuesForPage()` — aggregates all issue sources
 
 ### Key Backend Files

@@ -91,23 +91,11 @@ const MODEL_DEFAULTS = {
   imageBackend: 'gemini',              // Default: Gemini for production quality
 
   // Feature flags for generation pipeline
-  enableAutoRepair: false,             // Auto-repair: regenerate low-scoring images (NOT inpaint/grid artifact repair)
+  enableAutoRepair: false,             // Auto-repair: inpaint fixable issues (Runware SDXL/FLUX)
   useGridRepair: false,                // Grid-based artifact repair: OFF - we only want character fixes
   enableQualityRetry: false,           // Quality retry: regenerate images scoring below threshold
   enableFinalChecks: false,            // Final checks: run entity consistency + one character fix pass
   checkOnlyMode: false,                // Check-only mode: run checks but skip all regeneration
-
-  // Separated Evaluation Pipeline (target architecture)
-  // When enabled, the intended flow is:
-  // 1. Generate ALL images (parallel)
-  // 2. Evaluate ALL images (collect feedback)
-  // 3. Regenerate low-scoring images (1st attempt)
-  // 4. Re-evaluate regenerated images
-  // 5. 2nd regenerate of still-low images
-  // 6. Select best version across all attempts — no further regenerates
-  // 7. Run entity consistency checks on best images
-  // 8. One targeted character fix only (no artifact/grid repair)
-  separatedEvaluation: false           // Default: false (not yet enabled)
 };
 
 // Available inpaint backends
