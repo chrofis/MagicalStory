@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, FormEvent, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, CheckCircle, BookOpen, Mail, AlertTriangle } from 'lucide-react';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
-import { signInWithGoogle, getIdToken } from '@/services/firebase';
+import { signInWithGoogle, getIdToken, handleRedirectResult } from '@/services/firebase';
 import { useLanguage } from '@/context/LanguageContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -160,9 +160,21 @@ export default function TrialGenerationPage() {
   const { language } = useLanguage();
   const t = translations[language as keyof typeof translations] || translations.en;
 
-  const state = location.state as LocationState | null;
+  // Recover state from localStorage if location.state is lost (e.g., after Google redirect)
+  const state = (location.state as LocationState | null) || (() => {
+    const savedToken = localStorage.getItem('trial_gen_session_token');
+    if (savedToken) {
+      return {
+        sessionToken: savedToken,
+        characterId: localStorage.getItem('trial_gen_character_id') || '',
+        storyInput: {},
+        characterName: localStorage.getItem('trial_gen_character_name') || '',
+      } as LocationState;
+    }
+    return null;
+  })();
 
-  // Redirect if no state
+  // Redirect if no state (and no saved state from localStorage)
   useEffect(() => {
     if (!state?.sessionToken) {
       navigate('/try', { replace: true });
@@ -172,7 +184,9 @@ export default function TrialGenerationPage() {
   // Generation state
   const [pageState, setPageState] = useState<PageState>('starting');
   const [progress, setProgress] = useState(0);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(
+    localStorage.getItem('trial_gen_job_id')
+  );
   const hasStartedRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollStartRef = useRef<number>(0);
@@ -238,10 +252,15 @@ export default function TrialGenerationPage() {
     return () => clearInterval(interval);
   }, [emailLinked, state?.sessionToken]);
 
-  // Start story generation on mount
+  // Start story generation on mount (skip if resuming after Google redirect — jobId already set)
   useEffect(() => {
     if (!state?.sessionToken || hasStartedRef.current) return;
     hasStartedRef.current = true;
+    if (jobId) {
+      // Resuming after redirect — job was already started
+      setPageState('generating');
+      return;
+    }
 
     const startGeneration = async () => {
       try {
@@ -269,6 +288,7 @@ export default function TrialGenerationPage() {
         }
 
         setJobId(data.jobId);
+        localStorage.setItem('trial_gen_job_id', data.jobId);
         setPageState('generating');
       } catch {
         setPageState('failed');
@@ -364,6 +384,11 @@ export default function TrialGenerationPage() {
     if (pageState === 'completed' && (isVerified || googleLinked)) {
       // Small delay so user sees the "100% complete" state
       const timer = setTimeout(() => {
+        // Clean up trial generation state from localStorage
+        localStorage.removeItem('trial_gen_session_token');
+        localStorage.removeItem('trial_gen_character_id');
+        localStorage.removeItem('trial_gen_character_name');
+        localStorage.removeItem('trial_gen_job_id');
         window.location.href = '/stories';
       }, 1500);
       return () => clearTimeout(timer);
@@ -406,40 +431,82 @@ export default function TrialGenerationPage() {
 
   // ── Google linking ─────────────────────────────────────────────────────────
 
+  // Complete Google linking with a Firebase user (shared by popup and redirect flows)
+  const completeGoogleLink = async (firebaseUser: import('@/services/firebase').FirebaseUser) => {
+    const idToken = await getIdToken(firebaseUser);
+    const sessionToken = state?.sessionToken;
+    if (!sessionToken) return;
+
+    const response = await fetch(`${API_URL}/api/trial/link-google`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ idToken }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setAuthError(data.error || t.error);
+      return;
+    }
+
+    // Store JWT token for authenticated access
+    if (data.token) {
+      localStorage.setItem('auth_token', data.token);
+      localStorage.removeItem('trial_session_token');
+    }
+
+    // Clean up saved trial state
+    localStorage.removeItem('trial_gen_session_token');
+    localStorage.removeItem('trial_gen_character_id');
+    localStorage.removeItem('trial_gen_character_name');
+
+    setGoogleLinked(true);
+    setIsVerified(true);
+  };
+
+  // Handle Google redirect result on page load (when popup was blocked → redirect flow)
+  const redirectHandledRef = useRef(false);
+  useEffect(() => {
+    if (redirectHandledRef.current || !state?.sessionToken) return;
+    // Only run if we have saved trial state (meaning we initiated a Google redirect)
+    if (!localStorage.getItem('trial_gen_session_token')) return;
+    redirectHandledRef.current = true;
+
+    (async () => {
+      try {
+        const firebaseUser = await handleRedirectResult();
+        if (firebaseUser) {
+          setIsAuthLoading(true);
+          await completeGoogleLink(firebaseUser);
+          setIsAuthLoading(false);
+        }
+      } catch (err) {
+        console.error('Google redirect completion failed:', err);
+        setIsAuthLoading(false);
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state?.sessionToken]);
+
   const handleGoogleSignIn = async () => {
     if (isAuthLoading || !state?.sessionToken) return;
 
     setAuthError('');
     setIsAuthLoading(true);
 
+    // Save trial state to localStorage before Google sign-in
+    // (in case popup is blocked and we fall back to redirect, which loses location.state)
+    localStorage.setItem('trial_gen_session_token', state.sessionToken);
+    if (state.characterId) localStorage.setItem('trial_gen_character_id', state.characterId);
+    if (state.characterName) localStorage.setItem('trial_gen_character_name', state.characterName);
+
     try {
       const firebaseUser = await signInWithGoogle();
-      const idToken = await getIdToken(firebaseUser);
-
-      const response = await fetch(`${API_URL}/api/trial/link-google`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${state.sessionToken}`,
-        },
-        body: JSON.stringify({ idToken }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setAuthError(data.error || t.error);
-        return;
-      }
-
-      // Store JWT token for authenticated access
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
-        localStorage.removeItem('trial_session_token');
-      }
-
-      setGoogleLinked(true);
-      setIsVerified(true);
+      await completeGoogleLink(firebaseUser);
     } catch (err) {
       // Don't show error for redirect-based auth
       if (err instanceof Error && err.message === 'Redirecting to Google...') {

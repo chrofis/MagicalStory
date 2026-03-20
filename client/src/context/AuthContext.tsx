@@ -571,6 +571,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Skip if on trial generation page — it handles its own Google redirect
+      if (localStorage.getItem('trial_gen_session_token')) {
+        logger.info('Trial generation in progress, skipping redirect check (trial page handles it)');
+        return;
+      }
+
       try {
         logger.info('Checking for Google redirect result...');
         const firebaseUser = await handleRedirectResult();
