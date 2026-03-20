@@ -341,7 +341,7 @@ export function RepairWorkflowPanel({
   const [gridLightbox, setGridLightbox] = useState<string | null>(null);
   const [overrideImageModel, setOverrideImageModel] = useState<string | null>(null);
   const [overrideQualityModel, setOverrideQualityModel] = useState<string | null>(null);
-  const [grokRepairMode, setGrokRepairMode] = useState<'cutout' | 'blackout' | null>(null);
+  const [grokRepairMode, setGrokRepairMode] = useState<'blended' | 'cutout' | 'blackout' | null>(null);
   const effectiveImageModel = overrideImageModel || imageModel;
 
   const {
@@ -1242,12 +1242,17 @@ export function RepairWorkflowPanel({
                       value={
                         grokRepairMode === 'cutout' ? 'grok-cutout' :
                         grokRepairMode === 'blackout' ? 'grok-blackout' :
+                        grokRepairMode === 'blended' ? 'grok-blended' :
                         useMagicApiRepair ? 'magicapi' :
                         (overrideImageModel || imageModel || '')
                       }
                       onChange={(e) => {
                         const val = e.target.value;
-                        if (val === 'grok-cutout') {
+                        if (val === 'grok-blended') {
+                          setGrokRepairMode('blended');
+                          setUseMagicApiRepair?.(false);
+                          setOverrideImageModel(null);
+                        } else if (val === 'grok-cutout') {
                           setGrokRepairMode('cutout');
                           setUseMagicApiRepair?.(false);
                           setOverrideImageModel(null);
@@ -1277,11 +1282,17 @@ export function RepairWorkflowPanel({
                         <option value="flux-schnell">FLUX Schnell ($0.0006/image)</option>
                       </optgroup>
                       <optgroup label="Character Repair">
-                        <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
+                        <option value="grok-blended">Grok Blended — default ($0.02, feathered)</option>
                         <option value="grok-cutout">Grok Cut-Out ($0.02/repair)</option>
                         <option value="grok-blackout">Grok Blackout ($0.02/repair)</option>
+                        <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
                       </optgroup>
                     </select>
+                    {!grokRepairMode && !useMagicApiRepair && (
+                      <p className="text-xs text-yellow-600 mt-2">
+                        Blended: whites out character region, Grok fixes it, feathered blend preserves background. Uses face-only bbox for face issues, full body for clothing issues.
+                      </p>
+                    )}
                     {useMagicApiRepair && (
                       <p className="text-xs text-yellow-600 mt-2">
                         Uses face swap + hair fix pipeline with iterative crop checking

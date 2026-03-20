@@ -3236,13 +3236,22 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             return { task, error: true, failReason: `No avatar for ${characterName}` };
           }
 
-          const faceBox = storedAppearance.faceBox || storedAppearance.bodyBox;
-          // Convert {x, y, width, height} to [ymin, xmin, ymax, xmax]
-          const bbox = [faceBox.y, faceBox.x, faceBox.y + faceBox.height, faceBox.x + faceBox.width];
-
+          // Determine repair region based on issue types
+          // face issues → use faceBox, clothing issues → use bodyBox, both → bodyBox
           const issueDesc = charIssues.length > 0
             ? charIssues.map(i => i.issue || i.description || '').filter(Boolean).join('; ')
             : '';
+          const issueText = issueDesc.toLowerCase();
+          const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
+          const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
+
+          // Pick the right box: face-only issues use faceBox, everything else uses bodyBox (full character)
+          const useFaceOnly = hasFaceIssue && !hasClothingIssue && storedAppearance.faceBox;
+          const repairBox = useFaceOnly ? storedAppearance.faceBox : (storedAppearance.bodyBox || storedAppearance.faceBox);
+          // Convert {x, y, width, height} to [ymin, xmin, ymax, xmax]
+          const bbox = [repairBox.y, repairBox.x, repairBox.y + repairBox.height, repairBox.x + repairBox.width];
+
+          log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
 
           const grokResult = await repairCharacterMismatch(
             sceneImage.imageData,
