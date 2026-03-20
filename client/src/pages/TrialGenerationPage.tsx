@@ -161,7 +161,8 @@ export default function TrialGenerationPage() {
   const t = translations[language as keyof typeof translations] || translations.en;
 
   // Recover state from localStorage if location.state is lost (e.g., after Google redirect)
-  const state = (location.state as LocationState | null) || (() => {
+  const locationState = location.state as LocationState | null;
+  const state = locationState || (() => {
     const savedToken = localStorage.getItem('trial_gen_session_token');
     if (savedToken) {
       return {
@@ -174,6 +175,11 @@ export default function TrialGenerationPage() {
     return null;
   })();
 
+  // If we arrived with fresh navigation state, clear stale localStorage from previous sessions
+  if (locationState) {
+    localStorage.removeItem('trial_gen_job_id');
+  }
+
   // Redirect if no state (and no saved state from localStorage)
   useEffect(() => {
     if (!state?.sessionToken) {
@@ -184,8 +190,9 @@ export default function TrialGenerationPage() {
   // Generation state
   const [pageState, setPageState] = useState<PageState>('starting');
   const [progress, setProgress] = useState(0);
+  // Only restore jobId from localStorage if we're recovering from a redirect (no location.state)
   const [jobId, setJobId] = useState<string | null>(
-    localStorage.getItem('trial_gen_job_id')
+    locationState ? null : localStorage.getItem('trial_gen_job_id')
   );
   const hasStartedRef = useRef(false);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
