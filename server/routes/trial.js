@@ -642,10 +642,25 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
     }
 
     const user = result.rows[0];
+    const trialUsed = user.stories_generated >= user.story_quota;
+
+    // If trial is used, find their story so we can link to it
+    let storyId = null;
+    if (trialUsed) {
+      const storyResult = await pool.query(
+        'SELECT id FROM stories WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [userId]
+      );
+      if (storyResult.rows.length > 0) {
+        storyId = storyResult.rows[0].id;
+      }
+    }
+
     res.json({
-      trialUsed: user.stories_generated >= user.story_quota,
+      trialUsed,
       emailVerified: user.email_verified === true,
       hasEmail: !!user.email,
+      ...(storyId ? { storyId } : {}),
     });
   } catch (err) {
     log.error(`[TRIAL] Check status error: ${err.message}`);

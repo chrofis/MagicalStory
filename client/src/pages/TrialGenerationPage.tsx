@@ -280,7 +280,9 @@ export default function TrialGenerationPage() {
 
         if (!response.ok) {
           if (data.code === 'TRIAL_USED') {
-            navigate('/try', { replace: true });
+            // Story already exists — show the claim UI so user can sign up to view it
+            setPageState('completed');
+            setProgress(100);
             return;
           }
           setPageState('failed');

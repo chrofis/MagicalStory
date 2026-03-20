@@ -51,24 +51,27 @@ const stepLabels: Record<string, Record<TrialStep, string>> = {
   fr: { character: 'Personnage', topic: 'Sujet', ideas: 'Idées' },
 };
 
-const trialUsedStrings: Record<string, { title: string; desc: string; signUp: string; checkInbox: string }> = {
+const trialUsedStrings: Record<string, { title: string; desc: string; signUp: string; checkInbox: string; viewStory: string }> = {
   en: {
     title: 'You already created your free story!',
     desc: 'Sign up for a full account to create more stories with multiple characters, longer plots, and printed books.',
     signUp: 'Sign up now',
     checkInbox: 'Already signed up? Check your inbox for the verification link.',
+    viewStory: 'View your story',
   },
   de: {
     title: 'Du hast bereits deine kostenlose Geschichte erstellt!',
     desc: 'Erstelle ein Konto, um weitere Geschichten mit mehreren Figuren, längeren Handlungen und gedruckten Büchern zu erstellen.',
     signUp: 'Jetzt registrieren',
     checkInbox: 'Bereits registriert? Prüfe deinen Posteingang für den Bestätigungslink.',
+    viewStory: 'Deine Geschichte ansehen',
   },
   fr: {
     title: 'Vous avez déjà créé votre histoire gratuite !',
     desc: 'Créez un compte pour créer plus d\'histoires avec plusieurs personnages, des intrigues plus longues et des livres imprimés.',
     signUp: 'S\'inscrire maintenant',
     checkInbox: 'Déjà inscrit ? Vérifiez votre boîte de réception pour le lien de vérification.',
+    viewStory: 'Voir votre histoire',
   },
 };
 
@@ -137,6 +140,7 @@ export default function TrialWizard() {
   );
   const [characterId, setCharacterId] = useState<string | null>(null);
   const [trialUsed, setTrialUsed] = useState(false);
+  const [trialStoryId, setTrialStoryId] = useState<string | null>(null);
 
   // Check if trial is already used on mount
   useEffect(() => {
@@ -155,7 +159,10 @@ export default function TrialWizard() {
         return r.json();
       })
       .then(data => {
-        if (data?.trialUsed) setTrialUsed(true);
+        if (data?.trialUsed) {
+          setTrialUsed(true);
+          if (data.storyId) setTrialStoryId(data.storyId);
+        }
       })
       .catch(() => {
         // Network error — clear stale token to be safe
@@ -237,9 +244,19 @@ export default function TrialWizard() {
             </div>
             <h1 className="text-xl font-bold text-gray-800 mb-2">{tu.title}</h1>
             <p className="text-gray-600 text-sm mb-6">{tu.desc}</p>
+            {trialStoryId && (
+              <button
+                onClick={() => navigate('/trial-generation', {
+                  state: { sessionToken, characterId: '', storyInput: {}, characterName: '' }
+                })}
+                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors mb-3"
+              >
+                {tu.viewStory}
+              </button>
+            )}
             <Link
               to="/?signup=true"
-              className="inline-block w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+              className={`inline-block w-full ${trialStoryId ? 'bg-white text-indigo-600 border border-indigo-200 hover:bg-indigo-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'} py-3 rounded-lg font-semibold transition-colors`}
             >
               {tu.signUp}
             </Link>
