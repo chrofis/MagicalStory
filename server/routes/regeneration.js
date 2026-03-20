@@ -3007,7 +3007,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
-    const repairMethod = grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : 'Gemini';
+    const repairMethod = grokRepairMode ? `Grok ${grokRepairMode}` : useMagicApiRepair ? 'MagicAPI' : isGrokConfigured() ? 'Grok blended' : 'Gemini';
     log.info(`👤 [REPAIR-WORKFLOW] Starting character repair for story ${id} using ${repairMethod}`);
 
     const { repairSinglePage } = require('../lib/entityConsistency');
@@ -3249,8 +3249,14 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           // Pick the right box: face-only issues use faceBox, everything else uses bodyBox (full character)
           const useFaceOnly = hasFaceIssue && !hasClothingIssue && storedAppearance.faceBox;
           const repairBox = useFaceOnly ? storedAppearance.faceBox : (storedAppearance.bodyBox || storedAppearance.faceBox);
-          // Convert {x, y, width, height} to [ymin, xmin, ymax, xmax]
-          const bbox = [repairBox.y, repairBox.x, repairBox.y + repairBox.height, repairBox.x + repairBox.width];
+          // Bbox can be either [ymin, xmin, ymax, xmax] (array from detectAllBoundingBoxes)
+          // or {x, y, width, height} (object from some legacy paths)
+          let bbox;
+          if (Array.isArray(repairBox)) {
+            bbox = repairBox; // Already [ymin, xmin, ymax, xmax]
+          } else {
+            bbox = [repairBox.y, repairBox.x, repairBox.y + repairBox.height, repairBox.x + repairBox.width];
+          }
 
           log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
 
