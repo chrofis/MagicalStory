@@ -3205,7 +3205,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           let storedAppearance = null;
           if (charReport?.byClothing) {
             for (const [, clothingData] of Object.entries(charReport.byClothing)) {
-              const app = (clothingData as any).appearances?.find((a: any) => a.pageNumber === pageNumber);
+              const app = clothingData.appearances?.find(a => a.pageNumber === pageNumber);
               if (app?.faceBox || app?.bodyBox) {
                 storedAppearance = app;
                 break;
