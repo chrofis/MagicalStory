@@ -3457,7 +3457,9 @@ function buildTrialStoryPrompt(inputData, sceneCount = null) {
       avatarSelection = `# Avatar Selection
 The main character has two avatar styles available:
 - \`standard\` — everyday modern clothes
-- \`costumed:${costume.costumeType}\` — ${costume.description}`;
+- \`costumed:${costume.costumeType}\` — ${costume.description}
+
+**IMPORTANT**: The MAJORITY of scenes (at least 3 out of 5) MUST use \`costumed:${costume.costumeType}\` for the main character's clothing in scene hints. Use \`standard\` only for 1-2 scenes where it makes narrative sense (e.g., before a transformation, or a brief real-world moment).`;
     }
 
     // Build landmarks instruction for the visual bible

@@ -108,6 +108,7 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
   - BAD: "Werner (left) gestures. Franziska and Roger stand together smiling. Lukas sits with Manuel and Sophie nearby." (7 characters named!)
   - GOOD: "Werner (left) gestures appreciatively at the clean room. Verena (center) sets down pirate decorations." (only listed characters)
 - **POSITIONS REQUIRED** - Every character needs (left), (right), or (center). No other position words like "background" or "foreground" in the position field. Example: "Luna (left) waves at Max (right)"
+- **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in the **majority of scenes** (at least 70%). Use `standard` only for scenes before a transformation or brief real-world moments. The costume IS the story — show it!
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **INDOOR SCENES** - Use "n/a" for weather

@@ -58,7 +58,7 @@ It must be detailed enough to illustrate without additional context.
 }
 ```
 
-- MAX 2 characters per scene. Use character names, not descriptions.
+- MAX 4 characters per scene. Use character names, not descriptions.
 - `characters.id`: use visual bible `CHR` IDs for secondary characters (e.g., `"CHR001"`). Use `null` for the main character (who has reference photos).
 - `setting.location`: use `"Name [LOC001]"` format referencing visual bible location IDs.
 - `objects`: include visual bible items visible in the scene with their IDs.
