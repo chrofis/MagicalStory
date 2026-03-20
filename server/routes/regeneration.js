@@ -3327,8 +3327,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       // Track repair cost
       if (repairResult.method === 'magicapi') {
         totalMagicApiRepairs++;
-      } else if (repairResult.method === 'grok_cutout' || repairResult.method === 'grok_blackout') {
-        // Grok repairs are $0.02 each, tracked via usage
+      } else if (repairResult.method?.startsWith('grok_')) {
+        // Grok repairs (blended, cutout, blackout) are $0.02 each, tracked via usage
       } else {
         totalGeminiRepairs++;
       }
@@ -3381,11 +3381,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           const isMagicApiMethod = repairResult.method === 'magicapi';
+          const isGrokMethod = repairResult.method?.startsWith('grok_');
+          const repairModelId = isMagicApiMethod ? 'magicapi-faceswap-hair' : isGrokMethod ? `grok-imagine (${repairResult.method})` : 'gemini-2.0-flash-preview-image-generation';
           existingImage.imageVersions.push({
             imageData: update.imageData,
             description: existingImage.description,
             prompt: existingImage.prompt,
-            modelId: isMagicApiMethod ? 'magicapi-faceswap-hair' : 'gemini-2.0-flash-preview-image-generation',
+            modelId: repairModelId,
             createdAt: new Date().toISOString(),
             isActive: true,
             type: 'entity-repair',
