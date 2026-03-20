@@ -70,7 +70,7 @@ const MODEL_DEFAULTS = {
   outline: 'claude-sonnet',            // Story outline generation
   storyText: 'claude-sonnet',          // Story narrative text
   sceneDescription: 'grok-4-fast',     // Initial scene expansion (fast/cheap — 4x cheaper than Haiku, 2x faster)
-  sceneIteration: 'claude-sonnet',     // Scene iteration/retry (thorough, with all checks)
+  sceneIteration: 'grok-4-fast',       // Scene iteration/retry (same fast model as initial expansion)
 
   // Image models
   pageImage: 'grok-imagine',                 // Regular page images ($0.02/image — vs $0.04 Gemini)
