@@ -3208,7 +3208,20 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const appearance = appearances?.find(a => a.pageNumber === pageNumber);
 
           if (!appearance?.faceBox && !appearance?.bodyBox) {
-            return { task, error: true, failReason: `No bounding box for ${characterName} on page ${pageNumber}` };
+            // Entity consistency found the character but no bbox — try direct detection
+            log.info(`🔍 [CHAR REPAIR] No bbox from entity data for ${characterName} on page ${pageNumber}, running fresh detection...`);
+            const { detectAllBoundingBoxes } = require('../lib/images');
+            const detection = await detectAllBoundingBoxes(sceneImage.imageData, [characterName]);
+            const charFigure = detection?.figures?.find(f => f.label?.toLowerCase().includes(characterName.toLowerCase()));
+            if (charFigure?.boundingBox) {
+              const [ymin, xmin, ymax, xmax] = charFigure.boundingBox;
+              if (appearance) {
+                appearance.faceBox = { x: xmin, y: ymin, width: xmax - xmin, height: ymax - ymin };
+              }
+              log.info(`✅ [CHAR REPAIR] Fresh bbox for ${characterName}: [${charFigure.boundingBox.map(v => Math.round(v*100)+'%').join(', ')}]`);
+            } else {
+              return { task, error: true, failReason: `Could not locate ${characterName} on page ${pageNumber}` };
+            }
           }
 
           const clothingCategory = appearance.clothing || 'standard';
