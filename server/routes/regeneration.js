@@ -2955,9 +2955,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
       const story = storyResult.rows[0];
       const storyData = typeof story.data === 'string' ? JSON.parse(story.data) : story.data;
-      const entityReport = storyData.finalChecksReport?.entity;
+      const storyEntityReport = storyData.finalChecksReport?.entity;
 
-      if (!entityReport || !entityReport.characters) {
+      if (!storyEntityReport || !storyEntityReport.characters) {
         return res.json({ results: [], message: 'No entity report found, nothing to repair' });
       }
 
@@ -2974,7 +2974,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
         }
       }
-      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(entityReport, { pageScores });
+      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(storyEntityReport, { pageScores });
       if (autoRepairs.length === 0) {
         return res.json({ results: [], message: 'No major/critical issues found' });
       }
@@ -3201,7 +3201,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           // Look up bbox from stored entity report (saved during consistency check)
-          const charReport = entityReport?.characters?.[characterName];
+          const charReport = storyEntityReport?.characters?.[characterName];
           let storedAppearance = null;
           if (charReport?.byClothing) {
             for (const [, clothingData] of Object.entries(charReport.byClothing)) {
