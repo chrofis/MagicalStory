@@ -60,6 +60,7 @@ const translations = {
     failedDesc: 'Story generation failed. Please try again.',
     tryAgain: 'Try Again',
     accountReady: 'Account ready!',
+    creditsReceived: 'You received 300 free credits!',
     waitingForStory: 'Your story is almost done. You\'ll be redirected automatically.',
     verifiedWaiting: 'Email verified! Your story is still being created...',
     upsellTitle: 'This is a trial story. With a free account you can create full stories:',
@@ -99,6 +100,7 @@ const translations = {
     failedDesc: 'Die Geschichte konnte nicht erstellt werden. Bitte versuche es erneut.',
     tryAgain: 'Erneut versuchen',
     accountReady: 'Konto bereit!',
+    creditsReceived: 'Du hast 300 Gratis-Credits erhalten!',
     waitingForStory: 'Deine Geschichte ist fast fertig. Du wirst automatisch weitergeleitet.',
     verifiedWaiting: 'E-Mail bestätigt! Deine Geschichte wird noch erstellt...',
     upsellTitle: 'Das ist eine Probegeschichte. Mit einem kostenlosen Konto kannst du vollständige Geschichten erstellen:',
@@ -138,6 +140,7 @@ const translations = {
     failedDesc: 'La création de l\'histoire a échoué. Veuillez réessayer.',
     tryAgain: 'Réessayer',
     accountReady: 'Compte prêt !',
+    creditsReceived: 'Vous avez reçu 300 crédits gratuits !',
     waitingForStory: 'Votre histoire est presque terminée. Vous serez redirigé automatiquement.',
     verifiedWaiting: 'E-mail vérifié ! Votre histoire est encore en cours de création...',
     upsellTitle: 'Ceci est une histoire d\'essai. Avec un compte gratuit, vous pouvez créer des histoires complètes :',
@@ -462,9 +465,12 @@ export default function TrialGenerationPage() {
       return;
     }
 
-    // Store JWT token for authenticated access
+    // Store JWT token + user data for authenticated access
     if (data.token) {
       localStorage.setItem('auth_token', data.token);
+      if (data.user) {
+        localStorage.setItem('current_user', JSON.stringify(data.user));
+      }
       localStorage.removeItem('trial_session_token');
     }
 
@@ -629,6 +635,9 @@ export default function TrialGenerationPage() {
                     <CheckCircle className="w-7 h-7 text-green-600" />
                   </div>
                   <h2 className="text-lg font-bold text-gray-800 mb-1">{t.accountReady}</h2>
+                  <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm font-medium mb-3">
+                    {t.creditsReceived}
+                  </p>
                   {pageState !== 'completed' ? (
                     <p className="text-gray-500 text-sm">{t.waitingForStory}</p>
                   ) : (

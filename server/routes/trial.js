@@ -1051,16 +1051,27 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
       });
     }
 
-    // Update user: link Google, set email, mark verified, remove anonymous
+    // Upgrade trial to full account: link Google, give credits, mark verified
+    const { CREDIT_CONFIG } = require('../config/credits');
+    const fullCredits = CREDIT_CONFIG.LIMITS.INITIAL_USER; // 300
     await pool.query(
       `UPDATE users SET
          email = $1,
          username = $1,
          anonymous = false,
          email_verified = true,
-         firebase_uid = $2
-       WHERE id = $3`,
-      [normalizedEmail, decodedToken.uid, userId]
+         has_set_password = true,
+         is_trial = false,
+         credits = $2,
+         firebase_uid = $3
+       WHERE id = $4`,
+      [normalizedEmail, fullCredits, decodedToken.uid, userId]
+    );
+
+    // Log credit transaction
+    await pool.query(
+      'INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description) VALUES ($1, $2, $3, $4, $5)',
+      [userId, fullCredits, fullCredits, 'initial', 'Welcome credits (Google sign-up)']
     );
 
     // Generate full auth token
@@ -1069,20 +1080,22 @@ router.post('/link-google', verifySessionToken, async (req, res) => {
     const user = updatedUser.rows[0];
     const fullToken = generateToken(user);
 
-    log.info(`[TRIAL] Google account linked for user ${userId}: ${normalizedEmail}`);
+    log.info(`[TRIAL] Google account linked for user ${userId}: ${normalizedEmail} (${fullCredits} credits)`);
 
     res.json({
       success: true,
       token: fullToken,
+      credits: fullCredits,
       user: {
         id: user.id,
         username: user.username,
         email: user.email,
         role: user.role,
-        credits: user.credits,
+        credits: fullCredits,
         storyQuota: user.story_quota,
         storiesGenerated: user.stories_generated,
         emailVerified: true,
+        hasPassword: true,
       },
     });
   } catch (err) {
