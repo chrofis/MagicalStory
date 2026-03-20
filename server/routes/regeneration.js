@@ -877,11 +877,25 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       return res.status(400).json({ error: `No scene description found for page ${pageNumber}` });
     }
 
-    // Gather context for scene description prompt
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Analyzing current image with vision model...`);
+
+    // Get context for image analysis
     const characters = storyData.characters || [];
     const visualBible = storyData.visualBible || null;
     const clothingRequirements = storyData.clothingRequirements || null;
 
+    // Step 1: Analyze the current image using analyzeGeneratedImage (identifies characters by name)
+    const { analyzeGeneratedImage } = require('../lib/sceneValidator');
+    const imageDescription = await analyzeGeneratedImage(currentImage.imageData, characters, visualBible, clothingRequirements);
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Composition analysis complete (${imageDescription.description.length} chars)`);
+    log.debug(`🔄 [ITERATE] Composition: ${imageDescription.description.substring(0, 200)}...`);
+
+    // Step 2: Build previewFeedback from the image analysis
+    const previewFeedback = {
+      composition: imageDescription.description
+    };
+
+    // Step 3: Gather context for scene description prompt
     const pageText = getPageText(storyData.storyText, pageNumber);
     if (!pageText) {
       return res.status(404).json({ error: `Page ${pageNumber} text not found` });
@@ -928,23 +942,26 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       shortSceneDesc = currentScene.description.substring(0, 500);
     }
 
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt...`);
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
 
+    // Step 4: Build the scene description prompt with preview feedback
     const scenePrompt = buildSceneDescriptionPrompt(
       pageNumber,
       pageText,
       characters,
-      shortSceneDesc,  // The current scene hint to re-expand
+      shortSceneDesc,  // The current scene hint to critique
       language,
       visualBible,
       previousScenes,
       expectedClothing,
-      '',  // No correction notes
-      availableAvatars
+      '',  // No correction notes for iteration
+      availableAvatars,
+      null,  // rawOutlineContext
+      previewFeedback  // The actual image analysis feedback!
     );
 
-    // Generate corrected scene description (uses fast iteration model)
-    log.info(`🔄 [ITERATE] Page ${pageNumber}: Running validation checks...`);
+    // Step 5: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
+    log.info(`🔄 [ITERATE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
     const sceneResult = await callClaudeAPI(scenePrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
     const newSceneDescription = sceneResult.text;
 
