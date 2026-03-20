@@ -8436,8 +8436,8 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
   // Add the evaluation prompt
   parts.push({ text: prompt });
 
-  // Call Gemini API with retry for socket errors
-  const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+  // Entity consistency needs precise visual comparison — use bbox/consistency model (2.5-flash)
+  const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   log.info(`🔍 [CONSISTENCY] Checking ${imagesToCheck.length} images${batchInfo} (type: ${checkType})`);
@@ -8656,7 +8656,7 @@ async function evaluateConsistencyAcrossImages(images, checkType = 'full', optio
       usage: {
         inputTokens: totalInputTokens,
         outputTokens: totalOutputTokens,
-        model: MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash',
+        model: MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash',
         batches: batches.length
       },
       evaluationPrompts: evaluationPrompts.length > 0 ? evaluationPrompts : undefined,
@@ -8934,8 +8934,8 @@ async function evaluateIncrementalConsistency(currentImage, currentPageNumber, p
   // Add the evaluation prompt
   parts.push({ text: prompt });
 
-  // Call Gemini API
-  const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+  // Entity consistency needs precise visual comparison — use bbox/consistency model (2.5-flash)
+  const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
   let data;
