@@ -3220,6 +3220,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
 
           const faceBox = appearance.faceBox || appearance.bodyBox;
+          if (!faceBox || faceBox.x == null || faceBox.y == null || faceBox.width == null || faceBox.height == null) {
+            log.warn(`⚠️ [CHAR REPAIR] No bounding box for ${characterName} on page ${pageNum} — skipping`);
+            return { task, error: true, failReason: `No bounding box for ${characterName} on page ${pageNum}` };
+          }
           // Convert {x, y, width, height} to [ymin, xmin, ymax, xmax]
           const bbox = [faceBox.y, faceBox.x, faceBox.y + faceBox.height, faceBox.x + faceBox.width];
 

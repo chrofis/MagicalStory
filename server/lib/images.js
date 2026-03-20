@@ -5435,6 +5435,13 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   }
 
   const [ymin, xmin, ymax, xmax] = bbox;
+
+  // Validate bbox coordinates — NaN or out-of-range values crash Sharp
+  if ([ymin, xmin, ymax, xmax].some(v => v == null || isNaN(v) || v < 0 || v > 1) || ymin >= ymax || xmin >= xmax) {
+    log.warn(`⚠️ [CHAR REPAIR GROK] Invalid bbox for ${charName}: [${bbox.join(', ')}] — skipping`);
+    return { imageData: null, character: charName, method: 'grok_blended', error: 'Invalid bounding box' };
+  }
+
   const useBlended = options.useBlended !== undefined ? options.useBlended : true; // default ON
   const useCutout = !useBlended && (options.useCutout || false);
   const method = useBlended ? 'grok_blended' : useCutout ? 'grok_cutout' : 'grok_blackout';
