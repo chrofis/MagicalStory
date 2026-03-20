@@ -5458,7 +5458,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const sceneBuffer = Buffer.from(currentBase64, 'base64');
 
   const issueDescription = options.issueDescription || '';
-  const issueContext = issueDescription ? ` Specific issue: ${issueDescription}` : '';
+  const clothingDescription = options.clothingDescription || '';
+  const sceneDescription = options.sceneDescription || '';
+  const issueContext = issueDescription ? `\nIssues to fix: ${issueDescription}` : '';
+  const clothingContext = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
 
   if (useBlended) {
     // ── Blended mode: blackout → Grok → blend repaired region onto original ──
@@ -5487,7 +5490,18 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const hPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
     const vPos = centerY < 33 ? 'upper' : centerY > 66 ? 'lower' : 'middle';
 
-    const prompt = `Fix the character at the ${vPos} ${hPos} of this illustration (the white rectangle marks where they should be). Replace the white area with ${charName} matching the reference photo exactly — same face, hair, and skin tone. Keep pose, background, art style, and all other characters unchanged.${issueContext}`;
+    // Extract what the character should be doing from scene description
+    let actionContext = '';
+    if (sceneDescription) {
+      // Find mentions of this character in the scene description
+      const charNameLower = charName.toLowerCase();
+      const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
+      if (lines.length > 0) {
+        actionContext = `\n${charName} in this scene: ${lines.slice(0, 2).join('. ').trim()}`;
+      }
+    }
+
+    const prompt = `Draw ${charName} in the white rectangle area of this illustration. The reference photo shows exactly what ${charName} looks like — match their face, hair, and skin tone precisely. ${charName} must be clearly visible and drawn in the same art style as the rest of the illustration.${clothingContext}${actionContext}${issueContext}\n\nKeep the background, art style, and all other characters completely unchanged. Only fill the white rectangle with ${charName}.`;
 
     log.info(`👤 [CHAR REPAIR GROK] Blended: whiteout ${bboxWidth}x${bboxHeight} at (${bboxLeft},${bboxTop}), sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, blackoutDataUri]);

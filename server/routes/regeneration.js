@@ -3258,6 +3258,12 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             bbox = [repairBox.y, repairBox.x, repairBox.y + repairBox.height, repairBox.x + repairBox.width];
           }
 
+          // Get clothing description for the prompt
+          const clothingDesc = character.avatars?.clothing?.[clothingCategory] || '';
+
+          // Get scene description for context (what is the character doing?)
+          const sceneDesc = sceneImage.description || sceneImage.translatedDescription || '';
+
           log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
 
           const grokResult = await repairCharacterMismatch(
@@ -3269,7 +3275,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               imageBackend: 'grok',
               useBlended: effectiveMode === 'blended',
               useCutout: effectiveMode === 'cutout',
-              issueDescription: issueDesc
+              issueDescription: issueDesc,
+              clothingDescription: clothingDesc,
+              sceneDescription: sceneDesc,
             }
           );
 
