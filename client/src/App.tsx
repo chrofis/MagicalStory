@@ -32,6 +32,8 @@ const ThemeCategory = lazy(() => import('./pages/ThemeCategory'));
 const ThemePage = lazy(() => import('./pages/ThemePage'));
 const Occasions = lazy(() => import('./pages/Occasions'));
 const OccasionPage = lazy(() => import('./pages/OccasionPage'));
+const GiftHub = lazy(() => import('./pages/GiftHub'));
+const GiftPage = lazy(() => import('./pages/GiftPage'));
 const Comparisons = lazy(() => import('./pages/Comparisons'));
 const ComparisonPage = lazy(() => import('./pages/ComparisonPage'));
 const CityListing = lazy(() => import('./pages/CityListing'));
@@ -66,6 +68,8 @@ function App() {
           <Route path="/themes/:category/:themeId" element={<ThemePage />} />
           <Route path="/anlass" element={<Occasions />} />
           <Route path="/anlass/:occasionSlug" element={<OccasionPage />} />
+          <Route path="/geschenk" element={<GiftHub />} />
+          <Route path="/geschenk/:giftSlug" element={<GiftPage />} />
           <Route path="/vergleich" element={<Comparisons />} />
           <Route path="/vergleich/:competitorSlug" element={<ComparisonPage />} />
           <Route path="/stadt" element={<CityListing />} />
