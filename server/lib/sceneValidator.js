@@ -23,8 +23,9 @@ const { getPhysical } = require('./characterPhysical');
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const VISION_MODEL = 'gemini-2.5-flash';
-const COMPARISON_MODEL = 'gemini-2.5-flash';
+const { MODEL_DEFAULTS } = require('../config/models');
+const VISION_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
+const COMPARISON_MODEL = MODEL_DEFAULTS.qualityEval || 'gemini-2.0-flash';
 
 // Step 1: Vision model describes what it sees (no scene description provided)
 const IMAGE_DESCRIPTION_PROMPT = `Describe ONLY the geometric composition of this image. For each person visible:

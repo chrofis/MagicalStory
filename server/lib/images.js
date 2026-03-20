@@ -1218,8 +1218,8 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       { text: prompt }
     ];
 
-    // Use same model as quality evaluation for consistent spatial reasoning
-    const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+    // Bbox needs spatial precision — use dedicated bbox model (gemini-2.5-flash)
+    const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await withRetry(async () => {
@@ -1487,8 +1487,8 @@ async function detectSubRegion(characterCrop, targetElement) {
       { text: prompt }
     ];
 
-    // Use same model as quality evaluation for consistent spatial reasoning
-    const modelId = MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+    // Bbox needs spatial precision — use dedicated bbox model (gemini-2.5-flash)
+    const modelId = MODEL_DEFAULTS.bboxDetection || 'gemini-2.5-flash';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
 
     const response = await withRetry(async () => {
