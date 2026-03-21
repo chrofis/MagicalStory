@@ -1027,6 +1027,31 @@ router.get('/:id/evaluation-data', authenticateToken, async (req, res) => {
       consistencyRegen: row.consistency_regen,
     }));
 
+    // Add cover evaluations with negative page numbers
+    const coverPageMap = { frontCover: -1, initialPage: -2, backCover: -3 };
+    const coverRows = await dbQuery(
+      `SELECT data::jsonb->'coverImages' as cover_images FROM stories WHERE id = $1`,
+      [id]
+    );
+    const coverImages = coverRows[0]?.cover_images;
+    if (coverImages) {
+      for (const [coverType, cover] of Object.entries(coverImages)) {
+        if (cover && coverPageMap[coverType] != null) {
+          sceneEvaluations.push({
+            pageNumber: coverPageMap[coverType],
+            qualityScore: cover.qualityScore ?? null,
+            semanticScore: cover.semanticScore ?? null,
+            verdict: cover.verdict ?? null,
+            issuesSummary: cover.issuesSummary ?? null,
+            fixableIssues: cover.fixableIssues || [],
+            fixTargets: cover.fixTargets || [],
+            semanticResult: cover.semanticResult ?? null,
+            consistencyRegen: null,
+          });
+        }
+      }
+    }
+
     const finalChecksReport = reportRows[0]?.final_checks_report || null;
 
     res.json({ sceneEvaluations, finalChecksReport });

@@ -469,6 +469,88 @@ export function useRepairWorkflow({
         pages[scene.pageNumber] = feedback;
       }
 
+      // Process cover images the same way as scenes
+      if (coverImages) {
+        const coverEntries: Array<[string, number]> = [
+          ['frontCover', -1], ['initialPage', -2], ['backCover', -3]
+        ];
+        for (const [coverType, pageNum] of coverEntries) {
+          const cover = coverImages[coverType as keyof typeof coverImages];
+          if (!cover) continue;
+          const evalPage = evalByPage.get(pageNum);
+
+          const feedback: PageFeedback = {
+            pageNumber: pageNum,
+            qualityScore: evalPage?.qualityScore ?? cover.qualityScore ?? undefined,
+            semanticScore: evalPage?.semanticScore ?? null,
+            verdict: evalPage?.verdict ?? undefined,
+            issuesSummary: evalPage?.issuesSummary ?? undefined,
+            semanticResult: evalPage?.semanticResult ?? null,
+            fixableIssues: [],
+            entityIssues: [],
+            objectIssues: [],
+            semanticIssues: [],
+            needsFullRedo: false,
+          };
+
+          // Collect fixable issues (same dedup logic as scenes)
+          const seenDescriptions = new Set<string>();
+          const addIssue = (issue: any, source: string) => {
+            const desc = issue.description || issue.issue || '';
+            if (desc && seenDescriptions.has(desc)) return;
+            if (desc) seenDescriptions.add(desc);
+            feedback.fixableIssues.push({ ...issue, source });
+          };
+
+          if (evalPage?.fixableIssues?.length) {
+            for (const i of evalPage.fixableIssues) addIssue(i, (i as any).source || 'quality eval');
+          }
+          if (evalPage?.fixTargets?.length) {
+            for (const t of evalPage.fixTargets) {
+              addIssue({
+                description: t.issue || 'Quality issue detected',
+                severity: 'medium',
+                type: 'visual',
+                fix: t.fixPrompt || '',
+              }, 'fix targets');
+            }
+          }
+          if (evalPage?.semanticResult) {
+            for (const si of (evalPage.semanticResult.semanticIssues || [])) {
+              addIssue({
+                description: si.problem || `${si.type || 'semantic'}: ${si.item || ''}`,
+                severity: si.severity?.toLowerCase() || 'medium',
+                type: si.type || 'semantic',
+                fix: si.expected ? `Expected: ${si.expected}` : '',
+              }, 'semantic eval');
+            }
+            for (const si of (evalPage.semanticResult.issues || [])) {
+              addIssue({
+                description: si.problem || `${si.type}: ${si.item || ''}`,
+                severity: si.severity?.toLowerCase() || 'medium',
+                type: si.type || 'semantic',
+                fix: '',
+              }, 'semantic eval');
+            }
+          }
+
+          // Compute entity penalty (covers typically have no entity issues, but handle uniformly)
+          let entityPenalty = 0;
+          for (const ei of feedback.entityIssues) {
+            if (ei.severity === 'critical') entityPenalty += 30;
+            else if (ei.severity === 'major') entityPenalty += 20;
+            else entityPenalty += 10;
+          }
+          feedback.entityPenalty = entityPenalty;
+          const baseScore = feedback.qualityScore ?? 100;
+          feedback.score = Math.max(0, baseScore - entityPenalty);
+
+          totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
+                         feedback.objectIssues.length + feedback.semanticIssues.length;
+          pages[pageNum] = feedback;
+        }
+      }
+
       completeStep('collect-feedback', { pages, totalIssues });
 
       // Seed consistency results from existing entity report so the
@@ -484,7 +566,7 @@ export function useRepairWorkflow({
       console.error('Failed to collect feedback:', error);
       failStep('collect-feedback', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, sceneImages, startStep, completeStep, failStep]);
+  }, [storyId, sceneImages, coverImages, startStep, completeStep, failStep]);
 
   // Step 2: Toggle page for redo
   const toggleRedoPage = useCallback((pageNumber: number, reason?: string) => {

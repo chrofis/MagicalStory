@@ -25,6 +25,12 @@ import { ImageLightbox } from '@/components/common/ImageLightbox';
 import type { SceneImage, CoverImages, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult } from '@/types/story';
 import type { Character } from '@/types/character';
 
+/** Map negative page numbers to cover display names */
+const COVER_PAGE_NAMES: Record<number, string> = { [-1]: 'Front Cover', [-2]: 'Initial Page', [-3]: 'Back Cover' };
+function getPageName(pageNumber: number): string {
+  return pageNumber < 0 ? (COVER_PAGE_NAMES[pageNumber] || `Cover ${pageNumber}`) : `Page ${pageNumber}`;
+}
+
 interface RepairWorkflowPanelProps {
   storyId: string | null;
   sceneImages: SceneImage[];
@@ -98,6 +104,8 @@ function PageFeedbackCard({
                       (feedback.objectIssues?.length || 0) + (feedback.semanticIssues?.length || 0);
   const hasIssues = totalIssues > 0 || (feedback.qualityScore !== undefined && feedback.qualityScore < 70);
 
+  const pageName = getPageName(feedback.pageNumber);
+
   return (
     <div className={`border rounded-lg p-3 ${isMarkedForRedo ? 'border-red-300 bg-red-50' : hasIssues ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
       <div className="flex items-center justify-between">
@@ -108,7 +116,7 @@ function PageFeedbackCard({
           >
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
-          <span className="font-medium">Page {feedback.pageNumber}</span>
+          <span className="font-medium">{pageName}</span>
           {feedback.qualityScore !== undefined && (
             <span className={`text-xs px-1.5 py-0.5 rounded ${
               feedback.qualityScore >= 80 ? 'bg-green-100 text-green-700' :
@@ -733,7 +741,7 @@ export function RepairWorkflowPanel({
                           className="inline-flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 text-xs rounded"
                           title={workflowState.redoPages.reasons[page]}
                         >
-                          Page {page}
+                          {getPageName(page)}
                           <button
                             onClick={() => toggleRedoPage(page)}
                             className="hover:text-red-900"
@@ -798,7 +806,7 @@ export function RepairWorkflowPanel({
                     <div className="flex items-center justify-between text-sm">
                       <span>Progress: {redoProgress.current} / {redoProgress.total}</span>
                       {redoProgress.currentPage && (
-                        <span className="text-gray-500">Currently: Page {redoProgress.currentPage}</span>
+                        <span className="text-gray-500">Currently: {getPageName(redoProgress.currentPage)}</span>
                       )}
                     </div>
                     <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -821,7 +829,7 @@ export function RepairWorkflowPanel({
                         return (
                           <div key={page} className="p-2 bg-green-50 border border-green-200 rounded-lg">
                             <div className="text-xs font-medium text-green-800 mb-1">
-                              Page {page} (v{workflowState.redoResults.newVersions[page] ?? '?'})
+                              {getPageName(page)} (v{workflowState.redoResults.newVersions[page] ?? '?'})
                             </div>
                             {detail && (detail.previousImage || detail.newImage) ? (
                               <div className="flex gap-2 items-end">
@@ -912,7 +920,7 @@ export function RepairWorkflowPanel({
                         return (
                           <div key={page} className="p-2 bg-gray-50 rounded border text-sm space-y-1">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium">Page {page}:</span>
+                              <span className="font-medium">{getPageName(Number(page))}:</span>
                               <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
                                 Quality: {qualityScore}%
                               </span>
@@ -1234,9 +1242,63 @@ export function RepairWorkflowPanel({
                           }`}
                           disabled={isRunning}
                         >
-                          Page {scene.pageNumber}
+                          {getPageName(scene.pageNumber)}
                         </button>
                       ))}
+                      {coverImages?.frontCover && (
+                        <button
+                          key={-1}
+                          onClick={() => {
+                            setSelectedCharacterPages(prev =>
+                              prev.includes(-1) ? prev.filter(p => p !== -1) : [...prev, -1]
+                            );
+                          }}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedCharacterPages.includes(-1)
+                              ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          disabled={isRunning}
+                        >
+                          Front Cover
+                        </button>
+                      )}
+                      {coverImages?.initialPage && (
+                        <button
+                          key={-2}
+                          onClick={() => {
+                            setSelectedCharacterPages(prev =>
+                              prev.includes(-2) ? prev.filter(p => p !== -2) : [...prev, -2]
+                            );
+                          }}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedCharacterPages.includes(-2)
+                              ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          disabled={isRunning}
+                        >
+                          Initial Page
+                        </button>
+                      )}
+                      {coverImages?.backCover && (
+                        <button
+                          key={-3}
+                          onClick={() => {
+                            setSelectedCharacterPages(prev =>
+                              prev.includes(-3) ? prev.filter(p => p !== -3) : [...prev, -3]
+                            );
+                          }}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedCharacterPages.includes(-3)
+                              ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          disabled={isRunning}
+                        >
+                          Back Cover
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1347,7 +1409,7 @@ export function RepairWorkflowPanel({
                         {(pages as RepairPageResult[]).map((page) => (
                           <div key={page.pageNumber} className="p-3 bg-green-50 border border-green-200 rounded-lg">
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-sm font-medium text-green-800">Page {page.pageNumber}</span>
+                              <span className="text-sm font-medium text-green-800">{getPageName(page.pageNumber)}</span>
                               {page.method && (
                                 <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${
                                   page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' :
@@ -1462,7 +1524,7 @@ export function RepairWorkflowPanel({
                           {pages.map((page) => (
                             <div key={page.pageNumber} className="p-3 bg-red-50 border border-red-200 rounded-lg">
                               <div className="flex items-center gap-2 mb-2">
-                                <span className="text-sm font-medium text-red-800">Page {page.pageNumber}</span>
+                                <span className="text-sm font-medium text-red-800">{getPageName(page.pageNumber)}</span>
                                 {page.rejected && (
                                   <span className="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-700 font-medium">Rejected</span>
                                 )}
@@ -1553,7 +1615,7 @@ export function RepairWorkflowPanel({
                           }`}
                           disabled={isRunning}
                         >
-                          Page {page}
+                          {getPageName(page)}
                         </button>
                       ))
                     ) : (
@@ -1580,9 +1642,63 @@ export function RepairWorkflowPanel({
                           }`}
                           disabled={isRunning}
                         >
-                          Page {scene.pageNumber}
+                          {getPageName(scene.pageNumber)}
                         </button>
                       ))}
+                      {coverImages?.frontCover && (
+                        <button
+                          key={-1}
+                          onClick={() => {
+                            setSelectedArtifactPages(prev =>
+                              prev.includes(-1) ? prev.filter(p => p !== -1) : [...prev, -1]
+                            );
+                          }}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedArtifactPages.includes(-1)
+                              ? 'bg-amber-100 border-amber-300 text-amber-700'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          disabled={isRunning}
+                        >
+                          Front Cover
+                        </button>
+                      )}
+                      {coverImages?.initialPage && (
+                        <button
+                          key={-2}
+                          onClick={() => {
+                            setSelectedArtifactPages(prev =>
+                              prev.includes(-2) ? prev.filter(p => p !== -2) : [...prev, -2]
+                            );
+                          }}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedArtifactPages.includes(-2)
+                              ? 'bg-amber-100 border-amber-300 text-amber-700'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          disabled={isRunning}
+                        >
+                          Initial Page
+                        </button>
+                      )}
+                      {coverImages?.backCover && (
+                        <button
+                          key={-3}
+                          onClick={() => {
+                            setSelectedArtifactPages(prev =>
+                              prev.includes(-3) ? prev.filter(p => p !== -3) : [...prev, -3]
+                            );
+                          }}
+                          className={`px-2 py-1 text-xs rounded border transition-colors ${
+                            selectedArtifactPages.includes(-3)
+                              ? 'bg-amber-100 border-amber-300 text-amber-700'
+                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                          }`}
+                          disabled={isRunning}
+                        >
+                          Back Cover
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
