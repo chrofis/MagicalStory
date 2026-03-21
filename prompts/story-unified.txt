@@ -114,6 +114,7 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
 - **INDOOR SCENES** - Use "n/a" for weather
 
 **Scene Variety (IMPORTANT for great illustrations):**
+- **SIMPLE ACTIONS** - Describe what the scene LOOKS LIKE, not a freeze-frame of complex motion. Characters should be in natural, stable poses: sitting, standing, walking, looking at something. Avoid mid-action descriptions like "jumping up from chair while reaching toward the door" — instead: "standing at the table, pointing toward the door." If it would be hard to capture in a single photo, simplify it.
 - **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters in the foreground per scene. A third only when truly needed. More faces in close-up = harder to illustrate well.
   Avoid group scenes. If a group moment is needed, keep only 1-2 characters in the foreground and place others far in the background (small, no detail needed), or show background characters from behind (walking toward something, looking at something). Back-view and distant figures are much simpler to illustrate.
   - Good: "Sophie (center) discovers the cave entrance while Max (right, far background) waves from the hilltop"
