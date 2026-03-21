@@ -469,8 +469,8 @@ export function useRepairWorkflow({
         pages[scene.pageNumber] = feedback;
       }
 
-      // Process cover images the same way as scenes
-      if (coverImages) {
+      // Process cover images the same way as scenes (errors don't block scene feedback)
+      try { if (coverImages) {
         const coverEntries: Array<[string, number]> = [
           ['frontCover', -1], ['initialPage', -2], ['backCover', -3]
         ];
@@ -549,6 +549,8 @@ export function useRepairWorkflow({
                          feedback.objectIssues.length + feedback.semanticIssues.length;
           pages[pageNum] = feedback;
         }
+      } } catch (coverErr) {
+        console.error('Cover feedback collection failed (scenes unaffected):', coverErr);
       }
 
       completeStep('collect-feedback', { pages, totalIssues });

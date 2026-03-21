@@ -117,7 +117,7 @@ function PageFeedbackCard({
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
           <span className="font-medium">{pageName}</span>
-          {feedback.qualityScore !== undefined && (
+          {feedback.qualityScore != null ? (
             <span className={`text-xs px-1.5 py-0.5 rounded ${
               feedback.qualityScore >= 80 ? 'bg-green-100 text-green-700' :
               feedback.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
@@ -125,6 +125,8 @@ function PageFeedbackCard({
             }`}>
               {feedback.semanticScore != null ? 'Quality' : 'Score'}: {Math.max(0, feedback.qualityScore)}
             </span>
+          ) : (
+            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Not evaluated</span>
           )}
           {feedback.semanticScore != null && (
             <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
