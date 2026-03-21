@@ -141,7 +141,7 @@ The scene hint is a STARTING IDEA - change it freely if composition doesn't work
 | 3 | Action Compatibility | Actions must match object orientation (pulling vertical door ≠ lifting floor hatch) |
 | 5 | Camera View | Back view = no expressions; front/three-quarter = expressions OK |
 | 7 | Physics | Ropes taut, heavy objects = straining posture, distinct materials where objects touch |
-| 9 | Distance Separation | Name what fills the gap between distant characters (plaza, snow, empty space) |
+| 9 | Distance Separation | When characters must be far apart: describe the GAP explicitly ("wide empty plaza stretches between them"), use SIZE to show distance ("Roger appears small in the far distance"), and state relative scale ("Lukas fills the left third of the frame, Roger is a small figure on the right edge"). Image models ignore "foreground/background" — use concrete size descriptions instead. |
 | 10 | Location Continuity | Same location as previous scene unless story explicitly says they moved |
 | 11 | Story Fidelity | Match spatial terms exactly: "vor" = in front of, "neben" = beside, not behind |
 | 12 | Linear Space | Path orientation (lengthwise/crosswise) determines positioning. Characters moving along path MUST have explicit facing direction in pose (e.g., "running away from camera", "back view moving into distance", "sprinting toward camera") |

@@ -88,9 +88,10 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 - `imageSummary`: 1-2 sentences. What's happening, who's there.
 - `action`: One short phrase. NOT a paragraph.
 - `expression`: 1-2 words.
-- `position`: "left", "center", "right", or "background".
+- `position`: "left", "center", "right", "background left", "background right", "background center". For distant characters, add size: "background right (small figure)".
 - `setting.description`: 10 words max.
 - `depthLayers`: What's close, what's far. Tells the image generator spatial depth. E.g. "Castle far background, river midground, children close foreground". Only include when depth matters.
+- **DISTANCE RULE**: Image models draw all characters the same size unless told otherwise. When characters must be far apart: (1) describe the GAP ("wide empty plaza stretches between them"), (2) use SIZE ("appears as a small figure in the far distance, about 1/4 the height of the foreground character"), (3) state frame fractions ("fills left third of frame" vs "small figure on right edge"). Never just say "foreground" and "background" — the model will put them side by side.
 - `weatherVisibility`: Critical for indoor scenes with weather outside. E.g. "snow visible through window only" prevents the generator from putting snow inside the room. Use "directly on scene" for outdoor, "visible through window" for indoor with weather outside, "none" for indoor with no weather visible.
 - `objects`: List ALL recurring visual elements (from the list above) that appear in this scene. Use their exact IDs. Include locations, animals, artifacts, vehicles — anything from the recurring elements list that's visible.
 - `landmarkPhotoVariant`: Pick the variant that matches the scene's perspective. If characters are ON or INSIDE the landmark, pick an interior/close-up variant — NOT a distant exterior. A photo from 100m away will make the generator draw the landmark from far away instead of placing characters at/in it. Pick `null` if no variant matches the perspective (no photo is better than a wrong-perspective photo).
