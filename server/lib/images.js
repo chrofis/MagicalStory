@@ -4229,14 +4229,14 @@ function selectBestVersion(versions) {
 function buildRegenFeedback(evaluation) {
   if (!evaluation?.evaluated) return '';
   const parts = [];
-  if (evaluation.reasoning) {
-    parts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluation.reasoning}`);
-  }
+  // Only include fixable issues (concise) — skip verbose reasoning (can be 5000+ chars)
   if (evaluation.fixableIssues?.length > 0) {
-    parts.push('Specific problems to avoid:\n' +
+    parts.push('IMPORTANT — Fix these issues from the previous attempt:\n' +
       evaluation.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
   }
-  return parts.join('\n\n');
+  // Cap total feedback to 2000 chars to stay within prompt limits
+  const feedback = parts.join('\n\n');
+  return feedback.length > 2000 ? feedback.substring(0, 2000) + '\n...(truncated)' : feedback;
 }
 
 /**
