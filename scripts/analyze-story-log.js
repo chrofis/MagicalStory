@@ -1119,10 +1119,10 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
     console.log(`\n   Token Totals: ${(totalIn/1000).toFixed(1)}k input, ${(totalOut/1000).toFixed(1)}k output`);
   }
 
-  // Issues (real problems)
-  const totalIssues = issues.warnings.length + issues.errors.length +
-                      issues.fallbacks.length + issues.lowQualityScores.length +
-                      issues.runtimeErrors.length + issues.nanIssues.length;
+  // Issues (real problems — NOT low quality scores, those are expected)
+  const totalIssues = issues.errors.length + issues.runtimeErrors.length +
+                      issues.warnings.length + issues.fallbacks.length +
+                      issues.nanIssues.length;
 
   console.log(`\n⚠️  ISSUES (${totalIssues} found)`);
 
@@ -1147,8 +1147,9 @@ function printAnalysis(job, storyInfo, costs, issues, imageStats, timing) {
       if (issues.fallbacks.length > 5) console.log(`      ... and ${issues.fallbacks.length - 5} more`);
     }
 
+    // Low quality scores shown separately (not counted as issues)
     if (issues.lowQualityScores.length > 0) {
-      console.log(`\n   📊 Low Quality Scores (${issues.lowQualityScores.length}):`);
+      console.log(`\n   📊 Quality Scores Below Threshold (${issues.lowQualityScores.length}) — not issues, just info:`);
       issues.lowQualityScores.forEach(q => {
         const pageStr = q.page ? ` Page ${q.page}:` : '';
         console.log(`      [${q.time}]${pageStr} Score: ${q.score}%`);
