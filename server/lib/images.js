@@ -5460,42 +5460,86 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // White out the target area (face or body) to signal Grok what to redraw
-    // whiteoutTarget: 'face' (head only, +50% padding), 'body' (full char, +20% padding), or auto
+    // Gradient whiteout: signals Grok what to redraw while preserving edge context
+    // - Face bbox: completely white (100% opacity)
+    // - Body bbox inner 20%: completely white (100% opacity)
+    // - Body bbox outer ring: strong white overlay (80% opacity) — preserves some context
+    // This prevents the body bbox from erasing important scene elements at its edges
     const faceBbox = options.faceBbox;
-    const whiteoutTarget = options.whiteoutTarget || 'face'; // default to face if faceBbox exists
     let sceneForGrok = sceneBuffer;
 
-    // Determine what to white out: face bbox or full body bbox
-    const whiteoutBox = (whiteoutTarget === 'body') ? [ymin, xmin, ymax, xmax] : faceBbox;
-    const whiteoutPadding = (whiteoutTarget === 'body') ? 0.20 : 0.50;
+    // Helper: create a gradient whiteout overlay for a bbox region
+    // innerRatio = fraction of box that is fully white (0.0-1.0)
+    // outerOpacity = white opacity for the outer ring (0.0-1.0)
+    const createGradientWhiteout = async (boxCoords, innerRatio, outerOpacity) => {
+      const [bymin, bxmin, bymax, bxmax] = boxCoords;
+      const bLeft = Math.floor(bxmin * sceneMeta.width);
+      const bTop = Math.floor(bymin * sceneMeta.height);
+      const bWidth = Math.max(1, Math.ceil((bxmax - bxmin) * sceneMeta.width));
+      const bHeight = Math.max(1, Math.ceil((bymax - bymin) * sceneMeta.height));
 
-    if (whiteoutBox) {
-      const [wymin, wxmin, wymax, wxmax] = whiteoutBox;
-      // Apply padding
-      const wWidth = wxmax - wxmin;
-      const wHeight = wymax - wymin;
-      const padX = wWidth * whiteoutPadding;
-      const padY = wHeight * whiteoutPadding;
-      const paddedXmin = Math.max(0, wxmin - padX);
-      const paddedYmin = Math.max(0, wymin - padY);
-      const paddedXmax = Math.min(1, wxmax + padX);
-      const paddedYmax = Math.min(1, wymax + padY);
+      // Build RGBA overlay: inner = white 100%, outer = white at outerOpacity
+      const overlay = Buffer.alloc(bWidth * bHeight * 4);
+      const centerX = bWidth / 2;
+      const centerY = bHeight / 2;
+      // Inner zone boundaries (fraction of half-width/height from center)
+      const innerHalfW = (bWidth / 2) * innerRatio;
+      const innerHalfH = (bHeight / 2) * innerRatio;
 
-      const fLeft = Math.floor(paddedXmin * sceneMeta.width);
-      const fTop = Math.floor(paddedYmin * sceneMeta.height);
-      const fWidth = Math.max(1, Math.ceil((paddedXmax - paddedXmin) * sceneMeta.width));
-      const fHeight = Math.max(1, Math.ceil((paddedYmax - paddedYmin) * sceneMeta.height));
+      for (let py = 0; py < bHeight; py++) {
+        for (let px = 0; px < bWidth; px++) {
+          const idx = (py * bWidth + px) * 4;
+          const dx = Math.abs(px - centerX);
+          const dy = Math.abs(py - centerY);
+          // Inside inner zone = fully white
+          if (dx <= innerHalfW && dy <= innerHalfH) {
+            overlay[idx] = 255; overlay[idx + 1] = 255; overlay[idx + 2] = 255;
+            overlay[idx + 3] = 255; // fully opaque white
+          } else {
+            // Outer ring = white at outerOpacity
+            overlay[idx] = 255; overlay[idx + 1] = 255; overlay[idx + 2] = 255;
+            overlay[idx + 3] = Math.round(outerOpacity * 255);
+          }
+        }
+      }
 
-      const whiteBlock = await sharp({
+      return { buffer: await sharp(overlay, { raw: { width: bWidth, height: bHeight, channels: 4 } }).png().toBuffer(), left: bLeft, top: bTop, width: bWidth, height: bHeight };
+    };
+
+    const composites = [];
+
+    // 1. Body bbox: gradient whiteout (inner 20% fully white, outer 80% opacity overlay)
+    const bodyBox = [ymin, xmin, ymax, xmax];
+    const bodyOverlay = await createGradientWhiteout(bodyBox, 0.2, 0.80);
+    composites.push({ input: bodyOverlay.buffer, left: bodyOverlay.left, top: bodyOverlay.top });
+    log.info(`👤 [CHAR REPAIR GROK] Body gradient whiteout: ${bodyOverlay.width}x${bodyOverlay.height} (inner 20% solid, outer 80% overlay)`);
+
+    // 2. Face bbox: completely white on top (overrides body overlay in face area)
+    if (faceBbox) {
+      const [fymin, fxmin, fymax, fxmax] = faceBbox;
+      // Add 50% padding to face
+      const fW = fxmax - fxmin, fH = fymax - fymin;
+      const pfxmin = Math.max(0, fxmin - fW * 0.5);
+      const pfymin = Math.max(0, fymin - fH * 0.5);
+      const pfxmax = Math.min(1, fxmax + fW * 0.5);
+      const pfymax = Math.min(1, fymax + fH * 0.5);
+
+      const fLeft = Math.floor(pfxmin * sceneMeta.width);
+      const fTop = Math.floor(pfymin * sceneMeta.height);
+      const fWidth = Math.max(1, Math.ceil((pfxmax - pfxmin) * sceneMeta.width));
+      const fHeight = Math.max(1, Math.ceil((pfymax - pfymin) * sceneMeta.height));
+
+      const faceWhite = await sharp({
         create: { width: fWidth, height: fHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
       }).jpeg().toBuffer();
+      composites.push({ input: faceWhite, left: fLeft, top: fTop });
+      log.info(`👤 [CHAR REPAIR GROK] Face solid whiteout: ${fWidth}x${fHeight} at (${fLeft},${fTop}) +50% padding`);
+    }
 
+    if (composites.length > 0) {
       sceneForGrok = await sharp(sceneBuffer)
-        .composite([{ input: whiteBlock, left: fLeft, top: fTop }])
+        .composite(composites)
         .jpeg({ quality: 90 }).toBuffer();
-
-      log.info(`👤 [CHAR REPAIR GROK] ${whiteoutTarget} whiteout: ${fWidth}x${fHeight} at (${fLeft},${fTop}), padding: ${Math.round(whiteoutPadding * 100)}%`);
     }
 
     const sceneDataUri = `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`;
@@ -5515,9 +5559,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
-    const whiteAreaNote = whiteoutBox
-      ? `There is a WHITE RECTANGLE in the image where the character should be. You MUST completely replace ALL white pixels in that area — redraw the entire character (face, hair, body, clothing) to fill the white region entirely. No white area should remain visible.`
-      : '';
+    const whiteAreaNote = faceBbox
+      ? `The character's face/head area is completely WHITE — redraw the face, hair, and head to match the reference photo. The body area has a semi-transparent white overlay showing the original faintly — redraw the full character through this overlay, replacing all whitened areas with the correct appearance.`
+      : `The character area has a white overlay — the center is fully white, the edges show the original faintly. Redraw the entire character (face, hair, body, clothing) through this overlay. Replace ALL whitened areas completely. No white should remain.`;
     const prompt = `Fix the character at the ${vPos} ${hPos} of this children's book illustration.\n\n${whiteAreaNote}\n\nMake this character look like ${charName} from the reference photo — match face, hair color, skin tone, and features exactly. Keep the same pose, position, and action. Keep the same art style.${clothingContext}${actionContext}${issueContext}\n\nOnly change the character at ${vPos} ${hPos}. Keep background and all other characters unchanged.`;
 
     log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'whited out' : 'intact'}, sending to Grok...`);
