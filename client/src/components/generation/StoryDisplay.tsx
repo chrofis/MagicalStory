@@ -864,28 +864,30 @@ export function StoryDisplay({
     // Handle case where description is an object (JSON response not converted to string)
     let desc: string;
     if (typeof fullDescription !== 'string') {
-      const obj = fullDescription as {
-        output?: string | { translatedSummary?: string; imageSummary?: string };
-        thinking?: unknown
-      };
+      const obj = fullDescription as Record<string, unknown>;
 
-      // Try to extract the translated image summary from nested output object
+      // Format 1: Art Director — {output: {translatedSummary, imageSummary}}
       if (obj.output) {
         if (typeof obj.output === 'string') {
           desc = obj.output;
         } else if (typeof obj.output === 'object') {
-          // Extract translatedSummary (preferred) or imageSummary from output object
-          const summary = obj.output.translatedSummary || obj.output.imageSummary || '';
+          const output = obj.output as { translatedSummary?: string; imageSummary?: string };
+          const summary = output.translatedSummary || output.imageSummary || '';
           if (summary) {
-            return summary; // Return directly - it's already the clean summary
+            return summary;
           }
-          // No summary found, stringify as fallback
           desc = JSON.stringify(fullDescription);
         } else {
           desc = JSON.stringify(fullDescription);
         }
+      // Format 2: Trial JSON scene hint — {scene: {imageSummary: "..."}}
+      } else if (obj.scene && typeof obj.scene === 'object') {
+        const scene = obj.scene as { imageSummary?: string };
+        if (scene.imageSummary) {
+          return scene.imageSummary;
+        }
+        desc = JSON.stringify(fullDescription);
       } else {
-        // No output field, stringify as fallback
         desc = JSON.stringify(fullDescription);
       }
     } else {
@@ -896,16 +898,20 @@ export function StoryDisplay({
     if (desc.trim().startsWith('{')) {
       try {
         const parsed = JSON.parse(desc);
+        // Format 1: Art Director output — {output: {translatedSummary, imageSummary}}
         if (parsed.output) {
           if (typeof parsed.output === 'string') {
             desc = parsed.output;
           } else if (typeof parsed.output === 'object') {
-            // Extract translatedSummary (preferred) or imageSummary from nested object
             const summary = parsed.output.translatedSummary || parsed.output.imageSummary;
             if (summary) {
               return summary;
             }
           }
+        }
+        // Format 2: Trial JSON scene hint — {scene: {imageSummary: "..."}}
+        if (parsed.scene?.imageSummary) {
+          return parsed.scene.imageSummary;
         }
       } catch {
         // Not valid JSON, continue with original string
