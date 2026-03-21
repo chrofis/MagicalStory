@@ -9392,14 +9392,8 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
     maxElements = null
   } = options;
 
-  // Reference sheet generation uses the Gemini API directly, so skip for non-Gemini backends.
-  // Grok has its own packReferences() system; Runware doesn't support this at all.
-  const resolvedModel = imageModel || MODEL_DEFAULTS.pageImage;
-  const modelConfig = IMAGE_MODELS[resolvedModel];
-  if (modelConfig?.backend && modelConfig.backend !== 'gemini') {
-    log.info(`[REF-SHEET] Skipping — ${modelConfig.backend} backend does not use Gemini reference sheets`);
-    return { generated: 0, failed: 0, elements: [] };
-  }
+  // Generate reference sheets using whatever image model is configured
+  // (same flow for Gemini, Grok, etc.)
 
   // DEBUG: Log visual bible contents to diagnose reference image generation
   log.info(`[REF-SHEET] Visual Bible summary:`);
@@ -9465,50 +9459,16 @@ async function generateReferenceSheet(visualBible, styleDescription, options = {
       // Build the prompt for this batch
       const prompt = buildReferenceSheetPrompt(batch, styleDescription);
 
-      // Generate the grid image using Gemini
-      const apiKey = process.env.GEMINI_API_KEY;
-      if (!apiKey) {
-        throw new Error('Gemini API key not configured');
+      // Generate the grid image using the configured image model (Gemini, Grok, etc.)
+      const imageModelOverride = imageModel || null;
+      const result = await callGeminiAPIForImage(prompt, [], null, 'avatar', null, imageModelOverride, null, '');
+
+      if (!result || !result.imageData) {
+        throw new Error('Image generation did not return an image');
       }
 
-      // Use the image model from config or default (pageImage is for regular illustrations)
-      const modelId = imageModel || MODEL_DEFAULTS.pageImage;
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
-
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(120000),
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseModalities: ['image', 'text'],
-            responseMimeType: 'text/plain'
-          }
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      // Extract image from response
-      const parts = data.candidates?.[0]?.content?.parts || [];
-      let gridImageData = null;
-
-      for (const part of parts) {
-        if (part.inlineData?.data) {
-          gridImageData = part.inlineData.data;
-          break;
-        }
-      }
-
-      if (!gridImageData) {
-        throw new Error('Gemini did not return an image');
-      }
+      // Extract base64 from data URI
+      const gridImageData = result.imageData.replace(/^data:image\/\w+;base64,/, '');
 
       log.info(`[REF-SHEET] ✓ Generated ${batch.length}-element grid (${Math.round(gridImageData.length / 1024)}KB)`);
 
