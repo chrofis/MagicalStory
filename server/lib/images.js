@@ -2903,6 +2903,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       const finalResult = {
         imageData: result.imageData,
+        prompt,
         modelId: result.modelId,
         usage: result.usage
       };
@@ -3081,6 +3082,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       const finalResult = {
         imageData: result.imageData,
+        prompt: effectivePrompt,
         modelId: result.modelId,
         usage: result.usage
       };
@@ -3116,6 +3118,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
       const finalResult = {
         imageData: result.imageData,
+        prompt: effectivePrompt,
         modelId: result.modelId,
         usage: result.usage
       };
@@ -3229,6 +3232,7 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
 
             const result = {
               imageData: compressedImageData,
+              prompt: effectivePrompt,
               modelId,
               thinkingText,
               usage,
