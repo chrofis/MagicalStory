@@ -4401,6 +4401,8 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image?.retryHistory}
+                              bboxDetection={image?.bboxDetection}
+                              bboxOverlayImage={image?.bboxOverlayImage}
                               language={language}
                               storyId={storyId}
                               pageNumber={image?.pageNumber}
@@ -4859,6 +4861,8 @@ export function StoryDisplay({
                             {/* Object Detection (separate from retry history for visibility) */}
                             <ObjectDetectionDisplay
                               retryHistory={image.retryHistory}
+                              bboxDetection={image.bboxDetection}
+                              bboxOverlayImage={image.bboxOverlayImage}
                               language={language}
                               storyId={storyId}
                               pageNumber={image.pageNumber}

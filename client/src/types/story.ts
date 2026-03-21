@@ -752,6 +752,9 @@ export interface SceneImage {
     score: number;
     timestamp: string;
   };
+  // Bounding box detection from latest evaluation (for dev mode)
+  bboxDetection?: BboxSceneDetection | null;
+  bboxOverlayImage?: string | null;
 }
 
 export interface CoverImageData {

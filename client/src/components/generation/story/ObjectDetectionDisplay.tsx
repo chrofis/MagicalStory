@@ -109,14 +109,20 @@ export function ObjectDetectionDisplay({
         // Cover image - use cover query param
         params.set('cover', coverType);
       } else {
-        // Regular page - use page and retry index
+        // Regular page - fetch from scene object first (has latest eval bbox),
+        // fall back to retryHistory entry (original generation bbox)
         params.set('page', String(pageNumber));
-        params.set('type', 'retry');
-        // Find the retry index that has bbox data
-        const retryIdx = retryHistory?.findIndex(r =>
-          (r.type === 'bbox_detection_only' && r.bboxDetection) || r.bboxDetection
-        ) ?? 0;
-        params.set('index', String(retryIdx));
+        if (directBboxDetection) {
+          // Scene has direct bbox data (from latest re-evaluation) — fetch scene-level overlay
+          params.set('type', 'original');
+        } else {
+          // Fall back to retryHistory overlay
+          params.set('type', 'retry');
+          const retryIdx = retryHistory?.findIndex(r =>
+            (r.type === 'bbox_detection_only' && r.bboxDetection) || r.bboxDetection
+          ) ?? 0;
+          params.set('index', String(retryIdx));
+        }
       }
 
       const response = await fetch(`/api/stories/${storyId}/dev-image?${params}`, {
