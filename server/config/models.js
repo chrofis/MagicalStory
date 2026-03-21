@@ -77,7 +77,7 @@ const MODEL_DEFAULTS = {
   coverImage: 'grok-imagine',                // Cover images ($0.02/image)
 
   // Quality evaluation models
-  qualityEval: 'gemini-2.0-flash',     // Image quality evaluation (cheap — $0.005/page vs $0.026)
+  qualityEval: 'gemini-2.5-flash',     // Image quality evaluation (needs 2.5 for reliable character identification + bbox)
   bboxDetection: 'gemini-2.5-flash',   // Bounding box detection (needs 2.5 for spatial precision)
 
   // Utility models (inspection, visual bible, etc.)
