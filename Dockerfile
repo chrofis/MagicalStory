@@ -32,6 +32,9 @@ RUN cd client && npm install
 COPY . .
 
 # Pass VITE_ env vars as build args so they're baked into the frontend bundle
+# (these are public frontend keys, not secrets — safe to use in ARG)
+# hadolint ignore=DL3028
+# check=skip=SecretsUsedInArgOrEnv
 ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_API_URL
 
