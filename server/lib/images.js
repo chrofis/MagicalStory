@@ -5460,25 +5460,42 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // White out the face area to signal Grok what to redraw
+    // White out the target area (face or body) to signal Grok what to redraw
+    // whiteoutTarget: 'face' (head only, +50% padding), 'body' (full char, +20% padding), or auto
     const faceBbox = options.faceBbox;
+    const whiteoutTarget = options.whiteoutTarget || 'face'; // default to face if faceBbox exists
     let sceneForGrok = sceneBuffer;
-    if (faceBbox) {
-      const [fymin, fxmin, fymax, fxmax] = faceBbox;
-      const fLeft = Math.floor(fxmin * sceneMeta.width);
-      const fTop = Math.floor(fymin * sceneMeta.height);
-      const fWidth = Math.max(1, Math.ceil((fxmax - fxmin) * sceneMeta.width));
-      const fHeight = Math.max(1, Math.ceil((fymax - fymin) * sceneMeta.height));
 
-      const whiteHead = await sharp({
+    // Determine what to white out: face bbox or full body bbox
+    const whiteoutBox = (whiteoutTarget === 'body') ? [ymin, xmin, ymax, xmax] : faceBbox;
+    const whiteoutPadding = (whiteoutTarget === 'body') ? 0.20 : 0.50;
+
+    if (whiteoutBox) {
+      const [wymin, wxmin, wymax, wxmax] = whiteoutBox;
+      // Apply padding
+      const wWidth = wxmax - wxmin;
+      const wHeight = wymax - wymin;
+      const padX = wWidth * whiteoutPadding;
+      const padY = wHeight * whiteoutPadding;
+      const paddedXmin = Math.max(0, wxmin - padX);
+      const paddedYmin = Math.max(0, wymin - padY);
+      const paddedXmax = Math.min(1, wxmax + padX);
+      const paddedYmax = Math.min(1, wymax + padY);
+
+      const fLeft = Math.floor(paddedXmin * sceneMeta.width);
+      const fTop = Math.floor(paddedYmin * sceneMeta.height);
+      const fWidth = Math.max(1, Math.ceil((paddedXmax - paddedXmin) * sceneMeta.width));
+      const fHeight = Math.max(1, Math.ceil((paddedYmax - paddedYmin) * sceneMeta.height));
+
+      const whiteBlock = await sharp({
         create: { width: fWidth, height: fHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
       }).jpeg().toBuffer();
 
       sceneForGrok = await sharp(sceneBuffer)
-        .composite([{ input: whiteHead, left: fLeft, top: fTop }])
+        .composite([{ input: whiteBlock, left: fLeft, top: fTop }])
         .jpeg({ quality: 90 }).toBuffer();
 
-      log.info(`👤 [CHAR REPAIR GROK] Head whiteout: ${fWidth}x${fHeight} at (${fLeft},${fTop})`);
+      log.info(`👤 [CHAR REPAIR GROK] ${whiteoutTarget} whiteout: ${fWidth}x${fHeight} at (${fLeft},${fTop}), padding: ${Math.round(whiteoutPadding * 100)}%`);
     }
 
     const sceneDataUri = `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`;

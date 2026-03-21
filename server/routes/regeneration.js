@@ -2946,7 +2946,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode } = req.body;
+    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget } = req.body;
 
     let repairs;
 
@@ -3297,8 +3297,10 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           const hasFaceIssue = issueText.includes('face') || issueText.includes('hair') || issueText.includes('skin') || issueText.includes('eye') || issueText.includes('age');
           const hasClothingIssue = issueText.includes('cloth') || issueText.includes('outfit') || issueText.includes('dress') || issueText.includes('shirt') || issueText.includes('jacket') || issueText.includes('color');
 
-          // Pick the right box: face-only issues use faceBox, everything else uses bodyBox (full character)
-          const useFaceOnly = hasFaceIssue && !hasClothingIssue && storedAppearance.faceBox;
+          // Pick the right box: user override > auto-detect from issues
+          const useFaceOnly = whiteoutTarget === 'face' ? !!storedAppearance.faceBox
+            : whiteoutTarget === 'body' ? false
+            : (hasFaceIssue && !hasClothingIssue && !!storedAppearance.faceBox);
           const repairBox = useFaceOnly ? storedAppearance.faceBox : (storedAppearance.bodyBox || storedAppearance.faceBox);
           // Bbox can be either [ymin, xmin, ymax, xmax] (array from detectAllBoundingBoxes)
           // or {x, y, width, height} (object from some legacy paths)
@@ -3337,6 +3339,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               clothingDescription: clothingDesc,
               sceneDescription: sceneDesc,
               faceBbox,
+              whiteoutTarget: whiteoutTarget || (useFaceOnly ? 'face' : 'body'),
             }
           );
 

@@ -352,6 +352,7 @@ export function RepairWorkflowPanel({
   const [overrideImageModel, setOverrideImageModel] = useState<string | null>(null);
   const [overrideQualityModel, setOverrideQualityModel] = useState<string | null>(null);
   const [grokRepairMode, setGrokRepairMode] = useState<'blended' | 'cutout' | 'blackout' | null>(null);
+  const [whiteoutTarget, setWhiteoutTarget] = useState<'auto' | 'face' | 'body'>('auto');
   const effectiveImageModel = overrideImageModel || imageModel;
 
   const {
@@ -1359,10 +1360,25 @@ export function RepairWorkflowPanel({
                         <option value="magicapi">MagicAPI Face+Hair (~$0.006/repair)</option>
                       </optgroup>
                     </select>
-                    {!grokRepairMode && !useMagicApiRepair && (
-                      <p className="text-xs text-yellow-600 mt-2">
-                        Blended: whites out character region, Grok fixes it, feathered blend preserves background. Uses face-only bbox for face issues, full body for clothing issues.
-                      </p>
+                    {(!grokRepairMode || grokRepairMode === 'blended') && !useMagicApiRepair && (
+                      <div className="mt-2 space-y-2">
+                        <label className="text-xs font-medium text-yellow-800 block">Whiteout target:</label>
+                        <div className="flex gap-2">
+                          {(['auto', 'face', 'body'] as const).map(target => (
+                            <button
+                              key={target}
+                              onClick={() => setWhiteoutTarget(target)}
+                              className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
+                                whiteoutTarget === target
+                                  ? 'bg-yellow-600 text-white'
+                                  : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              {target === 'auto' ? 'Auto (by issue type)' : target === 'face' ? 'Face only (+50% pad)' : 'Full body (+20% pad)'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     )}
                     {useMagicApiRepair && (
                       <p className="text-xs text-yellow-600 mt-2">
@@ -1386,7 +1402,8 @@ export function RepairWorkflowPanel({
                   onClick={async () => {
                     await repairCharacter(selectedCharacter, selectedCharacterPages, {
                       useMagicApiRepair,
-                      ...(grokRepairMode && { grokRepairMode })
+                      ...(grokRepairMode && { grokRepairMode }),
+                      ...(whiteoutTarget !== 'auto' && { whiteoutTarget }),
                     });
                     if (onRefreshStory) {
                       await onRefreshStory();

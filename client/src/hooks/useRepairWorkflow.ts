@@ -157,7 +157,7 @@ export interface UseRepairWorkflowReturn {
   runConsistencyCheck: () => Promise<void>;
 
   // Step 6: Character repair
-  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout' }) => Promise<void>;
+  repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => Promise<void>;
 
   // Step 7: Artifact repair
   repairArtifacts: (pageNumbers: number[]) => Promise<void>;
@@ -822,7 +822,7 @@ export function useRepairWorkflow({
   }, [storyId, startStep, completeStep, failStep]);
 
   // Step 6: Repair character on specific pages
-  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout' }) => {
+  const repairCharacter = useCallback(async (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => {
     if (!storyId || pages.length === 0) return;
 
     startStep('character-repair');
