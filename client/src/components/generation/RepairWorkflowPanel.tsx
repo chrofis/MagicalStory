@@ -1473,38 +1473,28 @@ export function RepairWorkflowPanel({
                             {page.verification?.explanation && (
                               <p className="text-xs text-gray-600 italic">{page.verification.explanation}</p>
                             )}
-                            {/* Debug: show what was sent to Grok (dev mode) */}
+                            {/* Grok repair details (dev mode) */}
                             {developerMode && (page as any).debug && (
-                              <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs">
-                                <details>
-                                  <summary className="cursor-pointer font-medium text-gray-700">Debug: Grok input/output</summary>
-                                  <div className="mt-2 space-y-2">
-                                    <p className="text-gray-600 break-all"><strong>Prompt:</strong> {(page as any).debug.prompt}</p>
-                                    <p className="text-gray-600"><strong>Bbox:</strong> [{(page as any).debug.bbox?.map((v: number) => Math.round(v * 100) + '%').join(', ')}]</p>
-                                    <p className="text-gray-600"><strong>Face bbox:</strong> {(page as any).debug.faceBbox ? `[${(page as any).debug.faceBbox.map((v: number) => Math.round(v * 100) + '%').join(', ')}]` : 'none'}</p>
-                                    <div className="grid grid-cols-4 gap-2 mt-2">
-                                      <div className="text-center">
-                                        <img src={(page as any).debug.avatarSent} alt="Avatar sent" className="w-full h-24 object-contain rounded border bg-white cursor-pointer" onClick={() => setGridLightbox((page as any).debug.avatarSent)} />
-                                        <span className="text-gray-500 block mt-1">Avatar sent</span>
-                                      </div>
-                                      <div className="text-center">
-                                        <img src={(page as any).debug.sceneSent} alt="Scene sent" className="w-full h-24 object-contain rounded border bg-white cursor-pointer" onClick={() => setGridLightbox((page as any).debug.sceneSent)} />
-                                        <span className="text-gray-500 block mt-1">Scene sent</span>
-                                      </div>
-                                      <div className="text-center">
-                                        <img src={(page as any).debug.grokRawResult} alt="Grok raw" className="w-full h-24 object-contain rounded border bg-white cursor-pointer" onClick={() => setGridLightbox((page as any).debug.grokRawResult)} />
-                                        <span className="text-gray-500 block mt-1">Grok raw output</span>
-                                      </div>
-                                      <div className="text-center">
-                                        {page.pageNumber != null && (
-                                          <>
-                                            <img src={(page as any).debug.sceneSent} alt="Final" className="w-full h-24 object-contain rounded border bg-white cursor-pointer" onClick={() => setGridLightbox((page as any).debug.grokRawResult)} />
-                                            <span className="text-gray-500 block mt-1">Blend region: {(page as any).debug.blendRegion?.width}x{(page as any).debug.blendRegion?.height}</span>
-                                          </>
-                                        )}
-                                      </div>
-                                    </div>
+                              <div className="mt-2 p-3 bg-gray-50 border border-gray-200 rounded text-xs space-y-2">
+                                <h6 className="font-semibold text-gray-700">Grok Repair Details</h6>
+                                <p className="text-gray-600"><strong>Bbox:</strong> [{(page as any).debug.bbox?.map((v: number) => Math.round(v * 100) + '%').join(', ')}] | <strong>Face:</strong> {(page as any).debug.faceBbox ? `[${(page as any).debug.faceBbox.map((v: number) => Math.round(v * 100) + '%').join(', ')}]` : 'none'} | <strong>Blend:</strong> {(page as any).debug.blendRegion?.width}x{(page as any).debug.blendRegion?.height}</p>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <div className="text-center">
+                                    <img src={(page as any).debug.avatarSent} alt="Avatar ref" className="w-full h-32 object-contain rounded border bg-white cursor-pointer hover:opacity-80" onClick={() => setGridLightbox((page as any).debug.avatarSent)} />
+                                    <span className="text-gray-500 block mt-1">Avatar ref sent</span>
                                   </div>
+                                  <div className="text-center">
+                                    <img src={(page as any).debug.sceneSent} alt="Scene sent to Grok" className="w-full h-32 object-contain rounded border bg-white cursor-pointer hover:opacity-80" onClick={() => setGridLightbox((page as any).debug.sceneSent)} />
+                                    <span className="text-gray-500 block mt-1">Scene sent (head whited out)</span>
+                                  </div>
+                                  <div className="text-center">
+                                    <img src={(page as any).debug.grokRawResult} alt="Grok raw output" className="w-full h-32 object-contain rounded border bg-white cursor-pointer hover:opacity-80" onClick={() => setGridLightbox((page as any).debug.grokRawResult)} />
+                                    <span className="text-gray-500 block mt-1">Grok raw output (before blend)</span>
+                                  </div>
+                                </div>
+                                <details className="mt-1">
+                                  <summary className="cursor-pointer text-gray-500 hover:text-gray-700">Prompt sent to Grok</summary>
+                                  <p className="mt-1 text-gray-600 break-all bg-white p-2 rounded border">{(page as any).debug.prompt}</p>
                                 </details>
                               </div>
                             )}

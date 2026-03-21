@@ -854,11 +854,12 @@ export function useRepairWorkflow({
       }
 
       // Store full repair details (comparison, verification, method) for debug UI
-      const repairedDetails = pagesRepaired.map(r => ({
+      const repairedDetails = pagesRepaired.map((r: any) => ({
         pageNumber: typeof r === 'number' ? r : r.pageNumber,
         comparison: r.comparison || null,
         verification: r.verification || null,
         method: r.method || 'gemini',
+        debug: r.debug || null,
       }));
       const failedPages = pagesFailed.map(f => ({
         pageNumber: f.pageNumber,
