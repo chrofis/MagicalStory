@@ -881,12 +881,19 @@ export function RepairWorkflowPanel({
                     </button>
                   ) : null}
                   <button
-                    onClick={() => reEvaluatePages(sceneImages.map(s => s.pageNumber))}
+                    onClick={() => {
+                      const pageNums = sceneImages.map(s => s.pageNumber);
+                      // Include covers
+                      if (coverImages?.frontCover) pageNums.push(-1);
+                      if (coverImages?.initialPage) pageNums.push(-2);
+                      if (coverImages?.backCover) pageNums.push(-3);
+                      reEvaluatePages(pageNums);
+                    }}
                     disabled={isRunning}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
                   >
                     <CheckCircle className="w-4 h-4" />
-                    Re-evaluate All {sceneImages.length} Pages
+                    Re-evaluate All Pages + Covers
                   </button>
                 </div>
 
