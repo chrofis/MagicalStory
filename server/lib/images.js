@@ -3365,6 +3365,14 @@ async function evaluateImageBatch(images, options = {}) {
           : {};
       }
 
+      // Log character/position data for debugging bbox expected list
+      if (Object.keys(expectedCharacterPositions).length > Object.keys(characterDescriptions).length) {
+        const sceneOnly = Object.keys(expectedCharacterPositions).filter(n => !characterDescriptions[n]);
+        if (sceneOnly.length > 0) {
+          log.debug(`📦 [BATCH EVAL] PAGE ${img.pageNumber}: ${sceneOnly.length} secondary character(s) from scene metadata: ${sceneOnly.join(', ')}`);
+        }
+      }
+
       // Parse Visual Bible objects from prompt
       const vbObjects = parseVisualBibleObjects(img.prompt || '');
       const allExpectedObjects = [...expectedObjects, ...vbObjects.filter(o => !expectedObjects.includes(o))];
