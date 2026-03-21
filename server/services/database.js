@@ -604,8 +604,8 @@ async function saveStoryData(storyId, storyData) {
         for (let i = 0; i < coverData.imageVersions.length; i++) {
           const version = coverData.imageVersions[i];
           if (version.imageData) {
-            // Skip versions that were rehydrated from DB (marked by rehydrateStoryImages)
-            if (!version._rehydrated) {
+            // Skip versions already saved to DB (rehydrated from DB, or pre-saved by cover regen)
+            if (!version._rehydrated && !version._alreadySaved) {
               await saveStoryImage(storyId, coverType, null, version.imageData, {
                 qualityScore: version.qualityScore,
                 generatedAt: version.createdAt || version.generatedAt,
@@ -616,6 +616,7 @@ async function saveStoryData(storyId, storyData) {
             delete version.imageData;
           }
           delete version._rehydrated;
+          delete version._alreadySaved;
         }
       }
     }

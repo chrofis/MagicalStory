@@ -1727,6 +1727,19 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     log.debug(`📸 [COVER REGEN] New ${normalizedCoverType} cover generated - score: ${coverResult.score}, attempts: ${coverResult.totalAttempts}, model: ${coverResult.modelId}, version: ${newVersionIndex}`);
 
+    // Save the new cover image directly at the correct version_index BEFORE saveStoryData
+    // saveStoryData uses arrayToDbIndex(i, coverType) which maps based on array position,
+    // but the array may not have all historical entries (migration can produce 0 versions).
+    // Saving directly ensures the image lands at the right version_index.
+    const { saveStoryImage } = require('../services/database');
+    await saveStoryImage(id, coverKey, null, coverResult.imageData, {
+      qualityScore: coverResult.score,
+      generatedAt: new Date().toISOString(),
+      versionIndex: newVersionIndex
+    });
+    // Mark the new version's imageData as already saved so saveStoryData doesn't re-save it
+    newVersion._alreadySaved = true;
+
     if (normalizedCoverType === 'front') {
       storyData.coverImages.frontCover = coverData;
     } else if (normalizedCoverType === 'initialPage') {
@@ -1736,10 +1749,9 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
     }
 
     // Update active version in image_version_meta (same mechanism as scenes)
-    // Note: saveStoryData() below handles extracting imageVersions to story_images table
     await setActiveVersion(id, coverKey, newVersionIndex);
 
-    // Save updated story with metadata (imageData will be stripped by saveStoryData)
+    // Save updated story metadata (imageData will be stripped by saveStoryData)
     await saveStoryData(id, storyData);
 
     // Deduct credits and log transaction (skip for infinite credits or impersonating admin)
