@@ -553,7 +553,8 @@ function extractSceneMetadata(sceneDescription) {
   }
   if (!parsedData) parsedData = parsed;
   // Handle double-nested {scene: {scene: {...}}} from Art Director
-  if (parsedData?.scene && !parsedData.characters && parsedData.scene.characters) {
+  if (parsedData?.scene && typeof parsedData.scene === 'object' &&
+      !parsedData.characters && (parsedData.scene.characters || parsedData.scene.objects || parsedData.scene.imageSummary)) {
     parsedData = parsedData.scene;
   }
   if (parsed && parsedData && parsedData.characters) {
@@ -2843,6 +2844,11 @@ function buildImagePrompt(sceneDescription, inputData, sceneCharacters = null, i
 
   // Extract metadata BEFORE stripping (needed for objects lookup)
   const metadata = extractSceneMetadata(sceneDescription);
+  if (metadata?.objects?.length > 0) {
+    log.debug(`[IMAGE PROMPT] Page ${pageNumber}: metadata.objects = ${JSON.stringify(metadata.objects)}`);
+  } else {
+    log.debug(`[IMAGE PROMPT] Page ${pageNumber}: no metadata.objects (metadata=${metadata ? 'exists' : 'null'}, objects=${metadata?.objects?.length || 0})`);
+  }
 
   // Strip JSON metadata block from scene description (not needed in image prompt)
   const cleanSceneDescription = stripSceneMetadata(sceneDescription);

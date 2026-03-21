@@ -74,7 +74,8 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
       }
     ],
     "objects": [
-      {"id": "LOC001", "name": "Stadtturm", "position": "left, ancient clock tower with blue face"}
+      {"id": "LOC001", "name": "Stadtturm", "position": "left, ancient clock tower with blue face"},
+      {"id": "ANI001", "name": "Bello", "position": "at Sophie's feet"}
     ],
     "translatedSummary": "Sophie und Manuel gehen über den verschneiten Platz auf den Stadtturm zu."
   }
@@ -91,6 +92,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 - `setting.description`: 10 words max.
 - `depthLayers`: What's close, what's far. Tells the image generator spatial depth. E.g. "Castle far background, river midground, children close foreground". Only include when depth matters.
 - `weatherVisibility`: Critical for indoor scenes with weather outside. E.g. "snow visible through window only" prevents the generator from putting snow inside the room. Use "directly on scene" for outdoor, "visible through window" for indoor with weather outside, "none" for indoor with no weather visible.
+- `objects`: List ALL recurring visual elements (from the list above) that appear in this scene. Use their exact IDs. Include locations, animals, artifacts, vehicles — anything from the recurring elements list that's visible.
 
 **Validation-only fields (NOT sent to image generator, used to catch impossible scenes):**
 - `holding`: Forces you to account for both hands. If both hands are full, the character can't also wave/point/gesture. Fix the `action` to be physically possible.
