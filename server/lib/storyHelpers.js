@@ -553,7 +553,8 @@ function extractSceneMetadata(sceneDescription) {
   }
   if (!parsedData) parsedData = parsed;
   // Handle double-nested {scene: {scene: {...}}} from Art Director
-  if (parsedData?.scene && !parsedData.characters && parsedData.scene.characters) {
+  if (parsedData?.scene && typeof parsedData.scene === 'object' &&
+      !parsedData.characters && (parsedData.scene.characters || parsedData.scene.objects || parsedData.scene.imageSummary)) {
     parsedData = parsedData.scene;
   }
   if (parsed && parsedData && parsedData.characters) {
