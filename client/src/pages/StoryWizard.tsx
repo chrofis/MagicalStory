@@ -4873,12 +4873,9 @@ export default function StoryWizard() {
                     if (!cover) return prev;
                     const coverObj = cover;
                     if (!coverObj.imageVersions) return prev;
-                    // Validate version index is in bounds
-                    if (versionIndex < 0 || versionIndex >= coverObj.imageVersions.length) {
-                      log.error(`Invalid versionIndex ${versionIndex} for ${coverType} (max: ${coverObj.imageVersions.length - 1})`);
-                      return prev;
-                    }
-                    const activeVersion = coverObj.imageVersions[versionIndex];
+                    // Find version by DB versionIndex field (matching scene handler pattern)
+                    const activeVersion = coverObj.imageVersions.find(v => v.versionIndex === versionIndex)
+                      ?? coverObj.imageVersions[versionIndex];
                     if (!activeVersion?.imageData) {
                       log.error(`Version ${versionIndex} has no imageData for ${coverType}`);
                       return prev;
@@ -4888,9 +4885,9 @@ export default function StoryWizard() {
                       [coverType]: {
                         ...coverObj,
                         imageData: activeVersion.imageData,
-                        imageVersions: coverObj.imageVersions.map((v, i) => ({
+                        imageVersions: coverObj.imageVersions.map(v => ({
                           ...v,
-                          isActive: i === versionIndex
+                          isActive: v.versionIndex === versionIndex
                         }))
                       }
                     };

@@ -1588,8 +1588,9 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
             const coverData = covers[coverType];
             const activeCoverVersion = activeVersions[coverType] ?? 0;
 
-            // Add to imageVersions array
+            // Add to imageVersions array (include versionIndex for consistent version selection)
             coverData.imageVersions.push({
+              versionIndex: row.version_index,
               imageData: normalizeImageData(row.image_data),
               qualityScore: row.quality_score,
               generatedAt: row.generated_at,
