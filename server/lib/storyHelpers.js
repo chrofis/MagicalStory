@@ -544,6 +544,10 @@ function extractSceneMetadata(sceneDescription) {
     parsedData = parsed.previewMismatches[0].scene;
   }
   if (!parsedData) parsedData = parsed;
+  // Handle double-nested {scene: {scene: {...}}} from Art Director
+  if (parsedData?.scene && !parsedData.characters && parsedData.scene.characters) {
+    parsedData = parsedData.scene;
+  }
   if (parsed && parsedData && parsedData.characters) {
     // Extract per-character clothing and positions
     const characterClothing = {};

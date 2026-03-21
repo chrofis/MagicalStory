@@ -880,11 +880,14 @@ export function StoryDisplay({
         } else {
           desc = JSON.stringify(fullDescription);
         }
-      // Format 2: Trial JSON scene hint — {scene: {imageSummary: "..."}}
+      // Format 2: Scene JSON — {scene: {translatedSummary?, imageSummary}}
+      // Handle double-nested: {scene: {scene: {imageSummary}}}
       } else if (obj.scene && typeof obj.scene === 'object') {
-        const scene = obj.scene as { imageSummary?: string };
-        if (scene.imageSummary) {
-          return scene.imageSummary;
+        const outerScene = obj.scene as Record<string, unknown>;
+        const sceneData = (outerScene.scene && typeof outerScene.scene === 'object' ? outerScene.scene : outerScene) as { translatedSummary?: string; imageSummary?: string };
+        const summary = sceneData.translatedSummary || sceneData.imageSummary;
+        if (summary) {
+          return summary;
         }
         desc = JSON.stringify(fullDescription);
       } else {
@@ -903,15 +906,19 @@ export function StoryDisplay({
           if (typeof parsed.output === 'string') {
             desc = parsed.output;
           } else if (typeof parsed.output === 'object') {
+            // Prefer translated (user's language) over English imageSummary
             const summary = parsed.output.translatedSummary || parsed.output.imageSummary;
             if (summary) {
               return summary;
             }
           }
         }
-        // Format 2: Trial JSON scene hint — {scene: {imageSummary: "..."}}
-        if (parsed.scene?.imageSummary) {
-          return parsed.scene.imageSummary;
+        // Format 2: Scene JSON — {scene: {translatedSummary?, imageSummary}}
+        // Handle both single and double-nested: {scene: {imageSummary}} or {scene: {scene: {imageSummary}}}
+        const sceneData = parsed.scene?.scene || parsed.scene;
+        if (sceneData) {
+          const summary = sceneData.translatedSummary || sceneData.imageSummary;
+          if (summary) return summary;
         }
       } catch {
         // Not valid JSON, continue with original string
