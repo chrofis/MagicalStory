@@ -3319,6 +3319,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               method: grokResult.method,
               usage: grokResult.usage,
               debug: grokResult.debug || null,
+              comparison: {
+                before: sceneImage.imageData,
+                after: grokResult.imageData,
+                reference: avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
+              },
             };
           } else {
             return { task, error: true, failReason: 'Grok repair returned no image' };
