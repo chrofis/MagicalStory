@@ -5464,9 +5464,9 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const clothingContext = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
 
   if (useBlended) {
-    // ── Blended mode: send original scene + avatar → Grok redraws character → feathered blend ──
-    // No whiteout — Grok sees the original scene and redraws the character to match the avatar.
-    // The feathered blend then replaces only the character region, preserving the background.
+    // ── Blended mode: whiteout head → Grok redraws face → feathered blend ──
+    // White out only the face/head area so Grok knows what to fix.
+    // The full body bbox is used for the blend region.
     const sharp = require('sharp');
     const sceneMeta = await sharp(sceneBuffer).metadata();
 
@@ -5475,8 +5475,28 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    // Send the original scene (no whiteout) — Grok needs to see the current character to redraw it
-    const sceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
+    // White out the face area to signal Grok what to redraw
+    const faceBbox = options.faceBbox;
+    let sceneForGrok = sceneBuffer;
+    if (faceBbox) {
+      const [fymin, fxmin, fymax, fxmax] = faceBbox;
+      const fLeft = Math.floor(fxmin * sceneMeta.width);
+      const fTop = Math.floor(fymin * sceneMeta.height);
+      const fWidth = Math.max(1, Math.ceil((fxmax - fxmin) * sceneMeta.width));
+      const fHeight = Math.max(1, Math.ceil((fymax - fymin) * sceneMeta.height));
+
+      const whiteHead = await sharp({
+        create: { width: fWidth, height: fHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
+      }).jpeg().toBuffer();
+
+      sceneForGrok = await sharp(sceneBuffer)
+        .composite([{ input: whiteHead, left: fLeft, top: fTop }])
+        .jpeg({ quality: 90 }).toBuffer();
+
+      log.info(`👤 [CHAR REPAIR GROK] Head whiteout: ${fWidth}x${fHeight} at (${fLeft},${fTop})`);
+    }
+
+    const sceneDataUri = `data:image/jpeg;base64,${sceneForGrok.toString('base64')}`;
 
     const centerX = Math.round(((xmin + xmax) / 2) * 100);
     const centerY = Math.round(((ymin + ymax) / 2) * 100);
@@ -5493,9 +5513,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
-    const prompt = `Redraw the character at the ${vPos} ${hPos} of this children's book illustration to look like ${charName} from the reference photo. Match ${charName}'s face, hair color, skin tone, and features exactly from the reference. Keep the same pose, position, and action. Keep the same art style.${clothingContext}${actionContext}${issueContext}\n\nOnly change the character at ${vPos} ${hPos}. Keep background, art style, and all other characters completely unchanged.`;
+    const headNote = faceBbox ? `The character's head has been removed (blank area). Fill in the head to match ${charName}'s face, hair, and skin from the reference photo exactly. ` : '';
+    const prompt = `Fix the character at the ${vPos} ${hPos} of this children's book illustration. ${headNote}Make this character look like ${charName} from the reference photo — match face, hair color, skin tone, and features exactly. Keep the same pose, position, and action. Keep the same art style.${clothingContext}${actionContext}${issueContext}\n\nOnly change the character at ${vPos} ${hPos}. Keep background and all other characters unchanged.`;
 
-    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), sending original scene + avatar to Grok...`);
+    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'whited out' : 'intact'}, sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);
 
     if (!grokResult.imageData) {

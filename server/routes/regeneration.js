@@ -3266,6 +3266,13 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
 
           log.info(`👤 [CHAR REPAIR] ${characterName} on page ${pageNumber}: ${useFaceOnly ? 'FACE only' : 'FULL character'} repair (face:${hasFaceIssue}, clothing:${hasClothingIssue})`);
 
+          // Get face bbox for head whiteout (separate from repair bbox which may be full body)
+          let faceBbox = null;
+          const faceData = storedAppearance.faceBox;
+          if (faceData) {
+            faceBbox = Array.isArray(faceData) ? faceData : [faceData.y, faceData.x, faceData.y + faceData.height, faceData.x + faceData.width];
+          }
+
           const grokResult = await repairCharacterMismatch(
             sceneImage.imageData,
             avatarData.startsWith('data:') ? avatarData : `data:image/jpeg;base64,${avatarData}`,
@@ -3278,6 +3285,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               issueDescription: issueDesc,
               clothingDescription: clothingDesc,
               sceneDescription: sceneDesc,
+              faceBbox,
             }
           );
 
