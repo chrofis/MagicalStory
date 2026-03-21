@@ -217,6 +217,20 @@ export function GenerationProvider({ children }: { children: ReactNode }) {
     };
   }, [activeJob, isComplete, pollJobStatus]);
 
+  // Poll immediately when user returns to app (phone wakes up, tab refocused)
+  // Prevents stale "generating 18%" state from showing after a deploy killed the job
+  useEffect(() => {
+    if (!activeJob || isComplete) return;
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && activeJob) {
+        logger.info('[GenerationContext] App visible again, polling job immediately');
+        pollJobStatus(activeJob.jobId);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [activeJob, isComplete, pollJobStatus]);
+
   // Listen for storage changes (cross-tab sync)
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
