@@ -78,10 +78,17 @@ export function useDeveloperMode(): DeveloperModeState {
   // Skip covers by default in dev mode
   const [devSkipCovers, setDevSkipCovers] = useState(wasDevMode);
 
-  // Full repair after generation (default: ON)
+  // Full repair after generation (default: ON, persisted to localStorage)
   // When ON: generate all → evaluate all → regen low-scoring (up to 2 passes) → pick best → character fix
   // When OFF: generate all → evaluate only (scores visible but no regeneration)
-  const [enableFullRepair, setEnableFullRepair] = useState(true);
+  const [enableFullRepair, setEnableFullRepairInternal] = useState(() => {
+    const stored = localStorage.getItem('dev_enableFullRepair');
+    return stored !== null ? stored === 'true' : true; // default ON
+  });
+  const setEnableFullRepair = (v: boolean) => {
+    setEnableFullRepairInternal(v);
+    localStorage.setItem('dev_enableFullRepair', String(v));
+  };
 
   // Load all avatar variants upfront (heavy - for debugging avatar generation)
   const [loadAllAvatars, setLoadAllAvatars] = useState(false);
