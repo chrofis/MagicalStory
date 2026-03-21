@@ -2836,15 +2836,16 @@ router.post('/:id/repair-workflow/consistency-check', authenticateToken, async (
     storyData.finalChecksReport.totalIssues = (report.totalIssues || 0) + legacyIssues;
     storyData.finalChecksReport.overallConsistent = (report.totalIssues || 0) + legacyIssues === 0;
 
-    await saveStoryData(id, storyData);
-
-    // Calculate and persist repair cost
+    // Calculate cost before responding
     const { inputTokens = 0, outputTokens = 0, model: checkModel } = report.tokenUsage || {};
     const apiCost = calculateTokenCost(checkModel || 'gemini-2.5-flash', inputTokens, outputTokens);
-    await addRepairCost(id, apiCost, 'Consistency check');
 
     log.info(`✅ [REPAIR-WORKFLOW] Consistency check complete: ${report.totalIssues} issues found`);
     res.json({ report, apiCost });
+
+    // Save to DB in background (don't block the response)
+    saveStoryData(id, storyData).catch(err => log.error('Failed to save entity report:', err.message));
+    addRepairCost(id, apiCost, 'Consistency check').catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in consistency check:', err);
     res.status(500).json({ error: 'Failed to run consistency check: ' + err.message });
