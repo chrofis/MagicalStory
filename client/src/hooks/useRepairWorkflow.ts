@@ -675,13 +675,24 @@ export function useRepairWorkflow({
             reasoning: 'reasoning' in evalSource ? evalSource.reasoning : undefined,
             fixableIssues: evalSource.fixableIssues as Array<{ description?: string; issue?: string }>,
           } : undefined;
-          const result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
-            useOriginalAsReference: options?.useOriginalAsReference,
-            blackoutIssues: options?.blackoutIssues,
-            evaluationFeedback: evalFeedback,
-          });
+          let result: any;
+          if (pageNumber < 0) {
+            // Cover redo
+            const coverTypeMap: Record<number, 'front' | 'back' | 'initial'> = { [-1]: 'front', [-2]: 'initial', [-3]: 'back' };
+            const coverType = coverTypeMap[pageNumber];
+            if (coverType) {
+              const coverResult = await storyService.regenerateCover(storyId, coverType);
+              result = { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
+            }
+          } else {
+            result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
+              useOriginalAsReference: options?.useOriginalAsReference,
+              blackoutIssues: options?.blackoutIssues,
+              evaluationFeedback: evalFeedback,
+            });
+          }
 
-          if (result.success) {
+          if (result?.success) {
             pagesCompleted.push(pageNumber);
 
             // Find version index (imageVersions length after update)
