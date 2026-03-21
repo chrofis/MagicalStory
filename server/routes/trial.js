@@ -592,20 +592,46 @@ router.post('/create-anonymous-account', trialAvatarLimiter, async (req, res) =>
 
     const { characterId, charId } = await saveTrialCharacter(pool, userId, characterData);
 
-    // If preview avatar was already generated (background generation), save it to the character
-    if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
+    // Save preview avatar + extract physical traits from face photo
+    // Physical traits (hair, eyes, skin tone) are needed for styled avatar prompts
+    {
       try {
         const charResult = await pool.query('SELECT data FROM characters WHERE id = $1', [characterId]);
         if (charResult.rows.length > 0) {
           const charData = typeof charResult.rows[0].data === 'string'
             ? JSON.parse(charResult.rows[0].data) : charResult.rows[0].data;
           if (charData.characters && charData.characters[0]) {
-            charData.characters[0].previewAvatar = previewAvatar;
+            // Save preview avatar if already generated (background generation)
+            if (previewAvatar && typeof previewAvatar === 'string' && previewAvatar.startsWith('data:image/')) {
+              charData.characters[0].previewAvatar = previewAvatar;
+            }
+            // Extract physical traits from face photo (non-blocking, best-effort)
+            try {
+              const { extractTraitsWithGemini } = require('./avatars');
+              const photoDataUri = facePhoto.startsWith('data:') ? facePhoto : `data:image/jpeg;base64,${facePhoto}`;
+              const traitsResult = await extractTraitsWithGemini(photoDataUri);
+              if (traitsResult?.traits) {
+                const physical = charData.characters[0].physical || {};
+                const t = traitsResult.traits;
+                if (t.hairColor) physical.hairColor = t.hairColor;
+                if (t.hairLength) physical.hairLength = t.hairLength;
+                if (t.hairStyle) physical.hairStyle = t.hairStyle;
+                if (t.hairDensity) physical.hairDensity = t.hairDensity;
+                if (t.eyeColor) physical.eyeColor = t.eyeColor;
+                if (t.skinTone) physical.skinTone = t.skinTone;
+                if (t.apparentAge) physical.apparentAge = t.apparentAge;
+                if (t.detailedHairAnalysis) physical.detailedHairAnalysis = t.detailedHairAnalysis;
+                charData.characters[0].physical = physical;
+                log.debug(`[TRIAL] Extracted physical traits: hair=${physical.hairColor}, eyes=${physical.eyeColor}, skin=${physical.skinTone}`);
+              }
+            } catch (traitErr) {
+              log.debug(`[TRIAL] Physical trait extraction failed (non-critical): ${traitErr.message}`);
+            }
             await pool.query('UPDATE characters SET data = $1 WHERE id = $2', [JSON.stringify(charData), characterId]);
           }
         }
-      } catch (avatarErr) {
-        log.warn(`[TRIAL] Failed to save preview avatar: ${avatarErr.message}`);
+      } catch (saveErr) {
+        log.warn(`[TRIAL] Failed to save avatar/traits: ${saveErr.message}`);
       }
     }
 
@@ -759,6 +785,7 @@ router.post('/create-story', verifySessionToken, async (req, res) => {
       gender: mainChar.gender,
       traits: mainChar.traits,
       customTraits: mainChar.traits?.specialDetails || '',
+      physical: mainChar.physical || {},
       photos: mainChar.photos || {},
       _charId: mainChar.id,
       _preGeneratedStyledAvatars: mainChar.preGeneratedStyledAvatars || null,

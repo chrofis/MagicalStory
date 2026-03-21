@@ -184,6 +184,7 @@ function buildPhysicalTraitsString(character) {
   if (hairDesc) parts.push(`Hair: ${hairDesc}`);
 
   if (traits.build) parts.push(`Build: ${traits.build}`);
+  if (traits.skinTone) parts.push(`Skin tone: ${traits.skinTone}`);
   if (traits.eyeColor) parts.push(`Eye color: ${traits.eyeColor}`);
   if (traits.facialHair && traits.facialHair !== 'none') {
     if (traits.facialHair.toLowerCase() === 'clean-shaven') {
