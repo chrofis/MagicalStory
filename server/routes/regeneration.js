@@ -2571,14 +2571,6 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
         photoUrl: c.avatars?.styled || c.photoUrl
       }));
 
-    // Helper to extract page text from story
-    const getPageText = (storyText, pageNum) => {
-      if (!storyText) return null;
-      const pageRegex = new RegExp(`---\\s*Page\\s*${pageNum}\\s*---([\\s\\S]*?)(?=---\\s*Page|$)`, 'i');
-      const match = storyText.match(pageRegex);
-      return match ? match[1].trim() : null;
-    };
-
     // Run evaluations in parallel with concurrency limit
     const evalLimit = pLimit(100);
     const fullStoryText = storyData.storyText || storyData.generatedStory || storyData.story || '';
@@ -3029,10 +3021,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const artStyle = storyData.artStyle || 'pixar';
 
     // Helper: look up a scene image or cover image by page number
-    const COVER_TYPES_BY_PAGE = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
     function findSceneOrCover(sData, pageNum) {
       if (pageNum < 0) {
-        const coverType = COVER_TYPES_BY_PAGE[String(pageNum)];
+        const coverType = COVER_PAGE_MAP[String(pageNum)];
         return coverType ? sData.coverImages?.[coverType] || null : null;
       }
       return sData.sceneImages?.find(s => s.pageNumber === pageNum) || null;
@@ -3077,13 +3068,31 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
 
       const entityReport = storyData.finalChecksReport?.entity;
-      const charIssues = entityReport?.characters?.[characterName]?.issues || [];
+      // Collect issues from both legacy flat format and modern byClothing format
+      const charResult = entityReport?.characters?.[characterName];
+      const charIssues = [];
+      if (charResult) {
+        // Legacy format: issues at character root
+        if (charResult.issues) charIssues.push(...charResult.issues);
+        // Modern format: issues nested under byClothing
+        if (charResult.byClothing) {
+          for (const clothingResult of Object.values(charResult.byClothing)) {
+            for (const issue of (clothingResult.issues || [])) {
+              if (!charIssues.some(i => i.id === issue.id)) charIssues.push(issue);
+            }
+          }
+        }
+      }
       if (charIssues.length > 0) {
         log.info(`🔧 [REPAIR-WORKFLOW] Found ${charIssues.length} consistency issues for ${characterName}`);
       }
 
       for (const pageNumber of pages) {
-        repairTasks.push({ characterName, character, pageNumber, charIssues });
+        // Filter to issues relevant to this page
+        const pageCharIssues = charIssues.filter(i =>
+          i.pagesToFix?.includes(pageNumber) || i.pageNumber === pageNumber
+        );
+        repairTasks.push({ characterName, character, pageNumber, charIssues: pageCharIssues });
       }
     }
 
@@ -3317,6 +3326,9 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       'SELECT * FROM stories WHERE id = $1 AND user_id = $2',
       [id, req.user.id]
     );
+    if (freshResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Story not found during Phase 2 write-back' });
+    }
     storyData = typeof freshResult.rows[0].data === 'string' ? JSON.parse(freshResult.rows[0].data) : freshResult.rows[0].data;
     storyData = await rehydrateStoryImages(id, storyData);
 

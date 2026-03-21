@@ -4924,22 +4924,6 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
 // ============================================================================
 
 /**
- * Helper: Get text for a specific page from storyText
- * @param {string} storyText - Full story text with page markers
- * @param {number} pageNumber - Page number to extract
- * @returns {string|null} Page text or null if not found
- */
-function getPageText(storyText, pageNumber) {
-  if (!storyText) return null;
-
-  // Match page markers like "--- Page X ---" or "## Page X"
-  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
-  const match = storyText.match(pageRegex);
-
-  return match ? match[1].trim() : null;
-}
-
-/**
  * Iterate a page using image analysis and 17-check scene description prompt
  * This is the most comprehensive repair - analyzes what's wrong and regenerates with corrections
  *
@@ -4959,6 +4943,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   } = require('./sceneValidator');
 
   const {
+    getPageText,
     buildSceneDescriptionPrompt,
     buildImagePrompt,
     getCharactersInScene,
