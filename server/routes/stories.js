@@ -1274,19 +1274,38 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         break;
       }
 
-      case 'reference':
-        // Return all reference photos with their image data (photoUrl or photoData)
-        result = {
-          referencePhotos: (sceneImage.referencePhotos || []).map(p => ({
+      case 'reference': {
+        // Rebuild reference photos from character avatars (photoData is stripped from blob on save)
+        const characters = story.characters || [];
+        const refPhotos = (sceneImage.referencePhotos || []).map(p => {
+          let photoUrl = p.photoUrl || p.photoData || null;
+          // If no photo data in blob, find the character's styled avatar
+          if (!photoUrl && p.name) {
+            const char = characters.find(c => c.name === p.name);
+            if (char) {
+              const artStyle = story.artStyle || 'pixar';
+              const clothing = p.clothingCategory || 'standard';
+              photoUrl = char.avatars?.styledAvatars?.[artStyle]?.[clothing]
+                || char.avatars?.styled
+                || char.avatars?.standard
+                || char.photoUrl
+                || null;
+            }
+          }
+          return {
             name: p.name,
             photoType: p.photoType,
             clothingCategory: p.clothingCategory,
             clothingDescription: p.clothingDescription,
-            photoUrl: p.photoUrl || p.photoData || null  // photoData contains base64 data URI
-          })),
+            photoUrl
+          };
+        });
+        result = {
+          referencePhotos: refPhotos,
           visualBibleGrid: sceneImage.visualBibleGrid || null
         };
         break;
+      }
 
       case 'landmark':
         // Return all landmark photos with their image data

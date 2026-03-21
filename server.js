@@ -4163,8 +4163,14 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
     // The client only needs metadata from result_data to navigate to the story
     const stripImageData = (img) => {
       if (!img) return img;
-      const { imageData, referencePhotos, landmarkPhotos, visualBibleGrid, bboxOverlayImage, ...metadata } = img;
-      const stripped = { ...metadata, hasImage: !!imageData, hasVisualBibleGrid: !!visualBibleGrid };
+      const { imageData, referencePhotos, visualBibleGrid, bboxOverlayImage, ...metadata } = img;
+      // Keep referencePhotos metadata but strip actual photo data (rebuild from character avatars on demand)
+      const strippedRefPhotos = referencePhotos?.map(p => ({
+        name: p.name, photoType: p.photoType, clothingCategory: p.clothingCategory,
+        clothingDescription: p.clothingDescription, hasPhoto: !!(p.photoUrl || p.photoData)
+      }));
+      // Keep landmarkPhotos WITH photoData (small, unique per page, needed for display)
+      const stripped = { ...metadata, hasImage: !!imageData, hasVisualBibleGrid: !!visualBibleGrid, referencePhotos: strippedRefPhotos };
       // Strip imageData from imageVersions
       if (stripped.imageVersions) {
         stripped.imageVersions = stripped.imageVersions.map(v => {
