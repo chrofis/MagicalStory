@@ -835,7 +835,8 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           source: loc.source,
           isRealLandmark: loc.isRealLandmark,
           appearsInPages: loc.appearsInPages,
-          hasReferenceImage: !!loc.referenceImageData
+          hasReferenceImage: !!(loc.referenceImageData || loc.referencePhotoData),
+          photoUrl: loc.referencePhotoUrl || null,
         })),
         vehicles: (story.visualBible.vehicles || []).map(v => ({
           id: v.id,
@@ -2065,14 +2066,15 @@ router.get('/:id/visual-bible-image/:elementId', authenticateToken, async (req, 
       return res.status(404).json({ error: 'Element not found' });
     }
 
-    if (!foundElement.referenceImageData) {
+    const imageData = foundElement.referenceImageData || foundElement.referencePhotoData;
+    if (!imageData) {
       return res.status(404).json({ error: 'No reference image for this element' });
     }
 
     res.json({
       elementId,
       name: foundElement.name,
-      imageData: normalizeImageData(foundElement.referenceImageData)
+      imageData: normalizeImageData(imageData)
     });
 
   } catch (err) {
