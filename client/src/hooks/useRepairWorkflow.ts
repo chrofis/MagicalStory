@@ -282,6 +282,7 @@ export function useRepairWorkflow({
       let totalIssues = 0;
 
       // Process each scene image, enriching with server-side evaluation data
+      console.log(`[collectFeedback] Processing ${sceneImages.length} scene images, ${evalByPage.size} eval entries from server`);
       for (const scene of sceneImages) {
         const evalPage = evalByPage.get(scene.pageNumber);
 
@@ -553,6 +554,7 @@ export function useRepairWorkflow({
         console.error('Cover feedback collection failed (scenes unaffected):', coverErr);
       }
 
+      console.log(`[collectFeedback] Completed: ${Object.keys(pages).length} pages (scenes: ${sceneImages.length}, covers: ${Object.keys(pages).filter(k => parseInt(k) < 0).length}), ${totalIssues} total issues`);
       completeStep('collect-feedback', { pages, totalIssues });
 
       // Seed consistency results from existing entity report so the
