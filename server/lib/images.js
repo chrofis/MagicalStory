@@ -5464,27 +5464,20 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
   const clothingContext = clothingDescription ? `\nClothing: ${clothingDescription}` : '';
 
   if (useBlended) {
-    // ── Blended mode: blackout → Grok → blend repaired region onto original ──
-    // Preserves background quality: only the character region changes.
+    // ── Blended mode: send original scene + avatar → Grok redraws character → feathered blend ──
+    // No whiteout — Grok sees the original scene and redraws the character to match the avatar.
+    // The feathered blend then replaces only the character region, preserving the background.
     const sharp = require('sharp');
     const sceneMeta = await sharp(sceneBuffer).metadata();
 
-    // A. Solid white blackout over character bbox (clear signal to Grok)
     const bboxLeft = Math.floor(xmin * sceneMeta.width);
     const bboxTop = Math.floor(ymin * sceneMeta.height);
     const bboxWidth = Math.max(1, Math.ceil((xmax - xmin) * sceneMeta.width));
     const bboxHeight = Math.max(1, Math.ceil((ymax - ymin) * sceneMeta.height));
 
-    const whiteBlock = await sharp({
-      create: { width: bboxWidth, height: bboxHeight, channels: 3, background: { r: 255, g: 255, b: 255 } }
-    }).jpeg().toBuffer();
+    // Send the original scene (no whiteout) — Grok needs to see the current character to redraw it
+    const sceneDataUri = `data:image/jpeg;base64,${sceneBuffer.toString('base64')}`;
 
-    const blackoutBuffer = await sharp(sceneBuffer)
-      .composite([{ input: whiteBlock, left: bboxLeft, top: bboxTop }])
-      .jpeg({ quality: 90 }).toBuffer();
-    const blackoutDataUri = `data:image/jpeg;base64,${blackoutBuffer.toString('base64')}`;
-
-    // B. Send blackout scene + avatar reference to Grok
     const centerX = Math.round(((xmin + xmax) / 2) * 100);
     const centerY = Math.round(((ymin + ymax) / 2) * 100);
     const hPos = centerX < 33 ? 'left side' : centerX > 66 ? 'right side' : 'center';
@@ -5493,7 +5486,6 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     // Extract what the character should be doing from scene description
     let actionContext = '';
     if (sceneDescription) {
-      // Find mentions of this character in the scene description
       const charNameLower = charName.toLowerCase();
       const lines = sceneDescription.split(/[.\n]/).filter(l => l.toLowerCase().includes(charNameLower));
       if (lines.length > 0) {
@@ -5501,10 +5493,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
-    const prompt = `Redraw the character at the ${vPos} ${hPos} of this children's book illustration. The character there needs to be replaced with ${charName}. Use the reference photo to match ${charName}'s face, hair color, and skin tone exactly. Draw ${charName} in the same art style as the rest of the illustration so they blend in naturally.${clothingContext}${actionContext}${issueContext}\n\nKeep the background, art style, and all other characters completely unchanged.`;
+    const prompt = `Redraw the character at the ${vPos} ${hPos} of this children's book illustration to look like ${charName} from the reference photo. Match ${charName}'s face, hair color, skin tone, and features exactly from the reference. Keep the same pose, position, and action. Keep the same art style.${clothingContext}${actionContext}${issueContext}\n\nOnly change the character at ${vPos} ${hPos}. Keep background, art style, and all other characters completely unchanged.`;
 
-    log.info(`👤 [CHAR REPAIR GROK] Blended: whiteout ${bboxWidth}x${bboxHeight} at (${bboxLeft},${bboxTop}), sending to Grok...`);
-    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, blackoutDataUri]);
+    log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), sending original scene + avatar to Grok...`);
+    const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);
 
     if (!grokResult.imageData) {
       log.warn('⚠️ [CHAR REPAIR GROK] No image in Grok response');
