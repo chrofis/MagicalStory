@@ -261,159 +261,144 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     const artStyle = storyData.artStyle || 'pixar';
 
     if (checkCharacters) {
-      // Process all characters in parallel for speed
+      // Flatten all character×clothing tasks for maximum parallelism
+      // Instead of: 5 characters parallel, clothing groups serial within each
+      // Now: ALL character+clothing combos run in parallel (e.g. 15 concurrent Gemini calls)
       const pLimit = require('p-limit');
-      const entityLimit = pLimit(5); // Up to 5 characters evaluated concurrently
+      const entityLimit = pLimit(10); // All combos parallel, capped at 10 concurrent API calls
 
-      await Promise.all(characters.map(character => entityLimit(async () => {
+      // Phase 1: Collect all character×clothing tasks
+      const tasks = [];
+      for (const character of characters) {
         const charName = character.name;
         const appearances = entityAppearances.get(charName);
-
         if (!appearances || appearances.length === 0) {
           log.verbose(`[ENTITY-CHECK] Skipping ${charName}: no appearances found`);
-          return;
+          continue;
         }
 
-        log.info(`🔍 [ENTITY-CHECK] Checking ${charName}: ${appearances.length} total appearances`);
-
-        // Initialize character report with new structure
-        // Note: `issues` array is for backward compatibility (flattened from all byClothing)
+        // Initialize character report
         report.characters[charName] = {
           byClothing: {},
-          issues: [],  // Flattened issues for backward compatibility
+          issues: [],
           overallConsistent: true,
           overallScore: 10,
           totalIssues: 0
         };
 
+        const byClothing = groupAppearancesByClothing(appearances);
+        log.info(`🔍 [ENTITY-CHECK] ${charName}: ${appearances.length} appearances, ${byClothing.size} clothing categories: ${[...byClothing.keys()].join(', ')}`);
+
+        for (const [clothingCategory, groupAppearances] of byClothing) {
+          const isCostumed = clothingCategory.startsWith('costumed:');
+          const minRequired = isCostumed ? 1 : minAppearances;
+          if (groupAppearances.length < minRequired) {
+            log.verbose(`[ENTITY-CHECK] Skipping ${charName} (${clothingCategory}): only ${groupAppearances.length} appearances (need ${minRequired})`);
+            continue;
+          }
+          tasks.push({ character, charName, clothingCategory, groupAppearances, minRequired });
+        }
+      }
+
+      log.info(`🔍 [ENTITY-CHECK] Running ${tasks.length} character×clothing checks in parallel...`);
+
+      // Phase 2: Run all tasks in parallel
+      const results = await Promise.all(tasks.map(task => entityLimit(async () => {
+        const { character, charName, clothingCategory, groupAppearances, minRequired } = task;
         try {
-          // Group appearances by clothing category
-          const byClothing = groupAppearancesByClothing(appearances);
-          log.info(`🔍 [ENTITY-CHECK] ${charName} has ${byClothing.size} clothing categories: ${[...byClothing.keys()].join(', ')}`);
+          log.info(`🔍 [ENTITY-CHECK] Checking ${charName} (${clothingCategory}): ${groupAppearances.length} appearances`);
 
-          // Evaluate each clothing group separately
-          for (const [clothingCategory, groupAppearances] of byClothing) {
-            // For costumed categories, allow single appearances (compare to avatar)
-            // For standard categories, still require minAppearances
-            const isCostumed = clothingCategory.startsWith('costumed:');
-            const minRequired = isCostumed ? 1 : minAppearances;
-
-            if (groupAppearances.length < minRequired) {
-              log.verbose(`[ENTITY-CHECK] Skipping ${charName} (${clothingCategory}): only ${groupAppearances.length} appearances (need ${minRequired})`);
-              continue;
-            }
-
-            log.info(`🔍 [ENTITY-CHECK] Checking ${charName} (${clothingCategory}): ${groupAppearances.length} appearances`);
-
-            // Extract crops for this clothing group
-            const crops = await extractEntityCrops(groupAppearances);
-
-            if (crops.length < minRequired) {
-              log.warn(`⚠️  [ENTITY-CHECK] ${charName} (${clothingCategory}): only ${crops.length} valid crops`);
-              continue;
-            }
-
-            // Get styled avatar for this specific clothing category
-            const refAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
-
-            // Create grid with appropriate reference
-            const gridLabel = `${charName} (${clothingCategory})`;
-            const gridResult = await createEntityGrid(crops, gridLabel, refAvatar);
-
-            // Store grid for dev panel
-            report.grids.push({
-              entityName: charName,
-              entityType: 'character',
-              clothingCategory,
-              gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-              manifest: gridResult.manifest,
-              cellCount: crops.length
-            });
-
-            // Save grid to disk if requested
-            if (saveGrids && outputDir) {
-              await saveEntityGrid(gridResult.buffer, `${charName}_${clothingCategory}`, 'character', outputDir);
-            }
-
-            // Evaluate consistency with clothing context
-            const evalResult = await evaluateEntityConsistency(
-              gridResult.buffer,
-              gridResult.manifest,
-              {
-                entityType: 'character',
-                entityName: charName,
-                clothingCategory,
-                referencePhoto: refAvatar,
-                cellCount: crops.length
-              }
-            );
-
-            // Store per-clothing result + per-page bboxes for character repair
-            report.characters[charName].byClothing[clothingCategory] = {
-              gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
-              consistent: evalResult.consistent,
-              score: evalResult.score,
-              issues: evalResult.issues || [],
-              summary: evalResult.summary,
-              cellCount: crops.length,
-              // Store per-page appearance data (bbox) so character repair doesn't need to re-detect
-              appearances: groupAppearances.map(a => ({
-                pageNumber: a.pageNumber,
-                faceBox: a.faceBox || null,
-                bodyBox: a.bodyBox || null,
-                clothing: a.clothing || clothingCategory,
-              })),
-              ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
-            };
-
-            // Aggregate into character-level stats
-            if (!evalResult.consistent) {
-              report.characters[charName].overallConsistent = false;
-              report.overallConsistent = false;
-            }
-            const issueCount = evalResult.issues?.length || 0;
-            report.characters[charName].totalIssues += issueCount;
-            report.totalIssues += issueCount;
-
-            // Add issues to flattened array for backward compatibility
-            // Tag each issue with its clothing category
-            for (const issue of (evalResult.issues || [])) {
-              report.characters[charName].issues.push({
-                ...issue,
-                clothingCategory
-              });
-            }
-
-            // Update overall score (use minimum across clothing categories)
-            if (evalResult.score < report.characters[charName].overallScore) {
-              report.characters[charName].overallScore = evalResult.score;
-            }
-
-            // Track token usage
-            if (evalResult.usage) {
-              report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
-              report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
-              report.tokenUsage.calls++;
-            }
+          const crops = await extractEntityCrops(groupAppearances);
+          if (crops.length < minRequired) {
+            log.warn(`⚠️  [ENTITY-CHECK] ${charName} (${clothingCategory}): only ${crops.length} valid crops`);
+            return null;
           }
 
-          // If no clothing categories were evaluated, remove the empty entry
-          if (Object.keys(report.characters[charName].byClothing).length === 0) {
-            delete report.characters[charName];
-          }
+          const refAvatar = getStyledAvatarForClothing(character, artStyle, clothingCategory);
+          const gridLabel = `${charName} (${clothingCategory})`;
+          const gridResult = await createEntityGrid(crops, gridLabel, refAvatar);
+          const evalResult = await evaluateEntityConsistency(
+            gridResult.buffer, gridResult.manifest,
+            { entityType: 'character', entityName: charName, clothingCategory, referencePhoto: refAvatar, cellCount: crops.length }
+          );
 
+          return { charName, clothingCategory, groupAppearances, gridResult, evalResult, crops };
         } catch (err) {
-          log.error(`❌ [ENTITY-CHECK] Error checking ${charName}: ${err.message}`);
-          report.characters[charName] = {
-            byClothing: {},
-            issues: [],  // Empty for backward compatibility
-            overallConsistent: true,
-            overallScore: 0,
-            totalIssues: 0,
-            error: err.message
-          };
+          log.error(`❌ [ENTITY-CHECK] Error checking ${charName} (${clothingCategory}): ${err.message}`);
+          return { charName, clothingCategory, error: err.message };
         }
       })));
+
+      // Phase 3: Aggregate results into report (sequential, no race conditions)
+      for (const result of results) {
+        if (!result) continue;
+        const { charName, clothingCategory, error } = result;
+
+        if (error) {
+          if (!report.characters[charName]) {
+            report.characters[charName] = { byClothing: {}, issues: [], overallConsistent: true, overallScore: 0, totalIssues: 0, error };
+          }
+          continue;
+        }
+
+        const { groupAppearances, gridResult, evalResult, crops } = result;
+
+        // Store grid for dev panel
+        report.grids.push({
+          entityName: charName, entityType: 'character', clothingCategory,
+          gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+          manifest: gridResult.manifest, cellCount: crops.length
+        });
+
+        if (saveGrids && outputDir) {
+          await saveEntityGrid(gridResult.buffer, `${charName}_${clothingCategory}`, 'character', outputDir);
+        }
+
+        // Store per-clothing result
+        report.characters[charName].byClothing[clothingCategory] = {
+          gridImage: `data:image/jpeg;base64,${gridResult.buffer.toString('base64')}`,
+          consistent: evalResult.consistent,
+          score: evalResult.score,
+          issues: evalResult.issues || [],
+          summary: evalResult.summary,
+          cellCount: crops.length,
+          appearances: groupAppearances.map(a => ({
+            pageNumber: a.pageNumber, faceBox: a.faceBox || null,
+            bodyBox: a.bodyBox || null, clothing: a.clothing || clothingCategory,
+          })),
+          ...(evalResult.parseError && { parseError: true, rawResponse: evalResult.rawResponse })
+        };
+
+        // Aggregate stats
+        if (!evalResult.consistent) {
+          report.characters[charName].overallConsistent = false;
+          report.overallConsistent = false;
+        }
+        const issueCount = evalResult.issues?.length || 0;
+        report.characters[charName].totalIssues += issueCount;
+        report.totalIssues += issueCount;
+
+        for (const issue of (evalResult.issues || [])) {
+          report.characters[charName].issues.push({ ...issue, clothingCategory });
+        }
+
+        if (evalResult.score < report.characters[charName].overallScore) {
+          report.characters[charName].overallScore = evalResult.score;
+        }
+
+        if (evalResult.usage) {
+          report.tokenUsage.inputTokens += evalResult.usage.promptTokenCount || 0;
+          report.tokenUsage.outputTokens += evalResult.usage.candidatesTokenCount || 0;
+          report.tokenUsage.calls++;
+        }
+      }
+
+      // Clean up characters with no evaluated clothing categories
+      for (const charName of Object.keys(report.characters)) {
+        if (Object.keys(report.characters[charName].byClothing).length === 0 && !report.characters[charName].error) {
+          delete report.characters[charName];
+        }
+      }
     }
 
     // Process objects (after character loop)
