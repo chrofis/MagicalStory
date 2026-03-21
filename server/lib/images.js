@@ -5560,7 +5560,22 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
     const finalImageData = `data:image/jpeg;base64,${composited.toString('base64')}`;
     log.info(`✅ [CHAR REPAIR GROK] Blended repair for ${charName} completed. Blend region: ${blendWidth}x${blendHeight}. Cost: $${grokResult.usage?.cost || 0.02}`);
 
-    return { imageData: finalImageData, character: charName, usage: grokResult.usage, method };
+    return {
+      imageData: finalImageData,
+      character: charName,
+      usage: grokResult.usage,
+      method,
+      // Debug: what was sent to Grok (for dev panel inspection)
+      debug: {
+        prompt,
+        sceneSent: sceneDataUri,
+        avatarSent: croppedAvatarDataUri,
+        grokRawResult: grokResult.imageData,
+        bbox: [ymin, xmin, ymax, xmax],
+        faceBbox: faceBbox || null,
+        blendRegion: { left: blendLeft, top: blendTop, width: blendWidth, height: blendHeight },
+      }
+    };
   } else if (useCutout) {
     // ── Cut-out mode: extract bbox region, repair it, composite back ──
     const sharp = require('sharp');
