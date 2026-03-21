@@ -785,6 +785,11 @@ export interface CoverImageData {
   // Bounding box detection for character identification (for dev mode)
   bboxDetection?: BboxSceneDetection | null;
   bboxOverlayImage?: string | null;  // Image with bounding boxes drawn
+  // Evaluation fix targets and issues (from repair workflow re-evaluate)
+  fixTargets?: Array<{ boundingBox: number[]; issue: string; fixPrompt: string }>;
+  fixableIssues?: Array<{ description: string; severity: string; type: string; fix: string; source?: string }>;
+  semanticScore?: number | null;
+  semanticResult?: Record<string, unknown> | null;
   // Story title (sent with frontCover during streaming for early display transition)
   storyTitle?: string;
   // User-initiated image versions (same pattern as scene images)

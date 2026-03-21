@@ -3443,7 +3443,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         if (sceneIndex >= 0) {
           existingImage = sceneImages[sceneIndex];
         } else if (update.pageNumber < 0) {
-          coverType = COVER_TYPES_BY_PAGE[String(update.pageNumber)];
+          coverType = COVER_PAGE_MAP[String(update.pageNumber)];
           existingImage = coverType ? storyData.coverImages?.[coverType] : null;
           isCover = !!existingImage;
         }
