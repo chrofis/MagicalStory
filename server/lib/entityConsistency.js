@@ -261,13 +261,17 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     const artStyle = storyData.artStyle || 'pixar';
 
     if (checkCharacters) {
-      for (const character of characters) {
+      // Process all characters in parallel for speed
+      const pLimit = require('p-limit');
+      const entityLimit = pLimit(5); // Up to 5 characters evaluated concurrently
+
+      await Promise.all(characters.map(character => entityLimit(async () => {
         const charName = character.name;
         const appearances = entityAppearances.get(charName);
 
         if (!appearances || appearances.length === 0) {
           log.verbose(`[ENTITY-CHECK] Skipping ${charName}: no appearances found`);
-          continue;
+          return;
         }
 
         log.info(`🔍 [ENTITY-CHECK] Checking ${charName}: ${appearances.length} total appearances`);
@@ -409,7 +413,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
             error: err.message
           };
         }
-      }
+      })));
     }
 
     // Process objects (after character loop)
