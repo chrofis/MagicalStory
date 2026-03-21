@@ -529,6 +529,23 @@ export function RepairWorkflowPanel({
 
       {isExpanded && (
         <div className="p-4 space-y-3">
+          {/* Evaluation model selector - dev mode only, affects re-evaluate step */}
+          {developerMode && (
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-center gap-3">
+              <label className="text-sm font-medium text-yellow-800 whitespace-nowrap">Evaluation Model:</label>
+              <select
+                value={overrideQualityModel || ''}
+                onChange={(e) => setOverrideQualityModel(e.target.value || null)}
+                className="flex-1 appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                disabled={isRunning}
+              >
+                <option value="">Server Default (gemini-2.0-flash)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast ($0.005/eval)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash — thorough ($0.026/eval)</option>
+              </select>
+            </div>
+          )}
+
           {/* Full Automated Workflow Button */}
           <div className="p-4 bg-gradient-to-r from-indigo-50 to-amber-50 border border-indigo-200 rounded-lg">
             <div className="flex items-center justify-between">
@@ -1217,23 +1234,6 @@ export function RepairWorkflowPanel({
                   </div>
                 )}
 
-                {/* Quality eval model selector - only in developer mode */}
-                {developerMode && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <label className="text-sm font-medium text-yellow-800 mb-2 block">Evaluation Model:</label>
-                    <select
-                      value={overrideQualityModel || ''}
-                      onChange={(e) => setOverrideQualityModel(e.target.value || null)}
-                      className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                      disabled={isRunning}
-                    >
-                      <option value="">Server Default (gemini-2.0-flash)</option>
-                      <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast ($0.005/eval)</option>
-                      <option value="gemini-2.5-flash">Gemini 2.5 Flash — thorough ($0.026/eval)</option>
-                    </select>
-                  </div>
-                )}
-
                 {/* Image & repair model selector - only in developer mode */}
                 {developerMode && (
                   <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -1344,12 +1344,14 @@ export function RepairWorkflowPanel({
                               {page.method && (
                                 <span className={`px-1.5 py-0.5 text-xs rounded font-medium ${
                                   page.method === 'magicapi' ? 'bg-blue-100 text-blue-700' :
-                                  page.method === 'grok_cutout' || page.method === 'grok_blackout' ? 'bg-orange-100 text-orange-700' :
+                                  page.method?.startsWith('grok_') ? 'bg-orange-100 text-orange-700' :
                                   'bg-indigo-100 text-indigo-700'
                                 }`}>
                                   {page.method === 'magicapi' ? 'MagicAPI' :
+                                   page.method === 'grok_blended' ? 'Grok Blended' :
                                    page.method === 'grok_cutout' ? 'Grok Cut-Out' :
-                                   page.method === 'grok_blackout' ? 'Grok Blackout' : 'Gemini'}
+                                   page.method === 'grok_blackout' ? 'Grok Blackout' :
+                                   page.method?.startsWith('grok_') ? `Grok ${page.method.replace('grok_', '')}` : 'Gemini'}
                                 </span>
                               )}
                               {page.verification && (
