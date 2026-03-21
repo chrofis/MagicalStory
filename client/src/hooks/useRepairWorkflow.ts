@@ -459,8 +459,9 @@ export function useRepairWorkflow({
           else entityPenalty += 10;
         }
         feedback.entityPenalty = entityPenalty;
-        // scene.score already includes semantic penalties; apply entity penalty on top
-        const baseScore = scene.score ?? feedback.qualityScore ?? 100;
+        // Use qualityScore (visual-quality-only) as base; scene.score already has entity
+        // penalties baked in from the last evaluation, so using it would double-penalise.
+        const baseScore = feedback.qualityScore ?? 100;
         feedback.score = Math.max(0, baseScore - entityPenalty);
 
         totalIssues += feedback.fixableIssues.length + feedback.entityIssues.length +
@@ -519,7 +520,8 @@ export function useRepairWorkflow({
 
     for (const [pageNum, feedback] of Object.entries(workflowState.collectedFeedback.pages)) {
       const page = parseInt(pageNum);
-      const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length;
+      const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length
+        + (feedback.objectIssues?.length ?? 0) + (feedback.semanticIssues?.length ?? 0);
 
       // Prefer re-evaluation scores when available (more current than collectedFeedback)
       const reEval = workflowState.reEvaluationResults.pages?.[page];
@@ -580,10 +582,19 @@ export function useRepairWorkflow({
         setRedoProgress({ current: completed, total: pageNumbers.length, currentPage: pageNumber });
 
         try {
-          // Use existing iteratePage function
+          // Use existing iteratePage function, passing evaluation feedback if available
+          const reEval = workflowState.reEvaluationResults.pages?.[pageNumber];
+          const pageFeedback = workflowState.collectedFeedback.pages?.[pageNumber];
+          const evalSource = reEval || pageFeedback;
+          const evalFeedback = evalSource ? {
+            score: ('score' in evalSource ? evalSource.score : undefined) ?? evalSource.qualityScore,
+            reasoning: 'reasoning' in evalSource ? evalSource.reasoning : undefined,
+            fixableIssues: evalSource.fixableIssues as Array<{ description?: string; issue?: string }>,
+          } : undefined;
           const result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
             useOriginalAsReference: options?.useOriginalAsReference,
             blackoutIssues: options?.blackoutIssues,
+            evaluationFeedback: evalFeedback,
           });
 
           if (result.success) {
@@ -643,7 +654,7 @@ export function useRepairWorkflow({
       console.error('Redo pages failed:', error);
       failStep('redo-pages', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, workflowState.redoPages.pageNumbers, imageModel, sceneImages, onImageUpdate, startStep, failStep]);
+  }, [storyId, workflowState.redoPages.pageNumbers, workflowState.reEvaluationResults.pages, workflowState.collectedFeedback.pages, imageModel, sceneImages, onImageUpdate, startStep, failStep]);
 
   // Step 4: Re-evaluate pages
   type EvalPageResult = {
@@ -1020,21 +1031,33 @@ export function useRepairWorkflow({
                 result = { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
               }
             } else {
-              result = await storyService.iteratePage(storyId, pageNumber, imageModel);
+              // Pass evaluation feedback so the iterate endpoint knows what to fix
+              // (mirrors the automatic pipeline's feedbackSuffix behaviour)
+              const pageEval = evalResult?.evalPages?.[pageNumber];
+              const evalFeedback = pageEval ? {
+                score: pageEval.score ?? pageEval.qualityScore,
+                reasoning: pageEval.reasoning,
+                fixableIssues: pageEval.fixableIssues,
+              } : undefined;
+              result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
+                evaluationFeedback: evalFeedback,
+              });
             }
             if (result?.success) {
               allRedonePagesAcrossPasses.add(pageNumber);
-              const scene = sceneImages.find(s => s.pageNumber === pageNumber);
-              const newVersionIndex = (scene?.imageVersions?.length ?? 0);
-              onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
-                description: result.sceneDescription,
-                prompt: result.imagePrompt,
-                qualityScore: result.qualityScore,
-                qualityReasoning: result.qualityReasoning,
-                modelId: result.modelId,
-                totalAttempts: result.totalAttempts,
-                type: 'repair',
-              });
+              if (!signal.aborted) {
+                const scene = sceneImages.find(s => s.pageNumber === pageNumber);
+                const newVersionIndex = (scene?.imageVersions?.length ?? 0);
+                onImageUpdate?.(pageNumber, result.imageData, newVersionIndex, {
+                  description: result.sceneDescription,
+                  prompt: result.imagePrompt,
+                  qualityScore: result.qualityScore,
+                  qualityReasoning: result.qualityReasoning,
+                  modelId: result.modelId,
+                  totalAttempts: result.totalAttempts,
+                  type: 'repair',
+                });
+              }
             }
           } catch (err) {
             console.error(`[RepairWorkflow] Pass ${pass}: Failed to redo ${pageNumber < 0 ? 'cover' : 'page'} ${pageNumber}:`, err);
@@ -1087,15 +1110,17 @@ export function useRepairWorkflow({
           const pagesRepaired = charResult.pagesRepaired || [];
           const pagesFailed = charResult.pagesFailed || [];
 
-          // Notify parent of image updates
-          for (const repair of pagesRepaired) {
-            if (repair.imageData && onImageUpdate) {
-              try {
-                onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex, {
-                  type: 'character-repair',
-                });
-              } catch (err) {
-                console.error(`[RepairWorkflow] Failed to notify image update for page ${repair.pageNumber}:`, err);
+          // Notify parent of image updates (skip if aborted)
+          if (!signal.aborted) {
+            for (const repair of pagesRepaired) {
+              if (repair.imageData && onImageUpdate) {
+                try {
+                  onImageUpdate(repair.pageNumber, repair.imageData, repair.versionIndex, {
+                    type: 'character-repair',
+                  });
+                } catch (err) {
+                  console.error(`[RepairWorkflow] Failed to notify image update for page ${repair.pageNumber}:`, err);
+                }
               }
             }
           }
@@ -1151,7 +1176,8 @@ export function useRepairWorkflow({
       // Pick best versions last (considers all versions including character repairs)
       // Include cover pages that have multiple versions so they are also considered
       const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
-      const pickBestPages = [...redonePagesArray, ...coverPageNumbers];
+      // Only include covers that were actually redone, and deduplicate
+      const pickBestPages = [...new Set([...redonePagesArray, ...coverPageNumbers.filter(p => allRedonePagesAcrossPasses.has(p))])];
       if (pickBestPages.length > 0) {
         checkAborted();
         onProgress?.('redo-pages', 'Picking best versions...');

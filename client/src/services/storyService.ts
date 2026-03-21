@@ -1147,7 +1147,7 @@ export const storyService = {
   },
 
   // Iterate image using 17-check scene description prompt with actual image analysis (DEV MODE ONLY)
-  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }): Promise<{
+  async iteratePage(storyId: string, pageNumber: number, imageModel?: string, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean; evaluationFeedback?: { score?: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> } }): Promise<{
     success: boolean;
     pageNumber: number;
     // What the vision model saw
@@ -1222,7 +1222,7 @@ export const storyService = {
       message: string;
     }>(
       `/api/stories/${storyId}/iterate/${pageNumber}`,
-      { imageModel, ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }) }
+      { imageModel, ...(options?.useOriginalAsReference && { useOriginalAsReference: true }), ...(options?.blackoutIssues && { blackoutIssues: true }), ...(options?.evaluationFeedback && { evaluationFeedback: options.evaluationFeedback }) }
     );
     return response;
   },

@@ -811,7 +811,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id, pageNum } = req.params;
-    const { imageModel, useOriginalAsReference, blackoutIssues } = req.body;  // Optional: developer model override
+    const { imageModel, useOriginalAsReference, blackoutIssues, evaluationFeedback } = req.body;  // Optional: developer model override + evaluation feedback
     const pageNumber = parseInt(pageNum);
     const creditCost = CREDIT_COSTS.IMAGE_REGENERATION;
 
@@ -1086,8 +1086,22 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
     }
 
-    // Build image prompt
-    const imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+    // Build image prompt (append evaluation feedback if provided, like the automatic pipeline's feedbackSuffix)
+    let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+    if (evaluationFeedback) {
+      const feedbackParts = [];
+      if (evaluationFeedback.reasoning) {
+        feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
+      }
+      if (evaluationFeedback.fixableIssues?.length > 0) {
+        feedbackParts.push('Specific problems to avoid:\n' +
+          evaluationFeedback.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
+      }
+      if (feedbackParts.length > 0) {
+        imagePrompt = `${imagePrompt}\n\n${feedbackParts.join('\n\n')}`;
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'})`);
+      }
+    }
 
     // Clear cache to force new generation
     const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
@@ -3303,7 +3317,8 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
               success: true,
               updatedImages: [{ pageNumber, imageData: grokResult.imageData }],
               method: grokResult.method,
-              usage: grokResult.usage
+              usage: grokResult.usage,
+              debug: grokResult.debug || null,
             };
           } else {
             return { task, error: true, failReason: 'Grok repair returned no image' };
@@ -3450,6 +3465,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
             verification: repairResult.verification || null,
             method: repairResult.method || 'gemini',
             cropHistory: repairResult.cropHistory || null,
+            debug: repairResult.debug || null,
           });
       }
     }
