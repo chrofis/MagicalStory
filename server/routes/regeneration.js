@@ -3110,10 +3110,38 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
       }
     }
 
-    // Phase 1: Run all expensive API calls in parallel
-    log.info(`🔧 [REPAIR-WORKFLOW] Running ${repairTasks.length} repair tasks in parallel...`);
+    // Phase 1: Run repair API calls — parallel across pages, sequential within a page
+    // Multiple characters on the same page must be repaired sequentially because each
+    // repair modifies the scene image (blackout region → Grok fix → blend). Running them
+    // in parallel would cause each to start from the original, and only the last write wins.
+    const tasksByPage = new Map();
+    for (const task of repairTasks) {
+      const key = task.pageNumber;
+      if (!tasksByPage.has(key)) tasksByPage.set(key, []);
+      tasksByPage.get(key).push(task);
+    }
+    const multiCharPages = [...tasksByPage.values()].filter(t => t.length > 1).length;
+    log.info(`🔧 [REPAIR-WORKFLOW] Running ${repairTasks.length} repair tasks across ${tasksByPage.size} pages (${multiCharPages} pages with multiple characters — sequential within page)...`);
+
     const repairLimit = pLimit(50);
-    const apiResults = await Promise.all(repairTasks.map(task => repairLimit(async () => {
+    // Each "unit" is one page — characters on that page run sequentially
+    const apiResults = (await Promise.all([...tasksByPage.entries()].map(([pageNumber, pageTasks]) => repairLimit(async () => {
+      const pageResults = [];
+      for (const task of pageTasks) {
+        // For sequential repairs on the same page, update the scene image reference
+        // so the next character repair starts from the already-repaired image
+        if (pageResults.length > 0) {
+          const lastSuccess = pageResults.filter(r => r.repairResult?.success).pop();
+          if (lastSuccess?.repairResult?.updatedImages?.[0]?.imageData) {
+            // Update the in-memory scene image so the next repair uses the already-fixed image
+            const sceneImage = findSceneOrCover(storyData, pageNumber);
+            if (sceneImage) {
+              sceneImage.imageData = lastSuccess.repairResult.updatedImages[0].imageData;
+              log.debug(`🔗 [REPAIR-WORKFLOW] Chaining: page ${pageNumber} updated with ${lastSuccess.task.characterName}'s repair for next character`);
+            }
+          }
+        }
+        const result = await (async () => {
       const { characterName, character, pageNumber, charIssues } = task;
       try {
         log.info(`🔧 [REPAIR-WORKFLOW] Repairing ${characterName} on page ${pageNumber} with ${repairMethod}`);
@@ -3338,7 +3366,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
         log.error(`Error repairing ${characterName} on page ${pageNumber}:`, pageErr);
         return { task, error: true, failReason: pageErr.message };
       }
-    })));
+        })();
+        pageResults.push(result);
+      }
+      return pageResults;
+    })))).flat();
 
     // Phase 2: Apply results to DB sequentially (avoids race conditions on storyData blob)
     // Re-read storyData fresh before applying
