@@ -51,7 +51,9 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
       "description": "Snowy town plaza, ancient clock tower on the left",
       "lighting": "Golden hour winter light",
       "weather": "light snow",
-      "camera": "Medium wide shot"
+      "weatherVisibility": "directly on scene",
+      "camera": "Medium wide shot",
+      "depthLayers": "Tower left midground, characters right foreground"
     },
     "characters": [
       {
@@ -87,6 +89,8 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 - `expression`: 1-2 words.
 - `position`: "left", "center", "right", or "background".
 - `setting.description`: 10 words max.
+- `depthLayers`: What's close, what's far. Tells the image generator spatial depth. E.g. "Castle far background, river midground, children close foreground". Only include when depth matters.
+- `weatherVisibility`: Critical for indoor scenes with weather outside. E.g. "snow visible through window only" prevents the generator from putting snow inside the room. Use "directly on scene" for outdoor, "visible through window" for indoor with weather outside, "none" for indoor with no weather visible.
 
 **Validation-only fields (NOT sent to image generator, used to catch impossible scenes):**
 - `holding`: Forces you to account for both hands. If both hands are full, the character can't also wave/point/gesture. Fix the `action` to be physically possible.

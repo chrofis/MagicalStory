@@ -321,6 +321,14 @@ function buildTextFromJson(scene) {
     if (scene.setting.camera) {
       lines.push('Camera: ' + scene.setting.camera);
     }
+    // Depth layers: tells generator what's close vs far (only when specified)
+    if (scene.setting.depthLayers) {
+      lines.push('Depth: ' + scene.setting.depthLayers);
+    }
+    // Weather visibility: prevents snow inside rooms etc. (only when relevant)
+    if (scene.setting.weatherVisibility && scene.setting.weatherVisibility !== 'none' && scene.setting.weatherVisibility !== 'not applicable') {
+      lines.push('Weather visibility: ' + scene.setting.weatherVisibility);
+    }
   }
 
   // Objects (if any have IDs from Visual Bible)
