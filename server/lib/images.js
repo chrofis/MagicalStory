@@ -3329,11 +3329,12 @@ async function evaluateImageBatch(images, options = {}) {
       }
 
       // Run quality evaluation (with parallel semantic fidelity check if pageText provided)
+      // Use img.evaluationType if set (covers use 'cover' for text-focused eval)
       const qualityResult = await evaluateImageQuality(
         img.imageData,
         img.sceneDescription || img.prompt || '',
         img.allCharacterPhotos || img.characterPhotos || [],
-        'scene',
+        img.evaluationType || 'scene',
         qualityModelOverride,
         pageLabel,
         img.pageText || null,  // Story text for semantic fidelity check
@@ -4338,7 +4339,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     sceneCharacters: img.sceneCharacters,
     sceneMetadata: img.sceneMetadata,
     pageText: img.text,
-    sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null
+    sceneHint: img.scene?.outlineExtract || img.scene?.sceneHint || null,
+    evaluationType: img.evaluationType,  // 'cover' for covers, undefined for scenes
   }));
 
   // Build entity check data (same structure as final checks in server.js)
@@ -4508,7 +4510,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           sceneCharacters: orig?.sceneCharacters,
           sceneMetadata: orig?.sceneMetadata,
           pageText: orig?.text,
-          sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null
+          sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null,
+          evaluationType: orig?.evaluationType,
         };
       });
 
@@ -4624,7 +4627,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
             sceneCharacters: orig?.sceneCharacters,
             sceneMetadata: orig?.sceneMetadata,
             pageText: orig?.text,
-            sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null
+            sceneHint: orig?.scene?.outlineExtract || orig?.scene?.sceneHint || null,
+            evaluationType: orig?.evaluationType,
           };
         });
 
