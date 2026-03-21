@@ -2751,10 +2751,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       }
     })));
 
-    // Save updated story
-    await saveStoryData(id, storyData);
-
-    // Calculate and persist repair cost
+    // Calculate cost before responding
     let totalInput = 0, totalOutput = 0;
     for (const pageData of Object.values(pages)) {
       if (pageData.usage) {
@@ -2763,11 +2760,14 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
       }
     }
     const apiCost = calculateTokenCost('gemini-2.5-flash', totalInput, totalOutput);
-    await addRepairCost(id, apiCost, 'Re-evaluate');
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
     const badPages = findBadPages(pages);
     res.json({ pages, badPages, apiCost });
+
+    // Save to DB in background (don't block the response)
+    saveStoryData(id, storyData).catch(err => log.error('Failed to save re-evaluation:', err.message));
+    addRepairCost(id, apiCost, 'Re-evaluate').catch(err => log.error('Failed to save re-eval cost:', err.message));
   } catch (err) {
     log.error('❌ [RE-EVALUATE] Failed to re-evaluate pages:', err);
     res.status(500).json({ error: 'Failed to re-evaluate: ' + err.message });
@@ -2933,10 +2933,11 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
       }
     }
 
-    await saveStoryData(id, storyData);
-
     log.info(`✅ [REPAIR-WORKFLOW] Pick-best complete: ${Object.values(results).filter(r => r.switched).length} pages switched`);
     res.json({ results });
+
+    // Save to DB in background (don't block the response)
+    saveStoryData(id, storyData).catch(err => log.error('Failed to save pick-best:', err.message));
   } catch (err) {
     log.error('❌ [REPAIR-WORKFLOW] Failed to pick best versions:', err);
     res.status(500).json({ error: 'Failed to pick best versions: ' + err.message });
@@ -3521,10 +3522,11 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     const verifyTokenCost = calculateTokenCost('gemini-2.5-flash', totalVerifyTokensIn, totalVerifyTokensOut);
     const apiCost = imageGenCost + verifyTokenCost;
     const totalAttempts = totalGeminiRepairs + totalMagicApiRepairs;
-    await addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini)`);
-
     log.info(`✅ [REPAIR-WORKFLOW] Character repair complete`);
     res.json({ results, apiCost });
+
+    // Save cost in background
+    addRepairCost(id, apiCost, `Character repair (${totalAttempts} attempts, ${totalGeminiRepairs} Gemini)`).catch(err => log.error('Failed to save repair cost:', err.message));
   } catch (err) {
     log.error('Error in character repair:', err);
     res.status(500).json({ error: 'Failed to repair characters: ' + err.message });
