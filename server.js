@@ -3686,6 +3686,39 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       const successCount = rawImages.filter(r => r.imageData).length;
       log.info(`✅ [UNIFIED] Phase 5a complete: ${successCount}/${rawImages.length} images generated in ${genDuration}s`);
 
+      // Await covers before repair pipeline so covers go through the same quality checks
+      const COVER_PAGE_MAP = { frontCover: -1, initialPage: -2, backCover: -3 };
+      if (coverAwaitPromise) {
+        if (!timing.coversEnd) {
+          log.debug(`⏳ [UNIFIED] Waiting for covers before repair pipeline...`);
+        }
+        try {
+          await Promise.race([
+            coverAwaitPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Cover generation timed out')), 180000))
+          ]);
+        } catch (coverErr) {
+          log.error(`❌ [UNIFIED] Cover await failed: ${coverErr.message}`);
+        }
+        // Add covers to rawImages with negative page numbers
+        for (const [coverKey, coverData] of Object.entries(coverImages)) {
+          if (coverData?.imageData && COVER_PAGE_MAP[coverKey] != null) {
+            rawImages.push({
+              pageNumber: COVER_PAGE_MAP[coverKey],
+              text: '',
+              sceneDescription: coverData.description,
+              imageData: coverData.imageData,
+              prompt: coverData.prompt,
+              characterPhotos: coverData.referencePhotos || [],
+              scene: { outlineExtract: coverData.description },
+              evaluationType: 'cover', // Use cover evaluation (includes text checks)
+            });
+            log.info(`📸 [UNIFIED] Added ${coverKey} (page ${COVER_PAGE_MAP[coverKey]}) to repair pipeline`);
+          }
+        }
+        coverAwaitPromise = null; // Mark as consumed
+      }
+
       // Phases 5b-5g: Unified repair pipeline
       // Evaluate + entity consistency (parallel) → regen low-scoring (max 2) → pick best → character fix
       const skipQualityEval = inputData.skipQualityEval === true;
@@ -3767,6 +3800,32 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           retryHistory: img.retryHistory || [],
           entityReport: img.entityReport || null
         }));
+
+        // Extract covers from pipeline results back into coverImages (updated with eval data)
+        const COVER_TYPE_MAP = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+        allImages = allImages.filter(img => {
+          if (img.pageNumber < 0) {
+            const coverKey = COVER_TYPE_MAP[String(img.pageNumber)];
+            if (coverKey && coverImages[coverKey]) {
+              // Update cover with pipeline eval results
+              coverImages[coverKey].qualityScore = img.qualityScore;
+              coverImages[coverKey].qualityReasoning = img.qualityReasoning;
+              coverImages[coverKey].fixTargets = img.fixTargets;
+              coverImages[coverKey].fixableIssues = img.fixableIssues;
+              coverImages[coverKey].semanticResult = img.semanticResult;
+              coverImages[coverKey].semanticScore = img.semanticScore;
+              coverImages[coverKey].issuesSummary = img.issuesSummary;
+              coverImages[coverKey].verdict = img.verdict;
+              coverImages[coverKey].bboxDetection = img.bboxDetection;
+              coverImages[coverKey].imageVersions = img.imageVersions;
+              if (img.imageData) coverImages[coverKey].imageData = img.imageData;
+              if (img.wasRegenerated) coverImages[coverKey].wasRegenerated = true;
+              log.info(`📸 [UNIFIED] ${coverKey} pipeline result: score ${img.qualityScore}, ${img.wasRegenerated ? 'regenerated' : 'original'}`);
+            }
+            return false; // Remove from allImages (covers stored separately)
+          }
+          return true;
+        });
       }
 
     }
