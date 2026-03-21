@@ -1453,38 +1453,41 @@ export function RepairWorkflowPanel({
                               )}
                             </div>
                             {page.comparison && (
-                              <div className="grid grid-cols-3 gap-2 mb-2">
-                                <div className="text-center">
+                              <div className="space-y-2 mb-2">
+                                {/* Side-by-side before/after — click to see full size comparison */}
+                                {page.comparison.before && (
+                                  <div
+                                    className="grid grid-cols-2 gap-1 cursor-pointer hover:opacity-90 transition-opacity rounded border border-gray-200 overflow-hidden"
+                                    onClick={() => setGridLightbox(`COMPARE:${page.comparison!.before}|||${page.comparison!.after}`)}
+                                  >
+                                    <div className="relative">
+                                      <img src={page.comparison.before} alt="Before" className="w-full h-32 object-contain bg-gray-50" />
+                                      <span className="absolute top-1 left-1 text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded font-medium">Before</span>
+                                    </div>
+                                    <div className="relative">
+                                      <img src={page.comparison.after} alt="After" className="w-full h-32 object-contain bg-gray-50" />
+                                      <span className="absolute top-1 left-1 text-[10px] bg-green-600 text-white px-1.5 py-0.5 rounded font-medium">After</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Reference avatar */}
+                                <div className="flex items-center gap-2">
                                   <img
                                     src={page.comparison.reference}
                                     alt="Reference avatar"
-                                    className="w-full h-24 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="w-12 h-12 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80"
                                     onClick={() => setGridLightbox(page.comparison!.reference)}
                                   />
-                                  <span className="text-xs text-gray-500 mt-1 block">Reference</span>
+                                  <span className="text-xs text-gray-500">Reference avatar</span>
                                 </div>
-                                <div className="text-center">
-                                  {page.comparison.before ? (
-                                    <img
-                                      src={page.comparison.before}
-                                      alt="Before repair"
-                                      className="w-full h-24 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
-                                      onClick={() => setGridLightbox(page.comparison!.before!)}
-                                    />
-                                  ) : (
-                                    <div className="w-full h-24 flex items-center justify-center rounded border border-gray-200 bg-gray-50 text-xs text-gray-400">N/A</div>
-                                  )}
-                                  <span className="text-xs text-gray-500 mt-1 block">Before</span>
-                                </div>
-                                <div className="text-center">
+                                {!page.comparison.before && (
                                   <img
                                     src={page.comparison.after}
                                     alt="After repair"
-                                    className="w-full h-24 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80 transition-opacity"
+                                    className="w-full h-32 object-contain rounded border border-gray-200 bg-gray-50 cursor-pointer hover:opacity-80"
                                     onClick={() => setGridLightbox(page.comparison!.after)}
                                   />
-                                  <span className="text-xs text-gray-500 mt-1 block">After</span>
-                                </div>
+                                )}
                               </div>
                             )}
                             {page.verification?.explanation && (
@@ -1817,11 +1820,35 @@ export function RepairWorkflowPanel({
       )}
     </div>
     {gridLightbox && (
-      <ImageLightbox
-        src={gridLightbox}
-        alt="Consistency Grid"
-        onClose={() => setGridLightbox(null)}
-      />
+      gridLightbox.startsWith('COMPARE:') ? (
+        // Side-by-side comparison lightbox
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setGridLightbox(null)}>
+          <div className="max-w-[95vw] max-h-[95vh] grid grid-cols-2 gap-2" onClick={e => e.stopPropagation()}>
+            {(() => {
+              const [before, after] = gridLightbox.replace('COMPARE:', '').split('|||');
+              return (
+                <>
+                  <div className="relative">
+                    <img src={before} alt="Before" className="max-h-[90vh] w-auto object-contain rounded" />
+                    <span className="absolute top-2 left-2 text-sm bg-red-600 text-white px-3 py-1 rounded font-semibold shadow">Before</span>
+                  </div>
+                  <div className="relative">
+                    <img src={after} alt="After" className="max-h-[90vh] w-auto object-contain rounded" />
+                    <span className="absolute top-2 left-2 text-sm bg-green-600 text-white px-3 py-1 rounded font-semibold shadow">After</span>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+          <button onClick={() => setGridLightbox(null)} className="absolute top-4 right-4 text-white text-3xl hover:text-gray-300">&times;</button>
+        </div>
+      ) : (
+        <ImageLightbox
+          src={gridLightbox}
+          alt="Consistency Grid"
+          onClose={() => setGridLightbox(null)}
+        />
+      )
     )}
     </>
   );
