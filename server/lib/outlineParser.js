@@ -1431,8 +1431,10 @@ class UnifiedStoryParser {
       // Strip any trailing metadata like "*(Word count: 331)*" or similar
       const text = textMatch ? textMatch[1].trim().replace(/\s*\*\([^)]*\)\*\s*$/g, '').replace(/\s*\[[A-Z]{2,3}\d{3}\]/g, '').trim() : '';
 
-      // Extract SCENE HINT section (stops at Characters: which is now multi-line)
-      const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=Characters:|---\s*Page|$)/i);
+      // Extract SCENE HINT section (stops at line-start Characters: block or next page)
+      // IMPORTANT: Use multiline flag so ^ matches line starts — prevents matching
+      // "characters": inside JSON scene hints (which would truncate the hint)
+      const hintMatch = content.match(/SCENE HINT:\s*([\s\S]*?)(?=^Characters(?:\s*\([^)]*\))?:|---\s*Page|$)/im);
       const sceneHint = hintMatch ? hintMatch[1].trim() : '';
 
       // Extract per-character clothing from text-based format:

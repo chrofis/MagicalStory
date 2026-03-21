@@ -1784,7 +1784,8 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
 
   const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-  // Build character object for inputData (stripped version - full data loaded from DB during processing)
+  // Build character object for inputData (full data reloaded from DB during processing,
+  // but include physical/photos defensively so avatar styling works even without DB reload)
   const trialCharacter = {
     id: characterData._charId,
     name: characterData.name || 'Child',
@@ -1793,6 +1794,8 @@ async function createTrialStoryJob(pool, userId, characterId, characterData, sto
     traits: characterData.traits || [],
     role: 'main',
     isMainCharacter: true,
+    physical: characterData.physical || {},
+    photos: characterData.photos || {},
     photoUrl: characterData.photos?.face || null,
     bodyPhotoUrl: characterData.photos?.body || null,
     bodyNoBgUrl: characterData.photos?.bodyNoBg || null,

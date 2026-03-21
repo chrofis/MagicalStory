@@ -259,7 +259,7 @@ async function convertAvatarToStyle(originalAvatar, artStyle, characterName, fac
       fullPrompt = fillTemplate(template, {
         'ART_STYLE_PROMPT': artStylePrompt,
         'COSTUME_DESCRIPTION': clothingText,
-        'COSTUME_TYPE': 'standard outfit',
+        'COSTUME_TYPE': clothingCategory.startsWith('costumed:') ? clothingCategory.split(':')[1] + ' costume' : 'standard outfit',
         'PHYSICAL_TRAITS': physicalTraits
       });
     } else {
