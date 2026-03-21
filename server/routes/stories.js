@@ -438,13 +438,14 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
           const versionMeta = row.version_index > 0 ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {}) : {};
           const versionDate = row.generated_at || versionMeta.createdAt;
+          const isActiveVersion = row.version_index === activeVersion;
           scene.imageVersions.push({
             versionIndex: row.version_index,
             hasImage: true,
             qualityScore: row.quality_score,
             generatedAt: versionDate,
             createdAt: versionDate,  // ImageHistoryModal reads createdAt
-            isActive: row.version_index === activeVersion,
+            isActive: isActiveVersion,
             // Dev mode metadata from data blob
             description: versionMeta.description,
             prompt: versionMeta.prompt,
@@ -452,6 +453,11 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             modelId: versionMeta.modelId,
             type: versionMeta.type
           });
+          // Update main qualityScore to reflect the ACTIVE version, not just version 0
+          if (isActiveVersion) {
+            scene.qualityScore = row.quality_score;
+            scene.generatedAt = row.generated_at;
+          }
         } else {
           // Cover image
           coverImages[row.image_type] = {
