@@ -5515,8 +5515,10 @@ async function repairCharacterMismatchWithGrok(imageData, characterPhoto, bbox, 
       }
     }
 
-    const headNote = faceBbox ? `The character's head has been removed (blank area). Fill in the head to match ${charName}'s face, hair, and skin from the reference photo exactly. ` : '';
-    const prompt = `Fix the character at the ${vPos} ${hPos} of this children's book illustration. ${headNote}Make this character look like ${charName} from the reference photo — match face, hair color, skin tone, and features exactly. Keep the same pose, position, and action. Keep the same art style.${clothingContext}${actionContext}${issueContext}\n\nOnly change the character at ${vPos} ${hPos}. Keep background and all other characters unchanged.`;
+    const whiteAreaNote = whiteoutBox
+      ? `There is a WHITE RECTANGLE in the image where the character should be. You MUST completely replace ALL white pixels in that area — redraw the entire character (face, hair, body, clothing) to fill the white region entirely. No white area should remain visible.`
+      : '';
+    const prompt = `Fix the character at the ${vPos} ${hPos} of this children's book illustration.\n\n${whiteAreaNote}\n\nMake this character look like ${charName} from the reference photo — match face, hair color, skin tone, and features exactly. Keep the same pose, position, and action. Keep the same art style.${clothingContext}${actionContext}${issueContext}\n\nOnly change the character at ${vPos} ${hPos}. Keep background and all other characters unchanged.`;
 
     log.info(`👤 [CHAR REPAIR GROK] Blended: character at ${bboxWidth}x${bboxHeight} (${bboxLeft},${bboxTop}), head ${faceBbox ? 'whited out' : 'intact'}, sending to Grok...`);
     const grokResult = await editWithGrok(prompt, [croppedAvatarDataUri, sceneDataUri]);
