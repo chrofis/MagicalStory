@@ -3747,6 +3747,19 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       } else {
         log.info(`🔧 [UNIFIED] Running unified repair pipeline...`);
 
+        // Build storyData for iterate (needs scene descriptions, characters, visual bible)
+        const pipelineStoryData = {
+          characters: inputData.characters,
+          sceneDescriptions: expandedScenes,
+          storyText: generatedStory,
+          visualBible,
+          artStyle: inputData.artStyle,
+          language: inputData.language,
+          clothingRequirements: mergedClothingRequirements,
+          pageClothing: pageClothingData,
+          sceneImages: rawImages.map(r => ({ pageNumber: r.pageNumber, imageData: r.imageData, description: r.sceneDescription })),
+        };
+
         const { results: pipelineResult, charFixDetails } = await runUnifiedRepairPipeline(rawImages, {
           characters: inputData.characters,
           modelOverrides,
@@ -3754,12 +3767,13 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBible,
           artStyle: inputData.artStyle,
           jobId,
-          dbPool
+          dbPool,
+          storyData: pipelineStoryData
         }, {
           maxRegenAttempts: enableFullRepair ? REPAIR_DEFAULTS.maxPasses : 0,  // 0 = evaluate only
           evalConcurrency: 500,
           qualityModelOverride: modelOverrides.qualityModel,
-          useIteratePage: false  // Fresh generation by default during story creation
+          useIteratePage: true  // Use iterate (re-expansion) for better redo quality
         });
 
         // Hoist pipeline data for use outside this block (finalChecksReport)
