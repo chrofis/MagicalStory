@@ -4318,10 +4318,21 @@ export function StoryDisplay({
                                     {Math.round(image?.qualityScore ?? 0)}%
                                   </span>
                                 </summary>
-                                {image?.qualityReasoning && (
+                                {(image?.issuesSummary || image?.qualityReasoning) && (
                                   <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                                    <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                                    <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
+                                    {image.issuesSummary && (
+                                      <p className="text-gray-700">{image.issuesSummary}</p>
+                                    )}
+                                    {image.qualityReasoning && (
+                                      <details className={image.issuesSummary ? 'mt-2' : ''}>
+                                        <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 text-xs">
+                                          {image.issuesSummary
+                                            ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
+                                            : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
+                                        </summary>
+                                        <p className="whitespace-pre-wrap mt-1">{image.qualityReasoning}</p>
+                                      </details>
+                                    )}
                                   </div>
                                 )}
                               </details>
@@ -4849,10 +4860,21 @@ export function StoryDisplay({
                                     {Math.round(image.qualityScore)}%
                                   </span>
                                 </summary>
-                                {image.qualityReasoning && (
+                                {(image.issuesSummary || image.qualityReasoning) && (
                                   <div className="mt-2 text-xs text-gray-800 bg-white p-3 rounded border border-gray-200">
-                                    <div className="font-semibold mb-1">{language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:'}</div>
-                                    <p className="whitespace-pre-wrap">{image.qualityReasoning}</p>
+                                    {image.issuesSummary && (
+                                      <p className="text-gray-700">{image.issuesSummary}</p>
+                                    )}
+                                    {image.qualityReasoning && (
+                                      <details className={image.issuesSummary ? 'mt-2' : ''}>
+                                        <summary className="cursor-pointer text-indigo-600 hover:text-indigo-800 text-xs">
+                                          {image.issuesSummary
+                                            ? (language === 'de' ? 'Vollständiges Feedback anzeigen' : language === 'fr' ? 'Afficher le retour complet' : 'Show full feedback')
+                                            : (language === 'de' ? 'Feedback:' : language === 'fr' ? 'Retour:' : 'Feedback:')}
+                                        </summary>
+                                        <p className="whitespace-pre-wrap mt-1">{image.qualityReasoning}</p>
+                                      </details>
+                                    )}
                                   </div>
                                 )}
                               </details>
