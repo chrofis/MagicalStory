@@ -15,40 +15,6 @@ interface ObjectDetectionDisplayProps {
 }
 
 /**
- * Extract bbox detection data from retry history
- * Looks for the most recent entry with bboxDetection data
- */
-function extractBboxData(retryHistory?: RetryAttempt[]): {
-  bboxDetection: BboxSceneDetection | null;
-  bboxOverlayImage: string | null;
-  hasBboxOverlay: boolean;
-} {
-  if (!retryHistory || retryHistory.length === 0) {
-    return { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
-  }
-
-  // Find the entry with bbox detection data (prefer bbox_detection_only, then others)
-  const bboxEntry = retryHistory.find(r => r.type === 'bbox_detection_only' && r.bboxDetection) ||
-    retryHistory.find(r => r.bboxDetection);
-
-  if (!bboxEntry) {
-    return { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
-  }
-
-  // Check if it's the new scene detection format (has figures array)
-  const detection = bboxEntry.bboxDetection;
-  if (detection && typeof detection === 'object' && 'figures' in detection) {
-    return {
-      bboxDetection: detection as BboxSceneDetection,
-      bboxOverlayImage: bboxEntry.bboxOverlayImage || null,
-      hasBboxOverlay: !!bboxEntry.hasBboxOverlay || !!bboxEntry.bboxOverlayImage
-    };
-  }
-
-  return { bboxDetection: null, bboxOverlayImage: null, hasBboxOverlay: false };
-}
-
-/**
  * Download text content as a file
  */
 function downloadAsText(content: string, filename: string) {
@@ -68,7 +34,8 @@ function downloadAsText(content: string, filename: string) {
  * Shows detected figures, objects, expected positions, and mismatches
  */
 export function ObjectDetectionDisplay({
-  retryHistory,
+  // retryHistory not used — fresh bbox comes from re-evaluate direct props
+  retryHistory: _retryHistory,
   bboxDetection: directBboxDetection,
   bboxOverlayImage: directBboxOverlayImage,
   language,
