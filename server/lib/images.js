@@ -4436,7 +4436,9 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       lowScoringPages.map(img => regenLimit(async () => {
         try {
           let result;
-          if (effectiveUseIteratePage) {
+          // iteratePage requires page text + scene description — not available for covers
+          const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
+          if (canIterate) {
             result = await iteratePage(img.imageData, img.pageNumber, storyData, {
               modelOverrides,
               usageTracker: null
@@ -4554,7 +4556,8 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
         stillLowPages.map(img => regenLimit2(async () => {
           try {
             let result;
-            if (effectiveUseIteratePage) {
+            const canIterate2 = effectiveUseIteratePage && img.pageNumber > 0;
+            if (canIterate2) {
               // For pass 2 with iteratePage, use the best version so far as input
               const versions = pageVersions.get(img.pageNumber) || [];
               const bestSoFar = selectBestVersion(versions);
@@ -5012,12 +5015,14 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   const availableAvatars = buildAvailableAvatarsForPrompt(characters, clothingRequirements);
 
   // Extract short scene description from current scene
+  // Handle both field names: 'description' (saved stories) and 'sceneDescription' (pipeline)
+  const sceneDescText = currentScene.description || currentScene.sceneDescription || '';
   let shortSceneDesc = '';
-  const sceneMetadata = extractSceneMetadata(currentScene.description);
+  const sceneMetadata = extractSceneMetadata(sceneDescText);
   if (sceneMetadata?.imageSummary) {
     shortSceneDesc = sceneMetadata.imageSummary;
   } else {
-    shortSceneDesc = currentScene.description.substring(0, 500);
+    shortSceneDesc = sceneDescText.substring(0, 500);
   }
 
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Building scene description prompt with preview feedback...`);
