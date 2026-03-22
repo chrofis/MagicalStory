@@ -605,7 +605,8 @@ async function evaluateImageQuality(imageData, originalPrompt = '', referenceIma
     }
 
     // Determine model to use (parameter override > config default > fallback)
-    const modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
+    // let: may be reassigned to fallback model on content block
+    let modelId = qualityModelOverride || MODEL_DEFAULTS.qualityEval || 'gemini-2.5-flash';
 
     // Pre-sanitize for 2.5 models to reduce content blocking on first attempt
     const promptForEval = modelId.includes('2.5') ? sanitizePromptFor25(originalPrompt) : originalPrompt;

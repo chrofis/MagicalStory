@@ -222,7 +222,7 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
  * @returns {Promise<Buffer>} Cropped (or original) JPEG buffer
  */
 async function cropToFrontColumn(buffer) {
-  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://localhost:5000';
+  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://127.0.0.1:5000';
 
   // Try Python service first (detects actual separator line via variance analysis)
   try {
