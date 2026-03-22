@@ -1143,6 +1143,14 @@ export function RepairWorkflowPanel({
                   const pageNumbers = sceneImages
                     .filter(img => img.imageVersions && img.imageVersions.length > 1)
                     .map(img => img.pageNumber);
+                  // Include covers with multiple versions
+                  if (coverImages) {
+                    const coverMap: Array<[string, number]> = [['frontCover', -1], ['initialPage', -2], ['backCover', -3]];
+                    for (const [ct, pn] of coverMap) {
+                      const cover = (coverImages as any)[ct];
+                      if (cover?.imageVersions?.length > 1) pageNumbers.push(pn);
+                    }
+                  }
                   if (pageNumbers.length === 0) return;
                   try {
                     const result = await storyService.pickBestVersions(storyId!, pageNumbers);
