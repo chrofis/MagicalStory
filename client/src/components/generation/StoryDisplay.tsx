@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users } from 'lucide-react';
+import { BookOpen, FileText, ShoppingCart, Plus, Download, RefreshCw, Edit3, Save, X, Images, RotateCcw, Wrench, Loader, Loader2, ChevronDown, Users, Sparkles } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { DiagnosticImage } from '@/components/common';
 import type { SceneImage, SceneDescription, CoverImages, CoverImageData, ImageVersion, RepairAttempt, StoryLanguageCode, GenerationLogEntry, FinalChecksReport } from '@/types/story';
@@ -117,6 +117,7 @@ interface StoryDisplayProps {
   characters?: Array<{ id: number; name: string; photoData?: string }>;
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
+  onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
   onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
@@ -188,6 +189,7 @@ export function StoryDisplay({
   characters = [],
   onEditImage,
   onEditCover: _onEditCover,
+  onImproveImage,
   onRepairImage,
   onIteratePage,
   onRevertRepair,
@@ -265,6 +267,8 @@ export function StoryDisplay({
   const [repairingIssuePage, setRepairingIssuePage] = useState<number | null>(null);
   const [repairingSingleEntityPage, setRepairingSingleEntityPage] = useState<{ entity: string; page: number } | null>(null);
 
+  // User-facing improve state (one-click, available to all users)
+  const [improvingPage, setImprovingPage] = useState<number | null>(null);
   // Iterative improvement state (dev mode only)
   const [iteratingPage, setIteratingPage] = useState<number | null>(null);
   // Iterate options panel: which page is showing options, and the toggle value
@@ -648,6 +652,19 @@ export function StoryDisplay({
       console.error('Failed to repair image:', err);
     } finally {
       setRepairingPage(null);
+    }
+  };
+
+  // Handle improve image (user-facing) - one click, uses iterate with defaults
+  const handleImproveImage = async (pageNumber: number) => {
+    if (!onImproveImage || improvingPage !== null) return;
+    setImprovingPage(pageNumber);
+    try {
+      await onImproveImage(pageNumber);
+    } catch (err) {
+      console.error('Failed to improve image:', err);
+    } finally {
+      setImprovingPage(null);
     }
   };
 
@@ -3514,26 +3531,38 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Regenerate Cover and History - visible to all users */}
-            {_onRegenerateCover && (
+            {/* Cover action buttons - visible to all users */}
+            {(_onRegenerateCover || onImproveImage) && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={() => openCoverEditModal('front')}
-                  disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
-                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                  }`}
-                  title={!hasEnoughCredits
-                    ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
-                    : ''
-                  }
-                >
-                  <RefreshCw size={14} />
-                  {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                  <span className="text-xs opacity-80">
-                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
-                  </span>
-                </button>
+                {onImproveImage && (
+                  <button
+                    onClick={() => handleImproveImage(-1)}
+                    disabled={isGenerating || improvingPage !== null || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
+                    className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || improvingPage !== null || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                    }`}
+                    title={language === 'de' ? 'KI verbessert das Bild automatisch' : language === 'fr' ? 'L\'IA améliore automatiquement' : 'AI improves automatically'}
+                  >
+                    {improvingPage === -1 ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                    ) : (
+                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                    )}
+                  </button>
+                )}
+                {_onRegenerateCover && (
+                  <button
+                    onClick={() => openCoverEditModal('front')}
+                    disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover')}
+                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || !hasEnoughCredits || regeneratingCovers.has('frontCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    }`}
+                    title={language === 'de' ? 'Szene bearbeiten und neu generieren' : language === 'fr' ? 'Modifier et régénérer' : 'Edit and regenerate'}
+                  >
+                    <RefreshCw size={14} />
+                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  </button>
+                )}
                 {getCoverVersions('frontCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'frontCover', versions: getCoverVersions('frontCover') })}
@@ -3738,26 +3767,36 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Regenerate Cover and History - visible to all users */}
-            {_onRegenerateCover && (
+            {/* Cover action buttons - visible to all users */}
+            {(_onRegenerateCover || onImproveImage) && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={() => openCoverEditModal('initial')}
-                  disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
-                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                  }`}
-                  title={!hasEnoughCredits
-                    ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
-                    : ''
-                  }
-                >
-                  <RefreshCw size={14} />
-                  {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                  <span className="text-xs opacity-80">
-                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
-                  </span>
-                </button>
+                {onImproveImage && (
+                  <button
+                    onClick={() => handleImproveImage(-2)}
+                    disabled={isGenerating || improvingPage !== null || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
+                    className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || improvingPage !== null || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                    }`}
+                  >
+                    {improvingPage === -2 ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                    ) : (
+                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                    )}
+                  </button>
+                )}
+                {_onRegenerateCover && (
+                  <button
+                    onClick={() => openCoverEditModal('initial')}
+                    disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage')}
+                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || !hasEnoughCredits || regeneratingCovers.has('initialPage') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    }`}
+                  >
+                    <RefreshCw size={14} />
+                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  </button>
+                )}
                 {getCoverVersions('initialPage').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'initialPage', versions: getCoverVersions('initialPage') })}
@@ -4027,27 +4066,38 @@ export function StoryDisplay({
                           </div>
                         )}
                         {/* Image action buttons - shown to all users */}
-                        {onRegenerateImage && (
+                        {(onRegenerateImage || onImproveImage) && (
                           <div className="mt-3 space-y-2">
-                            {/* Regenerate Image and Edit Text buttons */}
                             <div className="flex flex-wrap gap-2 items-center">
-                              <button
-                                onClick={() => openSceneEditModal(pageNumber)}
-                                disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
-                                className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                }`}
-                                title={!hasEnoughCredits
-                                  ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
-                                  : ''
-                                }
-                              >
-                                <RefreshCw size={14} />
-                                {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                                <span className="text-xs opacity-80">
-                                  ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
-                                </span>
-                              </button>
+                              {onImproveImage && (
+                                <button
+                                  onClick={() => handleImproveImage(pageNumber)}
+                                  disabled={isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                                  }`}
+                                  title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
+                                >
+                                  {improvingPage === pageNumber ? (
+                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
+                                  ) : (
+                                    <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                  )}
+                                </button>
+                              )}
+                              {onRegenerateImage && (
+                                <button
+                                  onClick={() => openSceneEditModal(pageNumber)}
+                                  disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  }`}
+                                  title={language === 'de' ? 'Szene bearbeiten und neu generieren' : language === 'fr' ? 'Modifier la scène et régénérer' : 'Edit scene and regenerate'}
+                                >
+                                  <RefreshCw size={14} />
+                                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                                </button>
+                              )}
                               {/* Edit Text button */}
                               {onSaveStoryText && (
                                 <button
@@ -4570,27 +4620,38 @@ export function StoryDisplay({
                           )}
                         </div>
                         {/* Image action buttons - shown to all users */}
-                        {onRegenerateImage && (
+                        {(onRegenerateImage || onImproveImage) && (
                           <div className="mt-3 space-y-2">
-                            {/* Regenerate Image and Edit Text buttons */}
                             <div className="flex flex-wrap gap-2 items-center">
-                              <button
-                                onClick={() => openSceneEditModal(pageNumber)}
-                                disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
-                                className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                  isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                                }`}
-                                title={!hasEnoughCredits
-                                  ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
-                                  : ''
-                                }
-                              >
-                                <RefreshCw size={14} />
-                                {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                                <span className="text-xs opacity-80">
-                                  ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
-                                </span>
-                              </button>
+                              {onImproveImage && (
+                                <button
+                                  onClick={() => handleImproveImage(pageNumber)}
+                                  disabled={isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                                  }`}
+                                  title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
+                                >
+                                  {improvingPage === pageNumber ? (
+                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
+                                  ) : (
+                                    <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                  )}
+                                </button>
+                              )}
+                              {onRegenerateImage && (
+                                <button
+                                  onClick={() => openSceneEditModal(pageNumber)}
+                                  disabled={isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                                    isGenerating || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                  }`}
+                                  title={language === 'de' ? 'Szene bearbeiten und neu generieren' : language === 'fr' ? 'Modifier la scène et régénérer' : 'Edit scene and regenerate'}
+                                >
+                                  <RefreshCw size={14} />
+                                  {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                                </button>
+                              )}
                               {/* Edit Text button */}
                               {onSaveStoryText && (
                                 <button
@@ -5043,26 +5104,36 @@ export function StoryDisplay({
                 </div>
               )}
             </div>
-            {/* Regenerate Cover and History - visible to all users */}
-            {_onRegenerateCover && (
+            {/* Cover action buttons - visible to all users */}
+            {(_onRegenerateCover || onImproveImage) && (
               <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={() => openCoverEditModal('back')}
-                  disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
-                  className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                    isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
-                  }`}
-                  title={!hasEnoughCredits
-                    ? (language === 'de' ? 'Nicht genug Credits' : language === 'fr' ? 'Pas assez de crédits' : 'Not enough credits')
-                    : ''
-                  }
-                >
-                  <RefreshCw size={14} />
-                  {language === 'de' ? 'Bild neu generieren' : language === 'fr' ? 'Régénérer l\'image' : 'Regenerate Image'}
-                  <span className="text-xs opacity-80">
-                    ({imageRegenerationCost} {language === 'de' ? 'Credits' : 'credits'})
-                  </span>
-                </button>
+                {onImproveImage && (
+                  <button
+                    onClick={() => handleImproveImage(-3)}
+                    disabled={isGenerating || improvingPage !== null || regeneratingCovers.has('backCover') || !hasEnoughCredits}
+                    className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || improvingPage !== null || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                    }`}
+                  >
+                    {improvingPage === -3 ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                    ) : (
+                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                    )}
+                  </button>
+                )}
+                {_onRegenerateCover && (
+                  <button
+                    onClick={() => openCoverEditModal('back')}
+                    disabled={isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover')}
+                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || !hasEnoughCredits || regeneratingCovers.has('backCover') ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                    }`}
+                  >
+                    <RefreshCw size={14} />
+                    {language === 'de' ? 'Neu generieren' : language === 'fr' ? 'Régénérer' : 'Regenerate'}
+                  </button>
+                )}
                 {getCoverVersions('backCover').length > 1 && (
                   <button
                     onClick={() => setCoverHistoryModal({ coverType: 'backCover', versions: getCoverVersions('backCover') })}

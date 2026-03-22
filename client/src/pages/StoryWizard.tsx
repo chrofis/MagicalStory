@@ -4403,6 +4403,45 @@ export default function StoryWizard() {
                     : 'Failed to update Visual Bible');
                 }
               } : undefined}
+              onImproveImage={storyId ? async (pageNumber: number) => {
+                try {
+                  log.info('Improving image for page:', pageNumber);
+                  const result = await storyService.iteratePage(storyId, pageNumber, modelSelections.imageModel || undefined);
+                  if (result.success) {
+                    if (pageNumber < 0) {
+                      // Cover
+                      const coverTypeMap: Record<number, 'frontCover' | 'initialPage' | 'backCover'> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+                      const coverKey = coverTypeMap[pageNumber];
+                      if (coverKey) {
+                        setCoverImages(prev => {
+                          if (!prev) return prev;
+                          const existing = prev[coverKey];
+                          return { ...prev, [coverKey]: { ...existing, imageData: result.imageData, qualityScore: result.qualityScore, imageVersions: result.imageVersions || existing?.imageVersions } };
+                        });
+                      }
+                    } else {
+                      // Page
+                      setSceneImages(prev => prev.map(img => {
+                        if (img.pageNumber !== pageNumber) return img;
+                        const existingVersions = img.imageVersions || [];
+                        const updatedVersions = result.imageVersions?.map((v, idx) => ({
+                          imageData: v.imageData || existingVersions[idx]?.imageData || '',
+                          description: v.description, prompt: v.prompt, modelId: v.modelId,
+                          createdAt: v.createdAt || new Date().toISOString(),
+                          isActive: v.isActive ?? false,
+                          type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
+                          qualityScore: v.qualityScore
+                        }));
+                        return { ...img, imageData: result.imageData, qualityScore: result.qualityScore, qualityReasoning: result.qualityReasoning, imageVersions: updatedVersions || img.imageVersions };
+                      }));
+                    }
+                    log.info('Image improved successfully, score:', result.qualityScore);
+                  }
+                } catch (error) {
+                  log.error('Image improvement failed:', error);
+                  throw error;
+                }
+              } : undefined}
               onRegenerateImage={storyId ? async (pageNumber: number, editedScene?: string, characterIds?: number[]) => {
                 try {
                   log.info('Regenerating image for page:', pageNumber, editedScene ? '(scene edited)' : '', characterIds ? `(${characterIds.length} characters)` : '');
