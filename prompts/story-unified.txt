@@ -91,49 +91,55 @@ You MUST follow these text length guidelines strictly. Each page's story text mu
 
 # Scene Hint Format
 
-Every page needs a scene hint for illustration. Use this EXACT format:
+Every page needs a scene hint for illustration. Output as JSON after `SCENE HINT:`:
 
 ```
 SCENE HINT:
-[1-2 sentences - capture a specific ACTION happening in the scene. Characters must be DOING something — interacting with the environment or each other. NOT posing, NOT smiling at the viewer. Describe what a camera would catch mid-moment.]
-Characters (MAX {MAX_CHARACTERS_PER_SCENE}):
-- [Name] (left/right/center): [standard | winter | summer | costumed:type]
-- [Name] (position): [clothing category]
-Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weather: [sunny/cloudy/rainy/snowy/n/a]
+{
+  "description": "1-2 sentences — a specific ACTION happening. Characters DOING something, not posing. What a camera would catch mid-moment.",
+  "characters": [
+    { "name": "Name", "position": "left|center|right", "clothing": "standard|winter|summer|costumed:type" },
+    { "name": "Name", "position": "right", "clothing": "standard", "depth": "background", "perspective": "back view" }
+  ],
+  "setting": "indoor|outdoor",
+  "time": "morning|midday|afternoon|sunset|night",
+  "weather": "sunny|cloudy|rainy|snowy|n/a",
+  "shot": "close-up|medium|wide|ultra-wide"
+}
 ```
+
+**Character fields:**
+- `position` (required): `left`, `center`, or `right`
+- `clothing` (required): must match an available avatar category
+- `depth` (optional, default `foreground`): `foreground`, `midground`, or `background` — how far from the camera
+- `perspective` (optional, default `front`): `front`, `side`, `back view`, `over-the-shoulder` — how the camera sees THIS character
 
 **Rules:**
 - **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Pick the most important for this visual moment. Others can be in the story text but NOT in the scene hint.
-  - The scene hint description must ONLY mention characters from the Characters list. Do NOT name anyone else in the hint — not in the background, not "nearby", not "standing together". If they're not in the Characters list, they don't exist in this illustration.
-  - BAD: "Werner (left) gestures. Franziska and Roger stand together smiling. Lukas sits with Manuel and Sophie nearby." (7 characters named!)
-  - GOOD: "Werner (left) gestures appreciatively at the clean room. Verena (center) sets down pirate decorations." (only listed characters)
-- **POSITIONS REQUIRED** - Every character needs (left), (right), or (center). No other position words like "background" or "foreground" in the position field. Example: "Luna (left) waves at Max (right)"
-- **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it! Historical period clothing, fantasy outfits, uniforms — all count as costumed.
+  - The description must ONLY mention characters from the characters array. If they're not listed, they don't exist in this illustration.
+  - BAD: description mentions 7 characters but only 2 are in the array
+  - GOOD: description only references characters that are in the array
+- **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it!
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **INDOOR SCENES** - Use "n/a" for weather
 
 **Scene Variety (IMPORTANT for great illustrations):**
-- **SIMPLE ACTIONS** - Describe what the scene LOOKS LIKE, not a freeze-frame of complex motion. Characters should be in natural, stable poses: sitting, standing, walking, looking at something. Avoid mid-action descriptions like "jumping up from chair while reaching toward the door" — instead: "sitting at the table, looking toward the door." If it would be hard to capture in a single photo, simplify it.
-- **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters in the foreground per scene. A third only when truly needed. More faces in close-up = harder to illustrate well.
-  Avoid group scenes. If a group moment is needed, keep only 1-2 characters in the foreground and place others far in the background (small, no detail needed), or show background characters from behind (walking toward something, looking at something). Back-view and distant figures are much simpler to illustrate.
-  - Good: "Sophie (center) discovers the cave entrance while Max (right, far background) waves from the hilltop"
-  - Good: "Luna (left) reads the map. Behind her, two friends walk away down the path, seen from behind"
-  - Bad: "Sophie, Max, Emma, and Luna all stand in a circle discussing the plan"
-- **EVERY CHARACTER VISIBLE** - Each primary character must appear in at least 2 scene hints across the story. Plan their appearances. A character that's only in the text but never illustrated feels invisible.
-- **VARY THE CAMERA** - Alternate between these shot types across pages. Add the shot type to your scene hint:
-  - Close-up (face/upper body, 1 character, emotional moment)
-  - Medium shot (1-2 characters, waist up, dialogue/interaction)
-  - Wide shot (full body, characters in environment, action)
-  - Ultra-wide/establishing (tiny characters in big landscape, new location)
-  Never use the same shot type 3 pages in a row.
-- **VARY THE COMPOSITION** - Don't always put 2 characters facing each other. Mix it up:
-  - Character alone discovering something
-  - Character seen from behind looking at something
-  - Over-the-shoulder view
-  - Characters side by side looking at the same thing
-  - One character in foreground, another small in distance
-- **VARY EXPRESSIONS** - Not every scene is happy. Match expression to the moment: wonder, concentration, worry, surprise, determination, frustration, relief. "Smiling" should appear on at most 2-3 pages in the entire story. Characters who smile in every scene look like mannequins.
+- **SIMPLE ACTIONS** - Describe what the scene LOOKS LIKE, not complex motion. Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.
+- **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters per scene. If a group moment is needed, keep 1-2 characters in foreground and use `"depth": "background"` or `"perspective": "back view"` for others.
+- **EVERY CHARACTER VISIBLE** - Each primary character must appear in at least 2 scene hints across the story.
+- **VARY THE SHOT** - Alternate across pages. Never use the same shot type 3 pages in a row:
+  - `close-up` — face/upper body, 1 character, emotional moment
+  - `medium` — 1-2 characters, waist up, dialogue/interaction
+  - `wide` — full body, characters in environment, action
+  - `ultra-wide` — tiny characters in big landscape, new location
+- **VARY DEPTH AND PERSPECTIVE** - Don't put every character in `foreground` facing `front` on every page. Plan variety across the story:
+  - Characters seen from behind walking away (use `"perspective": "back view"`)
+  - One character close, another tiny in the distance (use `"depth": "background"`)
+  - Over-the-shoulder view of one character watching another
+  - Ultra-wide with characters as small figures in a landscape
+  - At least 2-3 scenes should use non-default depth or perspective
+- **VARY EXPRESSIONS** - Not every scene is happy. Match expression to the moment: wonder, concentration, worry, surprise, determination. "Smiling" on at most 2-3 pages in the entire story.
 
 # Character Portrayal Guidelines
 
@@ -284,14 +290,13 @@ For EACH character ({CHARACTER_NAMES}), answer these questions BY NAME:
 14. **Passive voice** - Too much "was done" instead of "did"? Make it active.
 
 **D. SCENE HINTS REVIEW:**
-15. **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Check EACH page: more than {MAX_CHARACTERS_PER_SCENE} in scene hint? Pick the {MAX_CHARACTERS_PER_SCENE} most important.
-    - Background characters can be in text but scene hint focuses on max {MAX_CHARACTERS_PER_SCENE}
-16. **Positions** - Does EACH scene hint specify left/right/center for all characters?
+15. **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Check EACH page: more than {MAX_CHARACTERS_PER_SCENE} in characters array? Pick the {MAX_CHARACTERS_PER_SCENE} most important.
+16. **Positions** - Does EACH character have `position` set?
 17. **Clothing** - Categories match scene (winter for cold outdoor, costumed for costume scenes)?
 18. **Setting/Weather** - Is weather consistent across outdoor scenes? Time progresses logically?
-19. **Shot variety** - List the shot type for each page (close-up / medium / wide / ultra-wide). Are 3+ consecutive pages the same type? Fix by varying.
-20. **Scene simplicity** - Count foreground characters per scene hint. More than 2 on most pages? Simplify — pick 1-2 central figures, move others to background or show from behind.
-21. **Character coverage** - List which pages each primary character appears in scene hints. Any character with fewer than 2 appearances? Add them to a relevant scene.
+19. **Shot variety** - List the shot type for each page. Are 3+ consecutive pages the same type? Fix by varying.
+20. **Depth & perspective variety** - List pages where `depth` or `perspective` differs from the default (foreground/front). Are there at least 2-3 such pages? If every page is foreground+front, add variety: back views, background figures, over-the-shoulder.
+21. **Character coverage** - List which pages each primary character appears in. Any character with fewer than 2 appearances? Add them to a relevant scene.
 
 **E. CLICHÉ CHECK:**
 22. **BANNED GESTURES** - Search for: "hand on shoulder", "ruffled hair", "patted on back", "nodded wisely", "arm around shoulders". FORBIDDEN. Replace with: fist-bump, high-five, thumbs up, playful elbow nudge.
@@ -354,10 +359,8 @@ Based on the story draft, determine which clothing variants each character needs
 **Draft 1**
 Sophie ran to the window. Snow was falling!
 *(Word count: 8)*
-Scene hint: Sophie (right) presses hands against frosty window.
-Characters:
-- Sophie (right): standard
-Setting: indoor | Time: morning | Weather: snowy
+SCENE HINT:
+{"description":"Sophie presses both hands against the frosty window, breath fogging the glass.","characters":[{"name":"Sophie","position":"right","clothing":"standard"}],"setting":"indoor","time":"morning","weather":"snowy","shot":"close-up"}
 
 ---CRITICAL ANALYSIS---
 **Check:** 1. Logic OK  2. Positions OK  3. No banned gestures

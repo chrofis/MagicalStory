@@ -1376,17 +1376,35 @@ function parseCharacterClothing(sceneDescription) {
 function parseSceneHintMetadata(sceneHint) {
   if (!sceneHint || typeof sceneHint !== 'string') return null;
 
-  const result = { characters: null, setting: null, time: null, weather: null };
+  // Try JSON format first (new format)
+  try {
+    const jsonMatch = sceneHint.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (parsed.characters || parsed.description) {
+        return {
+          description: parsed.description || null,
+          characters: parsed.characters || null, // Array of {name, position, clothing, depth?, perspective?}
+          setting: parsed.setting || null,
+          time: parsed.time || null,
+          weather: parsed.weather || null,
+          shot: parsed.shot || null,
+          isJson: true,
+        };
+      }
+    }
+  } catch {
+    // Not valid JSON, fall through to text parsing
+  }
 
-  // Try to match Characters section - handles both formats:
-  // 1. Single line: "Characters: Luis: knight, Noel: standard"
-  // 2. Multi-line: "Characters:\n- Luis: knight\n- Noel: standard"
+  // Legacy text format fallback
+  const result = { characters: null, setting: null, time: null, weather: null, shot: null, isJson: false };
+
+  // Try to match Characters section
   const charsMatch = sceneHint.match(/Characters?:\s*([\s\S]*?)(?=Setting:|$)/i);
   if (charsMatch) {
     const charBlock = charsMatch[1].trim();
-    // Check if it's multi-line format (has newlines with bullet points)
     if (charBlock.includes('\n') && /^[-*]\s*\w/m.test(charBlock)) {
-      // Multi-line format: extract and join character entries
       const charEntries = [];
       const linePattern = /^[-*]\s*([^:\r\n]+:\s*(?:standard|winter|summer|formal|costumed:[^\r\n,]+))/gim;
       let lineMatch;
@@ -1395,29 +1413,23 @@ function parseSceneHintMetadata(sceneHint) {
       }
       result.characters = charEntries.length > 0 ? charEntries.join(', ') : charBlock;
     } else {
-      // Single line format: use as-is
       result.characters = charBlock;
     }
   }
 
-  // Try to match "Setting: X | Time: Y | Weather: Z" format
   const settingMatch = sceneHint.match(/Setting:\s*([^|]+)/i);
-  if (settingMatch) {
-    result.setting = settingMatch[1].trim();
-  }
+  if (settingMatch) result.setting = settingMatch[1].trim();
 
   const timeMatch = sceneHint.match(/Time:\s*([^|]+)/i);
-  if (timeMatch) {
-    result.time = timeMatch[1].trim();
-  }
+  if (timeMatch) result.time = timeMatch[1].trim();
 
   const weatherMatch = sceneHint.match(/Weather:\s*([^|\n]+)/i);
-  if (weatherMatch) {
-    result.weather = weatherMatch[1].trim();
-  }
+  if (weatherMatch) result.weather = weatherMatch[1].trim();
 
-  // Return null if nothing was extracted
-  if (!result.characters && !result.setting && !result.time && !result.weather) {
+  const shotMatch = sceneHint.match(/Shot:\s*([^|\n]+)/i);
+  if (shotMatch) result.shot = shotMatch[1].trim();
+
+  if (!result.characters && !result.setting && !result.time && !result.weather && !result.shot) {
     return null;
   }
 
@@ -2503,7 +2515,11 @@ function buildSceneExpansionPrompt(pageNumber, pageContent, characters, language
   // Build draft scene description from scene hint
   let draftSceneDescription = '';
   if (rawOutlineContext?.currentPage) {
-    const sceneHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(.+?)(?=\n[A-Z]|\n\n|$)/s);
+    // Try JSON scene hint first (new format: SCENE HINT:\n{...})
+    const jsonHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(\{[\s\S]*?\})\s*(?=---|$)/);
+    // Fall back to text scene hint (legacy format: SCENE HINT:\ntext...\nCharacters:...)
+    const textHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(.+?)(?=\n[A-Z]|\n\n|$)/s);
+    const sceneHintMatch = jsonHintMatch || textHintMatch;
     if (sceneHintMatch) {
       draftSceneDescription = sceneHintMatch[1].trim();
     } else {
@@ -2753,12 +2769,13 @@ function buildSceneDescriptionPrompt(pageNumber, pageContent, characters, shortS
     // Build draft scene description from scene hint (the starting point for critique)
     let draftSceneDescription = '';
     if (rawOutlineContext?.currentPage) {
-      // Extract SCENE HINT from the raw outline block
-      const sceneHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(.+?)(?=\n[A-Z]|\n\n|$)/s);
+      // Try JSON scene hint first, fall back to text format
+      const jsonHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(\{[\s\S]*?\})\s*(?=---|$)/);
+      const textHintMatch = rawOutlineContext.currentPage.match(/SCENE HINT:\s*(.+?)(?=\n[A-Z]|\n\n|$)/s);
+      const sceneHintMatch = jsonHintMatch || textHintMatch;
       if (sceneHintMatch) {
         draftSceneDescription = sceneHintMatch[1].trim();
       } else {
-        // Fallback: use the whole currentPage as the hint
         draftSceneDescription = rawOutlineContext.currentPage;
       }
     } else if (shortSceneDesc) {
