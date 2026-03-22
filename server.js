@@ -2064,9 +2064,12 @@ app.patch('/api/stories/:id/page/:pageNum', express.json({ limit: '50mb' }), aut
       storyData = await rehydrateStoryImages(id, storyData);
     }
 
-    // Update page text if provided
+    // Update page text if provided (handle both field names for compatibility)
     if (text !== undefined) {
-      storyData.storyText = updatePageText(storyData.storyText, pageNumber, text);
+      const currentText = storyData.story || storyData.storyText || '';
+      const updatedText = updatePageText(currentText, pageNumber, text);
+      storyData.story = updatedText;
+      storyData.storyText = updatedText;
     }
 
     // Update scene description if provided
@@ -3751,6 +3754,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const pipelineStoryData = {
           characters: inputData.characters,
           sceneDescriptions: expandedScenes,
+          story: fullStoryText,
           storyText: fullStoryText,
           visualBible,
           artStyle: inputData.artStyle,
@@ -4067,7 +4071,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
       visualBible: visualBible, // Recurring visual elements for consistency
       styledAvatarGeneration: getStyledAvatarGenerationLog(), // Styled avatar generation log (dev mode)
       costumedAvatarGeneration: getCostumedAvatarGenerationLog(), // Costumed avatar generation log (dev mode)
-      storyText: fullStoryText, // May be corrected text if text check found issues
+      story: fullStoryText, // Canonical field name — frontend reads 'story'
+      storyText: fullStoryText, // Keep for backwards compatibility with existing blobs
       originalStory: originalStoryText || fullStoryText, // Store original AI text for dev mode
       sceneDescriptions: allSceneDescriptions,
       sceneImages: allImages,

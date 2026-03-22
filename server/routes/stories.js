@@ -496,6 +496,12 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       const rows = await dbQuery('SELECT data FROM stories WHERE id = $1', [id]);
       const story = typeof rows[0].data === 'string' ? JSON.parse(rows[0].data) : rows[0].data;
 
+      // Normalise field name: full stories save as 'storyText', partial as 'story'
+      // Frontend reads 'story', so ensure it exists
+      if (!story.story && story.storyText) {
+        story.story = story.storyText;
+      }
+
       // Strip out image data and full characters (photo data is huge), but include minimal char info
       const { characters: fullCharacters, ...storyWithoutCharacters } = story;
       // Extract just id/name from characters for GenerationSettingsPanel

@@ -172,7 +172,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     // Extract pages from story text (format: "## Seite N\ntext..." or "--- Page N ---\ntext...")
     const pages = [];
     const storyText = data.story || data.storyText || data.generatedStory || '';
-    const sceneCount = data.sceneImages?.length || data.totalScenes || Math.floor((data.pages || 10) / 2) || 10;
+    const sceneCount = data.sceneImages?.length || data.totalScenes || data.pages || 10;
     for (let i = 1; i <= sceneCount; i++) {
       const text = getPageText(storyText, i);
       if (text) {
@@ -197,7 +197,7 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
       id: story.id,
       title: data.title,
       language: data.language,
-      pageCount: pageCount,
+      pageCount: pages.length,
       pages,
       dedication: data.dedication,
       hasImages: true,
