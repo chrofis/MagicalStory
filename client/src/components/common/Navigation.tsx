@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Sparkles, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { useAuth } from '@/context/AuthContext';
 import { useGenerationOptional } from '@/context/GenerationContext';
 import { ChangePasswordModal } from '@/components/auth/ChangePasswordModal';
 import { CreditsModal } from './CreditsModal';
@@ -35,7 +34,6 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
   const navigate = useNavigate();
   const location = useLocation();
   const { t, language } = useLanguage();
-  const { isAuthenticated, user, isImpersonating } = useAuth();
   const generation = useGenerationOptional();
   const [showMenu, setShowMenu] = useState(false);
   const [showCreditsModal, setShowCreditsModal] = useState(false);
