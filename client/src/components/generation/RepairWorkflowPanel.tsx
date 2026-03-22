@@ -449,7 +449,9 @@ export function RepairWorkflowPanel({
     setIsRunningFullWorkflow(true);
     try {
       await runFullWorkflow({
-        maxPasses: REPAIR_DEFAULTS.maxPasses,
+        maxPasses: devMaxPasses,
+        maxCharRepairPages: devMaxCharRepairPages,
+        scoreThreshold: devScoreThreshold,
         onProgress: (step, detail) => {
           setFullWorkflowProgress({ step, detail });
         },
@@ -464,6 +466,11 @@ export function RepairWorkflowPanel({
       setFullWorkflowProgress(null);
     }
   };
+
+  // Dev overrides for repair workflow settings
+  const [devMaxPasses, setDevMaxPasses] = useState<number>(REPAIR_DEFAULTS.maxPasses);
+  const [devMaxCharRepairPages, setDevMaxCharRepairPages] = useState<number>(REPAIR_DEFAULTS.maxCharRepairPages);
+  const [devScoreThreshold, setDevScoreThreshold] = useState<number>(REPAIR_DEFAULTS.scoreThreshold);
 
   // Selected character for repair
   const [selectedCharacter, setSelectedCharacter] = useState<string>('');
@@ -611,11 +618,29 @@ export function RepairWorkflowPanel({
 
           {/* Full Automated Workflow Button */}
           <div className="p-4 bg-gradient-to-r from-indigo-50 to-amber-50 border border-indigo-200 rounded-lg">
+            {/* Dev settings row */}
+            <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
+              <label className="flex items-center gap-1 text-gray-600">
+                Score &lt;
+                <input type="number" value={devScoreThreshold} onChange={e => setDevScoreThreshold(Number(e.target.value))}
+                  className="w-12 px-1 py-0.5 border rounded text-center" min={0} max={100} />
+              </label>
+              <label className="flex items-center gap-1 text-gray-600">
+                Max passes
+                <input type="number" value={devMaxPasses} onChange={e => setDevMaxPasses(Number(e.target.value))}
+                  className="w-10 px-1 py-0.5 border rounded text-center" min={1} max={10} />
+              </label>
+              <label className="flex items-center gap-1 text-gray-600">
+                Char repair pages
+                <input type="number" value={devMaxCharRepairPages} onChange={e => setDevMaxCharRepairPages(Number(e.target.value))}
+                  className="w-10 px-1 py-0.5 border rounded text-center" min={0} max={50} />
+              </label>
+            </div>
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="font-bold text-indigo-800">Automated Full Repair</h4>
                 <p className="text-sm text-indigo-600">
-                  Runs all steps automatically. Pages retry up to 2 times, keeping the best result.
+                  Runs all steps automatically. Pages retry up to {devMaxPasses} times, keeping the best result. Char repair: max {devMaxCharRepairPages} pages.
                 </p>
               </div>
               <div className="flex items-center gap-2">

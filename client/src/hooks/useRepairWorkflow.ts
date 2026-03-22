@@ -173,6 +173,8 @@ export interface UseRepairWorkflowReturn {
   // Full automated workflow
   runFullWorkflow: (options?: {
     maxPasses?: number;
+    maxCharRepairPages?: number;
+    scoreThreshold?: number;
     onProgress?: (step: string, detail: string) => void;
   }) => Promise<void>;
 
@@ -1048,11 +1050,13 @@ export function useRepairWorkflow({
   // Each pass: evaluate ALL → redo ALL bad → re-evaluate ALL
   const runFullWorkflow = useCallback(async (options: {
     maxPasses?: number;
+    maxCharRepairPages?: number;
+    scoreThreshold?: number;
     onProgress?: (step: string, detail: string) => void;
   } = {}) => {
     if (!storyId) return;
 
-    const { maxPasses = REPAIR_DEFAULTS.maxPasses, onProgress } = options;
+    const { maxPasses = REPAIR_DEFAULTS.maxPasses, maxCharRepairPages, scoreThreshold, onProgress } = options;
 
     // Create abort controller for this workflow run
     abortControllerRef.current = new AbortController();
