@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2, Download } from 'lucide-react';
 import type { BboxSceneDetection, RetryAttempt } from '@/types/story';
 
@@ -79,6 +79,12 @@ export function ObjectDetectionDisplay({
   const [enlargedImg, setEnlargedImg] = useState<{ src: string; title: string } | null>(null);
   const [loadedOverlay, setLoadedOverlay] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Clear cached overlay when bbox detection data changes (e.g., new version selected + re-evaluated)
+  const bboxKey = directBboxDetection ? JSON.stringify(directBboxDetection.figures?.length) + (directBboxDetection.objects?.length || 0) : null;
+  useEffect(() => {
+    setLoadedOverlay(null);
+  }, [bboxKey, directBboxOverlayImage]);
 
   // Use direct props if provided (for covers), otherwise extract from retryHistory (for pages)
   const fromRetryHistory = extractBboxData(retryHistory);
