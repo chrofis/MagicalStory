@@ -495,7 +495,7 @@ export function ObjectDetectionDisplay({
 
           {/* Raw JSON download */}
           <button
-            onClick={() => downloadAsText(JSON.stringify(bboxDetection, null, 2), `object-detection-page-${pageNumber}.json`)}
+            onClick={() => downloadAsText(JSON.stringify(bboxDetection, null, 2), `object-detection-${coverType ? `cover-${coverType}` : `page-${pageNumber}`}.json`)}
             className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded hover:bg-blue-100"
           >
             <Download size={12} /> {language === 'de' ? 'JSON herunterladen' : 'Download JSON'}
