@@ -2038,7 +2038,10 @@ router.get('/:id/cover-image/:coverType', authenticateToken, async (req, res) =>
     }
 
     // Try to get cover from separate table first (FAST path)
-    const separateImage = await getStoryImage(id, coverType, null, 0);
+    // Use active version, not always version 0
+    const activeVersions = await getAllActiveVersions(id);
+    const activeIdx = activeVersions[coverType] ?? 0;
+    const separateImage = await getStoryImage(id, coverType, null, activeIdx);
     if (separateImage) {
       return res.json({
         coverType,
