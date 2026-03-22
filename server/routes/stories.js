@@ -401,7 +401,21 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
       // Only needed for dev mode — skip this expensive jsonb_array_elements subquery for normal users
       const isDevMode = req.query.devMode === 'true';
       const versionMetaByPage = new Map();
+      // Also load scene-level bboxDetection for version 0 (original image)
+      const sceneBboxByPage = new Map();
       if (isDevMode) {
+        const bboxQuery = await dbQuery(
+          `SELECT scene->>'pageNumber' as page_number, scene->'bboxDetection' as bbox
+           FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
+           WHERE id = $1`,
+          [id]
+        );
+        for (const row of bboxQuery) {
+          if (row.page_number && row.bbox) {
+            sceneBboxByPage.set(parseInt(row.page_number), row.bbox);
+          }
+        }
+
         const versionMetaQuery = await dbQuery(
           `SELECT scene->>'pageNumber' as page_number, scene->'imageVersions' as image_versions
            FROM stories, jsonb_array_elements(data::jsonb->'sceneImages') AS scene
@@ -416,7 +430,8 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
               userInput: v.userInput,
               modelId: v.modelId,
               type: v.type,
-              createdAt: v.createdAt
+              createdAt: v.createdAt,
+              bboxDetection: v.bboxDetection || null,
             })));
           }
         }
@@ -445,7 +460,9 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           // saveStoryData saves imageVersions[i] at version_index i+1, so offset by -1
           const scene = sceneImagesMap.get(row.page_number);
           const pageMeta = versionMetaByPage.get(row.page_number) || [];
-          const versionMeta = row.version_index > 0 ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {}) : {};
+          const versionMeta = row.version_index > 0
+            ? (pageMeta[dbToArrayIndex(row.version_index, 'scene')] || {})
+            : { bboxDetection: sceneBboxByPage.get(row.page_number) || null };
           const versionDate = row.generated_at || versionMeta.createdAt;
           const isActiveVersion = row.version_index === activeVersion;
           scene.imageVersions.push({
@@ -460,12 +477,16 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             prompt: versionMeta.prompt,
             userInput: versionMeta.userInput,
             modelId: versionMeta.modelId,
-            type: versionMeta.type
+            type: versionMeta.type,
+            bboxDetection: versionMeta.bboxDetection || null,
           });
-          // Update main qualityScore to reflect the ACTIVE version, not just version 0
+          // Update main qualityScore and bboxDetection to reflect the ACTIVE version
           if (isActiveVersion) {
             scene.qualityScore = row.quality_score;
             scene.generatedAt = row.generated_at;
+            if (versionMeta.bboxDetection) {
+              scene.bboxDetection = versionMeta.bboxDetection;
+            }
           }
         } else {
           // Cover image
