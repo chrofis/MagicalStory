@@ -6,10 +6,9 @@
 
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 
 const { getPool } = require('../../services/database');
-const { JWT_SECRET } = require('../../middleware/auth');
+const { verifyToken } = require('../../middleware/auth');
 const { log } = require('../../utils/logger');
 const {
   indexLandmarksForCities,
@@ -38,7 +37,7 @@ function checkAuth(req, res, isPost = false) {
 
   try {
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = verifyToken(token);
     if (decoded.role !== 'admin') {
       res.status(403).json({ error: 'Admin access required' });
       return false;

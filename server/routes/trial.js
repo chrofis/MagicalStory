@@ -250,9 +250,9 @@ setInterval(() => {
   if (cleaned > 0) log.debug(`[FINGERPRINT] Cleaned ${cleaned} stale entries`);
 }, 60 * 60 * 1000).unref();
 
-// ─── Session Token for Anonymous Trial Users ─────────────────────────────────
+const { verifyToken, signToken } = require('../middleware/auth');
 
-const jwt = require('jsonwebtoken');
+// ─── Session Token for Anonymous Trial Users ─────────────────────────────────
 
 /**
  * Middleware to verify anonymous session tokens.
@@ -268,7 +268,7 @@ function verifySessionToken(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = verifyToken(token);
     if (!decoded.anonymous) {
       return res.status(403).json({ error: 'Invalid session token' });
     }
@@ -284,10 +284,9 @@ function verifySessionToken(req, res, next) {
  * 24h expiry, minimal payload.
  */
 function generateSessionToken(userId) {
-  return jwt.sign(
+  return signToken(
     { userId, anonymous: true },
-    process.env.JWT_SECRET,
-    { expiresIn: '24h' }
+    '24h'
   );
 }
 
@@ -473,7 +472,7 @@ OUTPUT: A single character illustration. No text, no borders, no additional elem
     const sessionTokenStr = authHeader && authHeader.split(' ')[1];
     if (sessionTokenStr && req.body.characterId) {
       try {
-        const decoded = jwt.verify(sessionTokenStr, process.env.JWT_SECRET);
+        const decoded = verifyToken(sessionTokenStr);
         if (decoded.anonymous && decoded.userId) {
           const { getPool } = require('../services/database');
           const pool = getPool();

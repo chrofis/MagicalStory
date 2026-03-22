@@ -2,18 +2,17 @@
  * Admin Routes - /api/admin/*
  *
  * Main admin router that aggregates all admin submodules.
- * Impersonation routes are kept here as they require JWT_SECRET.
+ * Impersonation routes are kept here as they require token signing.
  */
 
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 
 const fs = require('fs').promises;
 const path = require('path');
 
 const { getPool, isDatabaseMode, logActivity } = require('../services/database');
-const { authenticateToken, JWT_SECRET } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, verifyToken, signToken } = require('../middleware/auth');
 const { log } = require('../utils/logger');
 
 function getDbPool() { return getPool(); }
@@ -34,13 +33,7 @@ async function writeJSON(filePath, data) {
 // Import aggregated admin routes from submodules
 const adminSubroutes = require('./admin/index');
 
-// Middleware to check admin role
-const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
-};
+// requireAdmin is now imported from ../middleware/auth
 
 // =============================================
 // IMPERSONATION
@@ -73,7 +66,7 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
     log.info(`👤 [ADMIN] ${req.user.username} is impersonating user ${targetUser.username}`);
     log.info(`👤 [ADMIN] [DEBUG] Impersonation token user ID: "${targetUser.id}" (type: ${typeof targetUser.id})`);
 
-    const impersonationToken = jwt.sign(
+    const impersonationToken = signToken(
       {
         id: targetUser.id,
         username: targetUser.username,
@@ -83,10 +76,10 @@ router.post('/impersonate/:userId', authenticateToken, requireAdmin, async (req,
         impersonating: true,
         originalAdminId: req.user.id,
         originalAdminUsername: req.user.username,
-        originalAdminRole: 'admin'
+        originalAdminRole: 'admin',
+        impersonationStartedAt: Date.now()
       },
-      JWT_SECRET,
-      { expiresIn: '2h' }
+      '2h'
     );
 
     res.json({
@@ -116,6 +109,11 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Not currently impersonating anyone' });
     }
 
+    // Verify the token was issued to an actual admin
+    if (req.user.originalAdminRole !== 'admin') {
+      return res.status(403).json({ error: 'Admin access required to stop impersonation' });
+    }
+
     const originalAdminId = req.user.originalAdminId;
 
     if (!isDatabaseMode()) {
@@ -129,9 +127,14 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
     }
     const adminUser = result.rows[0];
 
+    // Double-check the original admin is still an admin in the database
+    if (adminUser.role !== 'admin') {
+      return res.status(403).json({ error: 'Original user is no longer an admin' });
+    }
+
     log.info(`👤 [ADMIN] ${req.user.originalAdminUsername} stopped impersonating ${req.user.username}`);
 
-    const adminToken = jwt.sign(
+    const adminToken = signToken(
       {
         id: adminUser.id,
         username: adminUser.username,
@@ -139,8 +142,7 @@ router.post('/stop-impersonate', authenticateToken, async (req, res) => {
         role: adminUser.role,
         emailVerified: adminUser.email_verified
       },
-      JWT_SECRET,
-      { expiresIn: '7d' }
+      '7d'
     );
 
     res.json({
@@ -281,7 +283,7 @@ router.delete('/landmarks-cache', async (req, res) => {
       }
       try {
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = verifyToken(token);
         if (decoded.role !== 'admin') {
           return res.status(403).json({ error: 'Admin access required' });
         }

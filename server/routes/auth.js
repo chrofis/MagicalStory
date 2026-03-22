@@ -7,14 +7,16 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
 const { dbQuery, isDatabaseMode, logActivity, getPool } = require('../services/database');
-const { authenticateToken, generateToken, JWT_SECRET } = require('../middleware/auth');
+const { authenticateToken, generateToken, verifyToken, signToken } = require('../middleware/auth');
 const { authLimiter, registerLimiter, passwordResetLimiter } = require('../middleware/rateLimit');
 const { validateBody, schemas, sanitizeString } = require('../middleware/validation');
 const { log } = require('../utils/logger');
+
+// Pre-computed dummy hash for constant-time login (prevents timing-based email enumeration)
+const DUMMY_HASH = bcrypt.hashSync('dummy_password_for_timing', 10);
 
 // Firebase Admin SDK - import if available
 let firebaseAdmin = null;
@@ -52,14 +54,14 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
       return res.json({ success: true, message: 'Registration successful' });
     }
 
-    // Bot protection: form submission time check (too fast = bot)
-    const formStartTime = parseInt(req.body._formStartTime) || 0;
-    if (formStartTime > 0) {
-      const submissionTime = Date.now() - formStartTime;
-      if (submissionTime < 3000) { // Less than 3 seconds = likely bot
-        log.warn(`🤖 Bot detected: form submitted too fast (${submissionTime}ms) from IP ${req.ip}`);
-        return res.json({ success: true, message: 'Registration successful' });
-      }
+    // Bot protection: form submission time check (required, too fast = bot)
+    const formStartTime = parseInt(req.body._formStartTime, 10);
+    if (!formStartTime || formStartTime <= 0) {
+      return res.status(400).json({ error: 'Invalid form submission' });
+    }
+    const elapsed = Date.now() - formStartTime;
+    if (elapsed < 3000) { // Less than 3 seconds = likely bot
+      return res.status(429).json({ error: 'Please slow down' });
     }
 
     const username = sanitizeString(req.body.username, 30);
@@ -80,7 +82,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
       const userCount = await dbQuery('SELECT COUNT(*) as count FROM users', []);
       const isFirstUser = parseInt(userCount[0].count) === 0;
 
-      const userId = Date.now().toString();
+      const userId = crypto.randomUUID();
       const role = isFirstUser ? 'admin' : 'user';
       const storyQuota = isFirstUser ? -1 : 2;
       const initialCredits = isFirstUser ? -1 : 500;
@@ -114,7 +116,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
 
     const token = generateToken(newUser);
 
-    console.log(`✅ User registered: ${newUser.username} (role: ${newUser.role})`);
+    log.info(`User registered: ${newUser.username} (role: ${newUser.role})`);
 
     res.json({
       token,
@@ -129,7 +131,7 @@ router.post('/register', registerLimiter, validateBody(schemas.register), async 
       }
     });
   } catch (err) {
-    console.error('Registration error:', err);
+    log.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed' });
   }
 });
@@ -148,6 +150,8 @@ router.post('/login', authLimiter, async (req, res) => {
     if (isDatabaseMode()) {
       const rows = await dbQuery('SELECT * FROM users WHERE username = $1 OR email = $1', [username]);
       if (rows.length === 0) {
+        // Constant-time: run bcrypt anyway to prevent timing-based email enumeration
+        await bcrypt.compare(password, DUMMY_HASH);
         return res.status(401).json({ error: 'Email not registered', code: 'EMAIL_NOT_REGISTERED' });
       }
 
@@ -179,7 +183,7 @@ router.post('/login', authLimiter, async (req, res) => {
 
     const token = generateToken(user);
 
-    console.log(`✅ User logged in: ${user.username} (role: ${user.role})`);
+    log.info(`User logged in: ${user.username} (role: ${user.role})`);
 
     res.json({
       token,
@@ -197,7 +201,7 @@ router.post('/login', authLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Login error:', err);
+    log.error('Login error:', err);
     res.status(500).json({ error: 'Login failed' });
   }
 });
@@ -208,15 +212,17 @@ router.get('/me', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     if (isDatabaseMode()) {
-      const rows = await dbQuery('SELECT * FROM users WHERE id = $1', [userId]);
+      const rows = await dbQuery(
+        'SELECT id, username, email, role, story_quota, stories_generated, credits, preferred_language, email_verified, photo_consent_at, has_set_password FROM users WHERE id = $1',
+        [userId]
+      );
       if (rows.length === 0) {
         return res.status(404).json({ error: 'User not found' });
       }
 
       const dbUser = rows[0];
-      console.log(`[AUTH /me] User ${dbUser.username}: email_verified in DB = ${dbUser.email_verified} (type: ${typeof dbUser.email_verified})`);
+      log.debug(`[AUTH /me] User ${dbUser.username}: email_verified=${dbUser.email_verified}`);
       const emailVerifiedResult = dbUser.email_verified !== false;
-      console.log(`[AUTH /me] Returning emailVerified = ${emailVerifiedResult}`);
       res.json({
         user: {
           id: dbUser.id,
@@ -238,7 +244,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       return res.status(501).json({ error: 'File storage mode not supported' });
     }
   } catch (err) {
-    console.error('Get user error:', err);
+    log.error('Get user error:', err);
     res.status(500).json({ error: 'Failed to get user info' });
   }
 });
@@ -285,7 +291,7 @@ router.post('/firebase', authLimiter, async (req, res) => {
 
       const randomPassword = crypto.randomBytes(32).toString('hex');
       const hashedPassword = await bcrypt.hash(randomPassword, 10);
-      const userId = Date.now().toString();
+      const userId = crypto.randomUUID();
 
       const result = await dbQuery(
         'INSERT INTO users (id, username, email, password, role, story_quota, stories_generated, credits, email_verified) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TRUE) RETURNING *',
@@ -301,14 +307,14 @@ router.post('/firebase', authLimiter, async (req, res) => {
       }
 
       await logActivity(user.id, username, 'USER_REGISTERED_FIREBASE', { provider: decodedToken.firebase?.sign_in_provider });
-      console.log(`✅ New Firebase user registered: ${username} (role: ${role})`);
+      log.info(`New Firebase user registered: ${username} (role: ${role})`);
     }
 
     await dbQuery('UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = $1', [user.id]);
 
     const token = generateToken(user);
 
-    console.log(`✅ Firebase user authenticated: ${username}`);
+    log.info(`Firebase user authenticated: ${username}`);
 
     res.json({
       token,
@@ -326,7 +332,7 @@ router.post('/firebase', authLimiter, async (req, res) => {
       }
     });
   } catch (err) {
-    console.error('Firebase auth error:', err);
+    log.error('Firebase auth error:', err);
     if (err.code === 'auth/id-token-expired') {
       return res.status(401).json({ error: 'Token expired. Please sign in again.' });
     }
@@ -371,16 +377,16 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
       const resetUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/reset-password/${resetToken}`;
       const emailResult = await emailService.sendPasswordResetEmail(user.email, user.username, resetUrl, user.preferred_language);
       if (emailResult.success) {
-        console.log(`✅ Password reset email sent to ${user.email}`);
+        log.info(`Password reset email sent to ${user.email}`);
       } else {
         // Log error but don't expose to user (prevent email enumeration)
-        console.error(`❌ Password reset email failed for ${user.email}:`, emailResult.error);
+        log.error(`Password reset email failed for ${user.email}:`, emailResult.error);
       }
     }
 
     res.json({ success: true, message: 'If this email exists, a reset link has been sent' });
   } catch (err) {
-    console.error('Password reset error:', err);
+    log.error('Password reset error:', err);
     res.status(500).json({ error: 'Failed to process password reset' });
   }
 });
@@ -415,7 +421,7 @@ router.post('/reset-password/confirm', passwordResetLimiter, validateBody(schema
 
     res.json({ success: true, message: 'Password has been reset successfully' });
   } catch (err) {
-    console.error('Password reset confirm error:', err);
+    log.error('Password reset confirm error:', err);
     res.status(500).json({ error: 'Failed to reset password' });
   }
 });
@@ -440,6 +446,10 @@ router.post('/change-password', authenticateToken, validateBody(schemas.changePa
 
     const user = result.rows[0];
 
+    if (!user.password) {
+      return res.status(400).json({ error: 'No password set. Use Google sign-in or set a password first.' });
+    }
+
     if (user.firebase_uid && !user.password) {
       return res.status(400).json({ error: 'Cannot change password for Google accounts.' });
     }
@@ -454,7 +464,7 @@ router.post('/change-password', authenticateToken, validateBody(schemas.changePa
 
     res.json({ success: true, message: 'Password changed successfully' });
   } catch (err) {
-    console.error('Password change error:', err);
+    log.error('Password change error:', err);
     res.status(500).json({ error: 'Failed to change password' });
   }
 });
@@ -465,8 +475,8 @@ router.post('/set-password', authenticateToken, async (req, res) => {
     const { password } = req.body;
     const userId = req.user.id;
 
-    if (!password || typeof password !== 'string' || password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (!password || typeof password !== 'string' || password.length < 8 || password.length > 128) {
+      return res.status(400).json({ error: 'Password must be between 8 and 128 characters' });
     }
 
     if (!isDatabaseMode()) {
@@ -583,17 +593,17 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
     );
 
     if (!emailService) {
-      console.error('❌ Email service not available - cannot send verification email');
+      log.error('Email service not available - cannot send verification email');
       return res.status(500).json({ error: 'Email service not configured. Please contact support.' });
     }
 
     const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
-    console.log(`📧 Sending verification email to: ${user.email}, URL: ${verifyUrl}`);
+    log.debug(`Sending verification email to: ${user.email}, URL: ${verifyUrl}`);
 
     const emailResult = await emailService.sendEmailVerificationEmail(user.email, user.username, verifyUrl, user.preferred_language);
 
     if (!emailResult.success) {
-      console.error(`❌ Failed to send verification email to ${user.email}:`, emailResult.error);
+      log.error(`Failed to send verification email to ${user.email}:`, emailResult.error);
       // Distinguish between retryable and permanent errors
       const statusCode = emailResult.error?.isRetryable ? 503 : 500;
       return res.status(statusCode).json({
@@ -603,10 +613,10 @@ router.post('/send-verification', authenticateToken, async (req, res) => {
       });
     }
 
-    console.log(`✅ Verification email sent successfully to ${user.email}`);
+    log.info(`Verification email sent successfully to ${user.email}`);
     res.json({ success: true, message: 'Verification email sent', cooldown: VERIFICATION_EMAIL_COOLDOWN_SECONDS });
   } catch (err) {
-    console.error('Send verification error:', err);
+    log.error('Send verification error:', err);
     res.status(500).json({ error: 'Failed to send verification email' });
   }
 });
@@ -705,7 +715,7 @@ router.get('/verify-email/:token', async (req, res) => {
 
     res.redirect(`${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/email-verified`);
   } catch (err) {
-    console.error('Verify email error:', err);
+    log.error('Verify email error:', err);
     res.status(500).json({ error: 'Failed to verify email' });
   }
 });
@@ -764,7 +774,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
       const verifyUrl = `${process.env.FRONTEND_URL || 'https://www.magicalstory.ch'}/api/auth/verify-email/${verificationToken}`;
       const emailResult = await emailService.sendEmailVerificationEmail(newEmail, user.username, verifyUrl, user.preferred_language);
       if (!emailResult.success) {
-        console.error(`❌ Failed to send verification email for email change:`, emailResult.error);
+        log.error(`Failed to send verification email for email change:`, emailResult.error);
         // Email was already changed in DB, but verification email failed
         // Still return success but log the error
       }
@@ -776,7 +786,7 @@ router.post('/change-email', authenticateToken, async (req, res) => {
       newEmail: newEmail.toLowerCase()
     });
   } catch (err) {
-    console.error('Change email error:', err);
+    log.error('Change email error:', err);
     res.status(500).json({ error: 'Failed to change email' });
   }
 });
@@ -799,7 +809,7 @@ router.get('/verification-status', authenticateToken, async (req, res) => {
       res.json({ emailVerified: true });
     }
   } catch (err) {
-    console.error('Verification status error:', err);
+    log.error('Verification status error:', err);
     res.status(500).json({ error: 'Failed to check verification status' });
   }
 });
@@ -828,7 +838,13 @@ router.post('/refresh', authenticateToken, async (req, res) => {
     // Preserve impersonation state when refreshing an impersonation token
     let newToken;
     if (req.user.impersonating && req.user.originalAdminId) {
-      newToken = jwt.sign(
+      // Cap total impersonation time at 8 hours
+      const maxImpersonationMs = 8 * 60 * 60 * 1000; // 8 hours
+      if (req.user.impersonationStartedAt && Date.now() - req.user.impersonationStartedAt > maxImpersonationMs) {
+        return res.status(403).json({ error: 'Impersonation session expired (max 8 hours). Please re-impersonate.' });
+      }
+
+      newToken = signToken(
         {
           id: user.id,
           username: user.username,
@@ -838,12 +854,12 @@ router.post('/refresh', authenticateToken, async (req, res) => {
           impersonating: true,
           originalAdminId: req.user.originalAdminId,
           originalAdminUsername: req.user.originalAdminUsername,
-          originalAdminRole: req.user.originalAdminRole || 'admin'
+          originalAdminRole: req.user.originalAdminRole || 'admin',
+          impersonationStartedAt: req.user.impersonationStartedAt || Date.now()
         },
-        JWT_SECRET,
-        { expiresIn: '2h' }  // Impersonation tokens get shorter expiry
+        '2h'
       );
-      console.log(`🔄 [AUTH] Token refreshed for impersonation session (${req.user.originalAdminUsername} → ${user.username})`);
+      log.info(`[AUTH] Token refreshed for impersonation session (${req.user.originalAdminUsername} -> ${user.username})`);
     } else {
       newToken = generateToken(user);
     }
@@ -865,7 +881,7 @@ router.post('/refresh', authenticateToken, async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Token refresh error:', err);
+    log.error('Token refresh error:', err);
     res.status(500).json({ error: 'Failed to refresh token' });
   }
 });
@@ -903,7 +919,7 @@ router.post('/photo-consent', authenticateToken, async (req, res) => {
     );
 
     await logActivity(userId, req.user.username, 'PHOTO_CONSENT_GIVEN', {});
-    console.log(`✅ Photo consent recorded for user: ${req.user.username}`);
+    log.info(`Photo consent recorded for user: ${req.user.username}`);
 
     res.json({
       success: true,
@@ -911,7 +927,7 @@ router.post('/photo-consent', authenticateToken, async (req, res) => {
       message: 'Consent recorded successfully'
     });
   } catch (err) {
-    console.error('Photo consent error:', err);
+    log.error('Photo consent error:', err);
     res.status(500).json({ error: 'Failed to record consent' });
   }
 });
@@ -932,7 +948,7 @@ router.post('/logout', authenticateToken, async (req, res) => {
     res.json({ success: true, message: 'Logged out successfully' });
   } catch (err) {
     // Even if logging fails, consider logout successful
-    console.error('Logout logging error:', err);
+    log.error('Logout logging error:', err);
     res.json({ success: true, message: 'Logged out' });
   }
 });

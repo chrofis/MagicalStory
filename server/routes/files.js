@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 
 const { dbQuery, isDatabaseMode, logActivity } = require('../services/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, verifyToken } = require('../middleware/auth');
 const { validateBody, schemas, FILE_UPLOAD_CONFIG } = require('../middleware/validation');
 
 // POST /api/files - Upload a file
@@ -84,14 +84,12 @@ const optionalAuth = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1];
 
   if (token) {
-    const jwt = require('jsonwebtoken');
-    const JWT_SECRET = process.env.JWT_SECRET;
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-      if (!err) {
-        req.user = user;
-      }
-      next();
-    });
+    try {
+      req.user = verifyToken(token);
+    } catch {
+      // Invalid token — continue as anonymous
+    }
+    next();
   } else {
     next();
   }

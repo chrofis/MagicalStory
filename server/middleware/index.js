@@ -1,5 +1,5 @@
 // Middleware exports
-const { authenticateToken, requireAdmin, generateToken, JWT_SECRET } = require('./auth');
+const { authenticateToken, requireAdmin, generateToken, verifyToken, signToken } = require('./auth');
 const { authLimiter, registerLimiter, apiLimiter, storyGenerationLimiter } = require('./rateLimit');
 
 module.exports = {
@@ -7,7 +7,8 @@ module.exports = {
   authenticateToken,
   requireAdmin,
   generateToken,
-  JWT_SECRET,
+  verifyToken,
+  signToken,
 
   // Rate limiters
   authLimiter,

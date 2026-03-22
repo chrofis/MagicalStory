@@ -51,9 +51,20 @@ function generateToken(user, expiresIn = '7d') {
   );
 }
 
+// Verify a JWT token and return the decoded payload
+function verifyToken(token) {
+  return jwt.verify(token, JWT_SECRET);
+}
+
+// Sign arbitrary payload (for impersonation tokens etc.)
+function signToken(payload, expiresIn = '7d') {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
+}
+
 module.exports = {
   authenticateToken,
   requireAdmin,
   generateToken,
-  JWT_SECRET
+  verifyToken,
+  signToken
 };

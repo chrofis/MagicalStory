@@ -16,11 +16,9 @@ const path = require('path');
 const fs = require('fs').promises;
 const sharp = require('sharp');
 
-const jwt = require('jsonwebtoken');
-
 const { dbQuery, getStoryImage, getActiveVersion } = require('../services/database');
 const { log } = require('../utils/logger');
-const { JWT_SECRET } = require('../middleware/auth');
+const { verifyToken } = require('../middleware/auth');
 
 // Base URL for OG tags and share links (consistent with stories.js)
 const SITE_URL = process.env.FRONTEND_URL || 'https://www.magicalstory.ch';
@@ -58,7 +56,7 @@ function optionalAuth(req, res, next) {
   const token = authHeader ? authHeader.split(' ')[1] : req.query.token;
   if (token) {
     try {
-      req.user = jwt.verify(token, JWT_SECRET);
+      req.user = verifyToken(token);
     } catch {
       // Invalid token — continue as anonymous
     }
