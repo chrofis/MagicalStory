@@ -242,7 +242,8 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
     // Collect entity appearances from bbox detection data
     log.info('🔍 [ENTITY-CHECK] Collecting entity appearances from scene images...');
     const entityAppearances = await collectEntityAppearances(allImages, characters, sceneDescriptions, {
-      storyCharacters: characters
+      storyCharacters: characters,
+      clothingRequirements: storyData.clothingRequirements || null
     });
 
     // Extract and forward pages where fallback bbox detection was run
@@ -512,7 +513,7 @@ async function runEntityConsistencyChecks(storyData, characters = [], options = 
  * @returns {Map<string, Array>} Map of entityName -> appearances
  */
 async function collectEntityAppearances(sceneImages, characters = [], sceneDescriptions = [], options = {}) {
-  const { skipMinAppearancesFilter = false, storyCharacters = null } = options;
+  const { skipMinAppearancesFilter = false, storyCharacters = null, clothingRequirements = null } = options;
   const pagesWithNewBbox = [];
   const appearances = new Map();
 
@@ -541,7 +542,7 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
     }
 
     // Get clothing info for this page - try multiple sources
-    // Priority: img.characterClothing > scene description metadata > img.clothing > 'standard'
+    // Priority: img.characterClothing > scene description metadata > clothingRequirements > 'standard'
     let characterClothing = img.characterClothing || img.sceneCharacterClothing || {};
     let defaultClothing = img.clothing || 'standard';
 
@@ -557,10 +558,24 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
             log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Extracted clothing from scene metadata: ${JSON.stringify(characterClothing)}`);
           }
           // Also check for global clothing in metadata
-          if (metadata.clothing && !defaultClothing) {
+          if (metadata.clothing && defaultClothing === 'standard') {
             defaultClothing = metadata.clothing;
           }
         }
+      }
+    }
+
+    // Safety net: use story-level clothingRequirements when per-page clothing is still missing
+    // This handles edge cases where clothing data was lost (e.g., old stories before this fix)
+    if (Object.keys(characterClothing).length === 0 && clothingRequirements) {
+      for (const char of characters) {
+        const charReqs = clothingRequirements[char.name];
+        if (charReqs?.costumed?.used && charReqs.costumed.costume) {
+          characterClothing[char.name] = `costumed:${charReqs.costumed.costume}`;
+        }
+      }
+      if (Object.keys(characterClothing).length > 0) {
+        log.debug(`[ENTITY-COLLECT] Page ${pageNumber}: Using story clothingRequirements fallback: ${JSON.stringify(characterClothing)}`);
       }
     }
 

@@ -619,7 +619,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
       modelId: imageResult.modelId || null,
       regeneratedAt: new Date().toISOString(),
-      regenerationCount: (existingImage?.regenerationCount || 0) + 1
+      regenerationCount: (existingImage?.regenerationCount || 0) + 1,
+      // Preserve clothing data from original image for entity consistency
+      sceneCharacterClothing: existingImage?.sceneCharacterClothing || existingImage?.characterClothing || null
     };
 
     log.debug(`📸 [REGEN] New image generated - score: ${imageResult.score}, attempts: ${imageResult.totalAttempts}, model: ${imageResult.modelId}`);
@@ -1566,7 +1568,9 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       landmarkPhotos: pageLandmarkPhotos,
       visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
       modelId: imageResult.modelId || null,
-      iterationCount: (currentImage.iterationCount || 0) + 1
+      iterationCount: (currentImage.iterationCount || 0) + 1,
+      // Preserve clothing data from original image for entity consistency
+      sceneCharacterClothing: currentImage.sceneCharacterClothing || currentImage.characterClothing || null
     };
 
     // Initialize imageVersions if needed
