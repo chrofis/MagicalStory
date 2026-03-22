@@ -365,7 +365,6 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
             'imageGenerationMode', data::jsonb->'imageGenerationMode',
             'isPartial', data::jsonb->'isPartial',
             'failureReason', data::jsonb->'failureReason',
-            'visualBible', data::jsonb->'visualBible',
             'historicalEvent', data::jsonb->'historicalEvent',
             'location', data::jsonb->'location',
             'season', data::jsonb->'season',
