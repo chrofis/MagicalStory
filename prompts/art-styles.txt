@@ -25,7 +25,7 @@ oil: Classic oil painting style, visible impasto brushstrokes, rich texture, hea
 
 lowpoly: Low poly 3D model, isometric perspective, minimalist geometric shapes, vibrant solid colors, clear edges, retro video game aesthetic, style of Monument Valley
 
-concept: Highly detailed digital concept art, dramatic lighting, epic composition, smooth rendering, focus on mood and atmosphere, wide-angle lens, matte painting aesthetic
+concept: Digital concept art, painterly brushwork, dramatic lighting, epic composition, rich color palette, visible artistic strokes, cinematic atmosphere, wide-angle lens — NOT photorealistic
 
 pixel: 16-bit pixel art style, low resolution, limited color palette, detailed sprite work, retro video game aesthetic, style of Final Fantasy VI
 
@@ -53,7 +53,7 @@ oil-character: Oil painting style, visible brushstrokes, rich textures, warm lig
 
 lowpoly-character: Low poly 3D style, geometric shapes, flat colors, clean edges, stylized proportions
 
-concept-character: Digital concept art, detailed rendering, clean studio lighting, professional character design
+concept-character: Digital concept art, painterly brushwork, stylized proportions, rich color palette, visible artistic strokes, cinematic atmosphere — NOT photorealistic
 
 pixel-character: Pixel art style, limited palette, detailed sprite work, retro aesthetic, clean edges
 

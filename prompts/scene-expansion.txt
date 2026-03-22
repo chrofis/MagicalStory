@@ -94,7 +94,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
   - Close characters: "left", "center", "right" (all drawn at normal size)
   - Distant characters: "far background left (tiny figure)", "far background right (tiny figure)", "far background center (tiny figure)"
   - NEVER put two characters both in "foreground" if they should be far apart. If one is distant, their position MUST contain "far background" and "(tiny figure)".
-- `setting.description`: 10 words max.
+- `setting.description`: 10 words max. For public places (markets, stations, festivals, schools), include background activity: "busy market square with shoppers and vendors". Background people are part of the setting — they exist naturally but are not the focus of the illustration.
 - `depthLayers`: What's close, what's far. E.g. "Lukas large left foreground, wide empty plaza, Roger tiny right background".
 - **DISTANCE RULE — CRITICAL**: Image models ALWAYS draw characters the same size unless you force perspective. When characters must be far apart you MUST:
   1. Put the distant character's position as "far background" with "(tiny figure, 1/5 the size of foreground character)"
