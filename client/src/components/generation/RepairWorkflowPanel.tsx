@@ -89,22 +89,107 @@ function StepStatusBadge({ status }: { status: StepStatus }) {
   );
 }
 
+// Re-evaluation result shape (from workflowState.reEvaluationResults.pages)
+interface ReEvalResult {
+  score?: number;
+  qualityScore: number;
+  semanticScore?: number | null;
+  entityPenalty?: number;
+  verdict?: string;
+  fixableIssues?: Array<{ description?: string; issue?: string; severity: string; type?: string; fix?: string; source?: string }>;
+  semanticResult?: PageFeedback['semanticResult'];
+}
+
+// Severity to numeric penalty mapping
+const severityPenalty = (s: string) =>
+  s === 'critical' || s === 'CRITICAL' ? 30 :
+  s === 'major' || s === 'MAJOR' ? 20 : 10;
+
 // Page feedback card component
 function PageFeedbackCard({
   feedback,
+  reEvalResult,
   isMarkedForRedo,
   onToggleRedo,
 }: {
   feedback: PageFeedback;
-  isMarkedForRedo: boolean;
-  onToggleRedo: () => void;
+  reEvalResult?: ReEvalResult;
+  isMarkedForRedo?: boolean;
+  onToggleRedo?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length +
-                      (feedback.objectIssues?.length || 0) + (feedback.semanticIssues?.length || 0);
-  const hasIssues = totalIssues > 0 || (feedback.qualityScore !== undefined && feedback.qualityScore < 70);
+
+  // When reEvalResult is provided, prefer its scores (more recent)
+  const qualityScore = reEvalResult?.qualityScore ?? feedback.qualityScore;
+  const semanticScore = reEvalResult?.semanticScore ?? feedback.semanticScore;
+  const entityPenalty = reEvalResult?.entityPenalty ?? feedback.entityPenalty ?? 0;
+  const finalScore = reEvalResult?.score ?? feedback.score ?? qualityScore;
+  const verdict = reEvalResult?.verdict ?? feedback.verdict;
+  const semanticResult = reEvalResult?.semanticResult ?? feedback.semanticResult;
+  const issuesSummary = feedback.issuesSummary;
+
+  // Warn if using fallback (indicates potential bug in evaluation)
+  if (reEvalResult && reEvalResult.score === null && reEvalResult.qualityScore !== null) {
+    console.warn(`[RepairWorkflow] Page ${feedback.pageNumber}: Missing combined score, using qualityScore fallback`);
+  }
+
+  // Build a unified fixableIssues list: prefer reEvalResult's if available (already source-tagged),
+  // otherwise fall back to feedback arrays
+  const allIssues: Array<{ description: string; severity: string; type?: string; source?: string }> = [];
+  if (reEvalResult?.fixableIssues && reEvalResult.fixableIssues.length > 0) {
+    for (const issue of reEvalResult.fixableIssues) {
+      allIssues.push({
+        description: issue.description || issue.issue || JSON.stringify(issue),
+        severity: issue.severity,
+        type: issue.type,
+        source: issue.source,
+      });
+    }
+  } else {
+    // Use feedback's separated arrays
+    for (const issue of feedback.fixableIssues) {
+      allIssues.push({ description: issue.description, severity: issue.severity, type: issue.type, source: issue.source });
+    }
+    for (const issue of feedback.entityIssues) {
+      allIssues.push({ description: `[${issue.character}] ${issue.issue}`, severity: issue.severity, source: issue.source || 'entity check' });
+    }
+    if (feedback.objectIssues) {
+      for (const issue of feedback.objectIssues) {
+        allIssues.push({ description: `[${issue.object}] ${issue.issue}`, severity: issue.severity, source: issue.source || 'entity check' });
+      }
+    }
+    if (feedback.semanticIssues) {
+      for (const issue of feedback.semanticIssues) {
+        allIssues.push({
+          description: issue.description,
+          severity: issue.severity,
+          type: issue.type.replace(/_/g, ' '),
+          source: issue.source || 'semantic',
+        });
+      }
+    }
+  }
+
+  // Group issues by source
+  const qualityIssues = allIssues.filter(i => !i.source?.includes('semantic') && !i.source?.includes('entity') && !i.source?.includes('image checks'));
+  const semanticIssues = allIssues.filter(i => i.source?.includes('semantic'));
+  const entityIssues = allIssues.filter(i => i.source?.includes('entity') || i.source?.includes('image checks'));
+
+  const totalIssues = allIssues.length;
+  const hasIssues = totalIssues > 0 || (qualityScore !== undefined && qualityScore < 70);
 
   const pageName = getPageName(feedback.pageNumber);
+
+  const renderIssueList = (issues: typeof allIssues, color: string) => (
+    <div className="space-y-0.5">
+      {issues.map((issue, idx) => (
+        <div key={idx} className="flex gap-1 items-start">
+          <span className={`text-[10px] font-bold ${color} shrink-0`}>-{severityPenalty(issue.severity)}</span>
+          <span className="text-xs text-gray-700">{issue.description}</span>
+        </div>
+      ))}
+    </div>
+  );
 
   return (
     <div className={`border rounded-lg p-3 ${isMarkedForRedo ? 'border-red-300 bg-red-50' : hasIssues ? 'border-amber-200 bg-amber-50' : 'border-gray-200 bg-white'}`}>
@@ -117,22 +202,21 @@ function PageFeedbackCard({
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
           <span className="font-medium">{pageName}</span>
-          {feedback.qualityScore != null ? (
+          {qualityScore != null ? (
             <span className={`text-xs px-1.5 py-0.5 rounded ${
-              feedback.qualityScore >= 80 ? 'bg-green-100 text-green-700' :
-              feedback.qualityScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
+              qualityScore >= 80 ? 'bg-green-100 text-green-700' :
+              qualityScore >= 60 ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              {feedback.semanticScore != null ? 'Quality' : 'Score'}: {Math.max(0, feedback.qualityScore)}
+              {semanticScore != null ? 'Quality' : 'Score'}: {Math.max(0, qualityScore)}
             </span>
           ) : (
             <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Not evaluated</span>
           )}
           {(() => {
-            const qScore = feedback.qualityScore ?? 0;
-            const fScore = feedback.score ?? qScore;
-            const entityPen = feedback.entityPenalty || 0;
-            const semanticPen = Math.max(0, qScore - fScore - entityPen);
+            const qScore = qualityScore ?? 0;
+            const fScore = finalScore ?? qScore;
+            const semanticPen = Math.max(0, qScore - fScore - entityPenalty);
             return (
               <>
                 {semanticPen > 0 && (
@@ -140,99 +224,135 @@ function PageFeedbackCard({
                     Semantic: -{semanticPen}
                   </span>
                 )}
-                {entityPen > 0 && (
+                {entityPenalty > 0 && (
                   <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
-                    Entity: -{entityPen}
+                    Entity: -{entityPenalty}
                   </span>
+                )}
+                {semanticPen === 0 && entityPenalty === 0 && semanticScore != null && (
+                  <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                    No penalties
+                  </span>
+                )}
+                {(semanticPen > 0 || entityPenalty > 0) && (
+                  <span className="text-xs text-gray-400">=</span>
                 )}
               </>
             );
           })()}
-          {feedback.score !== undefined && (
+          {finalScore !== undefined && (
             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-              feedback.score >= 70 ? 'bg-green-100 text-green-700' :
-              feedback.score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+              finalScore >= 70 ? 'bg-green-100 text-green-700' :
+              finalScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              Final: {feedback.score}%
+              Final: {finalScore}%
             </span>
           )}
-          {feedback.verdict && (
+          {verdict && (
             <span className={`text-xs px-1.5 py-0.5 rounded ${
-              feedback.verdict === 'PASS' ? 'bg-green-100 text-green-700' :
-              feedback.verdict === 'SOFT_FAIL' ? 'bg-yellow-100 text-yellow-700' :
+              verdict === 'PASS' ? 'bg-green-100 text-green-700' :
+              verdict === 'SOFT_FAIL' ? 'bg-yellow-100 text-yellow-700' :
               'bg-red-100 text-red-700'
             }`}>
-              {feedback.verdict}
+              {verdict}
             </span>
           )}
           {totalIssues > 0 && (
             <span className="text-xs text-gray-500">{totalIssues} issues</span>
           )}
         </div>
-        <button
-          onClick={onToggleRedo}
-          className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
-            isMarkedForRedo
-              ? 'bg-red-600 text-white hover:bg-red-700'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          {isMarkedForRedo ? 'Marked for Redo' : 'Mark for Redo'}
-        </button>
+        {onToggleRedo && (
+          <button
+            onClick={onToggleRedo}
+            className={`px-3 py-1 text-xs rounded font-medium transition-colors ${
+              isMarkedForRedo
+                ? 'bg-red-600 text-white hover:bg-red-700'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {isMarkedForRedo ? 'Marked for Redo' : 'Mark for Redo'}
+          </button>
+        )}
       </div>
 
       {expanded && (
         <div className="mt-3 space-y-2 pl-7">
-          {feedback.issuesSummary && feedback.issuesSummary !== 'none' && (
+          {issuesSummary && issuesSummary !== 'none' && (
             <p className={`text-xs pl-2 border-l-2 ${
-              feedback.issuesSummary.includes('SEMANTIC:')
+              issuesSummary.includes('SEMANTIC:')
                 ? 'text-indigo-700 border-indigo-400 bg-indigo-50 p-1 rounded-r'
                 : 'text-gray-600 border-gray-300'
             }`}>
-              {feedback.issuesSummary}
+              {issuesSummary}
             </p>
           )}
-          {feedback.semanticResult && (
+
+          {/* Source-grouped issues with per-issue penalty values */}
+          {totalIssues > 0 && (
+            <div className="space-y-2">
+              {qualityIssues.length > 0 && (
+                <div className="text-xs pl-2 border-l-2 border-blue-300 bg-blue-50 p-1.5 rounded-r">
+                  <div className="font-semibold text-blue-800 mb-1">Quality Issues ({qualityIssues.length}):</div>
+                  {renderIssueList(qualityIssues, 'text-blue-600')}
+                </div>
+              )}
+              {semanticIssues.length > 0 && (
+                <div className="text-xs pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1.5 rounded-r">
+                  <div className="font-semibold text-indigo-800 mb-1">Semantic Issues ({semanticIssues.length}):</div>
+                  {renderIssueList(semanticIssues, 'text-indigo-600')}
+                </div>
+              )}
+              {entityIssues.length > 0 && (
+                <div className="text-xs pl-2 border-l-2 border-orange-400 bg-orange-50 p-1.5 rounded-r">
+                  <div className="font-semibold text-orange-800 mb-1">Entity / Consistency Issues ({entityIssues.length}):</div>
+                  {renderIssueList(entityIssues, 'text-orange-600')}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Semantic analysis detail (visible vs expected) */}
+          {semanticResult && (
             <div className="text-xs text-indigo-700 pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1 rounded-r mt-1">
-              <span className="font-medium">Semantic Analysis (Score: {feedback.semanticResult.score ?? 'N/A'}):</span>
-              {feedback.semanticResult.visible && (
+              <span className="font-medium">Semantic Analysis (Score: {semanticResult.score ?? 'N/A'}):</span>
+              {semanticResult.visible && (
                 <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-white p-2 rounded border border-indigo-200">
                     <div className="font-medium text-indigo-800 mb-1">Visible:</div>
-                    {feedback.semanticResult.visible.characters && feedback.semanticResult.visible.characters.length > 0 && (
-                      <div><span className="text-gray-500">Characters:</span> {feedback.semanticResult.visible.characters.join(', ')}</div>
+                    {semanticResult.visible.characters && semanticResult.visible.characters.length > 0 && (
+                      <div><span className="text-gray-500">Characters:</span> {semanticResult.visible.characters.join(', ')}</div>
                     )}
-                    {feedback.semanticResult.visible.objects && feedback.semanticResult.visible.objects.length > 0 && (
-                      <div><span className="text-gray-500">Objects:</span> {feedback.semanticResult.visible.objects.join(', ')}</div>
+                    {semanticResult.visible.objects && semanticResult.visible.objects.length > 0 && (
+                      <div><span className="text-gray-500">Objects:</span> {semanticResult.visible.objects.join(', ')}</div>
                     )}
-                    {feedback.semanticResult.visible.setting && (
-                      <div><span className="text-gray-500">Setting:</span> {feedback.semanticResult.visible.setting}</div>
+                    {semanticResult.visible.setting && (
+                      <div><span className="text-gray-500">Setting:</span> {semanticResult.visible.setting}</div>
                     )}
-                    {feedback.semanticResult.visible.action && (
-                      <div><span className="text-gray-500">Action:</span> {feedback.semanticResult.visible.action}</div>
+                    {semanticResult.visible.action && (
+                      <div><span className="text-gray-500">Action:</span> {semanticResult.visible.action}</div>
                     )}
                   </div>
                   <div className="bg-white p-2 rounded border border-indigo-200">
                     <div className="font-medium text-indigo-800 mb-1">Expected:</div>
-                    {feedback.semanticResult.expected?.characters && feedback.semanticResult.expected.characters.length > 0 && (
-                      <div><span className="text-gray-500">Characters:</span> {feedback.semanticResult.expected.characters.join(', ')}</div>
+                    {semanticResult.expected?.characters && semanticResult.expected.characters.length > 0 && (
+                      <div><span className="text-gray-500">Characters:</span> {semanticResult.expected.characters.join(', ')}</div>
                     )}
-                    {feedback.semanticResult.expected?.objects && feedback.semanticResult.expected.objects.length > 0 && (
-                      <div><span className="text-gray-500">Objects:</span> {feedback.semanticResult.expected.objects.join(', ')}</div>
+                    {semanticResult.expected?.objects && semanticResult.expected.objects.length > 0 && (
+                      <div><span className="text-gray-500">Objects:</span> {semanticResult.expected.objects.join(', ')}</div>
                     )}
-                    {feedback.semanticResult.expected?.setting && (
-                      <div><span className="text-gray-500">Setting:</span> {feedback.semanticResult.expected.setting}</div>
+                    {semanticResult.expected?.setting && (
+                      <div><span className="text-gray-500">Setting:</span> {semanticResult.expected.setting}</div>
                     )}
-                    {feedback.semanticResult.expected?.action && (
-                      <div><span className="text-gray-500">Action:</span> {feedback.semanticResult.expected.action}</div>
+                    {semanticResult.expected?.action && (
+                      <div><span className="text-gray-500">Action:</span> {semanticResult.expected.action}</div>
                     )}
                   </div>
                 </div>
               )}
-              {feedback.semanticResult.semanticIssues && feedback.semanticResult.semanticIssues.length > 0 && (
+              {semanticResult.semanticIssues && semanticResult.semanticIssues.length > 0 && (
                 <ul className="list-disc list-inside mt-2">
-                  {feedback.semanticResult.semanticIssues.map((issue, idx) => (
+                  {semanticResult.semanticIssues.map((issue, idx) => (
                     <li key={idx}>
                       <span className={`font-medium ${
                         issue.severity === 'CRITICAL' ? 'text-red-600' :
@@ -242,98 +362,9 @@ function PageFeedbackCard({
                   ))}
                 </ul>
               )}
-              {feedback.semanticResult.semanticIssues?.length === 0 && !feedback.semanticResult.visible && (
+              {semanticResult.semanticIssues?.length === 0 && !semanticResult.visible && (
                 <span className="text-green-600 ml-2">No issues</span>
               )}
-            </div>
-          )}
-          {feedback.fixableIssues.length > 0 && (
-            <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Quality Issues ({feedback.fixableIssues.length}):</h5>
-              <ul className="text-xs text-gray-600 space-y-1">
-                {feedback.fixableIssues.map((issue, i) => (
-                  <li key={i} className="flex items-start gap-1">
-                    {issue.source && (
-                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
-                    )}
-                    <span className={`px-1 rounded ${
-                      issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                      issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>{issue.severity}</span>
-                    <span>[{issue.type}] {issue.description}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {feedback.entityIssues.length > 0 && (
-            <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Character Consistency ({feedback.entityIssues.length}):</h5>
-              <ul className="text-xs text-gray-600 space-y-1">
-                {feedback.entityIssues.map((issue, i) => (
-                  <li key={i} className="flex items-start gap-1">
-                    {issue.source && (
-                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
-                    )}
-                    <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.character}</span>
-                    <span className={`px-1 rounded ${
-                      issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                      issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>{issue.severity}</span>
-                    <span>{issue.issue}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {feedback.objectIssues && feedback.objectIssues.length > 0 && (
-            <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Object Consistency ({feedback.objectIssues.length}):</h5>
-              <ul className="text-xs text-gray-600 space-y-1">
-                {feedback.objectIssues.map((issue, i) => (
-                  <li key={i} className="flex items-start gap-1">
-                    {issue.source && (
-                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
-                    )}
-                    <span className="px-1 rounded bg-blue-100 text-blue-700">{issue.object}</span>
-                    <span className={`px-1 rounded ${
-                      issue.severity === 'critical' ? 'bg-red-100 text-red-700' :
-                      issue.severity === 'major' ? 'bg-orange-100 text-orange-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>{issue.severity}</span>
-                    <span>{issue.issue}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {feedback.semanticIssues && feedback.semanticIssues.length > 0 && (
-            <div>
-              <h5 className="text-xs font-medium text-gray-600 mb-1">Semantic Issues ({feedback.semanticIssues.length}):</h5>
-              <ul className="text-xs text-gray-600 space-y-1">
-                {feedback.semanticIssues.map((issue, i) => (
-                  <li key={i} className="flex items-start gap-1">
-                    {issue.source && (
-                      <span className="text-[10px] px-1 rounded bg-gray-100 text-gray-500">{issue.source}</span>
-                    )}
-                    <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.type.replace(/_/g, ' ')}</span>
-                    {issue.characterInvolved && (
-                      <span className="px-1 rounded bg-indigo-100 text-indigo-700">{issue.characterInvolved}</span>
-                    )}
-                    <span className={`px-1 rounded ${
-                      issue.severity === 'high' ? 'bg-red-100 text-red-700' :
-                      issue.severity === 'medium' ? 'bg-orange-100 text-orange-700' :
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>{issue.severity}</span>
-                    <span>{issue.description}</span>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 
@@ -933,168 +964,26 @@ export function RepairWorkflowPanel({
                   <div className="space-y-2">
                     <h5 className="text-sm font-medium">Evaluation Results:</h5>
                     <div className="space-y-2">
-                      {Object.entries(workflowState.reEvaluationResults.pages).map(([page, result]) => {
-                        const finalScore = result.score ?? result.qualityScore;
-                        const qualityScore = result.qualityScore;
-                        const semanticScore = result.semanticScore;
-                        // Warn if using fallback (indicates potential bug in evaluation)
-                        if (result.score === null && result.qualityScore !== null) {
-                          console.warn(`[RepairWorkflow] Page ${page}: Missing combined score, using qualityScore fallback`);
-                        }
-                        return (
-                          <div key={page} className="p-2 bg-gray-50 rounded border text-sm space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-medium">{getPageName(Number(page))}:</span>
-                              <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
-                                Quality: {qualityScore}%
-                              </span>
-                              {(() => {
-                                const entityPen = result.entityPenalty || 0;
-                                const semanticPen = qualityScore - finalScore - entityPen;
-                                return (
-                                  <>
-                                    {semanticPen > 0 && (
-                                      <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
-                                        Semantic: -{semanticPen}
-                                      </span>
-                                    )}
-                                    {entityPen > 0 && (
-                                      <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
-                                        Entity: -{entityPen}
-                                      </span>
-                                    )}
-                                    {semanticPen === 0 && entityPen === 0 && semanticScore != null && (
-                                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
-                                        No penalties
-                                      </span>
-                                    )}
-                                    <span className="text-xs text-gray-400">=</span>
-                                  </>
-                                );
-                              })()}
-                              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                                finalScore >= 70 ? 'bg-green-100 text-green-700' :
-                                finalScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
-                              }`}>
-                                Final: {finalScore}%
-                              </span>
-                              {result.verdict && (
-                                <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                  result.verdict === 'PASS' ? 'bg-green-100 text-green-700' :
-                                  result.verdict === 'SOFT_FAIL' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-red-100 text-red-700'
-                                }`}>
-                                  {result.verdict}
-                                </span>
-                              )}
-                              {result.fixableIssues && result.fixableIssues.length > 0 && (
-                                <span className="text-gray-500 text-xs">
-                                  ({result.fixableIssues.length} fixable issues)
-                                </span>
-                              )}
-                            </div>
-                            {/* Organized issue breakdown by source */}
-                            {result.fixableIssues && result.fixableIssues.length > 0 && (() => {
-                              const qualityIssues = (result.fixableIssues as any[]).filter(i => !i.source?.includes('semantic') && !i.source?.includes('entity') && !i.source?.includes('image checks'));
-                              const semanticIssues = (result.fixableIssues as any[]).filter(i => i.source?.includes('semantic'));
-                              const entityIssues = (result.fixableIssues as any[]).filter(i => i.source?.includes('entity') || i.source?.includes('image checks'));
-                              const severityPenalty = (s: string) => s === 'critical' || s === 'CRITICAL' ? 30 : s === 'major' || s === 'MAJOR' ? 20 : 10;
-                              const renderIssueList = (issues: any[], color: string) => (
-                                <div className="space-y-0.5">
-                                  {issues.map((issue, idx) => (
-                                    <div key={idx} className="flex gap-1 items-start">
-                                      <span className={`text-[10px] font-bold ${color} shrink-0`}>-{severityPenalty(issue.severity)}</span>
-                                      <span className="text-xs text-gray-700">{issue.description || issue.issue || JSON.stringify(issue)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                              return (
-                                <div className="space-y-2 mt-1">
-                                  {qualityIssues.length > 0 && (
-                                    <div className="text-xs pl-2 border-l-2 border-blue-300 bg-blue-50 p-1.5 rounded-r">
-                                      <div className="font-semibold text-blue-800 mb-1">Quality Issues ({qualityIssues.length}):</div>
-                                      {renderIssueList(qualityIssues, 'text-blue-600')}
-                                    </div>
-                                  )}
-                                  {semanticIssues.length > 0 && (
-                                    <div className="text-xs pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1.5 rounded-r">
-                                      <div className="font-semibold text-indigo-800 mb-1">Semantic Issues ({semanticIssues.length}):</div>
-                                      {renderIssueList(semanticIssues, 'text-indigo-600')}
-                                    </div>
-                                  )}
-                                  {entityIssues.length > 0 && (
-                                    <div className="text-xs pl-2 border-l-2 border-orange-400 bg-orange-50 p-1.5 rounded-r">
-                                      <div className="font-semibold text-orange-800 mb-1">Entity / Consistency Issues ({entityIssues.length}):</div>
-                                      {renderIssueList(entityIssues, 'text-orange-600')}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                            {result.semanticResult && (
-                              <div className="text-xs text-indigo-700 pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1 rounded-r mt-1">
-                                <span className="font-medium">🔍 Semantic Analysis (Score: {result.semanticResult.score ?? 'N/A'}):</span>
-
-                                {/* Show visible vs expected */}
-                                {result.semanticResult.visible && (
-                                  <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                                    <div className="bg-white p-2 rounded border border-indigo-200">
-                                      <div className="font-medium text-indigo-800 mb-1">👁️ Visible:</div>
-                                      {result.semanticResult.visible.characters && result.semanticResult.visible.characters.length > 0 && (
-                                        <div><span className="text-gray-500">Characters:</span> {result.semanticResult.visible.characters.join(', ')}</div>
-                                      )}
-                                      {result.semanticResult.visible.objects && result.semanticResult.visible.objects.length > 0 && (
-                                        <div><span className="text-gray-500">Objects:</span> {result.semanticResult.visible.objects.join(', ')}</div>
-                                      )}
-                                      {result.semanticResult.visible.setting && (
-                                        <div><span className="text-gray-500">Setting:</span> {result.semanticResult.visible.setting}</div>
-                                      )}
-                                      {result.semanticResult.visible.action && (
-                                        <div><span className="text-gray-500">Action:</span> {result.semanticResult.visible.action}</div>
-                                      )}
-                                    </div>
-                                    <div className="bg-white p-2 rounded border border-indigo-200">
-                                      <div className="font-medium text-indigo-800 mb-1">🎯 Expected:</div>
-                                      {result.semanticResult.expected?.characters && result.semanticResult.expected.characters.length > 0 && (
-                                        <div><span className="text-gray-500">Characters:</span> {result.semanticResult.expected.characters.join(', ')}</div>
-                                      )}
-                                      {result.semanticResult.expected?.objects && result.semanticResult.expected.objects.length > 0 && (
-                                        <div><span className="text-gray-500">Objects:</span> {result.semanticResult.expected.objects.join(', ')}</div>
-                                      )}
-                                      {result.semanticResult.expected?.setting && (
-                                        <div><span className="text-gray-500">Setting:</span> {result.semanticResult.expected.setting}</div>
-                                      )}
-                                      {result.semanticResult.expected?.action && (
-                                        <div><span className="text-gray-500">Action:</span> {result.semanticResult.expected.action}</div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Show issues */}
-                                {result.semanticResult.semanticIssues && result.semanticResult.semanticIssues.length > 0 && (
-                                  <ul className="list-disc list-inside mt-2">
-                                    {result.semanticResult.semanticIssues.map((issue, idx) => (
-                                      <li key={idx}>
-                                        <span className={`font-medium ${
-                                          issue.severity === 'CRITICAL' ? 'text-red-600' :
-                                          issue.severity === 'MAJOR' ? 'text-orange-600' : 'text-yellow-600'
-                                        }`}>[{issue.severity}]</span> {issue.problem}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-
-                                {result.semanticResult.semanticIssues?.length === 0 && !result.semanticResult.visible && (
-                                  <span className="text-green-600 ml-2">✓ No issues</span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                      {Object.entries(workflowState.reEvaluationResults.pages)
+                        .sort(([a], [b]) => Number(a) - Number(b))
+                        .map(([page, result]) => {
+                          const pageNum = Number(page);
+                          const feedbackData = workflowState.collectedFeedback.pages[pageNum] || {
+                            pageNumber: pageNum,
+                            fixableIssues: [],
+                            entityIssues: [],
+                            objectIssues: [],
+                            semanticIssues: [],
+                            needsFullRedo: false,
+                          };
+                          return (
+                            <PageFeedbackCard
+                              key={page}
+                              feedback={feedbackData}
+                              reEvalResult={result}
+                            />
+                          );
+                        })}
                     </div>
                   </div>
                 )}
