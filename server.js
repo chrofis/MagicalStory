@@ -3751,7 +3751,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
         const pipelineStoryData = {
           characters: inputData.characters,
           sceneDescriptions: expandedScenes,
-          storyText: generatedStory,
+          storyText: fullStoryText,
           visualBible,
           artStyle: inputData.artStyle,
           language: inputData.language,
@@ -5079,7 +5079,7 @@ async function _processStoryJobImpl(jobId) {
           if (user.email) {
             const firstName = user.shipping_first_name || user.username?.split(' ')[0] || null;
             // Prefer story language over DB default (DB defaults to 'English' for trial users)
-            const emailLanguage = inputData.language || user.preferred_language || 'English';
+            const emailLanguage = user.preferred_language || 'en';
             await email.sendStoryFailedEmail(user.email, firstName, emailLanguage);
           }
         }
