@@ -4737,51 +4737,75 @@ export default function StoryWizard() {
                   const result = await storyService.iteratePage(storyId, pageNumber, modelSelections.imageModel || undefined, options);
 
                   if (result.success) {
-                    // Update the scene image with the iterated version
-                    setSceneImages(prev => prev.map(img => {
-                      if (img.pageNumber === pageNumber) {
-                        // Convert server imageVersions to local type
-                        // Merge with existing versions to preserve imageData for older versions
-                        const existingVersions = img.imageVersions || [];
-                        const updatedVersions = result.imageVersions?.map((v, idx) => ({
-                          // Use existing imageData if server didn't send it (older versions)
-                          imageData: v.imageData || existingVersions[idx]?.imageData || '',
-                          description: v.description,
-                          prompt: v.prompt,
-                          modelId: v.modelId,
-                          createdAt: v.createdAt || new Date().toISOString(),
-                          isActive: v.isActive ?? false,
-                          type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
-                          qualityScore: v.qualityScore
-                        }));
-                        return {
-                          ...img,
-                          imageData: result.imageData,
-                          description: result.sceneDescription,
-                          prompt: result.imagePrompt,
-                          qualityScore: result.qualityScore,
-                          qualityReasoning: result.qualityReasoning,
-                          wasIterated: true,
-                          iteratedAt: new Date().toISOString(),
-                          iterationFeedback: result.composition,
-                          previewMismatches: result.previewMismatches,
-                          // Update image versions from server response
-                          imageVersions: updatedVersions || img.imageVersions
-                        };
+                    // Cover iteration (negative page numbers)
+                    if (pageNumber < 0) {
+                      const coverTypeMap: Record<number, 'frontCover' | 'initialPage' | 'backCover'> = { [-1]: 'frontCover', [-2]: 'initialPage', [-3]: 'backCover' };
+                      const coverKey = coverTypeMap[pageNumber];
+                      if (coverKey) {
+                        setCoverImages(prev => {
+                          if (!prev) return prev;
+                          const existing = prev[coverKey];
+                          return {
+                            ...prev,
+                            [coverKey]: {
+                              ...existing,
+                              imageData: result.imageData,
+                              description: result.sceneDescription,
+                              prompt: result.imagePrompt,
+                              qualityScore: result.qualityScore,
+                              qualityReasoning: result.qualityReasoning,
+                              wasRegenerated: true,
+                              imageVersions: result.imageVersions || existing?.imageVersions,
+                            }
+                          };
+                        });
                       }
-                      return img;
-                    }));
-                    // Update scene descriptions too
-                    setSceneDescriptions(prev => prev.map(scene => {
-                      if (scene.pageNumber === pageNumber) {
-                        return {
-                          ...scene,
-                          description: result.sceneDescription,
-                          iteratedAt: new Date().toISOString()
-                        };
-                      }
-                      return scene;
-                    }));
+                    } else {
+                      // Page iteration (positive page numbers)
+                      setSceneImages(prev => prev.map(img => {
+                        if (img.pageNumber === pageNumber) {
+                          const existingVersions = img.imageVersions || [];
+                          const updatedVersions = result.imageVersions?.map((v, idx) => ({
+                            imageData: v.imageData || existingVersions[idx]?.imageData || '',
+                            description: v.description,
+                            prompt: v.prompt,
+                            modelId: v.modelId,
+                            createdAt: v.createdAt || new Date().toISOString(),
+                            isActive: v.isActive ?? false,
+                            type: v.type as 'original' | 'regeneration' | 'iteration' | 'repair' | undefined,
+                            qualityScore: v.qualityScore
+                          }));
+                          return {
+                            ...img,
+                            imageData: result.imageData,
+                            description: result.sceneDescription,
+                            prompt: result.imagePrompt,
+                            qualityScore: result.qualityScore,
+                            qualityReasoning: result.qualityReasoning,
+                            wasIterated: true,
+                            iteratedAt: new Date().toISOString(),
+                            iterationFeedback: result.composition,
+                            previewMismatches: result.previewMismatches,
+                            imageVersions: updatedVersions || img.imageVersions,
+                            referencePhotos: result.referencePhotos || img.referencePhotos,
+                            landmarkPhotos: result.landmarkPhotos || img.landmarkPhotos,
+                            visualBibleGrid: result.visualBibleGrid || img.visualBibleGrid,
+                            grokRefImages: result.grokRefImages || null,
+                          };
+                        }
+                        return img;
+                      }));
+                      setSceneDescriptions(prev => prev.map(scene => {
+                        if (scene.pageNumber === pageNumber) {
+                          return {
+                            ...scene,
+                            description: result.sceneDescription,
+                            iteratedAt: new Date().toISOString()
+                          };
+                        }
+                        return scene;
+                      }));
+                    }
                     log.info('Iteration completed successfully:', {
                       mismatches: result.previewMismatches?.length || 0,
                       score: result.qualityScore,

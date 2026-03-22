@@ -16,6 +16,7 @@ interface ReferencePhotosDisplayProps {
   landmarkPhotos?: LandmarkPhoto[];
   visualBibleGrid?: string;  // Base64 data URL of combined VB elements grid
   hasVisualBibleGrid?: boolean;  // Flag when visualBibleGrid is stripped (for lazy loading)
+  grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
   language: string;
   // For lazy loading
   storyId?: string;
@@ -30,6 +31,7 @@ export function ReferencePhotosDisplay({
   landmarkPhotos,
   visualBibleGrid,
   hasVisualBibleGrid,
+  grokRefImages,
   language,
   storyId,
   pageNumber
@@ -305,6 +307,30 @@ export function ReferencePhotosDisplay({
                 {isLoading ? (language === 'de' ? 'Wird geladen...' : 'Loading...') : (language === 'de' ? 'Bild nicht geladen' : 'Image not loaded')}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Grok API: exact packed images sent (max 3 slots) */}
+      {grokRefImages && grokRefImages.length > 0 && (
+        <div className={hasCharacterPhotos || hasLandmarkPhotos || hasVBGrid ? "mt-4 pt-3 border-t border-pink-200" : "mt-3"}>
+          <div className="text-xs font-semibold text-orange-700 mb-2 flex items-center gap-1">
+            🎯 {language === 'de' ? 'An Grok API gesendet' : 'Sent to Grok API'}
+            <span className="text-[10px] font-normal text-orange-500">({grokRefImages.length}/3 slots)</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {grokRefImages.map((img, idx) => (
+              <div key={idx} className="bg-orange-50 rounded-lg p-1 border border-orange-200">
+                <div className="text-[10px] text-orange-600 font-medium mb-1 text-center">Slot {idx + 1}</div>
+                <img
+                  src={img}
+                  alt={`Grok ref slot ${idx + 1}`}
+                  className="w-full max-h-40 object-contain rounded border border-orange-200 bg-white cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setLightboxImage(img)}
+                  title="Click to enlarge — exact image sent to Grok API"
+                />
+              </div>
+            ))}
           </div>
         </div>
       )}

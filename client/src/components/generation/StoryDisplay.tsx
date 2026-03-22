@@ -3546,6 +3546,22 @@ export function StoryDisplay({
             {/* Developer Mode Features for Front Cover */}
             {developerMode && frontCoverObj && (
               <div className="mt-3 space-y-2">
+                {/* Iterate Button - dev only (uses same iterate endpoint as pages) */}
+                {onIteratePage && (
+                  <button
+                    onClick={() => handleIteratePage(-1)}
+                    disabled={isGenerating || iteratingPage !== null}
+                    className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || iteratingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                    }`}
+                  >
+                    {iteratingPage === -1 ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
+                    ) : (
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
+                    )}
+                  </button>
+                )}
                 {/* Edit Button - dev only */}
                 {_onEditCover && (
                   <button
@@ -3754,6 +3770,22 @@ export function StoryDisplay({
             {/* Developer Mode Features for Initial Page */}
             {developerMode && initialPageObj && (
               <div className="mt-3 space-y-2">
+                {/* Iterate Button - dev only */}
+                {onIteratePage && (
+                  <button
+                    onClick={() => handleIteratePage(-2)}
+                    disabled={isGenerating || iteratingPage !== null}
+                    className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || iteratingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                    }`}
+                  >
+                    {iteratingPage === -2 ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
+                    ) : (
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
+                    )}
+                  </button>
+                )}
                 {/* Edit Button - dev only */}
                 {_onEditCover && (
                   <button
@@ -4290,12 +4322,13 @@ export function StoryDisplay({
                             )}
 
                             {/* Reference Photos */}
-                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid) && image && (
+                            {((image?.referencePhotos?.length ?? 0) > 0 || (image?.landmarkPhotos?.length ?? 0) > 0 || image?.visualBibleGrid || image?.hasVisualBibleGrid || (image as any)?.grokRefImages) && image && (
                               <ReferencePhotosDisplay
                                 referencePhotos={image.referencePhotos || []}
                                 landmarkPhotos={image.landmarkPhotos}
                                 visualBibleGrid={image.visualBibleGrid}
                                 hasVisualBibleGrid={image.hasVisualBibleGrid}
+                                grokRefImages={(image as any)?.grokRefImages}
                                 language={language}
                                 storyId={storyId || undefined}
                                 pageNumber={pageNumber}
@@ -5042,6 +5075,22 @@ export function StoryDisplay({
             {/* Developer Mode Features for Back Cover */}
             {developerMode && backCoverObj && (
               <div className="mt-3 space-y-2">
+                {/* Iterate Button - dev only */}
+                {onIteratePage && (
+                  <button
+                    onClick={() => handleIteratePage(-3)}
+                    disabled={isGenerating || iteratingPage !== null}
+                    className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
+                      isGenerating || iteratingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                    }`}
+                  >
+                    {iteratingPage === -3 ? (
+                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
+                    ) : (
+                      <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
+                    )}
+                  </button>
+                )}
                 {/* Edit Button - dev only */}
                 {_onEditCover && (
                   <button

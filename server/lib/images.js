@@ -2245,7 +2245,8 @@ async function callGeminiAPIForImage(prompt, characterPhotos = [], previousImage
         semanticScore: qualityResult?.semanticScore ?? null,
         issuesSummary: qualityResult?.issuesSummary || null,
         verdict: qualityResult?.verdict || null,
-        usage: result.usage
+        usage: result.usage,
+        grokRefImages: refImages.length > 0 ? refImages : undefined,
       };
 
       imageCache.set(cacheKey, finalResult);
@@ -2885,7 +2886,8 @@ async function generateImageOnly(prompt, characterPhotos = [], options = {}) {
         imageData: result.imageData,
         prompt,
         modelId: result.modelId,
-        usage: result.usage
+        usage: result.usage,
+        grokRefImages: refImages.length > 0 ? refImages : undefined,
       };
 
       if (!skipCache) imageCache.set(genOnlyCacheKey, finalResult);

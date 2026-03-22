@@ -1226,6 +1226,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         referencePhotos: coverCharacterPhotos,
         landmarkPhotos: [],
         visualBibleGrid: null,
+        grokRefImages: imageResult.grokRefImages || null,
         message: 'Cover regenerated with fresh generation',
         // Version info
         versionIndex: newVersionIndex
@@ -1713,6 +1714,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       referencePhotos,
       landmarkPhotos: pageLandmarkPhotos,
       visualBibleGrid: vbGrid ? `data:image/jpeg;base64,${vbGrid.toString('base64')}` : null,
+      // Exact images sent to Grok API (max 3 packed/stitched slots)
+      grokRefImages: imageResult.grokRefImages || null,
       message: previewMismatches.length > 0
         ? `Found ${previewMismatches.length} mismatch(es), regenerated with corrections`
         : 'No mismatches found, regenerated with fresh analysis'

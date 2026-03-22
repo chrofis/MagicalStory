@@ -1186,6 +1186,7 @@ export const storyService = {
     referencePhotos?: ReferencePhoto[];
     landmarkPhotos?: LandmarkPhoto[];
     visualBibleGrid?: string;
+    grokRefImages?: string[] | null;  // Exact packed images sent to Grok API (max 3)
     message: string;
   }> {
     const response = await api.post<{
