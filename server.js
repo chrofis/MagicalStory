@@ -4864,11 +4864,11 @@ async function _processStoryJobImpl(jobId) {
             const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
 
             if (cp.step_name === 'outline') {
+              // Legacy pipeline checkpoint
               outline = data.outline || '';
               outlinePrompt = data.outlinePrompt || '';
               outlineModelId = data.outlineModelId || null;
               outlineUsage = data.outlineUsage || null;
-              // Extract clothing data from outline
               if (outline) {
                 try {
                   pageClothingData = extractPageClothing(outline, inputData?.pages || 15);
@@ -4876,9 +4876,44 @@ async function _processStoryJobImpl(jobId) {
                   log.debug(`[PARTIAL SAVE] Could not extract clothing: ${e.message}`);
                 }
               }
+            } else if (cp.step_name === 'unified_story') {
+              // Unified pipeline: contains story pages, visual bible, clothing, title
+              if (data.storyPages?.length) {
+                fullStoryText = data.storyPages.map(p => `## Seite ${p.pageNumber}\n\n${p.text}`).join('\n\n');
+                // Extract scene descriptions from storyPages
+                for (const page of data.storyPages) {
+                  if (page.sceneHint) {
+                    sceneDescriptions.push({
+                      pageNumber: page.pageNumber,
+                      description: page.sceneHint
+                    });
+                  }
+                }
+              }
+              if (data.visualBible) visualBible = data.visualBible;
+              if (data.clothingRequirements) {
+                try {
+                  pageClothingData = data.clothingRequirements;
+                } catch (e) {
+                  log.debug(`[PARTIAL SAVE] Could not parse clothing: ${e.message}`);
+                }
+              }
+              if (data.unifiedPrompt) {
+                outlinePrompt = data.unifiedPrompt;
+                outlineModelId = data.unifiedModelId || null;
+                outlineUsage = data.unifiedUsage || null;
+              }
+            } else if (cp.step_name === 'story_text') {
+              // Unified pipeline: story text for progressive display
+              // Only use if fullStoryText wasn't already set from unified_story
+              if (!fullStoryText && data.pageTexts) {
+                const pageNums = Object.keys(data.pageTexts).sort((a, b) => Number(a) - Number(b));
+                fullStoryText = pageNums.map(n => `## Seite ${n}\n\n${data.pageTexts[n]}`).join('\n\n');
+              }
             } else if (cp.step_name === 'scene_hints' && data.visualBible) {
               visualBible = data.visualBible;
             } else if (cp.step_name === 'story_batch') {
+              // Legacy pipeline checkpoint
               if (data.batchText) {
                 fullStoryText += (fullStoryText ? '\n\n' : '') + data.batchText;
               }
@@ -4918,15 +4953,15 @@ async function _processStoryJobImpl(jobId) {
                   referencePhotos: data.referencePhotos || null  // For consistency check character names
                 });
               }
-            } else if (cp.step_name === 'cover') {
+            } else if (cp.step_name === 'cover' || cp.step_name === 'partial_cover') {
               const coverType = data.type;
-              if (data.imageData) {
+              if (data.imageData && coverType) {
                 coverImages[coverType] = {
                   imageData: data.imageData,
                   description: data.description || '',
                   prompt: data.prompt || '',
-                  qualityScore: data.score,
-                  qualityReasoning: data.reasoning,
+                  qualityScore: data.qualityScore || data.score,
+                  qualityReasoning: data.qualityReasoning || data.reasoning,
                   modelId: data.modelId || null
                 };
               }
