@@ -528,18 +528,9 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
 
     if (!imageData) continue;
 
-    // Get bbox detection - check direct property first, then retryHistory
-    let bboxDetection = img.bboxDetection || null;
-    if (!bboxDetection && img.retryHistory && Array.isArray(img.retryHistory)) {
-      // Find the most recent entry with bbox detection
-      for (let i = img.retryHistory.length - 1; i >= 0; i--) {
-        const entry = img.retryHistory[i];
-        if (entry.bboxDetection) {
-          bboxDetection = entry.bboxDetection;
-          break;
-        }
-      }
-    }
+    // Don't use cached img.bboxDetection — it may be from a different image version.
+    // Force fresh detection on the active image (loaded by rehydrateStoryImages).
+    let bboxDetection = null;
 
     // Get clothing info for this page - try multiple sources
     // Priority: img.characterClothing > scene description metadata > clothingRequirements > 'standard'
@@ -750,18 +741,9 @@ function collectObjectAppearances(sceneImages) {
 
     if (!imageData) continue;
 
-    // Get bbox detection - check direct property first, then retryHistory
-    let bboxDetection = img.bboxDetection || null;
-    if (!bboxDetection && img.retryHistory && Array.isArray(img.retryHistory)) {
-      // Find the most recent entry with bbox detection
-      for (let i = img.retryHistory.length - 1; i >= 0; i--) {
-        const entry = img.retryHistory[i];
-        if (entry.bboxDetection) {
-          bboxDetection = entry.bboxDetection;
-          break;
-        }
-      }
-    }
+    // Don't use cached img.bboxDetection — it may be from a different image version.
+    // Force fresh detection on the active image (loaded by rehydrateStoryImages).
+    let bboxDetection = null;
 
     if (!bboxDetection?.objects) continue;
 
