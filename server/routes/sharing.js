@@ -115,16 +115,29 @@ function getPageText(storyText, pageNumber) {
     return page?.text || null;
   }
 
-  // Handle string format with page markers
-  const pageMarker = `--- Page ${pageNumber} ---`;
-  const pageIndex = storyText.indexOf(pageMarker);
-  if (pageIndex === -1) return null;
+  // Try multiple page marker formats
+  // Format 1: "--- Page N ---" or "--- Seite N ---"
+  // Format 2: "## Page N" or "## Seite N"
+  const markers = [
+    `--- Page ${pageNumber} ---`,
+    `--- Seite ${pageNumber} ---`,
+    `## Page ${pageNumber}`,
+    `## Seite ${pageNumber}`,
+  ];
 
-  const textStart = pageIndex + pageMarker.length;
-  const nextPageMarker = storyText.indexOf('--- Page ', textStart);
-  const textEnd = nextPageMarker === -1 ? storyText.length : nextPageMarker;
+  for (const marker of markers) {
+    const pageIndex = storyText.indexOf(marker);
+    if (pageIndex === -1) continue;
 
-  return storyText.substring(textStart, textEnd).trim();
+    const textStart = pageIndex + marker.length;
+    // Find start of next page (any format)
+    const nextMatch = storyText.substring(textStart).match(/(?:---\s*(?:Page|Seite)\s+\d+\s*---|##\s*(?:Page|Seite)\s+\d+)/i);
+    const textEnd = nextMatch ? textStart + nextMatch.index : storyText.length;
+
+    return storyText.substring(textStart, textEnd).trim();
+  }
+
+  return null;
 }
 
 // ============================================
@@ -156,11 +169,12 @@ apiRouter.get('/shared/:shareToken', async (req, res) => {
     // Return only safe public data (no user info, no prompts)
     const data = story.data;
 
-    // Extract pages from storyText (format: "--- Page N ---\ntext...")
+    // Extract pages from story text (format: "## Seite N\ntext..." or "--- Page N ---\ntext...")
     const pages = [];
-    const pageCount = data.pageCount || data.pages || 10;
-    for (let i = 1; i <= pageCount; i++) {
-      const text = getPageText(data.storyText || data.generatedStory, i);
+    const storyText = data.story || data.storyText || data.generatedStory || '';
+    const sceneCount = data.sceneImages?.length || data.totalScenes || Math.floor((data.pages || 10) / 2) || 10;
+    for (let i = 1; i <= sceneCount; i++) {
+      const text = getPageText(storyText, i);
       if (text) {
         pages.push({ pageNumber: i, text });
       }
