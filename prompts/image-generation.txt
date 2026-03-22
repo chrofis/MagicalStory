@@ -1,5 +1,11 @@
 Generate a SINGLE illustration. No split screen, no panels, no grid, no collage. One continuous scene filling the entire image. Do NOT add any text, letters, words, labels, signatures, or watermarks to the image.
 
+**CRITICAL — COMPOSITION:**
+- Characters must INTERACT with the scene — facing and engaging with objects, landmarks, or each other. NOT standing in front of a backdrop looking at the viewer.
+- Characters face TOWARD what they interact with. Eyes look at objects or other characters, NOT at the camera.
+- If a landmark, building, or object is in the BACKGROUND, characters must face AWAY from the camera toward it — we see their backs or sides as they look at it. A castle in the background means characters face the castle, not the viewer.
+- Each character must be DOING something specific (reaching, looking at, holding, walking toward). No static posing.
+
 {CHARACTER_REFERENCE_LIST}
 
 **SCENE:**
