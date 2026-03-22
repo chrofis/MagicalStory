@@ -682,11 +682,22 @@ router.get('/check-status', verifySessionToken, async (req, res) => {
       }
     }
 
+    // Look up characterId so frontend can restore it for returning users
+    let characterId = null;
+    const charResult = await pool.query(
+      'SELECT id FROM characters WHERE user_id = $1 LIMIT 1',
+      [userId]
+    );
+    if (charResult.rows.length > 0) {
+      characterId = charResult.rows[0].id;
+    }
+
     res.json({
       trialUsed,
       emailVerified: user.email_verified === true,
       hasEmail: !!user.email,
       ...(storyId ? { storyId } : {}),
+      ...(characterId ? { characterId } : {}),
     });
   } catch (err) {
     log.error(`[TRIAL] Check status error: ${err.message}`);

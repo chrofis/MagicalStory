@@ -163,6 +163,10 @@ export default function TrialWizard() {
           setTrialUsed(true);
           if (data.storyId) setTrialStoryId(data.storyId);
         }
+        // Restore characterId for returning users (session token in localStorage but no characterId in state)
+        if (data?.characterId && !characterId) {
+          setCharacterId(data.characterId);
+        }
       })
       .catch(() => {
         // Network error — clear stale token to be safe
