@@ -89,7 +89,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 
 **Fields sent to image generator (keep SHORT):**
 - `imageSummary`: 1-2 sentences. What's happening, who's there.
-- `action`: One short phrase. NOT a paragraph.
+- `action`: 3-5 words max. One simple verb phrase. Image models can handle "sitting on stairs looking out window" but NOT "leans right elbow on dark wood banister with eyes narrowed thoughtfully toward window." Keep it to WHAT they do, not HOW exactly they pose.
 - `expression`: 1-2 words. Must match the action — NOT "smiling" unless the story moment is genuinely happy. Use: focused, startled, frowning, squinting, laughing, nervous, determined. "Smiling" on more than 2 pages in a story = too many.
 - `position`: Use ONLY these values:
   - Close characters: "left", "center", "right" (all drawn at normal size)

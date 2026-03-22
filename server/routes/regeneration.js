@@ -1009,19 +1009,19 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         });
       }
 
-      // Append evaluation feedback if provided
+      // Append evaluation feedback — only critical issues as positive instructions
       if (evaluationFeedback) {
-        const feedbackParts = [];
-        if (evaluationFeedback.reasoning) {
-          feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
-        }
-        if (evaluationFeedback.fixableIssues?.length > 0) {
-          feedbackParts.push('Specific problems to avoid:\n' +
-            evaluationFeedback.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
-        }
-        if (feedbackParts.length > 0) {
-          coverPrompt = `${coverPrompt}\n\n${feedbackParts.join('\n\n')}`;
-          log.info(`🔄 [ITERATE] Cover ${coverKey}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'})`);
+        const criticalIssues = (evaluationFeedback.fixableIssues || [])
+          .filter(i => {
+            const desc = (i.description || i.issue || '').toLowerCase();
+            return desc.includes('missing') || desc.includes('absent') || desc.includes('not present')
+              || desc.includes('wrong setting') || desc.includes('wrong location');
+          });
+        if (criticalIssues.length > 0) {
+          const feedbackText = 'IMPORTANT — ensure these elements are present this time:\n' +
+            criticalIssues.map(i => `- ${i.description || i.issue || i}`).join('\n');
+          coverPrompt = `${coverPrompt}\n\n${feedbackText}`;
+          log.info(`🔄 [ITERATE] Cover ${coverKey}: Appended ${criticalIssues.length} critical issues as positive instructions`);
         }
       }
 
@@ -1506,19 +1506,21 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     }
 
     // Build image prompt (append evaluation feedback if provided)
+    // Only include critical issues (missing characters/objects/settings) — not pose/expression nitpicks
     let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
     if (evaluationFeedback) {
-      const feedbackParts = [];
-      if (evaluationFeedback.reasoning) {
-        feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
-      }
-      if (evaluationFeedback.fixableIssues?.length > 0) {
-        feedbackParts.push('Specific problems to avoid:\n' +
-          evaluationFeedback.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
-      }
-      if (feedbackParts.length > 0) {
-        imagePrompt = `${imagePrompt}\n\n${feedbackParts.join('\n\n')}`;
-        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'})`);
+      const criticalIssues = (evaluationFeedback.fixableIssues || [])
+        .filter(i => {
+          const desc = (i.description || i.issue || '').toLowerCase();
+          // Only keep issues about missing/wrong elements, not pose or expression differences
+          return desc.includes('missing') || desc.includes('absent') || desc.includes('not present')
+            || desc.includes('wrong setting') || desc.includes('wrong location');
+        });
+      if (criticalIssues.length > 0) {
+        const feedbackText = 'IMPORTANT — ensure these elements are present this time:\n' +
+          criticalIssues.map(i => `- ${i.description || i.issue || i}`).join('\n');
+        imagePrompt = `${imagePrompt}\n\n${feedbackText}`;
+        log.info(`🔄 [ITERATE] Page ${pageNumber}: Appended ${criticalIssues.length} critical issues as positive instructions (score: ${evaluationFeedback.score ?? 'N/A'})`);
       }
     }
 

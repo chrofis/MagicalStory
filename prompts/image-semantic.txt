@@ -21,7 +21,17 @@ Check if the image matches what was requested:
 - Are all mentioned characters present?
 - Are all mentioned objects present?
 - Is the setting/location correct?
-- Is the action correct? (who's doing what to whom)
+- Is the general action correct? (who's doing what to whom)
+
+**DO NOT penalize:**
+- Exact pose differences (sitting vs standing is fine if character is in the right place)
+- Facial expressions not matching (image models cannot render "thoughtful" vs "determined")
+- Specific gestures (thumbs up vs hands at sides — irrelevant unless the gesture IS the story moment)
+- Exact gaze direction (looking left vs looking at window — only flag if completely wrong direction)
+- Minor spatial differences (left midground vs center — only flag if completely wrong side)
+- Characters facing camera instead of an object — this is a generation limitation, not a semantic error
+
+Image models produce illustrations, not movie stills. Judge WHO is WHERE doing roughly WHAT — not exact choreography.
 
 ---
 
@@ -31,7 +41,7 @@ Start at 10, subtract for issues:
 - Missing character: -3 (CRITICAL)
 - Missing key object: -2 (MAJOR)
 - Wrong/missing setting: -2 (MAJOR)
-- Action reversed or wrong: -2 (MAJOR)
+- Key action completely wrong (hugging instead of fighting): -2 (MAJOR)
 - Missing background element: -1 (MINOR)
 
 VERDICT: PASS (7+), FAIL (0-6)
