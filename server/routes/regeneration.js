@@ -3097,8 +3097,8 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           log.info(`📊 [RE-EVALUATE] ${pageLabel}: entity penalty ${entityPenalty} (${evaluation.score} → ${adjustedScore})`);
         }
 
-        // Run bbox enrichment if there are any issues
-        if (allIssues.length > 0) {
+        // Run bbox enrichment — always run to keep bboxDetection in sync with active image
+        {
           const characterDescriptions = {};
           for (const char of (storyData.characters || [])) {
             characterDescriptions[char.name] = {
@@ -3116,7 +3116,9 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           );
           scene.fixTargets = enrichResult.targets || [];
           scene.bboxDetection = enrichResult.detectionHistory || null;
-          log.info(`🎯 [RE-EVALUATE] ${pageLabel} - bbox enrichment: ${scene.fixTargets.length} targets from ${allIssues.length} issues`);
+          if (allIssues.length > 0) {
+            log.info(`🎯 [RE-EVALUATE] ${pageLabel} - bbox enrichment: ${scene.fixTargets.length} targets from ${allIssues.length} issues`);
+          }
         }
 
         // Store combined issues + bbox results on scene and active version
