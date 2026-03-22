@@ -4894,6 +4894,9 @@ export default function StoryWizard() {
                         ...(activeVersion.description !== undefined && { description: activeVersion.description }),
                         ...(activeVersion.totalAttempts !== undefined && { totalAttempts: activeVersion.totalAttempts }),
                         ...(activeVersion.modelId !== undefined && { modelId: activeVersion.modelId }),
+                        // Clear stale bbox data — was from previous version's evaluation
+                        bboxDetection: null,
+                        bboxOverlayImage: null,
                         imageVersions: img.imageVersions.map(v => ({
                           ...v,
                           isActive: v.versionIndex === versionIndex
