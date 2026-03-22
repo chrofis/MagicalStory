@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { BookOpen } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { Navigation } from '@/components/common';
 import TrialCharacterStep from './trial/TrialCharacterStep';
 import TrialTopicStep from './trial/TrialTopicStep';
@@ -75,11 +76,30 @@ const trialUsedStrings: Record<string, { title: string; desc: string; signUp: st
   },
 };
 
+const loggedInStrings: Record<string, { title: string; desc: string; goToCreate: string }> = {
+  en: {
+    title: 'You already have an account!',
+    desc: 'You\'re logged in. Create stories directly from your account — with more characters, longer stories, and printed books.',
+    goToCreate: 'Create a story',
+  },
+  de: {
+    title: 'Du hast bereits ein Konto!',
+    desc: 'Du bist angemeldet. Erstelle Geschichten direkt von deinem Konto — mit mehr Figuren, längeren Geschichten und gedruckten Büchern.',
+    goToCreate: 'Geschichte erstellen',
+  },
+  fr: {
+    title: 'Vous avez déjà un compte !',
+    desc: 'Vous êtes connecté. Créez des histoires directement depuis votre compte — avec plus de personnages, des histoires plus longues et des livres imprimés.',
+    goToCreate: 'Créer une histoire',
+  },
+};
+
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function TrialWizard() {
   const { language } = useLanguage();
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   // Wizard step
@@ -225,6 +245,40 @@ export default function TrialWizard() {
       },
     });
   }, [selectedIdeaIndex, generatedIdeas, sessionToken, characterId, storyInput, characterData.name, previewAvatar, titlePageData, navigate]);
+
+  // ─── Logged-in user redirect ────────────────────────────────────────────────
+
+  const li = loggedInStrings[language] || loggedInStrings.en;
+
+  if (!authLoading && user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <nav className="bg-black text-white px-3 py-3">
+          <div className="flex justify-between items-center">
+            <Link to="/" className="text-sm md:text-base font-bold whitespace-nowrap hover:opacity-80 flex items-center gap-1.5">
+              <img src="/images/logo-book.png" alt="" className="h-10 md:h-11 -my-2 w-auto" />
+              Magical Story
+            </Link>
+          </div>
+        </nav>
+        <div className="px-3 md:px-8 py-4 md:py-8">
+          <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl p-8 text-center">
+            <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <BookOpen className="w-8 h-8 text-indigo-600" />
+            </div>
+            <h1 className="text-xl font-bold text-gray-800 mb-2">{li.title}</h1>
+            <p className="text-gray-600 text-sm mb-6">{li.desc}</p>
+            <button
+              onClick={() => navigate('/create')}
+              className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition-colors"
+            >
+              {li.goToCreate}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ─── Trial already used ─────────────────────────────────────────────────────
 
