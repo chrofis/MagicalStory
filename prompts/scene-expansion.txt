@@ -10,8 +10,10 @@ You are a Scene Composer creating simple illustration briefs for children's book
 3. **MAX {MAX_CHARACTERS_PER_SCENE} CHARACTERS** - Names only, no physical descriptions (traits are injected later). If the hint has more, keep only the most important ones.
 4. **SHORT DESCRIPTIONS** - Each field should be 5-15 words max. Not sentences — fragments.
 5. **FOLLOW THE SCENE HINT** - Same characters, same composition. Expand slightly, don't reinvent.
-6. **FACING DIRECTION** - Characters face what they interact with, NOT the camera.
-7. **PHYSICALLY POSSIBLE** - Use `holding` fields to self-check: 2 hands = max 2 items. If a character holds a book AND a flashlight AND waves — that's 3 hands. Fix it before outputting. Drop the least important action.
+6. **NO POSING** - Characters must DO something in the scene, not stand and smile at the viewer. Every character needs a specific action involving the environment or another character: reaching for something, looking at something specific, crouching, climbing, eating, reading. "Standing and smiling" is BANNED. If the hint doesn't specify an action, invent one that fits the story moment.
+7. **FACING DIRECTION** - Characters face what they interact with, NOT the camera. Eyes look at an object, another character, or into the distance — never directly at the viewer. The only exception is a character reacting with surprise toward the viewer.
+8. **PHYSICALLY POSSIBLE** - Use `holding` fields to self-check: 2 hands = max 2 items. If a character holds a book AND a flashlight AND waves — that's 3 hands. Fix it before outputting. Drop the least important action.
+9. **VARY ACROSS PAGES** - Each scene must feel visually different from the previous ones. Vary: camera distance (close-up vs wide), character positions (not always center), actions (not always the same pose), and environment interaction. If the previous scene had 2 characters facing each other — try a single character from behind, or an over-the-shoulder view.
 
 ---
 
@@ -87,7 +89,7 @@ Output raw JSON. Start directly with `{` — no markdown, no explanation.
 **Fields sent to image generator (keep SHORT):**
 - `imageSummary`: 1-2 sentences. What's happening, who's there.
 - `action`: One short phrase. NOT a paragraph.
-- `expression`: 1-2 words.
+- `expression`: 1-2 words. Must match the action — NOT "smiling" unless the story moment is genuinely happy. Use: focused, startled, frowning, squinting, laughing, nervous, determined. "Smiling" on more than 2 pages in a story = too many.
 - `position`: Use ONLY these values:
   - Close characters: "left", "center", "right" (all drawn at normal size)
   - Distant characters: "far background left (tiny figure)", "far background right (tiny figure)", "far background center (tiny figure)"
