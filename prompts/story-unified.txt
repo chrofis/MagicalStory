@@ -95,7 +95,7 @@ Every page needs a scene hint for illustration. Use this EXACT format:
 
 ```
 SCENE HINT:
-[1-2 sentences - the KEY VISUAL MOMENT with character positions]
+[1-2 sentences - capture a specific ACTION happening in the scene. Characters must be DOING something — interacting with the environment or each other. NOT posing, NOT smiling at the viewer. Describe what a camera would catch mid-moment.]
 Characters (MAX {MAX_CHARACTERS_PER_SCENE}):
 - [Name] (left/right/center): [standard | winter | summer | costumed:type]
 - [Name] (position): [clothing category]
@@ -133,6 +133,7 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
   - Over-the-shoulder view
   - Characters side by side looking at the same thing
   - One character in foreground, another small in distance
+- **VARY EXPRESSIONS** - Not every scene is happy. Match expression to the moment: wonder, concentration, worry, surprise, determination, frustration, relief. "Smiling" should appear on at most 2-3 pages in the entire story. Characters who smile in every scene look like mannequins.
 
 # Character Portrayal Guidelines
 
