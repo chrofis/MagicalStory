@@ -983,15 +983,45 @@ export function RepairWorkflowPanel({
                                 </span>
                               )}
                             </div>
-                            {result.issuesSummary && result.issuesSummary !== 'none' && (
-                              <p className={`text-xs pl-2 border-l-2 ${
-                                result.issuesSummary.includes('SEMANTIC:')
-                                  ? 'text-indigo-700 border-indigo-400 bg-indigo-50 p-1 rounded-r'
-                                  : 'text-gray-600 border-gray-300'
-                              }`}>
-                                {result.issuesSummary}
-                              </p>
-                            )}
+                            {/* Organized issue breakdown by source */}
+                            {result.fixableIssues && result.fixableIssues.length > 0 && (() => {
+                              const qualityIssues = (result.fixableIssues as any[]).filter(i => !i.source?.includes('semantic') && !i.source?.includes('entity') && !i.source?.includes('image checks'));
+                              const semanticIssues = (result.fixableIssues as any[]).filter(i => i.source?.includes('semantic'));
+                              const entityIssues = (result.fixableIssues as any[]).filter(i => i.source?.includes('entity') || i.source?.includes('image checks'));
+                              const severityPenalty = (s: string) => s === 'critical' || s === 'CRITICAL' ? 30 : s === 'major' || s === 'MAJOR' ? 20 : 10;
+                              const renderIssueList = (issues: any[], color: string) => (
+                                <div className="space-y-0.5">
+                                  {issues.map((issue, idx) => (
+                                    <div key={idx} className="flex gap-1 items-start">
+                                      <span className={`text-[10px] font-bold ${color} shrink-0`}>-{severityPenalty(issue.severity)}</span>
+                                      <span className="text-xs text-gray-700">{issue.description || issue.issue || JSON.stringify(issue)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                              return (
+                                <div className="space-y-2 mt-1">
+                                  {qualityIssues.length > 0 && (
+                                    <div className="text-xs pl-2 border-l-2 border-blue-300 bg-blue-50 p-1.5 rounded-r">
+                                      <div className="font-semibold text-blue-800 mb-1">Quality Issues ({qualityIssues.length}):</div>
+                                      {renderIssueList(qualityIssues, 'text-blue-600')}
+                                    </div>
+                                  )}
+                                  {semanticIssues.length > 0 && (
+                                    <div className="text-xs pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1.5 rounded-r">
+                                      <div className="font-semibold text-indigo-800 mb-1">Semantic Issues ({semanticIssues.length}):</div>
+                                      {renderIssueList(semanticIssues, 'text-indigo-600')}
+                                    </div>
+                                  )}
+                                  {entityIssues.length > 0 && (
+                                    <div className="text-xs pl-2 border-l-2 border-orange-400 bg-orange-50 p-1.5 rounded-r">
+                                      <div className="font-semibold text-orange-800 mb-1">Entity / Consistency Issues ({entityIssues.length}):</div>
+                                      {renderIssueList(entityIssues, 'text-orange-600')}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                             {result.semanticResult && (
                               <div className="text-xs text-indigo-700 pl-2 border-l-2 border-indigo-400 bg-indigo-50 p-1 rounded-r mt-1">
                                 <span className="font-medium">🔍 Semantic Analysis (Score: {result.semanticResult.score ?? 'N/A'}):</span>
