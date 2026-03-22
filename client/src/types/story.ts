@@ -933,9 +933,7 @@ export type RepairWorkflowStep =
   | 'redo-pages'
   | 're-evaluate'
   | 'consistency-check'
-  | 'character-repair'
-  | 'artifact-repair'
-  | 'cover-repair';
+  | 'character-repair';
 
 export type StepStatus = 'pending' | 'in-progress' | 'completed' | 'skipped' | 'failed';
 
@@ -1043,10 +1041,6 @@ export interface RepairWorkflowState {
     charactersProcessed: string[];
     pagesRepaired: Record<string, RepairPageResult[]>;
     pagesFailed: Record<string, Array<{ pageNumber: number; reason: string; rejected?: boolean; comparison?: RepairComparison | null }>>;
-  };
-  artifactRepairResults: {
-    pagesProcessed: number[];
-    issuesFixed: number;
   };
   sessionId: string;
 }

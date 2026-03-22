@@ -60,8 +60,6 @@ function createInitialState(): RepairWorkflowState {
       're-evaluate': 'pending',
       'consistency-check': 'pending',
       'character-repair': 'pending',
-      'artifact-repair': 'pending',
-      'cover-repair': 'pending',
     },
     collectedFeedback: {
       pages: {},
@@ -85,10 +83,6 @@ function createInitialState(): RepairWorkflowState {
       pagesRepaired: {},
       pagesFailed: {},
     },
-    artifactRepairResults: {
-      pagesProcessed: [],
-      issuesFixed: 0,
-    },
     sessionId: `repair-${Date.now()}`,
   };
 }
@@ -102,8 +96,6 @@ const STEP_ORDER: RepairWorkflowStep[] = [
   're-evaluate',
   'consistency-check',
   'character-repair',
-  'artifact-repair',
-  'cover-repair',
 ];
 
 export interface UseRepairWorkflowProps {
@@ -162,13 +154,6 @@ export interface UseRepairWorkflowReturn {
 
   // Step 6: Character repair
   repairCharacter: (characterName: string, pages: number[], options?: { useMagicApiRepair?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }) => Promise<void>;
-
-  // Step 7: Artifact repair
-  repairArtifacts: (pageNumbers: number[]) => Promise<void>;
-
-  // Step 8: Cover repair
-  regenerateCovers: (coverTypes: ('front' | 'back' | 'initial')[]) => Promise<void>;
-  coverRepairProgress: { current: number; total: number; currentCover?: string };
 
   // Full automated workflow
   runFullWorkflow: (options?: {
@@ -650,13 +635,7 @@ export function useRepairWorkflow({
     pageNumber: number,
     evalFeedback?: { score: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> },
   ) => {
-    if (pageNumber < 0) {
-      const coverTypeMap: Record<number, 'front' | 'back' | 'initial'> = { [-1]: 'front', [-2]: 'initial', [-3]: 'back' };
-      const coverType = coverTypeMap[pageNumber];
-      if (!coverType) throw new Error(`Unknown cover page number: ${pageNumber}`);
-      const coverResult = await storyService.regenerateCover(storyId!, coverType);
-      return { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
-    }
+    // Both covers (negative page numbers) and pages now use iteratePage
     return storyService.iteratePage(storyId!, pageNumber, imageModel, { evaluationFeedback: evalFeedback });
   }, [storyId, imageModel]);
 
@@ -916,72 +895,7 @@ export function useRepairWorkflow({
     }
   }, [storyId, startStep, failStep, onImageUpdate]);
 
-  // Step 7: Repair artifacts on pages
-  const repairArtifacts = useCallback(async (pageNumbers: number[]) => {
-    if (!storyId || pageNumbers.length === 0) return;
-
-    startStep('artifact-repair');
-
-    try {
-      const result = await storyService.repairArtifacts(storyId, pageNumbers);
-
-      setWorkflowState(prev => ({
-        ...prev,
-        artifactRepairResults: {
-          pagesProcessed: result.pagesProcessed || pageNumbers,
-          issuesFixed: result.issuesFixed || 0,
-        },
-        stepStatus: {
-          ...prev.stepStatus,
-          'artifact-repair': 'completed',
-        },
-      }));
-    } catch (error) {
-      console.error('Artifact repair failed:', error);
-      failStep('artifact-repair', error instanceof Error ? error.message : 'Unknown error');
-    }
-  }, [storyId, startStep, failStep]);
-
-  // Step 8: Regenerate covers
-  const [coverRepairProgress, setCoverRepairProgress] = useState({ current: 0, total: 0, currentCover: undefined as string | undefined });
-
-  const regenerateCovers = useCallback(async (coverTypes: ('front' | 'back' | 'initial')[]) => {
-    if (!storyId || coverTypes.length === 0) return;
-
-    startStep('cover-repair');
-    setCoverRepairProgress({ current: 0, total: coverTypes.length, currentCover: undefined });
-
-    const coversCompleted: string[] = [];
-
-    try {
-      for (let i = 0; i < coverTypes.length; i++) {
-        const coverType = coverTypes[i];
-        setCoverRepairProgress({ current: i, total: coverTypes.length, currentCover: coverType });
-
-        try {
-          await storyService.regenerateCover(storyId, coverType);
-          coversCompleted.push(coverType);
-        } catch (coverError) {
-          console.error(`Failed to regenerate ${coverType} cover:`, coverError);
-        }
-      }
-
-      setWorkflowState(prev => ({
-        ...prev,
-        stepStatus: {
-          ...prev.stepStatus,
-          'cover-repair': coversCompleted.length > 0 ? 'completed' : 'failed',
-        },
-      }));
-
-      setCoverRepairProgress({ current: coverTypes.length, total: coverTypes.length, currentCover: undefined });
-    } catch (error) {
-      console.error('Cover repair failed:', error);
-      failStep('cover-repair', error instanceof Error ? error.message : 'Unknown error');
-    }
-  }, [storyId, startStep, failStep]);
-
-  // Get step number (1-8, 0 for idle)
+  // Get step number (1-6, 0 for idle)
   const getStepNumber = useCallback((step: RepairWorkflowStep): number => {
     const index = STEP_ORDER.indexOf(step);
     return index >= 0 ? index : 0;
@@ -1346,11 +1260,6 @@ export function useRepairWorkflow({
     runConsistencyCheck,
 
     repairCharacter,
-
-    repairArtifacts,
-
-    regenerateCovers,
-    coverRepairProgress,
 
     runFullWorkflow,
     abortWorkflow,

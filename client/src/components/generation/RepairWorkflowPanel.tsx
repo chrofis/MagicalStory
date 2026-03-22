@@ -12,12 +12,10 @@ import {
   Search,
   Zap,
   Users,
-  Grid,
   XCircle,
   Play,
   SkipForward,
   Square,
-  Image,
 } from 'lucide-react';
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
@@ -64,8 +62,6 @@ const STEP_CONFIG: Record<RepairWorkflowStep, { label: string; icon: React.Compo
   're-evaluate': { label: 'Re-evaluate', icon: CheckCircle, description: 'Run quality evaluation on new images' },
   'consistency-check': { label: 'Consistency Check', icon: Users, description: 'Run entity consistency on all pages' },
   'character-repair': { label: 'Character Repair', icon: Users, description: 'Fix character appearance issues' },
-  'artifact-repair': { label: 'Artifact Repair', icon: Grid, description: 'Fix remaining artifacts via grid repair' },
-  'cover-repair': { label: 'Cover Repair', icon: Image, description: 'Regenerate front, back, or dedication covers' },
 };
 
 // Status badge component
@@ -409,9 +405,6 @@ export function RepairWorkflowPanel({
     reEvaluatePages,
     runConsistencyCheck,
     repairCharacter,
-    repairArtifacts,
-    regenerateCovers,
-    coverRepairProgress,
     runFullWorkflow,
     abortWorkflow,
     isAborted,
@@ -476,14 +469,8 @@ export function RepairWorkflowPanel({
   const [selectedCharacter, setSelectedCharacter] = useState<string>('');
   const [selectedCharacterPages, setSelectedCharacterPages] = useState<number[]>([]);
 
-  // Selected pages for artifact repair
-  const [selectedArtifactPages, setSelectedArtifactPages] = useState<number[]>([]);
-
   // Redo mode option for step 3
   const [redoMode, setRedoMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
-
-  // Selected covers for step 8
-  const [selectedCovers, setSelectedCovers] = useState<('front' | 'back' | 'initial')[]>([]);
 
   // Toggle step expansion
   const toggleStepExpanded = (step: RepairWorkflowStep) => {
@@ -502,27 +489,6 @@ export function RepairWorkflowPanel({
   const charactersWithIssues = useMemo(() => {
     return getCharactersWithIssues();
   }, [getCharactersWithIssues]);
-
-  // Get pages with artifact issues (from both collected feedback AND re-evaluation results)
-  const pagesWithArtifacts = useMemo(() => {
-    const artifactPages = new Set<number>();
-
-    // Check collected feedback (from retryHistory)
-    for (const [page, fb] of Object.entries(workflowState.collectedFeedback.pages)) {
-      if (fb.fixableIssues.some(i => i.type === 'artifact' || i.type === 'distortion')) {
-        artifactPages.add(parseInt(page));
-      }
-    }
-
-    // Also check re-evaluation results (from Step 4)
-    for (const [page, result] of Object.entries(workflowState.reEvaluationResults.pages)) {
-      if (result.fixableIssues?.some(i => i.type === 'artifact' || i.type === 'distortion')) {
-        artifactPages.add(parseInt(page));
-      }
-    }
-
-    return Array.from(artifactPages).sort((a, b) => a - b);
-  }, [workflowState.collectedFeedback.pages, workflowState.reEvaluationResults.pages]);
 
   // Render step header
   const renderStepHeader = (step: RepairWorkflowStep) => {
@@ -1569,234 +1535,6 @@ export function RepairWorkflowPanel({
             )}
           </div>
 
-          {/* Step 7: Artifact Repair */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            {renderStepHeader('artifact-repair')}
-            {expandedSteps.has('artifact-repair') && (
-              <div className="p-4 space-y-3 bg-white">
-                <p className="text-sm text-gray-600">{STEP_CONFIG['artifact-repair'].description}</p>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Select Pages for Grid Repair:</label>
-                    <button
-                      onClick={() => setSelectedArtifactPages(pagesWithArtifacts)}
-                      disabled={disableForFinalSteps || pagesWithArtifacts.length === 0}
-                      className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
-                      title="Auto-select all pages with artifact issues"
-                    >
-                      <Zap className="w-3 h-3" />
-                      Auto-Identify ({pagesWithArtifacts.length})
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {pagesWithArtifacts.length > 0 ? (
-                      pagesWithArtifacts.map(page => (
-                        <button
-                          key={page}
-                          onClick={() => {
-                            setSelectedArtifactPages(prev =>
-                              prev.includes(page)
-                                ? prev.filter(p => p !== page)
-                                : [...prev, page]
-                            );
-                          }}
-                          className={`px-2 py-1 text-xs rounded border transition-colors ${
-                            selectedArtifactPages.includes(page)
-                              ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
-                          disabled={isFullWorkflowBusy}
-                        >
-                          {getPageName(page)}
-                        </button>
-                      ))
-                    ) : (
-                      <span className="text-sm text-gray-500">No pages with artifact issues detected</span>
-                    )}
-                  </div>
-                  {pagesWithArtifacts.length === 0 && (
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <span className="text-xs text-gray-500">Or select manually:</span>
-                      {sceneImages.map(scene => (
-                        <button
-                          key={scene.pageNumber}
-                          onClick={() => {
-                            setSelectedArtifactPages(prev =>
-                              prev.includes(scene.pageNumber)
-                                ? prev.filter(p => p !== scene.pageNumber)
-                                : [...prev, scene.pageNumber]
-                            );
-                          }}
-                          className={`px-2 py-1 text-xs rounded border transition-colors ${
-                            selectedArtifactPages.includes(scene.pageNumber)
-                              ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
-                          disabled={isFullWorkflowBusy}
-                        >
-                          {getPageName(scene.pageNumber)}
-                        </button>
-                      ))}
-                      {coverImages?.frontCover && (
-                        <button
-                          key={-1}
-                          onClick={() => {
-                            setSelectedArtifactPages(prev =>
-                              prev.includes(-1) ? prev.filter(p => p !== -1) : [...prev, -1]
-                            );
-                          }}
-                          className={`px-2 py-1 text-xs rounded border transition-colors ${
-                            selectedArtifactPages.includes(-1)
-                              ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
-                          disabled={isFullWorkflowBusy}
-                        >
-                          Front Cover
-                        </button>
-                      )}
-                      {coverImages?.initialPage && (
-                        <button
-                          key={-2}
-                          onClick={() => {
-                            setSelectedArtifactPages(prev =>
-                              prev.includes(-2) ? prev.filter(p => p !== -2) : [...prev, -2]
-                            );
-                          }}
-                          className={`px-2 py-1 text-xs rounded border transition-colors ${
-                            selectedArtifactPages.includes(-2)
-                              ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
-                          disabled={isFullWorkflowBusy}
-                        >
-                          Initial Page
-                        </button>
-                      )}
-                      {coverImages?.backCover && (
-                        <button
-                          key={-3}
-                          onClick={() => {
-                            setSelectedArtifactPages(prev =>
-                              prev.includes(-3) ? prev.filter(p => p !== -3) : [...prev, -3]
-                            );
-                          }}
-                          className={`px-2 py-1 text-xs rounded border transition-colors ${
-                            selectedArtifactPages.includes(-3)
-                              ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                          }`}
-                          disabled={isFullWorkflowBusy}
-                        >
-                          Back Cover
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={async () => {
-                    await repairArtifacts(selectedArtifactPages);
-                    if (onRefreshStory) {
-                      await onRefreshStory();
-                    }
-                  }}
-                  disabled={disableForFinalSteps || selectedArtifactPages.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
-                >
-                  <Grid className="w-4 h-4" />
-                  Run Grid Repair on {selectedArtifactPages.length} pages
-                </button>
-
-                {workflowState.artifactRepairResults.pagesProcessed.length > 0 && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <h5 className="text-sm font-medium text-green-800">
-                      Processed {workflowState.artifactRepairResults.pagesProcessed.length} pages,
-                      fixed {workflowState.artifactRepairResults.issuesFixed} issues
-                    </h5>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Step 8: Cover Repair */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            {renderStepHeader('cover-repair')}
-            {expandedSteps.has('cover-repair') && (
-              <div className="p-4 space-y-3 bg-white">
-                <p className="text-sm text-gray-600">{STEP_CONFIG['cover-repair'].description}</p>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Select Covers to Regenerate:</label>
-                  <div className="flex flex-wrap gap-3">
-                    {(['front', 'initial', 'back'] as const).map(coverType => {
-                      const labels = { front: 'Front Cover', initial: 'Dedication Page', back: 'Back Cover' };
-                      return (
-                        <label key={coverType} className="flex items-center gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedCovers.includes(coverType)}
-                            onChange={(e) => {
-                              setSelectedCovers(prev =>
-                                e.target.checked
-                                  ? [...prev, coverType]
-                                  : prev.filter(c => c !== coverType)
-                              );
-                            }}
-                            disabled={isFullWorkflowBusy}
-                            className="rounded text-amber-600"
-                          />
-                          <span className="text-sm">{labels[coverType]}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <button
-                  onClick={async () => {
-                    await regenerateCovers(selectedCovers);
-                    if (onRefreshStory) {
-                      await onRefreshStory();
-                    }
-                  }}
-                  disabled={disableForFinalSteps || selectedCovers.length === 0}
-                  className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
-                >
-                  <Image className="w-4 h-4" />
-                  Regenerate {selectedCovers.length} Cover{selectedCovers.length !== 1 ? 's' : ''}
-                </button>
-
-                {coverRepairProgress.total > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span>Progress: {coverRepairProgress.current} / {coverRepairProgress.total}</span>
-                      {coverRepairProgress.currentCover && (
-                        <span className="text-gray-500">Currently: {coverRepairProgress.currentCover} cover</span>
-                      )}
-                    </div>
-                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-amber-500 transition-all"
-                        style={{ width: `${(coverRepairProgress.current / coverRepairProgress.total) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {workflowState.stepStatus['cover-repair'] === 'completed' && (
-                  <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                    <h5 className="text-sm font-medium text-green-800">
-                      Covers regenerated successfully
-                    </h5>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       )}
     </div>
