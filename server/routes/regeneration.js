@@ -3001,6 +3001,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
           activeVersion.entityPenalty = entityPenalty || 0;
           activeVersion.evaluatedAt = new Date().toISOString();
           activeVersion.issuesSummary = evaluation.issuesSummary || '';
+          activeVersion.bboxDetection = scene.bboxDetection || null;
         }
 
         // Update scene with adjusted score

@@ -677,6 +677,9 @@ export interface ImageVersion {
   }>;
   totalAttempts?: number;
   referencePhotoNames?: Array<{ name: string; photoType?: string; clothingCategory?: string; clothingDescription?: string }>;
+  // Bounding box detection (per-version, computed on this version's image)
+  bboxDetection?: BboxSceneDetection | null;
+  bboxOverlayImage?: string | null;
   // Entity repair specific
   entityRepairedFor?: string;
   clothingCategory?: string;

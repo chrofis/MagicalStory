@@ -1346,6 +1346,12 @@ async function rehydrateStoryImages(storyId, storyData) {
           }
         }
       }
+
+      // Load active version's bboxDetection onto scene (so consumers get correct bbox for active image)
+      const activeV = scene.imageVersions?.find(v => v.isActive);
+      if (activeV?.bboxDetection) {
+        scene.bboxDetection = activeV.bboxDetection;
+      }
     }
   }
 

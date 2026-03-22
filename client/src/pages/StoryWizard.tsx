@@ -886,16 +886,13 @@ export default function StoryWizard() {
               return metaScenes.map(metaScene => {
                 const existing = prev.find(p => p.pageNumber === metaScene.pageNumber);
                 // Clear stale bbox data if active version is not version 0
-                // (bboxDetection in blob is from the last evaluation, which may be on a different version)
-                const hasNonZeroActive = metaScene.imageVersions?.some((v: any) => v.isActive && v.versionIndex > 0);
                 return {
                   ...metaScene,
                   // Preserve imageData from fast/full image phases if already loaded
                   imageData: existing?.imageData || metaScene.imageData,
                   // Preserve imageVersions from full-images phase if already loaded
                   ...(existing?.imageVersions ? { imageVersions: existing.imageVersions } : {}),
-                  // Clear bbox if active version changed (stale data from wrong image)
-                  ...(hasNonZeroActive ? { bboxDetection: null, bboxOverlayImage: null } : {}),
+                  // bboxDetection is now per-version — rehydrateStoryImages loads the active version's bbox
                 };
               });
             });
@@ -4892,7 +4889,7 @@ export default function StoryWizard() {
                       return {
                         ...img,
                         imageData: activeVersion.imageData,
-                        // Swap metadata to match selected version (only if version has the data)
+                        // Swap per-version metadata (only if version has the data)
                         ...(activeVersion.qualityScore !== undefined && { qualityScore: activeVersion.qualityScore }),
                         ...(activeVersion.qualityReasoning !== undefined && { qualityReasoning: activeVersion.qualityReasoning }),
                         ...(activeVersion.fixTargets !== undefined && { fixTargets: activeVersion.fixTargets }),
@@ -4900,9 +4897,9 @@ export default function StoryWizard() {
                         ...(activeVersion.description !== undefined && { description: activeVersion.description }),
                         ...(activeVersion.totalAttempts !== undefined && { totalAttempts: activeVersion.totalAttempts }),
                         ...(activeVersion.modelId !== undefined && { modelId: activeVersion.modelId }),
-                        // Clear stale bbox data — was from previous version's evaluation
-                        bboxDetection: null,
-                        bboxOverlayImage: null,
+                        // Swap bbox data from the selected version (null if version has no bbox yet)
+                        bboxDetection: activeVersion.bboxDetection ?? null,
+                        bboxOverlayImage: null, // Always regenerate overlay on-demand
                         imageVersions: img.imageVersions.map(v => ({
                           ...v,
                           isActive: v.versionIndex === versionIndex
