@@ -609,18 +609,42 @@ async function collectEntityAppearances(sceneImages, characters = [], sceneDescr
       }
 
       if (pageCharNames.length > 0) {
-        // Build expected characters with physical descriptions for Gemini
+        // Build expected characters with physical descriptions + clothing for Gemini
+        const { extractSceneMetadata } = require('./storyHelpers');
+        const sceneMetadata = extractSceneMetadata(sceneDesc.description || sceneDesc.sceneDescription);
+        const charClothing = sceneMetadata?.characterClothing || {};
+
         const expectedChars = pageCharNames.map(name => {
           const fullChar = storyCharacters.find(c => c.name === name);
+          const clothing = charClothing[name] || fullChar?.avatars?.clothing?.standard || '';
+          const physDesc = fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character';
+          const position = sceneMetadata?.characterPositions?.[name] || '';
           return {
             name,
-            description: fullChar ? buildCharacterPhysicalDescription(fullChar) : 'character'
+            description: clothing ? `${physDesc}. Wearing: ${clothing}` : physDesc,
+            position
           };
         });
 
-        log.info(`🔍 [ENTITY-COLLECT] Page ${pageNumber}: Running fallback bbox detection for ${pageCharNames.join(', ')}`);
+        // Build scene context for disambiguation
+        let sceneContext = null;
+        if (sceneMetadata?.imageSummary) {
+          const contextParts = [`**SCENE:** ${sceneMetadata.imageSummary}`];
+          const sceneChars = sceneMetadata.characters || [];
+          if (sceneChars.length > 0) {
+            contextParts.push(sceneChars.map(c => {
+              const parts = [`- ${c.name}:`];
+              if (c.position) parts.push(c.position);
+              if (c.action) parts.push(c.action);
+              return parts.join(', ');
+            }).join('\n'));
+          }
+          sceneContext = contextParts.join('\n\n');
+        }
+
+        log.info(`🔍 [ENTITY-COLLECT] Page ${pageNumber}: Running fallback bbox detection for ${pageCharNames.join(', ')}${sceneContext ? ' (with scene context)' : ''}`);
         try {
-          const detection = await detectAllBoundingBoxes(imageData, { expectedCharacters: expectedChars });
+          const detection = await detectAllBoundingBoxes(imageData, { expectedCharacters: expectedChars, sceneContext });
           if (detection) {
             bboxDetection = detection;
             figures = detection.figures || [];

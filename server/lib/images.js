@@ -1157,7 +1157,7 @@ function parseVisualBibleObjects(prompt) {
  * @returns {Promise<{figures: Array, objects: Array, usage: Object}|null>}
  */
 async function detectAllBoundingBoxes(imageData, options = {}) {
-  const { expectedCharacters = [], expectedObjects = [] } = options;
+  const { expectedCharacters = [], expectedObjects = [], sceneContext = null } = options;
 
   try {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -1193,6 +1193,13 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       prompt = prompt.replace('{{EXPECTED_OBJECTS}}', objSection);
     } else {
       prompt = prompt.replace('{{EXPECTED_OBJECTS}}', '(No expected objects provided)');
+    }
+
+    // Inject scene context (helps distinguish characters by position and action)
+    if (sceneContext) {
+      prompt = prompt.replace('{{SCENE_CONTEXT}}', `SCENE DESCRIPTION (use to identify characters by position and action):\n${sceneContext}`);
+    } else {
+      prompt = prompt.replace('{{SCENE_CONTEXT}}', '');
     }
 
     // Extract base64 and mime type
@@ -1565,6 +1572,38 @@ async function detectSubRegion(characterCrop, targetElement) {
 }
 
 /**
+ * Build scene context string for bbox detection prompt.
+ * Includes imageSummary and per-character position/action/clothing.
+ */
+function buildBboxSceneContext(sceneMetadata, sceneCharacters = [], characterClothing = {}) {
+  if (!sceneMetadata) return null;
+
+  const parts = [];
+
+  // Scene summary
+  if (sceneMetadata.imageSummary) {
+    parts.push(`**SCENE:** ${sceneMetadata.imageSummary}`);
+  }
+
+  // Per-character position, action, and clothing from scene description
+  const sceneChars = sceneMetadata.characters || [];
+  if (sceneChars.length > 0) {
+    const charLines = sceneChars.map(c => {
+      const clothing = characterClothing[c.name] || '';
+      const lineParts = [`- ${c.name}:`];
+      if (c.position) lineParts.push(c.position);
+      if (c.action) lineParts.push(c.action);
+      if (c.expression) lineParts.push(c.expression);
+      if (clothing) lineParts.push(`Wearing: ${clothing}`);
+      return lineParts.join(', ');
+    });
+    parts.push(charLines.join('\n'));
+  }
+
+  return parts.length > 0 ? parts.join('\n\n') : null;
+}
+
+/**
  * Build expected characters array for bbox detection from character descriptions, positions, and clothing
  * @param {Object} characterDescriptions - Map of charName → {age, gender, isChild, genderTerm}
  * @param {Object} expectedPositions - Map of charName → position string
@@ -1781,16 +1820,17 @@ async function detectBoundingBoxesForIssue(imageData, issueDescription) {
  * @param {Array<{reference: string, type: string, position: string, appearance: string, confidence: number}>} objectMatches - Object/animal/landmark matches from quality eval (legacy, not used)
  * @returns {Promise<{targets: Array, detectionHistory: Object}>} - Enriched fix targets and full detection for display
  */
-async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}) {
+async function enrichWithBoundingBoxes(imageData, fixableIssues, qualityMatches = [], objectMatches = [], expectedPositions = {}, expectedObjects = [], characterDescriptions = {}, characterClothing = {}, sceneContext = null) {
   // Build expected characters for bbox detection (AI will identify by name)
   const expectedCharacters = buildExpectedCharactersForBbox(characterDescriptions, expectedPositions, characterClothing);
 
-  log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects...`);
+  log.info(`📦 [BBOX-ENRICH] Detecting figures/objects with ${expectedCharacters.length} expected characters, ${expectedObjects.length} expected objects${sceneContext ? ', with scene context' : ''}...`);
 
   // Call bbox detection WITH character/object context - AI identifies directly by name
   const allDetections = await detectAllBoundingBoxes(imageData, {
     expectedCharacters,
-    expectedObjects
+    expectedObjects,
+    sceneContext
   });
 
   if (!allDetections) {
@@ -6594,8 +6634,11 @@ async function generateImageWithQualityRetry(prompt, characterPhotos = [], previ
       log.debug(`📦 [QUALITY RETRY] ${pageLabel}Expected objects: ${allExpectedObjects.join(', ')}`);
     }
 
+    // Build scene context for bbox detection (helps distinguish similar characters)
+    const bboxSceneContext = buildBboxSceneContext(sceneMetadata, sceneCharacters, expectedCharacterClothing);
+
     log.info(`📦 [QUALITY RETRY] ${pageLabel}Bbox detection: locating all figures/objects${fixableIssues.length > 0 ? `, matching ${fixableIssues.length} issues` : ''}${qualityMatches.length > 0 ? `, ${qualityMatches.length} character matches` : ''}${objectMatches.length > 0 ? `, ${objectMatches.length} object matches` : ''}${allExpectedObjects.length > 0 ? `, ${allExpectedObjects.length} expected objects` : ''}...`);
-    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing);
+    const enrichResult = await enrichWithBoundingBoxes(result.imageData, fixableIssues, qualityMatches, objectMatches, expectedCharacterPositions, allExpectedObjects, characterDescriptions, expectedCharacterClothing, bboxSceneContext);
     bboxDetectionHistory = enrichResult.detectionHistory;
     enrichedFixTargets = enrichResult.targets;
     if (bboxDetectionHistory) {

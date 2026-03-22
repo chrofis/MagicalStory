@@ -4,6 +4,8 @@ Detect figures and objects in this storybook illustration.
 
 {{EXPECTED_OBJECTS}}
 
+{{SCENE_CONTEXT}}
+
 COORDINATE SYSTEM:
 - Values are 0-1000 (Gemini native format)
 - Origin is top-left corner
@@ -11,6 +13,7 @@ COORDINATE SYSTEM:
 
 FOR EACH FIGURE:
 - If you can identify it as an expected character, set "name" to the character name (EXACTLY as listed above)
+- Use CLOTHING + POSITION to distinguish characters (two boys of similar age are distinguished by what they wear and where they stand)
 - If not identifiable as any expected character, set "name" to "UNKNOWN"
 - Include "confidence": "high", "medium", or "low" for identification certainty
 - face_box: bounding box around the FACE only (forehead to chin, ear to ear)
@@ -96,5 +99,6 @@ Given expected objects: "golden crown", "brown teddy bear"
 IMPORTANT:
 - Detect ALL visible figures, even if partially visible or UNKNOWN
 - Be precise with bounding boxes - they will be used for inpainting
-- Match characters based on age, gender, and physical description, not just position
+- Match characters by AGE and GENDER first (child vs adult, boy vs girl), then use CLOTHING and POSITION to distinguish similar characters
+- Two children of similar age are distinguished by their outfits and scene position
 - For creatures/animals/non-humans that are not expected characters, use "UNKNOWN"
