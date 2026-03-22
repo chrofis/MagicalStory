@@ -778,7 +778,7 @@ export function useRepairWorkflow({
     fixableIssues: EvaluationData['fixableIssues'];
   };
 
-  const reEvaluatePages = useCallback(async (pageNumbers?: number[]): Promise<{ evalPages: Record<number, EvalPageResult>; badPages: number[] } | undefined> => {
+  const reEvaluatePages = useCallback(async (pageNumbers?: number[], scoreThresholdOverride?: number): Promise<{ evalPages: Record<number, EvalPageResult>; badPages: number[] } | undefined> => {
     if (!storyId) return undefined;
 
     startStep('re-evaluate');
@@ -792,7 +792,7 @@ export function useRepairWorkflow({
     }
 
     try {
-      const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate, qualityModel);
+      const result = await storyService.reEvaluatePages(storyId, pagesToEvaluate, qualityModel, scoreThresholdOverride);
 
       const evalResults: Record<number, EvalPageResult> = {};
 
@@ -1110,7 +1110,7 @@ export function useRepairWorkflow({
         // Pass 1: entity data from generation. Pass 2+: freshly updated entity data.
         checkAborted();
         onProgress?.('re-evaluate', `Pass ${pass}/${maxPasses}: Evaluating all pages...`);
-        const evalResult = await reEvaluatePages(allEvalNumbers);
+        const evalResult = await reEvaluatePages(allEvalNumbers, scoreThreshold);
 
         // 3. Identify bad pages (server computes these using shared findBadPages)
         checkAborted();
@@ -1210,7 +1210,7 @@ export function useRepairWorkflow({
       onProgress?.('character-repair', 'Auto-selecting and repairing characters...');
       startStep('character-repair');
       try {
-        const repairResult = await storyService.repairCharacters(storyId, [], { autoSelect: true });
+        const repairResult = await storyService.repairCharacters(storyId, [], { autoSelect: true, ...(maxCharRepairPages != null ? { maxCharRepairPages } : {}) });
 
         // Process results for UI state and image updates
         for (const charResult of (repairResult.results || [])) {

@@ -2029,7 +2029,7 @@ export const storyService = {
   // =============================================================================
 
   // Step 4: Re-evaluate pages
-  async reEvaluatePages(storyId: string, pageNumbers: number[], qualityModelOverride?: string | null): Promise<{
+  async reEvaluatePages(storyId: string, pageNumbers: number[], qualityModelOverride?: string | null, scoreThreshold?: number): Promise<{
     pages: Record<number, {
       score?: number;
       qualityScore: number;
@@ -2058,7 +2058,7 @@ export const storyService = {
         semanticResult?: unknown;
       }>;
       badPages?: number[];
-    }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers, ...(qualityModelOverride ? { qualityModelOverride } : {}) });
+    }>(`/api/stories/${storyId}/repair-workflow/re-evaluate`, { pageNumbers, ...(qualityModelOverride ? { qualityModelOverride } : {}), ...(scoreThreshold ? { scoreThreshold } : {}) });
     return response;
   },
 
@@ -2222,7 +2222,7 @@ export const storyService = {
   async repairCharacters(
     storyId: string,
     repairs: Array<{ character: string; pages: number[] }>,
-    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body' }
+    options?: { useMagicApiRepair?: boolean; autoSelect?: boolean; grokRepairMode?: 'blended' | 'cutout' | 'blackout'; whiteoutTarget?: 'face' | 'body'; maxCharRepairPages?: number }
   ): Promise<{
     results: Array<{
       character: string;
@@ -2261,6 +2261,7 @@ export const storyService = {
       ...(options?.useMagicApiRepair !== undefined && { useMagicApiRepair: options.useMagicApiRepair }),
       ...(options?.grokRepairMode && { grokRepairMode: options.grokRepairMode }),
       ...(options?.whiteoutTarget && { whiteoutTarget: options.whiteoutTarget }),
+      ...(options?.maxCharRepairPages != null && { maxCharRepairPages: options.maxCharRepairPages }),
     });
     return response;
   },

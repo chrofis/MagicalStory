@@ -2596,7 +2596,7 @@ router.post('/:id/repair-entity-consistency', authenticateToken, imageRegenerati
 router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { pageNumbers, qualityModelOverride } = req.body;
+    const { pageNumbers, qualityModelOverride, scoreThreshold } = req.body;
 
     if (!pageNumbers || !Array.isArray(pageNumbers) || pageNumbers.length === 0) {
       return res.status(400).json({ error: 'pageNumbers array is required' });
@@ -2809,7 +2809,7 @@ router.post('/:id/repair-workflow/re-evaluate', authenticateToken, async (req, r
     const apiCost = calculateTokenCost(evalModel, totalInput, totalOutput);
 
     log.info(`✅ [REPAIR-WORKFLOW] Re-evaluation complete for ${Object.keys(pages).length} pages`);
-    const badPages = findBadPages(pages);
+    const badPages = findBadPages(pages, scoreThreshold ? { scoreThreshold } : {});
     res.json({ pages, badPages, apiCost });
 
     // Save to DB in background (don't block the response)
@@ -2994,7 +2994,7 @@ router.post('/:id/repair-workflow/pick-best-versions', authenticateToken, async 
 router.post('/:id/repair-workflow/character-repair', authenticateToken, imageRegenerationLimiter, async (req, res) => {
   try {
     const { id } = req.params;
-    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget } = req.body;
+    const { repairs: manualRepairs, useMagicApiRepair, autoSelect, grokRepairMode, whiteoutTarget, maxCharRepairPages: maxCharRepairPagesOverride } = req.body;
 
     let repairs;
 
@@ -3031,7 +3031,7 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
           }
         }
       }
-      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(storyEntityReport, { pageScores });
+      const { repairs: autoRepairs, dropped } = selectCharRepairTasks(storyEntityReport, { pageScores, ...(maxCharRepairPagesOverride != null ? { maxTasks: maxCharRepairPagesOverride } : {}) });
       if (autoRepairs.length === 0) {
         return res.json({ results: [], message: 'No major/critical issues found' });
       }
