@@ -714,7 +714,7 @@ export const storyService = {
   // Get images in one request
   // activeOnly=true (default): Fast load ~3MB - only active images, no versions (for initial display)
   // activeOnly=false: Full load ~53MB - all versions for dev mode / version switching
-  async getAllImages(storyId: string, activeOnly = true): Promise<{
+  async getAllImages(storyId: string, activeOnly = true, signal?: AbortSignal): Promise<{
     images: Array<{
       pageNumber: number;
       imageData: string;
@@ -769,7 +769,7 @@ export const storyService = {
           initialPage?: { imageData: string; qualityScore?: number; versionCount?: number };
           backCover?: { imageData: string; qualityScore?: number; versionCount?: number };
         };
-      }>(url);
+      }>(url, signal ? { signal } : undefined);
       console.log(`[getAllImages] ${activeOnly ? 'FAST' : 'FULL'}: ${response.images?.length || 0} pages, ${Object.keys(response.covers || {}).length} covers`);
       return response;
     } catch (err) {

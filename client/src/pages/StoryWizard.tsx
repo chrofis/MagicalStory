@@ -988,10 +988,12 @@ export default function StoryWizard() {
         // PHASE 2a: Fast image load (activeOnly=true) - shows images quickly
         // Add timeout to prevent stuck progress indicator (30 second timeout)
         const IMAGE_LOAD_TIMEOUT = 30000;
-        const imageLoadPromise = storyService.getAllImages(urlStoryId, true);
+        const fastImagesController = new AbortController();
+        const imageLoadPromise = storyService.getAllImages(urlStoryId, true, fastImagesController.signal);
         const timeoutPromise = new Promise<null>((resolve) =>
           setTimeout(() => {
-            log.warn('Image load timeout - clearing progress indicator');
+            fastImagesController.abort();
+            log.warn('Image load timeout - aborting request');
             resolve(null);
           }, IMAGE_LOAD_TIMEOUT)
         );
@@ -1011,21 +1013,31 @@ export default function StoryWizard() {
           if (imageCount > 0 || coverCount > 0) {
             let loadedCount = 0;
 
-            // Update cover images with imageData
+            // Update cover images with imageData (batched into single state update)
             const coverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
+            const coverUpdates: Partial<Record<'frontCover' | 'initialPage' | 'backCover', typeof covers['frontCover']>> = {};
             for (const coverType of coverTypes) {
               const cover = covers[coverType];
               if (cover?.imageData) {
                 loadedCount++;
-                setCoverImages(prev => {
-                  const current = prev[coverType];
-                  if (typeof current === 'object' && current !== null) {
-                    return { ...prev, [coverType]: { ...current, imageData: cover.imageData } };
-                  }
-                  return { ...prev, [coverType]: cover.imageData };
-                });
-                setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
+                coverUpdates[coverType] = cover;
               }
+            }
+            if (Object.keys(coverUpdates).length > 0) {
+              setCoverImages(prev => {
+                const next = { ...prev };
+                for (const [coverType, cover] of Object.entries(coverUpdates)) {
+                  const key = coverType as 'frontCover' | 'initialPage' | 'backCover';
+                  const current = next[key];
+                  if (typeof current === 'object' && current !== null) {
+                    next[key] = { ...current, imageData: cover!.imageData } as typeof current;
+                  } else {
+                    next[key] = cover!.imageData as any;
+                  }
+                }
+                return next;
+              });
+              setImageLoadProgress(prev => prev ? { ...prev, loaded: loadedCount } : null);
             }
 
             // Update page images with imageData (no versions yet)
@@ -1049,7 +1061,13 @@ export default function StoryWizard() {
 
           // PHASE 2b: Full image load (activeOnly=false) - adds imageVersions for dev mode
           // This runs in background after images are already displayed
-          storyService.getAllImages(urlStoryId, false).then(fullResult => {
+          const fullImagesController = new AbortController();
+          const fullImagesTimeout = setTimeout(() => {
+            fullImagesController.abort();
+            log.warn('Full images load aborted after 120s timeout');
+          }, 120_000);
+
+          storyService.getAllImages(urlStoryId, false, fullImagesController.signal).then(fullResult => {
             const fullImages = fullResult?.images || [];
             const fullCovers = fullResult?.covers || {};
 
@@ -1057,7 +1075,6 @@ export default function StoryWizard() {
 
             // Update scene images with imageVersions
             // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
-            // Full load's imageData is version 0, not the active version
             for (const img of fullImages) {
               if (img.imageVersions && img.imageVersions.length > 0) {
                 setSceneImages(prev => prev.map(scene => {
@@ -1078,32 +1095,38 @@ export default function StoryWizard() {
               }
             }
 
-            // Update cover images with full data (imageVersions, metadata)
+            // Update cover images with full data (imageVersions, metadata) - batched
             // IMPORTANT: Keep existing imageData from fast load (it's the correct active version)
-            const coverTypes2: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
-            for (const coverType of coverTypes2) {
-              const cover = fullCovers[coverType];
-              if (cover) {
-                setCoverImages(prev => {
-                  const existing = typeof prev[coverType] === 'object' ? prev[coverType] : {};
-                  return {
-                    ...prev,
-                    [coverType]: {
+            const fullCoverTypes: ('frontCover' | 'initialPage' | 'backCover')[] = ['frontCover', 'initialPage', 'backCover'];
+            const hasFullCoverUpdates = fullCoverTypes.some(ct => fullCovers[ct]);
+            if (hasFullCoverUpdates) {
+              setCoverImages(prev => {
+                const next = { ...prev };
+                for (const coverType of fullCoverTypes) {
+                  const cover = fullCovers[coverType];
+                  if (cover) {
+                    const existing = typeof next[coverType] === 'object' ? next[coverType] : {};
+                    next[coverType] = {
                       ...existing,
                       ...cover,
                       // Keep existing imageData from fast load (correct active version)
                       imageData: (existing as { imageData?: string })?.imageData || cover.imageData
-                    }
-                  };
-                });
-              }
+                    } as any;
+                  }
+                }
+                return next;
+              });
             }
 
             loadPhaseRef.current.fullImagesLoaded = true;
             log.info('Full image data with versions loaded');
           }).catch(err => {
-            log.warn('Failed to load full images (versions may be unavailable):', err);
-          });
+            if (err.name === 'AbortError') {
+              log.warn('Full images load was aborted (timeout or navigation)');
+            } else {
+              log.warn('Failed to load full images (versions may be unavailable):', err);
+            }
+          }).finally(() => clearTimeout(fullImagesTimeout));
 
         }).catch(err => {
           log.warn('Failed to load images:', err);

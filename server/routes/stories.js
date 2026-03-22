@@ -1663,18 +1663,6 @@ router.get('/:id/images', authenticateToken, async (req, res) => {
         }
       }
 
-      // Sort cover imageVersions by version_index (rows may not be in order)
-      // Skip for activeOnly mode (no imageVersions array)
-      if (!activeOnly) {
-        for (const coverType of ['frontCover', 'initialPage', 'backCover']) {
-          if (covers[coverType]?.imageVersions?.length > 0) {
-            // imageVersions were added in row order, but version_index determines actual order
-            // Since we don't have version_index in the version object, rely on insertion order
-            // (getAllStoryImages returns them ordered by version_index ASC)
-          }
-        }
-      }
-
       // For full mode only: merge cover metadata and process imageVersions
       if (!activeOnly) {
         // Merge cover metadata from story data blob (regeneration history, prompts, etc.)

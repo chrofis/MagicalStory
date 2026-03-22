@@ -403,6 +403,7 @@ async function initializeDatabase() {
       ON story_images(story_id, image_type, page_number, version_index) WHERE page_number IS NOT NULL`);
     await dbPool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_story_images_unique_without_page
       ON story_images(story_id, image_type, version_index) WHERE page_number IS NULL`);
+    await dbPool.query(`CREATE INDEX IF NOT EXISTS idx_story_images_story_id ON story_images(story_id)`);
 
     // Historical locations table (pre-fetched photos for historical stories)
     await dbPool.query(`
