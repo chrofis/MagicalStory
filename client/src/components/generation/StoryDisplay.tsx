@@ -117,7 +117,7 @@ interface StoryDisplayProps {
   characters?: Array<{ id: number; name: string; photoData?: string }>;
   onEditImage?: (pageNumber: number) => void;
   onEditCover?: (coverType: 'front' | 'back' | 'initial') => void;
-  onImproveImage?: (pageNumber: number) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
+  onImproveImage?: (pageNumber: number, options?: { sceneModel?: string; imageModel?: string }) => Promise<void>;  // User-facing: one-click improve (calls iterate with defaults)
   onRepairImage?: (pageNumber: number) => Promise<void>;
   onIteratePage?: (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => Promise<void>;
   onRevertRepair?: (pageNumber: number, beforeImage: string) => Promise<void>;
@@ -268,9 +268,13 @@ export function StoryDisplay({
   const [repairingSingleEntityPage, setRepairingSingleEntityPage] = useState<{ entity: string; page: number } | null>(null);
 
   // User-facing improve state (one-click, available to all users)
-  const [improvingPage, setImprovingPage] = useState<number | null>(null);
+  const [improvingPages, setImprovingPages] = useState<Set<number>>(new Set());
+  // Improve model selection (dev mode only)
+  const [improveModelsPage, setImproveModelsPage] = useState<number | null>(null);
+  const [improveSceneModel, setImproveSceneModel] = useState<string>('');
+  const [improveImageModel, setImproveImageModel] = useState<string>('');
   // Iterative improvement state (dev mode only)
-  const [iteratingPage, setIteratingPage] = useState<number | null>(null);
+  const [iteratingPages, setIteratingPages] = useState<Set<number>>(new Set());
   // Iterate options panel: which page is showing options, and the toggle value
   const [iterateOptionsPage, setIterateOptionsPage] = useState<number | null>(null);
   const [iterateMode, setIterateMode] = useState<'fresh' | 'reference' | 'blackout'>('fresh');
@@ -656,29 +660,31 @@ export function StoryDisplay({
   };
 
   // Handle improve image (user-facing) - one click, uses iterate with defaults
-  const handleImproveImage = async (pageNumber: number) => {
-    if (!onImproveImage || improvingPage !== null) return;
-    setImprovingPage(pageNumber);
+  // Supports parallel: multiple pages can improve simultaneously
+  const handleImproveImage = async (pageNumber: number, options?: { sceneModel?: string; imageModel?: string }) => {
+    if (!onImproveImage || improvingPages.has(pageNumber)) return;
+    setImprovingPages(prev => new Set(prev).add(pageNumber));
     try {
-      await onImproveImage(pageNumber);
+      await onImproveImage(pageNumber, options);
     } catch (err) {
       console.error('Failed to improve image:', err);
     } finally {
-      setImprovingPage(null);
+      setImprovingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
     }
   };
 
   // Handle iterate page (dev mode) - analyze current image, run 17 checks, regenerate
+  // Supports parallel: multiple pages can iterate simultaneously
   const handleIteratePage = async (pageNumber: number, options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => {
-    if (!onIteratePage || iteratingPage !== null) return;
-    setIteratingPage(pageNumber);
+    if (!onIteratePage || iteratingPages.has(pageNumber)) return;
+    setIteratingPages(prev => new Set(prev).add(pageNumber));
     setIterateOptionsPage(null); // Close options panel
     try {
       await onIteratePage(pageNumber, options);
     } catch (err) {
       console.error('Failed to iterate page:', err);
     } finally {
-      setIteratingPage(null);
+      setIteratingPages(prev => { const next = new Set(prev); next.delete(pageNumber); return next; });
     }
   };
 
@@ -3535,20 +3541,50 @@ export function StoryDisplay({
             {(_onRegenerateCover || onImproveImage) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {onImproveImage && (
-                  <button
-                    onClick={() => handleImproveImage(-1)}
-                    disabled={isGenerating || improvingPage !== null || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
-                    className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || improvingPage !== null || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
-                    }`}
-                    title={language === 'de' ? 'KI verbessert das Bild automatisch' : language === 'fr' ? 'L\'IA améliore automatiquement' : 'AI improves automatically'}
-                  >
-                    {improvingPage === -1 ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
-                    ) : (
-                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                  <div className="flex-1 flex gap-0.5">
+                    <button
+                      onClick={() => handleImproveImage(-1, {
+                        sceneModel: improveSceneModel || undefined,
+                        imageModel: improveImageModel || undefined
+                      })}
+                      disabled={isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
+                      className={`flex-1 bg-emerald-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
+                        isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                      }`}
+                      title={language === 'de' ? 'KI verbessert das Bild automatisch' : language === 'fr' ? 'L\'IA améliore automatiquement' : 'AI improves automatically'}
+                    >
+                      {improvingPages.has(-1) ? (
+                        <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                      ) : (
+                        <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                      )}
+                    </button>
+                    {developerMode && (
+                      <button
+                        onClick={() => setImproveModelsPage(improveModelsPage === -1 ? null : -1)}
+                        disabled={isGenerating || improvingPages.has(-1)}
+                        className="bg-emerald-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        ▾
+                      </button>
                     )}
-                  </button>
+                  </div>
+                )}
+                {improveModelsPage === -1 && developerMode && (
+                  <div className="flex gap-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs w-full">
+                    <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-emerald-300 text-xs">
+                      <option value="">Scene: Default</option>
+                      <option value="claude-sonnet">Claude Sonnet</option>
+                      <option value="grok-4-fast">Grok 4 Fast</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    </select>
+                    <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-emerald-300 text-xs">
+                      <option value="">Image: Default</option>
+                      <option value="grok-imagine">Grok Imagine</option>
+                      <option value="grok-imagine-pro">Grok Pro</option>
+                      <option value="gemini-2.5-flash-image">Gemini Flash</option>
+                    </select>
+                  </div>
                 )}
                 {_onRegenerateCover && (
                   <button
@@ -3581,12 +3617,12 @@ export function StoryDisplay({
                 {onIteratePage && (
                   <button
                     onClick={() => handleIteratePage(-1)}
-                    disabled={isGenerating || iteratingPage !== null}
+                    disabled={isGenerating || iteratingPages.has(-1)}
                     className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || iteratingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                      isGenerating || iteratingPages.has(-1) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
                     }`}
                   >
-                    {iteratingPage === -1 ? (
+                    {iteratingPages.has(-1) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
                     ) : (
                       <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
@@ -3773,12 +3809,12 @@ export function StoryDisplay({
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-2)}
-                    disabled={isGenerating || improvingPage !== null || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
+                    disabled={isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
                     className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || improvingPage !== null || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                      isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
                     }`}
                   >
-                    {improvingPage === -2 ? (
+                    {improvingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
                     ) : (
                       <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
@@ -3815,12 +3851,12 @@ export function StoryDisplay({
                 {onIteratePage && (
                   <button
                     onClick={() => handleIteratePage(-2)}
-                    disabled={isGenerating || iteratingPage !== null}
+                    disabled={isGenerating || iteratingPages.has(-2)}
                     className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || iteratingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                      isGenerating || iteratingPages.has(-2) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
                     }`}
                   >
-                    {iteratingPage === -2 ? (
+                    {iteratingPages.has(-2) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
                     ) : (
                       <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
@@ -4072,13 +4108,13 @@ export function StoryDisplay({
                               {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
-                                  disabled={isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
                                   className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                                    isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
                                 >
-                                  {improvingPage === pageNumber ? (
+                                  {improvingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
                                   ) : (
                                     <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
@@ -4139,13 +4175,13 @@ export function StoryDisplay({
                                       setIterateMode('fresh');
                                     }
                                   }}
-                                  disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
+                                  disabled={isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null}
                                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
                                 >
-                                  {iteratingPage === pageNumber ? (
+                                  {iteratingPages.has(pageNumber) ? (
                                     <>
                                       <Loader size={14} className="animate-spin" />
                                       {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}
@@ -4626,13 +4662,13 @@ export function StoryDisplay({
                               {onImproveImage && (
                                 <button
                                   onClick={() => handleImproveImage(pageNumber)}
-                                  disabled={isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                  disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
                                   className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || improvingPage !== null || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                                    isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
                                   }`}
                                   title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
                                 >
-                                  {improvingPage === pageNumber ? (
+                                  {improvingPages.has(pageNumber) ? (
                                     <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
                                   ) : (
                                     <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
@@ -4693,13 +4729,13 @@ export function StoryDisplay({
                                       setIterateMode('fresh');
                                     }
                                   }}
-                                  disabled={isGenerating || iteratingPage !== null || repairingPage !== null}
+                                  disabled={isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null}
                                   className={`w-full bg-indigo-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || iteratingPage !== null || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    isGenerating || iteratingPages.has(pageNumber) || repairingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                                   }`}
                                   title={language === 'de' ? 'Bild analysieren, 17 Checks durchführen, mit korrigierter Szene neu generieren' : language === 'fr' ? 'Analyser l\'image, exécuter 17 vérifications, régénérer avec scène corrigée' : 'Analyze image, run 17 checks, regenerate with corrected scene'}
                                 >
-                                  {iteratingPage === pageNumber ? (
+                                  {iteratingPages.has(pageNumber) ? (
                                     <>
                                       <Loader size={14} className="animate-spin" />
                                       {language === 'de' ? 'Iteriere...' : language === 'fr' ? 'Itération...' : 'Iterating...'}
@@ -5110,12 +5146,12 @@ export function StoryDisplay({
                 {onImproveImage && (
                   <button
                     onClick={() => handleImproveImage(-3)}
-                    disabled={isGenerating || improvingPage !== null || regeneratingCovers.has('backCover') || !hasEnoughCredits}
+                    disabled={isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
                     className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || improvingPage !== null || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                      isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
                     }`}
                   >
-                    {improvingPage === -3 ? (
+                    {improvingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
                     ) : (
                       <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
@@ -5152,12 +5188,12 @@ export function StoryDisplay({
                 {onIteratePage && (
                   <button
                     onClick={() => handleIteratePage(-3)}
-                    disabled={isGenerating || iteratingPage !== null}
+                    disabled={isGenerating || iteratingPages.has(-3)}
                     className={`w-full bg-purple-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || iteratingPage !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
+                      isGenerating || iteratingPages.has(-3) ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
                     }`}
                   >
-                    {iteratingPage === -3 ? (
+                    {iteratingPages.has(-3) ? (
                       <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Iteriere...' : 'Iterating...'}</>
                     ) : (
                       <><RotateCcw size={14} /> {language === 'de' ? 'Cover iterieren' : 'Iterate Cover'}</>
