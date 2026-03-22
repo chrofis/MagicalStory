@@ -112,23 +112,10 @@ export function ObjectDetectionDisplay({
       const params = new URLSearchParams({ field: 'bboxOverlay' });
 
       if (coverType) {
-        // Cover image - use cover query param
         params.set('cover', coverType);
       } else {
-        // Regular page - fetch from scene object first (has latest eval bbox),
-        // fall back to retryHistory entry (original generation bbox)
+        // Server generates overlay on-the-fly from active image + stored bbox detection
         params.set('page', String(pageNumber));
-        if (directBboxDetection) {
-          // Scene has direct bbox data (from latest re-evaluation) — fetch scene-level overlay
-          params.set('type', 'original');
-        } else {
-          // Fall back to retryHistory overlay
-          params.set('type', 'retry');
-          const retryIdx = retryHistory?.findIndex(r =>
-            (r.type === 'bbox_detection_only' && r.bboxDetection) || r.bboxDetection
-          ) ?? 0;
-          params.set('index', String(retryIdx));
-        }
       }
 
       const response = await fetch(`/api/stories/${storyId}/dev-image?${params}`, {

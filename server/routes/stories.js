@@ -1211,6 +1211,30 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: `Page ${pageNum} not found` });
     }
 
+    // Special handling: bboxOverlay should always be drawn on the ACTIVE image
+    // (not a stored overlay from a previous version). Regenerate on-the-fly.
+    if (field === 'bboxOverlay') {
+      const detection = sceneImage.bboxDetection;
+      if (!detection) {
+        // Fall back to retryHistory overlay
+        const retryEntry = sceneImage.retryHistory?.find(r => r.bboxOverlayImage);
+        return res.json({ bboxOverlayImage: retryEntry?.bboxOverlayImage || null });
+      }
+      // Get the active image to draw boxes on
+      const activeImageData = sceneImage.imageData;
+      if (activeImageData) {
+        try {
+          const { createBboxOverlayImage } = require('../lib/images');
+          const overlayImage = await createBboxOverlayImage(activeImageData, detection);
+          return res.json({ bboxOverlayImage: overlayImage });
+        } catch (overlayErr) {
+          log.warn(`⚠️ [DEV-IMAGE] Failed to generate bbox overlay for page ${pageNum}: ${overlayErr.message}`);
+          return res.json({ bboxOverlayImage: sceneImage.bboxOverlayImage || null });
+        }
+      }
+      return res.json({ bboxOverlayImage: sceneImage.bboxOverlayImage || null });
+    }
+
     let result = {};
 
     switch (type) {

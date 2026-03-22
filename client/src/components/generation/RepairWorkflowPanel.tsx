@@ -21,6 +21,7 @@ import {
 import { useRepairWorkflow } from '@/hooks/useRepairWorkflow';
 import { REPAIR_DEFAULTS } from '@/config/repairDefaults';
 import { ImageLightbox } from '@/components/common/ImageLightbox';
+import storyService from '@/services/storyService';
 import type { SceneImage, CoverImages, FinalChecksReport, RepairWorkflowStep, StepStatus, PageFeedback, RepairPageResult } from '@/types/story';
 import type { Character } from '@/types/character';
 
@@ -1145,7 +1146,7 @@ export function RepairWorkflowPanel({
                   if (pageNumbers.length === 0) return;
                   try {
                     const result = await storyService.pickBestVersions(storyId!, pageNumbers);
-                    const switched = Object.values(result.results).filter(r => r.switched).length;
+                    const switched = Object.values(result.results).filter((r: any) => r.switched).length;
                     if (onRefreshStory) await onRefreshStory();
                     alert(`${switched}/${pageNumbers.length} pages switched to better version`);
                   } catch (err) {
