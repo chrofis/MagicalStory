@@ -874,6 +874,368 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
     // Rehydrate images from story_images table (images may be stripped from data blob)
     storyData = await rehydrateStoryImages(id, storyData);
 
+    // Determine if this is a cover iteration (negative page numbers)
+    const isCover = pageNumber < 0;
+    const COVER_PAGE_MAP_REVERSE = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+    const coverKey = isCover ? COVER_PAGE_MAP_REVERSE[String(pageNumber)] : null;
+
+    if (isCover) {
+      // =========================================================================
+      // COVER ITERATION BRANCH
+      // Covers skip scene expansion / 17-check validation. Use stored description
+      // and the same prompt templates as the cover regeneration endpoint.
+      // =========================================================================
+      if (!coverKey) {
+        return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}. Use -1 (front), -2 (initial), -3 (back).` });
+      }
+
+      storyData.coverImages = storyData.coverImages || {};
+      const existingCover = storyData.coverImages[coverKey];
+      if (!existingCover || !existingCover.imageData) {
+        return res.status(400).json({ error: `No cover image found for ${coverKey}` });
+      }
+
+      const sceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
+      log.info(`🔄 [ITERATE] Cover ${coverKey} (page ${pageNumber}): Using stored description (${sceneDescription.length} chars)`);
+
+      // --- Art style ---
+      const artStyleId = storyData.artStyle || 'pixar';
+      const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
+
+      // --- Character selection (same logic as cover regen endpoint) ---
+      const characters = storyData.characters || [];
+      const visualBible = storyData.visualBible || null;
+
+      // Parse clothing from the stored cover description
+      let coverClothing = parseClothingCategory(sceneDescription) || 'standard';
+      let effectiveCoverClothing = coverClothing;
+      let coverCostumeType = null;
+      if (coverClothing && coverClothing.startsWith('costumed:')) {
+        coverCostumeType = coverClothing.split(':')[1];
+        effectiveCoverClothing = 'costumed';
+      }
+      const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
+
+      // Merge avatars: story avatars first, then fresh from characters table as fallback
+      const freshCharResult = await getDbPool().query(
+        'SELECT data FROM characters WHERE user_id = $1',
+        [req.user.id]
+      );
+      const freshCharData = freshCharResult.rows[0]?.data || {};
+      const freshCharacters = freshCharData.characters || [];
+      const mergedCharacters = characters.map(storyChar => {
+        if (storyChar.avatars) return storyChar;
+        const freshChar = freshCharacters.find(fc => fc.id === storyChar.id || fc.name === storyChar.name);
+        if (freshChar?.avatars) {
+          log.debug(`🔄 [ITERATE] Cover ${coverKey}: Using fresh avatars for ${storyChar.name}`);
+          return { ...storyChar, avatars: freshChar.avatars };
+        }
+        return storyChar;
+      });
+
+      // Character selection: main chars for front, main+extras for initial/back, max 5
+      const MAX_COVER_CHARACTERS = 5;
+      const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
+      const nonMainChars = mainChars.length > 0
+        ? mergedCharacters.filter(c => !c.isMainCharacter)
+        : mergedCharacters;
+
+      let coverCharacterPhotos;
+      const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
+      if (normalizedCoverType === 'front') {
+        let charactersToUse = mainChars.length > 0 ? mainChars : mergedCharacters;
+        if (charactersToUse.length > MAX_COVER_CHARACTERS) {
+          charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
+        }
+        coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      } else {
+        const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
+        const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
+        const halfPoint = Math.ceil(nonMainChars.length / 2);
+        let extras;
+        if (normalizedCoverType === 'initialPage') {
+          extras = nonMainChars.slice(0, halfPoint).slice(0, extraSlots);
+        } else {
+          extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
+        }
+        const coverChars = [...mainCapped, ...extras];
+        coverCharacterPhotos = getCharacterPhotoDetails(coverChars, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
+      }
+      // Apply styled avatars for non-costumed characters
+      if (effectiveCoverClothing !== 'costumed') {
+        coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
+      }
+
+      log.debug(`🔄 [ITERATE] Cover ${coverKey}: ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
+
+      // --- Build cover prompt (same templates as cover regen) ---
+      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
+      const storyTitle = storyData.title || 'My Story';
+      const coverDedication = storyData.dedication;
+
+      let coverPrompt;
+      if (normalizedCoverType === 'front') {
+        coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
+          TITLE_PAGE_SCENE: sceneDescription,
+          STYLE_DESCRIPTION: styleDescription,
+          STORY_TITLE: storyTitle,
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+          VISUAL_BIBLE: visualBiblePrompt
+        });
+      } else if (normalizedCoverType === 'initialPage') {
+        coverPrompt = coverDedication
+          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
+              INITIAL_PAGE_SCENE: sceneDescription,
+              STYLE_DESCRIPTION: styleDescription,
+              DEDICATION: coverDedication,
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+              VISUAL_BIBLE: visualBiblePrompt
+            })
+          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
+              INITIAL_PAGE_SCENE: sceneDescription,
+              STYLE_DESCRIPTION: styleDescription,
+              STORY_TITLE: storyTitle,
+              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+              VISUAL_BIBLE: visualBiblePrompt
+            });
+      } else {
+        coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
+          BACK_COVER_SCENE: sceneDescription,
+          STYLE_DESCRIPTION: styleDescription,
+          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
+          VISUAL_BIBLE: visualBiblePrompt
+        });
+      }
+
+      // Append evaluation feedback if provided
+      if (evaluationFeedback) {
+        const feedbackParts = [];
+        if (evaluationFeedback.reasoning) {
+          feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
+        }
+        if (evaluationFeedback.fixableIssues?.length > 0) {
+          feedbackParts.push('Specific problems to avoid:\n' +
+            evaluationFeedback.fixableIssues.map(i => `- ${i.description || i.issue || i}`).join('\n'));
+        }
+        if (feedbackParts.length > 0) {
+          coverPrompt = `${coverPrompt}\n\n${feedbackParts.join('\n\n')}`;
+          log.info(`🔄 [ITERATE] Cover ${coverKey}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'})`);
+        }
+      }
+
+      // Clear cache to force new generation
+      const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
+      deleteFromImageCache(cacheKey);
+
+      // Store previous image data
+      const previousImageData = existingCover.imageData;
+      const previousScore = existingCover.qualityScore || null;
+
+      // Generate new cover image with quality retry
+      const imageModelOverride = imageModel || null;
+      const coverImageModelId = imageModelOverride || MODEL_DEFAULTS.coverImage;
+      if (imageModelOverride) {
+        log.info(`🔄 [ITERATE] Cover ${coverKey}: Using model override: ${imageModelOverride}`);
+      }
+
+      let previousImage = null;
+      if (blackoutIssues) {
+        const fixTargets = existingCover.fixTargets || [];
+        if (fixTargets.length > 0) {
+          log.info(`🔄 [ITERATE] Cover ${coverKey}: Blacking out ${fixTargets.length} issue regions`);
+          previousImage = await blackoutIssueRegions(existingCover.imageData, fixTargets);
+        } else {
+          log.warn(`🔄 [ITERATE] Cover ${coverKey}: No fix targets for blackout, using original as reference`);
+          previousImage = existingCover.imageData;
+        }
+      } else if (useOriginalAsReference) {
+        previousImage = existingCover.imageData;
+        log.info(`🔄 [ITERATE] Cover ${coverKey}: Using original image as reference`);
+      }
+
+      const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
+      const imageResult = await generateImageWithQualityRetry(
+        coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, null, null,
+        { imageModel: imageModelOverride },
+        `${coverLabel} ITERATE`
+      );
+
+      log.info(`🔄 [ITERATE] Cover ${coverKey}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
+
+      // --- Version management ---
+      // Initialize imageVersions if needed (lazy migration)
+      if (!existingCover.imageVersions) {
+        existingCover.imageVersions = [];
+        if (existingCover.originalImage) {
+          existingCover.imageVersions.push({
+            imageData: existingCover.originalImage,
+            qualityScore: existingCover.originalScore,
+            description: existingCover.description,
+            createdAt: storyData.createdAt || new Date().toISOString(),
+            type: 'original',
+            isActive: false
+          });
+        }
+        const currentImageData = existingCover.imageData || null;
+        if (currentImageData && (!existingCover.originalImage || currentImageData !== existingCover.originalImage)) {
+          existingCover.imageVersions.push({
+            imageData: currentImageData,
+            qualityScore: existingCover.qualityScore,
+            description: existingCover.description,
+            prompt: existingCover.prompt,
+            modelId: existingCover.modelId,
+            createdAt: existingCover.regeneratedAt || existingCover.generatedAt || new Date().toISOString(),
+            type: existingCover.wasRegenerated ? 'regeneration' : 'original',
+            isActive: false
+          });
+        } else if (currentImageData && existingCover.imageVersions.length > 0) {
+          existingCover.imageVersions[0].isActive = false;
+        }
+        log.debug(`🔄 [ITERATE] Migrated legacy cover format to imageVersions[] (${existingCover.imageVersions.length} versions)`);
+      }
+
+      // Mark all existing versions as inactive
+      existingCover.imageVersions.forEach(v => v.isActive = false);
+
+      // Create new version entry
+      const timestamp = new Date().toISOString();
+      const newVersion = {
+        imageData: imageResult.imageData,
+        qualityScore: imageResult.score ?? null,
+        qualityReasoning: imageResult.reasoning || null,
+        description: sceneDescription,
+        prompt: coverPrompt,
+        modelId: imageResult.modelId || coverImageModelId,
+        createdAt: timestamp,
+        generatedAt: timestamp,
+        type: 'iteration',
+        isActive: true,
+        fixTargets: imageResult.fixTargets || [],
+        fixableIssues: imageResult.fixableIssues || [],
+        totalAttempts: imageResult.totalAttempts || null,
+        referencePhotoNames: (coverCharacterPhotos || []).map(p => ({
+          name: p.name, photoType: p.photoType,
+          clothingCategory: p.clothingCategory, clothingDescription: p.clothingDescription
+        })),
+      };
+      existingCover.imageVersions.push(newVersion);
+
+      // Query database for actual max version_index to avoid overwriting existing versions
+      const maxVersionResult = await dbQuery(
+        `SELECT COALESCE(MAX(version_index), -1) as max_version
+         FROM story_images
+         WHERE story_id = $1 AND image_type = $2 AND page_number IS NULL`,
+        [id, coverKey]
+      );
+      const currentMaxVersion = maxVersionResult[0]?.max_version ?? -1;
+      const newVersionIndex = currentMaxVersion + 1;
+
+      // Save the new cover image directly at the correct version_index
+      await saveStoryImage(id, coverKey, null, imageResult.imageData, {
+        qualityScore: imageResult.score,
+        generatedAt: timestamp,
+        versionIndex: newVersionIndex
+      });
+      // Mark as already saved so saveStoryData doesn't re-save it
+      newVersion._alreadySaved = true;
+
+      // Update the cover data in storyData
+      const coverData = {
+        ...existingCover,
+        imageData: imageResult.imageData,
+        description: sceneDescription,
+        prompt: coverPrompt,
+        qualityScore: imageResult.score,
+        qualityReasoning: imageResult.reasoning || null,
+        fixTargets: imageResult.fixTargets || [],
+        modelId: imageResult.modelId || coverImageModelId,
+        wasIterated: true,
+        wasRegenerated: true,
+        totalAttempts: imageResult.totalAttempts || 1,
+        previousImage: previousImageData,
+        previousScore: previousScore,
+        originalImage: existingCover.originalImage || previousImageData,
+        originalScore: existingCover.originalScore || previousScore,
+        referencePhotos: coverCharacterPhotos,
+        iteratedAt: timestamp,
+        iterationCount: (existingCover.iterationCount || 0) + 1,
+        imageVersions: existingCover.imageVersions
+      };
+      storyData.coverImages[coverKey] = coverData;
+
+      // Update active version in metadata
+      await setActiveVersion(id, coverKey, newVersionIndex);
+
+      // Save updated story (covers use saveStoryData, not saveScenePageData)
+      await saveStoryData(id, storyData);
+
+      // Deduct credits if not unlimited
+      let newCredits = hasInfiniteCredits ? -1 : userCredits - creditCost;
+      if (!hasInfiniteCredits) {
+        await getDbPool().query(
+          'UPDATE users SET credits = credits - $1 WHERE id = $2',
+          [creditCost, req.user.id]
+        );
+        await getDbPool().query(
+          `INSERT INTO credit_transactions (user_id, amount, balance_after, transaction_type, description)
+           VALUES ($1, $2, $3, 'image_iteration', $4)`,
+          [req.user.id, -creditCost, newCredits, `Iterate cover ${coverKey}`]
+        );
+      }
+
+      log.info(`✅ [ITERATE] Cover ${coverKey}: Iteration complete (score: ${imageResult.score})`);
+
+      // Build image versions for response (without heavy imageData except latest)
+      const imageVersions = existingCover.imageVersions.map((v, idx) => ({
+        description: v.description,
+        prompt: v.prompt,
+        modelId: v.modelId,
+        createdAt: v.createdAt,
+        isActive: v.isActive,
+        type: v.type,
+        qualityScore: v.qualityScore,
+        imageData: idx >= (existingCover.imageVersions.length - 2) ? v.imageData : undefined
+      }));
+
+      return res.json({
+        success: true,
+        pageNumber,
+        coverType: normalizedCoverType,
+        // No composition / previewMismatches / checksRun for covers (no scene analysis)
+        composition: null,
+        previewMismatches: [],
+        checksRun: {},
+        // New content
+        sceneDescription,
+        imageData: imageResult.imageData,
+        qualityScore: imageResult.score,
+        qualityReasoning: imageResult.reasoning,
+        modelId: imageResult.modelId || coverImageModelId,
+        totalAttempts: imageResult.totalAttempts,
+        // Previous version
+        previousImage: previousImageData,
+        previousScore: previousScore,
+        // Blackout image
+        blackoutImage: (blackoutIssues && previousImage !== existingCover.imageData) ? previousImage : null,
+        // Image versions for history display
+        imageVersions,
+        // Credits
+        creditsUsed: hasInfiniteCredits ? 0 : creditCost,
+        creditsRemaining: newCredits,
+        // Reference info
+        referencePhotos: coverCharacterPhotos,
+        landmarkPhotos: [],
+        visualBibleGrid: null,
+        message: 'Cover regenerated with fresh generation',
+        // Version info
+        versionIndex: newVersionIndex
+      });
+    }
+
+    // =========================================================================
+    // SCENE PAGE ITERATION BRANCH (existing flow, unchanged)
+    // =========================================================================
+
     // Get current image
     const sceneImages = storyData.sceneImages || [];
     const currentImage = sceneImages.find(img => img.pageNumber === pageNumber);
