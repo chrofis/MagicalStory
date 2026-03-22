@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Menu, Code, Sparkles, Loader2 } from 'lucide-react';
+import { Menu, Sparkles, Loader2 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useGenerationOptional } from '@/context/GenerationContext';
@@ -172,20 +172,9 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
 
         {/* Right side: DEV toggle + Menu */}
         <div className="flex items-center gap-3">
-          {/* Developer Mode Toggle - Admin or impersonating */}
-          {isAuthenticated && (user?.role === 'admin' || isImpersonating) && onDeveloperModeChange && (
-            <button
-              onClick={() => onDeveloperModeChange(!developerMode)}
-              className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-colors ${
-                developerMode
-                  ? 'bg-yellow-500 text-black'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
-              title={language === 'de' ? 'Entwicklermodus' : language === 'fr' ? 'Mode développeur' : 'Developer Mode'}
-            >
-              <Code size={14} />
-              <span className="hidden md:inline">DEV</span>
-            </button>
+          {/* DEV indicator (small badge, no toggle — toggle is in menu) */}
+          {developerMode && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500 text-black">DEV</span>
           )}
 
           {/* Generation In Progress Indicator */}
@@ -231,6 +220,8 @@ export function Navigation({ currentStep = 0, onStepClick, canAccessStep, develo
                 onClose={() => setShowMenu(false)}
                 onShowCreditsModal={() => setShowCreditsModal(true)}
                 onShowChangePasswordModal={() => setShowChangePasswordModal(true)}
+                developerMode={developerMode}
+                onDeveloperModeChange={onDeveloperModeChange}
               />
             )}
           </div>

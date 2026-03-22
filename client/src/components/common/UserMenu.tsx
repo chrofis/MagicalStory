@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles, Palette, HelpCircle, Info, Mail } from 'lucide-react';
+import { LogOut, BookOpen, Settings, Users, Package, CreditCard, KeyRound, Scale, Sparkles, Palette, HelpCircle, Info, Mail, Code } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import type { Language } from '@/types/story';
@@ -8,9 +8,11 @@ interface UserMenuProps {
   onClose: () => void;
   onShowCreditsModal: () => void;
   onShowChangePasswordModal: () => void;
+  developerMode?: boolean;
+  onDeveloperModeChange?: (enabled: boolean) => void;
 }
 
-export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModal }: UserMenuProps) {
+export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModal, developerMode, onDeveloperModeChange }: UserMenuProps) {
   const navigate = useNavigate();
   const { t, language, setLanguage } = useLanguage();
   const { isAuthenticated, user, logout, isImpersonating } = useAuth();
@@ -134,6 +136,24 @@ export function UserMenu({ onClose, onShowCreditsModal, onShowChangePasswordModa
           {/* Admin Panel (Admin or impersonating) */}
           {(user?.role === 'admin' || isImpersonating) && (
             <>
+              {/* Developer Mode Toggle */}
+              {onDeveloperModeChange && (
+                <button
+                  onClick={() => {
+                    onDeveloperModeChange(!developerMode);
+                    onClose();
+                  }}
+                  className={`w-full text-left px-4 py-3 flex items-center gap-2 border-b border-gray-700 ${
+                    developerMode ? 'bg-yellow-600 text-black hover:bg-yellow-500' : 'hover:bg-gray-700 text-white'
+                  }`}
+                >
+                  <Code size={16} />
+                  <span>{language === 'de' ? 'Entwicklermodus' : language === 'fr' ? 'Mode développeur' : 'Developer Mode'}</span>
+                  <span className={`ml-auto text-xs font-bold px-1.5 py-0.5 rounded ${
+                    developerMode ? 'bg-black/20 text-black' : 'bg-gray-600 text-gray-300'
+                  }`}>{developerMode ? 'ON' : 'OFF'}</span>
+                </button>
+              )}
               <button
                 onClick={() => handleNavigate('/admin')}
                 className="w-full text-left px-4 py-3 hover:bg-gray-700 text-white flex items-center gap-2 border-b border-gray-700"
