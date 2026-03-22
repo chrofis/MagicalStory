@@ -3755,7 +3755,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           visualBible,
           artStyle: inputData.artStyle,
           language: inputData.language,
-          clothingRequirements: mergedClothingRequirements,
+          clothingRequirements: clothingRequirements,
           pageClothing: pageClothingData,
           sceneImages: rawImages.map(r => ({ pageNumber: r.pageNumber, imageData: r.imageData, description: r.sceneDescription })),
         };
