@@ -1220,8 +1220,17 @@ router.get('/:id/dev-image', authenticateToken, async (req, res) => {
         const retryEntry = sceneImage.retryHistory?.find(r => r.bboxOverlayImage);
         return res.json({ bboxOverlayImage: retryEntry?.bboxOverlayImage || null });
       }
-      // Get the active image to draw boxes on
-      const activeImageData = sceneImage.imageData;
+      // Get the active image — load from story_images table (blob may have imageData stripped)
+      let activeImageData = sceneImage.imageData;
+      if (!activeImageData) {
+        try {
+          const activeVersion = await getActiveVersion(id, pageNum);
+          const imgRow = await getStoryImage(id, 'scene', pageNum, activeVersion);
+          activeImageData = imgRow?.image_data || null;
+        } catch (dbErr) {
+          log.warn(`⚠️ [DEV-IMAGE] Failed to load active image for page ${pageNum}: ${dbErr.message}`);
+        }
+      }
       if (activeImageData) {
         try {
           const { createBboxOverlayImage } = require('../lib/images');
