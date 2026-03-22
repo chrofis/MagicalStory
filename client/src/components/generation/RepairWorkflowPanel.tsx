@@ -128,16 +128,26 @@ function PageFeedbackCard({
           ) : (
             <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Not evaluated</span>
           )}
-          {feedback.semanticScore != null && (
-            <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
-              Semantic: {feedback.semanticScore}%
-            </span>
-          )}
-          {feedback.entityPenalty != null && feedback.entityPenalty > 0 && (
-            <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
-              Entity: -{feedback.entityPenalty}
-            </span>
-          )}
+          {(() => {
+            const qScore = feedback.qualityScore ?? 0;
+            const fScore = feedback.score ?? qScore;
+            const entityPen = feedback.entityPenalty || 0;
+            const semanticPen = Math.max(0, qScore - fScore - entityPen);
+            return (
+              <>
+                {semanticPen > 0 && (
+                  <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                    Semantic: -{semanticPen}
+                  </span>
+                )}
+                {entityPen > 0 && (
+                  <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                    Entity: -{entityPen}
+                  </span>
+                )}
+              </>
+            );
+          })()}
           {feedback.score !== undefined && (
             <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
               feedback.score >= 70 ? 'bg-green-100 text-green-700' :
@@ -927,16 +937,30 @@ export function RepairWorkflowPanel({
                               <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
                                 Quality: {qualityScore}%
                               </span>
-                              {semanticScore !== null && semanticScore !== undefined && (
-                                <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
-                                  Semantic: {semanticScore}%
-                                </span>
-                              )}
-                              {result.entityPenalty != null && result.entityPenalty > 0 && (
-                                <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
-                                  Entity: -{result.entityPenalty}
-                                </span>
-                              )}
+                              {(() => {
+                                const entityPen = result.entityPenalty || 0;
+                                const semanticPen = qualityScore - finalScore - entityPen;
+                                return (
+                                  <>
+                                    {semanticPen > 0 && (
+                                      <span className="text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">
+                                        Semantic: -{semanticPen}
+                                      </span>
+                                    )}
+                                    {entityPen > 0 && (
+                                      <span className="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">
+                                        Entity: -{entityPen}
+                                      </span>
+                                    )}
+                                    {semanticPen === 0 && entityPen === 0 && semanticScore != null && (
+                                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                                        No penalties
+                                      </span>
+                                    )}
+                                    <span className="text-xs text-gray-400">=</span>
+                                  </>
+                                );
+                              })()}
                               <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                                 finalScore >= 70 ? 'bg-green-100 text-green-700' :
                                 finalScore >= 50 ? 'bg-yellow-100 text-yellow-700' :
