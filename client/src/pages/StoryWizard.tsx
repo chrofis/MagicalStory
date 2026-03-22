@@ -497,6 +497,7 @@ export default function StoryWizard() {
             referencePhotos: devData.referencePhotos ?? img.referencePhotos,
             landmarkPhotos: devData.landmarkPhotos ?? img.landmarkPhotos,
             hasVisualBibleGrid: devData.hasVisualBibleGrid ?? img.hasVisualBibleGrid,
+            grokRefImages: (devData as any).grokRefImages ?? (img as any).grokRefImages,
             consistencyRegen: devData.consistencyRegen ?? img.consistencyRegen,
             // Merge per-version metadata into imageVersions
             // Match by versionIndex (DB version_index) instead of array position

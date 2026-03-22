@@ -2813,7 +2813,8 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           totalAttempts: coverResult.totalAttempts,
           retryHistory: coverResult.retryHistory,
           referencePhotos: coverPhotos,
-          modelId: coverResult.modelId
+          modelId: coverResult.modelId,
+          grokRefImages: coverResult.grokRefImages || null
         };
       });
 
@@ -3659,6 +3660,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
               characterPhotos: pageData.characterPhotos,
               landmarkPhotos: pageData.landmarkPhotos,
               visualBibleGrid: pageData.visualBibleGrid,
+              grokRefImages: genResult.grokRefImages || null,
               sceneDescription: pageData.scene.sceneDescription,
               text: pageData.scene.text,
               sceneCharacters: pageData.sceneCharacters,
@@ -3743,6 +3745,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           referencePhotos: img.characterPhotos,
           landmarkPhotos: img.landmarkPhotos,
           visualBibleGrid: img.visualBibleGrid || null,
+          grokRefImages: img.grokRefImages || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           imageVersions: [],
@@ -3804,6 +3807,7 @@ async function processUnifiedStoryJob(jobId, inputData, characterPhotos, skipIma
           referencePhotos: img.characterPhotos,
           landmarkPhotos: img.landmarkPhotos,
           visualBibleGrid: img.visualBibleGrid ? (typeof img.visualBibleGrid === 'string' ? img.visualBibleGrid : `data:image/jpeg;base64,${img.visualBibleGrid.toString('base64')}`) : null,
+          grokRefImages: img.grokRefImages || null,
           sceneCharacters: img.sceneCharacters,
           sceneCharacterClothing: img.perCharClothing,
           bboxDetection: img.bboxDetection,

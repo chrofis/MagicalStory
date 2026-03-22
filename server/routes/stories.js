@@ -676,6 +676,7 @@ router.get('/:id/dev-metadata', authenticateToken, async (req, res) => {
           hasPhoto: !!p.photoData
         })),
         hasVisualBibleGrid: !!img.visualBibleGrid,
+        grokRefImages: img.grokRefImages || null,
         // Consistency regeneration - flags only, images lazy loaded
         consistencyRegen: img.consistencyRegen ? {
           hasOriginalImage: !!img.consistencyRegen.originalImage,
