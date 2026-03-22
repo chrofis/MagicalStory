@@ -79,6 +79,15 @@ function isCoverPage(pageNumber) { return pageNumber < 0; }
 function getCoverType(pageNumber) { return COVER_PAGE_MAP[String(pageNumber)]; }
 function getCoverData(storyData, coverType) { return storyData.coverImages?.[coverType]; }
 
+// Look up a scene image or cover image by page number
+function findSceneOrCover(sData, pageNum) {
+  if (pageNum < 0) {
+    const coverType = COVER_PAGE_MAP[String(pageNum)];
+    return coverType ? sData.coverImages?.[coverType] || null : null;
+  }
+  return sData.sceneImages?.find(s => s.pageNumber === pageNum) || null;
+}
+
 function getDbPool() { return getPool(); }
 
 // Calculate token-based API cost for Gemini models
@@ -217,7 +226,7 @@ router.post('/:id/regenerate/scene-description/:pageNum', authenticateToken, ima
     storyData.sceneDescriptions = sceneDescriptions;
     await saveStoryData(id, storyData);
 
-    console.log(`✅ Scene description regenerated for story ${id}, page ${pageNumber}`);
+    log.info(`✅ Scene description regenerated for story ${id}, page ${pageNumber}`);
 
     res.json({
       success: true,
@@ -328,9 +337,9 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Log scene changes for dev mode visibility
     if (sceneWasEdited) {
-      console.log(`📝 [REGEN] SCENE EDITED for page ${pageNumber}:`);
-      console.log(`   Original: ${originalDescription.substring(0, 100)}${originalDescription.length > 100 ? '...' : ''}`);
-      console.log(`   New:      ${inputDescription.substring(0, 100)}${inputDescription.length > 100 ? '...' : ''}`);
+      log.debug(`📝 [REGEN] SCENE EDITED for page ${pageNumber}:`);
+      log.debug(`   Original: ${originalDescription.substring(0, 100)}${originalDescription.length > 100 ? '...' : ''}`);
+      log.debug(`   New:      ${inputDescription.substring(0, 100)}${inputDescription.length > 100 ? '...' : ''}`);
     }
 
     // Get visual bible from stored story (for recurring elements)
@@ -391,7 +400,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       }
       if (pageIssues.length > 0) {
         correctionNotes = `The previous image for this page had the following issues that need to be corrected:\n${pageIssues.join('\n\n')}`;
-        console.log(`📋 [REGEN] Found ${pageIssues.length} correction note(s) from evaluation for page ${pageNumber}`);
+        log.debug(`📋 [REGEN] Found ${pageIssues.length} correction note(s) from evaluation for page ${pageNumber}`);
       }
     }
 
@@ -419,7 +428,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
     const shouldExpand = sceneWasEdited || hasCorrectionNotes || (!hasArtDirectorFormat && textDescription.length < 1500);
 
     if (shouldExpand) {
-      console.log(`📝 [REGEN] Expanding scene using unified 3-step prompt (edited: ${sceneWasEdited}, corrections: ${hasCorrectionNotes}, length: ${inputDescription.length} chars)...`);
+      log.debug(`📝 [REGEN] Expanding scene using unified 3-step prompt (edited: ${sceneWasEdited}, corrections: ${hasCorrectionNotes}, length: ${inputDescription.length} chars)...`);
       // Use language code (e.g., 'de-ch', 'en') not name (e.g., 'English')
       const language = storyData.language || 'en';
       // Build context for scene description prompt (same as original generation)
@@ -444,7 +453,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       try {
         const expansionResult = await callClaudeAPI(expansionPrompt, 10000, MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
         expandedDescription = expansionResult.text;
-        console.log(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
+        log.debug(`✅ [REGEN] Scene expanded to ${expandedDescription.length} chars`);
         log.debug(`📝 [REGEN] Expanded scene preview: ${expandedDescription.substring(0, 300)}...`);
       } catch (expansionError) {
         log.error(`⚠️  [REGEN] Scene expansion failed, using original summary:`, expansionError.message);
@@ -542,8 +551,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Log prompt changes for debugging
     if (sceneWasEdited) {
-      console.log(`📝 [REGEN] PROMPT BUILT for page ${pageNumber}:`);
-      console.log(`   Prompt length: ${imagePrompt.length} chars`);
+      log.debug(`📝 [REGEN] PROMPT BUILT for page ${pageNumber}:`);
+      log.debug(`   Prompt length: ${imagePrompt.length} chars`);
     }
 
     // Clear the image cache for this prompt to force a new generation
@@ -579,7 +588,7 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
 
     // Log API costs for this regeneration
     const imageCost = calculateImageCost(imageModelId, imageResult.totalAttempts || 1);
-    console.log(`💰 [REGEN] API Cost: ${formatCostSummary(imageModelId, { imageCount: imageResult.totalAttempts || 1 }, imageCost)} (${imageResult.totalAttempts || 1} attempt(s))`);
+    log.info(`💰 [REGEN] API Cost: ${formatCostSummary(imageModelId, { imageCount: imageResult.totalAttempts || 1 }, imageCost)} (${imageResult.totalAttempts || 1} attempt(s))`);
 
     // Update the image in story data
     const existingIndex = sceneImages.findIndex(img => img.pageNumber === pageNumber);
@@ -737,11 +746,11 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
          VALUES ($1, $2, $3, 'image_regeneration', $4)`,
         [req.user.id, -creditCost, newCredits, `Regenerate image for page ${pageNumber}`]
       );
-      console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
+      log.info(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, cost: ${creditCost} credits, remaining: ${newCredits})`);
     } else if (isImpersonating) {
-      console.log(`✅ [IMPERSONATE] Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, FREE - admin impersonating)`);
+      log.info(`✅ [IMPERSONATE] Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, FREE - admin impersonating)`);
     } else {
-      console.log(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
+      log.info(`✅ Image regenerated for story ${id}, page ${pageNumber} (quality: ${imageResult.score}, unlimited credits)`);
     }
 
     // Get version info for response (reuse updatedScene from save above)
@@ -1692,7 +1701,7 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
 
     // Log API costs for this cover regeneration
     const coverImageCost = calculateImageCost(coverImageModelId, coverResult.totalAttempts || 1);
-    console.log(`💰 [COVER REGEN] API Cost: ${formatCostSummary(coverImageModelId, { imageCount: coverResult.totalAttempts || 1 }, coverImageCost)} (${coverResult.totalAttempts || 1} attempt(s))`);
+    log.info(`💰 [COVER REGEN] API Cost: ${formatCostSummary(coverImageModelId, { imageCount: coverResult.totalAttempts || 1 }, coverImageCost)} (${coverResult.totalAttempts || 1} attempt(s))`);
 
     // Create new version entry
     const coverRegenTimestamp = new Date().toISOString();
@@ -1791,11 +1800,11 @@ router.post('/:id/regenerate/cover/:coverType', authenticateToken, imageRegenera
          VALUES ($1, $2, $3, $4, $5)`,
         [req.user.id, -requiredCredits, newCredits, 'cover_regeneration', `Regenerated ${normalizedCoverType} cover for story ${id}`]
       );
-      console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
+      log.info(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, credits: ${requiredCredits} used, ${newCredits} remaining)`);
     } else if (isImpersonating) {
-      console.log(`✅ [IMPERSONATE] ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, FREE - admin impersonating)`);
+      log.info(`✅ [IMPERSONATE] ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, FREE - admin impersonating)`);
     } else {
-      console.log(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, unlimited credits)`);
+      log.info(`✅ ${normalizedCoverType} cover regenerated for story ${id} (score: ${coverResult.score}, unlimited credits)`);
     }
 
     res.json({
@@ -1948,7 +1957,7 @@ router.post('/:id/edit/image/:pageNum', authenticateToken, imageRegenerationLimi
     storyData.sceneImages = sceneImages;
     await saveStoryData(id, storyData);
 
-    console.log(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
+    log.info(`✅ Image edited for story ${id}, page ${pageNumber} (new score: ${qualityScore})`);
 
     res.json({
       success: true,
@@ -3063,15 +3072,6 @@ router.post('/:id/repair-workflow/character-repair', authenticateToken, imageReg
     let totalVerifyTokensIn = 0, totalVerifyTokensOut = 0;
     const artStyle = storyData.artStyle || 'pixar';
 
-    // Helper: look up a scene image or cover image by page number
-    function findSceneOrCover(sData, pageNum) {
-      if (pageNum < 0) {
-        const coverType = COVER_PAGE_MAP[String(pageNum)];
-        return coverType ? sData.coverImages?.[coverType] || null : null;
-      }
-      return sData.sceneImages?.find(s => s.pageNumber === pageNum) || null;
-    }
-
     // Flatten all (character, page) pairs into parallel repair tasks
     const repairTasks = [];
     for (const repair of repairs) {
@@ -3786,7 +3786,7 @@ router.post('/:id/edit/cover/:coverType', authenticateToken, async (req, res) =>
     storyData.coverImages = coverImages;
     await saveStoryData(id, storyData);
 
-    console.log(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
+    log.info(`✅ Cover edited for story ${id}, type: ${normalizedCoverType} (new score: ${qualityScore})`);
 
     res.json({
       success: true,

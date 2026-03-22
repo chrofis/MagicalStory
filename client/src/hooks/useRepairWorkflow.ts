@@ -19,6 +19,9 @@ const COVER_PAGES: Record<string, number> = { frontCover: -1, initialPage: -2, b
 // Concurrency limit for parallel image operations (redo, character repair)
 const IMAGE_CONCURRENCY = 50;
 
+// Entity penalty values by severity (must match backend re-evaluate logic)
+const ENTITY_PENALTIES = { critical: 30, major: 20, minor: 10 } as const;
+
 /** Simple concurrency limiter (like p-limit) */
 function pLimit(concurrency: number) {
   const queue: Array<() => void> = [];
@@ -445,19 +448,13 @@ export function useRepairWorkflow({
         // Compute entity penalty (same model as backend re-evaluate)
         let entityPenalty = 0;
         for (const ei of feedback.entityIssues) {
-          if (ei.severity === 'critical') entityPenalty += 30;
-          else if (ei.severity === 'major') entityPenalty += 20;
-          else entityPenalty += 10;
+          entityPenalty += ENTITY_PENALTIES[ei.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         for (const oi of feedback.objectIssues) {
-          if (oi.severity === 'critical') entityPenalty += 30;
-          else if (oi.severity === 'major') entityPenalty += 20;
-          else entityPenalty += 10;
+          entityPenalty += ENTITY_PENALTIES[oi.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         for (const si of feedback.semanticIssues) {
-          if (si.severity === 'critical') entityPenalty += 30;
-          else if (si.severity === 'major') entityPenalty += 20;
-          else entityPenalty += 10;
+          entityPenalty += ENTITY_PENALTIES[si.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
         }
         feedback.entityPenalty = entityPenalty;
         // Use qualityScore (visual-quality-only) as base; scene.score already has entity
@@ -538,9 +535,7 @@ export function useRepairWorkflow({
           // Compute entity penalty (covers typically have no entity issues, but handle uniformly)
           let entityPenalty = 0;
           for (const ei of feedback.entityIssues) {
-            if (ei.severity === 'critical') entityPenalty += 30;
-            else if (ei.severity === 'major') entityPenalty += 20;
-            else entityPenalty += 10;
+            entityPenalty += ENTITY_PENALTIES[ei.severity as keyof typeof ENTITY_PENALTIES] ?? ENTITY_PENALTIES.minor;
           }
           feedback.entityPenalty = entityPenalty;
           const baseScore = feedback.qualityScore ?? 100;
@@ -642,6 +637,21 @@ export function useRepairWorkflow({
     }));
   }, [workflowState.collectedFeedback.pages, workflowState.reEvaluationResults.pages, startStep]);
 
+  // Helper: redo a single page or cover, returning a normalised result
+  const redoCoverOrPage = useCallback(async (
+    pageNumber: number,
+    evalFeedback?: { score: number; reasoning?: string; fixableIssues?: Array<{ description?: string; issue?: string }> },
+  ) => {
+    if (pageNumber < 0) {
+      const coverTypeMap: Record<number, 'front' | 'back' | 'initial'> = { [-1]: 'front', [-2]: 'initial', [-3]: 'back' };
+      const coverType = coverTypeMap[pageNumber];
+      if (!coverType) throw new Error(`Unknown cover page number: ${pageNumber}`);
+      const coverResult = await storyService.regenerateCover(storyId!, coverType);
+      return { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
+    }
+    return storyService.iteratePage(storyId!, pageNumber, imageModel, { evaluationFeedback: evalFeedback });
+  }, [storyId, imageModel]);
+
   // Step 3: Redo marked pages using existing iterate function
   const redoMarkedPages = useCallback(async (options?: { useOriginalAsReference?: boolean; blackoutIssues?: boolean }) => {
     if (!storyId || workflowState.redoPages.pageNumbers.length === 0) return;
@@ -679,13 +689,7 @@ export function useRepairWorkflow({
           } : undefined;
           let result: any;
           if (pageNumber < 0) {
-            // Cover redo
-            const coverTypeMap: Record<number, 'front' | 'back' | 'initial'> = { [-1]: 'front', [-2]: 'initial', [-3]: 'back' };
-            const coverType = coverTypeMap[pageNumber];
-            if (coverType) {
-              const coverResult = await storyService.regenerateCover(storyId, coverType);
-              result = { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
-            }
+            result = await redoCoverOrPage(pageNumber, evalFeedback);
           } else {
             result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
               useOriginalAsReference: options?.useOriginalAsReference,
@@ -751,7 +755,7 @@ export function useRepairWorkflow({
       console.error('Redo pages failed:', error);
       failStep('redo-pages', error instanceof Error ? error.message : 'Unknown error');
     }
-  }, [storyId, workflowState.redoPages.pageNumbers, workflowState.reEvaluationResults.pages, workflowState.collectedFeedback.pages, imageModel, sceneImages, onImageUpdate, startStep, failStep]);
+  }, [storyId, workflowState.redoPages.pageNumbers, workflowState.reEvaluationResults.pages, workflowState.collectedFeedback.pages, imageModel, sceneImages, onImageUpdate, startStep, failStep, redoCoverOrPage]);
 
   // Step 4: Re-evaluate pages
   type EvalPageResult = {
@@ -962,7 +966,7 @@ export function useRepairWorkflow({
   // Get step number (1-8, 0 for idle)
   const getStepNumber = useCallback((step: RepairWorkflowStep): number => {
     const index = STEP_ORDER.indexOf(step);
-    return index > 0 ? index : 0;
+    return index >= 0 ? index : 0;
   }, []);
 
   // Get characters with issues from consistency results
@@ -1119,28 +1123,14 @@ export function useRepairWorkflow({
           setRedoProgress({ current: redoCompleted, total: pagesToRedo.length, currentPage: pageNumber });
 
           try {
-            let result: any;
-            if (pageNumber < 0) {
-              // Cover redo — map negative page number to cover type
-              const coverTypeMap: Record<number, 'front' | 'back' | 'initial'> = { [-1]: 'front', [-2]: 'initial', [-3]: 'back' };
-              const coverType = coverTypeMap[pageNumber];
-              if (coverType) {
-                const coverResult = await storyService.regenerateCover(storyId, coverType);
-                result = { success: true, imageData: coverResult.imageData, qualityScore: coverResult.qualityScore, sceneDescription: coverResult.description, imagePrompt: coverResult.prompt, modelId: coverResult.modelId, totalAttempts: 1 };
-              }
-            } else {
-              // Pass evaluation feedback so the iterate endpoint knows what to fix
-              // (mirrors the automatic pipeline's feedbackSuffix behaviour)
-              const pageEval = evalResult?.evalPages?.[pageNumber];
-              const evalFeedback = pageEval ? {
-                score: pageEval.score ?? pageEval.qualityScore,
-                reasoning: pageEval.reasoning,
-                fixableIssues: pageEval.fixableIssues,
-              } : undefined;
-              result = await storyService.iteratePage(storyId, pageNumber, imageModel, {
-                evaluationFeedback: evalFeedback,
-              });
-            }
+            // Build evaluation feedback so the iterate endpoint knows what to fix
+            const pageEval = evalResult?.evalPages?.[pageNumber];
+            const evalFeedback = pageEval ? {
+              score: pageEval.score ?? pageEval.qualityScore,
+              reasoning: pageEval.reasoning,
+              fixableIssues: pageEval.fixableIssues as Array<{ description?: string; issue?: string }>,
+            } : undefined;
+            const result: any = await redoCoverOrPage(pageNumber, evalFeedback);
             if (result?.success) {
               allRedonePagesAcrossPasses.add(pageNumber);
               if (!signal.aborted) {
@@ -1274,8 +1264,7 @@ export function useRepairWorkflow({
       // Pick best versions last (considers all versions including character repairs)
       // Include cover pages that have multiple versions so they are also considered
       const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
-      // Only include covers that were actually redone, and deduplicate
-      const pickBestPages = [...new Set([...redonePagesArray, ...coverPageNumbers.filter(p => allRedonePagesAcrossPasses.has(p))])];
+      const pickBestPages = redonePagesArray;
       if (pickBestPages.length > 0) {
         checkAborted();
         onProgress?.('redo-pages', 'Picking best versions...');
@@ -1302,7 +1291,7 @@ export function useRepairWorkflow({
     }
   }, [
     storyId, sceneImages, coverImages, imageModel, onImageUpdate,
-    collectFeedback, reEvaluatePages, startStep, setRedoProgress,
+    collectFeedback, reEvaluatePages, startStep, setRedoProgress, redoCoverOrPage,
   ]);
 
   return {
