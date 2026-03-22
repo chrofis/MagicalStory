@@ -1131,45 +1131,6 @@ export function RepairWorkflowPanel({
             )}
           </div>
 
-          {/* Pick Best Versions */}
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-amber-600" />
-                <span className="text-sm font-semibold text-gray-700">Pick Best Versions</span>
-              </div>
-              <button
-                onClick={async () => {
-                  const pageNumbers = sceneImages
-                    .filter(img => img.imageVersions && img.imageVersions.length > 1)
-                    .map(img => img.pageNumber);
-                  // Include covers with multiple versions
-                  if (coverImages) {
-                    const coverMap: Array<[string, number]> = [['frontCover', -1], ['initialPage', -2], ['backCover', -3]];
-                    for (const [ct, pn] of coverMap) {
-                      const cover = (coverImages as any)[ct];
-                      if (cover?.imageVersions?.length > 1) pageNumbers.push(pn);
-                    }
-                  }
-                  if (pageNumbers.length === 0) return;
-                  try {
-                    const result = await storyService.pickBestVersions(storyId!, pageNumbers);
-                    const switched = Object.values(result.results).filter((r: any) => r.switched).length;
-                    if (onRefreshStory) await onRefreshStory();
-                    alert(`${switched}/${pageNumbers.length} pages switched to better version`);
-                  } catch (err) {
-                    console.error('Pick-best failed:', err);
-                  }
-                }}
-                disabled={disableForFinalSteps || sceneImages.filter(img => img.imageVersions && img.imageVersions.length > 1).length === 0}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
-              >
-                <Trophy className="w-3.5 h-3.5" />
-                Pick Best ({sceneImages.filter(img => img.imageVersions && img.imageVersions.length > 1).length} pages)
-              </button>
-            </div>
-          </div>
-
           {/* Step 6: Character Repair */}
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             {renderStepHeader('character-repair')}
@@ -1574,6 +1535,44 @@ export function RepairWorkflowPanel({
                 )}
               </div>
             )}
+          </div>
+
+          {/* Pick Best Versions (LAST — after character repair so repaired versions are considered) */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-semibold text-gray-700">Pick Best Versions</span>
+              </div>
+              <button
+                onClick={async () => {
+                  const pageNumbers = sceneImages
+                    .filter(img => img.imageVersions && img.imageVersions.length > 1)
+                    .map(img => img.pageNumber);
+                  if (coverImages) {
+                    const coverMap: Array<[string, number]> = [['frontCover', -1], ['initialPage', -2], ['backCover', -3]];
+                    for (const [ct, pn] of coverMap) {
+                      const cover = (coverImages as any)[ct];
+                      if (cover?.imageVersions?.length > 1) pageNumbers.push(pn);
+                    }
+                  }
+                  if (pageNumbers.length === 0) return;
+                  try {
+                    const result = await storyService.pickBestVersions(storyId!, pageNumbers);
+                    const switched = Object.values(result.results).filter((r: any) => r.switched).length;
+                    if (onRefreshStory) await onRefreshStory();
+                    alert(`${switched}/${pageNumbers.length} pages switched to better version`);
+                  } catch (err) {
+                    console.error('Pick-best failed:', err);
+                  }
+                }}
+                disabled={disableForFinalSteps || sceneImages.filter(img => img.imageVersions && img.imageVersions.length > 1).length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+              >
+                <Trophy className="w-3.5 h-3.5" />
+                Pick Best ({sceneImages.filter(img => img.imageVersions && img.imageVersions.length > 1).length} pages)
+              </button>
+            </div>
           </div>
 
         </div>
