@@ -22,6 +22,7 @@ You are a Scene Composer creating simple illustration briefs for children's book
 **SCENE HINT (your starting point):**
 {DRAFT_SCENE_DESCRIPTION}
 
+{PREVIOUS_SCENES}
 **CURRENT SCENE (Page {PAGE_NUMBER}):**
 {SCENE_SUMMARY}
 **Story Text:**
