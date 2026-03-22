@@ -2722,17 +2722,16 @@ export default function StoryWizard() {
       const result = await characterService.generateClothingAvatarsWithTraits(currentCharacter);
 
       if (result.success && result.avatars) {
-        // Update local state with new avatars (explicitly clear stale flag)
-        const freshAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
+        // Show avatars immediately from generation result
+        const immediateAvatars = { ...result.avatars, stale: false, generatedAt: new Date().toISOString() };
 
         // Merge physical traits - preserve USER edits, use extracted for non-user traits
         const merged = mergeExtractedTraits(currentCharacter, result.extractedTraits, result.extractedClothing);
 
-        // Update state only - DO NOT save here
-        // The user will click Save which triggers saveCharacter() with the updated state
+        // Update state with immediate avatars (images available, clothing not yet)
         setCurrentCharacter(prev => prev ? {
           ...prev,
-          avatars: freshAvatars,
+          avatars: immediateAvatars,
           physical: merged.physical,
           physicalTraitsSource: merged.physicalTraitsSource,
           clothing: merged.clothing,
@@ -2740,12 +2739,35 @@ export default function StoryWizard() {
         setCharacters(prev => prev.map(c =>
           c.id === currentCharacter.id ? {
             ...c,
-            avatars: freshAvatars,
+            avatars: immediateAvatars,
             physical: merged.physical,
             physicalTraitsSource: merged.physicalTraitsSource,
             clothing: merged.clothing,
           } : c
         ));
+
+        // Fetch fresh DB data after background evaluation completes (has clothing descriptions)
+        // Avatar job saves clothing ~10-15s after thumbnails are ready
+        setTimeout(async () => {
+          try {
+            const freshChar = await characterService.loadFullCharacter(currentCharacter.id);
+            if (freshChar?.avatars?.clothing) {
+              log.info(`👕 Clothing data loaded for ${currentCharacter.name}: ${Object.keys(freshChar.avatars.clothing).join(', ')}`);
+              setCurrentCharacter(prev => prev && prev.id === currentCharacter.id ? {
+                ...prev,
+                avatars: { ...prev.avatars, clothing: freshChar.avatars!.clothing },
+              } : prev);
+              setCharacters(prev => prev.map(c =>
+                c.id === currentCharacter.id ? {
+                  ...c,
+                  avatars: { ...c.avatars, clothing: freshChar.avatars!.clothing },
+                } : c
+              ));
+            }
+          } catch (err) {
+            log.warn('Failed to fetch clothing data:', err);
+          }
+        }, 15000);
 
         log.success(`✅ Avatars WITH TRAITS regenerated for ${currentCharacter.name}`);
         if (result.extractedTraits) {
