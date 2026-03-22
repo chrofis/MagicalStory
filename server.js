@@ -4853,12 +4853,14 @@ async function _processStoryJobImpl(jobId) {
           let outlineModelId = null;
           let outlineUsage = null;
           let fullStoryText = '';
-          let sceneDescriptions = [];
+          const sceneDescMap = new Map(); // pageNumber → description (deduplicates)
           let sceneImages = [];
           let storyTextPrompts = [];
           let visualBible = null;
           let coverImages = {};
           let pageClothingData = null;
+          const lang = inputData?.language || 'en';
+          const pageWord = lang.startsWith('de') ? 'Seite' : lang.startsWith('fr') ? 'Page' : 'Page';
 
           for (const cp of checkpoints) {
             const data = typeof cp.step_data === 'string' ? JSON.parse(cp.step_data) : cp.step_data;
@@ -4879,25 +4881,16 @@ async function _processStoryJobImpl(jobId) {
             } else if (cp.step_name === 'unified_story') {
               // Unified pipeline: contains story pages, visual bible, clothing, title
               if (data.storyPages?.length) {
-                fullStoryText = data.storyPages.map(p => `## Seite ${p.pageNumber}\n\n${p.text}`).join('\n\n');
-                // Extract scene descriptions from storyPages
+                fullStoryText = data.storyPages.map(p => `## ${pageWord} ${p.pageNumber}\n\n${p.text}`).join('\n\n');
+                // Extract scene descriptions from storyPages (higher quality than partial_page)
                 for (const page of data.storyPages) {
                   if (page.sceneHint) {
-                    sceneDescriptions.push({
-                      pageNumber: page.pageNumber,
-                      description: page.sceneHint
-                    });
+                    sceneDescMap.set(page.pageNumber, page.sceneHint);
                   }
                 }
               }
               if (data.visualBible) visualBible = data.visualBible;
-              if (data.clothingRequirements) {
-                try {
-                  pageClothingData = data.clothingRequirements;
-                } catch (e) {
-                  log.debug(`[PARTIAL SAVE] Could not parse clothing: ${e.message}`);
-                }
-              }
+              if (data.clothingRequirements) pageClothingData = data.clothingRequirements;
               if (data.unifiedPrompt) {
                 outlinePrompt = data.unifiedPrompt;
                 outlineModelId = data.unifiedModelId || null;
@@ -4905,13 +4898,19 @@ async function _processStoryJobImpl(jobId) {
               }
             } else if (cp.step_name === 'story_text') {
               // Unified pipeline: story text for progressive display
-              // Only use if fullStoryText wasn't already set from unified_story
+              // Only use text if not already set from unified_story
               if (!fullStoryText && data.pageTexts) {
                 const pageNums = Object.keys(data.pageTexts).sort((a, b) => Number(a) - Number(b));
-                fullStoryText = pageNums.map(n => `## Seite ${n}\n\n${data.pageTexts[n]}`).join('\n\n');
+                fullStoryText = pageNums.map(n => `## ${pageWord} ${n}\n\n${data.pageTexts[n]}`).join('\n\n');
               }
-            } else if (cp.step_name === 'scene_hints' && data.visualBible) {
-              visualBible = data.visualBible;
+              // Also recover sceneDescriptions if not already set
+              if (sceneDescMap.size === 0 && Array.isArray(data.sceneDescriptions)) {
+                for (const sd of data.sceneDescriptions) {
+                  if (sd.description) {
+                    sceneDescMap.set(sd.pageNumber, sd.description);
+                  }
+                }
+              }
             } else if (cp.step_name === 'story_batch') {
               // Legacy pipeline checkpoint
               if (data.batchText) {
@@ -4929,11 +4928,9 @@ async function _processStoryJobImpl(jobId) {
               const pageNum = cp.step_index;
               // Handle both old format (sceneDescription object) and new format (description string)
               const sceneDesc = data.description || data.sceneDescription?.description || data.sceneDescription || '';
-              if (sceneDesc) {
-                sceneDescriptions.push({
-                  pageNumber: pageNum,
-                  description: sceneDesc
-                });
+              // Only add if unified_story didn't already provide a better description
+              if (sceneDesc && !sceneDescMap.has(pageNum)) {
+                sceneDescMap.set(pageNum, sceneDesc);
               }
               if (data.imageData) {
                 sceneImages.push({
@@ -4950,7 +4947,7 @@ async function _processStoryJobImpl(jobId) {
                   originalScore: data.originalScore,
                   originalReasoning: data.originalReasoning,
                   modelId: data.modelId || null,
-                  referencePhotos: data.referencePhotos || null  // For consistency check character names
+                  referencePhotos: data.referencePhotos || null
                 });
               }
             } else if (cp.step_name === 'cover' || cp.step_name === 'partial_cover') {
@@ -4968,6 +4965,11 @@ async function _processStoryJobImpl(jobId) {
             }
           }
 
+          // Convert deduplicated scene descriptions map to array
+          const sceneDescriptions = Array.from(sceneDescMap.entries())
+            .map(([pageNumber, description]) => ({ pageNumber, description }))
+            .sort((a, b) => a.pageNumber - b.pageNumber);
+
           // Only save if we have at least some content
           const hasContent = outline || fullStoryText || sceneImages.length > 0;
           if (hasContent) {
@@ -4982,7 +4984,7 @@ async function _processStoryJobImpl(jobId) {
               storyTheme: inputData?.storyTheme || '',
               storyDetails: inputData?.storyDetails || '',
               artStyle: inputData?.artStyle || 'pixar',
-              language: inputData?.language || 'en',
+              language: lang,
               languageLevel: inputData?.languageLevel || 'standard',
               pages: inputData?.pages || sceneImages.length,
               dedication: inputData?.dedication || '',
@@ -4997,7 +4999,7 @@ async function _processStoryJobImpl(jobId) {
               outlineModelId: outlineModelId,
               outlineUsage: outlineUsage,
               story: fullStoryText,
-              originalStory: fullStoryText, // Store original for restore functionality
+              originalStory: fullStoryText,
               storyTextPrompts: storyTextPrompts,
               visualBible: visualBible,
               pageClothing: pageClothingData,
@@ -5013,17 +5015,7 @@ async function _processStoryJobImpl(jobId) {
             };
 
             await upsertStory(jobId, userId, storyData);
-            log.debug(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images to stories table`);
-
-            // Initialize image_version_meta with active versions for partial stories
-            if (sceneImages?.length > 0) {
-              for (const scene of sceneImages) {
-                if (scene.imageVersions?.length > 0) {
-                  const activeIndex = getActiveIndexAfterPush(scene.imageVersions, 'scene');
-                  await setActiveVersion(jobId, scene.pageNumber, activeIndex);
-                }
-              }
-            }
+            log.debug(`📚 [PARTIAL SAVE] Saved partial story ${jobId} with ${sceneImages.length} images, ${sceneDescriptions.length} descriptions to stories table`);
           } else {
             log.debug('📚 [PARTIAL SAVE] No content to save');
           }
