@@ -101,6 +101,8 @@ SCENE HINT:
     { "name": "Name", "position": "left|center|right", "clothing": "standard|winter|summer|costumed:type" },
     { "name": "Name", "position": "right", "clothing": "standard", "depth": "background", "perspective": "back view" }
   ],
+  "objects": ["LOC001", "ANI001"],
+  "background": "busy crowd in hats and coats",
   "setting": "indoor|outdoor",
   "time": "morning|midday|afternoon|sunset|night",
   "weather": "sunny|cloudy|rainy|snowy|n/a",
@@ -123,9 +125,15 @@ SCENE HINT:
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **INDOOR SCENES** - Use "n/a" for weather
+- **OBJECTS** - List Visual Bible IDs of any locations, animals, artifacts, or vehicles visible in this scene. Omit if none.
+- **NO POINTING** - BANNED: "points at", "points to". Use: gazes at, walks toward, reaches for, discovers.
+- **VISUAL ONLY** - Describe what the CAMERA sees. ❌ "excitedly runs" ✅ "runs with arms spread wide". No emotions, only body language.
+- **ONE MOMENT** - Description = one frozen instant. ❌ "opens door, walks in, sits" ✅ "steps through the doorway"
+- **SHOT + EXPRESSIONS** - `close-up`/`medium` = expressions visible. `wide`/`ultra-wide` = no facial detail, body language only.
+- **BACKGROUND** - Add `"background"` to the JSON: `"empty"`, `"a few passersby"`, `"busy crowd"`, `"dense forest"`. Tells the image generator if the scene feels isolated or populated.
 
 **Scene Variety (IMPORTANT for great illustrations):**
-- **SIMPLE ACTIONS** - Describe what the scene LOOKS LIKE, not complex motion. Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.
+- **SIMPLE ACTIONS** - Characters in natural, stable poses: sitting, standing, walking, looking. If it would be hard to capture in a single photo, simplify it.
 - **SIMPLE SCENES PREFERRED** - Prefer 1-2 central characters per scene. If a group moment is needed, keep 1-2 characters in foreground and use `"depth": "background"` or `"perspective": "back view"` for others.
 - **EVERY CHARACTER VISIBLE** - Each primary character must appear in at least 2 scene hints across the story.
 - **VARY THE SHOT** - Alternate across pages. Never use the same shot type 3 pages in a row:
