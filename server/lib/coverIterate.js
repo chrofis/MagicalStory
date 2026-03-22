@@ -6,7 +6,7 @@
  * prompt building, landmark/VB grid, image generation.
  */
 
-const log = require('./logger');
+const { log } = require('../utils/logger');
 const { ART_STYLES, MODEL_DEFAULTS } = require('../config/models');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 const { applyStyledAvatars } = require('./styledAvatars');
