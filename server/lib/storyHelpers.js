@@ -2248,7 +2248,7 @@ ${historicalGuide}${locationsSection}
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
 - Include historically accurate details about the time period
-- Characters should wear period-appropriate clothing as described above
+- Characters MUST use \`costumed:\` clothing for period-appropriate attire (e.g., costumed:1920s, costumed:medieval). Do NOT use \`standard\` — modern clothes in a historical setting looks wrong.
 - Use the suggested story angles or create a similar child-appropriate perspective
 - Make the history come alive through the eyes of a child character
 - Balance historical education with an engaging adventure narrative
@@ -3298,7 +3298,7 @@ ${historicalGuide}${locationsSection}
 **GUIDELINES:**
 - The main character(s) should witness or participate in this historical event
 - Include historically accurate details about the time period
-- Characters should wear period-appropriate clothing as described above
+- Characters MUST use \`costumed:\` clothing for period-appropriate attire (e.g., costumed:1920s, costumed:medieval). Do NOT use \`standard\` — modern clothes in a historical setting looks wrong.
 - Use the suggested story angles or create a similar child-appropriate perspective
 - Make the history come alive through the eyes of a child character
 - Balance historical education with an engaging adventure narrative

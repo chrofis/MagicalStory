@@ -108,7 +108,7 @@ Setting: [indoor/outdoor] | Time: [morning/midday/afternoon/sunset/night] | Weat
   - BAD: "Werner (left) gestures. Franziska and Roger stand together smiling. Lukas sits with Manuel and Sophie nearby." (7 characters named!)
   - GOOD: "Werner (left) gestures appreciatively at the clean room. Verena (center) sets down pirate decorations." (only listed characters)
 - **POSITIONS REQUIRED** - Every character needs (left), (right), or (center). No other position words like "background" or "foreground" in the position field. Example: "Luna (left) waves at Max (right)"
-- **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in the **majority of scenes** (at least 70%). Use `standard` only for scenes before a transformation or brief real-world moments. The costume IS the story — show it!
+- **COSTUME USAGE** - When a character has a `costumed:type` variant, use it in **ALL scenes** except the very first scene (before the adventure starts). The costume IS the story — show it! Historical period clothing, fantasy outfits, uniforms — all count as costumed.
 - **WEATHER CONSISTENCY** - Keep weather the same across outdoor scenes unless story explicitly changes it
 - **TIME PROGRESSION** - Time must progress logically (no sunset→midday jumps)
 - **INDOOR SCENES** - Use "n/a" for weather
@@ -317,7 +317,14 @@ TITLE: [Your creative, specific title]
 Based on the story draft, determine which clothing variants each character needs.
 
 **Guidelines:**
-- **COSTUME PRIORITY**: Story-defined costumes (spacesuits, uniforms, period attire) → use `costumed:type`. No costumes → use `standard`. Winter only for outdoor cold scenes.
+- **COSTUME PRIORITY**: Any story with a theme, setting, or era that implies special clothing MUST use `costumed:type`. This includes:
+  - Historical stories → `costumed:medieval`, `costumed:1920s`, `costumed:roman`, etc.
+  - Fantasy stories → `costumed:wizard`, `costumed:pirate`, `costumed:knight`, etc.
+  - Profession stories → `costumed:firefighter`, `costumed:detective`, etc.
+  - Swiss historical stories → `costumed:mittelalterliche`, `costumed:1800s`, etc.
+  - ONLY use `standard` when the story is set in the present day with normal everyday clothing.
+- **Costumed is PREFERRED** — when in doubt, use `costumed:type` over `standard`. Characters in costume look better and are more immersive.
+- **COVER IMAGES MUST use costumed** — title page, initial page, and back cover should ALWAYS use the costumed variant (not standard) so the book cover matches the story's theme.
 - **Signature element** (standard/winter/summer): ONE visible clothing item or accessory per character (e.g., "scout vest with badges", "red scarf"). Write "none" if not needed. Prefer worn items over carried objects.
 - **Costumed**: Full outfit description. CLOTHING ONLY — no pets, companions, carried objects, or bag contents.
 - Only mark `used: true` for variations that actually appear in the story.
@@ -462,6 +469,7 @@ For famous buildings, monuments, or locations that exist in reality:
 - **NO LANDMARKS** by name unless they have a Visual Bible entry
 - **LIST BY NAME**: NEVER write "the family", "everyone", "the group" - list each character by name
 - **NO GROUP REFERENCES**: "his family behind him" is WRONG → list: "Sophie (left), Manuel (right)"
+- **ALWAYS USE COSTUMED for covers** — if the story has costumed clothing, ALL cover characters MUST use their `costumed:type` variant, not `standard`. The book cover should showcase the story's theme.
 
 **Title Page** (Front Cover)
 ONLY main characters: {MAIN_CHARACTER_NAMES}
