@@ -19,7 +19,7 @@ const { calculateImageCost, formatCostSummary, MODEL_DEFAULTS, MODEL_PRICING, RE
 
 // Services
 const { log } = require('../utils/logger');
-const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
+const { saveStoryData, saveScenePageData, rehydrateStoryImages, saveStoryImage, getStoryImage, setActiveVersion, getPool, dbQuery } = require('../services/database');
 const { PROMPT_TEMPLATES, fillTemplate } = require('../services/prompts');
 
 // Shared repair logic
@@ -766,8 +766,8 @@ router.post('/:id/regenerate/image/:pageNum', authenticateToken, imageRegenerati
       isActive: v.isActive,
       type: v.type,
       qualityScore: v.qualityScore,
-      // Only include imageData for latest versions to keep response small
-      imageData: idx >= (updatedScene.imageVersions.length - 2) ? v.imageData : undefined
+      // Include imageData for all versions so frontend can display them immediately
+      imageData: v.imageData || undefined
     })) || [];
 
     res.json({
@@ -1537,19 +1537,30 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     log.info(`✅ [ITERATE] Page ${pageNumber}: Iteration complete (${previewMismatches.length} mismatches addressed, score: ${imageResult.score})`);
 
-    // Get the updated image versions (without imageData to reduce response size)
+    // Get the updated image versions with imageData for all versions
+    // Version 0 (original) may not have imageData in the blob — load from DB
     const updatedScene = sceneImages.find(img => img.pageNumber === pageNumber);
-    const imageVersions = updatedScene?.imageVersions?.map((v, idx) => ({
-      description: v.description,
-      prompt: v.prompt,
-      modelId: v.modelId,
-      createdAt: v.createdAt,
-      isActive: v.isActive,
-      type: v.type,
-      qualityScore: v.qualityScore,
-      // Only include imageData for latest versions to keep response small
-      imageData: idx >= (updatedScene.imageVersions.length - 2) ? v.imageData : undefined
-    })) || [];
+    log.debug(`🔄 [ITERATE] Page ${pageNumber}: ${updatedScene?.imageVersions?.length || 0} versions after iterate`);
+    const imageVersions = await Promise.all((updatedScene?.imageVersions || []).map(async (v, idx) => {
+      let imgData = v.imageData || undefined;
+      // Version 0 (original) has no imageData in blob — load from story_images
+      if (!imgData && idx === 0 && v.type === 'original') {
+        try {
+          const origImg = await getStoryImage(id, 'scene', pageNumber, 0);
+          imgData = origImg?.image_data || undefined;
+        } catch { /* ignore */ }
+      }
+      return {
+        description: v.description,
+        prompt: v.prompt,
+        modelId: v.modelId,
+        createdAt: v.createdAt,
+        isActive: v.isActive,
+        type: v.type,
+        qualityScore: v.qualityScore,
+        imageData: imgData,
+      };
+    }));
 
     res.json({
       success: true,
