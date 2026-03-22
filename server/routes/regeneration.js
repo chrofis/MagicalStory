@@ -1055,11 +1055,28 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         log.info(`🔄 [ITERATE] Cover ${coverKey}: Using original image as reference`);
       }
 
+      // Build landmark photos and VB grid for cover (same as normal page iterate)
+      const coverSceneMetadata = extractSceneMetadata(sceneDescription);
+      const coverLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, coverSceneMetadata) : [];
+      let coverVbGrid = null;
+      if (visualBible) {
+        const elementRefs = getElementReferenceImagesForPage(visualBible, 0, 6); // page 0 = cover
+        const secondaryLandmarks = coverLandmarkPhotos.slice(1);
+        if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
+          coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
+        }
+      }
+
+      if (coverLandmarkPhotos.length > 0 || coverVbGrid) {
+        log.debug(`🔄 [ITERATE] Cover ${coverKey}: ${coverLandmarkPhotos.length} landmark photos, VB grid: ${coverVbGrid ? 'yes' : 'no'}`);
+      }
+
       const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
       const imageResult = await generateImageWithQualityRetry(
         coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, null, null,
         { imageModel: imageModelOverride },
-        `${coverLabel} ITERATE`
+        `${coverLabel} ITERATE`,
+        { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid }
       );
 
       log.info(`🔄 [ITERATE] Cover ${coverKey}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
@@ -1226,8 +1243,8 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
         creditsRemaining: newCredits,
         // Reference info
         referencePhotos: coverCharacterPhotos,
-        landmarkPhotos: [],
-        visualBibleGrid: null,
+        landmarkPhotos: coverLandmarkPhotos,
+        visualBibleGrid: coverVbGrid ? `data:image/jpeg;base64,${coverVbGrid.toString('base64')}` : null,
         grokRefImages: imageResult.grokRefImages || null,
         message: 'Cover regenerated with fresh generation',
         // Version info
