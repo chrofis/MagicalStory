@@ -1665,6 +1665,71 @@ def split_grid():
         }), 500
 
 
+@app.route('/crop-front-column', methods=['POST'])
+def crop_front_column():
+    """
+    Crop a 2x2 avatar grid to just the left (front-facing) column.
+    Uses variance-based detection to find the actual vertical separator
+    instead of assuming it's at width/2.
+
+    Expected JSON:
+    {
+        "image": "data:image/jpeg;base64,..."  # 2x2 grid avatar image
+    }
+
+    Returns:
+    {
+        "success": true,
+        "image": "data:image/jpeg;base64,...",  # Left column only
+        "separator_x": 512                       # Detected separator position
+    }
+    """
+    try:
+        data = request.get_json()
+        if not data or 'image' not in data:
+            return jsonify({"success": False, "error": "Missing 'image'"}), 400
+
+        image_data = data['image']
+        if ',' in image_data:
+            image_data = image_data.split(',')[1]
+
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        if image is None:
+            return jsonify({"success": False, "error": "Failed to decode image"}), 400
+
+        height, width = image.shape[:2]
+
+        # Detect vertical separator using column variance (same as split-grid)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        search_w_start = int(width * 0.3)
+        search_w_end = int(width * 0.7)
+        col_variances = []
+        for x in range(search_w_start, search_w_end):
+            col_variances.append((np.var(gray[:, x].astype(float)), x))
+        col_variances.sort()
+        mid_w = col_variances[0][1] if col_variances else width // 2
+
+        print(f"[CROP-FRONT] {width}x{height}, separator at x={mid_w} ({mid_w*100/width:.0f}%)")
+
+        # Crop left column
+        left_col = image[0:height, 0:mid_w]
+        _, buffer = cv2.imencode('.jpg', left_col, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        result_b64 = f"data:image/jpeg;base64,{base64.b64encode(buffer).decode('utf-8')}"
+
+        return jsonify({
+            "success": True,
+            "image": result_b64,
+            "separator_x": mid_w
+        }), 200
+
+    except Exception as e:
+        print(f"[CROP-FRONT] Error: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route('/add-background', methods=['POST'])
 def add_background():
     """

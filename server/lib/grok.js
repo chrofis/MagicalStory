@@ -222,13 +222,35 @@ async function editWithGrok(prompt, referenceImages = [], options = {}) {
  * @returns {Promise<Buffer>} Cropped (or original) JPEG buffer
  */
 async function cropToFrontColumn(buffer) {
+  const photoAnalyzerUrl = process.env.PHOTO_ANALYZER_URL || 'http://localhost:5000';
+
+  // Try Python service first (detects actual separator line via variance analysis)
+  try {
+    const b64 = `data:image/jpeg;base64,${buffer.toString('base64')}`;
+    const response = await fetch(`${photoAnalyzerUrl}/crop-front-column`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: b64 }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && result.image) {
+        const croppedB64 = result.image.replace(/^data:image\/\w+;base64,/, '');
+        log.info(`🎨 [GROK] Cropped to front column via Python (separator at x=${result.separator_x})`);
+        return Buffer.from(croppedB64, 'base64');
+      }
+    }
+    log.debug(`[GROK] Python crop-front-column unavailable (${response.status}), using Sharp fallback`);
+  } catch (err) {
+    log.debug(`[GROK] Python crop-front-column failed: ${err.message}, using Sharp fallback`);
+  }
+
+  // Fallback: naive half-width crop with Sharp
   try {
     const meta = await sharp(buffer).metadata();
     if (!meta.width || !meta.height) return buffer;
-
-    const aspect = meta.height / meta.width;
-    // Portrait 2x2 grids have aspect ratio ~1.6–1.9 (4 images in 2x2, each roughly square)
-    if (aspect < 1.5 || aspect > 2.0) return buffer;
 
     const halfWidth = Math.floor(meta.width / 2);
     const cropped = await sharp(buffer)
@@ -236,7 +258,7 @@ async function cropToFrontColumn(buffer) {
       .jpeg({ quality: 90 })
       .toBuffer();
 
-    log.info(`🎨 [GROK] Cropped to front column: ${meta.width}x${meta.height} → ${halfWidth}x${meta.height}`);
+    log.info(`🎨 [GROK] Cropped to front column (Sharp fallback): ${meta.width}x${meta.height} → ${halfWidth}x${meta.height}`);
     return cropped;
   } catch (err) {
     log.warn(`⚠️ [GROK] cropToFrontColumn failed: ${err.message}`);
