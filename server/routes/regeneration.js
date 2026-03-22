@@ -1086,8 +1086,34 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
     }
 
-    // Build image prompt (append evaluation feedback if provided, like the automatic pipeline's feedbackSuffix)
-    let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+    // Extract only the scene part for image generation (strip previewMismatches, checks, corrections)
+    let cleanSceneForImage = newSceneDescription;
+    try {
+      const parsed = JSON.parse(newSceneDescription);
+      const sceneObj = parsed?.previewMismatches?.[0]?.scene || parsed?.scene || parsed;
+      if (sceneObj?.imageSummary || sceneObj?.characters) {
+        cleanSceneForImage = JSON.stringify({ scene: sceneObj });
+      }
+    } catch {
+      // If JSON parse fails, try extracting scene block with regex
+      const sceneMatch = newSceneDescription.match(/"scene"\s*:\s*\{[\s\S]*"imageSummary"/);
+      if (sceneMatch) {
+        // Find the matching closing brace for the scene object
+        const startIdx = newSceneDescription.indexOf(sceneMatch[0]);
+        let depth = 0;
+        let endIdx = startIdx;
+        for (let i = startIdx + '"scene":'.length; i < newSceneDescription.length; i++) {
+          if (newSceneDescription[i] === '{') depth++;
+          if (newSceneDescription[i] === '}') { depth--; if (depth === 0) { endIdx = i + 1; break; } }
+        }
+        if (endIdx > startIdx) {
+          cleanSceneForImage = newSceneDescription.substring(startIdx, endIdx);
+        }
+      }
+    }
+
+    // Build image prompt (append evaluation feedback if provided)
+    let imagePrompt = buildImagePrompt(cleanSceneForImage, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
     if (evaluationFeedback) {
       const feedbackParts = [];
       if (evaluationFeedback.reasoning) {
