@@ -898,6 +898,16 @@ export function useRepairWorkflow({
           'character-repair': pagesFailed.length > 0 && pagesRepaired.length === 0 ? 'failed' : 'completed',
         },
       }));
+
+      // Auto re-evaluate repaired pages so we know if the repair improved things
+      const repairedPageNumbers = pagesRepaired.map((r: any) => typeof r === 'number' ? r : r.pageNumber).filter(Boolean);
+      if (repairedPageNumbers.length > 0) {
+        try {
+          await reEvaluatePages(repairedPageNumbers);
+        } catch (evalErr) {
+          console.warn('[RepairWorkflow] Post-repair re-evaluation failed:', evalErr);
+        }
+      }
     } catch (error) {
       console.error('Character repair failed:', error);
       failStep('character-repair', error instanceof Error ? error.message : 'Unknown error');
@@ -1224,11 +1234,12 @@ export function useRepairWorkflow({
               pagesFailed.map(f => `page ${f.pageNumber}: ${f.reason}`).join(', '));
           }
 
-          const repairedDetails = pagesRepaired.map(r => ({
+          const repairedDetails = pagesRepaired.map((r: any) => ({
             pageNumber: typeof r === 'number' ? r : r.pageNumber,
             comparison: r.comparison || null,
             verification: r.verification || null,
             method: r.method || 'gemini',
+            debug: r.debug || null,
           }));
           const failedPages = pagesFailed.map(f => ({
             pageNumber: f.pageNumber,
@@ -1267,8 +1278,20 @@ export function useRepairWorkflow({
         }));
       }
 
+      // Re-evaluate character-repaired pages so pick-best has scores to compare
+      const charRepairedPages = Array.from(allRedonePagesAcrossPasses);
+      if (charRepairedPages.length > 0) {
+        checkAborted();
+        onProgress?.('re-evaluate', 'Re-evaluating repaired pages...');
+        try {
+          await reEvaluatePages(charRepairedPages);
+          console.log(`[RepairWorkflow] Post-repair re-evaluation complete for ${charRepairedPages.length} pages`);
+        } catch (err) {
+          console.warn('[RepairWorkflow] Post-repair re-evaluation failed:', err);
+        }
+      }
+
       // Pick best versions last (considers all versions including character repairs)
-      // Include cover pages that have multiple versions so they are also considered
       const redonePagesArray = Array.from(allRedonePagesAcrossPasses).sort((a, b) => a - b);
       const pickBestPages = redonePagesArray;
       if (pickBestPages.length > 0) {
