@@ -884,12 +884,17 @@ export default function StoryWizard() {
               const metaScenes = fullMeta.sceneImages || [];
               return metaScenes.map(metaScene => {
                 const existing = prev.find(p => p.pageNumber === metaScene.pageNumber);
+                // Clear stale bbox data if active version is not version 0
+                // (bboxDetection in blob is from the last evaluation, which may be on a different version)
+                const hasNonZeroActive = metaScene.imageVersions?.some((v: any) => v.isActive && v.versionIndex > 0);
                 return {
                   ...metaScene,
                   // Preserve imageData from fast/full image phases if already loaded
                   imageData: existing?.imageData || metaScene.imageData,
                   // Preserve imageVersions from full-images phase if already loaded
                   ...(existing?.imageVersions ? { imageVersions: existing.imageVersions } : {}),
+                  // Clear bbox if active version changed (stale data from wrong image)
+                  ...(hasNonZeroActive ? { bboxDetection: null, bboxOverlayImage: null } : {}),
                 };
               });
             });

@@ -86,11 +86,11 @@ export function ObjectDetectionDisplay({
     setLoadedOverlay(null);
   }, [bboxKey, directBboxOverlayImage]);
 
-  // Use direct props if provided (for covers), otherwise extract from retryHistory (for pages)
-  const fromRetryHistory = extractBboxData(retryHistory);
-  const bboxDetection = directBboxDetection || fromRetryHistory.bboxDetection;
-  const bboxOverlayImage = directBboxOverlayImage || fromRetryHistory.bboxOverlayImage;
-  const hasBboxOverlay = !!directBboxOverlayImage || fromRetryHistory.hasBboxOverlay;
+  // Use direct props only — retryHistory bbox is from old generation attempts and doesn't
+  // match the current active image version. Fresh bbox data comes from re-evaluate.
+  const bboxDetection = directBboxDetection || null;
+  const bboxOverlayImage = directBboxOverlayImage || null;
+  const hasBboxOverlay = !!directBboxOverlayImage;
 
   // Nothing to show if no detection data
   if (!bboxDetection) {
