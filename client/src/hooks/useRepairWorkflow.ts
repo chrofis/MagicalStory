@@ -594,15 +594,16 @@ export function useRepairWorkflow({
 
     for (const [pageNum, feedback] of Object.entries(workflowState.collectedFeedback.pages)) {
       const page = parseInt(pageNum);
-      const totalIssues = feedback.fixableIssues.length + feedback.entityIssues.length
-        + (feedback.objectIssues?.length ?? 0) + (feedback.semanticIssues?.length ?? 0);
+      // Use fixableIssues count only — entity/object issues are captured via score penalties
+      // This matches server's findBadPages which uses result.fixableIssues.length
+      const fallbackIssueCount = feedback.fixableIssues.length;
 
       // Prefer re-evaluation scores when available (more current than collectedFeedback)
       const reEval = workflowState.reEvaluationResults.pages?.[page];
       const score = reEval?.score ?? reEval?.qualityScore ?? feedback.qualityScore ?? 100;
       const issueCount = reEval
         ? (reEval.fixableIssues?.length ?? 0)
-        : totalIssues;
+        : fallbackIssueCount;
 
       // Mark for redo if score is low or too many issues
       if (score < scoreThreshold) {

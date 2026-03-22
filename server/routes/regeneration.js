@@ -883,9 +883,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
 
     if (isCover) {
       // =========================================================================
-      // COVER ITERATION BRANCH
-      // Covers skip scene expansion / 17-check validation. Use stored description
-      // and the same prompt templates as the cover regeneration endpoint.
+      // COVER ITERATION BRANCH — uses shared iterateCover function
       // =========================================================================
       if (!coverKey) {
         return res.status(400).json({ error: `Invalid cover page number: ${pageNumber}. Use -1 (front), -2 (initial), -3 (back).` });
@@ -898,25 +896,7 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       }
 
       const sceneDescription = existingCover.description || 'A beautiful illustrated cover page.';
-      log.info(`🔄 [ITERATE] Cover ${coverKey} (page ${pageNumber}): Using stored description (${sceneDescription.length} chars)`);
-
-      // --- Art style ---
-      const artStyleId = storyData.artStyle || 'pixar';
-      const styleDescription = ART_STYLES[artStyleId] || ART_STYLES.pixar;
-
-      // --- Character selection (same logic as cover regen endpoint) ---
-      const characters = storyData.characters || [];
-      const visualBible = storyData.visualBible || null;
-
-      // Parse clothing from the stored cover description
-      let coverClothing = parseClothingCategory(sceneDescription) || 'standard';
-      let effectiveCoverClothing = coverClothing;
-      let coverCostumeType = null;
-      if (coverClothing && coverClothing.startsWith('costumed:')) {
-        coverCostumeType = coverClothing.split(':')[1];
-        effectiveCoverClothing = 'costumed';
-      }
-      const clothingRequirements = convertClothingToCurrentFormat(storyData.clothingRequirements);
+      const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
 
       // Merge avatars: story avatars first, then fresh from characters table as fallback
       const freshCharResult = await getDbPool().query(
@@ -925,159 +905,22 @@ router.post('/:id/iterate/:pageNum', authenticateToken, imageRegenerationLimiter
       );
       const freshCharData = freshCharResult.rows[0]?.data || {};
       const freshCharacters = freshCharData.characters || [];
-      const mergedCharacters = characters.map(storyChar => {
-        if (storyChar.avatars) return storyChar;
-        const freshChar = freshCharacters.find(fc => fc.id === storyChar.id || fc.name === storyChar.name);
-        if (freshChar?.avatars) {
-          log.debug(`🔄 [ITERATE] Cover ${coverKey}: Using fresh avatars for ${storyChar.name}`);
-          return { ...storyChar, avatars: freshChar.avatars };
-        }
-        return storyChar;
+
+      // Use shared cover iterate function
+      const { iterateCover } = require('../lib/coverIterate');
+      const imageResult = await iterateCover(coverKey, storyData, {
+        imageModel: imageModel || null,
+        evaluationFeedback,
+        useOriginalAsReference: !!useOriginalAsReference,
+        blackoutIssues: !!blackoutIssues,
+        freshCharacters,
       });
 
-      // Character selection: main chars for front, main+extras for initial/back, max 5
-      const MAX_COVER_CHARACTERS = 5;
-      const mainChars = mergedCharacters.filter(c => c.isMainCharacter === true);
-      const nonMainChars = mainChars.length > 0
-        ? mergedCharacters.filter(c => !c.isMainCharacter)
-        : mergedCharacters;
-
-      let coverCharacterPhotos;
-      const normalizedCoverType = coverKey === 'frontCover' ? 'front' : coverKey === 'initialPage' ? 'initialPage' : 'back';
-      if (normalizedCoverType === 'front') {
-        let charactersToUse = mainChars.length > 0 ? mainChars : mergedCharacters;
-        if (charactersToUse.length > MAX_COVER_CHARACTERS) {
-          charactersToUse = charactersToUse.slice(0, MAX_COVER_CHARACTERS);
-        }
-        coverCharacterPhotos = getCharacterPhotoDetails(charactersToUse, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-      } else {
-        const mainCapped = mainChars.slice(0, MAX_COVER_CHARACTERS);
-        const extraSlots = Math.max(0, MAX_COVER_CHARACTERS - mainCapped.length);
-        const halfPoint = Math.ceil(nonMainChars.length / 2);
-        let extras;
-        if (normalizedCoverType === 'initialPage') {
-          extras = nonMainChars.slice(0, halfPoint).slice(0, extraSlots);
-        } else {
-          extras = nonMainChars.slice(halfPoint).slice(0, extraSlots);
-        }
-        const coverChars = [...mainCapped, ...extras];
-        coverCharacterPhotos = getCharacterPhotoDetails(coverChars, effectiveCoverClothing, coverCostumeType, artStyleId, clothingRequirements);
-      }
-      // Apply styled avatars for non-costumed characters
-      if (effectiveCoverClothing !== 'costumed') {
-        coverCharacterPhotos = applyStyledAvatars(coverCharacterPhotos, artStyleId);
-      }
-
-      log.debug(`🔄 [ITERATE] Cover ${coverKey}: ${coverCharacterPhotos.length} characters, clothing: ${coverClothing}`);
-
-      // --- Build cover prompt (same templates as cover regen) ---
-      const visualBiblePrompt = visualBible ? buildFullVisualBiblePrompt(visualBible, { skipMainCharacters: true }) : '';
-      const storyTitle = storyData.title || 'My Story';
-      const coverDedication = storyData.dedication;
-
-      let coverPrompt;
-      if (normalizedCoverType === 'front') {
-        coverPrompt = fillTemplate(PROMPT_TEMPLATES.frontCover, {
-          TITLE_PAGE_SCENE: sceneDescription,
-          STYLE_DESCRIPTION: styleDescription,
-          STORY_TITLE: storyTitle,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-      } else if (normalizedCoverType === 'initialPage') {
-        coverPrompt = coverDedication
-          ? fillTemplate(PROMPT_TEMPLATES.initialPageWithDedication, {
-              INITIAL_PAGE_SCENE: sceneDescription,
-              STYLE_DESCRIPTION: styleDescription,
-              DEDICATION: coverDedication,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-              VISUAL_BIBLE: visualBiblePrompt
-            })
-          : fillTemplate(PROMPT_TEMPLATES.initialPageNoDedication, {
-              INITIAL_PAGE_SCENE: sceneDescription,
-              STYLE_DESCRIPTION: styleDescription,
-              STORY_TITLE: storyTitle,
-              CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-              VISUAL_BIBLE: visualBiblePrompt
-            });
-      } else {
-        coverPrompt = fillTemplate(PROMPT_TEMPLATES.backCover, {
-          BACK_COVER_SCENE: sceneDescription,
-          STYLE_DESCRIPTION: styleDescription,
-          CHARACTER_REFERENCE_LIST: buildCharacterReferenceList(coverCharacterPhotos, storyData.characters),
-          VISUAL_BIBLE: visualBiblePrompt
-        });
-      }
-
-      // Append evaluation feedback — only critical issues as positive instructions
-      if (evaluationFeedback) {
-        const criticalIssues = (evaluationFeedback.fixableIssues || [])
-          .filter(i => {
-            const desc = (i.description || i.issue || '').toLowerCase();
-            return desc.includes('missing') || desc.includes('absent') || desc.includes('not present')
-              || desc.includes('wrong setting') || desc.includes('wrong location');
-          });
-        if (criticalIssues.length > 0) {
-          const feedbackText = 'IMPORTANT — ensure these elements are present this time:\n' +
-            criticalIssues.map(i => `- ${i.description || i.issue || i}`).join('\n');
-          coverPrompt = `${coverPrompt}\n\n${feedbackText}`;
-          log.info(`🔄 [ITERATE] Cover ${coverKey}: Appended ${criticalIssues.length} critical issues as positive instructions`);
-        }
-      }
-
-      // Clear cache to force new generation
-      const cacheKey = generateImageCacheKey(coverPrompt, coverCharacterPhotos, null);
-      deleteFromImageCache(cacheKey);
-
-      // Store previous image data
-      const previousImageData = existingCover.imageData;
-      const previousScore = existingCover.qualityScore || null;
-
-      // Generate new cover image with quality retry
-      const imageModelOverride = imageModel || null;
-      const coverImageModelId = imageModelOverride || MODEL_DEFAULTS.coverImage;
-      if (imageModelOverride) {
-        log.info(`🔄 [ITERATE] Cover ${coverKey}: Using model override: ${imageModelOverride}`);
-      }
-
-      let previousImage = null;
-      if (blackoutIssues) {
-        const fixTargets = existingCover.fixTargets || [];
-        if (fixTargets.length > 0) {
-          log.info(`🔄 [ITERATE] Cover ${coverKey}: Blacking out ${fixTargets.length} issue regions`);
-          previousImage = await blackoutIssueRegions(existingCover.imageData, fixTargets);
-        } else {
-          log.warn(`🔄 [ITERATE] Cover ${coverKey}: No fix targets for blackout, using original as reference`);
-          previousImage = existingCover.imageData;
-        }
-      } else if (useOriginalAsReference) {
-        previousImage = existingCover.imageData;
-        log.info(`🔄 [ITERATE] Cover ${coverKey}: Using original image as reference`);
-      }
-
-      // Build landmark photos and VB grid for cover (same as normal page iterate)
-      const coverSceneMetadata = extractSceneMetadata(sceneDescription);
-      const coverLandmarkPhotos = visualBible ? await getLandmarkPhotosForScene(visualBible, coverSceneMetadata) : [];
-      let coverVbGrid = null;
-      if (visualBible) {
-        const elementRefs = getElementReferenceImagesForPage(visualBible, 0, 6); // page 0 = cover
-        const secondaryLandmarks = coverLandmarkPhotos.slice(1);
-        if (elementRefs.length > 0 || secondaryLandmarks.length > 0) {
-          coverVbGrid = await buildVisualBibleGrid(elementRefs, secondaryLandmarks);
-        }
-      }
-
-      if (coverLandmarkPhotos.length > 0 || coverVbGrid) {
-        log.debug(`🔄 [ITERATE] Cover ${coverKey}: ${coverLandmarkPhotos.length} landmark photos, VB grid: ${coverVbGrid ? 'yes' : 'no'}`);
-      }
-
-      const coverLabel = coverKey === 'frontCover' ? 'FRONT COVER' : coverKey === 'initialPage' ? 'INITIAL PAGE' : 'BACK COVER';
-      const imageResult = await generateImageWithQualityRetry(
-        coverPrompt, coverCharacterPhotos, previousImage, 'cover', null, null, null,
-        { imageModel: imageModelOverride },
-        `${coverLabel} ITERATE`,
-        { landmarkPhotos: coverLandmarkPhotos, visualBibleGrid: coverVbGrid }
-      );
+      const previousImageData = imageResult.previousImage;
+      const previousScore = imageResult.previousScore;
+      const coverCharacterPhotos = imageResult.referencePhotos;
+      const coverPrompt = imageResult.prompt;
+      const coverImageModelId = imageModel || MODEL_DEFAULTS.coverImage;
 
       log.info(`🔄 [ITERATE] Cover ${coverKey}: New image generated (score: ${imageResult.score}, attempts: ${imageResult.totalAttempts})`);
 

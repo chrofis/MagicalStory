@@ -4408,8 +4408,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
     evaluateImageBatch(evalInputs, { concurrency: evalConcurrency, qualityModelOverride }),
     runEntityConsistencyChecks(imageCheckData, characters, {
       checkCharacters: true,
-      checkObjects: false,
-      minAppearances: 2,
+      checkObjects: true,
       saveGrids: false
     }).catch(err => {
       log.error(`❌ [UNIFIED PIPELINE] Entity consistency check failed: ${err.message}`);
@@ -4456,13 +4455,34 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
   // =========================================================================
   // Step 2: First regeneration of low-scoring pages
   // =========================================================================
-  // Build eval map for findBadPages: only include evaluated pages with images
+  // Helper: compute entity penalty for a page from entity report
+  const ENTITY_PENALTIES = { critical: 30, major: 20, minor: 10 };
+  const getEntityPenalty = (pageNumber, report) => {
+    if (!report?.characters) return 0;
+    let penalty = 0;
+    for (const charData of Object.values(report.characters)) {
+      const issues = charData.issues || [];
+      for (const issue of issues) {
+        if (issue.pages?.includes(pageNumber) || issue.pageNumber === pageNumber) {
+          penalty += ENTITY_PENALTIES[issue.severity] || 0;
+        }
+      }
+    }
+    return penalty;
+  };
+
+  // Build eval map for findBadPages: apply entity penalties to scores
   const pass1EvalPages = {};
   for (const img of rawImages) {
     if (!img.imageData) continue;
     const ev = evalMap.get(img.pageNumber);
     if (ev?.evaluated && ev.qualityScore != null) {
-      pass1EvalPages[img.pageNumber] = ev;
+      const entityPenalty = getEntityPenalty(img.pageNumber, entityReport);
+      const adjustedScore = Math.max(0, (ev.score ?? ev.qualityScore) - entityPenalty);
+      pass1EvalPages[img.pageNumber] = { ...ev, score: adjustedScore };
+      if (entityPenalty > 0) {
+        log.debug(`📊 [UNIFIED PIPELINE] Page ${img.pageNumber}: quality=${ev.qualityScore}, entity penalty=${entityPenalty}, adjusted=${adjustedScore}`);
+      }
     }
   }
   const pass1BadPageNums = findBadPages(pass1EvalPages, { scoreThreshold: regenThreshold });
@@ -4481,9 +4501,17 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
           // iteratePage requires page text + scene description — not available for covers
           const canIterate = effectiveUseIteratePage && img.pageNumber > 0;
           if (canIterate) {
+            // Build evaluation feedback from previous eval for iteratePage
+            const ev = evalMap.get(img.pageNumber);
+            const evalFeedback = ev ? {
+              score: ev.score ?? ev.qualityScore,
+              reasoning: ev.reasoning?.substring(0, 1000),
+              fixableIssues: (ev.fixableIssues || []).slice(0, 10),
+            } : null;
             result = await iteratePage(img.imageData, img.pageNumber, storyData, {
               modelOverrides,
-              usageTracker: null
+              usageTracker: null,
+              evaluationFeedback: evalFeedback,
             });
             if (result?.imageData && usageTracker) {
               // iteratePage tracks its own usage internally via Claude + Gemini calls
@@ -4492,6 +4520,25 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
                 usageTracker('gemini_image', result.usage, 'unified_pipeline_regen', result.modelId);
               }
             }
+          } else if (img.pageNumber < 0 && storyData) {
+            // Cover: use full cover iterate logic (same as manual endpoint)
+            const { iterateCover } = require('./coverIterate');
+            const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+            const ck = coverKeys[String(img.pageNumber)];
+            if (ck) {
+              const ev = evalMap.get(img.pageNumber);
+              const coverFeedback = ev ? {
+                score: ev.score ?? ev.qualityScore,
+                reasoning: ev.reasoning?.substring(0, 1000),
+                fixableIssues: (ev.fixableIssues || []).slice(0, 10),
+              } : null;
+              result = await iterateCover(ck, storyData, {
+                imageModel: modelOverrides?.imageModel,
+                evaluationFeedback: coverFeedback,
+                usageTracker,
+              });
+            }
+            // No separate usage tracking — iterateCover passes usageTracker through
           } else {
             // Inject evaluation feedback so the model knows what to fix
             const ev = evalMap.get(img.pageNumber);
@@ -4579,8 +4626,10 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
       const versions = pageVersions.get(img.pageNumber) || [];
       const bestSoFar = selectBestVersion(versions);
       if (bestSoFar && bestSoFar.score != null) {
+        const entityPenalty = getEntityPenalty(img.pageNumber, entityReport);
+        const adjustedScore = Math.max(0, bestSoFar.score - entityPenalty);
         pass2EvalPages[img.pageNumber] = {
-          qualityScore: bestSoFar.score,
+          qualityScore: adjustedScore,
           fixableIssues: bestSoFar.evaluation?.fixableIssues,
         };
       }
@@ -4604,12 +4653,40 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
               const versions = pageVersions.get(img.pageNumber) || [];
               const bestSoFar = selectBestVersion(versions);
               const inputImage = bestSoFar?.imageData || img.imageData;
+              // Build evaluation feedback from latest eval
+              const latestEval = bestSoFar?.evaluation || evalMap.get(img.pageNumber);
+              const evalFeedback2 = latestEval ? {
+                score: latestEval.score ?? latestEval.qualityScore,
+                reasoning: latestEval.reasoning?.substring(0, 1000),
+                fixableIssues: (latestEval.fixableIssues || []).slice(0, 10),
+              } : null;
               result = await iteratePage(inputImage, img.pageNumber, storyData, {
                 modelOverrides,
-                usageTracker: null
+                usageTracker: null,
+                evaluationFeedback: evalFeedback2,
               });
               if (result?.usage && usageTracker) {
                 usageTracker('gemini_image', result.usage, 'unified_pipeline_regen2', result.modelId);
+              }
+            } else if (img.pageNumber < 0 && storyData) {
+              // Cover: use full cover iterate logic
+              const { iterateCover } = require('./coverIterate');
+              const coverKeys = { '-1': 'frontCover', '-2': 'initialPage', '-3': 'backCover' };
+              const ck = coverKeys[String(img.pageNumber)];
+              if (ck) {
+                const versions = pageVersions.get(img.pageNumber) || [];
+                const latestVersion = versions[versions.length - 1];
+                const latestEval2 = latestVersion?.evaluation || evalMap.get(img.pageNumber);
+                const coverFeedback2 = latestEval2 ? {
+                  score: latestEval2.score ?? latestEval2.qualityScore,
+                  reasoning: latestEval2.reasoning?.substring(0, 1000),
+                  fixableIssues: (latestEval2.fixableIssues || []).slice(0, 10),
+                } : null;
+                result = await iterateCover(ck, storyData, {
+                  imageModel: modelOverrides?.imageModel,
+                  evaluationFeedback: coverFeedback2,
+                  usageTracker,
+                });
               }
             } else {
               // Use latest evaluation (from pass 1 if available) for feedback
@@ -4976,7 +5053,7 @@ async function runUnifiedRepairPipeline(rawImages, context, options = {}) {
  * @returns {Promise<Object>} { imageData, newScene, previewMismatches, method: 'iterate' }
  */
 async function iteratePage(imageData, pageNumber, storyData, options = {}) {
-  const { modelOverrides = {}, usageTracker = null, useOriginalAsReference = false } = options;
+  const { modelOverrides = {}, usageTracker = null, useOriginalAsReference = false, evaluationFeedback = null } = options;
 
   const {
     analyzeGeneratedImage
@@ -5087,7 +5164,7 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
 
   // Step 4: Call Claude to run 17 checks and generate corrected scene (uses iteration model)
   log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Running 17 validation checks with Claude...`);
-  const sceneResult = await callClaudeAPI(scenePrompt, 10000, modelOverrides?.sceneIterationModel, { prefill: '{"previewMismatches":[' });
+  const sceneResult = await callClaudeAPI(scenePrompt, 10000, modelOverrides?.sceneIterationModel || MODEL_DEFAULTS.sceneIteration, { prefill: '{"previewMismatches":[' });
   const newSceneDescription = sceneResult.text;
 
   // Track usage
@@ -5154,7 +5231,23 @@ async function iteratePage(imageData, pageNumber, storyData, options = {}) {
   }
 
   // Build image prompt
-  const imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+  let imagePrompt = buildImagePrompt(newSceneDescription, storyData, sceneCharacters, false, visualBible, pageNumber, true, referencePhotos);
+
+  // Append evaluation feedback if provided (tells the image model what to fix)
+  if (evaluationFeedback) {
+    const feedbackParts = [];
+    if (evaluationFeedback.reasoning) {
+      feedbackParts.push(`IMPORTANT - The previous generation had these quality issues that MUST be fixed:\n${evaluationFeedback.reasoning}`);
+    }
+    if (evaluationFeedback.fixableIssues?.length > 0) {
+      feedbackParts.push('Specific problems to avoid:\n' +
+        evaluationFeedback.fixableIssues.slice(0, 10).map(i => `- ${i.description || i.issue || i}`).join('\n'));
+    }
+    if (feedbackParts.length > 0) {
+      imagePrompt = `${imagePrompt}\n\n${feedbackParts.join('\n\n')}`;
+      log.info(`🔄 [ITERATE PAGE] Page ${pageNumber}: Appended evaluation feedback (score: ${evaluationFeedback.score ?? 'N/A'}, ${evaluationFeedback.fixableIssues?.length ?? 0} issues)`);
+    }
+  }
 
   // Clear cache to force new generation
   const cacheKey = generateImageCacheKey(imagePrompt, referencePhotos.map(p => p.photoUrl), null);
