@@ -7,6 +7,15 @@
 
 const { log } = require('../utils/logger');
 
+// Lazy-load to avoid circular dependency (storyHelpers imports outlineParser)
+let _extractJsonFromText = null;
+function getExtractJsonFromText() {
+  if (!_extractJsonFromText) {
+    _extractJsonFromText = require('./storyHelpers').extractJsonFromText;
+  }
+  return _extractJsonFromText;
+}
+
 // ============================================================================
 // CENTRALIZED KEYWORDS - Single source of truth for all languages
 // ============================================================================
@@ -850,47 +859,22 @@ class OutlineParser {
   extractClothingRequirements() {
     if (this._cache.clothingRequirements !== undefined) return this._cache.clothingRequirements;
 
-    // Look for clothingRequirements JSON block
-    // Pattern: ```json { "clothingRequirements": { ... } } ``` or inline JSON
-    const jsonBlockMatch = this.outline.match(
-      /```json\s*(\{[\s\S]*?"clothingRequirements"[\s\S]*?\})\s*```/i
-    );
-
-    if (jsonBlockMatch) {
-      try {
-        const parsed = JSON.parse(jsonBlockMatch[1]);
-        if (parsed.clothingRequirements) {
-          this._cache.clothingRequirements = parsed.clothingRequirements;
-          // Log details about what was extracted
-          for (const [charName, reqs] of Object.entries(parsed.clothingRequirements)) {
-            const categories = Object.keys(reqs);
-            const signatures = categories.filter(cat => reqs[cat]?.signature && reqs[cat].signature !== 'none');
-            log.debug(`[OUTLINE-PARSER] ${charName}: categories=${categories.join(',')}, signatures=${signatures.length > 0 ? signatures.map(c => `${c}:"${reqs[c].signature}"`).join(',') : 'none'}`);
-          }
-          log.debug(`[OUTLINE-PARSER] Extracted clothingRequirements for ${Object.keys(parsed.clothingRequirements).length} characters`);
-          return this._cache.clothingRequirements;
+    // Use robust JSON extractor to find clothingRequirements block
+    try {
+      const parsed = getExtractJsonFromText()(this.outline);
+      if (parsed?.clothingRequirements) {
+        this._cache.clothingRequirements = parsed.clothingRequirements;
+        // Log details about what was extracted
+        for (const [charName, reqs] of Object.entries(parsed.clothingRequirements)) {
+          const categories = Object.keys(reqs);
+          const signatures = categories.filter(cat => reqs[cat]?.signature && reqs[cat].signature !== 'none');
+          log.debug(`[OUTLINE-PARSER] ${charName}: categories=${categories.join(',')}, signatures=${signatures.length > 0 ? signatures.map(c => `${c}:"${reqs[c].signature}"`).join(',') : 'none'}`);
         }
-      } catch (e) {
-        log.warn(`[OUTLINE-PARSER] Failed to parse clothingRequirements JSON: ${e.message}`);
+        log.debug(`[OUTLINE-PARSER] Extracted clothingRequirements for ${Object.keys(parsed.clothingRequirements).length} characters`);
+        return this._cache.clothingRequirements;
       }
-    }
-
-    // Fallback: look for ## Clothing Requirements section with inline JSON
-    const sectionMatch = this.outline.match(
-      /##\s*Clothing\s*Requirements[\s\S]*?```json\s*(\{[\s\S]*?\})\s*```/i
-    );
-
-    if (sectionMatch) {
-      try {
-        const parsed = JSON.parse(sectionMatch[1]);
-        if (parsed.clothingRequirements) {
-          this._cache.clothingRequirements = parsed.clothingRequirements;
-          log.debug(`[OUTLINE-PARSER] Extracted clothingRequirements (section format) for ${Object.keys(parsed.clothingRequirements).length} characters`);
-          return this._cache.clothingRequirements;
-        }
-      } catch (e) {
-        log.warn(`[OUTLINE-PARSER] Failed to parse clothingRequirements JSON from section: ${e.message}`);
-      }
+    } catch (e) {
+      log.warn(`[OUTLINE-PARSER] Failed to parse clothingRequirements JSON: ${e.message}`);
     }
 
     this._cache.clothingRequirements = null;
@@ -1134,18 +1118,15 @@ class UnifiedStoryParser {
     }
 
     const section = sectionMatch[1];
-    const jsonMatch = section.match(/```json\s*([\s\S]*?)```/i) ||
-                      section.match(/(\{[\s\S]*?"clothingRequirements"[\s\S]*?\})/);
-
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1]);
+    try {
+      const parsed = getExtractJsonFromText()(section);
+      if (parsed) {
         this._cache.clothingRequirements = parsed.clothingRequirements || parsed;
         log.debug(`[UNIFIED-PARSER] Clothing requirements for ${Object.keys(this._cache.clothingRequirements).length} characters`);
         return this._cache.clothingRequirements;
-      } catch (e) {
-        log.error(`[UNIFIED-PARSER] Failed to parse clothing requirements: ${e.message}`);
       }
+    } catch (e) {
+      log.error(`[UNIFIED-PARSER] Failed to parse clothing requirements: ${e.message}`);
     }
 
     this._cache.clothingRequirements = null;

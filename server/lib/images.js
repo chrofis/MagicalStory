@@ -476,17 +476,15 @@ async function runVisualInventory(parts, modelId, apiKey, pageContext) {
       return null;
     }
 
-    const p1JsonMatch = p1Text.match(/\{[\s\S]*\}/);
-    if (!p1JsonMatch) {
-      log.warn(`⚠️ [QUALITY P1] No JSON in response`);
-      return null;
-    }
-
     let inventoryJson;
     try {
-      inventoryJson = JSON.parse(p1JsonMatch[0]);
+      inventoryJson = getStoryHelpers().extractJsonFromText(p1Text);
     } catch (e) {
       log.warn(`⚠️ [QUALITY P1] JSON parse failed`);
+      return null;
+    }
+    if (!inventoryJson) {
+      log.warn(`⚠️ [QUALITY P1] No JSON in response`);
       return null;
     }
 
@@ -847,10 +845,7 @@ Score 0-10. PASS=5+, SOFT_FAIL=3-4, HARD_FAIL=0-2`;
     let parsedJson = null;
     try {
       // Extract JSON from response (may have markdown code blocks)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        parsedJson = JSON.parse(jsonMatch[0]);
-      }
+      parsedJson = getStoryHelpers().extractJsonFromText(responseText);
     } catch (e) {
       log.debug(`📊 [EVAL] Response is not JSON, trying legacy format`);
     }
@@ -1266,28 +1261,9 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
     // Parse JSON response
     let parsedResult;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        // Try to fix common JSON issues from LLM output
-        let jsonText = jsonMatch[0];
-        // Remove trailing commas before ] or }
-        jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
-        // Remove any markdown code fence artifacts
-        jsonText = jsonText.replace(/```json?\s*/g, '').replace(/```\s*/g, '');
-        parsedResult = JSON.parse(jsonText);
-      }
+      parsedResult = getStoryHelpers().extractJsonFromText(responseText);
     } catch (e) {
       log.warn(`⚠️  [BBOX-DETECT] Failed to parse response: ${e.message}`);
-      // Log more context around the error position
-      const errorMatch = e.message.match(/position (\d+)/);
-      if (errorMatch) {
-        const pos = parseInt(errorMatch[1]);
-        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const context = jsonMatch[0].substring(Math.max(0, pos - 50), pos + 50);
-          log.warn(`⚠️  [BBOX-DETECT] JSON context around error: ...${context}...`);
-        }
-      }
       log.debug(`⚠️  [BBOX-DETECT] Raw response (first 1000 chars): ${responseText.substring(0, 1000)}`);
 
       // Attempt to repair truncated JSON (e.g. from MAX_TOKENS finish reason)
@@ -1367,7 +1343,12 @@ async function detectAllBoundingBoxes(imageData, options = {}) {
       const [ymin, xmin, ymax, xmax] = box;
       // Handle both 0-1000 format (Gemini native) and 0-1 format (already normalized)
       const scale = (ymin > 1 || xmin > 1 || ymax > 1 || xmax > 1) ? 1000 : 1;
-      return [ymin / scale, xmin / scale, ymax / scale, xmax / scale];
+      return [
+        Math.max(0, Math.min(1, ymin / scale)),
+        Math.max(0, Math.min(1, xmin / scale)),
+        Math.max(0, Math.min(1, ymax / scale)),
+        Math.max(0, Math.min(1, xmax / scale))
+      ];
     };
 
     // Normalize all figures (now includes name and confidence from AI identification)
@@ -1523,12 +1504,7 @@ async function detectSubRegion(characterCrop, targetElement) {
     // Parse JSON response
     let parsedResult;
     try {
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        let jsonText = jsonMatch[0];
-        jsonText = jsonText.replace(/,(\s*[}\]])/g, '$1');
-        parsedResult = JSON.parse(jsonText);
-      }
+      parsedResult = getStoryHelpers().extractJsonFromText(responseText);
     } catch (e) {
       log.warn(`⚠️  [SUB-REGION] Failed to parse response: ${e.message}`);
       log.debug(`⚠️  [SUB-REGION] Raw response: ${responseText.substring(0, 500)}`);
@@ -7588,7 +7564,11 @@ Output JSON only:
     const usage = { inputTokens, outputTokens, model: modelId };
 
     try {
-      const result = JSON.parse(responseText);
+      const result = getStoryHelpers().extractJsonFromText(responseText);
+      if (!result) {
+        log.warn('⚠️ [INPAINT VERIFY] Could not extract JSON from response');
+        return { usage };
+      }
       return {
         fixed: result.fixed === true,
         confidence: parseFloat(result.confidence) || 0.5,
@@ -8716,10 +8696,8 @@ async function evaluateSingleBatch(imagesToCheck, checkType, options, batchInfo 
 
   // Parse JSON response
   try {
-    // Extract JSON from response (handle markdown code blocks)
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const result = JSON.parse(jsonMatch[0]);
+    const result = getStoryHelpers().extractJsonFromText(responseText);
+    if (result) {
       return { ...result, usage: { inputTokens, outputTokens, model: modelId }, evaluationPrompt: prompt, rawResponse: responseText };
     }
   } catch (parseError) {

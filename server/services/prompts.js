@@ -104,7 +104,10 @@ function fillTemplate(template, replacements) {
   if (!template) return '';
   let result = template;
   for (const [key, value] of Object.entries(replacements)) {
-    result = result.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+    if (value === undefined || value === null) continue;
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safeValue = String(value).replace(/\$/g, '$$$$');
+    result = result.replace(new RegExp(`\\{${escapedKey}\\}`, 'g'), safeValue);
   }
   return result;
 }

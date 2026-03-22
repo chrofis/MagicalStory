@@ -205,17 +205,17 @@ function extractJsonFromText(text) {
   for (let i = jsonStart; i < jsonToParse.length; i++) {
     const char = jsonToParse[i];
 
+    if (char === '\\' && inString && !escape) {
+      escape = true;
+      continue;
+    }
+
     if (escape) {
       escape = false;
       continue;
     }
 
-    if (char === '\\' && inString) {
-      escape = true;
-      continue;
-    }
-
-    if (char === '"' && !escape) {
+    if (char === '"') {
       inString = !inString;
       continue;
     }
@@ -1983,6 +1983,7 @@ function parseStoryPages(storyText) {
   const matches = [];
   while ((match = pageRegex.exec(storyText)) !== null) {
     const pageNum = parseInt(match[1] || match[2]);
+    if (isNaN(pageNum)) continue;
     matches.push({ index: match.index, pageNum, length: match[0].length });
   }
 
@@ -3802,9 +3803,11 @@ function convertClothingToCurrentFormat(clothingRequirements) {
  */
 function getPageText(storyText, pageNumber) {
   if (!storyText) return null;
+  const safeNum = parseInt(pageNumber, 10);
+  if (isNaN(safeNum)) return null;
 
   // Match page markers like "--- Page X ---" or "## Page X"
-  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const pageRegex = new RegExp(`(?:---|##)\\s*Page\\s+${safeNum}\\s*(?:---|\\n)([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
   const match = storyText.match(pageRegex);
 
   return match ? match[1].trim() : null;
@@ -3818,16 +3821,18 @@ function getPageText(storyText, pageNumber) {
  * @returns {string} Updated story text
  */
 function updatePageText(storyText, pageNumber, newText) {
-  if (!storyText) return `--- Page ${pageNumber} ---\n${newText}\n`;
+  const safeNum = parseInt(pageNumber, 10);
+  if (isNaN(safeNum)) return storyText || '';
+  if (!storyText) return `--- Page ${safeNum} ---\n${newText}\n`;
 
-  const pageRegex = new RegExp(`((?:---|##)\\s*Page\\s+${pageNumber}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
+  const pageRegex = new RegExp(`((?:---|##)\\s*Page\\s+${safeNum}\\s*(?:---|\\n))([\\s\\S]*?)(?=(?:---|##)\\s*Page\\s+\\d+|$)`, 'i');
   const match = storyText.match(pageRegex);
 
   if (match) {
     return storyText.replace(pageRegex, `$1\n${newText}\n`);
   } else {
     // Page doesn't exist, append it
-    return storyText + `\n--- Page ${pageNumber} ---\n${newText}\n`;
+    return storyText + `\n--- Page ${safeNum} ---\n${newText}\n`;
   }
 }
 
@@ -3908,6 +3913,9 @@ module.exports = {
   // Page text helpers
   getPageText,
   updatePageText,
+
+  // JSON extraction
+  extractJsonFromText,
 
   // Exposed for testing
   wrapUserInput
