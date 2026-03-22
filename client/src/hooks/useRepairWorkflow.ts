@@ -133,6 +133,7 @@ export interface UseRepairWorkflowReturn {
   // State
   workflowState: RepairWorkflowState;
   isRunning: boolean;
+  runningSteps: Set<string>;  // Which specific steps are currently in-progress
   resetWorkflow: () => void;
 
   // Step 1: Collect feedback
@@ -202,10 +203,15 @@ export function useRepairWorkflow({
   const abortControllerRef = useRef<AbortController | null>(null);
   const [isAborted, setIsAborted] = useState(false);
 
-  // Computed: is any step running
-  const isRunning = useMemo(() => {
-    return Object.values(workflowState.stepStatus).some(s => s === 'in-progress');
+  // Computed: which steps are running, and is anything running
+  const runningSteps = useMemo(() => {
+    const steps = new Set<string>();
+    for (const [step, status] of Object.entries(workflowState.stepStatus)) {
+      if (status === 'in-progress') steps.add(step);
+    }
+    return steps;
   }, [workflowState.stepStatus]);
+  const isRunning = runningSteps.size > 0;
 
   // Step control
   const startStep = useCallback((step: RepairWorkflowStep) => {
@@ -1297,6 +1303,7 @@ export function useRepairWorkflow({
   return {
     workflowState,
     isRunning,
+    runningSteps,
     resetWorkflow,
 
     collectFeedback,

@@ -368,6 +368,7 @@ export function RepairWorkflowPanel({
   const {
     workflowState,
     isRunning,
+    runningSteps,
     resetWorkflow,
     collectFeedback,
     toggleRedoPage,
@@ -400,6 +401,16 @@ export function RepairWorkflowPanel({
   // Full workflow progress state
   const [fullWorkflowProgress, setFullWorkflowProgress] = useState<{ step: string; detail: string } | null>(null);
   const [isRunningFullWorkflow, setIsRunningFullWorkflow] = useState(false);
+
+  // Per-step disable logic: full workflow locks everything, otherwise only block conflicting ops
+  // Re-evaluate, consistency check, and redo can all run in parallel (independent API calls)
+  // Character repair and pick-best need redo to be finished
+  const isStepBusy = (step: string) => runningSteps.has(step);
+  const isFullWorkflowBusy = isRunningFullWorkflow;
+  // Disable a button if full workflow is running OR this specific step is already running
+  const disableFor = (step: string) => isFullWorkflowBusy || isStepBusy(step);
+  // Disable if full workflow OR any step that conflicts with pick-best/character-repair
+  const disableForFinalSteps = isFullWorkflowBusy || runningSteps.has('redo-pages');
 
 
 
@@ -531,7 +542,7 @@ export function RepairWorkflowPanel({
           {isRunning && (
             <span className="flex items-center gap-1 text-xs text-blue-600">
               <Loader2 className="w-3 h-3 animate-spin" />
-              Running...
+              {runningSteps.size > 1 ? `${runningSteps.size} steps running...` : 'Running...'}
             </span>
           )}
           <button
@@ -558,7 +569,7 @@ export function RepairWorkflowPanel({
                 value={overrideQualityModel || ''}
                 onChange={(e) => setOverrideQualityModel(e.target.value || null)}
                 className="flex-1 appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                disabled={isRunning}
+                disabled={isFullWorkflowBusy}
               >
                 <option value="">Server Default (gemini-2.0-flash)</option>
                 <option value="gemini-2.0-flash">Gemini 2.0 Flash — fast ($0.005/eval)</option>
@@ -642,7 +653,7 @@ export function RepairWorkflowPanel({
 
                 <button
                   onClick={collectFeedback}
-                  disabled={isRunning}
+                  disabled={disableFor('collect-feedback')}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Search className="w-4 h-4" />
@@ -734,7 +745,7 @@ export function RepairWorkflowPanel({
                 <div className="flex gap-2">
                   <button
                     onClick={() => autoIdentifyRedoPages(REPAIR_DEFAULTS.scoreThreshold, REPAIR_DEFAULTS.issueThreshold)}
-                    disabled={isRunning || workflowState.stepStatus['collect-feedback'] !== 'completed'}
+                    disabled={disableFor('re-evaluate') || workflowState.stepStatus['collect-feedback'] !== 'completed'}
                     className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                   >
                     <Zap className="w-4 h-4" />
@@ -779,21 +790,21 @@ export function RepairWorkflowPanel({
 
                 <div className="space-y-1.5">
                   <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'fresh' ? 'bg-amber-50 border border-amber-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
-                    <input type="radio" name="redoMode" checked={redoMode === 'fresh'} onChange={() => setRedoMode('fresh')} disabled={isRunning} className="mt-0.5" />
+                    <input type="radio" name="redoMode" checked={redoMode === 'fresh'} onChange={() => setRedoMode('fresh')} disabled={isFullWorkflowBusy} className="mt-0.5" />
                     <div>
                       <span className="text-sm font-medium">Fresh generation</span>
                       <p className="text-xs text-gray-500">New generation from AI-corrected scene description</p>
                     </div>
                   </label>
                   <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'reference' ? 'bg-blue-50 border border-blue-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
-                    <input type="radio" name="redoMode" checked={redoMode === 'reference'} onChange={() => setRedoMode('reference')} disabled={isRunning} className="mt-0.5" />
+                    <input type="radio" name="redoMode" checked={redoMode === 'reference'} onChange={() => setRedoMode('reference')} disabled={isFullWorkflowBusy} className="mt-0.5" />
                     <div>
                       <span className="text-sm font-medium">Use original as reference</span>
                       <p className="text-xs text-gray-500">Passes current image to Gemini — preserves composition, fixes details</p>
                     </div>
                   </label>
                   <label className={`flex items-start gap-2 p-2 rounded-lg cursor-pointer transition-colors ${redoMode === 'blackout' ? 'bg-indigo-50 border border-indigo-300' : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'}`}>
-                    <input type="radio" name="redoMode" checked={redoMode === 'blackout'} onChange={() => setRedoMode('blackout')} disabled={isRunning} className="mt-0.5" />
+                    <input type="radio" name="redoMode" checked={redoMode === 'blackout'} onChange={() => setRedoMode('blackout')} disabled={isFullWorkflowBusy} className="mt-0.5" />
                     <div>
                       <span className="text-sm font-medium">Blackout issues</span>
                       <p className="text-xs text-gray-500">Blacks out broken areas in the image, forces AI to regenerate those regions</p>
@@ -806,7 +817,7 @@ export function RepairWorkflowPanel({
                     useOriginalAsReference: redoMode === 'reference',
                     blackoutIssues: redoMode === 'blackout',
                   })}
-                  disabled={isRunning || workflowState.redoPages.pageNumbers.length === 0}
+                  disabled={disableFor('redo-pages') || workflowState.redoPages.pageNumbers.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Play className="w-4 h-4" />
@@ -894,7 +905,7 @@ export function RepairWorkflowPanel({
                   {workflowState.redoResults.pagesCompleted.length > 0 ? (
                     <button
                       onClick={() => reEvaluatePages()}
-                      disabled={isRunning}
+                      disabled={disableFor('re-evaluate')}
                       className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                     >
                       <CheckCircle className="w-4 h-4" />
@@ -910,7 +921,7 @@ export function RepairWorkflowPanel({
                       if (coverImages?.backCover) pageNums.push(-3);
                       reEvaluatePages(pageNums);
                     }}
-                    disabled={isRunning}
+                    disabled={disableFor('re-evaluate')}
                     className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
                   >
                     <CheckCircle className="w-4 h-4" />
@@ -1100,7 +1111,7 @@ export function RepairWorkflowPanel({
 
                 <button
                   onClick={() => runConsistencyCheck()}
-                  disabled={isRunning}
+                  disabled={disableFor('consistency-check')}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Users className="w-4 h-4" />
@@ -1252,7 +1263,7 @@ export function RepairWorkflowPanel({
                       setSelectedCharacterPages([]);
                     }}
                     className="w-full p-2 border rounded text-sm"
-                    disabled={isRunning}
+                    disabled={isFullWorkflowBusy}
                   >
                     <option value="">Choose a character...</option>
                     {charactersWithIssues.map(name => (
@@ -1273,7 +1284,7 @@ export function RepairWorkflowPanel({
                           const severePages = getPagesWithSevereIssuesForCharacter(selectedCharacter);
                           setSelectedCharacterPages(severePages);
                         }}
-                        disabled={isRunning || workflowState.stepStatus['consistency-check'] !== 'completed'}
+                        disabled={disableForFinalSteps || workflowState.stepStatus['consistency-check'] !== 'completed'}
                         className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
                         title="Auto-select pages with major/critical issues"
                       >
@@ -1297,7 +1308,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           {getPageName(scene.pageNumber)}
                         </button>
@@ -1315,7 +1326,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           Front Cover
                         </button>
@@ -1333,7 +1344,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           Initial Page
                         </button>
@@ -1351,7 +1362,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           Back Cover
                         </button>
@@ -1397,7 +1408,7 @@ export function RepairWorkflowPanel({
                         }
                       }}
                       className="w-full appearance-none bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                      disabled={isRunning}
+                      disabled={isFullWorkflowBusy}
                     >
                       <optgroup label="Image Generation">
                         <option value="">Server Default</option>
@@ -1463,7 +1474,7 @@ export function RepairWorkflowPanel({
                       await onRefreshStory();
                     }
                   }}
-                  disabled={isRunning || !selectedCharacter || selectedCharacterPages.length === 0}
+                  disabled={disableForFinalSteps || !selectedCharacter || selectedCharacterPages.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                 >
                   <Wrench className="w-4 h-4" />
@@ -1654,7 +1665,7 @@ export function RepairWorkflowPanel({
                     <label className="text-sm font-medium">Select Pages for Grid Repair:</label>
                     <button
                       onClick={() => setSelectedArtifactPages(pagesWithArtifacts)}
-                      disabled={isRunning || pagesWithArtifacts.length === 0}
+                      disabled={disableForFinalSteps || pagesWithArtifacts.length === 0}
                       className="flex items-center gap-1 px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
                       title="Auto-select all pages with artifact issues"
                     >
@@ -1679,7 +1690,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           {getPageName(page)}
                         </button>
@@ -1706,7 +1717,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           {getPageName(scene.pageNumber)}
                         </button>
@@ -1724,7 +1735,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           Front Cover
                         </button>
@@ -1742,7 +1753,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           Initial Page
                         </button>
@@ -1760,7 +1771,7 @@ export function RepairWorkflowPanel({
                               ? 'bg-amber-100 border-amber-300 text-amber-700'
                               : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
                           }`}
-                          disabled={isRunning}
+                          disabled={isFullWorkflowBusy}
                         >
                           Back Cover
                         </button>
@@ -1776,7 +1787,7 @@ export function RepairWorkflowPanel({
                       await onRefreshStory();
                     }
                   }}
-                  disabled={isRunning || selectedArtifactPages.length === 0}
+                  disabled={disableForFinalSteps || selectedArtifactPages.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Grid className="w-4 h-4" />
@@ -1819,7 +1830,7 @@ export function RepairWorkflowPanel({
                                   : prev.filter(c => c !== coverType)
                               );
                             }}
-                            disabled={isRunning}
+                            disabled={isFullWorkflowBusy}
                             className="rounded text-amber-600"
                           />
                           <span className="text-sm">{labels[coverType]}</span>
@@ -1836,7 +1847,7 @@ export function RepairWorkflowPanel({
                       await onRefreshStory();
                     }
                   }}
-                  disabled={isRunning || selectedCovers.length === 0}
+                  disabled={disableForFinalSteps || selectedCovers.length === 0}
                   className="flex items-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
                 >
                   <Image className="w-4 h-4" />
