@@ -911,35 +911,37 @@ export function RepairWorkflowPanel({
                             <div className="text-xs font-medium text-green-800 mb-1">
                               {getPageName(page)} (v{workflowState.redoResults.newVersions[page] ?? '?'})
                             </div>
-                            {detail && (detail.previousImage || detail.newImage) ? (
-                              <div className="flex gap-2 items-end">
-                                {detail.previousImage && (
-                                  <div className="text-center">
-                                    <img src={detail.previousImage.startsWith('data:') ? detail.previousImage : `data:image/jpeg;base64,${detail.previousImage}`}
-                                         className="w-16 h-16 object-cover rounded cursor-pointer hover:ring-2 hover:ring-gray-400"
-                                         onClick={() => setGridLightbox(detail.previousImage!.startsWith('data:') ? detail.previousImage! : `data:image/jpeg;base64,${detail.previousImage}`)} />
-                                    <span className="text-[10px] text-gray-500">Before{detail.previousScore != null ? ` (${detail.previousScore})` : ''}</span>
+                            {detail && (detail.previousImage || detail.newImage) ? (() => {
+                              const beforeSrc = detail.previousImage ? (detail.previousImage.startsWith('data:') ? detail.previousImage : `data:image/jpeg;base64,${detail.previousImage}`) : null;
+                              const afterSrc = detail.newImage ? (detail.newImage.startsWith('data:') ? detail.newImage : `data:image/jpeg;base64,${detail.newImage}`) : null;
+                              const blackoutSrc = detail.blackoutImage ? (detail.blackoutImage.startsWith('data:') ? detail.blackoutImage : `data:image/jpeg;base64,${detail.blackoutImage}`) : null;
+                              const canCompare = beforeSrc && afterSrc;
+                              return (
+                                <div className="space-y-1">
+                                  <div
+                                    className={`grid ${beforeSrc && afterSrc ? 'grid-cols-2' : 'grid-cols-1'} gap-1 ${canCompare ? 'cursor-pointer hover:opacity-90' : ''} rounded border border-gray-200 overflow-hidden`}
+                                    onClick={canCompare ? () => setGridLightbox(`COMPARE:${beforeSrc}|||${afterSrc}`) : undefined}
+                                  >
+                                    {beforeSrc && (
+                                      <div className="relative">
+                                        <img src={beforeSrc} alt="Before" className="w-full h-20 object-cover" />
+                                        <span className="absolute top-0.5 left-0.5 text-[9px] bg-red-600 text-white px-1 py-0.5 rounded font-medium">Before{detail.previousScore != null ? ` ${detail.previousScore}` : ''}</span>
+                                      </div>
+                                    )}
+                                    {afterSrc && (
+                                      <div className="relative">
+                                        <img src={afterSrc} alt="After" className="w-full h-20 object-cover" />
+                                        <span className="absolute top-0.5 left-0.5 text-[9px] bg-green-600 text-white px-1 py-0.5 rounded font-medium">After{detail.newScore != null ? ` ${detail.newScore}` : ''}</span>
+                                      </div>
+                                    )}
                                   </div>
-                                )}
-                                {detail.blackoutImage && (
-                                  <div className="text-center">
-                                    <img src={detail.blackoutImage.startsWith('data:') ? detail.blackoutImage : `data:image/jpeg;base64,${detail.blackoutImage}`}
-                                         className="w-16 h-16 object-cover rounded cursor-pointer border-2 border-indigo-300 hover:ring-2 hover:ring-indigo-400"
-                                         onClick={() => setGridLightbox(detail.blackoutImage!.startsWith('data:') ? detail.blackoutImage! : `data:image/jpeg;base64,${detail.blackoutImage}`)} />
-                                    <span className="text-[10px] text-indigo-500">Blackout</span>
-                                  </div>
-                                )}
-                                <span className="text-gray-400 self-center">&rarr;</span>
-                                {detail.newImage && (
-                                  <div className="text-center">
-                                    <img src={detail.newImage.startsWith('data:') ? detail.newImage : `data:image/jpeg;base64,${detail.newImage}`}
-                                         className="w-16 h-16 object-cover rounded cursor-pointer hover:ring-2 hover:ring-green-400"
-                                         onClick={() => setGridLightbox(detail.newImage!.startsWith('data:') ? detail.newImage! : `data:image/jpeg;base64,${detail.newImage}`)} />
-                                    <span className="text-[10px] text-green-600">After{detail.newScore != null ? ` (${detail.newScore})` : ''}</span>
-                                  </div>
-                                )}
-                              </div>
-                            ) : null}
+                                  {blackoutSrc && (
+                                    <img src={blackoutSrc} alt="Blackout" className="w-10 h-10 object-cover rounded cursor-pointer border border-indigo-300 hover:ring-2 hover:ring-indigo-400"
+                                         onClick={() => setGridLightbox(blackoutSrc)} />
+                                  )}
+                                </div>
+                              );
+                            })() : null}
                           </div>
                         );
                       })}
