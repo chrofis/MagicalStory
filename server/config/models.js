@@ -77,7 +77,9 @@ const MODEL_DEFAULTS = {
   coverImage: 'grok-imagine',                // Cover images ($0.02/image)
 
   // Quality evaluation models
-  qualityEval: 'gemini-2.5-flash',     // Image quality evaluation (needs 2.5 for reliable character identification + bbox)
+  // NOTE: quality eval uses Gemini REST API directly (not generic text model caller)
+  // Switching to Grok requires adding Grok vision API support to evaluateImageQuality()
+  qualityEval: 'gemini-2.5-flash',     // Image quality evaluation (2.5 for character identification)
   bboxDetection: 'gemini-2.5-flash',   // Bounding box detection (needs 2.5 for spatial precision)
 
   // Utility models (inspection, visual bible, etc.)
