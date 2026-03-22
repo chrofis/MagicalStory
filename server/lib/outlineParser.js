@@ -1436,7 +1436,15 @@ class UnifiedStoryParser {
             for (const char of sceneData.characters) {
               if (char.name && char.clothing) {
                 const baseName = char.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                characterClothing[baseName] = char.clothing.toLowerCase();
+                // Normalize: only 4 valid categories
+                const raw = char.clothing.toLowerCase();
+                const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
+                let clothing = 'standard';
+                if (costumedMatch) clothing = `costumed:${costumedMatch[1].trim()}`;
+                else if (raw.includes('costumed')) clothing = 'costumed';
+                else if (raw.includes('winter')) clothing = 'winter';
+                else if (raw.includes('summer')) clothing = 'summer';
+                characterClothing[baseName] = clothing;
                 characters.push(char.name);
               }
             }

@@ -35,12 +35,15 @@ const MAX_GRID_CELLS = 12;    // Maximum cells per grid (4x3)
  */
 function normalizeClothingCategory(category) {
   if (!category) return 'standard';
-  // Strip any bracket notation (e.g., [CLO001], [CLO002])
-  let normalized = category.replace(/\s*\[[A-Z]+\d+\]\s*/g, '').trim();
-  if (!normalized) return 'standard';
-  // Normalize common aliases
-  if (normalized === 'normal') normalized = 'standard';
-  return normalized;
+  const raw = category.replace(/\s*\[[A-Z]+\d+\]\s*/g, '').trim().toLowerCase();
+  if (!raw) return 'standard';
+  // Extract costumed type — handles costumed:type, costumed:costumed:type, etc.
+  const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
+  if (costumedMatch) return `costumed:${costumedMatch[1].trim()}`;
+  if (raw.includes('costumed')) return 'costumed'; // bare "costumed" without type
+  if (raw.includes('winter')) return 'winter';
+  if (raw.includes('summer')) return 'summer';
+  return 'standard';
 }
 
 /**

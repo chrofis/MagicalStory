@@ -570,7 +570,14 @@ function extractSceneMetadata(sceneDescription) {
       if (char.name) {
         characterNames.push(char.name);
         if (char.clothing) {
-          characterClothing[char.name] = char.clothing;
+          // Normalize: only 4 valid categories — extract from any AI format
+          const raw = char.clothing.toLowerCase();
+          const costumedMatch = raw.match(/costumed:(?!costumed)(.+)/);
+          if (costumedMatch) characterClothing[char.name] = `costumed:${costumedMatch[1].trim()}`;
+          else if (raw.includes('costumed')) characterClothing[char.name] = 'costumed';
+          else if (raw.includes('winter')) characterClothing[char.name] = 'winter';
+          else if (raw.includes('summer')) characterClothing[char.name] = 'summer';
+          else characterClothing[char.name] = 'standard';
         }
         if (char.position) {
           characterPositions[char.name] = char.position;
