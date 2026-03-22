@@ -484,8 +484,10 @@ router.get('/:id/metadata', authenticateToken, async (req, res) => {
           if (isActiveVersion) {
             scene.qualityScore = row.quality_score;
             scene.generatedAt = row.generated_at;
-            if (versionMeta.bboxDetection) {
-              scene.bboxDetection = versionMeta.bboxDetection;
+            // Use version-specific bbox if available, fall back to scene-level (v0) bbox
+            const bbox = versionMeta.bboxDetection || sceneBboxByPage.get(row.page_number);
+            if (bbox) {
+              scene.bboxDetection = bbox;
             }
           }
         } else {
