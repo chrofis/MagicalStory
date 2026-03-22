@@ -2265,7 +2265,7 @@ export function StoryDisplay({
                       {(entry.faceMatchScore != null || entry.clothingMatchScore != null) && (
                         <div className={`p-2 rounded text-xs ${
                           (entry.faceMatchScore == null || entry.faceMatchScore >= 5) && (entry.clothingMatchScore == null || entry.clothingMatchScore >= 5)
-                            ? 'bg-emerald-50 border border-emerald-200'
+                            ? 'bg-indigo-50 border border-indigo-200'
                             : 'bg-amber-50 border border-amber-200'
                         }`}>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -2408,7 +2408,7 @@ export function StoryDisplay({
                       {entry.costumeEvaluation && (
                         <div className={`p-2 rounded text-xs ${
                           entry.costumeEvaluation.pass
-                            ? 'bg-emerald-50 border border-emerald-200'
+                            ? 'bg-indigo-50 border border-indigo-200'
                             : 'bg-amber-50 border border-amber-200'
                         }`}>
                           <div className="flex items-center gap-2">
@@ -3548,8 +3548,8 @@ export function StoryDisplay({
                         imageModel: improveImageModel || undefined
                       })}
                       disabled={isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits}
-                      className={`flex-1 bg-emerald-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
-                        isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
+                      className={`flex-1 bg-indigo-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
+                        isGenerating || improvingPages.has(-1) || regeneratingCovers.has('frontCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
                       }`}
                       title={language === 'de' ? 'KI verbessert das Bild automatisch' : language === 'fr' ? 'L\'IA améliore automatiquement' : 'AI improves automatically'}
                     >
@@ -3563,7 +3563,7 @@ export function StoryDisplay({
                       <button
                         onClick={() => setImproveModelsPage(improveModelsPage === -1 ? null : -1)}
                         disabled={isGenerating || improvingPages.has(-1)}
-                        className="bg-emerald-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-emerald-700 disabled:opacity-50"
+                        className="bg-indigo-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-indigo-700 disabled:opacity-50"
                       >
                         ▾
                       </button>
@@ -3571,14 +3571,14 @@ export function StoryDisplay({
                   </div>
                 )}
                 {improveModelsPage === -1 && developerMode && (
-                  <div className="flex gap-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs w-full">
-                    <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-emerald-300 text-xs">
+                  <div className="flex gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs w-full">
+                    <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
                       <option value="">Scene: Default</option>
                       <option value="claude-sonnet">Claude Sonnet</option>
                       <option value="grok-4-fast">Grok 4 Fast</option>
                       <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
                     </select>
-                    <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-emerald-300 text-xs">
+                    <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
                       <option value="">Image: Default</option>
                       <option value="grok-imagine">Grok Imagine</option>
                       <option value="grok-imagine-pro">Grok Pro</option>
@@ -3807,19 +3807,47 @@ export function StoryDisplay({
             {(_onRegenerateCover || onImproveImage) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {onImproveImage && (
-                  <button
-                    onClick={() => handleImproveImage(-2)}
-                    disabled={isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
-                    className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
-                    }`}
-                  >
-                    {improvingPages.has(-2) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
-                    ) : (
-                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                  <div className="flex-1 flex gap-0.5">
+                    <button
+                      onClick={() => handleImproveImage(-2, {
+                        sceneModel: improveSceneModel || undefined,
+                        imageModel: improveImageModel || undefined
+                      })}
+                      disabled={isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits}
+                      className={`flex-1 bg-indigo-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
+                        isGenerating || improvingPages.has(-2) || regeneratingCovers.has('initialPage') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      }`}
+                    >
+                      {improvingPages.has(-2) ? (
+                        <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                      ) : (
+                        <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                      )}
+                    </button>
+                    {developerMode && (
+                      <button
+                        onClick={() => setImproveModelsPage(improveModelsPage === -2 ? null : -2)}
+                        disabled={isGenerating || improvingPages.has(-2)}
+                        className="bg-indigo-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-indigo-700 disabled:opacity-50"
+                      >▾</button>
                     )}
-                  </button>
+                  </div>
+                )}
+                {improveModelsPage === -2 && developerMode && (
+                  <div className="flex gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs w-full">
+                    <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                      <option value="">Scene: Default</option>
+                      <option value="claude-sonnet">Claude Sonnet</option>
+                      <option value="grok-4-fast">Grok 4 Fast</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    </select>
+                    <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                      <option value="">Image: Default</option>
+                      <option value="grok-imagine">Grok Imagine</option>
+                      <option value="grok-imagine-pro">Grok Pro</option>
+                      <option value="gemini-2.5-flash-image">Gemini Flash</option>
+                    </select>
+                  </div>
                 )}
                 {_onRegenerateCover && (
                   <button
@@ -4106,20 +4134,48 @@ export function StoryDisplay({
                           <div className="mt-3 space-y-2">
                             <div className="flex flex-wrap gap-2 items-center">
                               {onImproveImage && (
-                                <button
-                                  onClick={() => handleImproveImage(pageNumber)}
-                                  disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
-                                  className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
-                                  }`}
-                                  title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
-                                >
-                                  {improvingPages.has(pageNumber) ? (
-                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
-                                  ) : (
-                                    <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                <div className="flex-1 flex gap-0.5">
+                                  <button
+                                    onClick={() => handleImproveImage(pageNumber, {
+                                      sceneModel: improveSceneModel || undefined,
+                                      imageModel: improveImageModel || undefined
+                                    })}
+                                    disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
+                                      isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    }`}
+                                    title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
+                                  >
+                                    {improvingPages.has(pageNumber) ? (
+                                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
+                                    ) : (
+                                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                    )}
+                                  </button>
+                                  {developerMode && (
+                                    <button
+                                      onClick={() => setImproveModelsPage(improveModelsPage === pageNumber ? null : pageNumber)}
+                                      disabled={isGenerating || improvingPages.has(pageNumber)}
+                                      className="bg-indigo-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-indigo-700 disabled:opacity-50"
+                                    >▾</button>
                                   )}
-                                </button>
+                                </div>
+                              )}
+                              {improveModelsPage === pageNumber && developerMode && (
+                                <div className="flex gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs w-full">
+                                  <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                                    <option value="">Scene: Default</option>
+                                    <option value="claude-sonnet">Claude Sonnet</option>
+                                    <option value="grok-4-fast">Grok 4 Fast</option>
+                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                  </select>
+                                  <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                                    <option value="">Image: Default</option>
+                                    <option value="grok-imagine">Grok Imagine</option>
+                                    <option value="grok-imagine-pro">Grok Pro</option>
+                                    <option value="gemini-2.5-flash-image">Gemini Flash</option>
+                                  </select>
+                                </div>
                               )}
                               {onRegenerateImage && (
                                 <button
@@ -4660,20 +4716,48 @@ export function StoryDisplay({
                           <div className="mt-3 space-y-2">
                             <div className="flex flex-wrap gap-2 items-center">
                               {onImproveImage && (
-                                <button
-                                  onClick={() => handleImproveImage(pageNumber)}
-                                  disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
-                                  className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                                    isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
-                                  }`}
-                                  title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
-                                >
-                                  {improvingPages.has(pageNumber) ? (
-                                    <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
-                                  ) : (
-                                    <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                <div className="flex-1 flex gap-0.5">
+                                  <button
+                                    onClick={() => handleImproveImage(pageNumber, {
+                                      sceneModel: improveSceneModel || undefined,
+                                      imageModel: improveImageModel || undefined
+                                    })}
+                                    disabled={isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits}
+                                    className={`flex-1 bg-indigo-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
+                                      isGenerating || improvingPages.has(pageNumber) || regeneratingPages.has(pageNumber) || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                                    }`}
+                                    title={language === 'de' ? 'KI analysiert das Bild und verbessert es automatisch' : language === 'fr' ? 'L\'IA analyse et améliore l\'image automatiquement' : 'AI analyzes the image and improves it automatically'}
+                                  >
+                                    {improvingPages.has(pageNumber) ? (
+                                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : language === 'fr' ? 'Amélioration...' : 'Improving...'}</>
+                                    ) : (
+                                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                                    )}
+                                  </button>
+                                  {developerMode && (
+                                    <button
+                                      onClick={() => setImproveModelsPage(improveModelsPage === pageNumber ? null : pageNumber)}
+                                      disabled={isGenerating || improvingPages.has(pageNumber)}
+                                      className="bg-indigo-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-indigo-700 disabled:opacity-50"
+                                    >▾</button>
                                   )}
-                                </button>
+                                </div>
+                              )}
+                              {improveModelsPage === pageNumber && developerMode && (
+                                <div className="flex gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs w-full">
+                                  <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                                    <option value="">Scene: Default</option>
+                                    <option value="claude-sonnet">Claude Sonnet</option>
+                                    <option value="grok-4-fast">Grok 4 Fast</option>
+                                    <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                                  </select>
+                                  <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                                    <option value="">Image: Default</option>
+                                    <option value="grok-imagine">Grok Imagine</option>
+                                    <option value="grok-imagine-pro">Grok Pro</option>
+                                    <option value="gemini-2.5-flash-image">Gemini Flash</option>
+                                  </select>
+                                </div>
                               )}
                               {onRegenerateImage && (
                                 <button
@@ -5144,19 +5228,47 @@ export function StoryDisplay({
             {(_onRegenerateCover || onImproveImage) && (
               <div className="mt-3 flex flex-wrap gap-2">
                 {onImproveImage && (
-                  <button
-                    onClick={() => handleImproveImage(-3)}
-                    disabled={isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
-                    className={`flex-1 bg-emerald-500 text-white px-3 py-2 rounded-lg flex items-center justify-center gap-2 text-sm font-semibold ${
-                      isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-600'
-                    }`}
-                  >
-                    {improvingPages.has(-3) ? (
-                      <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
-                    ) : (
-                      <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                  <div className="flex-1 flex gap-0.5">
+                    <button
+                      onClick={() => handleImproveImage(-3, {
+                        sceneModel: improveSceneModel || undefined,
+                        imageModel: improveImageModel || undefined
+                      })}
+                      disabled={isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits}
+                      className={`flex-1 bg-indigo-500 text-white px-3 py-2 ${developerMode ? 'rounded-l-lg' : 'rounded-lg'} flex items-center justify-center gap-2 text-sm font-semibold ${
+                        isGenerating || improvingPages.has(-3) || regeneratingCovers.has('backCover') || !hasEnoughCredits ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-600'
+                      }`}
+                    >
+                      {improvingPages.has(-3) ? (
+                        <><Loader size={14} className="animate-spin" /> {language === 'de' ? 'Verbessere...' : 'Improving...'}</>
+                      ) : (
+                        <><Sparkles size={14} /> {language === 'de' ? 'Verbessern' : language === 'fr' ? 'Améliorer' : 'Improve'}</>
+                      )}
+                    </button>
+                    {developerMode && (
+                      <button
+                        onClick={() => setImproveModelsPage(improveModelsPage === -3 ? null : -3)}
+                        disabled={isGenerating || improvingPages.has(-3)}
+                        className="bg-indigo-600 text-white px-1.5 py-2 rounded-r-lg text-xs hover:bg-indigo-700 disabled:opacity-50"
+                      >▾</button>
                     )}
-                  </button>
+                  </div>
+                )}
+                {improveModelsPage === -3 && developerMode && (
+                  <div className="flex gap-2 p-2 bg-indigo-50 border border-indigo-200 rounded-lg text-xs w-full">
+                    <select value={improveSceneModel} onChange={e => setImproveSceneModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                      <option value="">Scene: Default</option>
+                      <option value="claude-sonnet">Claude Sonnet</option>
+                      <option value="grok-4-fast">Grok 4 Fast</option>
+                      <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+                    </select>
+                    <select value={improveImageModel} onChange={e => setImproveImageModel(e.target.value)} className="flex-1 rounded border-indigo-300 text-xs p-1">
+                      <option value="">Image: Default</option>
+                      <option value="grok-imagine">Grok Imagine</option>
+                      <option value="grok-imagine-pro">Grok Pro</option>
+                      <option value="gemini-2.5-flash-image">Gemini Flash</option>
+                    </select>
+                  </div>
                 )}
                 {_onRegenerateCover && (
                   <button
