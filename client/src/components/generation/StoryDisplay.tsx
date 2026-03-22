@@ -884,12 +884,15 @@ export function StoryDisplay({
       // Handle double-nested: {scene: {scene: {imageSummary}}}
       } else if (obj.scene && typeof obj.scene === 'object') {
         const outerScene = obj.scene as Record<string, unknown>;
-        const sceneData = (outerScene.scene && typeof outerScene.scene === 'object' ? outerScene.scene : outerScene) as { translatedSummary?: string; imageSummary?: string };
-        const summary = sceneData.translatedSummary || sceneData.imageSummary;
+        const sceneData = (outerScene.scene && typeof outerScene.scene === 'object' ? outerScene.scene : outerScene) as { translatedSummary?: string; imageSummary?: string; description?: string };
+        const summary = sceneData.translatedSummary || sceneData.imageSummary || sceneData.description;
         if (summary) {
           return summary;
         }
         desc = JSON.stringify(fullDescription);
+      // Format 3: Flat JSON — {description: "...", characters: [...]} (new unified format, no scene wrapper)
+      } else if (obj.description && typeof obj.description === 'string') {
+        return obj.description as string;
       } else {
         desc = JSON.stringify(fullDescription);
       }
@@ -913,12 +916,11 @@ export function StoryDisplay({
             }
           }
         }
-        // Format 2: Scene JSON — {scene: {translatedSummary?, imageSummary}}
-        // Handle both single and double-nested: {scene: {imageSummary}} or {scene: {scene: {imageSummary}}}
-        const sceneData = parsed.scene?.scene || parsed.scene;
+        // Format 2: Scene JSON — {scene: {imageSummary}}, {scene: {scene: {imageSummary}}}, or flat {description: "..."}
+        const sceneData = parsed.scene?.scene || parsed.scene || parsed;
         if (sceneData) {
-          const summary = sceneData.translatedSummary || sceneData.imageSummary;
-          if (summary) return summary;
+          const summary = sceneData.translatedSummary || sceneData.imageSummary || sceneData.description;
+          if (summary && typeof summary === 'string') return summary;
         }
       } catch {
         // Not valid JSON, continue with original string

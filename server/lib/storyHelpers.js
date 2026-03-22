@@ -613,8 +613,8 @@ function extractSceneMetadata(sceneDescription) {
       thinking: parsed.thinking || null,
       // Extract translated summary for display in user's language
       translatedSummary: parsedData.translatedSummary || null,
-      // Extract image summary (English) for reference
-      imageSummary: parsedData.imageSummary || null,
+      // Extract image summary (English) — new format uses 'description', old uses 'imageSummary'
+      imageSummary: parsedData.imageSummary || parsedData.description || null,
       // Landmark photo variant selection (for Swiss landmarks with multiple photos)
       landmarkVariant,
       // Store setting for reference
